@@ -77,6 +77,9 @@ enum InlineStop {
     /// `STRONG` or `STRIKEOUT`; or the end of the paragraph, or the `]` that
     /// closes the group the span stands in, if that comes first.
     Delim(&'static str),
+    /// Up to, not including, the byte at this offset: where the groups a sugar
+    /// body ends in begin.
+    Offset(usize),
 }
 
 struct CstParser<'a> {
@@ -731,9 +734,13 @@ impl<'a> CstParser<'a> {
         self.builder.start_node(K::SECTION_HEADING.into());
         self.bump_while(K::EQUAL);
         self.bump_while(K::WHITESPACE);
-        if Self::is_opener(self.current_kind())
-            || (self.current_kind() == Some(K::HASH) && self.id_follows(self.pos))
-        {
+        let full_form = Self::is_opener(self.current_kind())
+            || (self.current_kind() == Some(K::HASH) && self.id_follows(self.pos));
+        // A body with a title in it: text after white space, not a group or a comment.
+        let sugar = !full_form
+            && self.src.as_bytes().get(self.start_of(self.pos).wrapping_sub(1)).is_some_and(|b| *b == b' ' || *b == b'\t')
+            && !matches!(self.current_kind(), None | Some(K::NEWLINE | K::COMMENT));
+        if full_form {
             self.parse_groups(true);
             // Decorative trailing `=`, which may itself be followed by groups.
             loop {
@@ -746,10 +753,40 @@ impl<'a> CstParser<'a> {
                 self.parse_groups(false);
             }
         }
-        self.parse_inline(InlineStop::Line);
+        if sugar {
+            self.parse_sugar_tail();
+        } else {
+            self.parse_inline(InlineStop::Line);
+        }
         self.builder.finish_node();
         self.parse_body(level);
         self.builder.finish_node();
+    }
+
+    /// The rest of a bracket-less body (`= text`, `- text`): the text, and the
+    /// groups it ends in -- `#(id)`, `{value}`, `:connect` -- which the AST parser
+    /// finds with `find_trailing_connect`, and so does this, so the two cut the
+    /// line in the same place.
+    fn parse_sugar_tail(&mut self) {
+        let from = self.start_of(self.pos);
+        let mut cursor = tomet_lexer::Cursor::new(self.src);
+        cursor.set_pos(from);
+        match crate::element::find_trailing_connect(crate::dialect::Dialect::Document, &cursor) {
+            Some(at) if at > from => {
+                self.parse_inline(InlineStop::Offset(at));
+                let outer = std::mem::replace(&mut self.allow_connect, true);
+                self.parse_groups(false);
+                self.allow_connect = outer;
+                self.parse_inline(InlineStop::Line);
+            }
+            Some(_) => {
+                let outer = std::mem::replace(&mut self.allow_connect, true);
+                self.parse_groups(false);
+                self.allow_connect = outer;
+                self.parse_inline(InlineStop::Line);
+            }
+            None => self.parse_inline(InlineStop::Line),
+        }
     }
 
     fn parse_thematic_break(&mut self) {
@@ -848,30 +885,67 @@ impl<'a> CstParser<'a> {
         // trailing `:name(...)`/`:(...)`/`:{...}` -- immediately after
         // its closing bracket, nothing else there to claim it -- attaches
         // to the item itself, the same as any other sigil's groups do.
+        let sugar = self.list_item_is_sugar();
         self.parse_groups(false);
-        // The rest of the line -- plain trailing text for a full-form
-        // item, or the whole bracket-less sugar body -- must not let an
-        // inner element (`@link` in `- @link(ref:x) :{ id: b }`) steal a
-        // colon connect meant for the item: `connect_joins_the_element`
-        // depends on this staying `false` here.
-        let outer = std::mem::replace(&mut self.allow_connect, false);
-        self.parse_inline(InlineStop::Line);
-        self.allow_connect = outer;
-        // A `:connect` on the line after the item is the item's own.
-        let mut connected = false;
-        loop {
-            let k = self.skip_ws_from(self.pos);
-            if self.allow_connect && self.kind_at(k) == Some(K::COLON) && self.connect_follows(k) {
-                self.bump_while(K::WHITESPACE);
-                self.parse_connect();
-                connected = true;
-            } else {
-                break;
+        if sugar {
+            // `- text` and `- (marker) text`: the text, and the groups it ends in.
+            let outer = std::mem::replace(&mut self.allow_connect, false);
+            self.parse_sugar_tail();
+            self.allow_connect = outer;
+        } else {
+            // The rest of the line -- plain trailing text for a full-form
+            // item -- must not let an inner element (`@link` in
+            // `- @link(ref:x) :{ id: b }`) steal a colon connect meant for
+            // the item: `connect_joins_the_element` depends on this staying
+            // `false` here.
+            let outer = self.allow_connect;
+            // The combine notation `-@name(...)` is the one exception: that
+            // element is the item, and takes its own connects.
+            let combine = self.current_kind() == Some(K::AT)
+                && self.pos > 0
+                && self.kind_at(self.pos - 1) != Some(K::WHITESPACE);
+            if combine {
+                self.allow_connect = true;
+                self.try_parse_inline_element();
             }
+            self.allow_connect = false;
+            self.parse_inline(InlineStop::Line);
+            self.allow_connect = outer;
         }
-        if connected {
+        // A `:connect` on the line after the item is the item's own, with the
+        // groups that follow it on that line.
+        let k = self.skip_ws_from(self.pos);
+        if self.allow_connect && self.kind_at(k) == Some(K::COLON) && self.connect_follows(k) {
+            self.bump_while(K::WHITESPACE);
+            self.parse_groups(false);
             self.parse_inline(InlineStop::Line);
         }
+    }
+
+    /// Whether the item whose marker was just read is the bracket-less sugar
+    /// (`- text`, `- (marker) text`): not the combine notation `-@name`, and not
+    /// the full form, where a group opens on the marker (`- [ content ]`,
+    /// `- (marker)[ content ]`, `- {value}`, `- #(id)`).
+    fn list_item_is_sugar(&self) -> bool {
+        let opens_full = |i: usize| match self.kind_at(i) {
+            Some(K::L_BRACKET | K::L_BRACE | K::PIPE) => true,
+            Some(K::HASH) => self.id_follows(i),
+            _ => false,
+        };
+        let at = self.pos;
+        if self.kind_at(at) == Some(K::AT) && at > 0 && self.kind_at(at - 1) != Some(K::WHITESPACE) {
+            return false;
+        }
+        if opens_full(at) {
+            return false;
+        }
+        if self.kind_at(at) == Some(K::L_PAREN) {
+            return match self.group_end(at) {
+                Some(end) => !opens_full(self.skip_ws_from(end).min(self.tokens.len())),
+                None => true,
+            };
+        }
+        true
     }
 
     /// A fenced code block: it closes on a line whose leading run of backticks
@@ -951,6 +1025,12 @@ impl<'a> CstParser<'a> {
                 continue;
             }
             match stop {
+                InlineStop::Offset(at) => {
+                    if self.start_of(self.pos) >= at {
+                        break;
+                    }
+                    self.split_at(at);
+                }
                 InlineStop::Line if k == K::NEWLINE => {
                     self.bump();
                     break;
@@ -1367,20 +1447,12 @@ impl<'a> CstParser<'a> {
         if self.current_kind() == Some(K::IDENT) {
             self.bump();
         }
-        match self.current_kind() {
-            Some(K::L_PAREN) => self.parse_args_group(),
-            Some(K::L_BRACE) => self.parse_value_group(),
-            Some(K::L_BRACKET) => self.parse_content_group(),
-            _ => {}
-        }
-        // A connect's own id, if immediately adjacent -- claimed here,
-        // before control returns to the outer `parse_groups` loop, the
-        // same way `parse_groups` itself claims one for its own element.
-        let j = self.skip_ws_from(self.pos);
-        if self.kind_at(j) == Some(K::HASH) && self.id_follows(j) {
-            self.bump_while(K::WHITESPACE);
-            self.parse_id_group();
-        }
+        // The groups of a connect are an element's: `(args)`, `{value}` and
+        // `[content]` in any order, each once -- but not a sibling `:connect`,
+        // which stays for the loop this was called from.
+        let outer = std::mem::replace(&mut self.allow_connect, false);
+        self.parse_groups(false);
+        self.allow_connect = outer;
         self.builder.finish_node();
     }
 

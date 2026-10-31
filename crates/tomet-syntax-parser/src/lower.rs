@@ -21,6 +21,7 @@
 use crate::dialect::Dialect;
 use crate::element::{Groups, parse_hash_id, parse_paren_value, parse_value_group};
 use crate::error::{Error, Result};
+use crate::section::{merge_values, trim_trailing_equals};
 use crate::inline::{DELIMITERS, extend_merging, push_text, split_softbreaks, trim_edges};
 use crate::interp::parse_interpolation;
 use crate::value::eat_name;
@@ -264,17 +265,27 @@ fn text_of<'a>(src: &'a str, node: &SyntaxNode) -> (usize, &'a str) {
     (start, &src[start..end])
 }
 
-/// `---`: a run of dashes on a line of its own. A title (`---[ T ]---`) is not
-/// lowered yet.
+/// `---`: a run of dashes on a line of its own; or `---[ title ]---`, whose
+/// title is the content of the `hr` element.
 fn lower_thematic_break(src: &str, node: &SyntaxNode) -> Result<Block> {
-    if node.children().next().is_some() {
-        return Err(unsupported("a titled thematic break"));
-    }
     if node.children_with_tokens().any(|e| e.kind() == K::COMMENT) {
         return Err(unsupported("a comment after a thematic break"));
     }
-    let (start, text) = text_of(src, node);
-    let end = start + text.trim_end_matches(['\n', '\r']).len();
+    let (start, end) = range_of(node);
+    if let Some(content) = node.children().find(|n| n.kind() == K::CONTENT) {
+        let title = title_from_content(lower_content(src, &content)?)?;
+        // The span of a titled break runs through its line end.
+        let span = Span::new(start, end);
+        let mut hr = element_new(Name::bare("hr"))
+            .with_placement(Placement::Block)
+            .with_span(span);
+        hr.content = Some(vec![Block::Paragraph(Paragraph::new(title, span))]);
+        return Ok(Block::Element(hr));
+    }
+    if node.children().next().is_some() {
+        return Err(unsupported("a thematic break with something in it"));
+    }
+    let end = start + src[start..end].trim_end_matches(['\n', '\r']).len();
     Ok(Block::Element(
         element_new(Name::bare("hr"))
             .with_placement(Placement::Block)
@@ -420,6 +431,15 @@ fn lower_groups(src: &str, node: &SyntaxNode) -> Result<Groups> {
         let mut cur = cursor_at(src, start);
         match child.kind() {
             K::SIGIL | K::SECTION_HEADING => {}
+            // What a list item holds besides groups: its sublist and the inline
+            // nodes of its text, lowered by the item itself.
+            K::LIST
+            | K::INLINE_ELEMENT
+            | K::EMPHASIS
+            | K::STRONG
+            | K::STRIKEOUT
+            | K::CODE_SPAN
+            | K::AUTOLINK => {}
             K::ARGS => {
                 read.data.args = Some(parse_paren_value(DIALECT, &mut cur)?);
                 expect_end(&cur, end, "an args group")?;
@@ -433,6 +453,7 @@ fn lower_groups(src: &str, node: &SyntaxNode) -> Result<Groups> {
                 read.id = Some(parse_hash_id(&mut cur)?);
                 expect_end(&cur, end, "an id")?;
             }
+            K::CONNECT if is_merge_connect(&child) => merge_connect(src, &child, &mut read)?,
             K::CONNECT => read.connects.push(lower_connect(src, &child)?),
             other => return Err(unsupported(format!("{other:?} in an element's groups"))),
         }
@@ -526,44 +547,29 @@ fn title_from_content(mut blocks: Vec<Block>) -> Result<Vec<Inline>> {
     }
 }
 
-/// `== text`: the heading's text, when it is plain.
+/// `== text`: the heading's text, up to the groups it ends in.
 fn sugar_title(src: &str, heading: &SyntaxNode, level: usize) -> Result<Vec<Inline>> {
-    if heading.children().next().is_some() {
-        return Err(unsupported("a sugar title with groups"));
-    }
     if heading.children_with_tokens().any(|e| e.kind() == K::COMMENT) {
         return Err(unsupported("a comment in a heading"));
     }
     let (start, end) = range_of(heading);
-    let text = &src[start..end];
-    let text = text.trim_end_matches(['\n', '\r']);
-    let after = text[level..].trim_start();
+    let line_end = start + src[start..end].trim_end_matches(['\n', '\r']).len();
+    let after = src[start + level..line_end].trim_start();
     if after.is_empty() {
         return Ok(Vec::new());
     }
-    // The AST parser takes a trailing `(args)`, `{value}`, `#(id)` or `:connect`
-    // off the end of a sugar title, and the CST does not know them there yet.
-    // Until it does, a title that could end in one is not lowered.
-    if after.contains(['(', '{', '#', ':']) {
-        return Err(unsupported("a sugar title that may end in groups"));
-    }
-    let from = start + (text.len() - after.len());
-    let mut items = Vec::new();
-    split_softbreaks(&mut items, &src[from..start + text.len()], from, &[]);
-    Ok(trim_edges(items))
-}
-
-/// The offsets of the `\` of every `\;` in `src[start..end]` that opens a line.
-fn escaped_semicolons(src: &str, start: usize, end: usize) -> Vec<usize> {
-    let text = &src[start..end];
-    text.match_indices("\\;")
-        .map(|(i, _)| start + i)
-        .filter(|&at| {
-            let line = &src[..at];
-            let from = line.rfind('\n').map_or(0, |n| n + 1);
-            line[from..].chars().all(char::is_whitespace)
-        })
-        .collect()
+    let from = line_end - after.len();
+    // The text stops where the first of its trailing groups starts.
+    let to = heading
+        .children()
+        .filter(|n| matches!(n.kind(), K::ARGS | K::VALUE_DATA | K::ID_GROUP | K::CONNECT))
+        .map(|n| range_of(&n).0)
+        .filter(|&at| at >= from)
+        .min()
+        .unwrap_or(line_end);
+    let mut title = lower_inlines(src, heading, from, to)?;
+    trim_trailing_equals(&mut title);
+    Ok(title)
 }
 
 /// A list: its items, each with the sublist that follows it.
@@ -584,79 +590,121 @@ fn lower_list(src: &str, node: &SyntaxNode) -> Result<List> {
     Ok(list(ordered, items, first.union(&last)))
 }
 
-/// One item. Four shapes are lowered: `- text`, `- (marker) text`, the combine
-/// notation `-@name(...)[...] text`, and the full form `- [ content ] text`.
-/// An item that takes a `{value}`, an `#(id)` or a `:connect` is not lowered yet.
+/// One item. Its shapes: `- text`, `- (marker) text`, the combine notation
+/// `-@name(...)[...] text`, and the full form, where a group opens on the marker
+/// (`- [ content ] text`). The groups before the text are the marker's and the
+/// full form's; those after it are the ones a sugar body ends in.
 fn lower_list_item(src: &str, node: &SyntaxNode) -> Result<tomet_ast::ListItem> {
     let (start, _) = range_of(node);
     let sublist = match node.children().find(|n| n.kind() == K::LIST) {
         Some(sub) => Some(lower_list(src, &sub)?),
         None => None,
     };
-    let marker_end = start + 1 + usize::from(
-        node.children_with_tokens().nth(1).is_some_and(|e| e.kind() == K::DOT),
-    );
-    // The groups on the marker, and the element of the combine notation; the
-    // other nodes are inline content of the text.
-    let groups: Vec<SyntaxNode> = node
-        .children()
-        .filter(|n| match n.kind() {
-            K::ARGS | K::VALUE_DATA | K::CONTENT | K::ID_GROUP | K::CONNECT => true,
-            K::INLINE_ELEMENT => range_of(n).0 == marker_end,
-            _ => false,
-        })
-        .collect();
-    // The end of the item's own line, or where its sublist starts.
-    let line_end = {
-        let limit = sublist_start(node).unwrap_or_else(|| range_of(node).1);
-        let from = groups.iter().map(|n| range_of(n).1).max().unwrap_or(marker_end);
-        let within = &src[from.min(limit)..limit];
-        from.min(limit) + within.find(['\n', '\r']).unwrap_or(within.len())
+    let marker_end = start
+        + 1
+        + usize::from(
+            node.children_with_tokens()
+                .nth(1)
+                .is_some_and(|e| e.kind() == K::DOT),
+        );
+    let is_group = |n: &SyntaxNode| {
+        matches!(
+            n.kind(),
+            K::ARGS | K::VALUE_DATA | K::CONTENT | K::ID_GROUP | K::CONNECT
+        )
     };
 
-    let mut item = match groups.as_slice() {
-        // `- text`
-        [] => {
-            let content = sugar_content(src, node, marker_end, line_end)?;
-            list_item(None, content, None, None, None, Vec::new(), None, Span::new(start, line_end))
-        }
-        // `- (marker) text`
-        [args] if args.kind() == K::ARGS && !text_has_group_candidates(src, args, line_end) => {
-            let marker = lower_args(src, args)?;
-            let content = sugar_content(src, node, range_of(args).1, line_end)?;
-            list_item(
-                None,
-                content,
-                Some(marker),
-                None,
-                None,
-                Vec::new(),
-                None,
-                Span::new(start, line_end),
-            )
-        }
-        // `-@name(...) text`
-        [element] if element.kind() == K::INLINE_ELEMENT && range_of(element).0 == marker_end => {
-            let el = lower_element(src, element)?;
-            let mut content = el.content.unwrap_or_default();
-            append_trailing_text(src, node, &mut content, range_of(element).1, line_end)?;
-            tomet_ast::ListItem {
-                name: Some(el.name),
-                data: el.data,
-                content,
-                id: el.id,
-                connects: el.connects,
-                sublist: None,
-                span: Span::new(start, line_end),
+    // Walk the item's own children: the groups before its text, its text, and the
+    // groups after it.
+    let mut combine = None;
+    let mut leading: Vec<SyntaxNode> = Vec::new();
+    let mut trailing: Vec<SyntaxNode> = Vec::new();
+    let mut text_start = None;
+    for child in node.children_with_tokens().skip_while(|e| {
+        matches!(e, SyntaxElement::Token(t) if matches!(t.kind(), K::MINUS | K::DOT))
+    }) {
+        match child {
+            SyntaxElement::Token(t) if t.kind() == K::WHITESPACE => {}
+            SyntaxElement::Node(n) if n.kind() == K::LIST => break,
+            SyntaxElement::Node(n) if is_group(&n) => {
+                if text_start.is_none() {
+                    leading.push(n);
+                } else {
+                    trailing.push(n);
+                }
+            }
+            SyntaxElement::Node(n)
+                if n.kind() == K::INLINE_ELEMENT
+                    && range_of(&n).0 == marker_end
+                    && text_start.is_none() =>
+            {
+                combine = Some(n);
+            }
+            other => {
+                if text_start.is_none() {
+                    text_start = Some(usize::from(other.text_range().start()));
+                }
             }
         }
-        // `- [ content ] text`
-        [content] if content.kind() == K::CONTENT => {
-            let mut blocks = lower_content(src, content)?;
-            append_trailing_text(src, node, &mut blocks, range_of(content).1, line_end)?;
-            list_item(None, blocks, None, None, None, Vec::new(), None, Span::new(start, line_end))
+    }
+
+    // The end of the item's own line: past its groups, which may span lines.
+    let limit = sublist_start(node).unwrap_or_else(|| range_of(node).1);
+    let line_end = {
+        let from = node
+            .children()
+            .filter(is_group)
+            .chain(combine.clone())
+            .map(|n| range_of(&n).1)
+            .max()
+            .unwrap_or(marker_end)
+            .min(limit);
+        let within = &src[from..limit];
+        from + within.find(['\n', '\r']).unwrap_or(within.len())
+    };
+    let span = Span::new(start, line_end);
+
+    let mut item = if let Some(element) = combine {
+        if !leading.is_empty() || !trailing.is_empty() {
+            return Err(unsupported("a combine item with other groups"));
         }
-        _ => return Err(unsupported("a list item with these groups")),
+        let el = lower_element(src, &element)?;
+        let mut content = el.content.unwrap_or_default();
+        append_trailing_text(src, node, &mut content, range_of(&element).1, line_end)?;
+        tomet_ast::ListItem {
+            name: Some(el.name),
+            data: el.data,
+            content,
+            id: el.id,
+            connects: el.connects,
+            sublist: None,
+            span,
+        }
+    } else {
+        let read = lower_groups(src, node)?;
+        let full_form = leading.iter().any(|n| n.kind() != K::ARGS);
+        let attrs = read.data.value.map(|v| v.as_data());
+        let content = if full_form {
+            let mut blocks = read.content.unwrap_or_default();
+            let after = leading.iter().map(|n| range_of(n).1).max().unwrap_or(marker_end);
+            append_trailing_text(src, node, &mut blocks, after, line_end)?;
+            blocks
+        } else {
+            // The text, up to the groups it ends in.
+            let to = trailing.first().map_or(line_end, |n| range_of(n).0);
+            match text_start {
+                Some(from) if from < to => {
+                    let inlines = lower_inlines(src, node, from, to)?;
+                    if inlines.is_empty() {
+                        Vec::new()
+                    } else {
+                        vec![Block::Paragraph(Paragraph::new(inlines, Span::new(from, to)))]
+                    }
+                }
+                _ => Vec::new(),
+            }
+        };
+        list_item(None, content, read.data.args, attrs, read.id, read.connects, None, span)
     };
     item.sublist = sublist;
     Ok(item)
@@ -666,40 +714,6 @@ fn sublist_start(node: &SyntaxNode) -> Option<usize> {
     node.children()
         .find(|n| n.kind() == K::LIST)
         .map(|sub| range_of(&sub).0)
-}
-
-/// The `(marker)` of an item: a value, read by the AST parser's own grammar.
-fn lower_args(src: &str, args: &SyntaxNode) -> Result<Value> {
-    let (start, end) = range_of(args);
-    let mut cur = cursor_at(src, start);
-    let value = parse_paren_value(DIALECT, &mut cur)?;
-    expect_end(&cur, end, "an args group")?;
-    Ok(value)
-}
-
-/// After a marker group, text that could itself end in groups (`#(id)`, `{...}`,
-/// `:connect`) is read differently by the two parsers; it is not lowered yet.
-fn text_has_group_candidates(src: &str, after: &SyntaxNode, line_end: usize) -> bool {
-    src[range_of(after).1..line_end].contains(['(', '{', '#', ':'])
-}
-
-/// The text of a sugar item, `- text`, as the one paragraph it is. Text that
-/// could end in groups is not lowered yet.
-fn sugar_content(src: &str, node: &SyntaxNode, from: usize, line_end: usize) -> Result<Vec<Block>> {
-    let body = &src[from..line_end];
-    if body.contains(['(', '{', '#', ':']) {
-        return Err(unsupported("an item text that may end in groups"));
-    }
-    let lead = body.len() - body.trim_start().len();
-    let start = from + lead;
-    let content = lower_inlines(src, node, start, line_end)?;
-    if content.is_empty() {
-        return Ok(Vec::new());
-    }
-    Ok(vec![Block::Paragraph(Paragraph::new(
-        content,
-        Span::new(start, line_end),
-    ))])
 }
 
 /// What follows the groups of a full-form or combine item on its line is added
@@ -717,9 +731,6 @@ fn append_trailing_text(
     if start >= line_end {
         return Ok(());
     }
-    if body[lead..].contains(['(', '{', '#', ':']) {
-        return Err(unsupported("an item text that may end in groups"));
-    }
     let rest = lower_inlines(src, node, start, line_end)?;
     if rest.is_empty() {
         return Ok(());
@@ -734,4 +745,55 @@ fn append_trailing_text(
         _ => content.push(Block::Paragraph(Paragraph::new(rest, Span::new(start, line_end)))),
     }
     Ok(())
+}
+
+/// `:(args)` or `:{value}`: no name, so it is not a connect of its own but more
+/// of the owner's args or value.
+fn is_merge_connect(node: &SyntaxNode) -> bool {
+    !node
+        .children_with_tokens()
+        .filter_map(|e| e.into_token())
+        .any(|t| t.kind() == K::IDENT)
+}
+
+/// Merges the groups of a nameless `:` connect into `read`, as the AST parser does.
+fn merge_connect(src: &str, node: &SyntaxNode, read: &mut Groups) -> Result<()> {
+    for child in node.children() {
+        let (start, end) = range_of(&child);
+        let mut cur = cursor_at(src, start);
+        match child.kind() {
+            K::ARGS => {
+                let args = parse_paren_value(DIALECT, &mut cur)?;
+                expect_end(&cur, end, "an args group")?;
+                read.data.args = merge_values(read.data.args.as_ref(), Some(&args));
+            }
+            K::VALUE_DATA => {
+                let value = parse_value_group(DIALECT, &mut cur)?;
+                expect_end(&cur, end, "a value group")?;
+                let merged = match &read.data.value {
+                    Some(existing) if !existing.has_children() && !value.has_children() => {
+                        merge_values(Some(&existing.as_data()), Some(&value.as_data()))
+                            .map(tomet_ast::Group::from_map)
+                    }
+                    _ => None,
+                };
+                read.data.value = Some(merged.unwrap_or(value));
+            }
+            other => return Err(unsupported(format!("{other:?} in a nameless connect"))),
+        }
+    }
+    Ok(())
+}
+
+/// The offsets of the `\` of every `\;` in `src[start..end]` that opens a line.
+fn escaped_semicolons(src: &str, start: usize, end: usize) -> Vec<usize> {
+    let text = &src[start..end];
+    text.match_indices("\\;")
+        .map(|(i, _)| start + i)
+        .filter(|&at| {
+            let line = &src[..at];
+            let from = line.rfind('\n').map_or(0, |n| n + 1);
+            line[from..].chars().all(char::is_whitespace)
+        })
+        .collect()
 }

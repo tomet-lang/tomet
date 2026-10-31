@@ -16,7 +16,7 @@ use tomet_parser::{UNSUPPORTED, lower_top_level_blocks, parse_cst, parse_documen
 use tomet_tests::{corpus, read_fixture};
 
 /// How many top-level blocks of the fixtures lowering produces today.
-const MIN_LOWERED: usize = 166;
+const MIN_LOWERED: usize = 186;
 
 /// Small documents, each of which lowering must give exactly as `parse_document` does.
 const SMALL: &[&str] = &[
@@ -32,6 +32,8 @@ const SMALL: &[&str] = &[
     "\\;a\n",
     "a;b\nc\n",
     "---\n",
+    "---[ Title ]---\n",
+    "---[ A *title* ]---\n\ntext\n",
     "a\n\n----\n\nb\n",
     "```\ncode\n```\n",
     "```rust\nfn main() {}\n```\n",
@@ -71,6 +73,15 @@ const SMALL: &[&str] = &[
     "-@task()\n-@task()[content] text\n",
     "- [ body ] tail\n",
     "- [ body ]\n",
+    "- text #(i)\n",
+    "- text :{a: 1}\n",
+    "- (m) text :rule(r)\n",
+    "== title :rule(allow: x) {k: v}\n",
+    "== title ==\n",
+    "== T #(id)\n",
+    "- content\n  :(x: 1){y: 2}\n",
+    "-@task():(x: 1){y: 2}\n",
+    "-@task()[content]:rule(allow:list(card))\n",
     "::kind(config)\n",
     "::meta{ id: x, title: T }\n\n= T\n",
     "::kind(config, 2)\n::id(doc-a)\n",

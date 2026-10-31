@@ -663,7 +663,7 @@ fn into_connect(name: Name, read: Groups, span: Span) -> Result<Connect> {
 ///   lets it claim a colon connect for itself (`parse_sugar_body` always
 ///   parses its own content with `allow_colon_connect: false`), so this
 ///   check is cheap insurance there rather than load-bearing.
-fn find_trailing_connect(dialect: Dialect, cur: &Cursor) -> Option<usize> {
+pub(crate) fn find_trailing_connect(dialect: Dialect, cur: &Cursor) -> Option<usize> {
     let src = cur.src();
     let preceded_by_colon = |pos: usize| {
         let bytes = src.as_bytes();

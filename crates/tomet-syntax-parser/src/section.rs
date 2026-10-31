@@ -273,7 +273,7 @@ fn merge_values_inner(direct: &Value, connected: &Value) -> Value {
     }
 }
 
-fn trim_trailing_equals(inlines: &mut Vec<Inline>) {
+pub(crate) fn trim_trailing_equals(inlines: &mut Vec<Inline>) {
     if let Some(Inline::Text(t)) = inlines.last_mut() {
         let trimmed = t.value.trim_end();
         if trimmed.ends_with('=') {
