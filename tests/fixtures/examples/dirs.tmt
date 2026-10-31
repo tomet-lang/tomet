@@ -5,14 +5,14 @@
 
 @dir(src)
 [ ソースコード ]
-@file(src/Cargo.toml)
+;@file(src/Cargo.toml)
 [ パッケージコンフィグ ]
-@file(src/crates)
+;@file(src/crates)
 [ Crates ]
 
 @dir(apps)
 [ ソースコード ]
-@file(apps/Cargo.toml)
+;@file(apps/Cargo.toml)
 [ パッケージコンフィグ ]
-@file(apps/crates)
+;@file(apps/crates)
 [ Crates ]

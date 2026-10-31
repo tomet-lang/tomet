@@ -148,9 +148,8 @@ pub fn for_each_element_in_block(block: &Block, mut f: impl FnMut(&Element)) {
 /// Visits every element a reader would find by scanning only the top of the
 /// document, in document order: every `Block::Element`, and every
 /// `Inline::Element` sitting directly in a `Block::Paragraph`'s own content
-/// (an element joined into a paragraph by an explicit `\` continuation
-/// trigger is still at the top; something nested inside another element is
-/// not).
+/// (an element that shares its paragraph with other text is still at the
+/// top; something nested inside another element is not).
 ///
 /// This is the one place that decision lives. A caller that wants "the
 /// elements at the top of this document" should call this instead of walking

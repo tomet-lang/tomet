@@ -518,6 +518,42 @@ impl<'a> CstParser<'a> {
         self.kind_at(j).is_none_or(|k| k == K::NEWLINE)
     }
 
+    /// The `@` at `i` is the whole of its line (see [`Self::is_block_element_at`]):
+    /// does the line after it fold into it, as running text goes on across
+    /// lines? Not if that line is blank, ends the `[content]` or `|` run being
+    /// read, or starts a block (`;`, a list marker, a section, ...).
+    fn element_line_folds(&self, i: usize) -> bool {
+        let mut j = self.element_end(i);
+        while matches!(self.kind_at(j), Some(K::WHITESPACE | K::COMMENT)) {
+            j += 1;
+        }
+        if self.kind_at(j) != Some(K::NEWLINE) {
+            return false;
+        }
+        // A `|` opening the next line is the element's own content run: the
+        // line that matters is the one after the run.
+        let opener = self.skip_ws_from(j + 1);
+        if self.kind_at(opener) == Some(K::PIPE) {
+            match self.group_end(opener) {
+                Some(end) => j = end,
+                None => return false,
+            }
+            if self.kind_at(j) != Some(K::NEWLINE) {
+                return false;
+            }
+        }
+        let k = self.skip_ws_from(j + 1);
+        let past_run = self
+            .run_ends
+            .last()
+            .is_some_and(|&end| self.kind_at(k).is_some() && self.start_of(k) >= end);
+        let closes = self.in_bracket && self.kind_at(k) == Some(K::R_BRACKET);
+        !(past_run
+            || closes
+            || matches!(self.kind_at(k), None | Some(K::NEWLINE))
+            || self.block_starts_at(k))
+    }
+
     /// `=`-run at `pos` that opens a section: its level.
     fn section_level_at(&self, i: usize) -> Option<usize> {
         let n = self.run_len(i, K::EQUAL);
@@ -589,21 +625,16 @@ impl<'a> CstParser<'a> {
             Some(K::LT) => true,
             // A line-start `;` breaks the block; it is no block of its own.
             Some(K::SEMI) => true,
-            Some(K::AT | K::COLON) => self.is_block_element_at(i),
+            // An `@` element is not here: a line that starts with one is
+            // running text and folds into the paragraph. A `::` declaration
+            // is only ever a block.
+            Some(K::COLON) => self.is_block_element_at(i),
             _ => false,
         }
     }
 
     /// At a `NEWLINE` inside a paragraph: does the paragraph end here?
     fn paragraph_ends_after_newline(&self) -> bool {
-        // A trailing `\` continues the line.
-        let mut b = self.pos;
-        while b > 0 && self.kind_at(b - 1) == Some(K::WHITESPACE) {
-            b -= 1;
-        }
-        if b > 0 && self.kind_at(b - 1) == Some(K::TEXT_CHUNK) && self.text_at(b - 1) == "\\" {
-            return false;
-        }
         let i = self.skip_ws_from(self.pos + 1);
         matches!(self.kind_at(i), None | Some(K::NEWLINE)) || self.block_starts_at(i)
     }
@@ -659,7 +690,16 @@ impl<'a> CstParser<'a> {
             }
             K::MINUS if self.is_list_start_at(self.pos) => self.parse_list(),
             K::BACKTICK if self.is_code_block_start_at(self.pos) => self.parse_code_block(),
-            K::AT | K::COLON if self.is_block_element_at(self.pos) => self.parse_block_element(),
+            // An `@` element that is the whole of its line is a block, unless
+            // the next line folds into it; then the line is running text.
+            K::AT if self.is_block_element_at(self.pos) => {
+                if self.element_line_folds(self.pos) {
+                    self.parse_folded_element_paragraph()
+                } else {
+                    self.parse_block_element()
+                }
+            }
+            K::COLON if self.is_block_element_at(self.pos) => self.parse_block_element(),
             K::LT => self.parse_block_element(),
             _ => self.parse_paragraph(),
         }
@@ -708,6 +748,23 @@ impl<'a> CstParser<'a> {
         while matches!(self.current_kind(), Some(K::WHITESPACE | K::COMMENT)) {
             self.bump();
         }
+        self.builder.finish_node();
+    }
+
+    /// A paragraph that opens with an element that is the whole of its line, and
+    /// goes on with the lines that fold into it. The element is read as a block
+    /// element is -- it may take its groups from the next line -- but it is an
+    /// inline element of the paragraph.
+    fn parse_folded_element_paragraph(&mut self) {
+        self.builder.start_node(K::PARAGRAPH.into());
+        self.builder.start_node(K::INLINE_ELEMENT.into());
+        self.parse_sigil();
+        self.parse_groups(true);
+        while matches!(self.current_kind(), Some(K::WHITESPACE | K::COMMENT)) {
+            self.bump();
+        }
+        self.builder.finish_node();
+        self.parse_inline(InlineStop::Paragraph);
         self.builder.finish_node();
     }
 
@@ -1640,9 +1697,6 @@ mod tests {
 
     #[test]
     fn paragraph_continuation_and_breaks() {
-        // A trailing `\` keeps the paragraph going across a block-looking line.
-        let root = parse_cst("one \\\n= two\n");
-        assert_eq!(child_kinds(&root), [K::PARAGRAPH]);
         // A block start on the next line ends the paragraph without a blank.
         let root = parse_cst("text\n=[ S ]\n- a\n");
         assert_eq!(child_kinds(&root), [K::PARAGRAPH, K::SECTION]);

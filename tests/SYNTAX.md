@@ -824,6 +824,7 @@ Paragraph
       Paragraph
         Text "a"
   SoftBreak
+  Text "\\"
   Inline @link
     args    {target: "https://b.example"}
     content
@@ -845,6 +846,7 @@ Paragraph
     content
       Paragraph
         Text "a"
+  Text " \\"
   SoftBreak
   Inline @link
     args    {target: "https://b.example"}
@@ -869,6 +871,7 @@ Paragraph
       Paragraph
         Text "a"
   SoftBreak
+  Text "\\"
   Inline @link
     args    {target: "https://b.example"}
     content
@@ -897,13 +900,17 @@ Paragraph
     content
       Paragraph
         Text "a"
+  Text " \\"
   SoftBreak
+  Text "\\"
   Inline @link
     args    {target: "https://b.example"}
     content
       Paragraph
         Text "b"
+  Text " \\"
   SoftBreak
+  Text "\\"
   Inline @link
     args    {target: "https://c.example"}
     content
@@ -919,16 +926,18 @@ Paragraph
 ```
 
 ```
-Block  @link
-  args    {target: "https://a.example"}
-  content
-    Paragraph
-      Text "a"
-Block  @link
-  args    {target: "https://b.example"}
-  content
-    Paragraph
-      Text "b"
+Paragraph
+  Inline @link
+    args    {target: "https://a.example"}
+    content
+      Paragraph
+        Text "a"
+  SoftBreak
+  Inline @link
+    args    {target: "https://b.example"}
+    content
+      Paragraph
+        Text "b"
 ```
 
 ### パーサーは種類を知らずに `\` を解釈するので、既に解析済みのどんな `Block::Element`（水平線など）も同じように畳み込める。ただし `hr` は `required_shape` が常に `Block` なので、`tomet check` の `shape_mismatch` に引っかかる -- 稀にしか起きない、明示的な誤用でしかない
@@ -943,16 +952,9 @@ text
 ```
 Paragraph
   Text "text"
+Block  @hr
 Paragraph
-  Inline @hr
-  SoftBreak
-  Text "joined"
-```
-
-検証:
-
-```
-`hr` is a block element, but is written as an inline element; shape comes from position -- give it a line of its own, in block context
+  Text "\\joined"
 ```
 
 ### 継ぐ先が無い `\` は黙って消費される（構文エラーにはならない）
@@ -962,11 +964,13 @@ Paragraph
 ```
 
 ```
-Block  @link
-  args    {target: "https://a.example"}
-  content
-    Paragraph
-      Text "dangling"
+Paragraph
+  Text "\\"
+  Inline @link
+    args    {target: "https://a.example"}
+    content
+      Paragraph
+        Text "dangling"
 ```
 
 ## リスト

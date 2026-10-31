@@ -1,7 +1,7 @@
 //! Parsing for inline sequences, text normalization, and inline delimiters (`*em*`, `_em_`, `**strong**`, `__strong__`, `~~strikeout~~`).
 
 use crate::dialect::Dialect;
-use crate::element::{LineEnd, element_ends_line, is_element_start, parse_written};
+use crate::element::{is_element_start, parse_written};
 use crate::error::Result;
 use crate::interp::{is_interp_start, parse_interpolation};
 use crate::list::peek_list_marker;
@@ -103,53 +103,11 @@ pub(crate) fn parse_inline_seq<'a>(
                     }
                 }
                 if cur.peek() == Some('\n') {
-                    // A trailing `\` right before this newline is a
-                    // continuation marker -- possibly redundant, since
-                    // this run may already be open, in which case it is
-                    // this element's own trailing form of the same
-                    // marker `document.rs`'s generic `@`-element branch
-                    // never gets a chance to see or consume, because an
-                    // element already inside an open run is parsed with
-                    // no trailing-marker awareness at all. Either way it
-                    // must never show up as literal text: strip it from
-                    // what gets flushed, whether the run ends here or
-                    // continues.
-                    let pending = &cur.src()[text_start..cur.pos()];
-                    let trimmed = pending.trim_end_matches([' ', '\t']);
-                    if let Some(content) = trimmed.strip_suffix('\\') {
-                        let content_end = text_start + content.trim_end_matches([' ', '\t']).len();
-                        flush_text_upto(&mut items, cur, &mut text_start, content_end, pipe_cols);
-                        text_start = cur.pos();
-                    }
-
                     let mut look = *cur;
                     look.bump();
                     skip_inline_ws(&mut look);
-                    // A leading `\` on the next line is likewise
-                    // redundant here for the same reason -- fold it away
-                    // below the same way `|`'s own repeated marker never
-                    // becomes literal text.
-                    let redundant_leading = look.peek() == Some('\\') && !look.starts_with("\\;");
-                    if redundant_leading {
-                        look.bump();
-                        skip_inline_ws(&mut look);
-                    }
                     if paragraph_breaks_here(dialect, &look) {
                         break;
-                    }
-                    if redundant_leading {
-                        // Flush up to (and including, as a `SoftBreak`)
-                        // the newline, then silently skip the marker so
-                        // it never shows up as literal text either.
-                        let break_start = cur.pos();
-                        flush_text(&mut items, cur, &mut text_start, pipe_cols);
-                        cur.bump();
-                        skip_inline_ws(cur);
-                        cur.bump();
-                        skip_inline_ws(cur);
-                        push_soft_break(&mut items, cur.span_from(break_start));
-                        text_start = cur.pos();
-                        continue;
                     }
                 }
             }
@@ -177,9 +135,9 @@ pub(crate) fn parse_inline_seq<'a>(
                 // `element::parse_pipe_content` starts a new one), same as
                 // `End` ends the whole run -- this call only ever builds
                 // one paragraph's content, so both stop it the same way.
-                // In addition, if the next line starts a block element or
-                // a list item under the same pipe run, this paragraph ends here
-                // so the outer block parser can dispatch it.
+                // In addition, if the next line starts a list item, a section,
+                // a `;` or another block under the same pipe run, this paragraph
+                // ends here so the outer block parser can dispatch it.
                 if cur.peek() == Some('\n') {
                     match pipe_run_state(cur, cols)? {
                         PipeContinuation::Empty | PipeContinuation::End => break,
@@ -191,12 +149,7 @@ pub(crate) fn parse_inline_seq<'a>(
                                 look.bump();
                             }
                             skip_inline_ws(&mut look);
-                            if paragraph_breaks_here(dialect, &look)
-                                || (dialect.opens_element(look.peek())
-                                    && is_element_start(dialect, &look, true)
-                                    && element_ends_line(dialect, &look) == LineEnd::Bare)
-                                || (look.peek() == Some('$') && is_interp_start(&look))
-                            {
+                            if paragraph_breaks_here(dialect, &look) {
                                 break;
                             }
                         }
@@ -268,24 +221,10 @@ pub(crate) fn parse_inline_seq<'a>(
             text_start = cur.pos();
             continue;
         }
-        // The placement rule applies inside a content group as well: a
-        // line start there is block context, so an element that also ends
-        // its line stands as a block. That is what lets `@references[`
-        // hold entries on their own lines, while `@link(…)[x]` mid-line
-        // stays part of the running text.
-        //
-        // A paragraph is the exception, and the reason this depends on
-        // `stop` at all: its continuation lines are *inside* running text,
-        // so a line start there is not block context. Treating it as one
-        // is what used to tear a wrapped sentence into separate blocks.
-        //
-        // A leading `\` continuation trigger (`docs/spec/syntax.tmt`'s
-        // `##[ 継続 ]`) demotes the previous element -- still the last
-        // thing pushed to `items` at this point, nothing has flushed the
-        // gap between them yet -- from `Placement::Block` to `Inline`,
-        // joining it to what follows. Dangling (nothing before it, or it
-        // is already `Inline`) is a silent no-op, which also covers a
-        // redundant repeated marker.
+        // An element met while reading running text is part of it, whatever
+        // line it opens: it is `Placement::Inline`. What makes an element a
+        // block is `parse_block_seq` seeing it as the whole of its line, with
+        // nothing folding into it.
         // `\;` at the start of a line is a `;` that is text, not a block break.
         if cur.starts_with("\\;") && at_marker_line_start(cur) {
             flush_text(&mut items, cur, &mut text_start, pipe_cols);
@@ -294,46 +233,12 @@ pub(crate) fn parse_inline_seq<'a>(
             cur.bump();
             continue;
         }
-        if matches!(stop, Stop::Bracket(_)) && at_line_start(cur) && cur.peek() == Some('\\') {
-            if let Some(Inline::Element(prev)) = items.last_mut() {
-                prev.placement = Placement::Inline;
-            }
-            cur.bump();
-            skip_inline_ws(cur);
+        if dialect.opens_element(cur.peek()) && is_element_start(dialect, cur, false) {
+            flush_text(&mut items, cur, &mut text_start, pipe_cols);
+            let written = parse_written(dialect, cur, allow_colon_connect, &[])?;
+            items.push(written.with_placement(Placement::Inline).into_inline());
             text_start = cur.pos();
             continue;
-        }
-        if dialect.opens_element(cur.peek()) {
-            let block_context = match stop {
-                Stop::Bracket(_) => at_line_start(cur),
-                Stop::PipeRun { .. } => at_marked_line_start(cur),
-                _ => false,
-            };
-            if is_element_start(dialect, cur, block_context) {
-                let line_end = if block_context {
-                    element_ends_line(dialect, cur)
-                } else {
-                    LineEnd::No
-                };
-                // Join/isolate rule (`docs/spec/syntax.tmt`'s
-                // `##[ 継続 ]`): a bare element that opens its own line
-                // isolates by default (`Placement::Block`) the same way
-                // it does at the top level; only an explicit trailing
-                // `\` joins it to what follows.
-                flush_text(&mut items, cur, &mut text_start, pipe_cols);
-                let written = parse_written(dialect, cur, allow_colon_connect, &[])?;
-                if line_end == LineEnd::Continuation {
-                    crate::element::consume_trailing_continuation(cur);
-                }
-                let placement = if line_end == LineEnd::Bare {
-                    Placement::Block
-                } else {
-                    Placement::Inline
-                };
-                items.push(written.with_placement(placement).into_inline());
-                text_start = cur.pos();
-                continue;
-            }
         }
         if cur.peek() == Some('$') && is_interp_start(cur) {
             flush_text(&mut items, cur, &mut text_start, pipe_cols);
@@ -361,14 +266,11 @@ pub(crate) fn parse_inline_seq<'a>(
 /// Whether a paragraph ends right after the newline `look` is already
 /// positioned past, with inline whitespace also already skipped.
 ///
-/// This is the stopping condition for a run already open (from genuine
-/// prose, or from an explicit `\` continuation trigger --
-/// `docs/spec/syntax.tmt`'s `##[ 継続 ]`): a blank line, a heading, a list
-/// marker, a `;`, a comment, a thematic break, or a fenced code block all start
-/// something with its own identity, not more of this paragraph. It is not
-/// consulted to decide whether a fresh bare element joins what precedes
-/// it -- that is opt-in now, via the trigger, not a default this
-/// look-ahead governs.
+/// A blank line, a `;`, a heading, a list marker, a comment, a thematic
+/// break, or a fenced code block all start something with its own identity,
+/// not more of this paragraph. An element or an interpolation does not: a
+/// line that starts with one is running text like any other, and it is folded
+/// into the paragraph unless a `;` or a blank line says otherwise.
 pub(crate) fn paragraph_breaks_here(dialect: Dialect, look: &Cursor) -> bool {
     look.is_eof()
         || look.peek() == Some('\n')
@@ -621,31 +523,6 @@ pub(crate) fn pipe_run_state(cur: &Cursor, cols: &[usize]) -> Result<PipeContinu
         return Ok(PipeContinuation::Empty);
     }
     Ok(PipeContinuation::Content)
-}
-
-/// [`at_line_start`] for a `|` run: the markers are the line's left edge, not
-/// content, so an element standing after them is at a line start exactly as
-/// it would be inside brackets.
-///
-/// Without this the two spellings disagree about placement -- an element on
-/// its own line becomes a block inside `[ ]` and stayed inline inside a run
-/// -- which is the sort of quiet divergence `tests/src/pipe.rs` exists to
-/// refuse.
-pub(crate) fn at_marked_line_start(cur: &Cursor) -> bool {
-    let before = &cur.src()[..cur.pos()];
-    let line = match before.rfind(['\n', '\r']) {
-        Some(nl) => &before[nl + 1..],
-        None => before,
-    };
-    let mut has_pipe = false;
-    for c in line.chars() {
-        if c == '|' {
-            has_pipe = true;
-        } else if !c.is_whitespace() {
-            return false;
-        }
-    }
-    has_pipe
 }
 
 fn flush_text(items: &mut Vec<Inline>, cur: &Cursor, text_start: &mut usize, pipe_cols: &[usize]) {

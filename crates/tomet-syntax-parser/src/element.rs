@@ -95,96 +95,29 @@ fn name_and_tail_start(mut look: Cursor, block_context: bool) -> bool {
     block_context && matches!(look.peek(), None | Some('\n') | Some('\r'))
 }
 
-/// What follows the element starting at `cur`, for the join/isolate
-/// decision (`docs/spec/syntax.tmt`'s `##[ 継続 ]`).
+/// Whether the element starting at `cur` is the whole of its line: nothing but
+/// whitespace and comments follows it. Such a line is a block of its own, when
+/// the line after it does not fold into it (`;`, a blank line, ...); anything
+/// else after the element makes it running text.
 ///
-/// The default is isolation: a bare element that opens its own line
-/// stands as its own block, whether or not a blank line follows --
-/// `docs/examples/dirs.tmt`'s file listing depends on this. Joining is
-/// opt-in, via an explicit `\` trigger, because it is the rarer intent
-/// (three consecutive badge links flowing into one row) and silently
-/// swallowing unrelated adjacent content into one paragraph is the wrong
-/// default for everything else.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum LineEnd {
-    /// Ends with just the element: isolates as its own block.
-    Bare,
-    /// Ends with the element followed by an explicit trailing `\`: joins
-    /// whatever follows, regardless of adjacency.
-    Continuation,
-    /// Something else follows: not a candidate. Ordinary running text.
-    No,
-}
-
 /// The element is parsed speculatively on a copy of the cursor and the
 /// copy is thrown away -- the same probe `eat_list_marker_with_indent`
 /// uses for a list marker's `(...)` form.
-pub(crate) fn element_ends_line(dialect: Dialect, cur: &Cursor) -> LineEnd {
+pub(crate) fn element_stands_alone(dialect: Dialect, cur: &Cursor) -> bool {
     let mut probe = *cur;
     if parse_written(dialect, &mut probe, true, &[]).is_err() {
-        return LineEnd::No;
+        return false;
     }
     skip_inline_ws(&mut probe);
     while probe.starts_with("//") || probe.starts_with("/*") {
         if probe.starts_with("//") {
             skip_line_comment(&mut probe);
         } else if skip_block_comment(&mut probe).is_err() {
-            return LineEnd::No;
+            return false;
         }
         skip_inline_ws(&mut probe);
     }
-    let continues = probe.peek() == Some('\\');
-    if continues {
-        probe.bump();
-        skip_inline_ws(&mut probe);
-    }
-    if matches!(probe.peek(), None | Some('\n') | Some('\r')) {
-        if continues {
-            LineEnd::Continuation
-        } else {
-            LineEnd::Bare
-        }
-    } else {
-        LineEnd::No
-    }
-}
-
-/// Consumes the trailing `\` continuation trigger a line ends with, plus
-/// the inline whitespace/comments before it and the whitespace after it
-/// -- the same shape [`element_ends_line`]'s probe already recognized.
-///
-/// Call only once `element_ends_line` has returned [`LineEnd::Continuation`]
-/// for this position; it assumes the shape is there and does not re-check.
-pub(crate) fn consume_trailing_continuation(cur: &mut Cursor) {
-    skip_inline_ws(cur);
-    loop {
-        if cur.starts_with("//") {
-            skip_line_comment(cur);
-        } else if cur.starts_with("/*") {
-            let _ = skip_block_comment(cur);
-        } else {
-            break;
-        }
-        skip_inline_ws(cur);
-    }
-    cur.bump();
-    skip_inline_ws(cur);
-}
-
-/// Whether a fresh line start at `cur` begins with the `\` continuation
-/// trigger, and if so, the cursor position right after it (and the
-/// inline whitespace following it) -- ready to parse whatever it joins
-/// to the previous block. Purely lexical: it does not judge whether
-/// there is anything valid to join to, the same way
-/// [`consume_trailing_continuation`] does not.
-pub(crate) fn leading_continuation<'a>(cur: &Cursor<'a>) -> Option<Cursor<'a>> {
-    if cur.peek() != Some('\\') || cur.starts_with("\\;") {
-        return None;
-    }
-    let mut after = *cur;
-    after.bump();
-    skip_inline_ws(&mut after);
-    Some(after)
+    matches!(probe.peek(), None | Some('\n') | Some('\r'))
 }
 
 fn skip_element_gap(cur: &mut Cursor) -> u8 {
@@ -419,7 +352,7 @@ pub(crate) fn parse_declaration(
 ///
 /// The alternative was to delete the recognizers instead: decide by
 /// parsing speculatively on a copy of the cursor, the way
-/// [`element_ends_line`] already does, which leaves one definition per
+/// [`element_stands_alone`] does, which leaves one definition per
 /// sigil and makes the disagreement structurally impossible. It was
 /// rejected on cost. `is_element_start` is called from `Stop::Paragraph`'s
 /// per-character scan, so trying a full parse there approaches quadratic
@@ -1039,13 +972,10 @@ pub(crate) fn parse_value_group(dialect: Dialect, cur: &mut Cursor) -> Result<Gr
             // compared against.
             //
             // `{value}` groups are a flat list of entries, not prose, so
-            // there is no paragraph for `;` to isolate from here -- the
-            // separator (`docs/spec/syntax.tmt`'s `##[ 区切り ]`) is out
-            // of scope for this position on purpose. `Separated` collapses
-            // into "not a block" the same as `No`, unchanged from
-            // `element_ends_line`'s old boolean behavior.
+            // there is no paragraph here for a `;` to break or a line to
+            // fold into: an element that is the whole of its line is a block.
             _ if is_element_start(dialect, cur, at_line_start(cur)) => {
-                let block = at_line_start(cur) && element_ends_line(dialect, cur) == LineEnd::Bare;
+                let block = at_line_start(cur) && element_stands_alone(dialect, cur);
                 let written = parse_written(dialect, cur, false, &[])?;
                 entries.push(
                     if block {

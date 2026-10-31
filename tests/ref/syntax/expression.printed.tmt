@@ -3,19 +3,7 @@
 ::id(doc-expression)
 
 =[リテラル]
-${true}
-
-${false}
-
-${null}
-
-${42}
-
-${-3}
-
-${1.5}
-
-${"text"}
+${true} ${false} ${null} ${42} ${-3} ${1.5} ${"text"}
 
 =[比較と論理]
 ${d.meta.created >= "2026-01-01" && not(d.meta.draft == true)}

@@ -25,8 +25,8 @@ pub(crate) fn render_blocks(blocks: &[Block], config: &PrinterConfig, out: &mut 
 
 pub(crate) fn render_block(block: &Block, config: &PrinterConfig, out: &mut String) {
     match block {
-        // A heading joined into a paragraph by an explicit `\`
-        // continuation trigger (`docs/spec/syntax.tmt`'s `##[ 継続 ]`) --
+        // A heading element that opens a paragraph (it shares the paragraph
+        // with other text, so it is `Placement::Inline`) --
         // rare, and flagged by `tomet-semantics::shape_mismatch` as a
         // kind that cannot actually be inline, but still round-trips.
         // It still sits at the document's own top level, at a genuine

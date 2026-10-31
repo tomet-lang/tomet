@@ -40,45 +40,69 @@ fn an_element_on_a_continuation_line_stays_in_the_paragraph() {
 }
 
 #[test]
-fn adjacent_elements_with_no_blank_line_isolate_by_default() {
-    // `docs/spec/syntax.tmt`'s `##[ 継続 ]`: a bare element that opens
-    // its own line isolates as its own block by default, whether or
-    // not a blank line follows -- `@note{...}` immediately followed
-    // by `@memo{...}` (no blank line, no `\`) stays two
-    // independent `Block::Element`s, not one `Block::Paragraph`.
-    // `docs/examples/dirs.tmt`'s file listing depends on this.
+fn adjacent_element_lines_are_one_paragraph() {
+    // An element is running text like any other: `@note{...}` then
+    // `@memo{...}` on consecutive lines fold into one paragraph, with a soft
+    // break between them. A blank line or a `;` is what makes them blocks.
     let doc = parse_document("@note{ type:#settings }\n@memo{ key:value }\n").unwrap();
-    assert_eq!(doc.blocks.len(), 2);
-    match (&doc.blocks[0], &doc.blocks[1]) {
-        (Block::Element(a), Block::Element(b)) => {
-            assert_eq!(a.name, Name::bare("note"));
-            assert_eq!(b.name, Name::bare("memo"));
+    assert_eq!(doc.blocks.len(), 1);
+    match &doc.blocks[0] {
+        Block::Paragraph(p) => {
+            assert_eq!(p.content.len(), 3);
+            assert!(matches!(&p.content[0], Inline::Element(el) if el.name == Name::bare("note")));
+            assert!(matches!(&p.content[1], Inline::SoftBreak(_)));
+            assert!(matches!(&p.content[2], Inline::Element(el) if el.name == Name::bare("memo")));
         }
-        other => panic!("expected two elements, got {other:?}"),
+        other => panic!("expected one paragraph, got {other:?}"),
+    }
+
+    for src in [
+        "@note{ type:#settings }\n\n@memo{ key:value }\n",
+        "@note{ type:#settings }\n;@memo{ key:value }\n",
+    ] {
+        let doc = parse_document(src).unwrap();
+        assert_eq!(doc.blocks.len(), 2, "{src:?}");
+        assert!(matches!(&doc.blocks[0], Block::Element(_)), "{src:?}");
+        assert!(matches!(&doc.blocks[1], Block::Element(_)), "{src:?}");
     }
 }
 
 #[test]
-fn a_leading_continuation_joins_adjacent_elements() {
-    // The `\` override (`docs/spec/syntax.tmt`'s `##[ 継続 ]`) for the
-    // case above: with it, `@memo{...}` joins `@note{...}`'s
-    // paragraph instead of standing alone.
-    let doc = parse_document("@note{ type:#settings }\n\\@memo{ key:value }\n").unwrap();
+fn text_after_an_element_line_folds_into_it_unless_a_semicolon_breaks() {
+    let doc = parse_document("@note{ a: 1 }\ntext\n").unwrap();
     assert_eq!(doc.blocks.len(), 1);
-    match &doc.blocks[0] {
-        Block::Paragraph(p) => {
-            let elements: Vec<_> = p
-                .content
-                .iter()
-                .filter_map(|inline| match inline {
-                    Inline::Element(el) => Some(el.name.clone()),
-                    _ => None,
-                })
-                .collect();
-            assert_eq!(elements, vec![Name::bare("note"), Name::bare("memo")]);
-        }
-        other => panic!("expected one paragraph, got {other:?}"),
+    assert!(matches!(&doc.blocks[0], Block::Paragraph(p) if p.content.len() == 3));
+
+    let doc = parse_document("@note{ a: 1 }\n;text\n").unwrap();
+    assert_eq!(doc.blocks.len(), 2);
+    assert!(matches!(&doc.blocks[0], Block::Element(_)));
+    assert!(matches!(&doc.blocks[1], Block::Paragraph(_)));
+}
+
+#[test]
+fn an_interpolation_is_a_block_only_when_it_stands_alone_on_its_line() {
+    let doc = parse_document("${a}\n").unwrap();
+    assert!(matches!(&doc.blocks[0], Block::Interp(_)));
+
+    // Anything else on the line, or a following line that folds, makes it
+    // running text.
+    for src in ["${a} text\n", "${a} ${b}\n", "${a}\n${b}\n", "${a}\ntext\n"] {
+        let doc = parse_document(src).unwrap();
+        assert_eq!(doc.blocks.len(), 1, "{src:?}");
+        assert!(matches!(&doc.blocks[0], Block::Paragraph(_)), "{src:?}");
     }
+
+    let doc = parse_document(";${a}\n;${b}\n").unwrap();
+    assert_eq!(doc.blocks.len(), 2);
+    assert!(doc.blocks.iter().all(|b| matches!(b, Block::Interp(_))));
+}
+
+#[test]
+fn a_declaration_after_an_element_line_stays_a_block() {
+    let doc = parse_document("@note{ a: 1 }\n::kind(config)\n").unwrap();
+    assert_eq!(doc.blocks.len(), 2);
+    assert!(matches!(&doc.blocks[0], Block::Element(_)));
+    assert!(matches!(&doc.blocks[1], Block::Declaration(_)));
 }
 
 #[test]
@@ -114,32 +138,6 @@ fn a_paragraph_does_not_swallow_a_following_thematic_break() {
             assert_eq!(&b.content, &vec![Inline::Text("more".into())]);
         }
         other => panic!("expected paragraph, hr, paragraph, got {other:?}"),
-    }
-}
-
-#[test]
-fn a_leading_continuation_joins_a_thematic_break_into_the_previous_paragraph() {
-    // The parser stays kind-oblivious about what a leading `\`
-    // (`docs/spec/syntax.tmt`'s `##[ 継続 ]`) joins: popping a
-    // thematic break (`Block::Element`) and demoting it to
-    // `Placement::Inline` works the same as for any other kind.
-    // `tomet-semantics::shape_mismatch` is what would flag this
-    // particular join as wrong, since `hr` always requires `Block`.
-    let doc = parse_document("text\n\n---\n\\more\n").unwrap();
-    assert_eq!(doc.blocks.len(), 2);
-    match (&doc.blocks[0], &doc.blocks[1]) {
-        (Block::Paragraph(a), Block::Paragraph(b)) => {
-            assert_eq!(&a.content, &vec![Inline::Text("text".into())]);
-            match b.content.first() {
-                Some(Inline::Element(hr)) => assert_eq!(hr.name, Name::bare("hr")),
-                other => panic!("expected hr as the paragraph's first item, got {other:?}"),
-            }
-            match b.content.last() {
-                Some(Inline::Text(t)) => assert_eq!(t.value, "more"),
-                other => panic!("expected trailing text, got {other:?}"),
-            }
-        }
-        other => panic!("expected two paragraphs, got {other:?}"),
     }
 }
 

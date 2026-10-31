@@ -13,7 +13,7 @@ use tomet_config::PrinterConfig;
 /// part of the running text.
 pub(crate) fn render_inlines(inlines: &[Inline], config: &PrinterConfig) -> String {
     let mut s = String::new();
-    for (i, inline) in inlines.iter().enumerate() {
+    for inline in inlines {
         match inline {
             Inline::Text(t) => {
                 // A `;` that starts a line would break the block when read
@@ -37,13 +37,11 @@ pub(crate) fn render_inlines(inlines: &[Inline], config: &PrinterConfig) -> Stri
             Inline::Interp(interp) => s.push_str(&crate::element::render_interp(interp)),
             Inline::Element(el) => push_node(
                 &mut s,
-                i,
                 el.placement == Placement::Block,
                 crate::element::render_element(el, config),
             ),
             Inline::Hole(hole) => push_node(
                 &mut s,
-                i,
                 hole.placement == Placement::Block,
                 crate::element::render_hole(hole, config),
             ),
@@ -52,27 +50,11 @@ pub(crate) fn render_inlines(inlines: &[Inline], config: &PrinterConfig) -> Stri
     s
 }
 
-/// An element or a hole, `rendered`, as the `i`th inline of a run being built
-/// in `s`: a block-placed one starts and ends its own line.
-fn push_node(s: &mut String, i: usize, block: bool, rendered: String) {
+/// An element or a hole, `rendered`, in the run being built in `s`: a
+/// block-placed one starts and ends its own line.
+fn push_node(s: &mut String, block: bool, rendered: String) {
     if block && !s.is_empty() && !s.ends_with('\n') {
         s.push('\n');
-    }
-    // A joined element (`Placement::Inline` reached here only via an
-    // explicit `\` continuation trigger -- `docs/spec/syntax.tmt`'s
-    // `##[ 継続 ]`) that opens a fresh output line needs the trigger
-    // re-emitted, or a reparse would isolate it back into its own block --
-    // except the very first item, which nothing precedes there, so no marker
-    // is ever needed for that one. Only a `@name(...)`- or `?matcher(...)`-
-    // shaped rendering is ever at risk of being misread as a bare element
-    // opening its own line; raw/backtick spans and other non-sigil sugar
-    // cannot be.
-    if !block
-        && i > 0
-        && (s.is_empty() || s.ends_with('\n'))
-        && (rendered.starts_with('@') || rendered.starts_with('?'))
-    {
-        s.push('\\');
     }
     s.push_str(&rendered);
     if block {

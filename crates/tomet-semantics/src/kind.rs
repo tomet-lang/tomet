@@ -594,16 +594,16 @@ pub fn builtin_region(kind: &ElementKind) -> crate::vocabulary::Region {
 ///
 /// `Placement::Inline` on a `Block`-required kind is always a mismatch,
 /// with no exception for directives or for column 1: the parser only
-/// ever produces that shape when the author wrote an explicit `\`
-/// continuation trigger (`docs/spec/syntax.tmt`'s `##[ 継続 ]`) to join a
-/// bare element into a paragraph, and the parser stays kind-oblivious
-/// about what it joined (heading, directive, or anything else) -- this
-/// function is where a join that made no sense for that kind gets
-/// reported back, same as it always has.
+/// produces that shape when an element shares its paragraph with other
+/// text (a line after it that is not set apart by a `;` or a blank line,
+/// for one), and the parser stays kind-oblivious about what it joined
+/// (heading, directive, or anything else) -- this function is where a join
+/// that made no sense for that kind gets reported back.
 ///
 /// The reverse (`Inline`-required found as `Block`) has no exception
-/// either: nothing about the join rule ever makes an inline-only element
-/// isolated, so `Placement::Block` there is exactly as wrong as always.
+/// either: an element is a block only when it is the whole of its line and
+/// nothing folds into it, so `Placement::Block` on an inline-only element is
+/// exactly as wrong as always.
 ///
 /// Returns `Some((found, expected))` when they disagree.
 pub fn shape_mismatch(el: &Element) -> Option<(Shape, Shape)> {

@@ -71,8 +71,8 @@ const SAME: &[(&str, &str, &str)] = &[
     ),
     (
         "nested pipe markers with child element and list",
-        "@tree\n| @tree\n| | @tree\n| | | - outline\n| | | - outline\n| | @tree\n| | | - outline\n| | | - outline\n",
-        "@tree[\n@tree[\n@tree[\n- outline\n- outline\n]\n@tree[\n- outline\n- outline\n]\n]\n]\n",
+        "@tree\n| @tree\n| | @tree\n| | | - outline\n| | | - outline\n| | ;@tree\n| | | - outline\n| | | - outline\n",
+        "@tree[\n@tree[\n@tree[\n- outline\n- outline\n]\n;@tree[\n- outline\n- outline\n]\n]\n]\n",
     ),
     (
         "nested pipe markers with paragraphs",
