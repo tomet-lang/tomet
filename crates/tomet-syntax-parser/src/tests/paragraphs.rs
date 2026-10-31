@@ -142,3 +142,69 @@ fn a_leading_continuation_joins_a_thematic_break_into_the_previous_paragraph() {
         other => panic!("expected two paragraphs, got {other:?}"),
     }
 }
+
+#[test]
+fn a_semicolon_at_the_start_of_a_line_breaks_the_paragraph() {
+    // `;` opens a new block without a blank line, the way `-` opens a list
+    // item: the line before it is not folded into the line after it.
+    let doc = parse_document("a\n;b\nc\n").unwrap();
+    assert_eq!(doc.blocks.len(), 2);
+    match (&doc.blocks[0], &doc.blocks[1]) {
+        (Block::Paragraph(a), Block::Paragraph(b)) => {
+            assert_eq!(&a.content, &vec![Inline::Text("a".into())]);
+            // `c` is a continuation of `b`: only the `;` line starts a block.
+            assert_eq!(b.content.len(), 3);
+            assert_eq!(&b.content[0], &Inline::Text("b".into()));
+            assert_eq!(&b.content[2], &Inline::Text("c".into()));
+        }
+        other => panic!("expected two paragraphs, got {other:?}"),
+    }
+}
+
+#[test]
+fn semicolons_stand_blocks_of_elements_side_by_side() {
+    let doc = parse_document(";@note{ a: 1 }\n;@memo{ b: 2 }\n").unwrap();
+    assert_eq!(doc.blocks.len(), 2);
+    for (block, name) in doc.blocks.iter().zip(["note", "memo"]) {
+        match block {
+            Block::Element(el) => {
+                assert_eq!(el.name.name, name);
+                assert_eq!(el.placement, tomet_ast::Placement::Block);
+            }
+            other => panic!("expected an element, got {other:?}"),
+        }
+    }
+}
+
+#[test]
+fn a_semicolon_inside_a_line_is_text() {
+    let doc = parse_document("a;b\n").unwrap();
+    assert_eq!(doc.blocks.len(), 1);
+    match &doc.blocks[0] {
+        Block::Paragraph(p) => assert_eq!(&p.content, &vec![Inline::Text("a;b".into())]),
+        other => panic!("expected a paragraph, got {other:?}"),
+    }
+}
+
+#[test]
+fn a_backslash_makes_a_semicolon_at_the_start_of_a_line_text() {
+    let doc = parse_document("a\n\\;b\n").unwrap();
+    assert_eq!(doc.blocks.len(), 1);
+    match &doc.blocks[0] {
+        Block::Paragraph(p) => {
+            assert_eq!(p.content.len(), 3);
+            assert_eq!(&p.content[0], &Inline::Text("a".into()));
+            assert_eq!(&p.content[2], &Inline::Text(";b".into()));
+        }
+        other => panic!("expected one paragraph, got {other:?}"),
+    }
+}
+
+#[test]
+fn a_semicolon_breaks_a_pipe_run_paragraph_too() {
+    let doc = parse_document("@quote\n| a\n| ;b\n").unwrap();
+    let Block::Element(el) = &doc.blocks[0] else {
+        panic!("expected an element, got {:?}", doc.blocks[0]);
+    };
+    assert_eq!(el.content.as_ref().map(Vec::len), Some(2));
+}

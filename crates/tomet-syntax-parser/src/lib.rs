@@ -24,7 +24,7 @@
 //!
 //! - (dialect) Which sigils may open an element: `@` always, `?` (a hole) only in a pattern.
 //!   `parse_document` and `parse_pattern` share every other function; each takes the dialect.
-//! - (document) Block-level dispatch loop, paragraphs, and document-level parsing.
+//! - (document) Block-level dispatch loop (a blank line or a line-start `;` breaks a block), paragraphs, and document-level parsing.
 //! - (element) Typed elements (`<T>`, `@name`, bare `@`), group ordering, and connect syntax.
 //! - (section) Headings (`=[...]`) and thematic breaks (`---`, `---[ title ]---`).
 //! - (list) Ordered and unordered lists (`-`, `-.`), markers, and item attributes.

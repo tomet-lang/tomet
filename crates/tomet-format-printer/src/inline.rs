@@ -15,7 +15,14 @@ pub(crate) fn render_inlines(inlines: &[Inline], config: &PrinterConfig) -> Stri
     let mut s = String::new();
     for (i, inline) in inlines.iter().enumerate() {
         match inline {
-            Inline::Text(t) => s.push_str(&t.value),
+            Inline::Text(t) => {
+                // A `;` that starts a line would break the block when read
+                // back; `\;` keeps it text.
+                if t.value.starts_with(';') && s.ends_with('\n') {
+                    s.push('\\');
+                }
+                s.push_str(&t.value);
+            }
             Inline::Raw(t) => s.push_str(&t.value),
             // A literal newline, not `softbreak_join`'s space/nothing.
             // Several callers (`render_list_with_indent`'s

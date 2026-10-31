@@ -1,0 +1,17 @@
+a
+b
+
+a
+
+b
+c
+
+@note[]{ value: a }
+
+@note[]{ value: b }
+
+@note[]{ value: c }
+
+a;b
+c
+\;d

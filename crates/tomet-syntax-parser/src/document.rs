@@ -2,6 +2,9 @@
 //!
 //! Orchestrates block-level constructs (sections, paragraphs, lists,
 //! elements, thematic breaks) into a [`Document`].
+//!
+//! A blank line ends a paragraph, and so does a `;` at the start of a line: it
+//! starts the next block without one. The `;` leaves nothing in the tree.
 
 use crate::dialect::Dialect;
 use crate::element::{
@@ -9,7 +12,9 @@ use crate::element::{
     is_element_start, leading_continuation, parse_declaration, parse_written,
 };
 use crate::error::Result;
-use crate::inline::{Stop, extend_merging, parse_inline_seq, push_soft_break};
+use crate::inline::{
+    Stop, at_marker_line_start, extend_merging, parse_inline_seq, push_soft_break,
+};
 use crate::interp::{is_interp_start, parse_interpolation};
 use crate::list::{parse_list, peek_list_marker};
 use crate::raw::{is_fenced_code_block_start, parse_fenced_code_block};
@@ -142,6 +147,15 @@ pub(crate) fn parse_block_seq(
                     break;
                 }
             }
+        }
+
+        // A `;` at the start of a line breaks the block: what follows starts a
+        // new one, as it would after a blank line, with none needed. The
+        // marker itself leaves nothing in the tree.
+        if cur.peek() == Some(';') && at_marker_line_start(&cur) {
+            cur.bump();
+            skip_inline_ws(&mut cur);
+            continue;
         }
 
         // A leading `\` continuation trigger (`docs/spec/syntax.tmt`'s

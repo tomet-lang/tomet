@@ -360,3 +360,22 @@ fn a_string_is_still_a_string_in_a_value() {
     let src = "@x(k: \"v w\", n: 'a')\n";
     assert_eq!(tokens_of(src, K::STRING_LITERAL), 2);
 }
+
+// --- `;` -------------------------------------------------------------------
+
+#[test]
+fn a_semicolon_at_the_start_of_a_line_breaks_the_paragraph() {
+    assert_eq!(kinds("a\n;b\n", K::PARAGRAPH), 2);
+    let semis = crate::parse_cst("a\n;b\n")
+        .descendants_with_tokens()
+        .filter(|e| e.kind() == K::SEMI)
+        .count();
+    assert_eq!(semis, 1);
+    // In the middle of a line it is part of the text.
+    assert_eq!(kinds("a;b\n", K::PARAGRAPH), 1);
+}
+
+#[test]
+fn a_semicolon_stands_blocks_of_elements_side_by_side() {
+    assert_eq!(kinds(";@a()\n;@b()\n", K::BLOCK_ELEMENT), 2);
+}

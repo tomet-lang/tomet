@@ -63,6 +63,10 @@ pub(crate) fn render_block(block: &Block, config: &PrinterConfig, out: &mut Stri
         Block::Paragraph(p) => {
             let inlines_text = render_inlines(&p.content, config);
             if !inlines_text.trim().is_empty() {
+                // The paragraph starts a line: a `;` there would break the block.
+                if inlines_text.starts_with(';') {
+                    out.push('\\');
+                }
                 out.push_str(&inlines_text);
                 out.push('\n');
             }

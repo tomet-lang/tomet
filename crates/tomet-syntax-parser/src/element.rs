@@ -178,7 +178,7 @@ pub(crate) fn consume_trailing_continuation(cur: &mut Cursor) {
 /// there is anything valid to join to, the same way
 /// [`consume_trailing_continuation`] does not.
 pub(crate) fn leading_continuation<'a>(cur: &Cursor<'a>) -> Option<Cursor<'a>> {
-    if cur.peek() != Some('\\') {
+    if cur.peek() != Some('\\') || cur.starts_with("\\;") {
         return None;
     }
     let mut after = *cur;

@@ -129,7 +129,7 @@ pub(crate) fn parse_inline_seq<'a>(
                     // redundant here for the same reason -- fold it away
                     // below the same way `|`'s own repeated marker never
                     // becomes literal text.
-                    let redundant_leading = look.peek() == Some('\\');
+                    let redundant_leading = look.peek() == Some('\\') && !look.starts_with("\\;");
                     if redundant_leading {
                         look.bump();
                         skip_inline_ws(&mut look);
@@ -286,6 +286,14 @@ pub(crate) fn parse_inline_seq<'a>(
         // joining it to what follows. Dangling (nothing before it, or it
         // is already `Inline`) is a silent no-op, which also covers a
         // redundant repeated marker.
+        // `\;` at the start of a line is a `;` that is text, not a block break.
+        if cur.starts_with("\\;") && at_marker_line_start(cur) {
+            flush_text(&mut items, cur, &mut text_start, pipe_cols);
+            cur.bump();
+            text_start = cur.pos();
+            cur.bump();
+            continue;
+        }
         if matches!(stop, Stop::Bracket(_)) && at_line_start(cur) && cur.peek() == Some('\\') {
             if let Some(Inline::Element(prev)) = items.last_mut() {
                 prev.placement = Placement::Inline;
@@ -356,7 +364,7 @@ pub(crate) fn parse_inline_seq<'a>(
 /// This is the stopping condition for a run already open (from genuine
 /// prose, or from an explicit `\` continuation trigger --
 /// `docs/spec/syntax.tmt`'s `##[ 継続 ]`): a blank line, a heading, a list
-/// marker, a comment, a thematic break, or a fenced code block all start
+/// marker, a `;`, a comment, a thematic break, or a fenced code block all start
 /// something with its own identity, not more of this paragraph. It is not
 /// consulted to decide whether a fresh bare element joins what precedes
 /// it -- that is opt-in now, via the trigger, not a default this
@@ -364,6 +372,7 @@ pub(crate) fn parse_inline_seq<'a>(
 pub(crate) fn paragraph_breaks_here(dialect: Dialect, look: &Cursor) -> bool {
     look.is_eof()
         || look.peek() == Some('\n')
+        || look.peek() == Some(';')
         || (look.peek() == Some('=') && crate::section::is_section_start(look))
         || matches!(peek_list_marker(dialect, look), Ok(Some(_)))
         || look.starts_with("//")
@@ -526,6 +535,18 @@ fn try_one_delimited(
         tomet_ast::Paragraph::new(inner, span),
     )]);
     Ok(Some(el))
+}
+
+/// Whether only whitespace and `|` run markers precede `cur` on its line: the
+/// place a line-start `;` (a block break) may stand, in a `|` run as well.
+pub(crate) fn at_marker_line_start(cur: &Cursor) -> bool {
+    let src = cur.src();
+    let before = &src[..cur.pos()];
+    let line = match before.rfind('\n') {
+        Some(nl) => &before[nl + 1..],
+        None => before,
+    };
+    line.chars().all(|c| c.is_whitespace() || c == '|')
 }
 
 /// Whether only whitespace precedes `cur` on its line.

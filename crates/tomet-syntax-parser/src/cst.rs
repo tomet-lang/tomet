@@ -587,6 +587,8 @@ impl<'a> CstParser<'a> {
             Some(K::MINUS) => self.is_thematic_break_at(i) || self.is_list_start_at(i),
             Some(K::BACKTICK) => self.is_code_block_start_at(i),
             Some(K::LT) => true,
+            // A line-start `;` breaks the block; it is no block of its own.
+            Some(K::SEMI) => true,
             Some(K::AT | K::COLON) => self.is_block_element_at(i),
             _ => false,
         }
@@ -629,6 +631,12 @@ impl<'a> CstParser<'a> {
             }
             if self.in_bracket && self.current_kind() == Some(K::R_BRACKET) {
                 break;
+            }
+            // A `;` at the start of a line only breaks the block before it: it
+            // stays in the tree as a token of the body, like trivia.
+            if self.current_kind() == Some(K::SEMI) && self.at_line_start() {
+                self.bump();
+                continue;
             }
             if self
                 .section_level_here()

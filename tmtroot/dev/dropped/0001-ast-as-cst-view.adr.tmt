@@ -1,0 +1,21 @@
+::kind(adr)
+::id(adr-0001)
+
+=[ 0001: AST を CST の窓にする方式の見送り ]
+
+==#(background)
+
+同じ文法を、CST パーサ（`cst.rs`）と AST パーサ（`document.rs` ほか）が別々に実装していて、食い違う（テストコーパス `tests/fixtures` の 38 ファイル中 10 ファイルで、トップレベルのブロックの構造が違った）。解消案の一つに、rust-analyzer 方式があった。AST を持たず、`Block` `Element` などを CST のノードを包む型付きの窓にする。
+
+==#(why)
+
+- tomet の AST は、ソースの窓ではなく文書のモデルである。`Placement` `SoftBreak` `Data` は、ソースに書かれた値ではなく、位置から導いた意味である。
+- 約 28 クレートが、AST を所有する木として読み書きする。pandoc からの変換や `${}` の展開は、ソース文字列なしで木を組み立てる。窓にすると、一度テキストに書いて読み直すことになる。
+- AST は `Serialize` と `PartialEq` を持つ素のデータで、スナップショットと `tomet ast` が使う。
+- AST の型が rowan に依存すると、cotomet のデータだけの構成にそれが持ち込まれる。
+- 速度は決め手ではなかった（CST パーサと AST パーサは同じ速さで、どちらも約 35 MB/s）。窓にして得られるのは、AST を作る手間の省略だけである。
+
+==#(decision)
+
+- 窓方式は採らない。AST は所有する木のまま、CST から降ろして作る。文法は CST パーサの 1 か所に集める。
+- CST の窓（`tomet-syntax-ast` の `cst_ast.rs`）は、CST を直接使う側（LSP、highlight、merge、edit）のために残す。

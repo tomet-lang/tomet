@@ -1,0 +1,22 @@
+// `;` at the start of a line breaks the block: what follows is a new
+// block, as after a blank line, with none needed. It works only at the start
+// of a line, the way a list marker does.
+
+// A line that follows is folded into the paragraph...
+a
+b
+
+// ...unless it starts with `;`.
+a
+;b
+c
+
+// Elements side by side, one block each, with no blank line between them.
+;@note(a)
+;@note(b)
+;@note(c)
+
+// In the middle of a line, `;` is text. At the start of a line, `\;` is text.
+a;b
+c
+\;d

@@ -659,3 +659,17 @@ fn a_number_reading_would_change_is_printed_as_written() {
         printed
     );
 }
+
+#[test]
+fn a_semicolon_that_is_text_at_the_start_of_a_line_is_printed_with_a_backslash() {
+    // A bare `;` at the start of a line would break the block when read back,
+    // so a text `;` there is written `\;` -- after a soft break and at the
+    // start of a paragraph alike. In the middle of a line it needs nothing.
+    for src in ["a\n\\;b\n", "\\;a\n", "a;b\n"] {
+        let doc = tomet_parser::parse_document(src).unwrap();
+        let printed = document_to_tm(&doc);
+        assert_eq!(printed, src, "{src:?}");
+        let again = tomet_parser::parse_document(&printed).unwrap();
+        assert_eq!(again.blocks.len(), doc.blocks.len(), "{src:?}");
+    }
+}
