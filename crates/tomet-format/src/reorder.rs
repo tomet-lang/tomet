@@ -139,6 +139,7 @@ fn collect_swaps_in_block(
             }
         }
         Block::List(list) => collect_swaps_in_list(list, src, config, swaps, limit),
+        Block::Interp(_) => {}
     }
 }
 

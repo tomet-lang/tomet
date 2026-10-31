@@ -68,11 +68,10 @@ pub fn is_attribute_key(key: &str) -> bool {
 
 /// Flattens `el`'s `(args)` and `{value}` for an attribute map.
 ///
-/// A `${...}` interpolation is not data and is skipped; so are the
-/// element children a `{...}` group may hold, which belong in the
-/// output's body rather than its attributes.
+/// The element children a `{...}` group may hold are skipped: they belong
+/// in the output's body rather than its attributes.
 pub fn flatten_element_data(el: &Element) -> FlatData {
-    let value = el.value.as_ref().and_then(|v| v.as_data());
+    let value = el.value.as_ref().map(|v| v.as_data());
     flatten_data(el.args.as_ref(), value.as_ref())
 }
 
@@ -148,8 +147,9 @@ pub fn scalar_string(v: &Value) -> Option<String> {
         // there is no single string it collapses to.
         Value::Call(..) => None,
         // An embedded element is a whole element, not a scalar -- same
-        // bucket as `Map`/`Call`.
-        Value::Element(_) => None,
+        // bucket as `Map`/`Call`. So is an interpolation: its value is not
+        // known until it is evaluated.
+        Value::Element(_) | Value::Interp(_) => None,
         // Block content (`key: [...]`) is a tree, not a scalar -- same
         // bucket.
         Value::Blocks(_) => None,
@@ -199,6 +199,14 @@ pub fn value_to_json(v: &Value) -> serde_json::Value {
         // rare enough in practice (`@doc.icon("x")` uses none of them)
         // that this isn't worth widening `serde_json` conversions for
         // `Inline`/`ElementValue`, which don't have one anywhere else.
+        Value::Interp(interp) => {
+            let mut obj = serde_json::Map::new();
+            obj.insert(
+                "interp".to_string(),
+                serde_json::Value::String(interp.expr.to_string()),
+            );
+            serde_json::Value::Object(obj)
+        }
         Value::Element(el) => {
             let mut obj = serde_json::Map::new();
             let name = el.sigil.name().map(|n| n.to_string()).unwrap_or_default();

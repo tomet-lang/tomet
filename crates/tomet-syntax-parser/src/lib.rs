@@ -54,10 +54,10 @@ pub use document::{parse_document, parse_pattern};
 pub use error::{Error, Result};
 pub use value::{CotometValueHook, parse_value};
 
-/// Parse a `$func(args)` or `${expr}` dollar element directly from a string slice.
-pub fn parse_dollar_element_str(source: &str) -> Result<tomet_ast::Element> {
+/// Parse a `$func(args)` or `${expr}` interpolation directly from a string slice.
+pub fn parse_interpolation_str(source: &str) -> Result<tomet_ast::Interpolation> {
     let mut cur = tomet_lexer::Cursor::new(source);
-    interp::parse_dollar_element(&mut cur).map_err(|e| e.located_in(source))
+    interp::parse_interpolation(&mut cur).map_err(|e| e.located_in(source))
 }
 
 #[cfg(test)]

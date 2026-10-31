@@ -81,6 +81,12 @@ fn parse_table_rows_inline(inlines: &[Inline]) -> Vec<TableRow> {
                     current_cell.push(Inline::Element(el.clone()));
                 }
             }
+            Inline::Interp(interp) => {
+                if in_cell {
+                    flush_text(&mut current_cell, &mut current_text_buf);
+                    current_cell.push(Inline::Interp(interp.clone()));
+                }
+            }
         }
     }
 

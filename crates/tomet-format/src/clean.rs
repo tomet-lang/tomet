@@ -136,6 +136,7 @@ pub(crate) fn collect_raw_spans(doc: &Document, out: &mut Vec<(usize, usize)>) {
                 }
                 walk_list_items(&list.items, out);
             }
+            Block::Interp(_) => {}
         }
     }
 

@@ -31,6 +31,7 @@ fn title_from_content_blocks(cur: &Cursor, content: Option<Vec<Block>>) -> Resul
                 el.placement = Placement::Inline;
                 Ok(vec![Inline::Element(el)])
             }
+            Some(Block::Interp(interp)) => Ok(vec![Inline::Interp(interp)]),
             Some(Block::Section(_)) => Err(err(
                 cur.pos(),
                 "a heading's title can only hold plain text, not a nested section",

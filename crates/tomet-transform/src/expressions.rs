@@ -110,17 +110,6 @@ struct Pass<'a> {
     level: usize,
 }
 
-/// The expression an element carries, when the element is a `${...}`.
-fn dollar_expr(el: &Element) -> Option<&InterpExpr> {
-    if !matches!(el.sigil, Sigil::Dollar) {
-        return None;
-    }
-    match el.value.as_ref()? {
-        ElementValue::Interp(expr) => Some(expr),
-        ElementValue::Group(_) => None,
-    }
-}
-
 impl Pass<'_> {
     /// Evaluates, or records why it could not and returns `None`.
     fn evaluate(&mut self, expr: &InterpExpr, span: Span) -> Option<EvalValue> {
@@ -196,10 +185,8 @@ impl Pass<'_> {
                 p.content = self.inlines(p.content);
                 vec![Block::Paragraph(p)]
             }
-            Block::Element(el) => match dollar_expr(&el) {
-                Some(expr) => self.block_expression(expr, el.span),
-                None => vec![Block::Element(self.element(el))],
-            },
+            Block::Element(el) => vec![Block::Element(self.element(el))],
+            Block::Interp(interp) => self.block_expression(&interp.expr, interp.span),
             Block::Section(mut sec) => {
                 sec.title = self.inlines(sec.title);
                 sec.args = sec.args.map(|v| self.value(v));
@@ -240,10 +227,8 @@ impl Pass<'_> {
         inlines
             .into_iter()
             .flat_map(|inline| match inline {
-                Inline::Element(el) => match dollar_expr(&el) {
-                    Some(expr) => self.inline_expression(expr, el.span),
-                    None => vec![Inline::Element(self.element(el))],
-                },
+                Inline::Interp(interp) => self.inline_expression(&interp.expr, interp.span),
+                Inline::Element(el) => vec![Inline::Element(self.element(el))],
                 other => vec![other],
             })
             .collect()
@@ -276,33 +261,26 @@ impl Pass<'_> {
     }
 
     fn element_value(&mut self, value: ElementValue) -> ElementValue {
-        match value {
-            // The element *is* the expression; its owner decided what to do.
-            ElementValue::Interp(expr) => ElementValue::Interp(expr),
-            ElementValue::Group(entries) => ElementValue::Group(
-                entries
-                    .into_iter()
-                    .map(|entry| match entry {
-                        Entry::Pair(key, value) => Entry::Pair(key, self.value(value)),
-                        Entry::Element(el) => Entry::Element(self.element(el)),
-                    })
-                    .collect(),
-            ),
-        }
+        let ElementValue::Group(entries) = value;
+        ElementValue::Group(
+            entries
+                .into_iter()
+                .map(|entry| match entry {
+                    Entry::Pair(key, value) => Entry::Pair(key, self.value(value)),
+                    Entry::Element(el) => Entry::Element(self.element(el)),
+                })
+                .collect(),
+        )
     }
 
     /// A `${...}` where data goes: it keeps its value, whatever the type
     /// allows to be kept as data.
     fn value(&mut self, value: Value) -> Value {
         match value {
-            Value::Element(el) => match dollar_expr(&el) {
-                Some(expr) => {
-                    let (expr, span) = (expr.clone(), el.span);
-                    self.data_expression(&expr, span)
-                        .unwrap_or(Value::Element(el))
-                }
-                None => Value::Element(Box::new(self.element(*el))),
-            },
+            Value::Interp(interp) => self
+                .data_expression(&interp.expr, interp.span)
+                .unwrap_or(Value::Interp(interp)),
+            Value::Element(el) => Value::Element(Box::new(self.element(*el))),
             Value::Seq(items) => Value::Seq(items.into_iter().map(|v| self.value(v)).collect()),
             Value::Map(entries) => Value::Map(
                 entries
@@ -375,10 +353,10 @@ fn item_expression(item: &ListItem) -> Option<(&InterpExpr, Span)> {
     let [Block::Paragraph(p)] = item.element.content.as_deref()? else {
         return None;
     };
-    let [Inline::Element(el)] = p.content.as_slice() else {
+    let [Inline::Interp(interp)] = p.content.as_slice() else {
         return None;
     };
-    dollar_expr(el).map(|expr| (expr, el.span))
+    Some((&interp.expr, interp.span))
 }
 
 // ---- turning a value into what a position accepts ---------------------------
@@ -516,6 +494,7 @@ impl Ids {
                     self.blocks(&mut section.blocks);
                 }
                 Block::List(list) => self.list(list),
+                Block::Interp(_) => {}
             }
         }
     }

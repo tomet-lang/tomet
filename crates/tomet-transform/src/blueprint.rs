@@ -255,7 +255,7 @@ mod tests {
             .iter()
             .find(|el| classify_std_lenient(el) == ElementKind::Declaration(DeclKind::Meta))
             .expect("expected a ::meta element");
-        let Some(Value::Map(entries)) = meta.value.as_ref().and_then(|v| v.as_data()) else {
+        let Some(Value::Map(entries)) = meta.value.as_ref().map(|v| v.as_data()) else {
             panic!("expected meta map");
         };
         let get = |key: &str| entries.iter().find(|(k, _)| k == key).unwrap().1.clone();

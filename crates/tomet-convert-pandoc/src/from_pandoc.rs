@@ -541,6 +541,7 @@ fn inlines_to_text_tm(inlines: &[TmInline]) -> String {
                     out.push_str(&blocks_to_text_tm(content));
                 }
             }
+            TmInline::Interp(_) => {}
         }
     }
     out
@@ -565,6 +566,7 @@ fn blocks_to_text_tm(blocks: &[TmBlock]) -> String {
                     }
                 }
             }
+            TmBlock::Interp(_) => {}
         }
     }
     out
@@ -791,7 +793,7 @@ mod tests {
                 Value::String("x".to_string())
             )]))
         );
-        let value = el.value.as_ref().and_then(|v| v.as_data()).unwrap();
+        let value = el.value.as_ref().map(|v| v.as_data()).unwrap();
         assert_eq!(
             value,
             Value::Map(vec![
@@ -815,7 +817,7 @@ mod tests {
         };
         assert_eq!(el.args, None);
         assert_eq!(
-            el.value.as_ref().and_then(|v| v.as_data()),
+            el.value.as_ref().map(|v| v.as_data()),
             Some(Value::Map(vec![(
                 "a".to_string(),
                 Value::String("1".to_string())
@@ -832,7 +834,7 @@ mod tests {
         };
         assert!(el.sigil.is_bare_named("meta"));
         assert_eq!(
-            el.value.as_ref().and_then(|v| v.as_data()),
+            el.value.as_ref().map(|v| v.as_data()),
             Some(Value::Map(vec![
                 ("draft".to_string(), Value::Bool(true)),
                 ("title".to_string(), Value::String("Hello".to_string())),

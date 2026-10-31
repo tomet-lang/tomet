@@ -22,6 +22,7 @@ pub(crate) fn inlines_to_plain(inlines: &[Inline]) -> String {
                     s.push_str(&blocks_to_plain(content));
                 }
             }
+            Inline::Interp(_) => {}
         }
     }
     s
@@ -49,6 +50,7 @@ pub(crate) fn blocks_to_plain(blocks: &[Block]) -> String {
                     }
                 }
             }
+            Block::Interp(_) => {}
         }
     }
     s
@@ -128,7 +130,7 @@ pub(crate) fn push_data_attr(out: &mut String, key: &str, value: &str) {
 /// which would be invalid HTML. `(args)` wins because it is the group the
 /// reader wrote closer to the name.
 pub(crate) fn push_value_data_attrs(out: &mut String, el: &Element) {
-    let Some(data) = el.value.as_ref().and_then(|v| v.as_data()) else {
+    let Some(data) = el.value.as_ref().map(|v| v.as_data()) else {
         return;
     };
     let taken: Vec<String> = el
@@ -200,6 +202,8 @@ pub(crate) fn value_to_plain(v: &Value) -> String {
         Value::Call(..) => String::new(),
         // An embedded element has no scalar form either -- same as `Map`.
         Value::Element(_) => String::new(),
+        // An interpolation is not known until it is evaluated.
+        Value::Interp(_) => String::new(),
         // Block content has no scalar form either -- same as `Map`.
         Value::Blocks(_) => String::new(),
     }

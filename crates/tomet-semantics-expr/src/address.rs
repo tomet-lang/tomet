@@ -6,8 +6,6 @@
 //! The right side is read as the steps that follow a `#` in an expression, so
 //! `intro.prop.tags.item(2)` means what it means after `#` anywhere else.
 
-use tomet_ast::ElementValue;
-
 use super::context::EvalContext;
 use super::error::EvalError;
 use super::nodes::normalize_path;
@@ -55,10 +53,7 @@ pub(crate) fn address_value(text: &str, cx: &EvalContext) -> Result<EvalValue, E
             "`{text}`: a directory has nothing inside it to address"
         )));
     };
-    let element = tomet_parser::parse_dollar_element_str(&format!("${{#{inner}}}"))
+    let interp = tomet_parser::parse_interpolation_str(&format!("${{#{inner}}}"))
         .map_err(|_| EvalError::BadAddress(text.to_string()))?;
-    let Some(ElementValue::Interp(expr)) = element.value else {
-        return Err(EvalError::BadAddress(text.to_string()));
-    };
-    super::eval(&expr, cx, &Env::new().bind(ROOT, base))
+    super::eval(&interp.expr, cx, &Env::new().bind(ROOT, base))
 }

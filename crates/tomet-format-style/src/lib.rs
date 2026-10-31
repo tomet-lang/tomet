@@ -15,7 +15,7 @@
 //! `tomet-printer` since it recurses into inline/child content and
 //! is genuinely part of rebuilding a whole document from its AST.
 
-use tomet_ast::{Block, Element, ElementValue, Entry, Inline, Sigil, Value};
+use tomet_ast::{Block, Element, ElementValue, Entry, Inline, Value};
 
 /// Renders one `Block` of a value-embedded element's `[content]` (now
 /// `Vec<Block>`) the way the old inline-only loop rendered an `Inline` --
@@ -33,6 +33,10 @@ fn render_nested_block(block: &Block, config: &PrinterConfig, out: &mut String) 
             Inline::SoftBreak(_) => out.push(' '),
             Inline::Element(child_el) => {
                 let child_val = Value::Element(Box::new(child_el.clone()));
+                out.push_str(&render_nested(&child_val, config));
+            }
+            Inline::Interp(interp) => {
+                let child_val = Value::Interp(interp.clone());
                 out.push_str(&render_nested(&child_val, config));
             }
         }
@@ -201,37 +205,11 @@ pub fn render_value_inner_with_blocks(
         // set and `content`/`value`/`children` all `None` (an MVP scope
         // limit enforced at parse time, not just convention) -- so `args`
         // alone is the whole element to print back.
-        // A `$name(args)`/`${...}` sitting in a value slot. Unresolved,
-        // it is written back in the `${...}` form (`InterpExpr`'s own
-        // `Display`), the same normalization `tomet-transform::interp`
-        // uses for one left unresolved in prose. A pass that already
-        // evaluated it in place (`tomet-transform::blueprint::instantiate_blueprint`,
-        // which mutates a dollar element's `value` rather than replacing
-        // the `Value::Element` node with the plain result) leaves the
-        // resolved value wrapped back through `ElementValue::from_map` --
-        // unwrap that and print the value itself, as if the `$` wrapper
-        // had never been there.
-        Value::Element(el) if el.sigil == Sigil::Dollar => match &el.value {
-            Some(ElementValue::Interp(expr)) => format!("${{{expr}}}"),
-            Some(ElementValue::Group(entries)) => match entries.as_slice() {
-                [Entry::Pair(k, v)] if k.is_empty() => {
-                    render_nested_with_blocks(v, config, render_blocks)
-                }
-                _ => {
-                    let map = Value::Map(
-                        entries
-                            .iter()
-                            .filter_map(|e| match e {
-                                Entry::Pair(k, v) => Some((k.clone(), v.clone())),
-                                Entry::Element(_) => None,
-                            })
-                            .collect(),
-                    );
-                    render_nested_with_blocks(&map, config, render_blocks)
-                }
-            },
-            None => String::new(),
-        },
+        // A `$name(args)`/`${...}` sitting in a value slot is written back in
+        // the `${...}` form (`InterpExpr`'s own `Display`), the same
+        // normalization `tomet-transform::interp` uses for one left
+        // unresolved in prose.
+        Value::Interp(interp) => format!("${{{}}}", interp.expr),
         Value::Element(el) => {
             let mut s = match &el.args {
                 Some(args) => format!(
@@ -273,9 +251,6 @@ pub fn render_value_inner_with_blocks(
                             }
                         }
                         s.push('}');
-                    }
-                    ElementValue::Interp(expr) => {
-                        s.push_str(&format!("${{{expr}}}"));
                     }
                 }
             }

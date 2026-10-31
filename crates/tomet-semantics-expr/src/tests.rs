@@ -1,7 +1,6 @@
 use std::collections::HashMap;
 
 use time::OffsetDateTime;
-use tomet_ast::ElementValue;
 
 use super::*;
 
@@ -39,12 +38,9 @@ fn map(entries: Vec<(&str, EvalValue)>) -> EvalValue {
 }
 
 fn parse(src: &str) -> tomet_ast::InterpExpr {
-    let el = tomet_parser::parse_dollar_element_str(&format!("${{{src}}}"))
-        .unwrap_or_else(|e| panic!("`{src}` does not parse: {e}"));
-    match el.value {
-        Some(ElementValue::Interp(expr)) => expr,
-        other => panic!("expected an interpolation, got {other:?}"),
-    }
+    tomet_parser::parse_interpolation_str(&format!("${{{src}}}"))
+        .unwrap_or_else(|e| panic!("`{src}` does not parse: {e}"))
+        .expr
 }
 
 fn run_with(

@@ -1,11 +1,9 @@
 use std::ops::ControlFlow;
 
 use lsp_types::{GotoDefinitionResponse, Location, Position, Uri};
-use tomet_ast::{
-    Block, Document, Element, ElementValue, Inline, InterpExpr, InterpExprKind, List, Span, Value,
-};
+use tomet_ast::{Block, Document, Element, Inline, InterpExpr, InterpExprKind, List, Span, Value};
 use tomet_semantics::TargetScheme;
-use tomet_tree::{Visitor, walk_document};
+use tomet_tree::{Visitor, for_each_interpolation, walk_document};
 
 use crate::position::{TextPositions, span_contains};
 
@@ -66,7 +64,7 @@ pub(crate) fn reference_at(doc: &Document, offset: usize) -> Option<Reference> {
             // Elements are visited outside in, so the innermost one that
             // refers to something wins.
             if span_contains(&el.span, self.offset)
-                && let Some(reference) = reference_in(el, self.offset)
+                && let Some(reference) = reference_in(el)
             {
                 self.found = Some(reference);
             }
@@ -79,6 +77,15 @@ pub(crate) fn reference_at(doc: &Document, offset: usize) -> Option<Reference> {
         found: None,
     };
     let _ = walk_document(doc, &mut finder);
+    // An interpolation is not an element, so the walk above never meets it.
+    // It is a leaf, hence inside every element around it, and wins over them.
+    for_each_interpolation(doc, |interp| {
+        if span_contains(&interp.span, offset)
+            && let Some(reference) = reference_in_expression(&interp.expr, offset)
+        {
+            finder.found = Some(reference);
+        }
+    });
     finder.found
 }
 
@@ -91,7 +98,7 @@ pub(crate) fn reference_at(doc: &Document, offset: usize) -> Option<Reference> {
 /// - in an expression, `#x` and `self#x` (this document), `doc#x` (a node of
 ///   another), and `tmt("p")`, `ref("n")` (the document itself). Where the
 ///   cursor is on more than one, the narrowest; where it is on none, the first.
-fn reference_in(el: &Element, offset: usize) -> Option<Reference> {
+fn reference_in(el: &Element) -> Option<Reference> {
     if let Some((_, target)) = tomet_semantics::link_target_of(el) {
         let (scheme, rest) = tomet_semantics::target_scheme(&target);
         match scheme {
@@ -122,18 +129,21 @@ fn reference_in(el: &Element, offset: usize) -> Option<Reference> {
             }
         }
     }
-    if let Some(ElementValue::Interp(expr)) = &el.value {
-        let mut found = Vec::new();
-        references_in(expr, &mut found);
-        let narrowest = found
-            .iter()
-            .filter(|(span, _)| span_contains(span, offset))
-            .min_by_key(|(span, _)| span.end.saturating_sub(span.start));
-        return narrowest
-            .or_else(|| found.first())
-            .map(|(_, reference)| reference.clone());
-    }
     None
+}
+
+/// What the expression `expr` refers to at `offset`: the narrowest reference
+/// the cursor is on, or the first when it is on none.
+fn reference_in_expression(expr: &InterpExpr, offset: usize) -> Option<Reference> {
+    let mut found = Vec::new();
+    references_in(expr, &mut found);
+    let narrowest = found
+        .iter()
+        .filter(|(span, _)| span_contains(span, offset))
+        .min_by_key(|(span, _)| span.end.saturating_sub(span.start));
+    narrowest
+        .or_else(|| found.first())
+        .map(|(_, reference)| reference.clone())
 }
 
 /// `path#x` as the path and the id, if there is one.
@@ -229,6 +239,7 @@ pub(crate) fn find_def_in_blocks(blocks: &[Block], target_id: &str) -> Option<Sp
                     return Some(span);
                 }
             }
+            Block::Interp(_) => {}
         }
     }
     None

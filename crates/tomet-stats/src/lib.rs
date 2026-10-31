@@ -63,7 +63,7 @@ pub struct Stats {
     pub named: usize,
     /// Declarations about the document (`::name`).
     pub document: usize,
-    /// Dynamic substitution elements (`${...}`).
+    /// Dynamic substitutions (`${...}`), counted with the elements.
     pub dollar: usize,
     /// Bare list item elements (`- ...`).
     pub bare: usize,
@@ -143,7 +143,6 @@ pub fn measure(doc: &Document) -> Stats {
                 stats.document += 1;
                 *stats.by_name.entry(format!("::{name}")).or_default() += 1;
             }
-            Sigil::Dollar => stats.dollar += 1,
             Sigil::Bare => stats.bare += 1,
             // A hole exists only in what `parse_pattern` reads, never in a
             // document that is being measured, so there is no count for it.
@@ -157,6 +156,8 @@ pub fn measure(doc: &Document) -> Stats {
             stats.links[i] += 1;
         }
     });
+
+    tomet_tree::for_each_interpolation(doc, |_| stats.dollar += 1);
 
     tomet_tree::for_each_inline(doc, |inline| {
         if let Inline::Text(text) = inline {

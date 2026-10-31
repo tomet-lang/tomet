@@ -220,15 +220,12 @@ mod tests {
             heading_level: 0,
             notes: Default::default(),
         };
-        let element = tomet_parser::parse_dollar_element_str(
+        let interp = tomet_parser::parse_interpolation_str(
             "${vault.docs.filter(d => d.meta.tags.contains(\"rust\")).map(d => d.path)}",
         )
         .unwrap();
-        let Some(tomet_ast::ElementValue::Interp(expr)) = element.value else {
-            panic!("an expression");
-        };
         assert_eq!(
-            evaluate(&expr, &cx).unwrap(),
+            evaluate(&interp.expr, &cx).unwrap(),
             EvalValue::Seq(vec![EvalValue::String("notes/rust.tmt".into())])
         );
         let _ = fs::remove_dir_all(&root);

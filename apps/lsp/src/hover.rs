@@ -2,10 +2,10 @@ use std::ops::ControlFlow;
 use tomet_semantics::DeclKind;
 
 use lsp_types::{Hover, HoverContents, MarkupContent, MarkupKind, Position, Range, Uri};
-use tomet_ast::{Document, Element, ElementValue, Value};
+use tomet_ast::{Document, Element, InterpExpr, Span, Value};
 use tomet_expr::{DocRef, EvalContext, EvalValue, MemoryResolver, Phase, SystemGenerate, evaluate};
 use tomet_semantics::{ElementKind, classify_std_lenient, heading_level, normalized_element_args};
-use tomet_tree::{ValueExt, Visitor, walk_document};
+use tomet_tree::{ValueExt, Visitor, for_each_interpolation, walk_document};
 
 use crate::format::resolve_effective_config;
 use crate::position::{TextPositions, span_contains};
@@ -173,6 +173,20 @@ pub fn hover_in(text: &str, pos: Position, evaluate: Evaluate<'_>) -> Option<Hov
         best_match: None,
     };
     let _ = walk_document(&doc, &mut finder);
+
+    // An interpolation is not an element, so the walk above never meets it.
+    // It is a leaf, hence the innermost thing under the cursor.
+    for_each_interpolation(&doc, |interp| {
+        if span_contains(&interp.span, offset) {
+            finder.best_match = Some(macro_result_hover(
+                &positions,
+                &doc,
+                evaluate,
+                &interp.expr,
+                interp.span,
+            ));
+        }
+    });
 
     finder.best_match
 }
@@ -379,20 +393,14 @@ fn find_interp_in_value(val: &Value) -> Option<tomet_ast::InterpExpr> {
             if trimmed.starts_with('$')
                 && let Ok(parsed) = tomet_parser::parse_document(trimmed)
             {
-                struct InterpFinder(Option<tomet_ast::InterpExpr>);
-                impl Visitor<()> for InterpFinder {
-                    fn visit(&mut self, el: &Element) -> ControlFlow<()> {
-                        if let Some(ElementValue::Interp(expr)) = &el.value {
-                            self.0 = Some(expr.clone());
-                            return ControlFlow::Break(());
-                        }
-                        ControlFlow::Continue(())
+                let mut found = None;
+                for_each_interpolation(&parsed, |interp| {
+                    if found.is_none() {
+                        found = Some(interp.expr.clone());
                     }
-                }
-                let mut finder = InterpFinder(None);
-                let _ = walk_document(&parsed, &mut finder);
-                if finder.0.is_some() {
-                    return finder.0;
+                });
+                if found.is_some() {
+                    return found;
                 }
             }
             None
@@ -423,15 +431,20 @@ fn macro_hover(
     evaluate: Evaluate<'_>,
     el: &Element,
 ) -> Option<Hover> {
-    let expr = if let Some(ElementValue::Interp(expr)) = el.value.as_ref() {
-        Some(expr.clone())
-    } else if let Some(args) = el.args.as_ref() {
-        find_interp_in_value(args)
-    } else {
-        None
-    }?;
+    let expr = find_interp_in_value(el.args.as_ref()?)?;
+    Some(macro_result_hover(positions, doc, evaluate, &expr, el.span))
+}
 
-    let md = match evaluate(doc, &expr) {
+/// The hover for the expression `expr`, written at `span`: what it comes to,
+/// or why it does not.
+fn macro_result_hover(
+    positions: &TextPositions<'_>,
+    doc: &Document,
+    evaluate: Evaluate<'_>,
+    expr: &InterpExpr,
+    span: Span,
+) -> Hover {
+    let md = match evaluate(doc, expr) {
         Ok(val) => {
             let rendered = render_value(&val);
             let trimmed = rendered.trim();
@@ -445,13 +458,13 @@ fn macro_hover(
             format!("**Macro**\n\n- **Error**: `{err}`")
         }
     };
-    Some(Hover {
+    Hover {
         contents: HoverContents::Markup(MarkupContent {
             kind: MarkupKind::Markdown,
             value: md,
         }),
-        range: Some(positions.range(&el.span)),
-    })
+        range: Some(positions.range(&span)),
+    }
 }
 
 fn is_web_url(s: &str) -> bool {

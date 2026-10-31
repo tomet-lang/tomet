@@ -10,7 +10,7 @@ use crate::element::{
 };
 use crate::error::Result;
 use crate::inline::{Stop, extend_merging, parse_inline_seq, push_soft_break};
-use crate::interp::{is_interp_start, parse_dollar_element};
+use crate::interp::{is_interp_start, parse_interpolation};
 use crate::list::{parse_list, peek_list_marker};
 use crate::raw::{is_fenced_code_block_start, parse_fenced_code_block};
 use crate::section::{
@@ -269,8 +269,8 @@ pub(crate) fn parse_block_seq(
             }
         }
         if cur.peek() == Some('$') && is_interp_start(&cur) {
-            let el = parse_dollar_element(&mut cur)?;
-            push_block(&mut doc_blocks, &mut stack, Block::Element(el));
+            let interp = parse_interpolation(&mut cur)?;
+            push_block(&mut doc_blocks, &mut stack, Block::Interp(interp));
             continue;
         }
 

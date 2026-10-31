@@ -4,7 +4,7 @@ use std::cell::RefCell;
 use std::collections::HashSet;
 
 use tomet_ast::{
-    Block, Document, Element, ElementValue, Inline, List, Placement, Section, Sigil, Value,
+    Block, Document, Element, Inline, Interpolation, List, Placement, Section, Sigil, Value,
 };
 use tomet_semantics::{
     FootnoteRegistry, TargetScheme, classify_std_lenient, extract_tags, heading_level,
@@ -69,6 +69,10 @@ fn render_block(cx: &TypstCtx, block: &Block, out: &mut String) {
         }
         Block::Section(sec) => render_section(cx, sec, out),
         Block::List(list) => render_list(cx, list, out),
+        Block::Interp(interp) => {
+            out.push_str(&render_interp(interp));
+            out.push_str("\n\n");
+        }
     }
 }
 
@@ -149,6 +153,7 @@ fn inline_to_typst(cx: &TypstCtx, inlines: &[Inline]) -> String {
             }
             Inline::LineBreak(_) => out.push_str("\\\n"),
             Inline::Element(el) => out.push_str(&element_to_typst(cx, el, true)),
+            Inline::Interp(interp) => out.push_str(&render_interp(interp)),
         }
     }
     out
@@ -196,7 +201,6 @@ fn element_to_typst(cx: &TypstCtx, el: &Element, inline: bool) -> String {
         }
         "tag" => render_tag(el),
         "task" => render_task(cx, el, inline),
-        "interp" => render_interp(el),
         _ => render_generic(cx, el, kind.as_str(), inline),
     }
 }
@@ -584,15 +588,12 @@ fn render_embed(el: &Element) -> String {
     }
 }
 
-/// Re-renders an `InterpExpr` back to `${...}`-shaped source text, wrapped
+/// Re-renders an interpolation back to `${...}`-shaped source text, wrapped
 /// in a raw span (`` `${...}` ``) so Typst's own `$`-prefixed math mode
 /// never tries to parse it -- see the module doc's note on why `${...}`
 /// is kept inert here rather than evaluated.
-fn render_interp(el: &Element) -> String {
-    match &el.value {
-        Some(ElementValue::Interp(expr)) => format!("`${{{expr}}}`"),
-        _ => String::new(),
-    }
+fn render_interp(interp: &Interpolation) -> String {
+    format!("`${{{}}}`", interp.expr)
 }
 
 /// Anything with no dedicated Typst mapping (a hand-authored `<T>`/`@name`
@@ -660,6 +661,7 @@ fn inlines_to_plain(inlines: &[Inline]) -> String {
                     s.push_str(&blocks_to_plain(content));
                 }
             }
+            Inline::Interp(_) => {}
         }
     }
     s
@@ -684,6 +686,7 @@ fn blocks_to_plain(blocks: &[Block]) -> String {
                     }
                 }
             }
+            Block::Interp(_) => {}
         }
     }
     s
@@ -744,6 +747,8 @@ fn value_to_plain(v: &Value) -> String {
         // whole nested element), so this stays unrendered rather than
         // half-rendering it out of context.
         Value::Element(_) => String::new(),
+        // An interpolation is not known until it is evaluated.
+        Value::Interp(_) => String::new(),
         // Block content has no scalar form either -- same as `Map`.
         Value::Blocks(_) => String::new(),
     }

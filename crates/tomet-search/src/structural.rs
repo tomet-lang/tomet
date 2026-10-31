@@ -3,7 +3,7 @@
 //! Provides pure in-memory querying over Tomet AST elements by tag,
 //! attribute/property key, and value content.
 
-use tomet_ast::{Document, Element, ElementValue, Span, Value};
+use tomet_ast::{Document, Element, Span, Value};
 use tomet_semantics::classify_std_lenient;
 use tomet_tree::{ElementExt, for_each_element};
 
@@ -46,12 +46,10 @@ pub fn matches_query(el: &Element, query: &StructuralQuery) -> bool {
         && !sub.is_empty()
     {
         let in_args = el.args.as_ref().is_some_and(|v| value_contains_str(v, sub));
-        let in_val = el.value.as_ref().is_some_and(|v| match v {
-            ElementValue::Group(_) => v
-                .as_data()
-                .is_some_and(|data| value_contains_str(&data, sub)),
-            ElementValue::Interp(_) => false,
-        });
+        let in_val = el
+            .value
+            .as_ref()
+            .is_some_and(|v| value_contains_str(&v.as_data(), sub));
         if !in_args && !in_val {
             return false;
         }

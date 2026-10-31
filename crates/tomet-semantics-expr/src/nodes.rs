@@ -83,6 +83,7 @@ fn in_block(block: &Block, id: &str) -> Option<Node> {
             _ => None,
         }),
         Block::List(list) => in_list(list, id),
+        Block::Interp(_) => None,
     }
 }
 
@@ -174,7 +175,7 @@ fn prop(doc: &DocRef, args: &Option<Value>, value: &Option<ElementValue>) -> Eva
         Some(Value::Map(entries)) => Some(entries.clone()),
         _ => None,
     };
-    let value_data = value.as_ref().and_then(|v| v.as_data());
+    let value_data = value.as_ref().map(|v| v.as_data());
     let value_map = match &value_data {
         Some(Value::Map(entries)) => Some(entries.clone()),
         _ => None,

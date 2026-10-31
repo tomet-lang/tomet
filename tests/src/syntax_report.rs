@@ -24,8 +24,8 @@ use std::fmt::Write as _;
 use std::path::PathBuf;
 
 use tomet_ast::{
-    Block, Document, Element, ElementValue, Entry, Inline, InterpExpr, List, Placement, Sigil,
-    Value,
+    Block, Document, Element, ElementValue, Entry, Inline, InterpExpr, Interpolation, List,
+    Placement, Sigil, Value,
 };
 use tomet_parser::parse_document;
 
@@ -663,6 +663,7 @@ fn dump_block(out: &mut String, block: &Block, depth: usize) {
             }
         }
         Block::Element(el) => dump_element(out, el, depth),
+        Block::Interp(interp) => dump_interp(out, interp, depth),
         Block::Section(sec) => {
             indent(out, depth);
             let _ = writeln!(out, "Section level={}", sec.level);
@@ -692,10 +693,6 @@ fn dump_block(out: &mut String, block: &Block, depth: usize) {
                             Entry::Element(child) => dump_element(out, child, depth + 2),
                         }
                     }
-                }
-                Some(ElementValue::Interp(expr)) => {
-                    indent(out, depth + 1);
-                    let _ = writeln!(out, "interp  {}", interp_str(expr));
                 }
                 None => {}
             }
@@ -763,7 +760,15 @@ fn dump_inline(out: &mut String, inline: &Inline, depth: usize) {
             let _ = writeln!(out, "LineBreak");
         }
         Inline::Element(el) => dump_element(out, el, depth),
+        Inline::Interp(interp) => dump_interp(out, interp, depth),
     }
+}
+
+fn dump_interp(out: &mut String, interp: &Interpolation, depth: usize) {
+    indent(out, depth);
+    out.push_str("Interp $\n");
+    indent(out, depth + 1);
+    let _ = writeln!(out, "interp  {}", interp_str(&interp.expr));
 }
 
 fn dump_element(out: &mut String, el: &Element, depth: usize) {
@@ -782,10 +787,6 @@ fn dump_element(out: &mut String, el: &Element, depth: usize) {
         }
     }
     match &el.value {
-        Some(ElementValue::Interp(expr)) => {
-            indent(out, depth + 1);
-            let _ = writeln!(out, "interp  {}", interp_str(expr));
-        }
         Some(ElementValue::Group(entries)) => {
             indent(out, depth + 1);
             if entries.is_empty() {
@@ -838,7 +839,6 @@ fn element_head(el: &Element) -> String {
             format!("{placement} ::{name}")
         }
         Sigil::Bare => "Bare".to_string(),
-        Sigil::Dollar => "Interp $".to_string(),
         Sigil::Question(matcher) => {
             let placement = match el.placement {
                 Placement::Block => "Block ",
@@ -886,6 +886,7 @@ fn value_str(v: &Value) -> String {
             let inner: Vec<String> = args.iter().map(value_str).collect();
             format!("{name}({})", inner.join(", "))
         }
+        Value::Interp(interp) => format!("${{{}}}", interp_str(&interp.expr)),
         Value::Element(el) => {
             let name = el.sigil.name().map(|n| n.to_string()).unwrap_or_default();
             match &el.args {

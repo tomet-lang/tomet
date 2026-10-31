@@ -1,7 +1,7 @@
 //! =[ tomet-ast ]
 //!
 //! Shared AST and `Value` data models for the Tomet toolchain (`Document`, `Block`,
-//! `Inline`, `Element`, `Value`, `Span`).
+//! `Inline`, `Element`, `Interpolation`, `Value`, `Span`).
 //!
 //! =[ Design Policy ]
 //!
@@ -9,6 +9,11 @@
 //!   | `tomet-ast` is the foundational dependency-free crate referenced across the workspace.
 //!   | It contains only struct/enum definitions and pure inherent methods for construction
 //!   | (`new`, `with_*`) and structural inspection (`as_str()`, `get()`, `is_null()`, `Span::union()`).
+//! - (A Node's Role Is Its Type)
+//!   | A `${...}` is an [`Interpolation`] (an expression and a span), not an [`Element`]:
+//!   | it has no name, no groups and no connects, so it is a variant of [`Block`],
+//!   | [`Inline`] and [`Value`] and no walker over elements ever meets one. Reach every
+//!   | interpolation of a document through `tomet_tree::for_each_interpolation`.
 //! - (Clear Crate Boundaries)
 //!   | Semantics: Classification of element meanings (links, `::meta`, `::config`) lives in `tomet-semantics`.
 //!   | Traversal & Manipulation: Generic tree traversal algorithms live in `tomet-tree`.
@@ -139,6 +144,9 @@ pub enum Value {
     /// not kinship -- conflating the two would blur which one is
     /// evaluated for a reader of either.
     Call(String, Vec<Value>),
+    /// `${...}` / `$name(...)` sitting where a value goes -- evaluated later,
+    /// so `tomet-semantics` never looks inside it as data. See [`Interpolation`].
+    Interp(Interpolation),
     /// A real, `@`-sigiled element sitting where a value goes --
     /// `::meta(icon: @doc.icon("triangle"))`. Unlike [`Value::Call`], this
     /// is the same [`Element`] any other position produces: it has a
@@ -253,6 +261,7 @@ impl Serialize for Value {
                 m.serialize_entry("args", args)?;
                 m.end()
             }
+            Value::Interp(interp) => interp.serialize(serializer),
             Value::Element(el) => el.serialize(serializer),
             Value::Blocks(blocks) => {
                 use serde::ser::SerializeSeq;
@@ -266,9 +275,10 @@ impl Serialize for Value {
     }
 }
 
-// Deliberately no `Value::Call`, `Value::Element`, or `Value::Blocks` arm
-// below: all three are only ever produced by `tomet-syntax-parser` reading
-// source text (`name(...)` / `@name(...)` / `key: [...]`), never by
+// Deliberately no `Value::Call`, `Value::Interp`, `Value::Element`, or
+// `Value::Blocks` arm below: all four are only ever produced by
+// `tomet-syntax-parser` reading source text (`name(...)` / `${...}` /
+// `@name(...)` / `key: [...]`), never by
 // deserializing inbound data -- there is no `visit_call` and nothing in
 // serde's data model looks like an `Element` or a `Vec<Block>` either. This
 // is not an oversight.
@@ -365,6 +375,10 @@ pub enum Block {
     /// A `-`/`-.` list, first-class like [`Section`] rather than encoded as
     /// a named [`Element`]. See [`List`].
     List(List),
+    /// A `${...}` that stands alone on its line, in block context. It is a
+    /// block of its own, and not a one-item paragraph, because what it
+    /// evaluates to may be blocks (an include, a generated table).
+    Interp(Interpolation),
 }
 
 impl Block {
@@ -374,6 +388,7 @@ impl Block {
             Block::Element(e) => e.span,
             Block::Section(s) => s.span,
             Block::List(l) => l.span,
+            Block::Interp(i) => i.span,
         }
     }
 }
@@ -481,6 +496,8 @@ impl Paragraph {
 pub enum Inline {
     Text(Text),
     Element(Element),
+    /// `${...}` / `$name(...)` inside running text. See [`Interpolation`].
+    Interp(Interpolation),
     /// A source line break that is semantically whitespace. Unlike the old
     /// behavior of folding it into a literal `' '` (or nothing, between two
     /// East-Asian-wide characters) at parse time, this keeps the break's
@@ -501,7 +518,7 @@ pub enum Inline {
 
 impl Inline {
     /// The first character of this node's own text, if it has one -- `Text`
-    /// and `Raw` do, `Element`/`SoftBreak`/`LineBreak` don't.
+    /// and `Raw` do, `Element`/`Interp`/`SoftBreak`/`LineBreak` don't.
     ///
     /// Used by renderers reproducing [`softbreak_join`]'s wide-character
     /// check against whatever inline follows a `SoftBreak`: only the
@@ -512,7 +529,10 @@ impl Inline {
         match self {
             Inline::Text(t) => t.value.chars().next(),
             Inline::Raw(t) => t.value.chars().next(),
-            Inline::Element(_) | Inline::SoftBreak(_) | Inline::LineBreak(_) => None,
+            Inline::Element(_)
+            | Inline::Interp(_)
+            | Inline::SoftBreak(_)
+            | Inline::LineBreak(_) => None,
         }
     }
 
@@ -520,6 +540,7 @@ impl Inline {
         match self {
             Inline::Text(t) => t.span,
             Inline::Element(e) => e.span,
+            Inline::Interp(i) => i.span,
             Inline::SoftBreak(b) => b.span,
             Inline::LineBreak(b) => b.span,
             Inline::Raw(t) => t.span,
@@ -750,13 +771,6 @@ pub enum Sigil {
     /// the list itself is the container.
     #[default]
     Bare,
-    /// `${...}` interpolation -- structurally just a sigil with a
-    /// mandatory `{value}` group, same shape as `@name{value}`, so it
-    /// reuses `Element`/`Inline::Element` rather than being a separate
-    /// `Inline` variant. No name of its own (unlike `Named`): the
-    /// `InterpExpr` inside the `ElementValue::Interp` value group carries
-    /// its own path/call name.
-    Dollar,
     /// `::name` -- a declaration about the document itself, not content in it.
     ///
     /// Structurally the same as [`Sigil::Named`]: an element with a mandatory
@@ -791,11 +805,11 @@ impl Sigil {
     pub fn name(&self) -> Option<&Name> {
         match self {
             Sigil::Named(name) | Sigil::Document(name) => Some(name),
-            Sigil::Bare | Sigil::Dollar | Sigil::Question(_) => None,
+            Sigil::Bare | Sigil::Question(_) => None,
         }
     }
 
-    /// The text that opens an element: `@name`, `::name`, `$`, `?matcher`.
+    /// The text that opens an element: `@name`, `::name`, `?matcher`.
     /// Empty for [`Sigil::Bare`], which is written with no sigil at all.
     ///
     /// Everything that prints an element asks here, so a sigil is spelled in
@@ -805,7 +819,6 @@ impl Sigil {
             Sigil::Named(name) => format!("@{name}"),
             Sigil::Document(name) => format!("::{name}"),
             Sigil::Bare => String::new(),
-            Sigil::Dollar => "$".to_string(),
             Sigil::Question(matcher) => match matcher {
                 Some(matcher) => format!("?{matcher}"),
                 None => "?".to_string(),
@@ -929,6 +942,10 @@ pub enum Entry {
 
 /// The contents of an element's value group.
 ///
+/// It has the one variant [`ElementValue::Group`] since a `${...}` stopped being
+/// an element value (it is an [`Interpolation`] now); the enum is kept until
+/// the value slot is given its final shape.
+///
 /// `{...}` is always data: it parses uniformly into [`Entry`] items in
 /// source order, whatever the element is called. "Is this a data map or a
 /// list of children?" is no longer a parse-time branch -- it is a view
@@ -937,7 +954,6 @@ pub enum Entry {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum ElementValue {
     Group(Vec<Entry>),
-    Interp(InterpExpr),
 }
 
 impl ElementValue {
@@ -969,12 +985,9 @@ impl ElementValue {
     /// The data view: this group's `key: value` pairs, in source order,
     /// as a [`Value::Map`]. Nested elements are skipped.
     ///
-    /// Returns `None` for `Raw`/`Interp`, which carry no pairs.
-    pub fn as_data(&self) -> Option<Value> {
-        let ElementValue::Group(entries) = self else {
-            return None;
-        };
-        Some(Value::Map(
+    pub fn as_data(&self) -> Value {
+        let ElementValue::Group(entries) = self;
+        Value::Map(
             entries
                 .iter()
                 .filter_map(|e| match e {
@@ -982,14 +995,12 @@ impl ElementValue {
                     Entry::Element(_) => None,
                 })
                 .collect(),
-        ))
+        )
     }
 
     /// The children view: this group's nested elements, in source order.
     pub fn as_children(&self) -> Vec<&Element> {
-        let ElementValue::Group(entries) = self else {
-            return Vec::new();
-        };
+        let ElementValue::Group(entries) = self;
         entries
             .iter()
             .filter_map(|e| match e {
@@ -1001,16 +1012,13 @@ impl ElementValue {
 
     /// Whether this group holds any nested elements.
     pub fn has_children(&self) -> bool {
-        matches!(self, ElementValue::Group(entries)
-            if entries.iter().any(|e| matches!(e, Entry::Element(_))))
+        let ElementValue::Group(entries) = self;
+        entries.iter().any(|e| matches!(e, Entry::Element(_)))
     }
 
     /// This group's `key: value` pairs, in source order.
     pub fn pairs(&self) -> impl Iterator<Item = (&String, &Value)> {
-        let entries: &[Entry] = match self {
-            ElementValue::Group(entries) => entries,
-            _ => &[],
-        };
+        let ElementValue::Group(entries) = self;
         entries.iter().filter_map(|e| match e {
             Entry::Pair(k, v) => Some((k, v)),
             Entry::Element(_) => None,
@@ -1019,10 +1027,7 @@ impl ElementValue {
 
     /// Mutable counterpart of [`ElementValue::pairs`].
     pub fn pairs_mut(&mut self) -> impl Iterator<Item = (&mut String, &mut Value)> {
-        let entries: &mut [Entry] = match self {
-            ElementValue::Group(entries) => entries,
-            _ => &mut [],
-        };
+        let ElementValue::Group(entries) = self;
         entries.iter_mut().filter_map(|e| match e {
             Entry::Pair(k, v) => Some((k, v)),
             Entry::Element(_) => None,
@@ -1039,19 +1044,15 @@ impl ElementValue {
         self.pairs_mut().find(|(k, _)| *k == key).map(|(_, v)| v)
     }
 
-    /// Appends a `key: value` pair. Does nothing for `Raw`/`Interp`, which
-    /// hold no entries.
+    /// Appends a `key: value` pair.
     pub fn push_pair(&mut self, key: impl Into<String>, value: Value) {
-        if let ElementValue::Group(entries) = self {
-            entries.push(Entry::Pair(key.into(), value));
-        }
+        let ElementValue::Group(entries) = self;
+        entries.push(Entry::Pair(key.into(), value));
     }
 
     /// Removes the first pair bound to `key` and returns its value.
     pub fn remove(&mut self, key: &str) -> Option<Value> {
-        let ElementValue::Group(entries) = self else {
-            return None;
-        };
+        let ElementValue::Group(entries) = self;
         let idx = entries
             .iter()
             .position(|e| matches!(e, Entry::Pair(k, _) if k == key))?;
@@ -1060,6 +1061,19 @@ impl ElementValue {
             Entry::Element(_) => unreachable!("position matched a Pair"),
         }
     }
+}
+
+/// A `${...}` (or `$name(...)`) interpolation: an expression to be evaluated
+/// where it stands.
+///
+/// It is not an [`Element`]: it has no name, no `(args)` / `[content]` and no
+/// `#(id)`, and it never takes a `:connect`. It holds an expression and the
+/// span of the whole `$`-form, and nothing else. It sits in three places, as
+/// [`Block::Interp`], [`Inline::Interp`] and [`Value::Interp`].
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Interpolation {
+    pub expr: InterpExpr,
+    pub span: Span,
 }
 
 /// One node of a `${...}` interpolation's parsed expression tree.

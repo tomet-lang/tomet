@@ -22,7 +22,7 @@ use crate::util::{
     escape_attr, escape_html, id_attr, push_data_attrs, push_value_data_attrs, value_to_plain,
 };
 use crate::{CustomElementCtx, RenderCtx};
-use tomet_ast::{Element, ElementValue};
+use tomet_ast::{Element, ElementValue, Interpolation};
 use tomet_semantics::{
     classify_std_lenient, extract_tags, is_directive, normalized_element_args_in,
 };
@@ -32,11 +32,6 @@ pub(crate) fn render_element(cx: &RenderCtx, el: &Element, out: &mut String, inl
     match kind.as_str() {
         // Directives -- see `tomet_semantics::is_directive`.
         _ if is_directive(&kind) => {}
-        "interp" => {
-            if let Some(value) = &el.value {
-                render_element_value(cx, value, out);
-            }
-        }
         "ftn" => {
             if (inline || el.placement == tomet_ast::Placement::Inline)
                 && let Some((idx, backlink)) = cx.footnotes.get_ref(&el.span)
@@ -248,23 +243,24 @@ fn render_element_value(cx: &RenderCtx, value: &ElementValue, out: &mut String) 
                 out.push_str("</div>\n");
             }
         }
-        // A `${...}` that reached here unresolved, written back as it was.
-        //
-        // Reaching here at all means the document was not prepared -- a
-        // caller that went straight to this crate rather than through
-        // `tomet_load::Vault`. Rendering nothing would hide it, and
-        // evaluating it here is what this crate stopped doing: what a
-        // `${...}` means is settled by `tomet-transform`'s
-        // `resolve_expressions` before any converter sees the tree.
-        //
-        // This used to evaluate with `evaluate_with_config` -- no
-        // `EvaluationContext` and no vault config, so `${self.path}`
-        // resolved in CommonMark and not here, and `default.config.tmt`'s
-        // macros expanded in neither. No wrapper element is emitted now
-        // that the text is plain: `<span class="tm-interp">` carried no
-        // style and marked a distinction that no longer survives to here.
-        ElementValue::Interp(expr) => {
-            out.push_str(&escape_html(&format!("${{{expr}}}")));
-        }
     }
+}
+
+/// A `${...}` that reached here unresolved, written back as it was.
+///
+/// Reaching here at all means the document was not prepared -- a
+/// caller that went straight to this crate rather than through
+/// `tomet_load::Vault`. Rendering nothing would hide it, and
+/// evaluating it here is what this crate stopped doing: what a
+/// `${...}` means is settled by `tomet-transform`'s
+/// `resolve_expressions` before any converter sees the tree.
+///
+/// This used to evaluate with `evaluate_with_config` -- no
+/// `EvaluationContext` and no vault config, so `${self.path}`
+/// resolved in CommonMark and not here, and `default.config.tmt`'s
+/// macros expanded in neither. No wrapper element is emitted now
+/// that the text is plain: `<span class="tm-interp">` carried no
+/// style and marked a distinction that no longer survives to here.
+pub(crate) fn render_interp(interp: &Interpolation, out: &mut String) {
+    out.push_str(&escape_html(&format!("${{{}}}", interp.expr)));
 }

@@ -708,13 +708,9 @@ mod tests {
         let host = root.join("host.tmt");
         let (doc, _) = vault.document(&host).unwrap();
         let eval = |src: &str| {
-            let expr = match tomet_parser::parse_dollar_element_str(&format!("${{{src}}}"))
+            let expr = tomet_parser::parse_interpolation_str(&format!("${{{src}}}"))
                 .unwrap()
-                .value
-            {
-                Some(tomet_ast::ElementValue::Interp(expr)) => expr,
-                other => panic!("not an expression: {other:?}"),
-            };
+                .expr;
             vault.evaluate(&doc, &host, &expr)
         };
         let text = |s: &str| tomet_expr::EvalValue::String(s.to_string());

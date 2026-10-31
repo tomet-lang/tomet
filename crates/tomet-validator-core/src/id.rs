@@ -33,6 +33,7 @@ fn collect_block_ids(block: &Block, ids: &mut Vec<(String, Span)>) {
             }
         }
         Block::List(list) => collect_list_ids(list, ids),
+        Block::Interp(_) => {}
     }
 }
 

@@ -39,6 +39,7 @@ fn every_sigil_takes_every_group_opener() {
             Block::Section(_) => Some("section".into()),
             Block::Paragraph(_) => None,
             Block::List(list) => Some(if list.ordered { "ol" } else { "ul" }.into()),
+            Block::Interp(_) => None,
         }
     }
 

@@ -126,7 +126,7 @@ impl ElementExt for Element {
             _ => None,
         };
         let value_map = self.value.as_ref().and_then(|v| match v.as_data() {
-            Some(Value::Map(entries)) => Some(entries),
+            Value::Map(entries) => Some(entries),
             _ => None,
         });
         match (args_map, value_map) {

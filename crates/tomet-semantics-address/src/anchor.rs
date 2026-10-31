@@ -64,6 +64,7 @@ fn find_in_block(block: &Block, anchor: &str) -> Option<Span> {
             None
         }
         Block::List(list) => find_in_list(list, anchor),
+        Block::Interp(_) => None,
     }
 }
 
@@ -194,6 +195,7 @@ fn collect_in_block(block: &Block, anchors: &mut Vec<(String, Span)>) {
             }
         }
         Block::List(list) => collect_in_list(list, anchors),
+        Block::Interp(_) => {}
     }
 }
 

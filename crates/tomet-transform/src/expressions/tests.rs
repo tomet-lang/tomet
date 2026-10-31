@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use tomet_ast::{Block, ElementValue, Inline, Sigil, Value};
+use tomet_ast::{Block, ElementValue, Inline, Value};
 use tomet_expr::{
     DocRef, EvalContext, EvalValue, MemoryResolver, NoResolver, Phase, Resolver, SystemGenerate,
 };
@@ -115,6 +115,7 @@ fn text_of(doc: &Document) -> String {
                         el.sigil.name().map(|n| n.to_string()).unwrap_or_default()
                     ));
                 }
+                Block::Interp(interp) => out.push_str(&format!("${{{}}}", interp.expr)),
             }
         }
     }
@@ -367,7 +368,7 @@ fn a_document_cannot_be_stored_as_data_and_the_expression_stays() {
     let Some(Value::Map(entries)) = &el.args else {
         panic!("args");
     };
-    assert!(matches!(&entries[0].1, Value::Element(e) if e.sigil == Sigil::Dollar));
+    assert!(matches!(&entries[0].1, Value::Interp(_)));
 }
 
 #[test]
@@ -440,7 +441,7 @@ fn creation_only_names_are_refused_when_rendering() {
     };
     assert!(matches!(
         &entries[0],
-        tomet_ast::Entry::Pair(_, Value::Element(_))
+        tomet_ast::Entry::Pair(_, Value::Interp(_))
     ));
 }
 

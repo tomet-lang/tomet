@@ -218,6 +218,9 @@ pub fn check_singletons_and_regions(
                         Inline::Text(t) if !t.value.trim().is_empty() => {
                             in_preamble = false;
                         }
+                        Inline::Interp(_) => {
+                            in_preamble = false;
+                        }
                         _ => {}
                     }
                 }
@@ -237,6 +240,9 @@ pub fn check_singletons_and_regions(
             Block::List(list) => {
                 in_preamble = false;
                 validate_list_items(list, &mut visit);
+            }
+            Block::Interp(_) => {
+                in_preamble = false;
             }
         }
     }
@@ -268,6 +274,7 @@ fn validate_section_block(block: &Block, visit: &mut impl FnMut(&Element, bool))
             }
         }
         Block::List(list) => validate_list_items(list, visit),
+        Block::Interp(_) => {}
     }
 }
 
@@ -357,7 +364,7 @@ pub fn check_arguments(doc: &Document, bindings: &Bindings, errors: &mut Vec<Dia
             let Some(ty) = decl.param(key).and_then(|p| p.declared_type()) else {
                 continue;
             };
-            if matches!(value, Value::Element(el) if matches!(el.sigil, tomet_ast::Sigil::Dollar)) {
+            if matches!(value, Value::Interp(_)) {
                 continue;
             }
             if let Err(mismatch) = ty.admits(value) {
@@ -572,8 +579,7 @@ fn for_each_direct_content_element<'a>(
                     }
                 }
             }
-            Block::Section(_) => {}
-            Block::List(_) => {}
+            Block::Section(_) | Block::List(_) | Block::Interp(_) => {}
         }
     }
 }
@@ -691,7 +697,7 @@ fn field_value_error(
         Value::Null => true,
         // `${...}` keeps its place in the tree until it is evaluated,
         // and what it comes to is not known here.
-        Value::Element(el) if matches!(el.sigil, tomet_ast::Sigil::Dollar) => true,
+        Value::Interp(_) => true,
         // A scalar is the text it was written as: a bare `1.10` is the
         // version `1.10`, and `2026` is not a datetime.
         scalar => scalar

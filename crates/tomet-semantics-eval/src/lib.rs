@@ -35,7 +35,7 @@ use std::collections::HashMap;
 use std::fmt;
 
 pub use cotomet_syntax::File;
-use tomet_ast::{ElementValue, Sigil, Value};
+use tomet_ast::Value;
 use tomet_declaration::{DeclKind, Declaration, Host, Problem, check_declarations};
 use tomet_expr::{DocRef, EvalContext, Generate, NoResolver, Phase};
 use tomet_lexer::LineIndex;
@@ -171,35 +171,25 @@ pub fn eval_file(file: File, src: &str, vars: &[(String, Value)]) -> Result<File
 
 fn walk_value(value: Value, lines: &LineIndex, cx: &EvalContext, errors: &mut Vec<Error>) -> Value {
     match value {
-        Value::Element(el) => {
-            if matches!(el.sigil, Sigil::Dollar) {
-                if let Some(ElementValue::Interp(expr)) = &el.value {
-                    match tomet_expr::evaluate_data(expr, cx) {
-                        Ok(data) => walk_value(data, lines, cx, errors),
-                        Err(err) => {
-                            let at = lines.line_col(el.span.start);
-                            let message = match err {
-                                tomet_expr::EvalError::NotData {
-                                    is_vault_ref: true, ..
-                                } => NO_VAULT.to_string(),
-                                other => other.to_string(),
-                            };
-                            errors.push(Error {
-                                message,
-                                line: at.line,
-                                column: at.column,
-                                span: el.span,
-                            });
-                            Value::Element(el)
-                        }
-                    }
-                } else {
-                    Value::Element(el)
-                }
-            } else {
-                Value::Element(el)
+        Value::Interp(interp) => match tomet_expr::evaluate_data(&interp.expr, cx) {
+            Ok(data) => walk_value(data, lines, cx, errors),
+            Err(err) => {
+                let at = lines.line_col(interp.span.start);
+                let message = match err {
+                    tomet_expr::EvalError::NotData {
+                        is_vault_ref: true, ..
+                    } => NO_VAULT.to_string(),
+                    other => other.to_string(),
+                };
+                errors.push(Error {
+                    message,
+                    line: at.line,
+                    column: at.column,
+                    span: interp.span,
+                });
+                Value::Interp(interp)
             }
-        }
+        },
         Value::Map(entries) => {
             let mut new_entries = Vec::with_capacity(entries.len());
             for (k, v) in entries {

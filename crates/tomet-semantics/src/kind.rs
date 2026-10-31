@@ -155,15 +155,10 @@ pub enum ElementKind {
     /// ambiguity the old stringly-typed `element_kind()` already had --
     /// not a regression.
     Bare,
-    /// `Sigil::Dollar` -- `${...}` interpolation. A dedicated kind (not
-    /// `Custom`) since, like `Em`/`Hr`/`Ref`, it's built-in recognized
-    /// syntax with fixed grammar-level meaning, not an arbitrary
-    /// user-chosen element name.
-    Interp,
-    /// `Sigil::Question` -- `?matcher(...)`, a hole in a pattern. Like
-    /// [`ElementKind::Interp`] it names a kind of syntax and nothing more:
-    /// what a matcher is and what a hole matches belong to whoever reads the
-    /// pattern (tandr), not to this crate. It never appears in an ordinary
+    /// `Sigil::Question` -- `?matcher(...)`, a hole in a pattern. It names
+    /// a kind of syntax and nothing more: what a matcher is and what a hole
+    /// matches belong to whoever reads the pattern (tandr), not to this
+    /// crate. It never appears in an ordinary
     /// document, only in what `tomet_parser::parse_pattern` reads.
     Hole,
     /// `@ftn` -- a footnote: a definition when it has content, a
@@ -209,7 +204,6 @@ impl ElementKind {
             ElementKind::Heading => "heading",
             ElementKind::Custom(name) => name,
             ElementKind::Bare => "bare",
-            ElementKind::Interp => "interp",
             ElementKind::Hole => "hole",
             ElementKind::Footnote => "ftn",
             ElementKind::Tag => "tag",
@@ -420,8 +414,8 @@ impl std::error::Error for UnknownName {}
 /// validator uses it for the non-`Named` sigils, which carry no name to
 /// resolve.
 ///
-/// `Sigil::Bare` is `ElementKind::Bare`, `Sigil::Dollar` is
-/// `ElementKind::Interp`, `Sigil::Question` is `ElementKind::Hole`. Everything else goes through [`classify_std_name`].
+/// `Sigil::Bare` is `ElementKind::Bare`, `Sigil::Question` is
+/// `ElementKind::Hole`. Everything else goes through [`classify_std_name`].
 ///
 /// The name is all the sigil carries. Where the element sits is
 /// `Element::placement`, and a placement that disagrees with the kind's
@@ -437,7 +431,6 @@ pub fn classify_std(el: &Element) -> Result<ElementKind, UnknownName> {
         Sigil::Named(name) => refuse_declaration_as_element(name, classify_std_name(name)?),
         Sigil::Document(name) => classify_std_name(name),
         Sigil::Bare => Ok(ElementKind::Bare),
-        Sigil::Dollar => Ok(ElementKind::Interp),
         Sigil::Question(_) => Ok(ElementKind::Hole),
     }
 }
@@ -508,7 +501,7 @@ pub fn required_shape(kind: &ElementKind) -> Option<Shape> {
         // Either shape: a mention sits inside a sentence, and the definition in a `::dictionary` stands as
         // an entry of its value group.
         Term => return None,
-        Custom(_) | Bare | Interp | Hole => return None,
+        Custom(_) | Bare | Hole => return None,
     })
 }
 
@@ -580,7 +573,7 @@ pub fn builtin_content_shape(kind: &ElementKind) -> Option<ContentShape> {
         // A term's description is the content of its definition; a mention has none.
         Quote | Callout | Card | Table | Footnote | Task | Term => Some(ContentShape::Block),
         // Not a built-in bare name at all.
-        Custom(_) | Bare | Interp | Hole => None,
+        Custom(_) | Bare | Hole => None,
     }
 }
 
@@ -620,7 +613,7 @@ pub fn builtin_region(kind: &ElementKind) -> crate::vocabulary::Region {
 ///
 /// Returns `Some((found, expected))` when they disagree.
 pub fn shape_mismatch(el: &Element) -> Option<(Shape, Shape)> {
-    if matches!(el.sigil, Sigil::Bare | Sigil::Dollar | Sigil::Question(_)) {
+    if matches!(el.sigil, Sigil::Bare | Sigil::Question(_)) {
         return None;
     }
     let found = Shape::from(el.placement);
@@ -820,11 +813,5 @@ mod tests {
     fn bare_sigil_is_always_bare() {
         let el = element_new(Sigil::Bare);
         assert_eq!(classify_std_lenient(&el), ElementKind::Bare);
-    }
-
-    #[test]
-    fn dollar_sigil_is_always_interp() {
-        let el = element_new(Sigil::Dollar);
-        assert_eq!(classify_std_lenient(&el), ElementKind::Interp);
     }
 }

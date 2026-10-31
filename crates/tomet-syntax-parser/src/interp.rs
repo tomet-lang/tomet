@@ -2,14 +2,13 @@
 
 use crate::error::Result;
 use crate::value::{err, parse_quoted};
-use tomet_ast::{BinaryOp, Element, InterpExpr, InterpExprKind, Literal, Sigil};
+use tomet_ast::{BinaryOp, InterpExpr, InterpExprKind, Interpolation, Literal};
 use tomet_lexer::Cursor;
-use tomet_tree::element_new;
 
 pub use cotomet_syntax::{is_interp_ident_char, is_interp_ident_start, is_interp_start};
 
-/// `${ Expr }` or `$func(args)` or `$macro.func(args)` -- structurally `Sigil::Dollar` with an `Interp` element value
-pub(crate) fn parse_dollar_element(cur: &mut Cursor) -> Result<Element> {
+/// `${ Expr }` or `$func(args)` or `$macro.func(args)`.
+pub(crate) fn parse_interpolation(cur: &mut Cursor) -> Result<Interpolation> {
     let start_pos = cur.pos();
     cur.eat_str("$");
     if cur.peek() == Some('{') {
@@ -26,10 +25,10 @@ pub(crate) fn parse_dollar_element(cur: &mut Cursor) -> Result<Element> {
         if !cur.eat_str("}") {
             return Err(err(cur.pos(), "unterminated '${', expected '}'"));
         }
-        let mut el = element_new(Sigil::Dollar);
-        el.value = Some(tomet_ast::ElementValue::Interp(expr));
-        el.span = cur.span_from(start_pos);
-        Ok(el)
+        Ok(Interpolation {
+            expr,
+            span: cur.span_from(start_pos),
+        })
     } else {
         let ident_start = cur.pos();
         let name = eat_interp_ident(cur)?.to_string();
@@ -72,10 +71,10 @@ pub(crate) fn parse_dollar_element(cur: &mut Cursor) -> Result<Element> {
                 _ => break,
             }
         }
-        let mut el = element_new(Sigil::Dollar);
-        el.value = Some(tomet_ast::ElementValue::Interp(expr));
-        el.span = cur.span_from(start_pos);
-        Ok(el)
+        Ok(Interpolation {
+            expr,
+            span: cur.span_from(start_pos),
+        })
     }
 }
 

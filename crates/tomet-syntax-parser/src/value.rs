@@ -41,7 +41,7 @@ pub(crate) fn parse_quoted(cur: &mut Cursor) -> Result<String> {
     cotomet_syntax::parse_quoted(cur).map_err(Into::into)
 }
 
-/// A [`cotomet_syntax::ValueHook`] allowing only dollar expressions (`${...}`, `$name(...)`)
+/// A [`cotomet_syntax::ValueHook`] allowing only interpolations (`${...}`, `$name(...)`)
 /// to be parsed inside value positions.
 ///
 /// Embedded elements (`@element`), block sequences (`[...]`), and prose pipes (`| prose`)
@@ -53,15 +53,15 @@ impl cotomet_syntax::ValueHook for CotometValueHook {
     fn try_parse_value(&mut self, cur: &mut Cursor) -> Option<cotomet_syntax::Result<Value>> {
         // `$name(args)`/`${...}` sitting where a value goes -- evaluated later.
         if cur.peek() == Some('$') && cotomet_syntax::is_interp_start(cur) {
-            let el = match crate::interp::parse_dollar_element(cur) {
-                Ok(el) => el,
+            let interp = match crate::interp::parse_interpolation(cur) {
+                Ok(interp) => interp,
                 Err(e) => {
                     return Some(Err(cotomet_syntax::Error::at(
                         e.message, e.line, e.column, e.offset,
                     )));
                 }
             };
-            return Some(Ok(Value::Element(Box::new(el))));
+            return Some(Ok(Value::Interp(interp)));
         }
 
         None

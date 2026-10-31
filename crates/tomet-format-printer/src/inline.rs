@@ -27,6 +27,7 @@ pub(crate) fn render_inlines(inlines: &[Inline], config: &PrinterConfig) -> Stri
             // softbreak. Folding to a space here would silently turn that
             // into always-one-line output.
             Inline::SoftBreak(_) | Inline::LineBreak(_) => s.push('\n'),
+            Inline::Interp(interp) => s.push_str(&crate::element::render_interp(interp)),
             Inline::Element(el) => {
                 let block = el.placement == Placement::Block;
                 if block && !s.is_empty() && !s.ends_with('\n') {

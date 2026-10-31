@@ -1,7 +1,7 @@
 //! `tomet_ast::Document` -> Pandoc's AST.
 
 use tomet_ast::{
-    Block as TmBlock, Document, Element, ElementValue, Id, Inline as TmInline, List, Placement,
+    Block as TmBlock, Document, Element, Id, Inline as TmInline, Interpolation, List, Placement,
     Sigil, Value,
 };
 use tomet_semantics::{
@@ -79,6 +79,9 @@ fn meta_value(v: &Value) -> MetaValue {
         // concept, and `::meta(icon: @doc.icon("x"))`'s whole point is that
         // nothing resolves or renders the embedded element anyway.
         Value::Element(_) => MetaValue::MetaString(String::new()),
+        // Same treatment again: an interpolation is not known until it is
+        // evaluated, and Pandoc has no place to keep it unevaluated.
+        Value::Interp(_) => MetaValue::MetaString(String::new()),
         // Same treatment as `Element`/`Call`: no metadata concept for
         // block content either.
         Value::Blocks(_) => MetaValue::MetaString(String::new()),
@@ -93,6 +96,7 @@ fn block_to_pandoc(block: &TmBlock) -> Vec<Block> {
     match block {
         TmBlock::Paragraph(p) => content_to_blocks(&p.content),
         TmBlock::Element(el) => element_to_blocks(el),
+        TmBlock::Interp(interp) => vec![Block::Para(vec![interp_inline(interp)])],
         TmBlock::Section(sec) => {
             let mut blocks = if !sec.title.is_empty() {
                 vec![Block::Header(
@@ -175,7 +179,7 @@ fn element_to_blocks(el: &Element) -> Vec<Block> {
         // placement rule makes `@link(...)[x]` on its own line a block.
         // It keeps its own mapping and gets wrapped, rather than falling
         // through to the generic `Div` and losing its link-ness.
-        "em" | "strong" | "mark" | "link" | "embed" | "interp" => {
+        "em" | "strong" | "mark" | "link" | "embed" => {
             vec![Block::Para(element_to_inlines(el))]
         }
         // Everything else -- including an inline-only kind that somehow
@@ -227,10 +231,6 @@ fn element_to_inlines(el: &Element) -> Vec<Inline> {
             content_to_inlines(el),
             Target::url(link_target(el, &kind).unwrap_or_default()),
         )],
-        // `${...}` is emitted as its own source text rather than
-        // evaluated: resolving it needs the document and its config, and
-        // the Typst writer already sets this precedent.
-        "interp" => vec![Inline::Code(Attr::empty(), interp_source(el))],
         "raw" => vec![Inline::Code(code_attr(el), content_to_plain_text(el))],
         // Same reasoning as the block-position arm above -- both sides
         // shown, not one silently dropped. Pandoc's `Inline` has no
@@ -296,6 +296,7 @@ fn blocks_to_inlines_lossy(blocks: &[TmBlock]) -> Vec<Inline> {
         match block {
             TmBlock::Paragraph(p) => out.extend(inlines_to_pandoc(&p.content)),
             TmBlock::Element(el) => out.extend(element_to_inlines(el)),
+            TmBlock::Interp(interp) => out.push(interp_inline(interp)),
             TmBlock::Section(sec) => out.extend(inlines_to_pandoc(&sec.title)),
             TmBlock::List(list) => {
                 for item in &list.items {
@@ -331,6 +332,7 @@ fn content_to_blocks(inlines: &[TmInline]) -> Vec<Block> {
                 blocks.extend(element_to_blocks(el));
             }
             TmInline::Element(el) => run.extend(element_to_inlines(el)),
+            TmInline::Interp(interp) => run.push(interp_inline(interp)),
             TmInline::Text(t) => run.extend(text_to_inlines(&t.value)),
             TmInline::Raw(t) => run.extend(text_to_inlines(&t.value)),
             TmInline::SoftBreak(_) => run.push(Inline::SoftBreak),
@@ -373,6 +375,7 @@ fn element_content_to_blocks(blocks: &[TmBlock]) -> Vec<Block> {
                 }
             }
             TmBlock::Element(el) => out.extend(element_to_blocks(el)),
+            TmBlock::Interp(interp) => out.push(Block::Para(vec![interp_inline(interp)])),
             // No direct Pandoc equivalent for a nested section; a header
             // plus its own blocks is the closest shape.
             TmBlock::Section(sec) => {
@@ -408,6 +411,7 @@ fn blocks_to_pandoc_inlines(blocks: &[TmBlock]) -> Vec<Inline> {
         match block {
             TmBlock::Paragraph(p) => out.extend(inlines_to_pandoc(&p.content)),
             TmBlock::Element(el) => out.extend(element_to_inlines(el)),
+            TmBlock::Interp(interp) => out.push(interp_inline(interp)),
             TmBlock::Section(sec) => out.extend(inlines_to_pandoc(&sec.title)),
             TmBlock::List(list) => {
                 for item in &list.items {
@@ -428,6 +432,7 @@ fn inlines_to_pandoc(inlines: &[TmInline]) -> Vec<Inline> {
             TmInline::SoftBreak(_) => out.push(Inline::SoftBreak),
             TmInline::LineBreak(_) => out.push(Inline::LineBreak),
             TmInline::Element(el) => out.extend(element_to_inlines(el)),
+            TmInline::Interp(interp) => out.push(interp_inline(interp)),
         }
     }
     out
@@ -537,6 +542,7 @@ fn blocks_plain_text(blocks: &[TmBlock]) -> String {
         match block {
             TmBlock::Paragraph(p) => out.push_str(&plain_text(&p.content)),
             TmBlock::Element(el) => out.push_str(&blocks_plain_text(content_of(el))),
+            TmBlock::Interp(_) => {}
             TmBlock::Section(sec) => out.push_str(&plain_text(&sec.title)),
             TmBlock::List(list) => {
                 for item in &list.items {
@@ -561,16 +567,17 @@ fn plain_text(inlines: &[TmInline]) -> String {
             }
             TmInline::LineBreak(_) => out.push('\n'),
             TmInline::Element(el) => out.push_str(&blocks_plain_text(content_of(el))),
+            TmInline::Interp(_) => {}
         }
     }
     out
 }
 
-fn interp_source(el: &Element) -> String {
-    match &el.value {
-        Some(ElementValue::Interp(expr)) => format!("${{{expr}}}"),
-        _ => String::new(),
-    }
+/// `${...}` is emitted as its own source text rather than evaluated:
+/// resolving it needs the document and its config, and the Typst writer
+/// already sets this precedent.
+fn interp_inline(interp: &Interpolation) -> Inline {
+    Inline::Code(Attr::empty(), format!("${{{}}}", interp.expr))
 }
 
 // ---- lists ---------------------------------------------------------
@@ -757,7 +764,7 @@ fn attr_of(el: &Element, classes: &[&str]) -> Attr {
 
 fn section_attr(sec: &tomet_ast::Section) -> Attr {
     let args = sec.args.as_ref();
-    let value = sec.value.as_ref().and_then(|v| v.as_data());
+    let value = sec.value.as_ref().map(|v| v.as_data());
     attr_from(
         sec.id.as_ref(),
         flatten_data(args, value.as_ref()).into_pairs(),
@@ -770,7 +777,7 @@ fn section_attr(sec: &tomet_ast::Section) -> Attr {
 /// For the builtins whose args the mapping already consumed into a
 /// dedicated field: a heading's level, a link's or image's target.
 fn attr_from_value(el: &Element, classes: &[&str]) -> Attr {
-    let value = el.value.as_ref().and_then(|v| v.as_data());
+    let value = el.value.as_ref().map(|v| v.as_data());
     attr_from(
         el.id.as_ref(),
         flatten_data(None, value.as_ref()).into_pairs(),

@@ -308,7 +308,7 @@ pub(crate) fn parse_list_item_body(
         }
         let id = item.id;
         let connects = item.connects;
-        let attrs = item.value.and_then(|v| v.as_data());
+        let attrs = item.value.map(|v| v.as_data());
         let mut content = item.content.unwrap_or_default();
         append_trailing_line_content(dialect, cur, &mut content)?;
         (content, attrs, id, connects)
@@ -334,7 +334,7 @@ pub(crate) fn parse_list_item_body(
         if body.args.is_some() {
             marker = merge_values(marker.as_ref(), body.args.as_ref());
         }
-        let attrs = body.value.and_then(|v| v.as_data());
+        let attrs = body.value.map(|v| v.as_data());
         (content, attrs, body.id, body.connects)
     };
 

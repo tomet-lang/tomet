@@ -1,5 +1,5 @@
 use lsp_types::{DocumentSymbol, SymbolKind};
-use tomet_ast::{Block, Element, Inline, List, Sigil};
+use tomet_ast::{Block, Element, Inline, Interpolation, List, Sigil};
 use tomet_semantics::{ElementKind, classify_std_lenient, heading_level};
 
 use crate::position::TextPositions;
@@ -60,6 +60,7 @@ fn collect_block_symbols(
             }
         }
         Block::List(list) => collect_list_symbol(positions, list, symbols),
+        Block::Interp(interp) => collect_interp_symbol(positions, interp, symbols),
     }
 }
 
@@ -138,13 +139,34 @@ fn collect_element_symbol(
     }
 }
 
+fn collect_interp_symbol(
+    positions: &TextPositions<'_>,
+    interp: &Interpolation,
+    symbols: &mut Vec<DocumentSymbol>,
+) {
+    let range = positions.range(&interp.span);
+    #[allow(deprecated)]
+    symbols.push(DocumentSymbol {
+        name: "${...}".to_string(),
+        detail: None,
+        kind: SymbolKind::OBJECT,
+        tags: None,
+        deprecated: None,
+        range,
+        selection_range: range,
+        children: None,
+    });
+}
+
 fn collect_inline_symbols(
     positions: &TextPositions<'_>,
     inline: &Inline,
     symbols: &mut Vec<DocumentSymbol>,
 ) {
-    if let Inline::Element(el) = inline {
-        collect_element_symbol(positions, el, symbols);
+    match inline {
+        Inline::Element(el) => collect_element_symbol(positions, el, symbols),
+        Inline::Interp(interp) => collect_interp_symbol(positions, interp, symbols),
+        _ => {}
     }
 }
 
@@ -174,6 +196,7 @@ pub(crate) fn extract_blocks_text(blocks: &[Block]) -> String {
                     }
                 }
             }
+            Block::Interp(_) => out.push_str("${...}"),
         }
     }
     out
@@ -192,6 +215,7 @@ pub(crate) fn extract_inlines_text(inlines: &[Inline]) -> String {
             }
             Inline::LineBreak(_) => out.push(' '),
             Inline::Element(el) => out.push_str(&sigil_display_name(&el.sigil)),
+            Inline::Interp(_) => out.push_str("${...}"),
         }
     }
     out
@@ -202,7 +226,6 @@ pub(crate) fn sigil_display_name(sigil: &Sigil) -> String {
         Sigil::Named(name) => format!("@{name}"),
         Sigil::Document(name) => format!("::{name}"),
         Sigil::Bare => "(bare)".to_string(),
-        Sigil::Dollar => "${...}".to_string(),
         Sigil::Question(matcher) => match matcher {
             Some(matcher) => format!("?{matcher}()"),
             None => "?()".to_string(),

@@ -1,7 +1,7 @@
 //! Block-level rendering -- sections, headings, lists and inline runs. This is
 //! the recursive core; the other renderers are called from it and call back in.
 
-use crate::elements::{HeadingState, render_element};
+use crate::elements::{HeadingState, render_element, render_interp};
 use crate::util::{
     escape_attr, escape_html, id_attr, inlines_to_plain, push_data_attr, push_named_attrs,
     split_attrs, value_to_plain,
@@ -67,15 +67,13 @@ pub(crate) fn render_block(
         }
         Block::Section(sec) => render_section(cx, sec, out, state),
         Block::List(list) => render_list(cx, list, out),
+        Block::Interp(interp) => render_interp(interp, out),
     }
 }
 
 fn render_section(cx: &RenderCtx, sec: &Section, out: &mut String, state: &mut HeadingState) {
     let level = (sec.level as u8).clamp(1, 6);
-    let value_data = match &sec.value {
-        Some(v) => v.as_data(),
-        _ => None,
-    };
+    let value_data = sec.value.as_ref().map(|v| v.as_data());
     let (class, data) = split_attrs(value_data.as_ref());
     let mut id = id_attr(sec.id.as_ref());
     let text = inlines_to_plain(&sec.title);
@@ -163,10 +161,7 @@ fn render_heading_element(
 ) {
     let level = heading_level(el).unwrap_or(1);
     let content = el.content.as_deref().unwrap_or(&[]);
-    let value_data = match &el.value {
-        Some(v) => v.as_data(),
-        _ => None,
-    };
+    let value_data = el.value.as_ref().map(|v| v.as_data());
     let (class, data) = split_attrs(value_data.as_ref());
     let mut id = id_attr(el.id.as_ref());
     let text = crate::util::blocks_to_plain(content);
@@ -224,10 +219,7 @@ fn render_list(cx: &RenderCtx, list: &List, out: &mut String) {
             continue;
         }
 
-        let attrs = match &item.value {
-            Some(v) => v.as_data(),
-            _ => None,
-        };
+        let attrs = item.value.as_ref().map(|v| v.as_data());
         let (class, data) = split_attrs(attrs.as_ref());
         let id = id_attr(item.id.as_ref());
         out.push_str("<li");
@@ -242,7 +234,7 @@ fn render_list(cx: &RenderCtx, list: &List, out: &mut String) {
                         push_data_attr(out, k, &value_to_plain(v));
                     }
                 }
-                Value::Element(_) => {}
+                Value::Element(_) | Value::Interp(_) => {}
                 other => out.push_str(&format!(
                     " data-marker=\"{}\"",
                     escape_attr(&value_to_plain(other))
@@ -253,6 +245,7 @@ fn render_list(cx: &RenderCtx, list: &List, out: &mut String) {
                 Value::Element(el) => {
                     render_element(cx, el, out, true);
                 }
+                Value::Interp(interp) => render_interp(interp, out),
                 other => {
                     let text = value_to_plain(other);
                     if !text.is_empty() {
@@ -302,6 +295,7 @@ pub(crate) fn render_inlines(cx: &RenderCtx, inlines: &[Inline], out: &mut Strin
             }
             Inline::LineBreak(_) => out.push_str("<br>"),
             Inline::Element(el) => render_element(cx, el, out, true),
+            Inline::Interp(interp) => render_interp(interp, out),
         }
     }
 }

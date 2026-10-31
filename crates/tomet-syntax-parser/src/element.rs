@@ -393,11 +393,8 @@ pub(crate) fn parse_groups_with_pipe_stack(
                             (Some(existing), ElementValue::Group(_))
                                 if !existing.has_children() && !conn_val.has_children() =>
                             {
-                                merge_values(
-                                    existing.as_data().as_ref(),
-                                    conn_val.as_data().as_ref(),
-                                )
-                                .map(ElementValue::from_map)
+                                merge_values(Some(&existing.as_data()), Some(&conn_val.as_data()))
+                                    .map(ElementValue::from_map)
                             }
                             _ => None,
                         };

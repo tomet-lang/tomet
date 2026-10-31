@@ -29,6 +29,7 @@ fn post_process_block_wikilinks(block: &mut Block) {
             }
         }
         Block::List(list) => post_process_list_wikilinks(list),
+        Block::Interp(_) => {}
     }
 }
 
@@ -71,7 +72,10 @@ fn post_process_inlines_wikilinks(inlines: Vec<Inline>) -> Vec<Inline> {
             // characters, and raw content (code block bodies -- already
             // skipped a level up by the `raw` check above) must stay
             // verbatim.
-            other @ (Inline::SoftBreak(_) | Inline::LineBreak(_) | Inline::Raw(_)) => {
+            other @ (Inline::SoftBreak(_)
+            | Inline::LineBreak(_)
+            | Inline::Raw(_)
+            | Inline::Interp(_)) => {
                 new_inlines.push(other);
             }
         }

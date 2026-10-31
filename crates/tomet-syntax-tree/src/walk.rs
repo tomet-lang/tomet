@@ -1,7 +1,9 @@
 //! Generic recursive traversal of a [`tomet_ast::Document`]'s tree.
 
 use std::ops::ControlFlow;
-use tomet_ast::{Block, Document, Element, ElementValue, Entry, Inline, List, ListItem, Value};
+use tomet_ast::{
+    Block, Document, Element, ElementValue, Entry, Inline, Interpolation, List, ListItem, Value,
+};
 
 /// Called at every [`Element`] `walk_document` visits, in document order.
 pub trait Visitor<B> {
@@ -55,6 +57,7 @@ fn inlines_in_block(block: &Block, f: &mut dyn FnMut(&Inline)) {
             }
         }
         Block::List(list) => inlines_in_list_items(&list.items, f),
+        Block::Interp(_) => {}
     }
 }
 
@@ -103,6 +106,7 @@ fn inlines_in_value(value: &Value, f: &mut dyn FnMut(&Inline)) {
         Value::Call(_, args) => args.iter().for_each(|a| inlines_in_value(a, f)),
         Value::Blocks(blocks) => blocks.iter().for_each(|b| inlines_in_block(b, f)),
         Value::Null
+        | Value::Interp(_)
         | Value::Bool(_)
         | Value::Int(_)
         | Value::Float(_)
@@ -157,6 +161,7 @@ pub fn for_each_top_level_element(doc: &Document, mut f: impl FnMut(&Element)) {
             }
             Block::Section(_) => {}
             Block::List(_) => {}
+            Block::Interp(_) => {}
         }
     }
 }
@@ -177,6 +182,7 @@ pub fn for_each_top_level_element_mut(doc: &mut Document, mut f: impl FnMut(&mut
             }
             Block::Section(_) => {}
             Block::List(_) => {}
+            Block::Interp(_) => {}
         }
     }
 }
@@ -218,7 +224,7 @@ pub fn retain_top_level_elements(doc: &mut Document, mut keep: impl FnMut(&Eleme
             true
         }
         Block::Section(_) => true,
-        Block::List(_) => true,
+        Block::List(_) | Block::Interp(_) => true,
     });
 }
 
@@ -260,6 +266,8 @@ fn walk_block<B>(block: &Block, visitor: &mut impl Visitor<B>) -> ControlFlow<B>
         // `list.connects` deliberately not walked here either -- same
         // reason as `section.connects` above.
         Block::List(list) => walk_list_items(list, visitor),
+        // An interpolation is not an element: no element walker visits it.
+        Block::Interp(_) => ControlFlow::Continue(()),
     }
 }
 
@@ -338,6 +346,7 @@ fn walk_value<B>(value: &Value, visitor: &mut impl Visitor<B>) -> ControlFlow<B>
             ControlFlow::Continue(())
         }
         Value::Null
+        | Value::Interp(_)
         | Value::Bool(_)
         | Value::Int(_)
         | Value::Float(_)
@@ -395,6 +404,7 @@ fn walk_block_mut<B>(block: &mut Block, visitor: &mut impl VisitorMut<B>) -> Con
             ControlFlow::Continue(())
         }
         Block::List(list) => walk_list_items_mut(list, visitor),
+        Block::Interp(_) => ControlFlow::Continue(()),
     }
 }
 
@@ -467,6 +477,7 @@ fn walk_value_mut<B>(value: &mut Value, visitor: &mut impl VisitorMut<B>) -> Con
             ControlFlow::Continue(())
         }
         Value::Null
+        | Value::Interp(_)
         | Value::Bool(_)
         | Value::Int(_)
         | Value::Float(_)
@@ -554,6 +565,7 @@ pub fn for_each_descendant_in_blocks(
                 }
                 Block::Section(_) => {}
                 Block::List(_) => {}
+                Block::Interp(_) => {}
             }
         }
         return;
@@ -625,6 +637,7 @@ fn lists_in_block(block: &Block, f: &mut dyn FnMut(&List)) {
             // sec.connects deliberately not visited, same invariant.
         }
         Block::List(list) => lists_in_list(list, f),
+        Block::Interp(_) => {}
     }
 }
 
@@ -689,6 +702,114 @@ where
     count
 }
 
+/// Visits every [`Interpolation`] in `doc`, in document order, wherever it sits.
+///
+/// Unlike [`walk_document`] and the walkers written beside it, this one has no
+/// position it skips: it reaches an interpolation in running text and in a
+/// section title, standing as a block, in an element's, a section's and a
+/// list item's `(args)` / `{value}` / `[content]`, in a list's, a section's
+/// and an element's `:connect`s, and inside a [`Value`] (`Seq`, `Map`, `Call`,
+/// a nested element, `[...]` blocks). An interpolation is not an [`Element`],
+/// so the element walkers never pass one to their visitor; this is the walker
+/// to ask for "every `${...}` in the document".
+pub fn for_each_interpolation(doc: &Document, mut f: impl FnMut(&Interpolation)) {
+    for block in &doc.blocks {
+        interpolations_in_block(block, &mut f);
+    }
+}
+
+fn interpolations_in_block(block: &Block, f: &mut dyn FnMut(&Interpolation)) {
+    match block {
+        Block::Paragraph(paragraph) => interpolations_in_inlines(&paragraph.content, f),
+        Block::Element(element) => interpolations_in_element(element, f),
+        Block::Section(section) => {
+            interpolations_in_inlines(&section.title, f);
+            if let Some(args) = &section.args {
+                interpolations_in_value(args, f);
+            }
+            if let Some(value) = &section.value {
+                interpolations_in_element_value(value, f);
+            }
+            for connect in &section.connects {
+                interpolations_in_element(connect, f);
+            }
+            for child in &section.blocks {
+                interpolations_in_block(child, f);
+            }
+        }
+        Block::List(list) => interpolations_in_list(list, f),
+        Block::Interp(interpolation) => f(interpolation),
+    }
+}
+
+fn interpolations_in_list(list: &List, f: &mut dyn FnMut(&Interpolation)) {
+    for connect in &list.connects {
+        interpolations_in_element(connect, f);
+    }
+    for item in &list.items {
+        interpolations_in_element(&item.element, f);
+        if let Some(sublist) = &item.sublist {
+            interpolations_in_list(sublist, f);
+        }
+    }
+}
+
+fn interpolations_in_inlines(inlines: &[Inline], f: &mut dyn FnMut(&Interpolation)) {
+    for inline in inlines {
+        match inline {
+            Inline::Interp(interpolation) => f(interpolation),
+            Inline::Element(element) => interpolations_in_element(element, f),
+            Inline::Text(_) | Inline::SoftBreak(_) | Inline::LineBreak(_) | Inline::Raw(_) => {}
+        }
+    }
+}
+
+fn interpolations_in_element(element: &Element, f: &mut dyn FnMut(&Interpolation)) {
+    if let Some(args) = &element.args {
+        interpolations_in_value(args, f);
+    }
+    if let Some(content) = &element.content {
+        for block in content {
+            interpolations_in_block(block, f);
+        }
+    }
+    if let Some(value) = &element.value {
+        interpolations_in_element_value(value, f);
+    }
+    for connect in &element.connects {
+        interpolations_in_element(connect, f);
+    }
+}
+
+fn interpolations_in_element_value(value: &ElementValue, f: &mut dyn FnMut(&Interpolation)) {
+    let ElementValue::Group(entries) = value;
+    for entry in entries {
+        match entry {
+            Entry::Pair(_, value) => interpolations_in_value(value, f),
+            Entry::Element(element) => interpolations_in_element(element, f),
+        }
+    }
+}
+
+fn interpolations_in_value(value: &Value, f: &mut dyn FnMut(&Interpolation)) {
+    match value {
+        Value::Interp(interpolation) => f(interpolation),
+        Value::Element(element) => interpolations_in_element(element, f),
+        Value::Seq(items) => items.iter().for_each(|v| interpolations_in_value(v, f)),
+        Value::Map(entries) => entries
+            .iter()
+            .for_each(|(_, v)| interpolations_in_value(v, f)),
+        Value::Call(_, args) => args.iter().for_each(|v| interpolations_in_value(v, f)),
+        Value::Blocks(blocks) => blocks.iter().for_each(|b| interpolations_in_block(b, f)),
+        Value::Null
+        | Value::Bool(_)
+        | Value::Int(_)
+        | Value::Float(_)
+        | Value::Number(_)
+        | Value::String(_) => {}
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -734,5 +855,28 @@ mod tests {
         let doc = tomet_parser::parse_document("@outer[ @mid[ text ] ]\n").unwrap();
         let outer = element_of(&doc);
         assert!(!names(outer, false).contains(&"outer".to_string()));
+    }
+
+    #[test]
+    fn every_interpolation_is_found_wherever_it_sits() {
+        let src = "=[ ${title} ]:rule(allow: ${conn})\n\
+                   \n\
+                   ${block}\n\
+                   \n\
+                   text ${inline} more\n\
+                   \n\
+                   @x(a: ${arg}, b: list(${nested})){ k: ${val} }[ ${content} ]:as(${connect})\n\
+                   \n\
+                   - item ${item}\n";
+        let doc = tomet_parser::parse_document(src).unwrap();
+        let mut found = Vec::new();
+        for_each_interpolation(&doc, |i| found.push(i.expr.to_string()));
+        found.sort();
+        let mut expected = vec![
+            "title", "conn", "block", "inline", "arg", "nested", "val", "content", "connect",
+            "item",
+        ];
+        expected.sort();
+        assert_eq!(found, expected);
     }
 }

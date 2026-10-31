@@ -3,7 +3,7 @@
 use crate::dialect::Dialect;
 use crate::element::{LineEnd, element_ends_line, is_element_start, parse_element};
 use crate::error::Result;
-use crate::interp::{is_interp_start, parse_dollar_element};
+use crate::interp::{is_interp_start, parse_interpolation};
 use crate::list::peek_list_marker;
 use crate::raw::is_fenced_code_block_start;
 use crate::section::{is_thematic_break, is_titled_thematic_break_start};
@@ -329,7 +329,7 @@ pub(crate) fn parse_inline_seq<'a>(
         }
         if cur.peek() == Some('$') && is_interp_start(cur) {
             flush_text(&mut items, cur, &mut text_start, pipe_cols);
-            items.push(Inline::Element(parse_dollar_element(cur)?));
+            items.push(Inline::Interp(parse_interpolation(cur)?));
             text_start = cur.pos();
             continue;
         }

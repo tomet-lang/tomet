@@ -77,6 +77,21 @@ fn collect_block_folding_ranges(
         }
         Block::Paragraph(_) => {}
         Block::List(list) => collect_list_folding_ranges(index, list, ranges),
+        Block::Interp(interp) => {
+            let start_line = line0(index, interp.span.start);
+            let end_line = span_end_line(index, &interp.span);
+
+            if end_line > start_line {
+                ranges.push(FoldingRange {
+                    start_line,
+                    start_character: None,
+                    end_line,
+                    end_character: None,
+                    kind: Some(FoldingRangeKind::Region),
+                    collapsed_text: None,
+                });
+            }
+        }
     }
 }
 
@@ -113,24 +128,23 @@ fn collect_element_value_folding_ranges(
     val: &ElementValue,
     ranges: &mut Vec<FoldingRange>,
 ) {
-    if let ElementValue::Group(entries) = val {
-        for entry in entries {
-            if let tomet_ast::Entry::Element(child) = entry {
-                let start_line = line0(index, child.span.start);
-                let end_line = line0(index, child.span.end);
-                if end_line > start_line {
-                    ranges.push(FoldingRange {
-                        start_line,
-                        start_character: None,
-                        end_line,
-                        end_character: None,
-                        kind: Some(FoldingRangeKind::Region),
-                        collapsed_text: None,
-                    });
-                }
-                if let Some(child_val) = &child.value {
-                    collect_element_value_folding_ranges(index, child_val, ranges);
-                }
+    let ElementValue::Group(entries) = val;
+    for entry in entries {
+        if let tomet_ast::Entry::Element(child) = entry {
+            let start_line = line0(index, child.span.start);
+            let end_line = line0(index, child.span.end);
+            if end_line > start_line {
+                ranges.push(FoldingRange {
+                    start_line,
+                    start_character: None,
+                    end_line,
+                    end_character: None,
+                    kind: Some(FoldingRangeKind::Region),
+                    collapsed_text: None,
+                });
+            }
+            if let Some(child_val) = &child.value {
+                collect_element_value_folding_ranges(index, child_val, ranges);
             }
         }
     }
@@ -148,6 +162,7 @@ fn block_end_line(index: &LineIndex<'_>, block: &Block) -> u32 {
         Block::Element(el) => span_end_line(index, &el.span),
         Block::Paragraph(p) => span_end_line(index, &p.span),
         Block::List(list) => span_end_line(index, &list.span),
+        Block::Interp(interp) => span_end_line(index, &interp.span),
     }
 }
 

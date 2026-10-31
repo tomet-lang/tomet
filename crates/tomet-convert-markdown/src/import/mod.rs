@@ -734,6 +734,12 @@ fn merge_block_into(content: &mut Vec<Inline>, block: Block) {
             }
             content.push(Inline::Element(el));
         }
+        Block::Interp(interp) => {
+            if !content.is_empty() {
+                content.push(Inline::Text(Text::new(" ", Span::dummy())));
+            }
+            content.push(Inline::Interp(interp));
+        }
         Block::Section(sec) => {
             extend_spaced(content, sec.title);
             for child in sec.blocks {

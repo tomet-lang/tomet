@@ -442,6 +442,7 @@ fn value_to_string(v: &Value) -> String {
                 None => format!("@{name}"),
             }
         }
+        Value::Interp(interp) => format!("${{{}}}", interp.expr),
         Value::Blocks(blocks) => format!("<{} block(s)>", blocks.len()),
     }
 }

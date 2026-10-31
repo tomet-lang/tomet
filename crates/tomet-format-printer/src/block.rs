@@ -5,7 +5,7 @@ use tomet_config::PrinterConfig;
 use tomet_semantics::{ElementKind, classify_std_lenient, heading_level};
 use tomet_style::render_value;
 
-use crate::element::{render_args, render_connects, render_element};
+use crate::element::{render_args, render_connects, render_element, render_interp};
 use crate::id::render_id;
 use crate::inline::{render_content_blocks, render_inlines};
 
@@ -62,6 +62,10 @@ pub(crate) fn render_block(block: &Block, config: &PrinterConfig, out: &mut Stri
         }
         Block::Section(sec) => render_section(sec, config, out),
         Block::List(list) => render_list(list, config, out),
+        Block::Interp(interp) => {
+            out.push_str(&render_interp(interp));
+            out.push('\n');
+        }
     }
 }
 
@@ -84,7 +88,7 @@ pub(crate) fn render_section(sec: &Section, config: &PrinterConfig, out: &mut St
         out.push_str(&render_args(args, config));
         out.push(')');
     }
-    if let Some(v) = sec.value.as_ref().and_then(|v| v.as_data()) {
+    if let Some(v) = sec.value.as_ref().map(|v| v.as_data()) {
         out.push(' ');
         out.push_str(&render_value(&v));
     }
@@ -122,7 +126,7 @@ pub(crate) fn render_heading_element(el: &Element, config: &PrinterConfig, out: 
         out.push_str(&render_content_blocks(content, config));
         out.push(']');
     }
-    if let Some(v) = el.value.as_ref().and_then(|v| v.as_data()) {
+    if let Some(v) = el.value.as_ref().map(|v| v.as_data()) {
         out.push(' ');
         out.push_str(&render_value(&v));
     }
@@ -182,10 +186,7 @@ pub(crate) fn render_list_with_indent(
 
         let content_str = render_content_blocks(item.content.as_deref().unwrap_or(&[]), config);
         let lines: Vec<&str> = content_str.lines().collect();
-        let item_attrs = match &item.value {
-            Some(v) => v.as_data(),
-            _ => None,
-        };
+        let item_attrs = item.value.as_ref().map(|v| v.as_data());
 
         if lines.len() > 1 && config.format.list_multiline_style_content.is_some() {
             let style = config

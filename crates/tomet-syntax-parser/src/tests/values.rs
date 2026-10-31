@@ -304,7 +304,7 @@ fn a_number_reading_would_change_keeps_its_text_in_an_argument() {
 }
 
 #[test]
-fn cotomet_value_hook_accepts_dollar_element_with_span() {
+fn cotomet_value_hook_accepts_interpolation_with_span() {
     let src = "key: ${macro.vocab(\"writ\", \"1.0.0\")}\n";
     let file = cotomet_syntax::parse_file_with(src, &mut CotometValueHook).unwrap();
     let Value::Map(entries) = file.body else {
@@ -312,24 +312,22 @@ fn cotomet_value_hook_accepts_dollar_element_with_span() {
     };
     assert_eq!(entries.len(), 1);
     assert_eq!(entries[0].0, "key");
-    let Value::Element(el) = &entries[0].1 else {
-        panic!("expected an element, got {:?}", entries[0].1);
+    let Value::Interp(interp) = &entries[0].1 else {
+        panic!("expected an interpolation, got {:?}", entries[0].1);
     };
-    assert_eq!(el.sigil, Sigil::Dollar);
-    assert_eq!(el.span.start, 5);
-    assert_eq!(el.span.end, 36);
+    assert_eq!(interp.span.start, 5);
+    assert_eq!(interp.span.end, 36);
 
     let src2 = "key: $f(1, 2)\n";
     let file2 = cotomet_syntax::parse_file_with(src2, &mut CotometValueHook).unwrap();
     let Value::Map(entries2) = file2.body else {
         panic!("expected a map");
     };
-    let Value::Element(el2) = &entries2[0].1 else {
-        panic!("expected an element");
+    let Value::Interp(interp2) = &entries2[0].1 else {
+        panic!("expected an interpolation");
     };
-    assert_eq!(el2.sigil, Sigil::Dollar);
-    assert_eq!(el2.span.start, 5);
-    assert_eq!(el2.span.end, 13);
+    assert_eq!(interp2.span.start, 5);
+    assert_eq!(interp2.span.end, 13);
 }
 
 #[test]

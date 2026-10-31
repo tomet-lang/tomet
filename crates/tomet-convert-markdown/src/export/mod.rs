@@ -16,7 +16,7 @@ mod tests;
 use escape::{escape_attr, escape_text, fence_for};
 
 use tomet_ast::{
-    Block, Document, Element, ElementValue, Inline, List, Placement, Section, Sigil, Value,
+    Block, Document, Element, Inline, Interpolation, List, Placement, Section, Sigil, Value,
 };
 use tomet_semantics::{
     FootnoteRegistry, TargetScheme, classify_std_lenient, extract_tags, heading_level,
@@ -73,6 +73,10 @@ fn render_block(cx: &MarkdownCtx, block: &Block, out: &mut String) {
         }
         Block::Section(sec) => render_section(cx, sec, out),
         Block::List(list) => render_list(cx, list, out),
+        Block::Interp(interp) => {
+            out.push_str(&render_interp(interp));
+            out.push_str("\n\n");
+        }
     }
 }
 
@@ -164,6 +168,7 @@ fn inline_to_md(cx: &MarkdownCtx, inlines: &[Inline]) -> String {
             // was rejected for tomet's own source syntax.
             Inline::LineBreak(_) => out.push_str("\\\n"),
             Inline::Element(el) => out.push_str(&element_to_md(cx, el, true)),
+            Inline::Interp(interp) => out.push_str(&render_interp(interp)),
         }
     }
     out
@@ -210,8 +215,6 @@ fn element_to_md(cx: &MarkdownCtx, el: &Element, inline: bool) -> String {
         }
         "tag" => render_tag(el),
         "task" => render_task(cx, el, inline),
-        // Evaluate `${...}` interpolations and macros
-        "interp" => render_interp(el),
         _ => render_generic(cx, el, kind.as_str(), inline),
     }
 }
@@ -280,11 +283,8 @@ fn render_table(cx: &MarkdownCtx, el: &Element) -> String {
 /// `tomet_load::Vault`. The honest output for that is the source
 /// spelling: rendering nothing would hide it, and evaluating it here is
 /// what this crate stopped doing.
-fn render_interp(el: &Element) -> String {
-    match &el.value {
-        Some(ElementValue::Interp(expr)) => format!("${{{expr}}}"),
-        _ => String::new(),
-    }
+fn render_interp(interp: &Interpolation) -> String {
+    format!("${{{}}}", interp.expr)
 }
 
 /// `@ruby[漢字](rt:"かんじ")` -- no CommonMark ruby syntax exists, so this
@@ -554,6 +554,7 @@ fn blocks_to_plain(blocks: &[Block]) -> String {
                     }
                 }
             }
+            Block::Interp(_) => {}
         }
     }
     s
@@ -576,6 +577,7 @@ fn inlines_to_plain(inlines: &[Inline]) -> String {
                     s.push_str(&blocks_to_plain(content));
                 }
             }
+            Inline::Interp(_) => {}
         }
     }
     s
@@ -737,6 +739,8 @@ fn value_to_plain(v: &Value) -> String {
         Value::Call(..) => String::new(),
         // An embedded element has no scalar form either -- same as `Map`.
         Value::Element(_) => String::new(),
+        // An interpolation is not known until it is evaluated.
+        Value::Interp(_) => String::new(),
         // Block content has no scalar form either -- same as `Map`.
         Value::Blocks(_) => String::new(),
     }

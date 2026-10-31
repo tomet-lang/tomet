@@ -31,10 +31,7 @@ pub(crate) fn render_table_element(cx: &RenderCtx, el: &Element, out: &mut Strin
         })
         .unwrap_or(true);
 
-    let attrs = match &el.value {
-        Some(v) => v.as_data(),
-        _ => None,
-    };
+    let attrs = el.value.as_ref().map(|v| v.as_data());
     let (class, data) = split_attrs(attrs.as_ref());
     let id = id_attr(el.id.as_ref());
     let class = class.or_else(|| Some("tm-element tm-table".to_string()));

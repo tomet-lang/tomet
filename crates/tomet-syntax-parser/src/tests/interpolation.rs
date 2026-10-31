@@ -1,23 +1,14 @@
 use super::*;
 
-/// `${...}` parses to a real `Element` (`Sigil::Dollar`, `value:
-/// Some(ElementValue::Interp(expr))`) -- same shape as `@name{value}`,
-/// not a bespoke `Inline` variant. A standalone `${x}` line therefore
-/// collapses to `Block::Element` exactly like a standalone
-/// `::meta{...}` does (`document.rs::parse_paragraph`'s one-element
-/// collapse), which is why these tests destructure `Block::Element`
-/// rather than `Block::Paragraph`.
+/// `${...}` parses to an `Interpolation`, not an `Element`. A standalone
+/// `${x}` line is a `Block::Interp` of its own (what it evaluates to may be
+/// blocks), which is why these tests destructure `Block::Interp` rather than
+/// `Block::Paragraph`.
 fn interp_expr(block: &Block) -> &InterpExpr {
     match block {
-        Block::Element(el) => {
-            assert_eq!(el.sigil, Sigil::Dollar);
-            match &el.value {
-                Some(ElementValue::Interp(expr)) => expr,
-                other => panic!("expected ElementValue::Interp, got {other:?}"),
-            }
-        }
+        Block::Interp(interp) => &interp.expr,
         other => {
-            panic!("expected a standalone ${{...}} to collapse to Block::Element, got {other:?}")
+            panic!("expected a standalone ${{...}} to be a Block::Interp, got {other:?}")
         }
     }
 }
@@ -231,15 +222,15 @@ fn interp_trigger_on_next_line_does_not_end_paragraph() {
     // `document.rs::parse_inline_seq`): a `${...}` embedded mid-prose
     // (with text before/after it on the same line) stays inline
     // content in the running paragraph. This case has trailing text
-    // after `${id}`, so it doesn't hit the single-element collapse
-    // `interp_expr` above relies on -- content.len() > 1.
+    // after `${id}`, so it is not a standalone line, which is the only
+    // place `${...}` becomes a `Block::Interp`.
     let doc = parse_document("first line\n${id} second line\n").unwrap();
     match &doc.blocks[0] {
         Block::Paragraph(p) => {
             assert_eq!(p.content.len(), 4);
             assert!(matches!(p.content[0], Inline::Text(_)));
             assert!(matches!(p.content[1], Inline::SoftBreak(_)));
-            assert!(matches!(p.content[2], Inline::Element(_)));
+            assert!(matches!(p.content[2], Inline::Interp(_)));
             assert!(matches!(p.content[3], Inline::Text(_)));
         }
         other => panic!("expected a single paragraph, got {other:?}"),
@@ -252,19 +243,13 @@ fn interpolation_inside_element_content_and_section() {
     match &doc.blocks[0] {
         Block::Element(el) => {
             let content = first_para(el.content.as_ref().expect("content"));
-            assert!(content.iter().any(|i| matches!(
-                i,
-                Inline::Element(e) if e.sigil == Sigil::Dollar
-            )));
+            assert!(content.iter().any(|i| matches!(i, Inline::Interp(_))));
         }
         other => panic!("expected element, got {other:?}"),
     }
     match &doc.blocks[1] {
         Block::Section(sec) => {
-            assert!(sec.title.iter().any(|i| matches!(
-                i,
-                Inline::Element(e) if e.sigil == Sigil::Dollar
-            )));
+            assert!(sec.title.iter().any(|i| matches!(i, Inline::Interp(_))));
         }
         other => panic!("expected section, got {other:?}"),
     }

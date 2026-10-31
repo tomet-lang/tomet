@@ -232,7 +232,7 @@ fn check_declared_version(
     let Some(written) = written_version(decl, kind) else {
         return;
     };
-    if matches!(&written, Value::Element(el) if matches!(el.sigil, tomet_ast::Sigil::Dollar)) {
+    if matches!(&written, Value::Interp(_)) {
         return;
     }
     if let Err(mismatch) = Type::Version.admits(&written) {

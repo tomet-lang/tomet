@@ -42,6 +42,9 @@ fn write_value(value: &Value, out: &mut String, top_level: bool) {
             }
             out.push(')');
         }
+        Value::Interp(interp) => {
+            out.push_str(&format!("${{{}}}", interp.expr));
+        }
         Value::Element(el) => {
             out.push_str(&el.sigil.head());
             if let Some(args) = &el.args {
@@ -80,7 +83,7 @@ fn write_block_plain_text(block: &tomet_ast::Block, out: &mut String) {
             Inline::Raw(r) => out.push_str(&r.value),
             Inline::SoftBreak(_) => out.push(' '),
             Inline::LineBreak(_) => out.push('\n'),
-            Inline::Element(_) => {}
+            Inline::Element(_) | Inline::Interp(_) => {}
         }
     }
 }

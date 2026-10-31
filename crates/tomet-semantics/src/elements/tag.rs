@@ -54,6 +54,8 @@ fn inlines_to_plain(inlines: &[Inline]) -> String {
                     s.push_str(&blocks_to_plain(content));
                 }
             }
+            // Not known until it is evaluated.
+            Inline::Interp(_) => {}
         }
     }
     s
@@ -77,6 +79,7 @@ fn blocks_to_plain(blocks: &[Block]) -> String {
                 s.push_str(&blocks_to_plain(&sec.blocks));
             }
             Block::List(list) => s.push_str(&list_to_plain(list)),
+            Block::Interp(_) => {}
         }
     }
     s
