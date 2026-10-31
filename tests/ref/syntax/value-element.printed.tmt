@@ -11,4 +11,5 @@
 クォート付きの位置引数は、先頭でもそれ以外の位置でも同じ文字列として読める
 (`::meta` の `mixed` を参照)。これは要素をvalueに埋め込む機能とは独立の
 パーサ修正で、`(args)` 一般に効く。
+
 @ns.thing(icon: @doc.icon(triangle, pkg: lucide))

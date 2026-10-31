@@ -1,3 +1,4 @@
 =[Notes]:rule(allow: list(card))
 @card(title: Alpha)[First entry.]
+
 #[This is disallowed.]

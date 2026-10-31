@@ -81,18 +81,13 @@ fn push_node(s: &mut String, i: usize, block: bool, rendered: String) {
 /// prints byte-for-byte what `render_inlines` on that paragraph's own
 /// content always has, so this is not a behaviour change for anything that
 /// doesn't actually use the new block-permitting content. Multiple blocks,
-/// or a block that isn't a paragraph, fall back to `render_block` per
-/// block, the same joining `render_section` already uses for its own
-/// `blocks` (no blank line between them -- see `.agents/tasks/
-/// man-import-and-printer-gaps.md`'s note on that, which this doesn't
-/// change).
+/// or a block that isn't a paragraph, go through `render_blocks`, the
+/// joining a document and a section use for their own blocks.
 pub(crate) fn render_content_blocks(blocks: &[Block], config: &PrinterConfig) -> String {
     if let [Block::Paragraph(p)] = blocks {
         return render_inlines(&p.content, config);
     }
     let mut out = String::new();
-    for block in blocks {
-        crate::block::render_block(block, config, &mut out);
-    }
+    crate::block::render_blocks(blocks, config, &mut out);
     out
 }

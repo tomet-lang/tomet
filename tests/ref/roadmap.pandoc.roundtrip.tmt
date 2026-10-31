@@ -38,6 +38,7 @@
 ---
 
 - Zed
+
 - フォーマッタ
 - サジェスト
 - 自動補完
@@ -47,6 +48,7 @@
 
 =[Archive]
 ---
+
 - x 要素設定 (.settings.tmt, json, yaml)
 - x コネクト構文 (`:(){}`)
 - x `args`推論 (基本要素対応, カスタム要素対応, positional: [ title, priority ])
@@ -60,6 +62,8 @@
 - x 基本要素 (heading, list, horizontal line)
 - x 名前 (element, arg, content, value)
 - x 基本AST (`@T()[]{}`)
+
 ---
+
 - x to_from_markdown ()
 - x export (`export:{type: commonmark, path: ...}`)

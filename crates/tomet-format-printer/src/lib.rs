@@ -33,11 +33,6 @@ pub fn document_to_tm(doc: &Document) -> String {
 
 pub fn document_to_tm_with_config(doc: &Document, config: &PrinterConfig) -> String {
     let mut out = String::new();
-    for (i, block) in doc.blocks.iter().enumerate() {
-        if i > 0 {
-            out.push('\n');
-        }
-        block::render_block(block, config, &mut out);
-    }
+    block::render_blocks(&doc.blocks, config, &mut out);
     tomet_formatter::format_source(&out)
 }

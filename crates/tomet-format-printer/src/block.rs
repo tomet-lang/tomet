@@ -11,6 +11,18 @@ use crate::element::{
 use crate::id::render_id;
 use crate::inline::{render_content_blocks, render_inlines};
 
+/// Renders a run of sibling blocks -- a document's, a section's, an element's `[content]` -- with a
+/// blank line between each. Without one, two paragraphs read back as one, and an element that
+/// starts the next line joins the paragraph before it.
+pub(crate) fn render_blocks(blocks: &[Block], config: &PrinterConfig, out: &mut String) {
+    for (i, block) in blocks.iter().enumerate() {
+        if i > 0 {
+            out.push('\n');
+        }
+        render_block(block, config, out);
+    }
+}
+
 pub(crate) fn render_block(block: &Block, config: &PrinterConfig, out: &mut String) {
     match block {
         // A heading joined into a paragraph by an explicit `\`
@@ -109,9 +121,7 @@ pub(crate) fn render_section(sec: &Section, config: &PrinterConfig, out: &mut St
     out.push_str(&render_connects(&sec.connects, config));
     out.push('\n');
 
-    for child in &sec.blocks {
-        render_block(child, config, out);
-    }
+    render_blocks(&sec.blocks, config, out);
 }
 
 /// Called only from `render_block`'s two top-level dispatch arms (a

@@ -606,7 +606,7 @@ fn test_section_blocks_blank_lines() {
     };
     let doc = Document::new(vec![Block::Section(sec)], tomet_ast::Span::dummy());
     let printed = document_to_tm(&doc);
-    assert_eq!(printed, "=[Title]\nParagraph 1\nParagraph 2\n");
+    assert_eq!(printed, "=[Title]\nParagraph 1\n\nParagraph 2\n");
 }
 
 #[test]
