@@ -1,6 +1,6 @@
 //! Documents, directories and the nodes inside documents.
 
-use tomet_ast::{Block, Document, Element, ElementValue, Entry, Inline, List, Value};
+use tomet_ast::{Block, Document, Element, Entry, Group, Inline, List, Value};
 
 use super::args::Args;
 use super::context::EvalContext;
@@ -112,7 +112,7 @@ fn in_element(el: &Element, id: &str) -> Option<Node> {
         .find_map(|block| in_block(block, id))
         .or_else(|| el.connects.iter().find_map(|conn| in_element(conn, id)))
         .or_else(|| match &el.value {
-            Some(ElementValue::Group(entries)) => entries.iter().find_map(|entry| match entry {
+            Some(Group(entries)) => entries.iter().find_map(|entry| match entry {
                 Entry::Element(child) => in_element(child, id),
                 _ => None,
             }),
@@ -170,7 +170,7 @@ fn block_value(doc: &DocRef, block: &Block) -> EvalValue {
 /// on a conflict, since `{value}` is where an element's real data usually
 /// lives (`::meta{...}`) while `(args)` tends toward attributes. When neither is
 /// a map, whichever scalar group there is.
-fn prop(doc: &DocRef, args: &Option<Value>, value: &Option<ElementValue>) -> EvalValue {
+fn prop(doc: &DocRef, args: &Option<Value>, value: &Option<Group>) -> EvalValue {
     let args_map = match args {
         Some(Value::Map(entries)) => Some(entries.clone()),
         _ => None,

@@ -20,8 +20,8 @@ mod values;
 
 use super::*;
 use tomet_ast::{
-    Block, Element, ElementValue, Inline, InterpExpr, InterpExprKind, Literal, Paragraph,
-    Placement, Sigil, SoftBreak, Span, Value,
+    Block, Element, Group, Inline, InterpExpr, InterpExprKind, Literal, Paragraph, Placement,
+    Sigil, SoftBreak, Span, Value,
 };
 
 /// A `SoftBreak` for test expectations -- span never matters, `Span`'s
@@ -54,7 +54,7 @@ fn first_para(blocks: &[Block]) -> &[Inline] {
 }
 
 /// A list item's trailing `{value}` attrs, if any -- mirrors how
-/// `Element::list_item` stores them under `value` as `ElementValue::Data`.
+/// `Element::list_item` stores them under `value` as `Group::Data`.
 fn item_attrs(item: &Element) -> Option<Value> {
     item.value.as_ref().map(|v| v.as_data())
 }

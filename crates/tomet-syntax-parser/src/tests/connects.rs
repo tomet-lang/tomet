@@ -7,7 +7,7 @@ fn section_supports_inline_colon_connection() {
         Block::Section(s) => {
             assert_eq!(
                 s.value,
-                Some(ElementValue::from_map(Value::Map(vec![
+                Some(Group::from_map(Value::Map(vec![
                     ("id".into(), Value::String("intro".into())),
                     ("tag".into(), Value::String("main".into())),
                 ])))
@@ -25,7 +25,7 @@ fn element_supports_inline_colon_connection() {
             assert_eq!(el.sigil, Sigil::named("task"));
             assert_eq!(
                 el.value,
-                Some(ElementValue::from_map(Value::Map(vec![
+                Some(Group::from_map(Value::Map(vec![
                     ("id".into(), Value::String("taskA".into())),
                     ("priority".into(), Value::String("high".into())),
                 ])))
@@ -44,7 +44,7 @@ fn remote_id_target_element_supports_colon_connection() {
             assert_eq!(el.args, Some(Value::String("taskA".into())));
             assert_eq!(
                 el.value,
-                Some(ElementValue::from_map(Value::Map(vec![
+                Some(Group::from_map(Value::Map(vec![
                     ("priority".into(), Value::String("high".into())),
                     ("tag".into(), Value::String("dev".into())),
                 ])))
@@ -100,7 +100,7 @@ fn bare_colon_merge_is_unaffected_by_named_connect_support() {
             assert!(el.connects.is_empty());
             assert_eq!(
                 el.value,
-                Some(ElementValue::from_map(Value::Map(vec![(
+                Some(Group::from_map(Value::Map(vec![(
                     "b".into(),
                     Value::Int(2)
                 )])))
@@ -169,7 +169,7 @@ fn sugar_list_item_and_heading_support_a_bare_connect() {
             assert_eq!(s.args, Some(Value::Map(vec![("x".into(), Value::Int(1))])));
             assert_eq!(
                 s.value,
-                Some(ElementValue::from_map(Value::Map(vec![(
+                Some(Group::from_map(Value::Map(vec![(
                     "y".into(),
                     Value::Int(2)
                 )])))
@@ -251,7 +251,7 @@ fn sugar_connect_tolerates_one_blank_line_but_not_two() {
         Block::Section(s) => {
             assert_eq!(
                 s.value,
-                Some(ElementValue::from_map(Value::Map(vec![(
+                Some(Group::from_map(Value::Map(vec![(
                     "y".into(),
                     Value::Int(2)
                 )])))

@@ -198,7 +198,7 @@ pub fn value_to_json(v: &Value) -> serde_json::Value {
         // value-embedded element's own `content`/`value`/`children` are
         // rare enough in practice (`@doc.icon("x")` uses none of them)
         // that this isn't worth widening `serde_json` conversions for
-        // `Inline`/`ElementValue`, which don't have one anywhere else.
+        // `Inline`/`Group`, which don't have one anywhere else.
         Value::Interp(interp) => {
             let mut obj = serde_json::Map::new();
             obj.insert(
@@ -229,13 +229,13 @@ pub fn value_to_json(v: &Value) -> serde_json::Value {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tomet_ast::{ElementValue, Sigil};
+    use tomet_ast::{Group, Sigil};
     use tomet_tree::element_new;
 
     fn el_with(args: Option<Value>, value: Option<Value>) -> Element {
         let mut el = element_new(Sigil::named("x"));
         el.args = args;
-        el.value = value.map(ElementValue::from_map);
+        el.value = value.map(Group::from_map);
         el
     }
 

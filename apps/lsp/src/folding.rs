@@ -1,7 +1,7 @@
 //! Provides folding ranges for sections, blocks, and comments in the editor.
 
 use lsp_types::{FoldingRange, FoldingRangeKind};
-use tomet_ast::{Block, ElementValue, List};
+use tomet_ast::{Block, Group, List};
 use tomet_lexer::LineIndex;
 
 /// Computes folding ranges for the given document text.
@@ -125,10 +125,10 @@ fn collect_list_folding_ranges(index: &LineIndex<'_>, list: &List, ranges: &mut 
 
 fn collect_element_value_folding_ranges(
     index: &LineIndex<'_>,
-    val: &ElementValue,
+    val: &Group,
     ranges: &mut Vec<FoldingRange>,
 ) {
-    let ElementValue::Group(entries) = val;
+    let Group(entries) = val;
     for entry in entries {
         if let tomet_ast::Entry::Element(child) = entry {
             let start_line = line0(index, child.span.start);

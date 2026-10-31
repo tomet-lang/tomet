@@ -9,7 +9,7 @@ fn parses_section_with_attrs() {
             assert_eq!(s.title, vec![Inline::Text("Hello".into())]);
             assert_eq!(
                 s.value,
-                Some(ElementValue::from_map(Value::Map(vec![(
+                Some(Group::from_map(Value::Map(vec![(
                     "id".into(),
                     Value::String("header1".into())
                 )])))

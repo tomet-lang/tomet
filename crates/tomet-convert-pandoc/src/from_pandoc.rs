@@ -34,8 +34,8 @@
 //!   `Attr` is where data goes. Only the elements move.
 
 use tomet_ast::{
-    Block as TmBlock, Document, Element, ElementValue, Id, Inline as TmInline, LineBreak, List,
-    Name, Paragraph, Placement, RawText, Section, Sigil, SoftBreak, Span, Text, Value,
+    Block as TmBlock, Document, Element, Group, Id, Inline as TmInline, LineBreak, List, Name,
+    Paragraph, Placement, RawText, Section, Sigil, SoftBreak, Span, Text, Value,
 };
 use tomet_semantics::EXACT_DATA_KEY;
 
@@ -124,7 +124,7 @@ fn meta_element(meta: &crate::ast::Meta) -> Element {
         .map(|(k, v)| (k.clone(), meta_value_to_value(v)))
         .collect();
     let mut el = element_new(Sigil::document("meta")).with_placement(Placement::Block);
-    el.value = Some(ElementValue::from_map(Value::Map(entries)));
+    el.value = Some(Group::from_map(Value::Map(entries)));
     el
 }
 
@@ -604,7 +604,7 @@ fn class_name(attr: &Attr) -> Option<String> {
 ///
 /// When [`EXACT_DATA_KEY`] is present it wins outright: it is the whole
 /// of the original `(args)` and `{value}`, so both groups come back
-fn extract_data_from_attr(attr: &Attr) -> (Option<Value>, Option<ElementValue>) {
+fn extract_data_from_attr(attr: &Attr) -> (Option<Value>, Option<Group>) {
     let exact = attr
         .2
         .iter()
@@ -612,9 +612,7 @@ fn extract_data_from_attr(attr: &Attr) -> (Option<Value>, Option<ElementValue>) 
         .and_then(|(_, json)| serde_json::from_str(json).ok());
     if let Some(serde_json::Value::Object(obj)) = exact {
         let args = obj.get("args").map(json_to_value);
-        let value = obj
-            .get("value")
-            .map(|v| ElementValue::from_map(json_to_value(v)));
+        let value = obj.get("value").map(|v| Group::from_map(json_to_value(v)));
         return (args, value);
     }
 
@@ -626,7 +624,7 @@ fn extract_data_from_attr(attr: &Attr) -> (Option<Value>, Option<ElementValue>) 
         entries.push((k.clone(), Value::String(v.clone())));
     }
     let value = if !entries.is_empty() {
-        Some(ElementValue::from_map(Value::Map(entries)))
+        Some(Group::from_map(Value::Map(entries)))
     } else {
         None
     };

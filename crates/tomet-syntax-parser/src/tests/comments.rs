@@ -244,7 +244,7 @@ fn own_line_comment_works_inside_a_lightweight_value_group() {
         Block::Element(el) => {
             assert_eq!(
                 el.value,
-                Some(ElementValue::from_map(Value::Map(vec![(
+                Some(Group::from_map(Value::Map(vec![(
                     "key".into(),
                     Value::String("value".into())
                 )])))

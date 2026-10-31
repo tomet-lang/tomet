@@ -1,5 +1,5 @@
 use super::*;
-use tomet_ast::{ElementValue, Paragraph, Placement, RawText, Sigil, Span, Text};
+use tomet_ast::{Group, Paragraph, Placement, RawText, Sigil, Span, Text};
 
 /// Wraps a flat inline sequence as `Element.content` (`Vec<Block>`
 /// now) -- every fixture below is still just one paragraph's worth.
@@ -88,7 +88,7 @@ fn adjacent_meta_blocks_have_no_visible_output() {
             placement: Placement::Inline,
             args: Some(Value::String(tag.to_string())),
             content: None,
-            value: Some(ElementValue::from_map(Value::Map(vec![(
+            value: Some(Group::from_map(Value::Map(vec![(
                 "key".to_string(),
                 Value::String("value".to_string()),
             )]))),

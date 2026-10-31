@@ -404,7 +404,7 @@ pub struct Section {
     pub level: usize,
     pub title: Vec<Inline>,
     pub args: Option<Value>,
-    pub value: Option<ElementValue>,
+    pub value: Option<Group>,
     pub id: Option<Id>,
     pub connects: Vec<Element>,
     pub blocks: Vec<Block>,
@@ -922,7 +922,7 @@ pub struct Element {
     /// vocabulary's own elements). See `tmtroot/docs/spec/feature/
     /// content-shape.tmt`.
     pub content: Option<Vec<Block>>,
-    pub value: Option<ElementValue>,
+    pub value: Option<Group>,
     pub id: Option<Id>,
     pub connects: Vec<Element>,
     pub span: Span,
@@ -940,32 +940,21 @@ pub enum Entry {
     Element(Element),
 }
 
-/// The contents of an element's value group.
-///
-/// It has the one variant [`ElementValue::Group`] since a `${...}` stopped being
-/// an element value (it is an [`Interpolation`] now); the enum is kept until
-/// the value slot is given its final shape.
+/// The entries of a `{...}` group, in source order.
 ///
 /// `{...}` is always data: it parses uniformly into [`Entry`] items in
 /// source order, whatever the element is called. "Is this a data map or a
 /// list of children?" is no longer a parse-time branch -- it is a view
 /// computed downstream in `tomet-semantics`, which is what lets the parser
 /// build the tree without consulting any element vocabulary.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub enum ElementValue {
-    Group(Vec<Entry>),
-}
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
+pub struct Group(pub Vec<Entry>);
 
-impl ElementValue {
-    /// An empty group -- what `{}` parses to.
-    pub fn empty_group() -> Self {
-        ElementValue::Group(Vec::new())
-    }
-
+impl Group {
     /// Builds a group from `key: value` pairs alone.
     pub fn from_map(value: Value) -> Self {
         match value {
-            Value::Map(entries) => ElementValue::Group(
+            Value::Map(entries) => Group(
                 entries
                     .into_iter()
                     .map(|(k, v)| Entry::Pair(k, v))
@@ -973,20 +962,20 @@ impl ElementValue {
             ),
             // A non-map body has no uniform-entry spelling; callers that
             // build one are constructing a single positional entry.
-            other => ElementValue::Group(vec![Entry::Pair(String::new(), other)]),
+            other => Group(vec![Entry::Pair(String::new(), other)]),
         }
     }
 
     /// Builds a group from nested elements alone.
     pub fn from_children(children: Vec<Element>) -> Self {
-        ElementValue::Group(children.into_iter().map(Entry::Element).collect())
+        Group(children.into_iter().map(Entry::Element).collect())
     }
 
     /// The data view: this group's `key: value` pairs, in source order,
     /// as a [`Value::Map`]. Nested elements are skipped.
     ///
     pub fn as_data(&self) -> Value {
-        let ElementValue::Group(entries) = self;
+        let Group(entries) = self;
         Value::Map(
             entries
                 .iter()
@@ -1000,7 +989,7 @@ impl ElementValue {
 
     /// The children view: this group's nested elements, in source order.
     pub fn as_children(&self) -> Vec<&Element> {
-        let ElementValue::Group(entries) = self;
+        let Group(entries) = self;
         entries
             .iter()
             .filter_map(|e| match e {
@@ -1012,22 +1001,22 @@ impl ElementValue {
 
     /// Whether this group holds any nested elements.
     pub fn has_children(&self) -> bool {
-        let ElementValue::Group(entries) = self;
+        let Group(entries) = self;
         entries.iter().any(|e| matches!(e, Entry::Element(_)))
     }
 
     /// This group's `key: value` pairs, in source order.
     pub fn pairs(&self) -> impl Iterator<Item = (&String, &Value)> {
-        let ElementValue::Group(entries) = self;
+        let Group(entries) = self;
         entries.iter().filter_map(|e| match e {
             Entry::Pair(k, v) => Some((k, v)),
             Entry::Element(_) => None,
         })
     }
 
-    /// Mutable counterpart of [`ElementValue::pairs`].
+    /// Mutable counterpart of [`Group::pairs`].
     pub fn pairs_mut(&mut self) -> impl Iterator<Item = (&mut String, &mut Value)> {
-        let ElementValue::Group(entries) = self;
+        let Group(entries) = self;
         entries.iter_mut().filter_map(|e| match e {
             Entry::Pair(k, v) => Some((k, v)),
             Entry::Element(_) => None,
@@ -1039,20 +1028,20 @@ impl ElementValue {
         self.pairs().find(|(k, _)| *k == key).map(|(_, v)| v)
     }
 
-    /// Mutable counterpart of [`ElementValue::get`].
+    /// Mutable counterpart of [`Group::get`].
     pub fn get_mut(&mut self, key: &str) -> Option<&mut Value> {
         self.pairs_mut().find(|(k, _)| *k == key).map(|(_, v)| v)
     }
 
     /// Appends a `key: value` pair.
     pub fn push_pair(&mut self, key: impl Into<String>, value: Value) {
-        let ElementValue::Group(entries) = self;
+        let Group(entries) = self;
         entries.push(Entry::Pair(key.into(), value));
     }
 
     /// Removes the first pair bound to `key` and returns its value.
     pub fn remove(&mut self, key: &str) -> Option<Value> {
-        let ElementValue::Group(entries) = self;
+        let Group(entries) = self;
         let idx = entries
             .iter()
             .position(|e| matches!(e, Entry::Pair(k, _) if k == key))?;

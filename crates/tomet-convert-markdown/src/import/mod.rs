@@ -168,7 +168,7 @@ pub fn from_markdown_with_options(src: &str, options: &ImportOptions) -> Documen
         }
         if !had_id || !entries.is_empty() {
             let mut meta_el = element_new(Sigil::document("meta"));
-            meta_el.value = Some(tomet_ast::ElementValue::from_map(Value::Map(entries)));
+            meta_el.value = Some(tomet_ast::Group::from_map(Value::Map(entries)));
             push_block(&mut stack, Block::Element(meta_el));
         }
     }

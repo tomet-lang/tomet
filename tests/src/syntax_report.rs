@@ -24,8 +24,8 @@ use std::fmt::Write as _;
 use std::path::PathBuf;
 
 use tomet_ast::{
-    Block, Document, Element, ElementValue, Entry, Inline, InterpExpr, Interpolation, List,
-    Placement, Sigil, Value,
+    Block, Document, Element, Entry, Group, Inline, InterpExpr, Interpolation, List, Placement,
+    Sigil, Value,
 };
 use tomet_parser::parse_document;
 
@@ -677,7 +677,7 @@ fn dump_block(out: &mut String, block: &Block, depth: usize) {
                 let _ = writeln!(out, "args    {}", value_str(args));
             }
             match &sec.value {
-                Some(ElementValue::Group(entries)) => {
+                Some(Group(entries)) => {
                     indent(out, depth + 1);
                     if entries.is_empty() {
                         out.push_str("group   (空)\n");
@@ -787,7 +787,7 @@ fn dump_element(out: &mut String, el: &Element, depth: usize) {
         }
     }
     match &el.value {
-        Some(ElementValue::Group(entries)) => {
+        Some(Group(entries)) => {
             indent(out, depth + 1);
             if entries.is_empty() {
                 out.push_str("group   (空)\n");

@@ -1,8 +1,6 @@
 //! Extension trait, attribute helpers, and constructors for [`tomet_ast::Element`].
 
-use tomet_ast::{
-    Block, Element, ElementValue, Id, List, ListItem, Name, Placement, Sigil, Span, Value,
-};
+use tomet_ast::{Block, Element, Group, Id, List, ListItem, Name, Placement, Sigil, Span, Value};
 
 /// Extension trait providing accessors, attribute manipulations, and inspections on [`Element`].
 pub trait ElementExt {
@@ -19,7 +17,7 @@ pub trait ElementExt {
     fn with_content(self, content: Vec<Block>) -> Self;
 
     /// Consumes `self` and sets its `value`.
-    fn with_value(self, value: ElementValue) -> Self;
+    fn with_value(self, value: Group) -> Self;
 
     /// Consumes `self` and sets its `id`.
     fn with_id(self, id: Id) -> Self;
@@ -45,7 +43,7 @@ pub trait ElementExt {
     /// Unlike [`ElementExt::attrs_view`] this does not fall back to the
     /// value group: a group is a list of [`tomet_ast::Entry`] items, not a
     /// `Value`, so there is no single `&mut Value` to hand out for it. Use
-    /// [`ElementExt::set_prop`] or `ElementValue`'s own pair accessors to
+    /// [`ElementExt::set_prop`] or `Group`'s own pair accessors to
     /// write into a group.
     fn attrs_mut(&mut self) -> Option<&mut Value>;
 
@@ -98,7 +96,7 @@ impl ElementExt for Element {
         self
     }
 
-    fn with_value(mut self, value: ElementValue) -> Self {
+    fn with_value(mut self, value: Group) -> Self {
         self.value = Some(value);
         self
     }
@@ -194,14 +192,14 @@ impl ElementExt for Element {
             *val = new_val;
             return;
         }
-        if let Some(value @ ElementValue::Group(_)) = &mut self.value {
+        if let Some(value @ Group(_)) = &mut self.value {
             value.push_pair(key, new_val);
         } else if let Some(Value::Map(entries)) = &mut self.args {
             entries.push((key.to_string(), new_val));
         } else if self.value.is_none() && self.args.is_none() {
             self.args = Some(Value::Map(vec![(key.to_string(), new_val)]));
         } else if self.args.is_some() {
-            self.value = Some(ElementValue::Group(vec![tomet_ast::Entry::Pair(
+            self.value = Some(Group(vec![tomet_ast::Entry::Pair(
                 key.to_string(),
                 new_val,
             )]));
@@ -333,7 +331,7 @@ pub fn list_item(
             placement: Placement::Block,
             args,
             content: Some(content),
-            value: attrs.map(ElementValue::from_map),
+            value: attrs.map(Group::from_map),
             id,
             connects,
             span,

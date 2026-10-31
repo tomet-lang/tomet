@@ -1,4 +1,4 @@
-use tomet_ast::{Block, Document, Element, ElementValue, Entry, Inline, List, Span, Value};
+use tomet_ast::{Block, Document, Element, Entry, Group, Inline, List, Span, Value};
 
 /// Walks every node in `doc` and returns `(id, span)` for each
 /// [`Element::id`]/[`Section::id`] found, in document order.
@@ -59,7 +59,7 @@ fn collect_element_ids(el: &Element, ids: &mut Vec<(String, Span)>) {
     if let Some(args) = &el.args {
         collect_value_ids(args, ids);
     }
-    if let Some(ElementValue::Group(entries)) = &el.value {
+    if let Some(Group(entries)) = &el.value {
         for entry in entries {
             match entry {
                 Entry::Pair(_, value) => collect_value_ids(value, ids),

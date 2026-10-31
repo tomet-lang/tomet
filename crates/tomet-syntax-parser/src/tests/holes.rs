@@ -102,7 +102,7 @@ fn several_arguments_are_unkeyed_entries() {
 #[test]
 fn options_are_the_value_group() {
     let hole = element("?int(n){min: 1}");
-    let Some(ElementValue::Group(entries)) = &hole.value else {
+    let Some(Group(entries)) = &hole.value else {
         panic!("expected a value group, got {:?}", hole.value);
     };
     assert_eq!(entries.len(), 1);

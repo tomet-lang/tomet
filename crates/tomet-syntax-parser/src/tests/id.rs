@@ -98,7 +98,7 @@ fn section_sugar_reads_a_trailing_id_and_attrs_together() {
             assert_eq!(s.id, Some(Id("intro".into())));
             assert_eq!(
                 s.value,
-                Some(ElementValue::from_map(Value::Map(vec![(
+                Some(Group::from_map(Value::Map(vec![(
                     "tag".into(),
                     Value::String("x".into())
                 )])))
@@ -146,7 +146,7 @@ fn list_item_sugar_reads_a_trailing_id_and_attrs_together() {
     assert_eq!(items[0].element.id, Some(Id("item1".into())));
     assert_eq!(
         items[0].element.value,
-        Some(ElementValue::from_map(Value::Map(vec![(
+        Some(Group::from_map(Value::Map(vec![(
             "tag".into(),
             Value::String("x".into())
         )])))

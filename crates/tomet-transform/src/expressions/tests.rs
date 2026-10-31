@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use tomet_ast::{Block, ElementValue, Inline, Value};
+use tomet_ast::{Block, Group, Inline, Value};
 use tomet_expr::{
     DocRef, EvalContext, EvalValue, MemoryResolver, NoResolver, Phase, Resolver, SystemGenerate,
 };
@@ -339,7 +339,7 @@ fn a_value_in_a_value_group_keeps_its_type_and_a_list_stays_a_list() {
     let Block::Element(el) = &doc.blocks[0] else {
         panic!("an element block");
     };
-    let Some(ElementValue::Group(entries)) = &el.value else {
+    let Some(Group(entries)) = &el.value else {
         panic!("a group");
     };
     assert_eq!(
@@ -408,7 +408,7 @@ fn creating_a_document_reads_var_and_generates() {
     let Block::Element(el) = &doc.blocks[0] else {
         panic!("meta");
     };
-    let Some(ElementValue::Group(entries)) = &el.value else {
+    let Some(Group(entries)) = &el.value else {
         panic!("a group");
     };
     let tomet_ast::Entry::Pair(_, Value::String(id)) = &entries[0] else {
@@ -436,7 +436,7 @@ fn creation_only_names_are_refused_when_rendering() {
         panic!("meta");
     };
     // The expression is still there.
-    let Some(ElementValue::Group(entries)) = &el.value else {
+    let Some(Group(entries)) = &el.value else {
         panic!("a group");
     };
     assert!(matches!(

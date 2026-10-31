@@ -22,7 +22,7 @@ use crate::util::{
     escape_attr, escape_html, id_attr, push_data_attrs, push_value_data_attrs, value_to_plain,
 };
 use crate::{CustomElementCtx, RenderCtx};
-use tomet_ast::{Element, ElementValue, Interpolation};
+use tomet_ast::{Element, Group, Interpolation};
 use tomet_semantics::{
     classify_std_lenient, extract_tags, is_directive, normalized_element_args_in,
 };
@@ -229,11 +229,11 @@ fn render_generic_element(
     }
 }
 
-fn render_element_value(cx: &RenderCtx, value: &ElementValue, out: &mut String) {
+fn render_element_value(cx: &RenderCtx, value: &Group, out: &mut String) {
     match value {
         // Only the elements. A group's *pairs* are data and left the body
         // for `data-*` beside `(args)`; see `push_value_data_attrs`.
-        ElementValue::Group(_) => {
+        Group(_) => {
             let children = value.as_children();
             if !children.is_empty() {
                 out.push_str("<div class=\"tm-children\">\n");

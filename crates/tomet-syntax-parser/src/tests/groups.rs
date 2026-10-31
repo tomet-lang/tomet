@@ -121,7 +121,7 @@ fn empty_paren_and_brace_groups_are_a_deliberately_empty_map() {
     let doc = parse_document("::meta{}\n").unwrap();
     match &doc.blocks[0] {
         Block::Element(el) => {
-            assert_eq!(el.value, Some(ElementValue::from_map(Value::Map(vec![]))));
+            assert_eq!(el.value, Some(Group::from_map(Value::Map(vec![]))));
         }
         other => panic!("expected an element, got {other:?}"),
     }

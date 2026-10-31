@@ -2,7 +2,7 @@
 
 use std::ops::ControlFlow;
 use tomet_ast::{
-    Block, Document, Element, ElementValue, Entry, Inline, Interpolation, List, ListItem, Value,
+    Block, Document, Element, Entry, Group, Inline, Interpolation, List, ListItem, Value,
 };
 
 /// Called at every [`Element`] `walk_document` visits, in document order.
@@ -88,7 +88,7 @@ fn inlines_in_element(element: &Element, f: &mut dyn FnMut(&Inline)) {
             inlines_in_block(block, f);
         }
     }
-    if let Some(ElementValue::Group(entries)) = &element.value {
+    if let Some(Group(entries)) = &element.value {
         for entry in entries {
             match entry {
                 Entry::Element(child) => inlines_in_element(child, f),
@@ -300,7 +300,7 @@ fn walk_element<B>(element: &Element, visitor: &mut impl Visitor<B>) -> ControlF
             propagate!(walk_block(block, visitor));
         }
     }
-    if let Some(ElementValue::Group(entries)) = &element.value {
+    if let Some(Group(entries)) = &element.value {
         for entry in entries {
             match entry {
                 Entry::Element(child) => propagate!(walk_element(child, visitor)),
@@ -437,7 +437,7 @@ fn walk_element_mut<B>(element: &mut Element, visitor: &mut impl VisitorMut<B>) 
             propagate!(walk_block_mut(block, visitor));
         }
     }
-    if let Some(ElementValue::Group(entries)) = &mut element.value {
+    if let Some(Group(entries)) = &mut element.value {
         for entry in entries {
             match entry {
                 Entry::Element(child) => propagate!(walk_element_mut(child, visitor)),
@@ -487,7 +487,7 @@ fn walk_value_mut<B>(value: &mut Value, visitor: &mut impl VisitorMut<B>) -> Con
 }
 
 /// Every descendant of `el` (not `el` itself), in document order --
-/// `content`, `children`, and `ElementValue::Group` entries. `:rule`'s own
+/// `content`, `children`, and `Group` entries. `:rule`'s own
 /// use is the only caller, so "descendant" means what `:rule(allow:...)`
 /// means by it: content and children the reader encounters *underneath*
 /// `el`, not configuration carried *on* `el`.
@@ -508,7 +508,7 @@ fn walk_value_mut<B>(value: &mut Value, visitor: &mut impl VisitorMut<B>) -> Con
 /// being reported as a disallowed *descendant* would be.
 ///
 /// `direct_only` restricts to immediate children only -- one level of
-/// `content`/`children`/`ElementValue::Group`, not recursed further --
+/// `content`/`children`/`Group`, not recursed further --
 /// for `:rule(direct:true)`; `false` walks every descendant at any
 /// depth, same as [`walk_element`].
 pub fn for_each_descendant(el: &Element, direct_only: bool, mut f: impl FnMut(&Element)) {
@@ -516,7 +516,7 @@ pub fn for_each_descendant(el: &Element, direct_only: bool, mut f: impl FnMut(&E
         for_each_descendant_in_blocks(content, direct_only, &mut f);
     }
     if direct_only {
-        if let Some(ElementValue::Group(entries)) = &el.value {
+        if let Some(Group(entries)) = &el.value {
             for entry in entries {
                 if let Entry::Element(child) = entry {
                     f(child);
@@ -529,7 +529,7 @@ pub fn for_each_descendant(el: &Element, direct_only: bool, mut f: impl FnMut(&E
         f(child);
         ControlFlow::Continue(())
     };
-    if let Some(ElementValue::Group(entries)) = &el.value {
+    if let Some(Group(entries)) = &el.value {
         for entry in entries {
             if let Entry::Element(child) = entry {
                 let _ = walk_element(child, &mut visitor);
@@ -657,7 +657,7 @@ fn lists_in_element(el: &Element, f: &mut dyn FnMut(&List)) {
             lists_in_block(b, f);
         }
     }
-    if let Some(ElementValue::Group(entries)) = &el.value {
+    if let Some(Group(entries)) = &el.value {
         for entry in entries {
             if let Entry::Element(child) = entry {
                 lists_in_element(child, f);
@@ -781,8 +781,8 @@ fn interpolations_in_element(element: &Element, f: &mut dyn FnMut(&Interpolation
     }
 }
 
-fn interpolations_in_element_value(value: &ElementValue, f: &mut dyn FnMut(&Interpolation)) {
-    let ElementValue::Group(entries) = value;
+fn interpolations_in_element_value(value: &Group, f: &mut dyn FnMut(&Interpolation)) {
+    let Group(entries) = value;
     for entry in entries {
         match entry {
             Entry::Pair(_, value) => interpolations_in_value(value, f),

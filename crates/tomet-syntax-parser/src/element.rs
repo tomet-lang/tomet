@@ -9,7 +9,7 @@ use crate::value::{
     parse_quoted, parse_value_at, skip_block_comment, skip_inline_ws, skip_line_comment,
     skip_ws_newlines_and_comments,
 };
-use tomet_ast::{Block, Element, ElementValue, Entry, Id, Inline, Placement, Sigil, Value};
+use tomet_ast::{Block, Element, Entry, Group, Id, Inline, Placement, Sigil, Value};
 use tomet_lexer::Cursor;
 use tomet_tree::{ElementExt, element_new};
 
@@ -390,11 +390,11 @@ pub(crate) fn parse_groups_with_pipe_stack(
                         // group holding elements is replaced wholesale,
                         // as there is nothing to merge key-wise.
                         let merged = match (&el.value, &conn_val) {
-                            (Some(existing), ElementValue::Group(_))
+                            (Some(existing), Group(_))
                                 if !existing.has_children() && !conn_val.has_children() =>
                             {
                                 merge_values(Some(&existing.as_data()), Some(&conn_val.as_data()))
-                                    .map(ElementValue::from_map)
+                                    .map(Group::from_map)
                             }
                             _ => None,
                         };
@@ -666,7 +666,7 @@ fn find_trailing_connect(dialect: Dialect, cur: &Cursor) -> Option<usize> {
 pub(crate) struct SugarBody {
     pub content: Vec<Inline>,
     pub args: Option<Value>,
-    pub value: Option<ElementValue>,
+    pub value: Option<Group>,
     pub id: Option<Id>,
     pub connects: Vec<Element>,
 }
@@ -872,7 +872,7 @@ fn parse_content(dialect: Dialect, cur: &mut Cursor) -> Result<Vec<Block>> {
 /// slot instead (`@tags(1, 2, 3)`, already a `Seq` there) -- there is no
 /// live spelling anywhere in the corpus that needs `{...}` itself to hold
 /// one.
-pub(crate) fn parse_value_group(dialect: Dialect, cur: &mut Cursor) -> Result<ElementValue> {
+pub(crate) fn parse_value_group(dialect: Dialect, cur: &mut Cursor) -> Result<Group> {
     let group_start = cur.pos();
     if !cur.eat_str("{") {
         return Err(err(cur.pos(), "expected '{'"));
@@ -944,7 +944,7 @@ pub(crate) fn parse_value_group(dialect: Dialect, cur: &mut Cursor) -> Result<El
     if !cur.eat_str("}") {
         return Err(err(cur.pos(), "expected '}'"));
     }
-    Ok(ElementValue::Group(entries))
+    Ok(Group(entries))
 }
 
 /// A `(marker)[content]` entry inside a `{...}` group -- an element whose

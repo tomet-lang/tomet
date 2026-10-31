@@ -97,7 +97,7 @@ fn list_item_ending_in_an_element_does_not_error_on_a_trailing_brace() {
                     assert_eq!(link.sigil, Sigil::named("link"), "{bare:?}");
                     assert_eq!(
                         link.value,
-                        Some(ElementValue::from_map(Value::Map(vec![(
+                        Some(Group::from_map(Value::Map(vec![(
                             "id".into(),
                             Value::String("breakfast".into())
                         )]))),

@@ -108,7 +108,7 @@ pub(crate) fn render_section(sec: &Section, config: &PrinterConfig, out: &mut St
 /// standalone `Block::Element`, or the first item of a `Block::Paragraph`
 /// it joined by the default placement rule), never from the shared,
 /// recursively-called `render_element` (which `render_inlines`/
-/// `ElementValue::Children` both call for genuinely nested/inline
+/// `Group::Children` both call for genuinely nested/inline
 /// elements) -- a nested `@heading(...)` must not round-trip back to
 /// `#`-sugar,
 /// consistent with `tomet-html`/`tomet-markdown`'s

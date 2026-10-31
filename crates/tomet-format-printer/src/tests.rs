@@ -1,5 +1,5 @@
 use super::*;
-use tomet_ast::{Block, Document, ElementValue, Inline, Paragraph, Section, Sigil, Value};
+use tomet_ast::{Block, Document, Group, Inline, Paragraph, Section, Sigil, Value};
 use tomet_config::{FieldConfig, FormatConfig, GroupOrder, MetaConfig, load_config_from_str};
 use tomet_field_utils::generate_id_for_field;
 use tomet_style::render_value_inner;
@@ -491,7 +491,7 @@ fn test_container_children_indentation() {
     ))]);
 
     let mut links = element_new(Sigil::named("links"));
-    links.value = Some(ElementValue::from_children(vec![child1, child2]));
+    links.value = Some(Group::from_children(vec![child1, child2]));
 
     let doc = Document::new(vec![Block::Element(links)], tomet_ast::Span::dummy());
     let printed = document_to_tm(&doc);

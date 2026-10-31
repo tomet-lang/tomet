@@ -3,7 +3,7 @@
 //! Searches for matching [`Element::id`], [`Section::id`], or [`List::id`]
 //! definitions anywhere in a parsed AST. Pure in-memory (no I/O).
 
-use tomet_ast::{Block, Document, Element, ElementValue, Entry, Inline, List, Span, Value};
+use tomet_ast::{Block, Document, Element, Entry, Group, Inline, List, Span, Value};
 
 /// Returns whether an anchor with the given ID exists anywhere in `doc`.
 pub fn has_anchor(doc: &Document, anchor: &str) -> bool {
@@ -115,7 +115,7 @@ fn find_in_element(el: &Element, anchor: &str) -> Option<Span> {
     {
         return Some(span);
     }
-    if let Some(ElementValue::Group(entries)) = &el.value {
+    if let Some(Group(entries)) = &el.value {
         for entry in entries {
             match entry {
                 Entry::Element(child) => {
@@ -229,7 +229,7 @@ fn collect_in_element(el: &Element, anchors: &mut Vec<(String, Span)>) {
     if let Some(args) = &el.args {
         collect_in_value(args, anchors);
     }
-    if let Some(ElementValue::Group(entries)) = &el.value {
+    if let Some(Group(entries)) = &el.value {
         for entry in entries {
             match entry {
                 Entry::Element(child) => collect_in_element(child, anchors),

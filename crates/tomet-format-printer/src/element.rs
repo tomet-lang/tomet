@@ -1,6 +1,6 @@
 //! Rendering elements, values, args, and connects.
 
-use tomet_ast::{Element, ElementValue, Entry, Interpolation, Placement, Value};
+use tomet_ast::{Element, Entry, Group, Interpolation, Placement, Value};
 use tomet_config::{GroupOrder, PrinterConfig};
 use tomet_style::render_nested;
 
@@ -261,8 +261,8 @@ pub fn render_element(el: &Element, config: &PrinterConfig) -> String {
 }
 
 /// Renders an element's value: a `{...}` group.
-pub(crate) fn render_element_value(value: &ElementValue, config: &PrinterConfig) -> String {
-    let ElementValue::Group(entries) = value;
+pub(crate) fn render_element_value(value: &Group, config: &PrinterConfig) -> String {
+    let Group(entries) = value;
     format!("{{{}}}", render_group_entries(entries, config))
 }
 

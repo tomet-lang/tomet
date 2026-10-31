@@ -32,8 +32,8 @@
 //! in a resolver that returns the document from before this pass rewrote it.
 
 use tomet_ast::{
-    Block, Document, Element, ElementValue, Entry, Id, Inline, InterpExpr, List, ListItem,
-    Paragraph, Sigil, Span, Text, Value,
+    Block, Document, Element, Entry, Group, Id, Inline, InterpExpr, List, ListItem, Paragraph,
+    Sigil, Span, Text, Value,
 };
 use tomet_expr::{EvalContext, EvalValue, Note, evaluate, evaluate_data};
 use tomet_tree::list_item;
@@ -260,9 +260,9 @@ impl Pass<'_> {
         el
     }
 
-    fn element_value(&mut self, value: ElementValue) -> ElementValue {
-        let ElementValue::Group(entries) = value;
-        ElementValue::Group(
+    fn element_value(&mut self, value: Group) -> Group {
+        let Group(entries) = value;
+        Group(
             entries
                 .into_iter()
                 .map(|entry| match entry {
@@ -520,7 +520,7 @@ impl Ids {
         for conn in &mut el.connects {
             self.element(conn);
         }
-        if let Some(ElementValue::Group(entries)) = &mut el.value {
+        if let Some(Group(entries)) = &mut el.value {
             for entry in entries {
                 if let Entry::Element(child) = entry {
                     self.element(child);
