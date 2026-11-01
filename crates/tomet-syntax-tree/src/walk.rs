@@ -1,160 +1,406 @@
-//! Generic recursive traversal of a [`tomet_ast::Document`]'s tree.
+//! One definition of what sits inside what in a [`Document`], and the walkers built on it.
+//!
+//! [`children`] says, for any [`Node`], which nodes sit directly inside it and in which [`Place`].
+//! [`walk`] is the one recursion over that. Every other walker here is [`walk`] with a filter
+//! and, where a position must stay unseen, a [`Visit::Skip`] written at the walker, so what a
+//! walker leaves out is read in its own body and not in a copy of the recursion.
+//!
+//! The groups of a node come in one order: `(args)`, `{value}`, `[content]`, then its
+//! `:connect`s. The AST keeps no order of groups, so this is the order of every walker.
+//!
+//! The one exception to "one recursion" is [`for_each_element_mut`]: a mutable walk cannot share
+//! the borrow with [`children`], so it lists the children again, and `tests/walk_coverage.rs`
+//! holds the two to the same reach.
 
 use std::ops::ControlFlow;
 use tomet_ast::{
     Block, Connect, Data, Declaration, Document, Element, Entry, Group, Hole, Inline,
-    Interpolation, List, ListItem, Value,
+    Interpolation, List, ListItem, Section, Value,
 };
 
-/// Called at every [`Element`] `walk_document` visits, in document order.
-pub trait Visitor<B> {
-    fn visit(&mut self, el: &Element) -> ControlFlow<B>;
+/// Where a node sits in the node that holds it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Place {
+    /// A block of the document itself.
+    Top,
+    /// An inline of a paragraph.
+    Text,
+    /// An inline of a section's title.
+    Title,
+    /// A block of a section's body.
+    Body,
+    /// The value of `(args)`.
+    Args,
+    /// An entry of a `{value}` group.
+    Entry,
+    /// The value of a `key: value` entry.
+    PairValue,
+    /// An item of a `list(...)`, a map's value or a call's argument.
+    Part,
+    /// A block of a `[content]`, or of a `[...]` value.
+    Content,
+    /// A `:connect`.
+    Connect,
+    /// An item of a list.
+    Item,
+    /// The list nested in a list item.
+    Sublist,
+}
 
-    /// Called at every [`ListItem`], before the elements inside it. A list
-    /// item is not an [`Element`], so [`Visitor::visit`] never sees one;
-    /// a visitor that wants them overrides this, and the closures that
-    /// stand for a visitor do not.
-    fn visit_item(&mut self, _item: &ListItem) -> ControlFlow<B> {
-        ControlFlow::Continue(())
+/// A thing in a document's tree, together with what it is in.
+///
+/// An element is not a node of its own: it is the `Block`, `Inline`, `Value` or `Entry` it stands
+/// as (see [`Node::element`]). A list at the top of a document is a `Block`; the list nested in an
+/// item is a [`Node::List`].
+#[derive(Debug, Clone, Copy)]
+pub enum Node<'a> {
+    Block(&'a Block),
+    Inline(&'a Inline),
+    Value(&'a Value),
+    /// An entry of a `{...}` group: a `key: value` pair, an element, a hole or a bare entry.
+    Entry(&'a Entry),
+    Connect(&'a Connect),
+    Item(&'a ListItem),
+    /// A list nested in a list item.
+    List(&'a List),
+}
+
+impl<'a> Node<'a> {
+    /// The element this node is, wherever it stands.
+    pub fn element(self) -> Option<&'a Element> {
+        match self {
+            Node::Block(Block::Element(el))
+            | Node::Inline(Inline::Element(el))
+            | Node::Entry(Entry::Element(el)) => Some(el),
+            Node::Value(Value::Element(el)) => Some(el),
+            _ => None,
+        }
+    }
+
+    /// The hole this node is, wherever it stands.
+    pub fn hole(self) -> Option<&'a Hole> {
+        match self {
+            Node::Block(Block::Hole(h))
+            | Node::Inline(Inline::Hole(h))
+            | Node::Entry(Entry::Hole(h)) => Some(h),
+            Node::Value(Value::Hole(h)) => Some(h),
+            _ => None,
+        }
+    }
+
+    pub fn declaration(self) -> Option<&'a Declaration> {
+        match self {
+            Node::Block(Block::Declaration(d)) => Some(d),
+            _ => None,
+        }
+    }
+
+    pub fn section(self) -> Option<&'a Section> {
+        match self {
+            Node::Block(Block::Section(s)) => Some(s),
+            _ => None,
+        }
+    }
+
+    /// The list this node is: one standing as a block, or one nested in an item.
+    pub fn list(self) -> Option<&'a List> {
+        match self {
+            Node::Block(Block::List(l)) | Node::List(l) => Some(l),
+            _ => None,
+        }
+    }
+
+    pub fn interpolation(self) -> Option<&'a Interpolation> {
+        match self {
+            Node::Block(Block::Interp(i))
+            | Node::Inline(Inline::Interp(i))
+            | Node::Value(Value::Interp(i)) => Some(i),
+            _ => None,
+        }
     }
 }
 
-impl<F, B> Visitor<B> for F
-where
-    F: FnMut(&Element) -> ControlFlow<B>,
-{
-    fn visit(&mut self, el: &Element) -> ControlFlow<B> {
-        self(el)
+/// What a walk does after it has been shown a node.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Visit<B = ()> {
+    /// Go on into what the node holds.
+    Descend,
+    /// Do not look at what the node holds; go on with its siblings.
+    Skip,
+    /// Stop the whole walk, handing `B` back.
+    Break(B),
+}
+
+/// Calls `f` for every node sitting directly in `node`, with the [`Place`] it sits in.
+///
+/// This is the one place that says what is inside what. A section holds its title, its
+/// `{value}`, its body and its connects; a node that carries data holds `(args)`, `{value}`
+/// entries and `[content]` blocks; an element or a hole inside a block, a line of text, a value
+/// or an entry holds what the element or hole holds.
+pub fn children<'a>(node: Node<'a>, f: &mut dyn FnMut(Node<'a>, Place)) {
+    match node {
+        Node::Block(block) => match block {
+            Block::Paragraph(p) => inlines(&p.content, Place::Text, f),
+            Block::Element(el) => element(el, f),
+            Block::Declaration(d) => groups(&d.data, d.content.as_deref(), f),
+            Block::Hole(h) => groups(&h.data, h.content.as_deref(), f),
+            Block::Section(s) => {
+                inlines(&s.title, Place::Title, f);
+                data(&s.data, f);
+                for b in &s.blocks {
+                    f(Node::Block(b), Place::Body);
+                }
+                connects(&s.connects, f);
+            }
+            Block::List(l) => list(l, f),
+            Block::Interp(_) => {}
+        },
+        Node::Inline(inline) => match inline {
+            Inline::Element(el) => element(el, f),
+            Inline::Hole(h) => groups(&h.data, h.content.as_deref(), f),
+            Inline::Text(_)
+            | Inline::Raw(_)
+            | Inline::SoftBreak(_)
+            | Inline::LineBreak(_)
+            | Inline::Interp(_) => {}
+        },
+        Node::Value(value) => match value {
+            Value::Element(el) => element(el, f),
+            Value::Hole(h) => groups(&h.data, h.content.as_deref(), f),
+            Value::Seq(items) | Value::Call(_, items) => {
+                for v in items {
+                    f(Node::Value(v), Place::Part);
+                }
+            }
+            Value::Map(entries) => {
+                for (_, v) in entries {
+                    f(Node::Value(v), Place::Part);
+                }
+            }
+            Value::Blocks(blocks) => {
+                for b in blocks {
+                    f(Node::Block(b), Place::Content);
+                }
+            }
+            Value::Null
+            | Value::Interp(_)
+            | Value::Bool(_)
+            | Value::Int(_)
+            | Value::Float(_)
+            | Value::Number(_)
+            | Value::String(_) => {}
+        },
+        Node::Entry(entry) => match entry {
+            Entry::Pair(_, v) => f(Node::Value(v), Place::PairValue),
+            Entry::Element(el) => element(el, f),
+            Entry::Hole(h) => groups(&h.data, h.content.as_deref(), f),
+            Entry::Bare(b) => groups(&b.data, b.content.as_deref(), f),
+        },
+        Node::Connect(c) => groups(&c.data, c.content.as_deref(), f),
+        Node::Item(item) => {
+            groups(&item.data, Some(&item.content), f);
+            if let Some(sub) = &item.sublist {
+                f(Node::List(sub), Place::Sublist);
+            }
+            connects(&item.connects, f);
+        }
+        Node::List(l) => list(l, f),
     }
+}
+
+fn inlines<'a>(items: &'a [Inline], place: Place, f: &mut dyn FnMut(Node<'a>, Place)) {
+    for inline in items {
+        f(Node::Inline(inline), place);
+    }
+}
+
+fn connects<'a>(items: &'a [Connect], f: &mut dyn FnMut(Node<'a>, Place)) {
+    for connect in items {
+        f(Node::Connect(connect), Place::Connect);
+    }
+}
+
+fn list<'a>(l: &'a List, f: &mut dyn FnMut(Node<'a>, Place)) {
+    for item in &l.items {
+        f(Node::Item(item), Place::Item);
+    }
+    connects(&l.connects, f);
+}
+
+fn element<'a>(el: &'a Element, f: &mut dyn FnMut(Node<'a>, Place)) {
+    groups(&el.data, el.content.as_deref(), f);
+    connects(&el.connects, f);
+}
+
+/// `(args)`, `{value}` and `[content]`: what every node that carries data has in common.
+fn groups<'a>(d: &'a Data, content: Option<&'a [Block]>, f: &mut dyn FnMut(Node<'a>, Place)) {
+    data(d, f);
+    for block in content.into_iter().flatten() {
+        f(Node::Block(block), Place::Content);
+    }
+}
+
+/// `(args)` and `{value}`.
+fn data<'a>(d: &'a Data, f: &mut dyn FnMut(Node<'a>, Place)) {
+    if let Some(args) = &d.args {
+        f(Node::Value(args), Place::Args);
+    }
+    if let Some(Group(entries)) = &d.value {
+        for entry in entries {
+            f(Node::Entry(entry), Place::Entry);
+        }
+    }
+}
+
+/// Shows `f` every node of `doc`, each before what it holds, in document order, and goes into
+/// what `f` answers [`Visit::Descend`] to. [`Visit::Break`] stops the walk and is handed back.
+pub fn walk<'a, B>(
+    doc: &'a Document,
+    f: &mut impl FnMut(Node<'a>, Place) -> Visit<B>,
+) -> ControlFlow<B> {
+    for block in &doc.blocks {
+        walk_node(Node::Block(block), Place::Top, f)?;
+    }
+    ControlFlow::Continue(())
+}
+
+/// [`walk`] from one node, which sits in `place`.
+pub fn walk_node<'a, B>(
+    node: Node<'a>,
+    place: Place,
+    f: &mut impl FnMut(Node<'a>, Place) -> Visit<B>,
+) -> ControlFlow<B> {
+    match f(node, place) {
+        Visit::Break(b) => return ControlFlow::Break(b),
+        Visit::Skip => return ControlFlow::Continue(()),
+        Visit::Descend => {}
+    }
+    let mut flow = ControlFlow::Continue(());
+    children(node, &mut |child, at| {
+        if flow.is_continue() {
+            flow = walk_node(child, at, f);
+        }
+    });
+    flow
+}
+
+/// Visits every node of `doc` in document order, each before what it holds, wherever it sits:
+/// running text, section titles, `:connect`s, and inside a [`Value`] (`Seq`, `Map`, `Call`, a
+/// nested element, `[...]` blocks). It is the walk that skips nothing.
+pub fn for_each_node(doc: &Document, mut f: impl FnMut(Node<'_>)) {
+    let _ = walk(doc, &mut |node, _| {
+        f(node);
+        Visit::<()>::Descend
+    });
+}
+
+/// Every node of `doc` that is part of what the document says: [`for_each_node`] without the
+/// `:connect`s, which are metadata about their owner and not a part of the document (see
+/// [`for_each_descendant`]). The element, list and section walkers are filters over this.
+fn for_each_part(doc: &Document, mut f: impl FnMut(Node<'_>)) {
+    let _ = walk(doc, &mut |node, place| {
+        if place == Place::Connect {
+            return Visit::<()>::Skip;
+        }
+        f(node);
+        Visit::Descend
+    });
 }
 
 /// Traverses all elements in `doc` in document order and executes `f` for each.
+///
+/// An element in a `:connect` is not reached.
 pub fn for_each_element(doc: &Document, mut f: impl FnMut(&Element)) {
-    let mut visitor = |el: &Element| -> ControlFlow<()> {
-        f(el);
-        ControlFlow::Continue(())
-    };
-    let _ = walk_document(doc, &mut visitor);
+    for_each_part(doc, |node| {
+        if let Some(el) = node.element() {
+            f(el);
+        }
+    });
 }
 
-/// Traverses every [`Inline`] in `doc` in document order: paragraph
-/// content, section titles, and every element's `[content]`.
-///
-/// It covers exactly the positions [`walk_document`] covers -- an element
-/// reached there has its inlines reached here -- so a count taken over
-/// elements and a count taken over text describe the same part of the tree.
-/// An `Inline::Element` is itself passed to `f`, and then descended into.
+/// Traverses every [`Inline`] in `doc` in document order: paragraph content, section titles and
+/// every `[content]`. An `Inline::Element` is itself passed to `f`, and then descended into.
 pub fn for_each_inline(doc: &Document, mut f: impl FnMut(&Inline)) {
-    for block in &doc.blocks {
-        inlines_in_block(block, &mut f);
-    }
-}
-
-fn inlines_in_block(block: &Block, f: &mut dyn FnMut(&Inline)) {
-    match block {
-        Block::Paragraph(paragraph) => inlines_in(&paragraph.content, f),
-        Block::Element(element) => inlines_in_element(element, f),
-        Block::Declaration(d) => inlines_in_groups(&d.data, d.content.as_deref(), f),
-        Block::Hole(h) => inlines_in_groups(&h.data, h.content.as_deref(), f),
-        Block::Section(section) => {
-            inlines_in(&section.title, f);
-            // `section.connects` is deliberately not walked here -- same
-            // reason `inlines_in_element` never looks at an ordinary
-            // element's own `.connects`: a connect is metadata about its
-            // owner, not reachable content (see `for_each_descendant`'s
-            // doc comment in this file).
-            for child in &section.blocks {
-                inlines_in_block(child, f);
-            }
+    for_each_part(doc, |node| {
+        if let Node::Inline(inline) = node {
+            f(inline);
         }
-        Block::List(list) => inlines_in_list_items(&list.items, f),
-        Block::Interp(_) => {}
-    }
+    });
 }
 
-fn inlines_in_list_items(items: &[ListItem], f: &mut dyn FnMut(&Inline)) {
-    for item in items {
-        inlines_in_groups(&item.data, Some(&item.content), f);
-        if let Some(sub) = &item.sublist {
-            inlines_in_list_items(&sub.items, f);
+/// Visits every [`ListItem`] in `doc`, in document order, at any depth: a list item is not an
+/// [`Element`], so [`for_each_element`] never passes one.
+pub fn for_each_list_item(doc: &Document, mut f: impl FnMut(&ListItem)) {
+    for_each_part(doc, |node| {
+        if let Node::Item(item) = node {
+            f(item);
         }
-    }
+    });
 }
 
-fn inlines_in(inlines: &[Inline], f: &mut dyn FnMut(&Inline)) {
-    for inline in inlines {
-        f(inline);
-        match inline {
-            Inline::Element(element) => inlines_in_element(element, f),
-            Inline::Hole(hole) => inlines_in_groups(&hole.data, hole.content.as_deref(), f),
-            _ => {}
+/// Visits every [`List`] in `doc`, in document order: those standing as a block, wherever the
+/// block is, and the ones nested in a list item.
+pub fn for_each_list(doc: &Document, mut f: impl FnMut(&List)) {
+    for_each_part(doc, |node| {
+        if let Some(list) = node.list() {
+            f(list);
         }
-    }
+    });
 }
 
-fn inlines_in_element(element: &Element, f: &mut dyn FnMut(&Inline)) {
-    inlines_in_groups(&element.data, element.content.as_deref(), f);
-}
-
-/// `(args)`, `[content]` and `{value}`, in that order: what an element and a
-/// declaration have in common.
-fn inlines_in_groups(data: &Data, content: Option<&[Block]>, f: &mut dyn FnMut(&Inline)) {
-    if let Some(args) = &data.args {
-        inlines_in_value(args, f);
-    }
-    for block in content.into_iter().flatten() {
-        inlines_in_block(block, f);
-    }
-    if let Some(Group(entries)) = &data.value {
-        for entry in entries {
-            match entry {
-                Entry::Element(child) => inlines_in_element(child, f),
-                Entry::Hole(hole) => inlines_in_groups(&hole.data, hole.content.as_deref(), f),
-                Entry::Bare(bare) => inlines_in_groups(&bare.data, bare.content.as_deref(), f),
-                Entry::Pair(_, v) => inlines_in_value(v, f),
-            }
+/// Visits every [`Section`] in `doc`, in document order, including ones nested under another
+/// section's body or in an element's content: a heading's own `:name(...)` connect is checked
+/// against its `blocks` ([`for_each_descendant_in_blocks`]) the way an element's connect is
+/// checked against its own content.
+pub fn for_each_section(doc: &Document, mut f: impl FnMut(&Section)) {
+    for_each_part(doc, |node| {
+        if let Some(section) = node.section() {
+            f(section);
         }
-    }
+    });
 }
 
-fn inlines_in_value(value: &Value, f: &mut dyn FnMut(&Inline)) {
-    match value {
-        Value::Element(el) => inlines_in_element(el, f),
-        Value::Hole(hole) => inlines_in_groups(&hole.data, hole.content.as_deref(), f),
-        Value::Seq(items) => items.iter().for_each(|item| inlines_in_value(item, f)),
-        Value::Map(entries) => entries.iter().for_each(|(_, v)| inlines_in_value(v, f)),
-        Value::Call(_, args) => args.iter().for_each(|a| inlines_in_value(a, f)),
-        Value::Blocks(blocks) => blocks.iter().for_each(|b| inlines_in_block(b, f)),
-        Value::Null
-        | Value::Interp(_)
-        | Value::Bool(_)
-        | Value::Int(_)
-        | Value::Float(_)
-        | Value::Number(_)
-        | Value::String(_) => {}
-    }
-}
-
-/// [`for_each_element`] over one [`Block`], for callers that walk the
-/// document's own top level themselves and need the elements below it.
-pub fn for_each_element_in_block(block: &Block, mut f: impl FnMut(&Element)) {
-    let mut visitor = |el: &Element| -> ControlFlow<()> {
-        f(el);
-        ControlFlow::Continue(())
-    };
-    let _ = walk_block(block, &mut visitor);
-}
-
-/// Visits every element a reader would find by scanning only the top of the
-/// document, in document order: every `Block::Element`, and every
-/// `Inline::Element` sitting directly in a `Block::Paragraph`'s own content
-/// (an element that shares its paragraph with other text is still at the
-/// top; something nested inside another element is not).
+/// Visits every [`Interpolation`] in `doc`, in document order, wherever it sits.
 ///
-/// This is the one place that decision lives. A caller that wants "the
-/// elements at the top of this document" should call this instead of walking
-/// `doc.blocks` by hand. Declarations are not elements: see
-/// [`for_each_top_level_declaration`].
+/// An interpolation is not an [`Element`], so the element walkers never pass one to their
+/// visitor; this is the walker to ask for "every `${...}` in the document".
+pub fn for_each_interpolation(doc: &Document, mut f: impl FnMut(&Interpolation)) {
+    for_each_node(doc, |node| {
+        if let Some(interp) = node.interpolation() {
+            f(interp);
+        }
+    });
+}
+
+/// Visits every [`Declaration`] in `doc`, in document order, wherever it sits: a declaration is a
+/// [`Block`], and a block can be in a section's body or an element's content as well as at the
+/// top, where only it belongs. [`for_each_top_level_declaration`] is the preamble.
+pub fn for_each_declaration(doc: &Document, mut f: impl FnMut(&Declaration)) {
+    for_each_node(doc, |node| {
+        if let Some(declaration) = node.declaration() {
+            f(declaration);
+        }
+    });
+}
+
+/// Visits every [`Hole`] in `doc`, in document order, wherever it sits: as a block, in running
+/// text, as an entry of a `{...}` group or as a value.
+pub fn for_each_hole(doc: &Document, mut f: impl FnMut(&Hole)) {
+    for_each_node(doc, |node| {
+        if let Some(hole) = node.hole() {
+            f(hole);
+        }
+    });
+}
+
+/// Visits every element a reader would find by scanning only the top of the document, in
+/// document order: every `Block::Element`, and every `Inline::Element` sitting directly in a
+/// `Block::Paragraph`'s own content (an element that shares its paragraph with other text is
+/// still at the top; something nested inside another element is not).
+///
+/// This is the one place that decision lives. A caller that wants "the elements at the top of
+/// this document" should call this instead of walking `doc.blocks` by hand. Declarations are not
+/// elements: see [`for_each_top_level_declaration`].
 pub fn for_each_top_level_element(doc: &Document, mut f: impl FnMut(&Element)) {
     for block in &doc.blocks {
         match block {
@@ -177,11 +423,10 @@ pub fn for_each_top_level_element(doc: &Document, mut f: impl FnMut(&Element)) {
 
 /// Visits every declaration at the top level of `doc`, in order.
 ///
-/// A declaration is always a [`Block`] of its own, so "the declarations at
-/// the top of this document" is `doc.blocks` and nothing else: one in a
-/// section's body or an element's content is misplaced, and the validator
-/// reports it (`OutsidePreamble`). A caller that wants the preamble should
-/// call this instead of walking `doc.blocks` by hand.
+/// A declaration is always a [`Block`] of its own, so "the declarations at the top of this
+/// document" is `doc.blocks` and nothing else: one in a section's body or an element's content is
+/// misplaced, and the validator reports it (`OutsidePreamble`). A caller that wants the preamble
+/// should call this instead of walking `doc.blocks` by hand.
 pub fn for_each_top_level_declaration(doc: &Document, mut f: impl FnMut(&Declaration)) {
     for block in &doc.blocks {
         if let Block::Declaration(declaration) = block {
@@ -190,9 +435,9 @@ pub fn for_each_top_level_declaration(doc: &Document, mut f: impl FnMut(&Declara
     }
 }
 
-/// [`for_each_top_level_declaration`], mutably -- for a caller that rewrites a
-/// top-level declaration in place (`::blueprint(x)` becoming `::kind(x)`,
-/// say) without changing how many there are.
+/// [`for_each_top_level_declaration`], mutably -- for a caller that rewrites a top-level
+/// declaration in place (`::blueprint(x)` becoming `::kind(x)`, say) without changing how many
+/// there are.
 pub fn for_each_top_level_declaration_mut(doc: &mut Document, mut f: impl FnMut(&mut Declaration)) {
     for block in &mut doc.blocks {
         if let Block::Declaration(declaration) = block {
@@ -212,464 +457,8 @@ pub fn retain_top_level_declarations(
     });
 }
 
-macro_rules! propagate {
-    ($e:expr) => {
-        match $e {
-            ControlFlow::Continue(()) => {}
-            broke @ ControlFlow::Break(_) => return broke,
-        }
-    };
-}
-
-/// Depth-first, document-order walk of every `Element` in `doc`.
-pub fn walk_document<B>(doc: &Document, visitor: &mut impl Visitor<B>) -> ControlFlow<B> {
-    for block in &doc.blocks {
-        propagate!(walk_block(block, visitor));
-    }
-    ControlFlow::Continue(())
-}
-
-fn walk_block<B>(block: &Block, visitor: &mut impl Visitor<B>) -> ControlFlow<B> {
-    match block {
-        Block::Paragraph(paragraph) => walk_inlines(&paragraph.content, visitor),
-        Block::Element(element) => walk_element(element, visitor),
-        // A declaration is not an element, so the visitor does not see it, but
-        // the elements inside its groups are the document's like any other.
-        Block::Declaration(d) => walk_groups(&d.data, d.content.as_deref(), visitor),
-        // Neither is a hole, in a pattern: not an element, but its groups hold some.
-        Block::Hole(h) => walk_groups(&h.data, h.content.as_deref(), visitor),
-        Block::Section(section) => {
-            propagate!(walk_inlines(&section.title, visitor));
-            // `section.connects` is deliberately not walked here -- same
-            // reason `walk_element` never descends into an ordinary
-            // element's own `.connects` (see `for_each_descendant`'s doc
-            // comment): a connect is metadata about its owner, not a
-            // document element in its own right, and feeding it through
-            // here is what let `rule` in `=[ h ]:rule(...)` reach the same
-            // "is this name bound" classification a real element gets.
-            for child in &section.blocks {
-                propagate!(walk_block(child, visitor));
-            }
-            ControlFlow::Continue(())
-        }
-        // `list.connects` deliberately not walked here either -- same
-        // reason as `section.connects` above.
-        Block::List(list) => walk_list_items(list, visitor),
-        // An interpolation is not an element: no element walker visits it.
-        Block::Interp(_) => ControlFlow::Continue(()),
-    }
-}
-
-fn walk_list_items<B>(list: &List, visitor: &mut impl Visitor<B>) -> ControlFlow<B> {
-    for item in &list.items {
-        propagate!(visitor.visit_item(item));
-        propagate!(walk_groups(&item.data, Some(&item.content), visitor));
-        if let Some(sub) = &item.sublist {
-            propagate!(walk_list_items(sub, visitor));
-        }
-    }
-    ControlFlow::Continue(())
-}
-
-fn walk_inlines<B>(inlines: &[Inline], visitor: &mut impl Visitor<B>) -> ControlFlow<B> {
-    for inline in inlines {
-        match inline {
-            Inline::Element(element) => propagate!(walk_element(element, visitor)),
-            Inline::Hole(hole) => {
-                propagate!(walk_groups(&hole.data, hole.content.as_deref(), visitor))
-            }
-            _ => {}
-        }
-    }
-    ControlFlow::Continue(())
-}
-
-fn walk_element<B>(element: &Element, visitor: &mut impl Visitor<B>) -> ControlFlow<B> {
-    propagate!(visitor.visit(element));
-    walk_groups(&element.data, element.content.as_deref(), visitor)
-}
-
-/// `(args)`, `[content]` and `{value}`, in that order: what an element and a
-/// declaration have in common.
-fn walk_groups<B>(
-    data: &Data,
-    content: Option<&[Block]>,
-    visitor: &mut impl Visitor<B>,
-) -> ControlFlow<B> {
-    if let Some(args) = &data.args {
-        propagate!(walk_value(args, visitor));
-    }
-    for block in content.into_iter().flatten() {
-        propagate!(walk_block(block, visitor));
-    }
-    if let Some(Group(entries)) = &data.value {
-        for entry in entries {
-            match entry {
-                Entry::Element(child) => propagate!(walk_element(child, visitor)),
-                Entry::Hole(hole) => {
-                    propagate!(walk_groups(&hole.data, hole.content.as_deref(), visitor))
-                }
-                Entry::Bare(bare) => {
-                    propagate!(walk_groups(&bare.data, bare.content.as_deref(), visitor))
-                }
-                Entry::Pair(_, v) => propagate!(walk_value(v, visitor)),
-            }
-        }
-    }
-    ControlFlow::Continue(())
-}
-
-/// Descends into a [`Value`] for any [`Value::Element`] nested inside it --
-/// directly, or under a [`Value::Seq`]/[`Value::Map`]/[`Value::Call`] that
-/// contains one. Every other position an element can sit in (`[content]`,
-/// `{value}`'s bare [`Entry::Element`], `children`) already had a walker
-/// before `Value::Element` existed; this is the one `element.args` and
-/// `Entry::Pair`'s value needed, since neither was ever visited at all
-/// while `Value` had no element-shaped variant to visit.
-fn walk_value<B>(value: &Value, visitor: &mut impl Visitor<B>) -> ControlFlow<B> {
-    match value {
-        Value::Element(el) => walk_element(el, visitor),
-        Value::Hole(hole) => walk_groups(&hole.data, hole.content.as_deref(), visitor),
-        Value::Seq(items) => {
-            for item in items {
-                propagate!(walk_value(item, visitor));
-            }
-            ControlFlow::Continue(())
-        }
-        Value::Map(entries) => {
-            for (_, v) in entries {
-                propagate!(walk_value(v, visitor));
-            }
-            ControlFlow::Continue(())
-        }
-        Value::Call(_, args) => {
-            for a in args {
-                propagate!(walk_value(a, visitor));
-            }
-            ControlFlow::Continue(())
-        }
-        Value::Blocks(blocks) => {
-            for block in blocks {
-                propagate!(walk_block(block, visitor));
-            }
-            ControlFlow::Continue(())
-        }
-        Value::Null
-        | Value::Interp(_)
-        | Value::Bool(_)
-        | Value::Int(_)
-        | Value::Float(_)
-        | Value::Number(_)
-        | Value::String(_) => ControlFlow::Continue(()),
-    }
-}
-
-/// Mutable counterpart of [`Visitor`] -- called at every `&mut Element`
-/// in document order.
-pub trait VisitorMut<B> {
-    fn visit_mut(&mut self, el: &mut Element) -> ControlFlow<B>;
-
-    /// Mutable counterpart of [`Visitor::visit_item`].
-    fn visit_item_mut(&mut self, _item: &mut ListItem) -> ControlFlow<B> {
-        ControlFlow::Continue(())
-    }
-}
-
-impl<F, B> VisitorMut<B> for F
-where
-    F: FnMut(&mut Element) -> ControlFlow<B>,
-{
-    fn visit_mut(&mut self, el: &mut Element) -> ControlFlow<B> {
-        self(el)
-    }
-}
-
-/// Traverses all elements in `doc` mutably in document order and executes `f` for each in place.
-pub fn for_each_element_mut(doc: &mut Document, mut f: impl FnMut(&mut Element)) {
-    let mut visitor = |el: &mut Element| -> ControlFlow<()> {
-        f(el);
-        ControlFlow::Continue(())
-    };
-    let _ = walk_document_mut(doc, &mut visitor);
-}
-
-/// Mutable counterpart of [`walk_document`].
-pub fn walk_document_mut<B>(
-    doc: &mut Document,
-    visitor: &mut impl VisitorMut<B>,
-) -> ControlFlow<B> {
-    for block in &mut doc.blocks {
-        propagate!(walk_block_mut(block, visitor));
-    }
-    ControlFlow::Continue(())
-}
-
-fn walk_block_mut<B>(block: &mut Block, visitor: &mut impl VisitorMut<B>) -> ControlFlow<B> {
-    match block {
-        Block::Paragraph(paragraph) => walk_inlines_mut(&mut paragraph.content, visitor),
-        Block::Element(element) => walk_element_mut(element, visitor),
-        Block::Declaration(d) => walk_groups_mut(&mut d.data, d.content.as_deref_mut(), visitor),
-        Block::Hole(h) => walk_groups_mut(&mut h.data, h.content.as_deref_mut(), visitor),
-        Block::Section(section) => {
-            propagate!(walk_inlines_mut(&mut section.title, visitor));
-            // See the immutable `walk_block`'s matching comment:
-            // `section.connects` stays unvisited by the generic walker.
-            for child in &mut section.blocks {
-                propagate!(walk_block_mut(child, visitor));
-            }
-            ControlFlow::Continue(())
-        }
-        Block::List(list) => walk_list_items_mut(list, visitor),
-        Block::Interp(_) => ControlFlow::Continue(()),
-    }
-}
-
-fn walk_list_items_mut<B>(list: &mut List, visitor: &mut impl VisitorMut<B>) -> ControlFlow<B> {
-    for item in &mut list.items {
-        propagate!(visitor.visit_item_mut(item));
-        propagate!(walk_groups_mut(
-            &mut item.data,
-            Some(&mut item.content),
-            visitor
-        ));
-        if let Some(sub) = &mut item.sublist {
-            propagate!(walk_list_items_mut(sub, visitor));
-        }
-    }
-    ControlFlow::Continue(())
-}
-
-fn walk_inlines_mut<B>(inlines: &mut [Inline], visitor: &mut impl VisitorMut<B>) -> ControlFlow<B> {
-    for inline in inlines {
-        match inline {
-            Inline::Element(element) => propagate!(walk_element_mut(element, visitor)),
-            Inline::Hole(hole) => propagate!(walk_groups_mut(
-                &mut hole.data,
-                hole.content.as_deref_mut(),
-                visitor
-            )),
-            _ => {}
-        }
-    }
-    ControlFlow::Continue(())
-}
-
-fn walk_element_mut<B>(element: &mut Element, visitor: &mut impl VisitorMut<B>) -> ControlFlow<B> {
-    propagate!(visitor.visit_mut(element));
-    walk_groups_mut(&mut element.data, element.content.as_deref_mut(), visitor)
-}
-
-/// Mutable counterpart of [`walk_groups`].
-fn walk_groups_mut<B>(
-    data: &mut Data,
-    content: Option<&mut [Block]>,
-    visitor: &mut impl VisitorMut<B>,
-) -> ControlFlow<B> {
-    if let Some(args) = &mut data.args {
-        propagate!(walk_value_mut(args, visitor));
-    }
-    for block in content.into_iter().flatten() {
-        propagate!(walk_block_mut(block, visitor));
-    }
-    if let Some(Group(entries)) = &mut data.value {
-        for entry in entries {
-            match entry {
-                Entry::Element(child) => propagate!(walk_element_mut(child, visitor)),
-                Entry::Hole(hole) => propagate!(walk_groups_mut(
-                    &mut hole.data,
-                    hole.content.as_deref_mut(),
-                    visitor
-                )),
-                Entry::Bare(bare) => propagate!(walk_groups_mut(
-                    &mut bare.data,
-                    bare.content.as_deref_mut(),
-                    visitor
-                )),
-                Entry::Pair(_, v) => propagate!(walk_value_mut(v, visitor)),
-            }
-        }
-    }
-    ControlFlow::Continue(())
-}
-
-/// Mutable counterpart of [`walk_value`].
-fn walk_value_mut<B>(value: &mut Value, visitor: &mut impl VisitorMut<B>) -> ControlFlow<B> {
-    match value {
-        Value::Element(el) => walk_element_mut(el, visitor),
-        Value::Hole(hole) => walk_groups_mut(&mut hole.data, hole.content.as_deref_mut(), visitor),
-        Value::Seq(items) => {
-            for item in items {
-                propagate!(walk_value_mut(item, visitor));
-            }
-            ControlFlow::Continue(())
-        }
-        Value::Map(entries) => {
-            for (_, v) in entries {
-                propagate!(walk_value_mut(v, visitor));
-            }
-            ControlFlow::Continue(())
-        }
-        Value::Call(_, args) => {
-            for a in args {
-                propagate!(walk_value_mut(a, visitor));
-            }
-            ControlFlow::Continue(())
-        }
-        Value::Blocks(blocks) => {
-            for block in blocks {
-                propagate!(walk_block_mut(block, visitor));
-            }
-            ControlFlow::Continue(())
-        }
-        Value::Null
-        | Value::Interp(_)
-        | Value::Bool(_)
-        | Value::Int(_)
-        | Value::Float(_)
-        | Value::Number(_)
-        | Value::String(_) => ControlFlow::Continue(()),
-    }
-}
-
-/// Every descendant of `el` (not `el` itself), in document order --
-/// `content`, `children`, and `Group` entries. `:rule`'s own
-/// use is the only caller, so "descendant" means what `:rule(allow:...)`
-/// means by it: content and children the reader encounters *underneath*
-/// `el`, not configuration carried *on* `el`.
-///
-/// That is also why this deliberately never looks at `el.args`, even
-/// though [`walk_element`] does (`args` can hold a [`Value::Element`]
-/// since elements were allowed to sit in value position): an element
-/// embedded in `el`'s own `(args)` -- `@thing(icon: @doc.icon("x"))` --
-/// describes `thing`, the same way `el.connects` does, so it is exempt
-/// for the same reason. `el.connects` itself is skipped for a related but
-/// distinct reason: a connect (a [`Connect`] carrying `:name(...)`'s own
-/// args/content/value, e.g. `:rule(...)`) is not a descendant of the
-/// document `el` sits in at all -- it is metadata about `el` itself,
-/// consumed only by the dedicated check that understands the closed set
-/// of connect names. Feeding either through here would let it reach the
-/// same classification a real document element gets, which is exactly the
-/// confusion a `:rule(...)` element (or an `@doc.icon` describing `thing`)
-/// being reported as a disallowed *descendant* would be.
-///
-/// `direct_only` restricts to immediate children only -- one level of
-/// `content`/`children`/`Group`, not recursed further --
-/// for `:rule(direct:true)`; `false` walks every descendant at any
-/// depth, same as [`walk_element`].
-pub fn for_each_descendant(el: &Element, direct_only: bool, f: impl FnMut(Child<'_>)) {
-    descendants_in_groups(el.content.as_deref(), &el.data, direct_only, f);
-}
-
-/// [`for_each_descendant`] for a list item: what is nested in its content and
-/// in its `{value}` group, not its `sublist` and not its `(args)` marker.
-pub fn for_each_descendant_of_item(item: &ListItem, direct_only: bool, f: impl FnMut(Child<'_>)) {
-    descendants_in_groups(Some(&item.content), &item.data, direct_only, f);
-}
-
-fn descendants_in_groups(
-    content: Option<&[Block]>,
-    data: &Data,
-    direct_only: bool,
-    mut f: impl FnMut(Child<'_>),
-) {
-    if let Some(content) = content {
-        for_each_descendant_in_blocks(content, direct_only, &mut f);
-    }
-    if direct_only {
-        if let Some(Group(entries)) = &data.value {
-            for entry in entries {
-                if let Entry::Element(child) = entry {
-                    f(Child::Element(child));
-                }
-            }
-        }
-        return;
-    }
-    let mut visitor = Children(f);
-    if let Some(Group(entries)) = &data.value {
-        for entry in entries {
-            if let Entry::Element(child) = entry {
-                let _ = walk_element(child, &mut visitor);
-            }
-        }
-    }
-}
-
-/// Every descendant reachable from `blocks`, in document order --
-/// [`for_each_descendant`]'s own `content` handling factored out, since a
-/// [`tomet_ast::Section`]'s `blocks` is exactly the same shape (a general
-/// block sequence that may hold a `Paragraph`, an `Element`, or a nested
-/// `Section`) and needs the identical walk: a heading's own `:rule(...)`
-/// has to check what sits *under* the heading, which is this.
-pub fn for_each_descendant_in_blocks(
-    blocks: &[Block],
-    direct_only: bool,
-    mut f: impl FnMut(Child<'_>),
-) {
-    if direct_only {
-        for block in blocks {
-            match block {
-                Block::Element(child) => f(Child::Element(child)),
-                // See `for_each_descendant`'s own doc comment: a
-                // `Paragraph`'s inline items are still direct children
-                // for this purpose.
-                Block::Paragraph(p) => {
-                    for inline in &p.content {
-                        if let Inline::Element(child) = inline {
-                            f(Child::Element(child));
-                        }
-                    }
-                }
-                Block::Section(_) => {}
-                Block::List(_) => {}
-                Block::Declaration(_) | Block::Hole(_) => {}
-                Block::Interp(_) => {}
-            }
-        }
-        return;
-    }
-    let mut visitor = Children(f);
-    for block in blocks {
-        let _ = walk_block(block, &mut visitor);
-    }
-}
-
-/// Walks `items` as descendants, mirroring [`for_each_descendant_in_blocks`]
-/// for a list's own items instead of a block sequence -- what a list's own
-/// `:rule(allow:...)` checks against. `direct_only` means "just the items
-/// themselves, not what's inside each one's own content" -- same meaning
-/// `for_each_descendant`'s `direct_only` already has.
-///
-/// Deliberately never reads `list.connects` or any `ListItem`'s own
-/// `connects` -- see [`for_each_descendant`]'s doc comment for why that
-/// must stay true structurally, not just by convention.
-pub fn for_each_item_descendant(
-    items: &[ListItem],
-    direct_only: bool,
-    mut f: impl FnMut(Child<'_>),
-) {
-    if direct_only {
-        for item in items {
-            f(Child::Item(item));
-        }
-        return;
-    }
-    item_descendants(items, &mut f);
-}
-
-fn item_descendants(items: &[ListItem], f: &mut dyn FnMut(Child<'_>)) {
-    for item in items {
-        f(Child::Item(item));
-        let mut visitor = Children(&mut *f);
-        let _ = walk_groups(&item.data, Some(&item.content), &mut visitor);
-        if let Some(sub) = &item.sublist {
-            item_descendants(&sub.items, f);
-        }
-    }
-}
-
-/// Something nested in a node: an element, or a list item. What a
-/// `:rule(allow:...)` constrains, and what the region rules run over.
+/// Something nested in a node: an element, or a list item. What a `:rule(allow:...)` constrains,
+/// and what the region rules run over.
 #[derive(Debug, Clone, Copy)]
 pub enum Child<'a> {
     Element(&'a Element),
@@ -693,136 +482,206 @@ impl<'a> Child<'a> {
     }
 }
 
-/// A [`Visitor`] that hands every element and every list item to `f`.
-struct Children<F>(F);
-
-impl<F: FnMut(Child<'_>)> Visitor<()> for Children<F> {
-    fn visit(&mut self, el: &Element) -> ControlFlow<()> {
-        (self.0)(Child::Element(el));
-        ControlFlow::Continue(())
-    }
-
-    fn visit_item(&mut self, item: &ListItem) -> ControlFlow<()> {
-        (self.0)(Child::Item(item));
-        ControlFlow::Continue(())
-    }
-}
-
-/// A [`Visitor`] that hands every list item to `f` and no element.
-struct Items<F>(F);
-
-impl<F: FnMut(&ListItem)> Visitor<()> for Items<F> {
-    fn visit(&mut self, _: &Element) -> ControlFlow<()> {
-        ControlFlow::Continue(())
-    }
-
-    fn visit_item(&mut self, item: &ListItem) -> ControlFlow<()> {
-        (self.0)(item);
-        ControlFlow::Continue(())
-    }
-}
-
-/// A [`VisitorMut`] that hands every list item to `f` and no element.
-struct ItemsMut<F>(F);
-
-impl<F: FnMut(&mut ListItem)> VisitorMut<()> for ItemsMut<F> {
-    fn visit_mut(&mut self, _: &mut Element) -> ControlFlow<()> {
-        ControlFlow::Continue(())
-    }
-
-    fn visit_item_mut(&mut self, item: &mut ListItem) -> ControlFlow<()> {
-        (self.0)(item);
-        ControlFlow::Continue(())
-    }
-}
-
-/// Visits every [`ListItem`] in `doc`, in document order, at any depth: a
-/// list item is not an [`Element`], so [`for_each_element`] never passes one.
-pub fn for_each_list_item(doc: &Document, f: impl FnMut(&ListItem)) {
-    let _ = walk_document(doc, &mut Items(f));
-}
-
-/// [`for_each_list_item`], mutably.
-pub fn for_each_list_item_mut(doc: &mut Document, f: impl FnMut(&mut ListItem)) {
-    let _ = walk_document_mut(doc, &mut ItemsMut(f));
-}
-
-/// Visits every [`List`] in `doc`, in document order, including ones
-/// reachable through an element's own `content`/`value` entries, a
-/// section's `blocks`, and a list item's own `sublist` -- every place a
-/// `Block::List` or a `ListItem.sublist` can occur. The counterpart to
-/// [`for_each_section`] for the other non-`Element` `Block` variant.
-pub fn for_each_list(doc: &Document, mut f: impl FnMut(&List)) {
-    for block in &doc.blocks {
-        lists_in_block(block, &mut f);
-    }
-}
-
-fn lists_in_block(block: &Block, f: &mut dyn FnMut(&List)) {
-    match block {
-        Block::Paragraph(_) => {}
-        Block::Element(el) => lists_in_element(el, f),
-        Block::Declaration(d) => lists_in_groups(&d.data, d.content.as_deref(), f),
-        Block::Hole(h) => lists_in_groups(&h.data, h.content.as_deref(), f),
-        Block::Section(sec) => {
-            for b in &sec.blocks {
-                lists_in_block(b, f);
-            }
-            // sec.connects deliberately not visited, same invariant.
+/// What a descendant walk shows `f`, given the nodes at its start. It leaves out three positions,
+/// at every depth:
+///
+/// - `(args)`: an element embedded in an element's own `(args)` --
+///   `@thing(icon: @doc.icon("x"))` -- describes `thing`, it is not part of what `thing` holds.
+/// - the value of a `key: value` entry, for the same reason; only an element that is an entry of
+///   `{value}` itself counts.
+/// - a `:connect`: it is metadata about its owner, consumed only by the dedicated check that
+///   understands the closed set of connect names. Feeding it through here would let `rule` in
+///   `=[ h ]:rule(...)` reach the same classification a real element gets, which is the confusion
+///   an element in a `:rule(...)` being reported as a disallowed *descendant* would be.
+///
+/// With `direct_only`, only the first level counts: an element is shown and not entered, a
+/// paragraph is entered (its inline elements are direct), and nothing else is.
+fn descendants<'a>(
+    start: impl FnOnce(&mut dyn FnMut(Node<'a>, Place)),
+    direct_only: bool,
+    mut f: impl FnMut(Child<'a>),
+) {
+    let mut visit = |node: Node<'a>, place: Place| -> Visit<()> {
+        if matches!(place, Place::Args | Place::PairValue | Place::Connect) {
+            return Visit::Skip;
         }
-        Block::List(list) => lists_in_list(list, f),
+        let child = match node {
+            Node::Item(item) => Some(Child::Item(item)),
+            other => other.element().map(Child::Element),
+        };
+        match child {
+            Some(child) => {
+                f(child);
+                if direct_only {
+                    Visit::Skip
+                } else {
+                    Visit::Descend
+                }
+            }
+            None if direct_only && !matches!(node, Node::Block(Block::Paragraph(_))) => Visit::Skip,
+            None => Visit::Descend,
+        }
+    };
+    start(&mut |node, place| {
+        let _ = walk_node(node, place, &mut visit);
+    });
+}
+
+/// What is nested in `el`: its `[content]` and the elements that are entries of its `{value}`.
+/// With `direct_only`, only the first level.
+///
+/// Neither `el.args` nor `el.connects` is looked at; see [`descendants`] for why.
+pub fn for_each_descendant(el: &Element, direct_only: bool, f: impl FnMut(Child<'_>)) {
+    descendants(
+        |g| groups(&el.data, el.content.as_deref(), g),
+        direct_only,
+        f,
+    );
+}
+
+/// [`for_each_descendant`] for a list item: what is nested in its content and in its `{value}`
+/// group, not its `sublist` and not its `(args)` marker.
+pub fn for_each_descendant_of_item(item: &ListItem, direct_only: bool, f: impl FnMut(Child<'_>)) {
+    descendants(
+        |g| groups(&item.data, Some(&item.content), g),
+        direct_only,
+        f,
+    );
+}
+
+/// Every descendant reachable from `blocks`, in document order: [`for_each_descendant`]'s own
+/// `content` handling for any block sequence (a [`Section`]'s `blocks` has the same shape), so a
+/// heading's own `:rule(...)` can check what sits *under* the heading.
+pub fn for_each_descendant_in_blocks(
+    blocks: &[Block],
+    direct_only: bool,
+    f: impl FnMut(Child<'_>),
+) {
+    descendants(
+        |g| {
+            for block in blocks {
+                g(Node::Block(block), Place::Content);
+            }
+        },
+        direct_only,
+        f,
+    );
+}
+
+/// [`for_each_descendant_in_blocks`] for a list's own items: what a list's own `:rule(allow:...)`
+/// checks against. `direct_only` means just the items themselves, not what is inside each one.
+pub fn for_each_item_descendant(items: &[ListItem], direct_only: bool, f: impl FnMut(Child<'_>)) {
+    descendants(
+        |g| {
+            for item in items {
+                g(Node::Item(item), Place::Item);
+            }
+        },
+        direct_only,
+        f,
+    );
+}
+
+/// Traverses all elements in `doc` mutably in document order and executes `f` for each in place.
+/// It reaches what [`for_each_element`] reaches, in the same order.
+pub fn for_each_element_mut(doc: &mut Document, mut f: impl FnMut(&mut Element)) {
+    for block in &mut doc.blocks {
+        block_mut(block, &mut f);
+    }
+}
+
+fn block_mut(block: &mut Block, f: &mut dyn FnMut(&mut Element)) {
+    match block {
+        Block::Paragraph(p) => inlines_mut(&mut p.content, f),
+        Block::Element(el) => element_mut(el, f),
+        Block::Declaration(d) => groups_mut(&mut d.data, d.content.as_deref_mut(), f),
+        Block::Hole(h) => groups_mut(&mut h.data, h.content.as_deref_mut(), f),
+        Block::Section(s) => {
+            inlines_mut(&mut s.title, f);
+            data_mut(&mut s.data, f);
+            for b in &mut s.blocks {
+                block_mut(b, f);
+            }
+        }
+        Block::List(l) => list_mut(l, f),
         Block::Interp(_) => {}
     }
 }
 
-fn lists_in_list(list: &List, f: &mut dyn FnMut(&List)) {
-    f(list);
-    for item in &list.items {
-        lists_in_groups(&item.data, Some(&item.content), f);
-        if let Some(sub) = &item.sublist {
-            lists_in_list(sub, f);
+fn inlines_mut(items: &mut [Inline], f: &mut dyn FnMut(&mut Element)) {
+    for inline in items {
+        match inline {
+            Inline::Element(el) => element_mut(el, f),
+            Inline::Hole(h) => groups_mut(&mut h.data, h.content.as_deref_mut(), f),
+            _ => {}
         }
     }
 }
 
-fn lists_in_element(el: &Element, f: &mut dyn FnMut(&List)) {
-    lists_in_groups(&el.data, el.content.as_deref(), f);
-    // el.connects deliberately not visited, same invariant.
+fn list_mut(l: &mut List, f: &mut dyn FnMut(&mut Element)) {
+    for item in &mut l.items {
+        groups_mut(&mut item.data, Some(&mut item.content), f);
+        if let Some(sub) = &mut item.sublist {
+            list_mut(sub, f);
+        }
+    }
 }
 
-fn lists_in_groups(data: &Data, content: Option<&[Block]>, f: &mut dyn FnMut(&List)) {
-    for b in content.into_iter().flatten() {
-        lists_in_block(b, f);
+fn element_mut(el: &mut Element, f: &mut dyn FnMut(&mut Element)) {
+    f(el);
+    groups_mut(&mut el.data, el.content.as_deref_mut(), f);
+}
+
+fn groups_mut(d: &mut Data, content: Option<&mut [Block]>, f: &mut dyn FnMut(&mut Element)) {
+    data_mut(d, f);
+    for block in content.into_iter().flatten() {
+        block_mut(block, f);
     }
-    if let Some(Group(entries)) = &data.value {
+}
+
+fn data_mut(d: &mut Data, f: &mut dyn FnMut(&mut Element)) {
+    if let Some(args) = &mut d.args {
+        value_mut(args, f);
+    }
+    if let Some(Group(entries)) = &mut d.value {
         for entry in entries {
             match entry {
-                Entry::Element(child) => lists_in_element(child, f),
-                Entry::Bare(bare) => lists_in_groups(&bare.data, bare.content.as_deref(), f),
-                Entry::Hole(hole) => lists_in_groups(&hole.data, hole.content.as_deref(), f),
-                Entry::Pair(..) => {}
+                Entry::Pair(_, v) => value_mut(v, f),
+                Entry::Element(el) => element_mut(el, f),
+                Entry::Hole(h) => groups_mut(&mut h.data, h.content.as_deref_mut(), f),
+                Entry::Bare(b) => groups_mut(&mut b.data, b.content.as_deref_mut(), f),
             }
         }
     }
 }
 
-/// Visits every [`tomet_ast::Section`] in `doc`, in document order,
-/// including ones nested under another section's own `blocks` -- the
-/// counterpart to [`for_each_element`] for the one `Block` variant that
-/// is not an [`Element`], needed so a heading's own `:name(...)` connect
-/// can be checked against `section.blocks`
-/// ([`for_each_descendant_in_blocks`]) the same way an element's connect
-/// is checked against its own content.
-pub fn for_each_section(doc: &Document, mut f: impl FnMut(&tomet_ast::Section)) {
-    fn walk(blocks: &[Block], f: &mut dyn FnMut(&tomet_ast::Section)) {
-        for block in blocks {
-            if let Block::Section(sec) = block {
-                f(sec);
-                walk(&sec.blocks, f);
+fn value_mut(value: &mut Value, f: &mut dyn FnMut(&mut Element)) {
+    match value {
+        Value::Element(el) => element_mut(el, f),
+        Value::Hole(h) => groups_mut(&mut h.data, h.content.as_deref_mut(), f),
+        Value::Seq(items) | Value::Call(_, items) => {
+            for v in items {
+                value_mut(v, f);
             }
         }
+        Value::Map(entries) => {
+            for (_, v) in entries {
+                value_mut(v, f);
+            }
+        }
+        Value::Blocks(blocks) => {
+            for b in blocks {
+                block_mut(b, f);
+            }
+        }
+        Value::Null
+        | Value::Interp(_)
+        | Value::Bool(_)
+        | Value::Int(_)
+        | Value::Float(_)
+        | Value::Number(_)
+        | Value::String(_) => {}
     }
-    walk(&doc.blocks, &mut f);
 }
 
 /// Mutates all elements in `doc` matching `filter` by applying `transform`.
@@ -839,194 +698,6 @@ where
         }
     });
     count
-}
-
-/// What [`for_each_node`] hands over: a thing in the tree that is not an
-/// element, together with the position it was found at.
-#[derive(Debug, Clone, Copy)]
-pub enum Node<'a> {
-    Block(&'a Block),
-    Inline(&'a Inline),
-    Value(&'a Value),
-    /// An entry of a `{...}` group: a `key: value` pair, an element or a hole.
-    Entry(&'a Entry),
-}
-
-/// Visits every [`Block`], [`Inline`], [`Value`] and [`Entry`] in `doc`, in document
-/// order, wherever it sits, each before what it holds.
-///
-/// Unlike [`walk_document`] and the walkers written beside it, this one has no
-/// position it skips: it reaches running text and section titles, blocks
-/// standing alone, an element's, a section's, a declaration's and a list
-/// item's `(args)` / `{value}` / `[content]`, every `:connect`, and inside a
-/// [`Value`] (`Seq`, `Map`, `Call`, a nested element, `[...]` blocks). It is
-/// what the walkers for things that are not elements are written on:
-/// [`for_each_interpolation`], [`for_each_declaration`] and [`for_each_hole`].
-pub fn for_each_node(doc: &Document, mut f: impl FnMut(Node<'_>)) {
-    for block in &doc.blocks {
-        nodes_in_block(block, &mut f);
-    }
-}
-
-/// Visits every [`Interpolation`] in `doc`, in document order, wherever it sits.
-///
-/// An interpolation is not an [`Element`], so the element walkers never pass
-/// one to their visitor; this is the walker to ask for "every `${...}` in the
-/// document".
-pub fn for_each_interpolation(doc: &Document, mut f: impl FnMut(&Interpolation)) {
-    for_each_node(doc, |node| match node {
-        Node::Block(Block::Interp(i))
-        | Node::Inline(Inline::Interp(i))
-        | Node::Value(Value::Interp(i)) => f(i),
-        _ => {}
-    });
-}
-
-/// Visits every [`Declaration`] in `doc`, in document order, wherever it sits:
-/// a declaration is a [`Block`], and a block can be in a section's body or an
-/// element's content as well as at the top, where only it belongs.
-/// [`for_each_top_level_declaration`] is the preamble.
-pub fn for_each_declaration(doc: &Document, mut f: impl FnMut(&Declaration)) {
-    for_each_node(doc, |node| {
-        if let Node::Block(Block::Declaration(declaration)) = node {
-            f(declaration);
-        }
-    });
-}
-
-/// Visits every [`Hole`] in `doc`, in document order, wherever it sits: as a
-/// block, in running text, as an entry of a `{...}` group or as a value.
-pub fn for_each_hole(doc: &Document, mut f: impl FnMut(&Hole)) {
-    for_each_node(doc, |node| match node {
-        Node::Block(Block::Hole(hole))
-        | Node::Inline(Inline::Hole(hole))
-        | Node::Entry(Entry::Hole(hole)) => f(hole),
-        Node::Value(Value::Hole(hole)) => f(hole),
-        _ => {}
-    });
-}
-
-fn nodes_in_block(block: &Block, f: &mut dyn FnMut(Node<'_>)) {
-    f(Node::Block(block));
-    match block {
-        Block::Paragraph(paragraph) => nodes_in_inlines(&paragraph.content, f),
-        Block::Element(element) => nodes_in_element(element, f),
-        Block::Declaration(d) => {
-            nodes_in_data(&d.data, f);
-            nodes_in_content(d.content.as_deref(), f);
-        }
-        Block::Hole(h) => {
-            nodes_in_data(&h.data, f);
-            nodes_in_content(h.content.as_deref(), f);
-        }
-        Block::Section(section) => {
-            nodes_in_inlines(&section.title, f);
-            nodes_in_data(&section.data, f);
-            for connect in &section.connects {
-                nodes_in_connect(connect, f);
-            }
-            for child in &section.blocks {
-                nodes_in_block(child, f);
-            }
-        }
-        Block::List(list) => nodes_in_list(list, f),
-        Block::Interp(_) => {}
-    }
-}
-
-fn nodes_in_list(list: &List, f: &mut dyn FnMut(Node<'_>)) {
-    for connect in &list.connects {
-        nodes_in_connect(connect, f);
-    }
-    for item in &list.items {
-        nodes_in_data(&item.data, f);
-        nodes_in_content(Some(&item.content), f);
-        for connect in &item.connects {
-            nodes_in_connect(connect, f);
-        }
-        if let Some(sublist) = &item.sublist {
-            nodes_in_list(sublist, f);
-        }
-    }
-}
-
-fn nodes_in_inlines(inlines: &[Inline], f: &mut dyn FnMut(Node<'_>)) {
-    for inline in inlines {
-        f(Node::Inline(inline));
-        match inline {
-            Inline::Element(element) => nodes_in_element(element, f),
-            Inline::Hole(hole) => {
-                nodes_in_data(&hole.data, f);
-                nodes_in_content(hole.content.as_deref(), f);
-            }
-            _ => {}
-        }
-    }
-}
-
-fn nodes_in_element(element: &Element, f: &mut dyn FnMut(Node<'_>)) {
-    nodes_in_data(&element.data, f);
-    nodes_in_content(element.content.as_deref(), f);
-    for connect in &element.connects {
-        nodes_in_connect(connect, f);
-    }
-}
-
-fn nodes_in_connect(connect: &Connect, f: &mut dyn FnMut(Node<'_>)) {
-    nodes_in_data(&connect.data, f);
-    nodes_in_content(connect.content.as_deref(), f);
-}
-
-fn nodes_in_content(content: Option<&[Block]>, f: &mut dyn FnMut(Node<'_>)) {
-    for block in content.into_iter().flatten() {
-        nodes_in_block(block, f);
-    }
-}
-
-/// `(args)` and `{value}`: the part every node that carries data shares.
-fn nodes_in_data(data: &Data, f: &mut dyn FnMut(Node<'_>)) {
-    if let Some(args) = &data.args {
-        nodes_in_value(args, f);
-    }
-    if let Some(Group(entries)) = &data.value {
-        for entry in entries {
-            f(Node::Entry(entry));
-            match entry {
-                Entry::Pair(_, value) => nodes_in_value(value, f),
-                Entry::Element(element) => nodes_in_element(element, f),
-                Entry::Hole(hole) => {
-                    nodes_in_data(&hole.data, f);
-                    nodes_in_content(hole.content.as_deref(), f);
-                }
-                Entry::Bare(bare) => {
-                    nodes_in_data(&bare.data, f);
-                    nodes_in_content(bare.content.as_deref(), f);
-                }
-            }
-        }
-    }
-}
-
-fn nodes_in_value(value: &Value, f: &mut dyn FnMut(Node<'_>)) {
-    f(Node::Value(value));
-    match value {
-        Value::Element(element) => nodes_in_element(element, f),
-        Value::Hole(hole) => {
-            nodes_in_data(&hole.data, f);
-            nodes_in_content(hole.content.as_deref(), f);
-        }
-        Value::Seq(items) => items.iter().for_each(|v| nodes_in_value(v, f)),
-        Value::Map(entries) => entries.iter().for_each(|(_, v)| nodes_in_value(v, f)),
-        Value::Call(_, args) => args.iter().for_each(|v| nodes_in_value(v, f)),
-        Value::Blocks(blocks) => blocks.iter().for_each(|b| nodes_in_block(b, f)),
-        Value::Interp(_)
-        | Value::Null
-        | Value::Bool(_)
-        | Value::Int(_)
-        | Value::Float(_)
-        | Value::Number(_)
-        | Value::String(_) => {}
-    }
 }
 
 #[cfg(test)]

@@ -1,11 +1,9 @@
-use std::ops::ControlFlow;
-
 use lsp_types::{GotoDefinitionResponse, Location, Position, Uri};
 use tomet_ast::{
     Block, Connect, Document, Element, Inline, InterpExpr, InterpExprKind, List, Span, Value,
 };
 use tomet_semantics::TargetScheme;
-use tomet_tree::{Visitor, for_each_interpolation, walk_document};
+use tomet_tree::{for_each_element, for_each_interpolation};
 
 use crate::position::{TextPositions, span_contains};
 
@@ -61,8 +59,8 @@ pub(crate) fn reference_at(doc: &Document, offset: usize) -> Option<Reference> {
         found: Option<Reference>,
     }
 
-    impl Visitor<()> for Finder {
-        fn visit(&mut self, el: &Element) -> ControlFlow<()> {
+    impl Finder {
+        fn visit(&mut self, el: &Element) {
             // Elements are visited outside in, so the innermost one that
             // refers to something wins.
             if span_contains(&el.span, self.offset)
@@ -70,7 +68,6 @@ pub(crate) fn reference_at(doc: &Document, offset: usize) -> Option<Reference> {
             {
                 self.found = Some(reference);
             }
-            ControlFlow::Continue(())
         }
     }
 
@@ -78,7 +75,7 @@ pub(crate) fn reference_at(doc: &Document, offset: usize) -> Option<Reference> {
         offset,
         found: None,
     };
-    let _ = walk_document(doc, &mut finder);
+    for_each_element(doc, |el| finder.visit(el));
     // An interpolation is not an element, so the walk above never meets it.
     // It is a leaf, hence inside every element around it, and wins over them.
     for_each_interpolation(doc, |interp| {

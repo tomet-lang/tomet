@@ -1,4 +1,3 @@
-use std::ops::ControlFlow;
 use tomet_semantics::DeclKind;
 
 use lsp_types::{Hover, HoverContents, MarkupContent, MarkupKind, Position, Range, Uri};
@@ -9,8 +8,7 @@ use tomet_semantics::{
     normalized_declaration_args, normalized_element_args,
 };
 use tomet_tree::{
-    ValueExt, Visitor, for_each_declaration, for_each_interpolation, for_each_list_item,
-    walk_document,
+    ValueExt, for_each_declaration, for_each_element, for_each_interpolation, for_each_list_item,
 };
 
 use crate::format::resolve_effective_config;
@@ -66,8 +64,8 @@ pub fn hover_in(text: &str, pos: Position, evaluate: Evaluate<'_>) -> Option<Hov
         }
     }
 
-    impl<'a> Visitor<()> for HoverFinder<'a> {
-        fn visit(&mut self, el: &Element) -> ControlFlow<()> {
+    impl HoverFinder<'_> {
+        fn visit(&mut self, el: &Element) {
             let span = el.span;
             if span_contains(&span, self.offset) {
                 let kind = classify_std_lenient(el);
@@ -101,7 +99,6 @@ pub fn hover_in(text: &str, pos: Position, evaluate: Evaluate<'_>) -> Option<Hov
                     self.offer(h, &span);
                 }
             }
-            ControlFlow::Continue(())
         }
     }
 
@@ -130,7 +127,7 @@ pub fn hover_in(text: &str, pos: Position, evaluate: Evaluate<'_>) -> Option<Hov
             );
         }
     });
-    let _ = walk_document(&doc, &mut finder);
+    for_each_element(&doc, |el| finder.visit(el));
 
     // An interpolation is not an element, so the walk above never meets it.
     // It is a leaf, hence the innermost thing under the cursor.

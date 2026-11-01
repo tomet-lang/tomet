@@ -21,7 +21,7 @@ text @s_para_inline[x] more
 
 text <?(h2)>[@s_hole_inline_content()]
 
-@s_host(a: @s_args(), b: [@s_args_blocks()], c: list(@s_seq())){ d: @s_pair(), @s_entry(id){} }[ @s_content()[ @s_deep() ] ]:rule(allow: list(@s_connect()))
+@s_host(a: @s_args(), b: [@s_args_blocks()], c: list(@s_seq())){ d: @s_pair(), @s_entry(id){} }[ @s_content(x: @s_nested_args())[ @s_deep() ] ]:rule(allow: list(@s_connect()))
 
 =[ title @s_title() ]{ k: @s_sec_data() }:rule(allow: list(@s_sec_connect()))
 
@@ -46,11 +46,10 @@ fn names(f: impl FnOnce(&mut Vec<String>)) -> Vec<String> {
     v
 }
 
-/// The positions an element sits in, in the order the element walkers meet them. Not reached on
-/// purpose: a `:connect` (metadata about its owner, not a part of the document: see the doc comment
-/// of `for_each_descendant`). Not reached, and nowhere said to be on purpose: the `{value}` of a
-/// section (`s_sec_data`). Everything else is.
-const ELEMENT_WALK: [&str; 18] = [
+/// The positions an element sits in, in the order the element walkers meet them: a node's
+/// `(args)`, `{value}`, `[content]`. Not reached on purpose: a `:connect` (metadata about its
+/// owner, not a part of the document: see `descendants` in `walk.rs`).
+const ELEMENT_WALK: [&str; 20] = [
     "s_decl_value",
     "s_decl_args",
     "s_para_inline",
@@ -61,18 +60,20 @@ const ELEMENT_WALK: [&str; 18] = [
     "s_args",
     "s_args_blocks",
     "s_seq",
-    "s_content",
-    "s_deep",
     "s_pair",
     "s_entry",
+    "s_content",
+    "s_nested_args",
+    "s_deep",
     "s_title",
+    "s_sec_data",
     "s_sec_block",
     "s_item",
     "s_sub",
 ];
 
 #[test]
-fn the_element_walkers_reach_every_position_but_connects_and_a_sections_value() {
+fn the_element_walkers_reach_every_position_but_connects() {
     let expected: Vec<&str> = ELEMENT_WALK.to_vec();
     let doc = doc();
     assert_eq!(
@@ -88,9 +89,8 @@ fn the_element_walkers_reach_every_position_but_connects_and_a_sections_value() 
 }
 
 #[test]
-fn for_each_node_reaches_the_connects_and_a_sections_value_too() {
-    // It also differs in order: the groups of a node come as `(args)`, `{value}`, `[content]`,
-    // where the element walkers have `(args)`, `[content]`, `{value}`.
+fn for_each_node_reaches_the_connects_too() {
+    // The same order as the element walkers, with the connects (last in their owner) added.
     let doc = doc();
     let got = names(|v| {
         for_each_node(&doc, |n| match n {
@@ -117,14 +117,15 @@ fn for_each_node_reaches_the_connects_and_a_sections_value_too() {
             "s_pair",
             "s_entry",
             "s_content",
+            "s_nested_args",
             "s_deep",
             "s_connect",
             "s_title",
             "s_sec_data",
-            "s_sec_connect",
             "s_sec_block",
             "s_item",
             "s_sub",
+            "s_sec_connect",
         ]
     );
 }
@@ -157,10 +158,11 @@ fn for_each_inline_reaches_the_inline_elements_and_holes_the_element_walkers_do(
 }
 
 #[test]
-fn descendants_are_the_content_and_the_entries_of_the_value_group_not_the_args() {
-    // `s_args`, `s_args_blocks` and `s_seq` sit in `(args)`, which a descendant walk skips on
-    // purpose (they describe the element). `s_pair` is the value of a `key: value` entry, and
-    // only the elements that are entries themselves count: nothing says that is on purpose.
+fn descendants_are_the_entries_and_the_content_not_the_args_nor_a_pairs_value() {
+    // `s_args` and `s_seq` sit in `(args)`, `s_pair` is the value of a `key: value` entry, and
+    // `s_nested_args` sits in the `(args)` of a nested element. A descendant walk leaves all of
+    // them out, at every depth (it used to leave out only the starting element's own `(args)`).
+    // `s_connect` is in a connect.
     let doc = doc();
     let mut got = Vec::new();
     for_each_element(&doc, |el| {
@@ -178,9 +180,9 @@ fn descendants_are_the_content_and_the_entries_of_the_value_group_not_the_args()
         [
             (
                 false,
-                vec!["s_content".to_string(), "s_deep".into(), "s_entry".into()]
+                vec!["s_entry".to_string(), "s_content".into(), "s_deep".into()]
             ),
-            (true, vec!["s_content".to_string(), "s_entry".into()]),
+            (true, vec!["s_entry".to_string(), "s_content".into()]),
         ]
     );
 }

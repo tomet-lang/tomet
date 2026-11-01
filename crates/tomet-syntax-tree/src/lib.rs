@@ -5,7 +5,7 @@
 //! - (ElementExt) Builders and name helpers on [`tomet_ast::Element`].
 //! - (DataExt) Property access on [`tomet_ast::Data`], shared by every node that carries `(args)` and `{value}`.
 //! - (DocumentExt) Block-level manipulation helpers on [`tomet_ast::Document`].
-//! - (walk) Generic recursive tree visitors ([`walk_document`], [`walk_document_mut`]).
+//! - (walk) One definition of what sits inside what ([`children`]), the one recursion over it ([`walk`]), and the walkers built on that.
 
 pub mod document;
 pub mod element;
