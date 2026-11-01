@@ -9,10 +9,11 @@ pub mod id;
 pub use diagnostic::{CstValidationError, Diagnostic, Severity};
 pub use id::{collect_ids, collect_ids_cst};
 
-use tomet_ast::{Block, Document, Element, Inline, List, Span};
+use tomet_ast::{Block, Document, Inline, Span};
 use tomet_cst::{SyntaxNode, TextRange};
 use tomet_semantics::DeclKind;
 use tomet_semantics::{Bindings, Shape};
+use tomet_tree::{Node, Place, Visit};
 
 /// Something written in the document that a region or sigil rule applies to:
 /// an element, or a declaration.
@@ -308,73 +309,43 @@ pub fn check_singletons_and_regions(
                     }
                 }
             }
-            Block::Section(s) => {
+            // Below the top, nothing is in the preamble: every element, named list item and
+            // declaration standing in a section's body is held to its own constraints.
+            Block::Section(_) | Block::List(_) => {
                 in_preamble = false;
-                for inline in &s.title {
-                    if let Inline::Element(el) = inline {
-                        visit(Written::Element(el), false);
-                        tomet_tree::for_each_descendant(el, false, |child| {
-                            visit_child(child, &mut visit)
-                        });
-                    }
-                }
-                for child in &s.blocks {
-                    validate_section_block(child, &mut visit);
-                }
-            }
-            Block::List(list) => {
-                in_preamble = false;
-                validate_list_items(list, &mut visit);
+                visit_all(Node::Block(block), Place::Top, &mut visit);
             }
             Block::Interp(_) => {
                 in_preamble = false;
             }
-            Block::Hole(_) => {}
+            Block::Hole(_) => visit_all(Node::Block(block), Place::Top, &mut visit),
         }
     }
 }
 
-fn validate_section_block(block: &Block, visit: &mut impl FnMut(Written<'_>, bool)) {
-    match block {
-        Block::Element(el) => visit_with_descendants(el, visit),
-        Block::Declaration(d) => visit(Written::Declaration(d), false),
-        Block::Paragraph(p) => {
-            for inline in &p.content {
-                if let Inline::Element(el) = inline {
-                    visit_with_descendants(el, visit);
+/// Everything written in `node` and under it, none of it in the preamble: an element, a list item
+/// that names one, and a declaration standing as a block of a section's body.
+///
+/// `(args)`, the value of a `key: value` entry and a `:connect` are left out, as a descendant walk
+/// leaves them out: they describe their owner and are not part of what it holds.
+fn visit_all(node: Node<'_>, place: Place, visit: &mut impl FnMut(Written<'_>, bool)) {
+    let _ = tomet_tree::walk_node(node, place, &mut |node, place| {
+        if matches!(place, Place::Args | Place::PairValue | Place::Connect) {
+            return Visit::<()>::Skip;
+        }
+        match node {
+            Node::Block(Block::Declaration(d)) if matches!(place, Place::Top | Place::Body) => {
+                visit(Written::Declaration(d), false)
+            }
+            Node::Item(item) => visit_child(tomet_tree::Child::Item(item), visit),
+            other => {
+                if let Some(el) = other.element() {
+                    visit(Written::Element(el), false);
                 }
             }
         }
-        Block::Section(s) => {
-            for inline in &s.title {
-                if let Inline::Element(el) = inline {
-                    visit_with_descendants(el, visit);
-                }
-            }
-            for child in &s.blocks {
-                validate_section_block(child, visit);
-            }
-        }
-        Block::List(list) => validate_list_items(list, visit),
-        Block::Interp(_) | Block::Hole(_) => {}
-    }
-}
-
-fn validate_list_items(list: &List, visit: &mut impl FnMut(Written<'_>, bool)) {
-    for item in &list.items {
-        visit_child(tomet_tree::Child::Item(item), visit);
-        // What is nested in the item.
-        tomet_tree::for_each_descendant_of_item(item, false, |child| visit_child(child, visit));
-        if let Some(sub) = &item.sublist {
-            validate_list_items(sub, visit);
-        }
-    }
-}
-
-/// `el` and everything nested in it, none of them in the preamble.
-fn visit_with_descendants(el: &Element, visit: &mut impl FnMut(Written<'_>, bool)) {
-    visit(Written::Element(el), false);
-    tomet_tree::for_each_descendant(el, false, |child| visit_child(child, visit));
+        Visit::Descend
+    });
 }
 
 /// What a child is held to: an element as itself, a list item as the element it

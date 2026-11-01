@@ -14,8 +14,8 @@
 
 use std::ops::ControlFlow;
 use tomet_ast::{
-    Block, Connect, Data, Declaration, Document, Element, Entry, Group, Hole, Inline,
-    Interpolation, List, ListItem, Section, Value,
+    Block, Connect, Data, Declaration, Document, Element, Entry, Group, Hole, Id, Inline,
+    Interpolation, List, ListItem, Section, Span, Value,
 };
 
 /// Where a node sits in the node that holds it.
@@ -107,6 +107,19 @@ impl<'a> Node<'a> {
         match self {
             Node::Block(Block::List(l)) | Node::List(l) => Some(l),
             _ => None,
+        }
+    }
+
+    /// The `#(id)` this node carries, if it is a kind that can: an element, a declaration, a
+    /// section, a list, a list item or a bare entry.
+    pub fn id(self) -> Option<&'a Id> {
+        match self {
+            Node::Block(Block::Declaration(d)) => d.id.as_ref(),
+            Node::Block(Block::Section(s)) => s.id.as_ref(),
+            Node::Block(Block::List(l)) | Node::List(l) => l.id.as_ref(),
+            Node::Item(item) => item.id.as_ref(),
+            Node::Entry(Entry::Bare(b)) => b.id.as_ref(),
+            other => other.element().and_then(|el| el.id.as_ref()),
         }
     }
 
@@ -582,106 +595,170 @@ pub fn for_each_item_descendant(items: &[ListItem], direct_only: bool, f: impl F
     );
 }
 
-/// Traverses all elements in `doc` mutably in document order and executes `f` for each in place.
-/// It reaches what [`for_each_element`] reaches, in the same order.
-pub fn for_each_element_mut(doc: &mut Document, mut f: impl FnMut(&mut Element)) {
+/// What a mutable walk hands over. A mutable walk cannot share the borrow with [`children`], so it
+/// lists the children again, in the same order; `tests/walk_coverage.rs` holds the two to the
+/// same reach.
+trait Sink {
+    fn element(&mut self, _el: &mut Element) {}
+    fn id(&mut self, _id: &mut Option<Id>, _span: Span) {}
+}
+
+struct MutWalk<'s, S: Sink> {
+    sink: &'s mut S,
+    /// Whether to go into `:connect`s.
+    connects: bool,
+}
+
+impl<S: Sink> MutWalk<'_, S> {
+    fn block(&mut self, block: &mut Block) {
+        match block {
+            Block::Paragraph(p) => self.inlines(&mut p.content),
+            Block::Element(el) => self.element(el),
+            Block::Declaration(d) => {
+                self.sink.id(&mut d.id, d.span);
+                self.groups(&mut d.data, d.content.as_deref_mut());
+            }
+            Block::Hole(h) => self.groups(&mut h.data, h.content.as_deref_mut()),
+            Block::Section(s) => {
+                self.sink.id(&mut s.id, s.span);
+                self.inlines(&mut s.title);
+                self.data(&mut s.data);
+                for b in &mut s.blocks {
+                    self.block(b);
+                }
+                self.connects(&mut s.connects);
+            }
+            Block::List(l) => self.list(l),
+            Block::Interp(_) => {}
+        }
+    }
+
+    fn inlines(&mut self, items: &mut [Inline]) {
+        for inline in items {
+            match inline {
+                Inline::Element(el) => self.element(el),
+                Inline::Hole(h) => self.groups(&mut h.data, h.content.as_deref_mut()),
+                _ => {}
+            }
+        }
+    }
+
+    fn list(&mut self, l: &mut List) {
+        self.sink.id(&mut l.id, l.span);
+        for item in &mut l.items {
+            self.sink.id(&mut item.id, item.span);
+            self.groups(&mut item.data, Some(&mut item.content));
+            if let Some(sub) = &mut item.sublist {
+                self.list(sub);
+            }
+            self.connects(&mut item.connects);
+        }
+        self.connects(&mut l.connects);
+    }
+
+    fn element(&mut self, el: &mut Element) {
+        self.sink.element(el);
+        self.sink.id(&mut el.id, el.span);
+        self.groups(&mut el.data, el.content.as_deref_mut());
+        self.connects(&mut el.connects);
+    }
+
+    fn connects(&mut self, items: &mut [Connect]) {
+        if self.connects {
+            for connect in items {
+                self.groups(&mut connect.data, connect.content.as_deref_mut());
+            }
+        }
+    }
+
+    fn groups(&mut self, d: &mut Data, content: Option<&mut [Block]>) {
+        self.data(d);
+        for block in content.into_iter().flatten() {
+            self.block(block);
+        }
+    }
+
+    fn data(&mut self, d: &mut Data) {
+        if let Some(args) = &mut d.args {
+            self.value(args);
+        }
+        if let Some(Group(entries)) = &mut d.value {
+            for entry in entries {
+                match entry {
+                    Entry::Pair(_, v) => self.value(v),
+                    Entry::Element(el) => self.element(el),
+                    Entry::Hole(h) => self.groups(&mut h.data, h.content.as_deref_mut()),
+                    Entry::Bare(b) => {
+                        self.sink.id(&mut b.id, b.span);
+                        self.groups(&mut b.data, b.content.as_deref_mut());
+                    }
+                }
+            }
+        }
+    }
+
+    fn value(&mut self, value: &mut Value) {
+        match value {
+            Value::Element(el) => self.element(el),
+            Value::Hole(h) => self.groups(&mut h.data, h.content.as_deref_mut()),
+            Value::Seq(items) | Value::Call(_, items) => {
+                for v in items {
+                    self.value(v);
+                }
+            }
+            Value::Map(entries) => {
+                for (_, v) in entries {
+                    self.value(v);
+                }
+            }
+            Value::Blocks(blocks) => {
+                for b in blocks {
+                    self.block(b);
+                }
+            }
+            Value::Null
+            | Value::Interp(_)
+            | Value::Bool(_)
+            | Value::Int(_)
+            | Value::Float(_)
+            | Value::Number(_)
+            | Value::String(_) => {}
+        }
+    }
+}
+
+fn walk_mut(doc: &mut Document, sink: &mut impl Sink, connects: bool) {
+    let mut walk = MutWalk { sink, connects };
     for block in &mut doc.blocks {
-        block_mut(block, &mut f);
+        walk.block(block);
     }
 }
 
-fn block_mut(block: &mut Block, f: &mut dyn FnMut(&mut Element)) {
-    match block {
-        Block::Paragraph(p) => inlines_mut(&mut p.content, f),
-        Block::Element(el) => element_mut(el, f),
-        Block::Declaration(d) => groups_mut(&mut d.data, d.content.as_deref_mut(), f),
-        Block::Hole(h) => groups_mut(&mut h.data, h.content.as_deref_mut(), f),
-        Block::Section(s) => {
-            inlines_mut(&mut s.title, f);
-            data_mut(&mut s.data, f);
-            for b in &mut s.blocks {
-                block_mut(b, f);
-            }
+/// Traverses all elements in `doc` mutably in document order and executes `f` for each in place.
+/// It reaches what [`for_each_element`] reaches, in the same order: an element in a `:connect` is
+/// not reached.
+pub fn for_each_element_mut(doc: &mut Document, f: impl FnMut(&mut Element)) {
+    struct Elements<F>(F);
+    impl<F: FnMut(&mut Element)> Sink for Elements<F> {
+        fn element(&mut self, el: &mut Element) {
+            (self.0)(el);
         }
-        Block::List(l) => list_mut(l, f),
-        Block::Interp(_) => {}
     }
+    walk_mut(doc, &mut Elements(f), false);
 }
 
-fn inlines_mut(items: &mut [Inline], f: &mut dyn FnMut(&mut Element)) {
-    for inline in items {
-        match inline {
-            Inline::Element(el) => element_mut(el, f),
-            Inline::Hole(h) => groups_mut(&mut h.data, h.content.as_deref_mut(), f),
-            _ => {}
+/// Hands `f` the `#(id)` of every node of `doc` that can carry one (an element, a declaration, a
+/// section, a list, a list item, a bare entry), with the node's span, in document order, each node
+/// before what it holds. It goes into `:connect`s too, as [`for_each_node`] does; the nodes it
+/// reaches are those for which [`Node::id`] answers.
+pub fn for_each_id_mut(doc: &mut Document, f: impl FnMut(&mut Option<Id>, Span)) {
+    struct Ids<F>(F);
+    impl<F: FnMut(&mut Option<Id>, Span)> Sink for Ids<F> {
+        fn id(&mut self, id: &mut Option<Id>, span: Span) {
+            (self.0)(id, span);
         }
     }
-}
-
-fn list_mut(l: &mut List, f: &mut dyn FnMut(&mut Element)) {
-    for item in &mut l.items {
-        groups_mut(&mut item.data, Some(&mut item.content), f);
-        if let Some(sub) = &mut item.sublist {
-            list_mut(sub, f);
-        }
-    }
-}
-
-fn element_mut(el: &mut Element, f: &mut dyn FnMut(&mut Element)) {
-    f(el);
-    groups_mut(&mut el.data, el.content.as_deref_mut(), f);
-}
-
-fn groups_mut(d: &mut Data, content: Option<&mut [Block]>, f: &mut dyn FnMut(&mut Element)) {
-    data_mut(d, f);
-    for block in content.into_iter().flatten() {
-        block_mut(block, f);
-    }
-}
-
-fn data_mut(d: &mut Data, f: &mut dyn FnMut(&mut Element)) {
-    if let Some(args) = &mut d.args {
-        value_mut(args, f);
-    }
-    if let Some(Group(entries)) = &mut d.value {
-        for entry in entries {
-            match entry {
-                Entry::Pair(_, v) => value_mut(v, f),
-                Entry::Element(el) => element_mut(el, f),
-                Entry::Hole(h) => groups_mut(&mut h.data, h.content.as_deref_mut(), f),
-                Entry::Bare(b) => groups_mut(&mut b.data, b.content.as_deref_mut(), f),
-            }
-        }
-    }
-}
-
-fn value_mut(value: &mut Value, f: &mut dyn FnMut(&mut Element)) {
-    match value {
-        Value::Element(el) => element_mut(el, f),
-        Value::Hole(h) => groups_mut(&mut h.data, h.content.as_deref_mut(), f),
-        Value::Seq(items) | Value::Call(_, items) => {
-            for v in items {
-                value_mut(v, f);
-            }
-        }
-        Value::Map(entries) => {
-            for (_, v) in entries {
-                value_mut(v, f);
-            }
-        }
-        Value::Blocks(blocks) => {
-            for b in blocks {
-                block_mut(b, f);
-            }
-        }
-        Value::Null
-        | Value::Interp(_)
-        | Value::Bool(_)
-        | Value::Int(_)
-        | Value::Float(_)
-        | Value::Number(_)
-        | Value::String(_) => {}
-    }
+    walk_mut(doc, &mut Ids(f), true);
 }
 
 /// Mutates all elements in `doc` matching `filter` by applying `transform`.

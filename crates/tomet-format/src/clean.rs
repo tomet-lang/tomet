@@ -1,10 +1,9 @@
 //! Whitespace-hygiene formatting preserving verbatim raw spans (fenced code
 //! blocks, and any `(content:raw)` element).
 
-use tomet_ast::{
-    Block, Connect, Data, Declaration, Document, Element, Entry, Group, Inline, ListItem, Value,
-};
+use tomet_ast::{Block, Document, Element, Value};
 use tomet_parser::parse_document;
+use tomet_tree::{Node, Place, Visit, walk};
 
 /// Normalizes whitespace (LF line endings, no trailing whitespace, collapsed excess
 /// blank lines, exactly one final newline) while losslessly preserving literal whitespace
@@ -82,101 +81,44 @@ pub(crate) fn is_raw_element(el: &Element) -> bool {
     false
 }
 
+/// The spans of the text inside every raw element of `doc`, an element written as `-@raw ...` in
+/// a list item included. A raw element can sit anywhere an element can: in a `:connect` too, and
+/// in a hole's content. What is in `(args)` or is the value of a `key: value` entry is not text of
+/// the document, and is not looked at.
 pub(crate) fn collect_raw_spans(doc: &Document, out: &mut Vec<(usize, usize)>) {
-    fn walk_element(el: &Element, out: &mut Vec<(usize, usize)>) {
-        if is_raw_element(el)
-            && let Some(blocks) = &el.content
-        {
-            for block in blocks {
-                let Block::Paragraph(p) = block else { continue };
-                for inline in &p.content {
-                    let span = inline.span();
-                    if span.start < span.end {
-                        out.push((span.start, span.end));
-                    }
-                }
-            }
-        }
-        walk_held(el.content.as_deref(), &el.data, out);
-    }
-
-    /// A connect is never a raw element, but what it holds can be.
-    fn walk_connect(conn: &Connect, out: &mut Vec<(usize, usize)>) {
-        walk_held(conn.content.as_deref(), &conn.data, out);
-    }
-
-    /// Neither is a declaration; what it holds can be.
-    fn walk_declaration(declaration: &Declaration, out: &mut Vec<(usize, usize)>) {
-        walk_held(declaration.content.as_deref(), &declaration.data, out);
-    }
-
-    fn walk_held(content: Option<&[Block]>, data: &Data, out: &mut Vec<(usize, usize)>) {
+    fn push_spans(content: Option<&[Block]>, out: &mut Vec<(usize, usize)>) {
         for block in content.into_iter().flatten() {
-            walk_block(block, out);
-        }
-        let Some(Group(entries)) = &data.value else {
-            return;
-        };
-        for entry in entries {
-            match entry {
-                Entry::Element(child) => walk_element(child, out),
-                // A bare entry holds what an element does, and is no element.
-                Entry::Bare(bare) => walk_held(bare.content.as_deref(), &bare.data, out),
-                Entry::Pair(..) | Entry::Hole(_) => {}
+            let Block::Paragraph(p) = block else { continue };
+            for inline in &p.content {
+                let span = inline.span();
+                if span.start < span.end {
+                    out.push((span.start, span.end));
+                }
             }
         }
     }
 
-    fn walk_block(block: &Block, out: &mut Vec<(usize, usize)>) {
-        match block {
-            Block::Paragraph(p) => {
-                for inline in &p.content {
-                    if let Inline::Element(el) = inline {
-                        walk_element(el, out);
-                    }
-                }
-            }
-            Block::Element(el) => walk_element(el, out),
-            Block::Declaration(declaration) => walk_declaration(declaration, out),
-            Block::Section(sec) => {
-                for inline in &sec.title {
-                    if let Inline::Element(el) = inline {
-                        walk_element(el, out);
-                    }
-                }
-                for conn in &sec.connects {
-                    walk_connect(conn, out);
-                }
-                for child in &sec.blocks {
-                    walk_block(child, out);
-                }
-            }
-            Block::List(list) => {
-                for conn in &list.connects {
-                    walk_connect(conn, out);
-                }
-                walk_list_items(&list.items, out);
-            }
-            Block::Interp(_) | Block::Hole(_) => {}
+    let _ = walk(doc, &mut |node, place| {
+        if matches!(place, Place::Args | Place::PairValue) {
+            return Visit::<()>::Skip;
         }
-    }
-
-    fn walk_list_items(items: &[ListItem], out: &mut Vec<(usize, usize)>) {
-        for item in items {
-            match item.named_element() {
-                Some(element) => walk_element(&element, out),
-                None => walk_held(Some(&item.content), &item.data, out),
-            }
-            if let Some(sub) = &item.sublist {
-                for conn in &sub.connects {
-                    walk_connect(conn, out);
+        match node {
+            // An item in the combine notation is the element it names.
+            Node::Item(item) => {
+                if let Some(el) = item.named_element()
+                    && is_raw_element(&el)
+                {
+                    push_spans(el.content.as_deref(), out);
                 }
-                walk_list_items(&sub.items, out);
+            }
+            other => {
+                if let Some(el) = other.element()
+                    && is_raw_element(el)
+                {
+                    push_spans(el.content.as_deref(), out);
+                }
             }
         }
-    }
-
-    for block in &doc.blocks {
-        walk_block(block, out);
-    }
+        Visit::Descend
+    });
 }

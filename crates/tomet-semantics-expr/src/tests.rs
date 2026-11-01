@@ -617,12 +617,16 @@ fn vault() -> MemoryResolver {
 
 /// Evaluates when rendering `here.tmt` in the small vault above.
 fn in_vault(src: &str) -> Result<EvalValue, EvalError> {
-    let resolver = vault();
+    in_resolver(&vault(), src)
+}
+
+/// Evaluates when rendering `here.tmt` in `resolver`.
+fn in_resolver(resolver: &MemoryResolver, src: &str) -> Result<EvalValue, EvalError> {
     let macros = HashMap::new();
     let vars = EvalValue::Null;
     let cx = EvalContext {
         phase: Phase::Output,
-        resolver: &resolver,
+        resolver,
         generate: &Fixed,
         self_doc: DocRef("here.tmt".to_string()),
         macros: &macros,
@@ -633,6 +637,25 @@ fn in_vault(src: &str) -> Result<EvalValue, EvalError> {
         notes: Default::default(),
     };
     evaluate(&parse(src), &cx)
+}
+
+#[test]
+fn an_id_is_found_wherever_the_node_sits() {
+    // In a section's title, in `(args)` and in a hole's content: places a search over the blocks
+    // and the `{value}` entries alone used to miss.
+    let resolver = MemoryResolver::new()
+        .with_source(
+            "here.tmt",
+            "=[ T @a()#(in_title) ]\n\n@b(icon: @c()#(in_args))\n\n<?(h)>[@d()#(in_hole)]\n",
+        )
+        .unwrap();
+    for (id, name) in [("in_title", "a"), ("in_args", "c"), ("in_hole", "d")] {
+        assert_eq!(
+            in_resolver(&resolver, &format!("#{id}.name")).unwrap(),
+            text(name),
+            "#{id}"
+        );
+    }
 }
 
 #[test]

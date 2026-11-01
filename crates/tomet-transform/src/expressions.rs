@@ -121,7 +121,7 @@ fn resolve(
         seen: std::collections::HashSet::new(),
         report: Vec::new(),
     };
-    ids.blocks(&mut doc.blocks);
+    tomet_tree::for_each_id_mut(doc, |id, span| ids.claim(id, span));
     pass.unresolved.extend(ids.report);
     pass.unresolved
 }
@@ -552,92 +552,6 @@ impl Ids {
             ),
             creation_only: false,
         });
-    }
-
-    fn blocks(&mut self, blocks: &mut [Block]) {
-        for block in blocks {
-            match block {
-                Block::Paragraph(paragraph) => {
-                    for inline in &mut paragraph.content {
-                        if let Inline::Element(el) = inline {
-                            self.element(el);
-                        }
-                    }
-                }
-                Block::Element(el) => self.element(el),
-                Block::Declaration(declaration) => {
-                    self.claim(&mut declaration.id, declaration.span);
-                    if let Some(content) = &mut declaration.content {
-                        self.blocks(content);
-                    }
-                    self.data(&mut declaration.data);
-                }
-                Block::Section(section) => {
-                    self.claim(&mut section.id, section.span);
-                    for conn in &mut section.connects {
-                        self.connect(conn);
-                    }
-                    self.blocks(&mut section.blocks);
-                }
-                Block::List(list) => self.list(list),
-                Block::Interp(_) | Block::Hole(_) => {}
-            }
-        }
-    }
-
-    fn list(&mut self, list: &mut List) {
-        self.claim(&mut list.id, list.span);
-        for conn in &mut list.connects {
-            self.connect(conn);
-        }
-        for item in &mut list.items {
-            self.claim(&mut item.id, item.span);
-            self.blocks(&mut item.content);
-            for conn in &mut item.connects {
-                self.connect(conn);
-            }
-            self.data(&mut item.data);
-            if let Some(sub) = &mut item.sublist {
-                self.list(sub);
-            }
-        }
-    }
-
-    fn element(&mut self, el: &mut Element) {
-        self.claim(&mut el.id, el.span);
-        if let Some(content) = &mut el.content {
-            self.blocks(content);
-        }
-        for conn in &mut el.connects {
-            self.connect(conn);
-        }
-        self.data(&mut el.data);
-    }
-
-    /// A connect has no id to claim; the elements it holds can.
-    fn connect(&mut self, connect: &mut Connect) {
-        if let Some(content) = &mut connect.content {
-            self.blocks(content);
-        }
-        self.data(&mut connect.data);
-    }
-
-    fn data(&mut self, data: &mut Data) {
-        if let Some(Group(entries)) = &mut data.value {
-            for entry in entries {
-                match entry {
-                    Entry::Element(child) => self.element(child),
-                    Entry::Bare(bare) => {
-                        self.claim(&mut bare.id, bare.span);
-                        if let Some(content) = &mut bare.content {
-                            self.blocks(content);
-                        }
-                        self.data(&mut bare.data);
-                    }
-                    Entry::Pair(..) | Entry::Hole(_) => {}
-                }
-            }
-        }
     }
 }
 

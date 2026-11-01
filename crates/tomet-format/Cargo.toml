@@ -11,6 +11,9 @@ cotomet-syntax = { workspace = true }
 tomet-ast = { workspace = true }
 tomet-config = { workspace = true }
 tomet-parser = { workspace = true }
+tomet-tree = { workspace = true }
+
+#= Crates.io
 unicode-width = { workspace = true }
 
 [dev-dependencies]

@@ -11,24 +11,24 @@ use tomet_tree::*;
 const SRC: &str = "\
 ::meta{ k: @s_decl_value() }
 
-::kind(@s_decl_args())
+::kind(@s_decl_args())#(i_decl)
 
 text @s_para_inline[x] more
 
-@s_block()
+@s_block()#(i_block)
 
 <?(h)>[@s_hole_block_content()]
 
 text <?(h2)>[@s_hole_inline_content()]
 
-@s_host(a: @s_args(), b: [@s_args_blocks()], c: list(@s_seq())){ d: @s_pair(), @s_entry(id){} }[ @s_content(x: @s_nested_args())[ @s_deep() ] ]:rule(allow: list(@s_connect()))
+@s_host(a: @s_args(), b: [@s_args_blocks()], c: list(@s_seq())){ d: @s_pair(), @s_entry(id){} }[ @s_content(x: @s_nested_args())[ @s_deep()#(i_deep) ] ]#(i_host):rule(allow: list(@s_connect()))
 
-=[ title @s_title() ]{ k: @s_sec_data() }:rule(allow: list(@s_sec_connect()))
+=[ title @s_title() ]{ k: @s_sec_data() }#(i_sec):rule(allow: list(@s_sec_connect()))
 
 @s_sec_block()
 
-- item @s_item()
-  - sub @s_sub()
+- item @s_item()#(i_in_item)
+  - sub @s_sub()#(i_in_sub)
 ";
 
 fn doc() -> Document {
@@ -211,4 +211,31 @@ fn the_other_walkers_count() {
     for_each_declaration(&doc, |_| decls += 1);
     // The sublist is a list of its own; a hole in running text and one standing as a block.
     assert_eq!((sections, lists, items, holes, decls), (1, 2, 2, 2, 2));
+}
+
+#[test]
+fn the_id_walks_reach_the_same_nodes_in_the_same_order() {
+    // `Node::id` over `for_each_node` and the mutable `for_each_id_mut` list the ids of the same
+    // nodes, connects included, each node before what it holds.
+    let doc = doc();
+    let mut immutable = Vec::new();
+    for_each_node(&doc, |n| immutable.extend(n.id().map(|i| i.0.clone())));
+    let mut d = doc.clone();
+    let mut mutable = Vec::new();
+    for_each_id_mut(&mut d, |id, _| {
+        mutable.extend(id.as_ref().map(|i| i.0.clone()))
+    });
+    assert_eq!(immutable, mutable);
+    assert_eq!(
+        immutable,
+        [
+            "i_decl",
+            "i_block",
+            "i_host",
+            "i_deep",
+            "i_sec",
+            "i_in_item",
+            "i_in_sub"
+        ]
+    );
 }

@@ -89,6 +89,13 @@ fn raw_content_in_brackets_is_preserved_losslessly() {
 }
 
 #[test]
+fn raw_content_in_a_holes_content_is_preserved_losslessly() {
+    // A hole holds content like an element does, so a raw element in it is raw.
+    let src = "<?(body)>[@raw(lang:rust)[\nfn foo() {\n    let a = 1;  \n\n    let b = 2;\n}\n]]\n";
+    assert_eq!(format_source(src), src);
+}
+
+#[test]
 fn fenced_code_block_content_is_preserved_losslessly() {
     let src = "```rust\nfn foo() {\n    let a = 1;  \n\n    let b = 2;\n}\n```\n";
     assert_eq!(format_source(src), src);

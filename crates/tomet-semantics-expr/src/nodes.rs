@@ -1,8 +1,6 @@
 //! Documents, directories and the nodes inside documents.
 
-use tomet_ast::{
-    Block, Connect, Data, Document, Element, Entry, Group, Inline, List, ListItem, Value,
-};
+use tomet_ast::{Block, Connect, Document, Group, Value};
 
 use super::args::Args;
 use super::context::EvalContext;
@@ -63,88 +61,38 @@ fn directory_docs(
 
 // ---- finding a node by id ----------------------------------------------------
 
-/// The node with unique id `id`: an element, a section or a list.
+/// The node with unique id `id`: an element, a declaration, a section, a list or a list item,
+/// wherever it sits in the document, in a `:connect` too.
 pub(crate) fn find_node(doc: &Document, id: &str) -> Option<Node> {
-    doc.blocks.iter().find_map(|block| in_block(block, id))
-}
-
-fn in_block(block: &Block, id: &str) -> Option<Node> {
-    match block {
-        Block::Section(sec) => {
-            if sec.id.as_ref().is_some_and(|i| i.0 == id) {
-                return Some(Node::Section(Box::new(sec.clone())));
-            }
-            sec.connects
-                .iter()
-                .find_map(|conn| in_connect(conn, id))
-                .or_else(|| sec.blocks.iter().find_map(|b| in_block(b, id)))
+    let found = tomet_tree::walk(doc, &mut |node, _| {
+        if node.id().is_some_and(|i| i.0 == id)
+            && let Some(found) = expr_node(node)
+        {
+            return tomet_tree::Visit::Break(found);
         }
-        Block::Element(el) => in_element(el, id),
-        Block::Declaration(d) => {
-            if d.id.as_ref().is_some_and(|i| i.0 == id) {
-                return Some(Node::Declaration(Box::new(d.clone())));
-            }
-            in_content(d.content.as_deref(), id).or_else(|| in_data(&d.data, id))
-        }
-        Block::Paragraph(p) => p.content.iter().find_map(|inline| match inline {
-            Inline::Element(el) => in_element(el, id),
-            _ => None,
-        }),
-        Block::List(list) => in_list(list, id),
-        Block::Interp(_) | Block::Hole(_) => None,
+        tomet_tree::Visit::Descend
+    });
+    match found {
+        std::ops::ControlFlow::Break(node) => Some(node),
+        std::ops::ControlFlow::Continue(()) => None,
     }
 }
 
-fn in_list(list: &List, id: &str) -> Option<Node> {
-    if list.id.as_ref().is_some_and(|i| i.0 == id) {
-        return Some(Node::List(Box::new(list.clone())));
-    }
-    list.connects
-        .iter()
-        .find_map(|conn| in_connect(conn, id))
-        .or_else(|| {
-            list.items.iter().find_map(|item| {
-                in_item(item, id).or_else(|| item.sublist.as_ref().and_then(|sub| in_list(sub, id)))
-            })
-        })
-}
-
-fn in_item(item: &ListItem, id: &str) -> Option<Node> {
-    if item.id.as_ref().is_some_and(|i| i.0 == id) {
-        return Some(Node::Item(Box::new(item.clone())));
-    }
-    in_content(Some(&item.content), id)
-        .or_else(|| item.connects.iter().find_map(|conn| in_connect(conn, id)))
-        .or_else(|| in_data(&item.data, id))
-}
-
-fn in_element(el: &Element, id: &str) -> Option<Node> {
-    if el.id.as_ref().is_some_and(|i| i.0 == id) {
+/// The expression language's node for a node of the tree, if it has one. A bare entry carries an
+/// id but is not something an expression can name.
+fn expr_node(node: tomet_tree::Node<'_>) -> Option<Node> {
+    if let Some(el) = node.element() {
         return Some(Node::Element(Box::new(el.clone())));
     }
-    in_content(el.content.as_deref(), id)
-        .or_else(|| el.connects.iter().find_map(|conn| in_connect(conn, id)))
-        .or_else(|| in_data(&el.data, id))
-}
-
-/// A connect has no id of its own; what it holds can.
-fn in_connect(conn: &Connect, id: &str) -> Option<Node> {
-    in_content(conn.content.as_deref(), id).or_else(|| in_data(&conn.data, id))
-}
-
-fn in_content(content: Option<&[Block]>, id: &str) -> Option<Node> {
-    content
-        .into_iter()
-        .flatten()
-        .find_map(|block| in_block(block, id))
-}
-
-fn in_data(data: &Data, id: &str) -> Option<Node> {
-    match &data.value {
-        Some(Group(entries)) => entries.iter().find_map(|entry| match entry {
-            Entry::Element(child) => in_element(child, id),
-            _ => None,
-        }),
+    if let Some(list) = node.list() {
+        return Some(Node::List(Box::new(list.clone())));
+    }
+    match node {
+        tomet_tree::Node::Block(Block::Section(s)) => Some(Node::Section(Box::new(s.clone()))),
+        tomet_tree::Node::Block(Block::Declaration(d)) => {
+            Some(Node::Declaration(Box::new(d.clone())))
+        }
+        tomet_tree::Node::Item(item) => Some(Node::Item(Box::new(item.clone()))),
         _ => None,
     }
 }
