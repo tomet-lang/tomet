@@ -26,8 +26,8 @@
 //!   (blocks, sections, lists, elements and their groups, `<...>` boxes, fences, `|` runs), powered by `tomet-cst`.
 //!   A blank line or a line-start `;` breaks a block here.
 //! - (lower) The CST read as an AST: `parse_document` is `parse_cst` and then this. It builds the typed tree and refuses what a document may not say.
-//! - (element) What makes `@` start an element, which characters open a group, and the readers
-//!   of a group's values: `(args)`, `{value}`, `#(id)`.
+//! - (element) The readers of a group's values: `(args)`, `{value}`, `#(id)`. Where an element or a
+//!   hole starts inside a group is the CST's to say.
 //! - (value) The Tomet data grammar (maps, sequences, scalars, comments), from `cotomet-syntax`,
 //!   with a hook that finds what a value embeds -- an element, `[content]`, a `|` run -- in the CST.
 //! - (inline) What the CST and lowering share about running text: `Text`/`SoftBreak` items, the

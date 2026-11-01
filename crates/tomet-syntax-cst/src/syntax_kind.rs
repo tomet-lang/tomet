@@ -12,26 +12,26 @@ pub enum SyntaxKind {
     NEWLINE,
 
     // --- Punctuation / Delimiters ---
-    AT,          // `@`
-    HASH,        // `#`
-    LT,          // `<`
-    GT,          // `>`
-    L_PAREN,     // `(`
-    R_PAREN,     // `)`
-    L_BRACKET,   // `[`
-    R_BRACKET,   // `]`
-    L_BRACE,     // `{`
-    R_BRACE,     // `}`
-    COLON,       // `:`
-    COMMA,       // `,`
-    EQUAL,       // `=`
-    MINUS,       // `-`
-    PLUS,        // `+`
-    STAR,        // `*`
-    SLASH,       // `/`
-    DOLLAR,      // `$`
-    PERCENT,     // `%`
-    PIPE,        // `|`
+    AT,        // `@`
+    HASH,      // `#`
+    LT,        // `<`
+    GT,        // `>`
+    L_PAREN,   // `(`
+    R_PAREN,   // `)`
+    L_BRACKET, // `[`
+    R_BRACKET, // `]`
+    L_BRACE,   // `{`
+    R_BRACE,   // `}`
+    COLON,     // `:`
+    COMMA,     // `,`
+    EQUAL,     // `=`
+    MINUS,     // `-`
+    PLUS,      // `+`
+    STAR,      // `*`
+    SLASH,     // `/`
+    DOLLAR,    // `$`
+    PERCENT,   // `%`
+    PIPE,      // `|`
     /// The `|` that begins a later line of a `|` run: layout that folds away with the line break
     /// before it, not content. The `|` that opens the run stays a `PIPE`.
     MARGIN,
@@ -108,6 +108,11 @@ pub enum SyntaxKind {
     /// inside the angle brackets; one family in the syntax whatever its mark.
     /// The AST gives it a node only where tomet interprets it (a hole is a
     /// `Hole`); a plain name tag lowers to text.
+    ///
+    /// A marked box is an element of the tree, so it stands in an `INLINE_ELEMENT` or a
+    /// `BLOCK_ELEMENT` like `@name(...)` does; a name tag is a span of running text, like an
+    /// `EMPHASIS` or a `CODE_SPAN`, and stands bare among the text. That is why the two are not
+    /// wrapped alike.
     SLOT,
     ERROR,
 

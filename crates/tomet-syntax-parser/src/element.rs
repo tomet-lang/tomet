@@ -1,96 +1,20 @@
-//! What opens an element, and the values a group holds.
+//! The values a group holds.
 //!
-//! Where an element starts and what makes `@` a sigil rather than a character
-//! ([`is_element_start`]), which characters open a group ([`opens_group`]), and
-//! the readers of the groups' values: `(args)` ([`parse_paren_value`]), `{value}`
+//! The readers of the groups' values: `(args)` ([`parse_paren_value`]), `{value}`
 //! ([`parse_value_group`]) and `#(id)` ([`parse_hash_id`]). They read the text of
-//! a group; the shape of what a group embeds is the CST's (see [`Embedded`]).
+//! a group; where an element, a hole or a `[content]` starts inside one is the CST's to say
+//! (see [`Embedded`]), and so is whether an `@` or a `<` is a sigil at all.
 
 use crate::error::Result;
 use crate::inline::at_line_start;
 use crate::value::{
-    Embedded, POSITIONAL_ENTRY_KEY, eat_name, eat_scalar_raw, err, is_name_start_at, parse_quoted,
-    skip_block_comment, skip_inline_ws, skip_line_comment, skip_ws_newlines_and_comments,
+    Embedded, POSITIONAL_ENTRY_KEY, eat_scalar_raw, err, parse_quoted, skip_block_comment,
+    skip_inline_ws, skip_line_comment, skip_ws_newlines_and_comments,
 };
 use tomet_ast::{Bare, Block, Connect, Data, Entry, Group, Id, Placement, Span, Value};
 use tomet_cst::{SyntaxKind as K, SyntaxNode};
 use tomet_lexer::Cursor;
 use tomet_tree::ElementExt;
-
-/// Whether `cur` starts an element: `@name`.
-///
-/// A hole is no `@` element: it is a box, `<?...>`, which the CST finds (see
-/// [`crate::cst`]) and the readers of a group ask it for by offset.
-///
-/// `block_context` is whether the cursor sits where a block may begin --
-/// the document's top level, or a line start inside another element's
-/// `[content]`. It only widens what may follow the name, never the sigil
-/// or the name itself:
-///
-/// - anywhere: a group (see [`opens_group`]), or a `:` that a `:name`
-///   family member follows. This is what keeps `me@example.com` and a
-///   lone `@foo` in running prose as plain text.
-/// - in block context only: end-of-line also counts, so `@memo` alone on
-///   its line is an element. It then fails later, in `tomet-semantics`,
-///   as an unknown bare name -- the intended report, and the reason no
-///   hashtag-style syntax exists.
-///
-/// The old `#name` spelling had the end-of-line allowance bound to the
-/// sigil rather than to the position. There is one element sigil now, so
-/// the allowance belongs to the position.
-pub(crate) fn is_element_start(cur: &Cursor, block_context: bool) -> bool {
-    let mut look = *cur;
-    match look.bump() {
-        Some('@') => name_and_tail_start(look, block_context),
-        _ => false,
-    }
-}
-
-/// The part of [`is_element_start`] after the sigil: the name, and what has to
-/// follow it for the sigil to start an element rather than prose.
-fn name_and_tail_start(mut look: Cursor, block_context: bool) -> bool {
-    // The name is mandatory. A nameless `@(url:...)` used to infer its
-    // kind from an args key; that inference was retired in favour of the
-    // one `@link(target:...)` element, but the syntax outlived it and
-    // kept parsing into a meaningless `Custom("at")`. It is text now.
-    if !is_name_start_at(&look) || eat_name(&mut look).is_none() {
-        return false;
-    }
-    // `@memo` alone on its line: asked before the gap is skipped, which reads
-    // past the line end and would take whatever follows for what follows the name.
-    if block_context {
-        let mut rest = look;
-        skip_inline_ws(&mut rest);
-        while rest.starts_with("//") || rest.starts_with("/*") {
-            if rest.starts_with("//") {
-                skip_line_comment(&mut rest);
-            } else if skip_block_comment(&mut rest).is_err() {
-                break;
-            }
-            skip_inline_ws(&mut rest);
-        }
-        if matches!(rest.peek(), None | Some('\n') | Some('\r')) {
-            return true;
-        }
-    }
-    skip_element_gap(&mut look);
-    if opens_group(&look) {
-        return true;
-    }
-    // A `:` right after the name only starts an element when a `:name`
-    // family member follows it. A bare one there can do nothing: `:` says
-    // "not a fresh group of this element", and right after the name every
-    // slot is still empty, so `@memo:{a:1}` was `@memo{a:1}` with a
-    // character in front of it -- a second spelling of one tree, which
-    // `explicit-form-first` in the workspace writ calls a duplicate.
-    // Nothing under `docs/`, `tests/fixtures/` or `tmtroot/` spelled it.
-    if look.peek() == Some(':') {
-        let mut after_colon = look;
-        after_colon.bump();
-        return is_name_start_at(&after_colon);
-    }
-    false
-}
 
 fn skip_element_gap(cur: &mut Cursor) -> u8 {
     let mut newlines = 0u8;
@@ -135,44 +59,6 @@ pub(crate) struct Groups {
     pub content: Option<Vec<Block>>,
     pub id: Option<Id>,
     pub connects: Vec<Connect>,
-}
-
-/// The characters that open one of an element's groups.
-///
-/// [`parse_groups`] is the only code that *reads* a group; every other site
-/// only asks whether one starts here, and each used to spell the set again.
-/// `|` had to be added to six independent spellings, and `-` was missing
-/// `[` and `{` from two of them from `2a99315` until `181b542`. One
-/// definition now, and `every_sigil_takes_every_group_opener` holds each
-/// sigil's recognizer and parser to it.
-///
-/// `:` is deliberately not here. It opens nothing; it says where the group
-/// that follows belongs. See [`is_element_start`].
-///
-/// `#` is here for a narrower reason than the rest: it does not open an
-/// `(args)`/`[content]`/`{value}` group at all, it opens the one `#(id)`
-/// slot (see [`parse_hash_id`]) -- and only when a `(` actually follows
-/// it, which is why this takes a `Cursor` rather than one already-peeked
-/// `char` the way it used to: `#` alone (not followed by `(`) answers
-/// "no", the same as any other character with no meaning here, since a
-/// bare `#` is otherwise completely free text.
-///
-/// The alternative was to delete the recognizers instead: decide by
-/// parsing speculatively on a copy of the cursor, the way
-/// [`element_stands_alone`] does, which leaves one definition per
-/// sigil and makes the disagreement structurally impossible. It was
-/// rejected on cost. `is_element_start` is called from `Stop::Paragraph`'s
-/// per-character scan, so trying a full parse there approaches quadratic
-/// on some inputs, and `parser-purity` in this
-/// crate's writ asks for the same tree from the same input *in
-/// predictable time*. Reconsider it if the lookahead ever stops being
-/// per-line; a shared set plus a guard buys the same safety until then.
-pub(crate) fn opens_group(cur: &Cursor) -> bool {
-    match cur.peek() {
-        Some('(') | Some('[') | Some('{') | Some('|') => true,
-        Some('#') => cur.peek_at(1) == Some('('),
-        _ => false,
-    }
 }
 
 pub(crate) fn parse_paren_value(
@@ -264,35 +150,27 @@ pub(crate) fn parse_value_group(embedded: &mut Embedded, cur: &mut Cursor) -> Re
             None => return Err(err(group_start, "unterminated '{', expected '}'")),
             Some('}') => break,
             Some('(') => entries.push(Entry::Bare(parse_bare_entry(embedded, cur)?)),
-            // A named entry, `@args{ ... }`. Unambiguous: `is_ident_char`
-            // excludes `@`, so a map key cannot begin with one, and this
-            // position errors today -- `eat_ident` returns empty and the
-            // `POSITIONAL_ENTRY_KEY` rejection below takes over. So this
-            // arm only turns errors into parses.
+            // An element or a hole as an entry (`@args{ ... }`, `<?(x)>`): the CST says whether one
+            // starts here, so a map key and an element are told apart in one place. A key cannot
+            // begin with `@` or `<`, so the arm only turns errors into parses.
             //
-            // `block_context: false`: a group entry still has to carry a
-            // group or a `:` after the name, so a bare `@foo`
-            // inside `{...}` stays the error it already was.
-            // The placement rule reaches inside a group too, the same way
-            // it reaches inside `[content]` (see `inline.rs`): a line start
-            // here is block context, so an element that also ends its line
-            // stands as a block. `@args{ ... }` on its own line inside
-            // `@element(x){ ... }` is what that is for -- `required_shape`
-            // calls those six block elements, and placement is what it is
-            // compared against.
+            // The placement rule reaches inside a group too, the same way it reaches inside
+            // `[content]` (see `inline.rs`): a line start here is block context, so an element that
+            // also ends its line stands as a block. `@args{ ... }` on its own line inside
+            // `@element(x){ ... }` is what that is for -- `required_shape` calls those six block
+            // elements, and placement is what it is compared against.
             //
-            // `{value}` groups are a flat list of entries, not prose, so
-            // there is no paragraph here for a `;` to break or a line to
-            // fold into: an element that is the whole of its line is a block.
-            _ if is_element_start(cur, at_line_start(cur))
-                || embedded
-                    .node_at(cur.pos())
-                    .is_some_and(|n| crate::lower::slot_of(n).is_some()) =>
+            // `{value}` groups are a flat list of entries, not prose, so there is no paragraph
+            // here for a `;` to break or a line to fold into: an element that is the whole of its
+            // line is a block.
+            _ if embedded
+                .node_at(cur.pos())
+                .is_some_and(|n| matches!(n.kind(), K::INLINE_ELEMENT | K::BLOCK_ELEMENT)) =>
             {
                 let at_start = at_line_start(cur);
-                let Some(node) = embedded.node_at(cur.pos()) else {
-                    return Err(err(cur.pos(), "an element the CST did not read here"));
-                };
+                let node = embedded
+                    .node_at(cur.pos())
+                    .expect("the arm's guard found the node");
                 let (value, end) = crate::lower::lower_embedded(embedded.src(), node)?;
                 cur.set_pos(end);
                 // The whole of its line: nothing but white space and comments after it.
