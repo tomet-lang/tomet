@@ -99,7 +99,8 @@ fn block_to_pandoc(block: &TmBlock) -> Vec<Block> {
         TmBlock::Interp(interp) => vec![Block::Para(vec![interp_inline(interp)])],
         // What a declaration says about the document is `to_pandoc`'s metadata,
         // not a block.
-        TmBlock::Declaration(_) | TmBlock::Hole(_) => Vec::new(),
+        TmBlock::Declaration(_) => Vec::new(),
+        TmBlock::Hole(hole) => vec![Block::Para(vec![hole_inline(hole)])],
         TmBlock::Section(sec) => {
             let mut blocks = if !sec.title.is_empty() {
                 vec![Block::Header(
@@ -300,7 +301,8 @@ fn blocks_to_inlines_lossy(blocks: &[TmBlock]) -> Vec<Inline> {
             TmBlock::Paragraph(p) => out.extend(inlines_to_pandoc(&p.content)),
             TmBlock::Element(el) => out.extend(element_to_inlines(el)),
             TmBlock::Interp(interp) => out.push(interp_inline(interp)),
-            TmBlock::Declaration(_) | TmBlock::Hole(_) => {}
+            TmBlock::Declaration(_) => {}
+            TmBlock::Hole(hole) => out.push(hole_inline(hole)),
             TmBlock::Section(sec) => out.extend(inlines_to_pandoc(&sec.title)),
             TmBlock::List(list) => {
                 for item in &list.items {
@@ -341,7 +343,7 @@ fn content_to_blocks(inlines: &[TmInline]) -> Vec<Block> {
             TmInline::Raw(t) => run.extend(text_to_inlines(&t.value)),
             TmInline::SoftBreak(_) => run.push(Inline::SoftBreak),
             TmInline::LineBreak(_) => run.push(Inline::LineBreak),
-            TmInline::Hole(_) => {}
+            TmInline::Hole(hole) => run.push(hole_inline(hole)),
         }
     }
     flush_run(&mut run, &mut blocks);
@@ -381,7 +383,8 @@ fn element_content_to_blocks(blocks: &[TmBlock]) -> Vec<Block> {
             }
             TmBlock::Element(el) => out.extend(element_to_blocks(el)),
             TmBlock::Interp(interp) => out.push(Block::Para(vec![interp_inline(interp)])),
-            TmBlock::Declaration(_) | TmBlock::Hole(_) => {}
+            TmBlock::Declaration(_) => {}
+            TmBlock::Hole(hole) => out.push(Block::Para(vec![hole_inline(hole)])),
             // No direct Pandoc equivalent for a nested section; a header
             // plus its own blocks is the closest shape.
             TmBlock::Section(sec) => {
@@ -418,7 +421,8 @@ fn blocks_to_pandoc_inlines(blocks: &[TmBlock]) -> Vec<Inline> {
             TmBlock::Paragraph(p) => out.extend(inlines_to_pandoc(&p.content)),
             TmBlock::Element(el) => out.extend(element_to_inlines(el)),
             TmBlock::Interp(interp) => out.push(interp_inline(interp)),
-            TmBlock::Declaration(_) | TmBlock::Hole(_) => {}
+            TmBlock::Declaration(_) => {}
+            TmBlock::Hole(hole) => out.push(hole_inline(hole)),
             TmBlock::Section(sec) => out.extend(inlines_to_pandoc(&sec.title)),
             TmBlock::List(list) => {
                 for item in &list.items {
@@ -440,7 +444,7 @@ fn inlines_to_pandoc(inlines: &[TmInline]) -> Vec<Inline> {
             TmInline::LineBreak(_) => out.push(Inline::LineBreak),
             TmInline::Element(el) => out.extend(element_to_inlines(el)),
             TmInline::Interp(interp) => out.push(interp_inline(interp)),
-            TmInline::Hole(_) => {}
+            TmInline::Hole(hole) => out.push(hole_inline(hole)),
         }
     }
     out
@@ -574,7 +578,8 @@ fn blocks_plain_text(blocks: &[TmBlock]) -> String {
         match block {
             TmBlock::Paragraph(p) => out.push_str(&plain_text(&p.content)),
             TmBlock::Element(el) => out.push_str(&blocks_plain_text(content_of(el))),
-            TmBlock::Interp(_) | TmBlock::Declaration(_) | TmBlock::Hole(_) => {}
+            TmBlock::Interp(_) | TmBlock::Declaration(_) => {}
+            TmBlock::Hole(hole) => out.push_str(&tomet_printer::hole_to_tm(hole)),
             TmBlock::Section(sec) => out.push_str(&plain_text(&sec.title)),
             TmBlock::List(list) => {
                 for item in &list.items {
@@ -599,7 +604,8 @@ fn plain_text(inlines: &[TmInline]) -> String {
             }
             TmInline::LineBreak(_) => out.push('\n'),
             TmInline::Element(el) => out.push_str(&blocks_plain_text(content_of(el))),
-            TmInline::Interp(_) | TmInline::Hole(_) => {}
+            TmInline::Interp(_) => {}
+            TmInline::Hole(hole) => out.push_str(&tomet_printer::hole_to_tm(hole)),
         }
     }
     out
@@ -608,6 +614,11 @@ fn plain_text(inlines: &[TmInline]) -> String {
 /// `${...}` is emitted as its own source text rather than evaluated:
 /// resolving it needs the document and its config, and the Typst writer
 /// already sets this precedent.
+/// A hole nobody filled, shown as it was written, as an interpolation is.
+fn hole_inline(hole: &tomet_ast::Hole) -> Inline {
+    Inline::Code(Attr::empty(), tomet_printer::hole_to_tm(hole))
+}
+
 fn interp_inline(interp: &Interpolation) -> Inline {
     Inline::Code(Attr::empty(), format!("${{{}}}", interp.expr))
 }

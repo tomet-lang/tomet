@@ -72,7 +72,12 @@ fn render_block(cx: &TypstCtx, block: &Block, out: &mut String) {
             out.push_str("\n\n");
         }
         // What a document says about itself has no rendering.
-        Block::Declaration(_) | Block::Hole(_) => {}
+        Block::Declaration(_) => {}
+        // A hole is shown as it was written.
+        Block::Hole(hole) => {
+            out.push_str(&escape_text(&tomet_printer::hole_to_tm(hole)));
+            out.push_str("\n\n");
+        }
     }
 }
 
@@ -153,7 +158,7 @@ fn inline_to_typst(cx: &TypstCtx, inlines: &[Inline]) -> String {
             Inline::LineBreak(_) => out.push_str("\\\n"),
             Inline::Element(el) => out.push_str(&element_to_typst(cx, el, true)),
             Inline::Interp(interp) => out.push_str(&render_interp(interp)),
-            Inline::Hole(_) => {}
+            Inline::Hole(hole) => out.push_str(&escape_text(&tomet_printer::hole_to_tm(hole))),
         }
     }
     out
@@ -661,7 +666,8 @@ fn inlines_to_plain(inlines: &[Inline]) -> String {
                     s.push_str(&blocks_to_plain(content));
                 }
             }
-            Inline::Interp(_) | Inline::Hole(_) => {}
+            Inline::Interp(_) => {}
+            Inline::Hole(hole) => s.push_str(&tomet_printer::hole_to_tm(hole)),
         }
     }
     s
@@ -684,7 +690,8 @@ fn blocks_to_plain(blocks: &[Block]) -> String {
                     s.push_str(&blocks_to_plain(&item.content));
                 }
             }
-            Block::Interp(_) | Block::Declaration(_) | Block::Hole(_) => {}
+            Block::Interp(_) | Block::Declaration(_) => {}
+            Block::Hole(hole) => s.push_str(&tomet_printer::hole_to_tm(hole)),
         }
     }
     s

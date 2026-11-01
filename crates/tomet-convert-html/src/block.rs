@@ -7,7 +7,7 @@ use crate::util::{
     split_attrs, value_to_plain,
 };
 use crate::{HeadingInfo, RenderCtx};
-use tomet_ast::{Block, Element, Inline, List, Section, Span, Value};
+use tomet_ast::{Block, Element, Inline, List, Paragraph, Section, Span, Value};
 use tomet_semantics::{ElementKind, classify_std_lenient, heading_level};
 
 /// Dispatches one top-level document block, and -- when
@@ -69,7 +69,12 @@ pub(crate) fn render_block(
         Block::List(list) => render_list(cx, list, out),
         Block::Interp(interp) => render_interp(interp, out),
         // What a document says about itself has no rendering.
-        Block::Declaration(_) | Block::Hole(_) => {}
+        Block::Declaration(_) => {}
+        // A hole is shown as it was written, in a paragraph of its own.
+        Block::Hole(hole) => {
+            let para = Paragraph::new(vec![Inline::Hole(hole.clone())], hole.span);
+            render_block(cx, &Block::Paragraph(para), out, state)
+        }
     }
 }
 
@@ -296,7 +301,7 @@ pub(crate) fn render_inlines(cx: &RenderCtx, inlines: &[Inline], out: &mut Strin
             Inline::LineBreak(_) => out.push_str("<br>"),
             Inline::Element(el) => render_element(cx, el, out, true),
             Inline::Interp(interp) => render_interp(interp, out),
-            Inline::Hole(_) => {}
+            Inline::Hole(hole) => out.push_str(&escape_html(&tomet_printer::hole_to_tm(hole))),
         }
     }
 }

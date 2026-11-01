@@ -22,7 +22,8 @@ pub(crate) fn inlines_to_plain(inlines: &[Inline]) -> String {
                     s.push_str(&blocks_to_plain(content));
                 }
             }
-            Inline::Interp(_) | Inline::Hole(_) => {}
+            Inline::Interp(_) => {}
+            Inline::Hole(hole) => s.push_str(&tomet_printer::hole_to_tm(hole)),
         }
     }
     s
@@ -48,7 +49,8 @@ pub(crate) fn blocks_to_plain(blocks: &[Block]) -> String {
                     s.push_str(&blocks_to_plain(&item.content));
                 }
             }
-            Block::Interp(_) | Block::Declaration(_) | Block::Hole(_) => {}
+            Block::Interp(_) | Block::Declaration(_) => {}
+            Block::Hole(hole) => s.push_str(&tomet_printer::hole_to_tm(hole)),
         }
     }
     s

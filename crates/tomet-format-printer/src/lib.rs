@@ -31,6 +31,15 @@ pub fn document_to_tm(doc: &Document) -> String {
     document_to_tm_with_config(doc, &config)
 }
 
+/// A [`tomet_ast::Hole`] as the box it was written as, `<?matcher(args){value}>[content]`,
+/// with the document-independent default configuration.
+///
+/// For a reader that has no rendering of a hole and shows it as it was written, the way an
+/// interpolation nobody evaluated is shown (`tomet-convert-*`).
+pub fn hole_to_tm(hole: &tomet_ast::Hole) -> String {
+    element::render_hole(hole, &PrinterConfig::default())
+}
+
 pub fn document_to_tm_with_config(doc: &Document, config: &PrinterConfig) -> String {
     let mut out = String::new();
     block::render_blocks(&doc.blocks, config, &mut out);

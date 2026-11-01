@@ -805,10 +805,6 @@ fn dump_hole(out: &mut String, hole: &Hole, depth: usize) {
     indent(out, depth);
     let _ = writeln!(out, "{placement} ?{matcher}");
     dump_groups(out, &hole.data, hole.content.as_deref(), depth);
-    if let Some(id) = &hole.id {
-        indent(out, depth + 1);
-        let _ = writeln!(out, "id      {:?}", id.0);
-    }
 }
 
 fn dump_interp(out: &mut String, interp: &Interpolation, depth: usize) {

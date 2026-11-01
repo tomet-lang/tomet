@@ -1259,7 +1259,7 @@ pub(crate) fn slot_of(node: &SyntaxNode) -> Option<SyntaxNode> {
     node.children().find(|n| n.kind() == K::SLOT)
 }
 
-/// `<?matcher(args){value}>[content]#(id)`: a hole, from the `SLOT` node of a marked box.
+/// `<?matcher(args){value}>[content]`: a hole, from the `SLOT` node of a marked box.
 fn lower_slot(src: &str, slot: &SyntaxNode) -> Result<tomet_ast::Hole> {
     let (start, end) = range_of(slot);
     let name = slot
@@ -1276,7 +1276,6 @@ fn lower_slot(src: &str, slot: &SyntaxNode) -> Result<tomet_ast::Hole> {
         placement: Placement::Inline,
         data: read.data,
         content: read.content,
-        id: read.id,
         span: Span::new(start, end),
     })
 }

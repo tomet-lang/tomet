@@ -97,7 +97,6 @@ export interface Hole {
   placement: Placement;
   data: Data;
   content: Block[] | null;
-  id: Id | null;
   span: Span;
 }
 

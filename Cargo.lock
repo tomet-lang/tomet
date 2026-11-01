@@ -1994,6 +1994,7 @@ dependencies = [
  "tomet-ast",
  "tomet-expr",
  "tomet-parser",
+ "tomet-printer",
  "tomet-semantics",
  "tomet-tree",
 ]
@@ -2127,6 +2128,7 @@ dependencies = [
  "tomet-expr",
  "tomet-html",
  "tomet-parser",
+ "tomet-printer",
  "tomet-semantics",
  "tomet-tree",
 ]
@@ -2335,6 +2337,7 @@ version = "0.5.0"
 dependencies = [
  "tomet-ast",
  "tomet-parser",
+ "tomet-printer",
  "tomet-semantics",
  "tomet-tree",
 ]

@@ -853,7 +853,7 @@ pub struct Bare {
 /// not there yet, in a pattern.
 ///
 /// It is a box, `<...>`, whose head (the `?` mark, the matcher and the `(args)` and `{options}`
-/// groups) is inside and whose `[content]` and `#(id)` follow the `>`. Its groups are read by the
+/// groups) is inside and whose `[content]` follows the `>`. Its groups are read by the
 /// same code as an element's. Differences: its head is a *matcher*, not an element name, and it is
 /// optional (`<?>` and `<?(n)>` have none); and it takes no `:connect`. A box that does not close
 /// or does not fit is text, so ordinary prose such as `本当に?(はい)` or `a < b` is never a hole.
@@ -871,7 +871,6 @@ pub struct Hole {
     pub placement: Placement,
     pub data: Data,
     pub content: Option<Vec<Block>>,
-    pub id: Option<Id>,
     pub span: Span,
 }
 

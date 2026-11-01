@@ -212,6 +212,20 @@ fn the_old_spelling_is_text() {
 }
 
 #[test]
+fn a_head_may_span_lines_like_an_elements_groups() {
+    let hole = hole("<?alt(\n  a,\n  b\n){\n  min: 1\n}>");
+    assert_eq!(hole.matcher, matcher("alt"));
+    assert!(matches!(&hole.data.args, Some(Value::Map(e)) if e.len() == 2));
+    assert!(hole.data.value.is_some());
+}
+
+#[test]
+fn a_hole_takes_no_id() {
+    // `#(id)` after a hole is the text it looks like; the hole ends at its `>`.
+    assert_eq!(shape(&inlines("<?(n)>#(x)")), r##"<?> "#(x)""##);
+}
+
+#[test]
 fn a_matcher_is_not_an_element_name() {
     // `<?meta>` is a hole with the matcher `meta`; it is not the `meta` element, and
     // is not reached by the walkers that visit elements.

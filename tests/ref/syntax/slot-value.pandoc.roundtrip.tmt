@@ -1,4 +1,4 @@
-@link(target: "url:")[]
+@link(target: "url:")[`<?(text)>`]
 
 @meta[]{ type: {hole: ""} }
 

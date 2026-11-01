@@ -3,10 +3,16 @@ Pass --out <PATH> to write the file, or open <ファイル> and Vec<T> instead.
 Text that looks like a box and is not one: a < b, x<=1, <->, <!doctype html>,
 </x>, <x/>, and a\<b と c>d stay as written.
 
-A hole in running text: adr--.md
+A hole in running text: adr-<?int(n)>-<?(slug)>.md
 
-A hole takes args and options in its head, , and a matcher
-may be namespaced, .
+<?()>
 
-<div data-tm-kind="card"></div>
+<?(id)>\[adr-<?int(n)>-<?(slug)>\]
+
+A hole takes args and options in its head, <?int(n){ min: 1 }>, and a matcher
+may be namespaced, <?tandr.heading(h)>.
+
+<div data-tm-kind="card"><?(body)>
+
+</div>
 

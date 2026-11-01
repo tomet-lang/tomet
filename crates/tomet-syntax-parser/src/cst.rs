@@ -513,32 +513,15 @@ impl<'a> CstParser<'a> {
         (self.kind_at(j) == Some(K::GT)).then_some((true, j))
     }
 
-    /// Index just past the box at `i` and what a marked one owns after its `>`:
-    /// a `[content]` and a `#(id)`, each at most once and with no gap.
+    /// Index just past the box at `i` and the `[content]` a marked one owns after its `>`,
+    /// with no gap.
     fn slot_end(&self, i: usize) -> usize {
         let Some((marked, close)) = self.slot_at(i) else {
             return i + 1;
         };
-        let mut j = close + 1;
-        if marked {
-            let (mut content, mut id) = (false, false);
-            loop {
-                let group = match self.kind_at(j) {
-                    Some(K::L_BRACKET) if !content => {
-                        content = true;
-                        self.group_end(j)
-                    }
-                    Some(K::HASH) if !id && self.id_follows(j) => {
-                        id = true;
-                        self.group_end(j + 1)
-                    }
-                    _ => break,
-                };
-                match group {
-                    Some(e) => j = e,
-                    None => return self.tokens.len(),
-                }
-            }
+        let j = close + 1;
+        if marked && self.kind_at(j) == Some(K::L_BRACKET) {
+            return self.group_end(j).unwrap_or(self.tokens.len());
         }
         j
     }
@@ -1042,7 +1025,7 @@ impl<'a> CstParser<'a> {
 
     /// A box, at the `<` the cursor stands on ([`CstParser::slot_at`] said it is one):
     /// `<`, the mark, the name, the `(args)` and `{data}` of the head, the `>`, and
-    /// for a marked one the `[content]` and `#(id)` after it.
+    /// for a marked one the `[content]` after it.
     fn parse_slot(&mut self) {
         self.builder.start_node(K::SLOT.into());
         let marked = self.kind_at(self.pos + 1) == Some(K::QUESTION);
@@ -1075,21 +1058,8 @@ impl<'a> CstParser<'a> {
         if self.current_kind() == Some(K::GT) {
             self.bump();
         }
-        if marked {
-            let (mut content, mut id) = (false, false);
-            loop {
-                match self.current_kind() {
-                    Some(K::L_BRACKET) if !content => {
-                        content = true;
-                        self.parse_content_group();
-                    }
-                    Some(K::HASH) if !id && self.id_follows(self.pos) => {
-                        id = true;
-                        self.parse_id_group();
-                    }
-                    _ => break,
-                }
-            }
+        if marked && self.current_kind() == Some(K::L_BRACKET) {
+            self.parse_content_group();
         }
         self.builder.finish_node();
     }
