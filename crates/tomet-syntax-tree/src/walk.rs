@@ -15,8 +15,9 @@
 use std::ops::ControlFlow;
 use tomet_ast::{
     Block, Connect, Data, Declaration, Document, Element, Entry, Group, Hole, Id, Inline,
-    Interpolation, List, ListItem, Section, Span, Value,
+    Interpolation, List, ListItem, Section, Value,
 };
+use tomet_span::Span;
 
 /// Where a node sits in the node that holds it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -487,7 +488,7 @@ impl<'a> Child<'a> {
         }
     }
 
-    pub fn span(&self) -> tomet_ast::Span {
+    pub fn span(&self) -> Span {
         match self {
             Child::Element(el) => el.span,
             Child::Item(item) => item.span,

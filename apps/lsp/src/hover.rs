@@ -1,7 +1,8 @@
 use tomet_semantics::DeclKind;
 
 use lsp_types::{Hover, HoverContents, MarkupContent, MarkupKind, Position, Range, Uri};
-use tomet_ast::{Declaration, Document, Element, InterpExpr, Span, Value};
+use tomet_ast::{Declaration, Document, Element, InterpExpr, Value};
+use tomet_span::Span;
 use tomet_expr::{DocRef, EvalContext, EvalValue, MemoryResolver, Phase, SystemGenerate, evaluate};
 use tomet_semantics::{
     ElementKind, classify_declaration_lenient, classify_std_lenient, heading_level,

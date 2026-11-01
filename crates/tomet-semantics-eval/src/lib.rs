@@ -38,7 +38,8 @@ pub use cotomet_syntax::File;
 use tomet_ast::Value;
 use tomet_declaration::{DeclKind, Declaration, Host, Problem, check_declarations};
 use tomet_expr::{DocRef, EvalContext, Generate, NoResolver, Phase};
-use tomet_lexer::LineIndex;
+use tomet_position::LineIndex;
+use tomet_span::Span;
 
 /// What a `.ctmt` says of a document, a directory or an element: it has none to find.
 const NO_VAULT: &str =
@@ -50,7 +51,7 @@ pub struct Error {
     pub message: String,
     pub line: usize,
     pub column: usize,
-    pub span: tomet_ast::Span,
+    pub span: Span,
 }
 
 impl fmt::Display for Error {
@@ -88,7 +89,7 @@ pub fn eval_str(src: &str, vars: &[(String, Value)]) -> Result<File, Vec<Error>>
                 message: e.message,
                 line: e.line,
                 column: e.column,
-                span: tomet_ast::Span::new(e.offset, e.offset),
+                span: Span::new(e.offset, e.offset),
             }]
         })?;
     eval_file(file, src, vars)
@@ -137,7 +138,7 @@ pub fn eval_file(file: File, src: &str, vars: &[(String, Value)]) -> Result<File
                 message: e.to_string(),
                 line: 1,
                 column: 1,
-                span: tomet_ast::Span::dummy(),
+                span: Span::dummy(),
             });
             tomet_expr::VarScope::empty()
         }

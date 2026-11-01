@@ -1,0 +1,9 @@
+[package]
+name = "tomet-position"
+version.workspace = true
+edition.workspace = true
+description = "Resolves byte offsets of Tomet source text to 1-based lines and columns, and back."
+license.workspace = true
+repository.workspace = true
+
+[dependencies]

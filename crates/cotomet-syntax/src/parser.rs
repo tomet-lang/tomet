@@ -8,7 +8,8 @@
 use std::collections::HashSet;
 
 use crate::error::{Error, Result};
-use tomet_ast::{Name, Span, Value};
+use tomet_ast::{Name, Value};
+use tomet_span::Span;
 use tomet_lexer::Cursor;
 
 /// A hook allowing callers (such as `tomet-syntax-parser`) to parse custom

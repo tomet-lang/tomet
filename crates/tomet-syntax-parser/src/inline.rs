@@ -4,7 +4,8 @@
 //! `**strong**`, `__strong__`, `~~strikeout~~`) or an autolink begins and ends.
 
 use crate::value::skip_inline_ws;
-use tomet_ast::{Inline, SoftBreak, Span, Text};
+use tomet_ast::{Inline, SoftBreak, Text};
+use tomet_span::Span;
 use tomet_lexer::Cursor;
 
 /// Trims leading/trailing whitespace from a finished inline sequence.

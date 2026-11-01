@@ -36,7 +36,8 @@
 
 use std::path::Path;
 
-use tomet_ast::{Block, Data, Document, Entry, Group, Name, Span, Value};
+use tomet_ast::{Block, Data, Document, Entry, Group, Name, Value};
+use tomet_span::Span;
 use tomet_declaration::{Profile, document_profiles};
 use tomet_expr::{Reach, Resolver};
 use tomet_validator_profile::{Dirt, Finding, standalone_findings};

@@ -24,8 +24,9 @@ use crate::interp::parse_interpolation;
 use crate::value::{Embedded, eat_name, err, skip_block_comment, skip_inline_ws};
 use tomet_ast::{
     Block, Connect, Data, Declaration, Document, Element, Inline, List, Name, Paragraph, Placement,
-    RawText, Section, Span, Value,
+    RawText, Section, Value,
 };
+use tomet_span::Span;
 use tomet_cst::{SyntaxElement, SyntaxKind as K, SyntaxNode};
 use tomet_lexer::Cursor;
 use tomet_tree::{ElementExt, element_new, list, list_item};

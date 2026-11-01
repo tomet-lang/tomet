@@ -8,6 +8,7 @@ use std::path::Path;
 use std::time::SystemTime;
 
 use rusqlite::{Connection, OptionalExtension, params};
+use tomet_span::Span;
 
 use crate::collect::{DocumentLink, LinkKind, collect_links};
 
@@ -290,7 +291,7 @@ impl LinkCache {
             links.push(DocumentLink {
                 kind,
                 target,
-                span: tomet_ast::Span::new(start as usize, end as usize),
+                span: Span::new(start as usize, end as usize),
             });
         }
         Ok(links)

@@ -4,9 +4,9 @@
 //! definitions anywhere in a parsed AST. Pure in-memory (no I/O).
 
 use tomet_ast::{
-    Bare, Block, Connect, Data, Document, Element, Entry, Group, Inline, List, ListItem, Span,
-    Value,
+    Bare, Block, Connect, Data, Document, Element, Entry, Group, Inline, List, ListItem, Value,
 };
+use tomet_span::Span;
 
 /// Returns whether an anchor with the given ID exists anywhere in `doc`.
 pub fn has_anchor(doc: &Document, anchor: &str) -> bool {

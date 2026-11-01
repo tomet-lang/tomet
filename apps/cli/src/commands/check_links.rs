@@ -175,7 +175,7 @@ fn locate(broken: &[TometBrokenLink]) -> Vec<Option<Position>> {
         let Ok(src) = std::fs::read_to_string(path) else {
             continue;
         };
-        let index = tomet_lexer::LineIndex::new(&src);
+        let index = tomet_position::LineIndex::new(&src);
         for i in links {
             let at = index.line_col(broken[i].span.start);
             located[i] = Some(Position {

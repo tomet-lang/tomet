@@ -1,7 +1,8 @@
 //! Table conversion, width calculation, and Markdown table preprocessing.
 
 use pulldown_cmark::Alignment;
-use tomet_ast::{Block, Element, Inline, Name, Placement, Span, Text};
+use tomet_ast::{Block, Element, Inline, Name, Placement, Text};
+use tomet_span::Span;
 use tomet_tree::{ElementExt, element_new};
 
 use super::{ImportOptions, wrap_inline_content};

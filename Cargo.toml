@@ -20,6 +20,10 @@ members = [
   "crates/tree-sitter-tomet",
   "crates/tree-sitter-cotomet",
 
+  #= Base -- positions in source text; depends on nothing in the workspace
+  "crates/tomet-base-span",
+  "crates/tomet-base-position",
+
   #= Syntax -- grammar/parsing
   "crates/tomet-syntax-cst",
   "crates/tomet-syntax-ast",
@@ -121,7 +125,9 @@ cotomet = { path = "crates/cotomet", version = "0.5.0" }
 #--- Syntax ---
 tomet-ast = { path = "crates/tomet-syntax-ast", version = "0.5.0" }
 tomet-cst = { path = "crates/tomet-syntax-cst", version = "0.5.0" }
+tomet-span = { path = "crates/tomet-base-span", version = "0.5.0" }
 tomet-lexer = { path = "crates/tomet-syntax-lexer", version = "0.5.0" }
+tomet-position = { path = "crates/tomet-base-position", version = "0.5.0" }
 tomet-parser = { path = "crates/tomet-syntax-parser", version = "0.5.0" }
 tomet-highlight = { path = "crates/tomet-syntax-highlight", version = "0.5.0" }
 tomet-tree = { path = "crates/tomet-syntax-tree", version = "0.5.0" }

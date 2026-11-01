@@ -1,0 +1,11 @@
+[package]
+name = "tomet-span"
+version.workspace = true
+edition.workspace = true
+description = "Source span representations (byte offsets) for the Tomet toolchain."
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+#= Crates.io
+serde = { workspace = true }

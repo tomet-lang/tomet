@@ -4,7 +4,8 @@
 //! `:rule` constraints) from blueprint documents (`::kind(blueprint)`), and validates
 //! target documents for conformance.
 
-use tomet_ast::{Block, Connect, Document, Element, Inline, Section, Span, Value};
+use tomet_ast::{Block, Connect, Document, Element, Inline, Section, Value};
+use tomet_span::Span;
 use tomet_semantics::DeclKind;
 use tomet_semantics::{Bindings, ElementKind, classify_declaration_lenient, classify_std_lenient};
 use tomet_tree::{ValueExt, for_each_top_level_declaration, for_each_top_level_element};

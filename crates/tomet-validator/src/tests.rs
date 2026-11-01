@@ -47,7 +47,7 @@ fn a_repeated_standard_declaration_says_where_the_first_is() {
     let doc = parse(src);
     let errors = validate_document(&doc);
     assert_eq!(errors.len(), 1, "{errors:?}");
-    let index = tomet_lexer::LineIndex::new(src);
+    let index = tomet_position::LineIndex::new(src);
     assert_eq!(
         errors[0].message_in(&index),
         "`meta` may appear once in a document; the first is at 2:1"
@@ -786,7 +786,7 @@ fn duplicate_id_with_integer_values_is_reported() {
     // a renderer that holds the source asks for it.
     assert_eq!(errors[0].to_string(), "duplicate id `42`");
     assert_eq!(
-        errors[0].message_in(&tomet_lexer::LineIndex::new(src)),
+        errors[0].message_in(&tomet_position::LineIndex::new(src)),
         "duplicate id `42` (first defined at 1:1)"
     );
 }
@@ -1275,8 +1275,9 @@ fn checking_a_vocabulary_reports_a_type_that_names_no_type() {
 
 #[test]
 fn check_ctmt_declarations_reports_expected_diagnostics() {
-    use tomet_ast::{Span, Value};
+    use tomet_ast::Value;
     use tomet_declaration::Declaration;
+    use tomet_span::Span;
 
     // 1. Valid declarations produce no errors
     let declared = vec![

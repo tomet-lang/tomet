@@ -22,8 +22,9 @@ mod values;
 use super::*;
 use tomet_ast::{
     Block, Declaration, Element, Group, Inline, InterpExpr, InterpExprKind, Literal, Name,
-    Paragraph, Placement, SoftBreak, Span, Value,
+    Paragraph, Placement, SoftBreak, Value,
 };
+use tomet_span::Span;
 
 /// A `SoftBreak` for test expectations -- span never matters, `Span`'s
 /// `PartialEq` always returns `true` (see its own doc comment).

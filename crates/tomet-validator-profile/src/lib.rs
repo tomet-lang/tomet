@@ -22,7 +22,8 @@
 //! - A vocabulary the document holds itself. No reader for one exists yet, so any element that is
 //!   not built in counts as taken from outside.
 
-use tomet_ast::{Document, Element, Span};
+use tomet_ast::{Document, Element};
+use tomet_span::Span;
 use tomet_declaration::{Profile, document_profiles};
 use tomet_expr::{OwnNames, Reach, reaches_outside};
 use tomet_validator_core::Diagnostic;

@@ -3,7 +3,8 @@
 use crate::kind::{ElementKind, classify_std_lenient};
 use crate::positional::normalized_element_args;
 use std::collections::HashMap;
-use tomet_ast::{Document, Element, Placement, Span};
+use tomet_ast::{Document, Element, Placement};
+use tomet_span::Span;
 use tomet_tree::{ValueExt, for_each_element};
 
 /// An individual footnote entry resolved within a document.

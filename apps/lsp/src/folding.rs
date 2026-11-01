@@ -2,7 +2,8 @@
 
 use lsp_types::{FoldingRange, FoldingRangeKind};
 use tomet_ast::{Block, Group, List};
-use tomet_lexer::LineIndex;
+use tomet_position::LineIndex;
+use tomet_span::Span;
 
 /// Computes folding ranges for the given document text.
 pub fn folding_ranges_for(text: &str) -> Vec<FoldingRange> {
@@ -175,7 +176,7 @@ fn block_end_line(index: &LineIndex<'_>, block: &Block) -> u32 {
     }
 }
 
-fn span_end_line(index: &LineIndex<'_>, span: &tomet_ast::Span) -> u32 {
+fn span_end_line(index: &LineIndex<'_>, span: &Span) -> u32 {
     let end = index.line_col(span.end);
     let raw_end = end.line.saturating_sub(1) as u32;
     if end.column <= 1 && end.line > index.line_col(span.start).line {

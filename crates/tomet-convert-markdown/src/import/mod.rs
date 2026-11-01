@@ -30,8 +30,9 @@
 use pulldown_cmark::{CodeBlockKind, Event, Options, Parser, Tag, TagEnd};
 use tomet_ast::{
     Block, Data, Document, Element, Inline, LineBreak, List, ListItem, Name, Paragraph, Placement,
-    RawText, Section, SoftBreak, Span, Text, Value,
+    RawText, Section, SoftBreak, Text, Value,
 };
+use tomet_span::Span;
 use tomet_semantics::{ElementKind, classify_std_lenient};
 use tomet_tree::{declaration_new, element_new, list, list_item};
 

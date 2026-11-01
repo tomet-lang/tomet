@@ -1,5 +1,6 @@
 use super::*;
-use tomet_ast::{Data, Declaration, Group, Name, Paragraph, Placement, RawText, Span, Text};
+use tomet_ast::{Data, Declaration, Group, Name, Paragraph, Placement, RawText, Text};
+use tomet_span::Span;
 
 /// Wraps a flat inline sequence as `Element.content` (`Vec<Block>`
 /// now) -- every fixture below is still just one paragraph's worth.

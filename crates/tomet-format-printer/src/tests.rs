@@ -2,6 +2,7 @@ use super::*;
 use tomet_ast::{
     Bare, Block, Data, Document, Entry, Group, Inline, Name, Paragraph, Section, Value,
 };
+use tomet_span::Span;
 use tomet_config::{FieldConfig, FormatConfig, GroupOrder, MetaConfig, load_config_from_str};
 use tomet_field_utils::generate_id_for_field;
 use tomet_style::render_value_inner;
@@ -486,17 +487,17 @@ fn test_container_children_indentation() {
             },
             content: Some(vec![Block::Paragraph(Paragraph::new(
                 vec![Inline::Text(text.into())],
-                tomet_ast::Span::dummy(),
+                Span::dummy(),
             ))]),
             id: None,
-            span: tomet_ast::Span::dummy(),
+            span: Span::dummy(),
         })
     };
 
     let mut links = element_new(Name::bare("links"));
     links.data.value = Some(Group(vec![note(1, "note 1"), note(2, "note 2")]));
 
-    let doc = Document::new(vec![Block::Element(links)], tomet_ast::Span::dummy());
+    let doc = Document::new(vec![Block::Element(links)], Span::dummy());
     let printed = document_to_tm(&doc);
     assert!(printed.contains("@links{\n  (1)[note 1]\n  (2)[note 2]\n}"));
 
@@ -511,10 +512,10 @@ fn test_group_order_content_first() {
     el.data.args = Some(Value::String("https://example.com".to_string()));
     el.content = Some(vec![Block::Paragraph(Paragraph::new(
         vec![Inline::Text("Example".into())],
-        tomet_ast::Span::dummy(),
+        Span::dummy(),
     ))]);
 
-    let doc = Document::new(vec![Block::Element(el)], tomet_ast::Span::dummy());
+    let doc = Document::new(vec![Block::Element(el)], Span::dummy());
 
     let mut config = PrinterConfig {
         format: tomet_config::FormatConfig {
@@ -594,17 +595,17 @@ fn test_section_blocks_blank_lines() {
         blocks: vec![
             Block::Paragraph(tomet_ast::Paragraph::new(
                 vec![Inline::Text("Paragraph 1".into())],
-                tomet_ast::Span::dummy(),
+                Span::dummy(),
             )),
             Block::Paragraph(tomet_ast::Paragraph::new(
                 vec![Inline::Text("Paragraph 2".into())],
-                tomet_ast::Span::dummy(),
+                Span::dummy(),
             )),
         ],
 
-        span: tomet_ast::Span::dummy(),
+        span: Span::dummy(),
     };
-    let doc = Document::new(vec![Block::Section(sec)], tomet_ast::Span::dummy());
+    let doc = Document::new(vec![Block::Section(sec)], Span::dummy());
     let printed = document_to_tm(&doc);
     assert_eq!(printed, "=[Title]\nParagraph 1\n\nParagraph 2\n");
 }
@@ -627,12 +628,12 @@ fn test_headingless_section_printing() {
 
         blocks: vec![Block::Paragraph(tomet_ast::Paragraph::new(
             vec![Inline::Text("Content".into())],
-            tomet_ast::Span::dummy(),
+            Span::dummy(),
         ))],
 
-        span: tomet_ast::Span::dummy(),
+        span: Span::dummy(),
     };
-    let doc = Document::new(vec![Block::Section(sec)], tomet_ast::Span::dummy());
+    let doc = Document::new(vec![Block::Section(sec)], Span::dummy());
     let printed = document_to_tm(&doc);
     assert_eq!(printed, "=\nContent\n");
 }

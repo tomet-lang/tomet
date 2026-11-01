@@ -6,7 +6,8 @@
 //! body's knowledge, so the evaluator does not do this itself: it asks the host
 //! (`tomet_expr::Resolver::rebase_links`), and a host that knows tomet documents calls this.
 
-use tomet_ast::{Block, Document, Element, Span, Value};
+use tomet_ast::{Block, Document, Element, Value};
+use tomet_span::Span;
 use tomet_tree::for_each_element_mut;
 
 use crate::elements::target::link_target_of;

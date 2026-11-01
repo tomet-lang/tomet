@@ -19,3 +19,4 @@ tomet-tree = { workspace = true }
 [dev-dependencies]
 tomet-markdown = { workspace = true }
 tomet-parser = { workspace = true }
+tomet-span = { workspace = true }

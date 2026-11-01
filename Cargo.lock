@@ -288,8 +288,9 @@ dependencies = [
  "tomet-ast",
  "tomet-declaration",
  "tomet-expr",
- "tomet-lexer",
  "tomet-parser",
+ "tomet-position",
+ "tomet-span",
 ]
 
 [[package]]
@@ -298,6 +299,8 @@ version = "0.5.0"
 dependencies = [
  "tomet-ast",
  "tomet-lexer",
+ "tomet-position",
+ "tomet-span",
 ]
 
 [[package]]
@@ -1790,6 +1793,7 @@ dependencies = [
  "serde",
  "tomet-ast",
  "tomet-parser",
+ "tomet-span",
  "tomet-tree",
 ]
 
@@ -1798,7 +1802,7 @@ name = "tomet-ast"
 version = "0.5.0"
 dependencies = [
  "serde",
- "tomet-cst",
+ "tomet-span",
  "unicode-width",
 ]
 
@@ -1838,13 +1842,13 @@ dependencies = [
  "tomet-formatter",
  "tomet-html",
  "tomet-indexer",
- "tomet-lexer",
  "tomet-links",
  "tomet-load",
  "tomet-load-config",
  "tomet-markdown",
  "tomet-pandoc",
  "tomet-parser",
+ "tomet-position",
  "tomet-printer",
  "tomet-semantics",
  "tomet-spec",
@@ -1881,6 +1885,7 @@ dependencies = [
  "tomet-markdown",
  "tomet-parser",
  "tomet-printer",
+ "tomet-span",
  "tomet-tree",
  "tomet-type",
  "tomet-validator-profile",
@@ -1901,6 +1906,7 @@ dependencies = [
  "cotomet-syntax",
  "tomet-ast",
  "tomet-parser",
+ "tomet-span",
  "tomet-tree",
  "tomet-type",
 ]
@@ -1941,6 +1947,7 @@ dependencies = [
  "tomet-ast",
  "tomet-declaration",
  "tomet-parser",
+ "tomet-span",
  "tomet-tree",
  "tomet-type",
  "uuid",
@@ -1952,8 +1959,9 @@ version = "0.5.0"
 dependencies = [
  "tomet-ast",
  "tomet-cst",
- "tomet-lexer",
  "tomet-parser",
+ "tomet-position",
+ "tomet-span",
  "tomet-tree",
 ]
 
@@ -1997,6 +2005,7 @@ dependencies = [
  "tomet-parser",
  "tomet-printer",
  "tomet-semantics",
+ "tomet-span",
  "tomet-tree",
 ]
 
@@ -2044,8 +2053,8 @@ dependencies = [
 name = "tomet-lexer"
 version = "0.5.0"
 dependencies = [
- "tomet-ast",
  "tomet-cst",
+ "tomet-span",
 ]
 
 [[package]]
@@ -2060,6 +2069,7 @@ dependencies = [
  "tomet-indexer",
  "tomet-parser",
  "tomet-semantics",
+ "tomet-span",
  "tomet-tree",
  "uuid",
 ]
@@ -2108,11 +2118,12 @@ dependencies = [
  "tomet-declaration",
  "tomet-expr",
  "tomet-formatter",
- "tomet-lexer",
  "tomet-load",
  "tomet-load-config",
  "tomet-parser",
+ "tomet-position",
  "tomet-semantics",
+ "tomet-span",
  "tomet-tree",
  "tomet-validator",
 ]
@@ -2131,6 +2142,7 @@ dependencies = [
  "tomet-parser",
  "tomet-printer",
  "tomet-semantics",
+ "tomet-span",
  "tomet-tree",
 ]
 
@@ -2154,6 +2166,7 @@ dependencies = [
  "tomet-parser",
  "tomet-printer",
  "tomet-semantics",
+ "tomet-span",
  "tomet-tree",
 ]
 
@@ -2165,10 +2178,16 @@ dependencies = [
  "tomet-ast",
  "tomet-cst",
  "tomet-lexer",
+ "tomet-position",
  "tomet-semantics",
+ "tomet-span",
  "tomet-tree",
  "unicode-width",
 ]
+
+[[package]]
+name = "tomet-position"
+version = "0.5.0"
 
 [[package]]
 name = "tomet-printer"
@@ -2182,6 +2201,7 @@ dependencies = [
  "tomet-markdown",
  "tomet-parser",
  "tomet-semantics",
+ "tomet-span",
  "tomet-style",
  "tomet-tree",
 ]
@@ -2203,6 +2223,7 @@ dependencies = [
  "tomet-ast",
  "tomet-parser",
  "tomet-semantics",
+ "tomet-span",
  "tomet-tree",
 ]
 
@@ -2216,8 +2237,16 @@ dependencies = [
  "tomet-ast",
  "tomet-declaration",
  "tomet-parser",
+ "tomet-span",
  "tomet-tree",
  "tomet-type",
+]
+
+[[package]]
+name = "tomet-span"
+version = "0.5.0"
+dependencies = [
+ "serde",
 ]
 
 [[package]]
@@ -2230,6 +2259,7 @@ dependencies = [
  "tomet-formatter",
  "tomet-parser",
  "tomet-printer",
+ "tomet-span",
  "tomet-spec-derive",
  "tomet-tree",
 ]
@@ -2313,6 +2343,7 @@ dependencies = [
  "tomet-parser",
  "tomet-search",
  "tomet-semantics",
+ "tomet-span",
  "tomet-style",
  "tomet-tree",
 ]
@@ -2323,6 +2354,7 @@ version = "0.5.0"
 dependencies = [
  "tomet-ast",
  "tomet-parser",
+ "tomet-span",
 ]
 
 [[package]]
@@ -2351,9 +2383,10 @@ dependencies = [
  "tomet-ast",
  "tomet-cst",
  "tomet-declaration",
- "tomet-lexer",
  "tomet-parser",
+ "tomet-position",
  "tomet-semantics",
+ "tomet-span",
  "tomet-validator-blueprint",
  "tomet-validator-core",
  "tomet-validator-profile",
@@ -2367,6 +2400,7 @@ dependencies = [
  "tomet-ast",
  "tomet-parser",
  "tomet-semantics",
+ "tomet-span",
  "tomet-tree",
  "tomet-validator-core",
  "tomet-validator-rule",
@@ -2381,8 +2415,9 @@ dependencies = [
  "tomet-ast",
  "tomet-cst",
  "tomet-declaration",
- "tomet-lexer",
+ "tomet-position",
  "tomet-semantics",
+ "tomet-span",
  "tomet-tree",
  "tomet-type",
 ]
@@ -2396,6 +2431,7 @@ dependencies = [
  "tomet-expr",
  "tomet-parser",
  "tomet-semantics",
+ "tomet-span",
  "tomet-tree",
  "tomet-validator-core",
 ]
@@ -2407,6 +2443,7 @@ dependencies = [
  "tomet-ast",
  "tomet-parser",
  "tomet-semantics",
+ "tomet-span",
  "tomet-tree",
  "tomet-validator-core",
 ]
@@ -2422,6 +2459,7 @@ dependencies = [
  "tomet-parser",
  "tomet-search",
  "tomet-semantics",
+ "tomet-span",
  "tomet-transform",
  "tomet-tree",
  "tomet-type",

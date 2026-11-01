@@ -37,8 +37,9 @@
 use tomet_ast::{
     Bare, Block as TmBlock, Data, Declaration, Document, Element, Entry, Group, Id,
     Inline as TmInline, LineBreak, List, Name, Paragraph, Placement, RawText, Section, SoftBreak,
-    Span, Text, Value,
+    Text, Value,
 };
+use tomet_span::Span;
 use tomet_semantics::EXACT_DATA_KEY;
 
 use crate::to_pandoc::{BARE_SIGIL, SIGIL_KEY};

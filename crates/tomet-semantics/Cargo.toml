@@ -11,6 +11,7 @@ cotomet-syntax = { workspace = true }
 tomet-address = { workspace = true }
 tomet-declaration = { workspace = true }
 tomet-ast = { workspace = true }
+tomet-span = { workspace = true }
 tomet-tree = { workspace = true }
 tomet-type = { workspace = true }
 

@@ -5,7 +5,8 @@
 //! round-trip as literal text rather than being misread as `.tmt`
 //! syntax on export.
 
-use tomet_ast::{Block, Document, Element, Inline, List, Name, Span, Text, Value};
+use tomet_ast::{Block, Document, Element, Inline, List, Name, Text, Value};
+use tomet_span::Span;
 use tomet_tree::element_new;
 
 pub(super) fn post_process_document_wikilinks(doc: &mut Document) {

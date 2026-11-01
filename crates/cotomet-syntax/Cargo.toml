@@ -9,3 +9,5 @@ description = "cotomet, the data language dual to tomet: syntax (parser and prin
 [dependencies]
 tomet-ast = { workspace = true }
 tomet-lexer = { workspace = true }
+tomet-position = { workspace = true }
+tomet-span = { workspace = true }

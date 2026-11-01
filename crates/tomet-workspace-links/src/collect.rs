@@ -3,7 +3,8 @@
 //! unconditionally). `Url`/`Id` are deliberately excluded -- see this
 //! crate's module doc.
 
-use tomet_ast::{Document, Span};
+use tomet_ast::Document;
+use tomet_span::Span;
 use tomet_semantics::{ElementKind, TargetScheme, link_target_of, path_target_of, target_scheme};
 use tomet_tree::for_each_element;
 

@@ -18,7 +18,7 @@ use std::path::{Path, PathBuf};
 
 use anyhow::{Result, anyhow};
 use tomet_convert_standalone::{Change, Options, Treatment, make_standalone};
-use tomet_lexer::LineIndex;
+use tomet_position::LineIndex;
 
 use crate::util::{format_parse_error, vault_for};
 

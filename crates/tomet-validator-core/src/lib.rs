@@ -9,7 +9,8 @@ pub mod id;
 pub use diagnostic::{CstValidationError, Diagnostic, Severity};
 pub use id::{collect_ids, collect_ids_cst};
 
-use tomet_ast::{Block, Document, Inline, Span};
+use tomet_ast::{Block, Document, Inline};
+use tomet_span::Span;
 use tomet_cst::{SyntaxNode, TextRange};
 use tomet_semantics::DeclKind;
 use tomet_semantics::{Bindings, Shape};
@@ -31,7 +32,7 @@ impl Written<'_> {
         }
     }
 
-    fn span(&self) -> tomet_ast::Span {
+    fn span(&self) -> Span {
         match self {
             Written::Element(el) => el.span,
             Written::Declaration(d) => d.span,
@@ -95,7 +96,7 @@ pub fn shape_str(shape: Shape) -> &'static str {
 
 /// Runs core element, ID, region, and argument validations on `doc`.
 pub fn validate_core(doc: &Document, bindings: &Bindings, errors: &mut Vec<Diagnostic>) {
-    let mut seen: Vec<(String, tomet_ast::Span)> = Vec::new();
+    let mut seen: Vec<(String, Span)> = Vec::new();
 
     for_each_element_and_item(doc, |el| {
         if let Err(unknown) = classify_in(el, bindings) {
@@ -218,7 +219,7 @@ pub fn check_singletons_and_regions(
     };
 
     let mut in_preamble = true;
-    let mut seen: Vec<(String, tomet_ast::Span)> = Vec::new();
+    let mut seen: Vec<(String, Span)> = Vec::new();
 
     let mut visit = |written: Written<'_>, in_place: bool| {
         let span = written.span();

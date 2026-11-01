@@ -1,9 +1,9 @@
 //! Extension traits, property helpers, and constructors for [`tomet_ast::Element`], [`tomet_ast::Declaration`] and [`tomet_ast::Data`].
 
 use tomet_ast::{
-    Block, Connect, Data, Declaration, Element, Group, Id, List, ListItem, Name, Placement, Span,
-    Value,
+    Block, Connect, Data, Declaration, Element, Group, Id, List, ListItem, Name, Placement, Value,
 };
+use tomet_span::Span;
 
 /// Extension trait providing accessors, attribute manipulations, and inspections on [`Element`].
 pub trait ElementExt {

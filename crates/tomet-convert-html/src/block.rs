@@ -7,7 +7,8 @@ use crate::util::{
     split_attrs, value_to_plain,
 };
 use crate::{HeadingInfo, RenderCtx};
-use tomet_ast::{Block, Element, Inline, List, Paragraph, Section, Span, Value};
+use tomet_ast::{Block, Element, Inline, List, Paragraph, Section, Value};
+use tomet_span::Span;
 use tomet_semantics::{ElementKind, classify_std_lenient, heading_level};
 
 /// Dispatches one top-level document block, and -- when

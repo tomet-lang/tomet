@@ -1,6 +1,6 @@
 //! Whitespace-hygiene and layout formatter for `.tmt` source text.
 //!
-//! [`format_source`] is AST-aware using source [`tomet_ast::Span`]
+//! [`format_source`] is AST-aware using source [`tomet_span::Span`]
 //! metadata. Normalizes whitespace policy (LF line endings, no trailing
 //! whitespace, collapsed excess blank lines, exactly one final newline)
 //! while losslessly preserving literal whitespace and blank lines inside

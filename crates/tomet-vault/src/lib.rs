@@ -49,7 +49,8 @@
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use tomet_ast::{Block, Document, Span};
+use tomet_ast::{Block, Document};
+use tomet_span::Span;
 use tomet_config::PrinterConfig;
 use tomet_expr::{
     DocRef, EvalContext, EvalError, EvalValue, Phase, PreparedBlocks, SystemGenerate,
@@ -389,7 +390,7 @@ impl Vault {
 
     /// [`Vault::prepare`] for only the `${...}` that `selected` picks, by the exact position of the
     /// [`Interpolation`](tomet_ast::Interpolation) in `doc` as it is passed in
-    /// ([`Span::exact_eq`](tomet_ast::Span::exact_eq): `==` on a span is always true). The others are
+    /// ([`Span::exact_eq`](tomet_span::Span::exact_eq): `==` on a span is always true). The others are
     /// left as interpolations, and `@term` mentions are left as they are: this is for changing a
     /// document, not for rendering it. So it reads the document with the whole vault even if the
     /// document promises `::profile(standalone)`: making that promise true is what it is for.
@@ -410,7 +411,7 @@ impl Vault {
     /// something between the brackets, so that a converter renders a word and need not know what a
     /// dictionary is. A mention that names no term is left as it is; `tomet check` reports it.
     fn fill_terms(&self, doc: &mut Document) {
-        use tomet_ast::{Block, Inline, Paragraph, Span, Text};
+        use tomet_ast::{Block, Inline, Paragraph, Text};
         use tomet_semantics::{ElementKind, TermRef, ValueExt};
 
         let dictionaries = self.dictionaries_for(doc);

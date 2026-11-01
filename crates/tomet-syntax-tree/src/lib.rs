@@ -101,7 +101,8 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tomet_ast::{Block, Inline, Name, Span, Text, Value};
+    use tomet_ast::{Block, Inline, Name, Text, Value};
+    use tomet_span::Span;
 
     fn parse(src: &str) -> tomet_ast::Document {
         tomet_parser::parse_document(src).expect("valid Tomet source")

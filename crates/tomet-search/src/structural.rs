@@ -3,7 +3,8 @@
 //! Provides pure in-memory querying over Tomet AST elements by tag,
 //! attribute/property key, and value content.
 
-use tomet_ast::{Data, Declaration, Document, Element, Span, Value};
+use tomet_ast::{Data, Declaration, Document, Element, Value};
+use tomet_span::Span;
 use tomet_semantics::{classify_declaration_lenient, classify_std_lenient};
 use tomet_tree::{DataExt, for_each_declaration, for_each_element};
 

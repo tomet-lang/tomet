@@ -157,11 +157,12 @@ pub use positional::bind_positional;
 pub use print::{
     float_text, key_text, print_value, quoted_text, write_float, write_key, write_scalar_string,
 };
-pub use tomet_ast::{Span, Value};
+pub use tomet_ast::Value;
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use tomet_span::Span;
 
     #[test]
     fn call_syntax_prints_back_as_a_call() {

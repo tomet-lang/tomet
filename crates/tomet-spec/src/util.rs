@@ -1,8 +1,9 @@
 //! Shared AST helpers and formatting utilities for specification generators.
 
 use tomet_ast::{
-    Block, Element, Inline, List, ListItem, Name, Paragraph, Placement, RawText, Span, Text, Value,
+    Block, Element, Inline, List, ListItem, Name, Paragraph, Placement, RawText, Text, Value,
 };
+use tomet_span::Span;
 use tomet_tree::{ElementExt, element_new};
 
 /// Returns a dummy source span for synthesized AST nodes.

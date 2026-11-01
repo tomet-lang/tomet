@@ -57,7 +57,8 @@ fn name_from_dotted(s: &str) -> Name {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tomet_ast::{Data, Span};
+    use tomet_ast::Data;
+    use tomet_span::Span;
 
     fn parse_connect(src: &str) -> Connect {
         let doc = tomet_parser::parse_document(src).expect("valid Tomet source");

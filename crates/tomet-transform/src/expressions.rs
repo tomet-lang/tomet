@@ -33,8 +33,9 @@
 
 use tomet_ast::{
     Block, Connect, Data, Document, Element, Entry, Group, Id, Inline, InterpExpr, List, ListItem,
-    Paragraph, Span, Text, Value,
+    Paragraph, Text, Value,
 };
+use tomet_span::Span;
 use tomet_expr::{EvalContext, EvalValue, Note, evaluate, evaluate_data};
 use tomet_tree::list_item;
 

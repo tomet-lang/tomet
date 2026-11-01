@@ -1,6 +1,7 @@
 //! A declaration as the readers see it, whichever document it was written in.
 
-use tomet_ast::{Document, Span, Value};
+use tomet_ast::{Document, Value};
+use tomet_span::Span;
 
 use crate::kind::DeclKind;
 

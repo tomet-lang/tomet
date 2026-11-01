@@ -18,9 +18,9 @@ does not relax the rule to fit the change it wanted to make.
   guard: { twrit: layers }
 
   layers: {
-    7: list( "crates/tomet", "apps/*", "bindings/*", "editors/*", "tests", "benches" )
-    6: list( "crates/tomet-workspace*", "crates/tomet-load*" )
-    5: list(
+    8: list( "crates/tomet", "apps/*", "bindings/*", "editors/*", "tests", "benches" )
+    7: list( "crates/tomet-workspace*", "crates/tomet-load*" )
+    6: list(
       "crates/tomet-format*",
       "crates/tomet-convert*",
       "crates/tomet-extract*",
@@ -33,10 +33,11 @@ does not relax the rule to fit the change it wanted to make.
       "crates/tomet-spec",
       "crates/tomet-vault"
       )
-    4: list( "crates/tomet-config*", "crates/tomet-spec-derive" )
-    3: list( "crates/tomet-validator*" )
-    2: list( "crates/tomet-semantics*", "crates/cotomet" )
-    1: list( "crates/tomet-syntax-*", "crates/cotomet-syntax", "crates/serde_cotomet" )
+    5: list( "crates/tomet-config*", "crates/tomet-spec-derive" )
+    4: list( "crates/tomet-validator*" )
+    3: list( "crates/tomet-semantics*", "crates/cotomet" )
+    2: list( "crates/tomet-syntax-*", "crates/cotomet-syntax", "crates/serde_cotomet" )
+    1: list( "crates/tomet-base-*" )
     0: list( "crates/tree-sitter-tomet", "crates/tree-sitter-cotomet" )
   }
 }

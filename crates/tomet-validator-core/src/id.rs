@@ -1,4 +1,5 @@
-use tomet_ast::{Block, Connect, Data, Document, Element, Entry, Group, Inline, List, Span, Value};
+use tomet_ast::{Block, Connect, Data, Document, Element, Entry, Group, Inline, List, Value};
+use tomet_span::Span;
 
 /// Walks every node in `doc` and returns `(id, span)` for each
 /// [`Element::id`]/[`Section::id`] found, in document order.

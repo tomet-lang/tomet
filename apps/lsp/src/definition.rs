@@ -1,7 +1,8 @@
 use lsp_types::{GotoDefinitionResponse, Location, Position, Uri};
 use tomet_ast::{
-    Block, Connect, Document, Element, Inline, InterpExpr, InterpExprKind, List, Span, Value,
+    Block, Connect, Document, Element, Inline, InterpExpr, InterpExprKind, List, Value,
 };
+use tomet_span::Span;
 use tomet_semantics::TargetScheme;
 use tomet_tree::{for_each_element, for_each_interpolation};
 

@@ -6,9 +6,10 @@
 //! =[ Design Policy ]
 //!
 //! - (Pure Data Models & Structural Accessors Only)
-//!   | `tomet-ast` is the foundational dependency-free crate referenced across the workspace.
+//!   | `tomet-ast` is the foundational AST crate referenced across the workspace,
+//!   | depending only on `tomet-span`, `serde`, and `unicode-width`.
 //!   | It contains only struct/enum definitions and pure inherent methods for construction
-//!   | (`new`, `with_*`) and structural inspection (`as_str()`, `get()`, `is_null()`, `Span::union()`).
+//!   | (`new`, `with_*`) and structural inspection (`as_str()`, `get()`, `is_null()`).
 //! - (A Node's Role Is Its Type)
 //!   | A `${...}` is an [`Interpolation`] (an expression and a span), not an [`Element`]:
 //!   | it has no name, no groups and no connects, so it is a variant of [`Block`],
@@ -34,7 +35,7 @@
 //!   | Formatting & Printing: Serialization to `.tmt` text lives in `tomet-style` and `tomet-printer`.
 //!   | Validation: Field formatting and lint validation live in `tomet-validator`.
 //! - (Span Equality Contract)
-//!   | `Span` implements a custom `PartialEq` that always returns `true` so that structural
+//!   | [`Span`] implements a custom `PartialEq` that always returns `true` so that structural
 //!   | equality comparisons (`assert_eq!(doc1, doc2)`) ignore source positions. Use
 //!   | [`Span::exact_eq()`] when exact source position comparisons are required.
 
@@ -42,73 +43,7 @@
 
 use serde::{Deserialize, Serialize};
 use std::fmt::{self, Write as _};
-
-pub mod cst_ast;
-pub use cst_ast::*;
-
-/// A source span: a range of byte offsets into the text it was parsed from.
-///
-/// A span deliberately holds no line or column. Those are a view of the source
-/// text, not a property of the node, and computing them while parsing made
-/// every node cost a rescan of everything before it. Resolve them on demand
-/// with `tomet_lexer::LineIndex`.
-///
-/// Note: [`PartialEq`] is implemented to always return `true` so that AST
-/// structural equality checks (e.g. `assert_eq!(doc1, doc2)`) compare node
-/// content and semantics without failing on source location differences.
-/// Use [`exact_eq`](Self::exact_eq) or direct field comparison when exact
-/// byte offsets need to be validated.
-///
-/// `Hash` is deliberately *not* derived: a derived impl would hash the real
-/// `start`/`end` offsets while `PartialEq` above always returns `true`,
-/// so two "equal" `Span`s could hash differently -- a Hash/Eq contract
-/// violation that breaks `HashMap`/`HashSet` lookups. Don't re-add it
-/// without also reconciling it with the custom equality above.
-#[derive(Debug, Clone, Copy, Eq, Default, Serialize, Deserialize)]
-pub struct Span {
-    /// Byte offset of the first byte.
-    pub start: usize,
-    /// Byte offset one past the last byte.
-    pub end: usize,
-}
-
-impl Span {
-    pub fn new(start: usize, end: usize) -> Self {
-        Self { start, end }
-    }
-
-    pub fn dummy() -> Self {
-        Self::default()
-    }
-
-    /// Returns `true` if this span represents a default/dummy span with zero offsets.
-    pub fn is_dummy(&self) -> bool {
-        self.start == 0 && self.end == 0
-    }
-
-    pub fn exact_eq(&self, other: &Self) -> bool {
-        self.start == other.start && self.end == other.end
-    }
-
-    /// Combines two spans into a single span spanning from `self.start` to `other.end`.
-    pub fn union(&self, other: &Self) -> Self {
-        Self {
-            start: self.start,
-            end: other.end,
-        }
-    }
-
-    /// Returns `true` if the given byte offset falls within this span (`start..=end`).
-    pub fn contains_offset(&self, offset: usize) -> bool {
-        self.start <= offset && offset <= self.end
-    }
-}
-
-impl PartialEq for Span {
-    fn eq(&self, _other: &Self) -> bool {
-        true
-    }
-}
+use tomet_span::Span;
 
 /// A pure data value: the subset of Tomet with a direct serde
 /// equivalent (no headings, prose, or links).
@@ -1298,26 +1233,4 @@ pub enum Literal {
     String(String),
     Bool(bool),
     Null,
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_span() {
-        let span = Span::new(0, 9);
-
-        assert!(!span.is_dummy());
-        assert!(span.contains_offset(0));
-        assert!(span.contains_offset(5));
-        assert!(span.contains_offset(9));
-        assert!(!span.contains_offset(10));
-
-        let dummy = Span::dummy();
-        assert!(dummy.is_dummy());
-
-        assert_eq!(span, dummy);
-        assert!(!span.exact_eq(&dummy));
-    }
 }

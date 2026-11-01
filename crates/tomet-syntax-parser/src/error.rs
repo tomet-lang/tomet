@@ -18,7 +18,7 @@ impl Error {
     /// once, on the error that actually escapes.
     pub fn located_in(mut self, src: &str) -> Self {
         if self.line == 0 {
-            let at = tomet_lexer::LineIndex::new(src).line_col(self.offset);
+            let at = tomet_position::LineIndex::new(src).line_col(self.offset);
             self.line = at.line;
             self.column = at.column;
         }

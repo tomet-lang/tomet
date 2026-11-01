@@ -104,7 +104,8 @@ fn list_to_plain(list: &List) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tomet_ast::{Name, Paragraph, Span, Text};
+    use tomet_ast::{Name, Paragraph, Text};
+    use tomet_span::Span;
     use tomet_tree::element_new;
 
     #[test]

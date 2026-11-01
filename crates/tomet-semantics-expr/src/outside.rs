@@ -10,7 +10,8 @@
 //! sorted here, and a test holds the sorting to the list of functions, so a function added there
 //! has to be given a verdict here.
 
-use tomet_ast::{Document, InterpExpr, InterpExprKind, Literal, Span};
+use tomet_ast::{Document, InterpExpr, InterpExprKind, Literal};
+use tomet_span::Span;
 
 use crate::address;
 

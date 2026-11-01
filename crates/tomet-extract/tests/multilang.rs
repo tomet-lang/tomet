@@ -1,6 +1,6 @@
 use std::path::Path;
 use tomet_extract::{CommentKind, collect_comment_elements};
-use tomet_lexer::{LineCol, LineIndex};
+use tomet_position::{LineCol, LineIndex};
 
 /// Where a byte offset of the original source is, as a line and column.
 fn line_col(src: &str, offset: usize) -> LineCol {

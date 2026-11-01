@@ -11,7 +11,8 @@ use crate::value::{
     Embedded, POSITIONAL_ENTRY_KEY, eat_scalar_raw, err, parse_quoted, skip_block_comment,
     skip_inline_ws, skip_line_comment, skip_ws_newlines_and_comments,
 };
-use tomet_ast::{Bare, Block, Connect, Data, Entry, Group, Id, Placement, Span, Value};
+use tomet_ast::{Bare, Block, Connect, Data, Entry, Group, Id, Placement, Value};
+use tomet_span::Span;
 use tomet_cst::{SyntaxKind as K, SyntaxNode};
 use tomet_lexer::Cursor;
 use tomet_tree::ElementExt;

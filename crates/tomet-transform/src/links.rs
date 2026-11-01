@@ -1,6 +1,7 @@
 use std::path::{Path, PathBuf};
 
-use tomet_ast::{Block, Document, Element, Inline, Paragraph, Span, Text, Value};
+use tomet_ast::{Block, Document, Element, Inline, Paragraph, Text, Value};
+use tomet_span::Span;
 use tomet_semantics::{
     ElementKind, TargetScheme, classify_std_lenient, link_target, target_scheme,
 };

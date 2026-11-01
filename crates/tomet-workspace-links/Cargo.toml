@@ -16,6 +16,7 @@ cache = ["dep:directories", "dep:rusqlite"]
 [dependencies]
 tomet-address = { workspace = true }
 tomet-ast = { workspace = true }
+tomet-span = { workspace = true }
 tomet-config = { workspace = true }
 tomet-indexer = { workspace = true }
 tomet-parser = { workspace = true }

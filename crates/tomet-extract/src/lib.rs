@@ -24,7 +24,8 @@ use std::path::{Path, PathBuf};
 
 pub use comment::{ExtractOptions, extract_comments};
 pub use lang::Language;
-use tomet_ast::{Document, Element, Span};
+use tomet_ast::{Document, Element};
+use tomet_span::Span;
 use tomet_parser::Error as ParseError;
 
 /// The kind of comment in source code.
@@ -65,7 +66,7 @@ pub struct LineOrigin {
 /// Everything is a byte offset: a [`Span`] from parsing `text` points into
 /// `text`, [`map_span`](Self::map_span) turns it into a span of the original
 /// file, and the caller resolves a line and column from the file with a
-/// `tomet_lexer::LineIndex` when it has to show one.
+/// `tomet_position::LineIndex` when it has to show one.
 #[derive(Debug, Clone)]
 pub struct CommentSourceMap {
     /// The path to the source file.

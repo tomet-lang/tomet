@@ -9,6 +9,7 @@ repository.workspace = true
 [dependencies]
 serde = { workspace = true }
 tomet-ast = { workspace = true }
+tomet-span = { workspace = true }
 tomet-tree = { workspace = true }
 
 [dev-dependencies]

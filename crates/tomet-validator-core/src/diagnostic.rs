@@ -1,8 +1,8 @@
 use serde::{Deserialize, Serialize};
 use std::fmt;
-use tomet_ast::Span;
+use tomet_span::Span;
 use tomet_cst::TextRange;
-use tomet_lexer::LineIndex;
+use tomet_position::LineIndex;
 
 /// How much a [`Diagnostic`] matters.
 ///

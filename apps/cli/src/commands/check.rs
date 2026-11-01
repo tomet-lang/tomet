@@ -2,7 +2,7 @@ use std::io::{self, Write};
 use std::path::Path;
 
 use rayon::prelude::*;
-use tomet_lexer::LineIndex;
+use tomet_position::LineIndex;
 use tomet_load::{Findings, is_error};
 use tomet_validator::Diagnostic;
 
@@ -107,7 +107,7 @@ pub(crate) fn check(path: &Path, data: bool, quiet: bool, json: bool) -> anyhow:
             };
 
             let findings = vault.findings(file, &doc);
-            let index = tomet_lexer::LineIndex::new(&src);
+            let index = LineIndex::new(&src);
             let warnings = findings.warnings();
             let has_errors = findings.has_errors();
             let Findings {
@@ -315,7 +315,7 @@ fn check_ctmt(file: &Path, src: &str, json: bool) -> CheckFileResult {
             .collect(),
     };
 
-    let index = tomet_lexer::LineIndex::new(src);
+    let index = LineIndex::new(src);
     let warnings = diagnostics.iter().filter(|d| !is_error(d)).count();
     let has_errors = diagnostics.iter().any(is_error) || !eval_errors.is_empty();
 

@@ -9,7 +9,9 @@ repository.workspace = true
 [dependencies]
 tomet-ast = { workspace = true }
 tomet-cst = { workspace = true }
+tomet-span = { workspace = true }
 tomet-lexer = { workspace = true }
+tomet-position = { workspace = true }
 tomet-tree = { workspace = true }
 cotomet-syntax = { workspace = true }
 

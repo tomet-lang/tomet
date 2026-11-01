@@ -7,5 +7,5 @@ license.workspace = true
 repository.workspace = true
 
 [dependencies]
-tomet-ast = { workspace = true }
+tomet-span = { workspace = true }
 tomet-cst = { workspace = true }

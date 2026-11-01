@@ -2235,7 +2235,7 @@ mod tests {
 
     #[test]
     fn typed_wrappers_walk_the_tree() {
-        use tomet_ast::{AstNode, CstRoot};
+        use tomet_cst::{AstNode, CstRoot};
 
         let src = "=[ A ]{ id: a }\n==[ B ]\n@x(\"k:1\": v, n: 2)\n";
         let root = CstRoot::cast(parse_cst(src)).unwrap();
@@ -2258,7 +2258,7 @@ mod tests {
         let el = b
             .syntax()
             .descendants()
-            .find_map(tomet_ast::CstBlockElement::cast)
+            .find_map(tomet_cst::CstBlockElement::cast)
             .unwrap();
         let entries: Vec<_> = el
             .args()

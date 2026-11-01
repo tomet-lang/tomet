@@ -1,6 +1,7 @@
 //! Values that are trees: what `link` builds.
 
-use tomet_ast::{Block, Inline, Name, Paragraph, Span, Value};
+use tomet_ast::{Block, Inline, Name, Paragraph, Value};
+use tomet_span::Span;
 use tomet_tree::element_new;
 
 use super::error::EvalError;

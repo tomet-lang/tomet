@@ -1,6 +1,6 @@
 //! Typed AST wrappers over Rowan's [`SyntaxNode`].
 
-use tomet_cst::{SyntaxKind, SyntaxNode, SyntaxToken, TextRange};
+use crate::{SyntaxKind, SyntaxNode, SyntaxToken, TextRange};
 
 pub trait AstNode: Clone {
     fn can_cast(kind: SyntaxKind) -> bool;
