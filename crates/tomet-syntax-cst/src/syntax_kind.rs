@@ -114,6 +114,11 @@ pub enum SyntaxKind {
     /// `EMPHASIS` or a `CODE_SPAN`, and stands bare among the text. That is why the two are not
     /// wrapped alike.
     SLOT,
+    /// A mistake the tree keeps instead of refusing: the tree never fails, lowering turns the node
+    /// into an error with the same message and offset. Two are made today: a group of a kind the
+    /// element already has, written against the last one (the node holds the group, read as the
+    /// kind it looks like), and the rest of the line after a `::` declaration (a declaration
+    /// stands alone).
     ERROR,
 
     // Must be the last variant
