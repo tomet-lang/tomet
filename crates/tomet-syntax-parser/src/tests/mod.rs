@@ -24,54 +24,6 @@ use tomet_ast::{
     Paragraph, Placement, SoftBreak, Span, Value,
 };
 
-/// `parse_document`, and whenever it reads a document, a check that lowering the CST
-/// of the same text gives the same tree: every string these tests parse is also a
-/// case for lowering, edge cases and odd syntax included. A construct lowering does
-/// not read yet is skipped, not failed.
-fn parse_document(src: &str) -> crate::Result<tomet_ast::Document> {
-    let parsed = crate::parse_document(src);
-    if let Ok(document) = &parsed {
-        match crate::lower_document(src, &crate::parse_cst(src)) {
-            Ok(lowered) => assert_eq!(&lowered, document, "lowering differs for {src:?}"),
-            Err(e) if e.message.starts_with(crate::UNSUPPORTED) => {}
-            Err(e) => panic!("lowering failed for {src:?}: {e}"),
-        }
-    }
-    // A document the AST parser rejects is rejected by lowering, with the same
-    // message at the same place.
-    if let Err(expected) = &parsed {
-        match crate::lower_document(src, &crate::parse_cst(src)) {
-            Ok(_) => panic!("the AST parser rejects {src:?} ({expected}), lowering reads it"),
-            Err(e) => assert_eq!(
-                (&e.message, e.offset),
-                (&expected.message, expected.offset),
-                "the two errors for {src:?} differ"
-            ),
-        }
-    }
-    parsed
-}
-
-/// [`parse_document`] above, for a pattern: the same two-way check against lowering.
-fn parse_pattern(src: &str) -> crate::Result<tomet_ast::Document> {
-    let parsed = crate::parse_pattern(src);
-    let lowered = crate::lower_pattern(src, &crate::parse_cst_pattern(src));
-    match (&parsed, lowered) {
-        (Ok(document), Ok(lowered)) => assert_eq!(&lowered, document, "lowering differs for {src:?}"),
-        (Ok(_), Err(e)) if e.message.starts_with(crate::UNSUPPORTED) => {}
-        (Ok(_), Err(e)) => panic!("lowering failed for {src:?}: {e}"),
-        (Err(expected), Err(e)) => assert_eq!(
-            (&e.message, e.offset),
-            (&expected.message, expected.offset),
-            "the two errors for {src:?} differ"
-        ),
-        (Err(expected), Ok(_)) => {
-            panic!("the AST parser rejects {src:?} ({expected}), lowering reads it")
-        }
-    }
-    parsed
-}
-
 /// A `SoftBreak` for test expectations -- span never matters, `Span`'s
 /// `PartialEq` always returns `true` (see its own doc comment).
 fn sb() -> Inline {

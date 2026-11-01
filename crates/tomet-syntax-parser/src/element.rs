@@ -1,18 +1,20 @@
-//! Parsing for elements (`@name`, bare elements, colon connect syntax).
+//! What opens an element, and the values a group holds.
+//!
+//! Where an element starts and what makes `@` a sigil rather than a character
+//! ([`is_element_start`]), which characters open a group ([`opens_group`]), and
+//! the readers of the groups' values: `(args)` ([`parse_paren_value`]), `{value}`
+//! ([`parse_value_group`]) and `#(id)` ([`parse_hash_id`]). They read the text of
+//! a group; the shape of what a group embeds is the CST's (see [`Embedded`]).
 
 use crate::dialect::Dialect;
 use crate::error::Result;
-use crate::inline::{Stop, at_line_start, parse_inline_seq};
-use crate::section::merge_values;
+use crate::inline::at_line_start;
 use crate::value::{
-    POSITIONAL_ENTRY_KEY, eat_name, eat_scalar_raw, err, is_name_start_at, parse_one_entry,
-    parse_quoted, parse_value_at, skip_block_comment, skip_inline_ws, skip_line_comment,
-    skip_ws_newlines_and_comments,
+    Embedded, POSITIONAL_ENTRY_KEY, eat_name, eat_scalar_raw, err, is_name_start_at, parse_quoted,
+    skip_block_comment, skip_inline_ws, skip_line_comment, skip_ws_newlines_and_comments,
 };
-use tomet_ast::{
-    Bare, Block, Connect, Data, Declaration, Element, Entry, Group, Hole, Id, Inline, Name,
-    Placement, Span, Value,
-};
+use tomet_ast::{Bare, Block, Connect, Data, Entry, Group, Id, Placement, Span, Value};
+use tomet_cst::{SyntaxKind as K, SyntaxNode};
 use tomet_lexer::Cursor;
 use tomet_tree::ElementExt;
 
@@ -93,7 +95,7 @@ fn name_and_tail_start(mut look: Cursor, block_context: bool) -> bool {
             return true;
         }
     }
-    skip_lookahead_gap(&mut look);
+    skip_element_gap(&mut look);
     if opens_group(&look) {
         return true;
     }
@@ -110,31 +112,6 @@ fn name_and_tail_start(mut look: Cursor, block_context: bool) -> bool {
         return is_name_start_at(&after_colon);
     }
     false
-}
-
-/// Whether the element starting at `cur` is the whole of its line: nothing but
-/// whitespace and comments follows it. Such a line is a block of its own, when
-/// the line after it does not fold into it (`;`, a blank line, ...); anything
-/// else after the element makes it running text.
-///
-/// The element is parsed speculatively on a copy of the cursor and the
-/// copy is thrown away -- the same probe `eat_list_marker_with_indent`
-/// uses for a list marker's `(...)` form.
-pub(crate) fn element_stands_alone(dialect: Dialect, cur: &Cursor) -> bool {
-    let mut probe = *cur;
-    if parse_written(dialect, &mut probe, true, &[]).is_err() {
-        return false;
-    }
-    skip_inline_ws(&mut probe);
-    while probe.starts_with("//") || probe.starts_with("/*") {
-        if probe.starts_with("//") {
-            skip_line_comment(&mut probe);
-        } else if skip_block_comment(&mut probe).is_err() {
-            return false;
-        }
-        skip_inline_ws(&mut probe);
-    }
-    matches!(probe.peek(), None | Some('\n') | Some('\r'))
 }
 
 fn skip_element_gap(cur: &mut Cursor) -> u8 {
@@ -167,52 +144,6 @@ fn skip_element_gap(cur: &mut Cursor) -> u8 {
     newlines
 }
 
-fn skip_lookahead_gap(cur: &mut Cursor) {
-    skip_element_gap(cur);
-}
-
-/// `allow_colon_connect` gates the `:(...)`/`:{...}`/`:name(...)` connect
-/// branch in [`parse_groups_with_pipe_stack`] (a bare, colon-less
-/// trailing group is *always* claimed regardless -- see
-/// `docs/spec/syntax.tmt`'s `::meta(format:yaml) {...}` example, real
-/// usage that must keep working). Every context that reaches a sigil's
-/// own top-level groups passes `true`: a list item's own groups used to
-/// pass `false` (no `connects` field to put a named one in), but
-/// `element_list_item` now takes `connects` too, so there is no longer a
-/// context that needs the connect branch half-enabled.
-pub(crate) fn parse_element_with_pipe_stack(
-    dialect: Dialect,
-    cur: &mut Cursor,
-    allow_colon_connect: bool,
-    parent_pipe_stack: &[usize],
-) -> Result<Element> {
-    let start_pos = cur.pos();
-    if !cur.eat_str("@") {
-        return Err(err(cur.pos(), "expected '@'"));
-    }
-    let Some(name) = eat_name(cur) else {
-        return Err(err(cur.pos(), "expected an element name after '@'"));
-    };
-
-    let mut read = Groups::default();
-    parse_groups_with_pipe_stack(
-        dialect,
-        cur,
-        &mut read,
-        allow_colon_connect,
-        parent_pipe_stack,
-    )?;
-    Ok(Element {
-        name,
-        placement: Placement::Inline,
-        data: read.data,
-        content: read.content,
-        id: read.id,
-        connects: read.connects,
-        span: cur.span_from(start_pos),
-    })
-}
-
 /// What [`parse_groups`] reads: the groups every node takes, before the node
 /// that owns them claims the ones it accepts.
 ///
@@ -226,125 +157,6 @@ pub(crate) struct Groups {
     pub content: Option<Vec<Block>>,
     pub id: Option<Id>,
     pub connects: Vec<Connect>,
-}
-
-/// What `@name...` -- or, in a pattern, `?matcher...` -- reads into.
-pub(crate) enum Written {
-    Element(Element),
-    Hole(Hole),
-}
-
-impl Written {
-    pub(crate) fn with_placement(self, placement: Placement) -> Self {
-        match self {
-            Written::Element(el) => Written::Element(el.with_placement(placement)),
-            Written::Hole(mut hole) => {
-                hole.placement = placement;
-                Written::Hole(hole)
-            }
-        }
-    }
-
-    pub(crate) fn span(&self) -> Span {
-        match self {
-            Written::Element(el) => el.span,
-            Written::Hole(hole) => hole.span,
-        }
-    }
-
-    pub(crate) fn into_block(self) -> Block {
-        match self {
-            Written::Element(el) => Block::Element(el),
-            Written::Hole(hole) => Block::Hole(hole),
-        }
-    }
-
-    pub(crate) fn into_inline(self) -> Inline {
-        match self {
-            Written::Element(el) => Inline::Element(el),
-            Written::Hole(hole) => Inline::Hole(hole),
-        }
-    }
-
-    pub(crate) fn into_entry(self) -> Entry {
-        match self {
-            Written::Element(el) => Entry::Element(el),
-            Written::Hole(hole) => Entry::Hole(hole),
-        }
-    }
-
-    pub(crate) fn into_value(self) -> Value {
-        match self {
-            Written::Element(el) => Value::Element(Box::new(el)),
-            Written::Hole(hole) => Value::Hole(Box::new(hole)),
-        }
-    }
-}
-
-/// An element, or a hole when `cur` is at a `?` in a pattern.
-pub(crate) fn parse_written(
-    dialect: Dialect,
-    cur: &mut Cursor,
-    allow_colon_connect: bool,
-    parent_pipe_stack: &[usize],
-) -> Result<Written> {
-    if dialect == Dialect::Pattern && cur.peek() == Some('?') {
-        return parse_hole(dialect, cur, parent_pipe_stack).map(Written::Hole);
-    }
-    parse_element_with_pipe_stack(dialect, cur, allow_colon_connect, parent_pipe_stack)
-        .map(Written::Element)
-}
-
-/// A hole, `?matcher(name, args){options}[content]#(id)`. The matcher is
-/// optional (`?()`, `?(n)[...]`) and the groups are the ones every other node
-/// reads. A hole has no connect form, so a `:name` after it is not read.
-fn parse_hole(dialect: Dialect, cur: &mut Cursor, parent_pipe_stack: &[usize]) -> Result<Hole> {
-    let start_pos = cur.pos();
-    cur.eat_str("?");
-    let matcher = eat_name(cur);
-    let mut read = Groups::default();
-    parse_groups_with_pipe_stack(dialect, cur, &mut read, false, parent_pipe_stack)?;
-    Ok(Hole {
-        matcher,
-        placement: Placement::Inline,
-        data: read.data,
-        content: read.content,
-        id: read.id,
-        span: cur.span_from(start_pos),
-    })
-}
-
-/// A declaration, `::name(args){data}[content]#(id)`. The caller has seen
-/// [`is_document_element_start`].
-///
-/// Its groups are read by the same [`parse_groups`] an element's are; what a
-/// declaration does not take, a `:connect`, is refused after the read.
-pub(crate) fn parse_declaration(
-    dialect: Dialect,
-    cur: &mut Cursor,
-    parent_pipe_stack: &[usize],
-) -> Result<Declaration> {
-    let start_pos = cur.pos();
-    cur.eat_str("::");
-    let Some(name) = eat_name(cur) else {
-        return Err(err(cur.pos(), "expected a declaration name after '::'"));
-    };
-    let mut read = Groups::default();
-    parse_groups_with_pipe_stack(dialect, cur, &mut read, true, parent_pipe_stack)?;
-    let span = cur.span_from(start_pos);
-    if !read.connects.is_empty() {
-        return Err(err(
-            start_pos,
-            "a `::` declaration takes no `:connect`: a connect belongs to an element",
-        ));
-    }
-    Ok(Declaration {
-        name,
-        data: read.data,
-        content: read.content,
-        id: read.id,
-        span,
-    })
 }
 
 /// The characters that open one of an element's groups.
@@ -385,460 +197,10 @@ pub(crate) fn opens_group(cur: &Cursor) -> bool {
     }
 }
 
-/// Reads an element's `(args)`, `[content]` and `{value}` groups -- in any
-/// order, each at most once -- plus the colon-connect form.
-///
-/// Split out of [`parse_element`] because a sigil is a sigil: `-` and `=`
-/// take the same groups as `@name` and must not grow a second, subtly
-/// different implementation of this. `[content]` stops at its closing
-/// bracket rather than at end of line, and `|content` -- the same group
-/// without the brackets -- stops at the end of its marked run, so either
-/// spelling may span lines. Only the bracket-less *sugar* body
-/// (`parse_sugar_body`, the `- x` and `= x` forms) is still one line.
-pub(crate) fn parse_groups(
-    dialect: Dialect,
+pub(crate) fn parse_paren_value(
+    hook: &mut impl cotomet_syntax::ValueHook,
     cur: &mut Cursor,
-    read: &mut Groups,
-    allow_colon_connect: bool,
-) -> Result<()> {
-    parse_groups_with_pipe_stack(dialect, cur, read, allow_colon_connect, &[])
-}
-
-pub(crate) fn parse_groups_with_pipe_stack(
-    dialect: Dialect,
-    cur: &mut Cursor,
-    read: &mut Groups,
-    allow_colon_connect: bool,
-    parent_pipe_stack: &[usize],
-) -> Result<()> {
-    loop {
-        let checkpoint = cur.pos();
-        let newlines = skip_element_gap(cur);
-        if newlines <= 1 {
-            let colon_pos = cur.pos();
-            // `::` is a declaration's sigil, not a connect that starts with a colon
-            if allow_colon_connect && !cur.starts_with("::") && cur.eat_str(":") {
-                skip_inline_ws(cur);
-                // `:name(...)` -- a connect, not the bare merge below. A
-                // name is checked for *before* `(`/`{` so this wins the
-                // ambiguity: a name right after `:` can never be the
-                // start of a bare merge's own group. Read with the same
-                // `parse_groups` every other sigil uses, so a connect
-                // takes `(args)`/`[content]`/`{value}` in any order just
-                // like `@name` does -- but with `allow_colon_connect:
-                // false`, so it does not itself swallow a *sibling*
-                // `:xxx(...)`; that is left for this same loop's next
-                // iteration, which is what turns `@x():as(y):rule(z)`
-                // into two flat `connects` entries rather than one
-                // nested inside the other.
-                if is_name_start_at(cur) {
-                    let name = eat_name(cur).expect("is_name_start_at just confirmed a name");
-                    let mut connect_read = Groups::default();
-                    parse_groups_with_pipe_stack(
-                        dialect,
-                        cur,
-                        &mut connect_read,
-                        false,
-                        parent_pipe_stack,
-                    )?;
-                    let span = cur.span_from(colon_pos);
-                    read.connects.push(into_connect(name, connect_read, span)?);
-                    continue;
-                }
-                match cur.peek() {
-                    Some('(') => {
-                        let conn_args = parse_paren_value(dialect, cur)?;
-                        read.data.args = merge_values(read.data.args.as_ref(), Some(&conn_args));
-                        continue;
-                    }
-                    Some('{') => {
-                        let conn_val = parse_value_group(dialect, cur)?;
-                        // Connect merges pairs into an existing group; a
-                        // group holding elements is replaced wholesale,
-                        // as there is nothing to merge key-wise.
-                        let merged = match (&read.data.value, &conn_val) {
-                            (Some(existing), Group(_))
-                                if !existing.has_children() && !conn_val.has_children() =>
-                            {
-                                merge_values(Some(&existing.as_data()), Some(&conn_val.as_data()))
-                                    .map(Group::from_map)
-                            }
-                            _ => None,
-                        };
-                        read.data.value = Some(merged.unwrap_or(conn_val));
-                        continue;
-                    }
-                    _ => {}
-                }
-            }
-            match cur.peek() {
-                Some('(') if read.data.args.is_none() => {
-                    read.data.args = Some(parse_paren_value(dialect, cur)?);
-                    continue;
-                }
-                Some('[') if read.content.is_none() => {
-                    read.content = Some(parse_content(dialect, cur)?);
-                    continue;
-                }
-                // `|` is `[` without the brackets -- same slot, closed by
-                // the end of the marked run instead of by `]`.
-                Some('|') if read.content.is_none() => {
-                    let mut probe = *cur;
-                    let mut parent_ok = true;
-                    if newlines > 0 && !parent_pipe_stack.is_empty() {
-                        for &expected_col in parent_pipe_stack {
-                            skip_inline_ws(&mut probe);
-                            if probe.peek() != Some('|') {
-                                parent_ok = false;
-                                break;
-                            }
-                            let col = probe.column();
-                            if col != expected_col {
-                                parent_ok = false;
-                                break;
-                            }
-                            probe.bump();
-                        }
-                        skip_inline_ws(&mut probe);
-                    }
-                    if parent_ok && probe.peek() == Some('|') {
-                        *cur = probe;
-                        read.content = Some(parse_pipe_content(dialect, cur, parent_pipe_stack)?);
-                        continue;
-                    } else {
-                        cur.set_pos(checkpoint);
-                        break;
-                    }
-                }
-                Some('{') if read.data.value.is_none() => {
-                    read.data.value = Some(parse_value_group(dialect, cur)?);
-                    continue;
-                }
-                // `#(id)` -- a single slot, read after the three groups
-                // above. "Before any `:name(...)` connect" needs no
-                // explicit check here: a connect's own `#` arm (this
-                // same one, reached through its own recursive
-                // `parse_groups` call) always claims an adjacent `#(...)`
-                // first, so an id written after a connect never reaches
-                // this element. A connect takes no id, though, so
-                // [`into_connect`] then refuses it: the owner's id is
-                // written before the first connect.
-                Some('#') if read.id.is_none() && cur.peek_at(1) == Some('(') => {
-                    read.id = Some(parse_hash_id(cur)?);
-                    continue;
-                }
-                // A group whose slot is already filled. Every arm above
-                // guards on its slot being empty, so reaching here with an
-                // opener means a second one of the same kind. It used to
-                // fall through: the group was left where it stood and read
-                // as prose, which also cost the element its block
-                // placement, so `@memo(a: 1)(b: 2)` quietly became a
-                // paragraph. `docs/spec/syntax.tmt` calls it an error.
-                //
-                // `:` is the spelling for reaching a filled slot, and it
-                // merges rather than replaces -- see the connect branch
-                // above.
-                //
-                // Two things narrow this. The second group must be
-                // written *against* the first, with nothing skipped
-                // between them: `@file(x) (it was ...)` is an element and
-                // then a parenthesis in running prose, which `docs/.writ.tmt`
-                // and `tmtroot/agents.tmt` both do, and a `(` opening the
-                // next line is prose too. The spec's own example --
-                // `@xxx()(){}{}[][]` -- is adjacent, and adjacency is the
-                // only reading that leaves ordinary sentences alone.
-                //
-                // And `allow_colon_connect` is false in exactly the
-                // contexts where a trailing group may belong to something
-                // else -- an entry inside a `{...}` group -- where this
-                // fall-through is what hands it over.
-                _ if allow_colon_connect && cur.pos() == checkpoint && opens_group(cur) => {
-                    if cur.peek() == Some('#') {
-                        return Err(err(
-                            cur.pos(),
-                            "a second `#(...)`: an element takes at most one id",
-                        ));
-                    }
-                    let group = match cur.peek() {
-                        Some('(') => "(args)",
-                        Some('[') | Some('|') => "[content]",
-                        _ => "{value}",
-                    };
-                    return Err(err(
-                        cur.pos(),
-                        format!(
-                            "a second `{group}` group: an element takes one of each. \
-                             Write `:` in front of it to merge into the one already there"
-                        ),
-                    ));
-                }
-                _ => {}
-            }
-        }
-        cur.set_pos(checkpoint);
-        break;
-    }
-    Ok(())
-}
-
-/// Confirms inline content parsing, stopped at `stop`, actually lands
-/// exactly there rather than overshooting it -- see
-/// [`find_trailing_connect`]'s doc comment for why this can't just be
-/// trusted.
-fn content_lands_at(dialect: Dialect, cur: &Cursor, stop: usize) -> bool {
-    let mut probe = *cur;
-    parse_inline_seq(dialect, &mut probe, Stop::Offset(stop), false).is_ok() && probe.pos() == stop
-}
-
-/// Whether `el`'s own groups-read actually claimed anything -- used to
-/// tell a genuine connect apart from a trial parse that advanced the
-/// cursor (eating a `:` and a name) without ever finding a group to
-/// read. A named connect with nothing of its own still counts as
-/// "nothing", even though [`parse_groups_with_pipe_stack`] pushes it to
-/// `connects` unconditionally: otherwise ordinary prose ending in
-/// `word:word` (`...see note:more`) would read as a zero-argument
-/// `:more` connect merely because there happened to be nothing left
-/// after it to disagree.
-fn claimed_something(read: &Groups) -> bool {
-    read.data.args.is_some()
-        || read.content.is_some()
-        || read.data.value.is_some()
-        || read.id.is_some()
-        || read
-            .connects
-            .iter()
-            .any(|c| c.data.args.is_some() || c.content.is_some() || c.data.value.is_some())
-}
-
-/// The [`Connect`] a connect's groups were read into. A connect takes the
-/// three groups an element does and nothing more, so the `#(id)` slot, which
-/// the shared reader fills like any other, is refused here: an id written
-/// after a connect is not the owner's, and is not the connect's either.
-fn into_connect(name: Name, read: Groups, span: Span) -> Result<Connect> {
-    if read.id.is_some() {
-        return Err(err(
-            span.start,
-            "a `:connect` takes no `#(id)`: write the id of its owner before the first `:connect`",
-        ));
-    }
-    Ok(Connect {
-        name,
-        data: read.data,
-        content: read.content,
-        span,
-    })
-}
-
-/// Leftmost position on the current line where the rest of the line,
-/// read the same way [`parse_groups_with_pipe_stack`] reads any sigil's
-/// own groups, both claims something and lands exactly at the end of the
-/// line -- the trailing `#(id)`/`(args)`/`{value}`/`:name(...)` a
-/// bracket-less sugar body hands over to its owner (a list item or
-/// heading). Leftmost, not rightmost: a valid starting point reads every
-/// contiguous group from there to the end of the line in one pass, so
-/// the leftmost one that validates is always the full run (`#(id){value}`,
-/// not just whichever piece happens to follow a later candidate).
-///
-/// Candidates are every `(`, `{`, `#(` and `:` on the line -- a cheap
-/// forward scan -- each confirmed or rejected by actually parsing from
-/// there, the only way to know without duplicating
-/// `parse_groups_with_pipe_stack`'s own claiming logic. Three things
-/// narrow this to exactly the shapes that belong to the owner rather
-/// than to something else in the content:
-///
-/// - "Lands exactly at the end of the line" rejects a colon that's just
-///   part of ordinary prose (`see note: more text`): something would
-///   still be unconsumed after it.
-/// - [`claimed_something`] further rejects a colon at the very end of a
-///   line with nothing structured after it (`...note:more`) -- otherwise
-///   indistinguishable from plain text that happens to end in a word
-///   with a colon in front of it.
-/// - [`content_lands_at`] rejects a *colon-less* candidate that an inner
-///   element occupying the end of the content would itself reach past --
-///   `::meta(format:yaml) {...}` must still belong to `::meta`, not to
-///   this sugar body, the same real, existing usage a bare trailing
-///   group has always been claimed by first (`parse_groups_with_pipe_stack`'s
-///   colon branch doc comment). A colon-prefixed candidate can't suffer
-///   this: nothing within the content is ever parsed with a mode that
-///   lets it claim a colon connect for itself (`parse_sugar_body` always
-///   parses its own content with `allow_colon_connect: false`), so this
-///   check is cheap insurance there rather than load-bearing.
-pub(crate) fn find_trailing_connect(dialect: Dialect, cur: &Cursor) -> Option<usize> {
-    let src = cur.src();
-    let preceded_by_colon = |pos: usize| {
-        let bytes = src.as_bytes();
-        let mut i = pos;
-        while i > 0 && matches!(bytes[i - 1], b' ' | b'\t') {
-            i -= 1;
-        }
-        i > 0 && bytes[i - 1] == b':'
-    };
-    // Names are ASCII-only (`is_name_char`), so a raw byte compare is
-    // UTF-8-safe here: no continuation byte of a multi-byte character
-    // ever equals one of these.
-    let preceded_by_name_char = |pos: usize| {
-        pos > 0
-            && matches!(src.as_bytes()[pos - 1], b'a'..=b'z' | b'A'..=b'Z' | b'0'..=b'9' | b'_' | b'-')
-    };
-    let mut look = *cur;
-    let mut candidates = Vec::new();
-    while !look.is_eof() && !matches!(look.peek(), Some('\n') | Some('\r')) {
-        if look.peek() == Some(':') {
-            // Always a candidate -- and, unlike an opener, never itself
-            // excluded for being colon-preceded (`::` doesn't happen in
-            // practice, but there's no reason to special-case it away).
-            candidates.push(look.pos());
-            look.bump();
-            continue;
-        }
-        let is_hash_paren = look.peek() == Some('#') && look.peek_at(1) == Some('(');
-        // A *colonless* `(` is deliberately not a candidate opener here,
-        // unlike `{` -- parenthetical remarks are common, ordinary prose
-        // (`tmtroot/locales/ja/readme.tmt`'s own
-        // `...記号の渋滞 (LSP機能を大切に)` is exactly this), so treating
-        // every sentence that happens to end in `(...)` as the owner's
-        // own `args` would be far too eager. `(` only ever participates
-        // here through a `:` candidate, matching what the user actually
-        // writes (`:(...)`), never bare.
-        let is_opener = is_hash_paren || look.peek() == Some('{');
-        // A colon-preceded opener is already reachable by starting the
-        // trial right at that colon (which will itself eat the opener
-        // as part of the same read) -- adding the opener too would let
-        // a trial starting there "succeed" while leaving the colon
-        // itself dangling as unconsumed content text. A name-preceded
-        // one (the `(` of `rule(...)` in `:rule(allow:list)`) is the
-        // same problem one level removed: starting right at it reads a
-        // plain `(args)` group that happens to look valid on its own,
-        // leaving the name *and* its colon as unconsumed text instead
-        // of being read together as one `:name(...)` connect.
-        if is_opener && !preceded_by_colon(look.pos()) && !preceded_by_name_char(look.pos()) {
-            candidates.push(look.pos());
-        }
-        look.bump();
-        // `#(` is one unit: stepping past both here keeps the `(` from
-        // also being added as its own, separate (and wrong -- it would
-        // read as a plain `(args)` group instead of the id it's part
-        // of) candidate one character later.
-        if is_hash_paren {
-            look.bump();
-        }
-    }
-    // Leftmost first, not rightmost: a valid starting point reads every
-    // contiguous group from there to the end of the line in one go (the
-    // same loop any sigil's own groups use), so the leftmost one that
-    // validates always captures the full run (`#(id){value}`, not just
-    // whichever piece happens to follow a later candidate) --
-    // `list_item_sugar_reads_a_trailing_id_and_attrs_together` is
-    // exactly this: starting at the `{` alone would "succeed" too, but
-    // only by skipping straight past the `#(id)` in front of it.
-    candidates.into_iter().find(|&pos| {
-        let mut probe = *cur;
-        probe.set_pos(pos);
-        let mut scratch = Groups::default();
-        if parse_groups_with_pipe_stack(dialect, &mut probe, &mut scratch, true, &[]).is_err()
-            || !claimed_something(&scratch)
-        {
-            return false;
-        }
-        skip_inline_ws(&mut probe);
-        matches!(probe.peek(), None | Some('\n') | Some('\r'))
-            && content_lands_at(dialect, cur, pos)
-    })
-}
-
-/// What a bracket-less sugar body (`- x`, `= x`) found for its own
-/// `args`/`value`/`id`/`connects`, alongside its `content` -- merged
-/// into the caller's constructed item/heading exactly the way any other
-/// element's own slots are.
-pub(crate) struct SugarBody {
-    pub content: Vec<Inline>,
-    pub args: Option<Value>,
-    pub value: Option<Group>,
-    pub id: Option<Id>,
-    pub connects: Vec<Connect>,
-}
-
-impl SugarBody {
-    fn from_scratch(content: Vec<Inline>, scratch: Groups) -> Self {
-        SugarBody {
-            content,
-            args: scratch.data.args,
-            value: scratch.data.value,
-            id: scratch.id,
-            connects: scratch.connects,
-        }
-    }
-}
-
-/// Reads a bracket-less body: inline content to the end of the line,
-/// plus whatever trailing connect that line (or, failing that, the next
-/// one) hands over to its owner.
-///
-/// This is the sugar shared by `-` and `=`. The content itself is
-/// single-line on purpose: content that spans lines has to say so with
-/// an explicit `[ ... ]` group, which is what [`parse_groups`] reads.
-/// The trailing connect is not bound by that: once a line's content ends
-/// with nothing of the owner's own found on it,
-/// [`parse_groups_with_pipe_stack`] is tried again right there, which is
-/// what lets it tolerate the same single-blank-line gap every other
-/// sigil's groups do -- `- content` followed by `  :{}` on the next line
-/// connects exactly as `- content :{}` does on one.
-pub(crate) fn parse_sugar_body(dialect: Dialect, cur: &mut Cursor) -> Result<SugarBody> {
-    if let Some(connect_pos) = find_trailing_connect(dialect, cur) {
-        let content = parse_inline_seq(dialect, cur, Stop::Offset(connect_pos), false)?;
-        cur.set_pos(connect_pos);
-        let mut scratch = Groups::default();
-        parse_groups_with_pipe_stack(dialect, cur, &mut scratch, true, &[])?;
-        // `find_trailing_connect` only ever starts a candidate at `:`,
-        // `(`, `{` or `#(`, never at `[`/`|` -- but a *second*, colon-less
-        // group read further along the same candidate's run still could
-        // be (`:(x:1)[y]`, say). A bracket-less sugar body has nowhere
-        // of its own to put that `[...]`/`|...`, so treat it the same as
-        // not finding a connect at all rather than silently losing it.
-        if scratch.content.is_some() {
-            cur.set_pos(connect_pos);
-            let content = parse_inline_seq(dialect, cur, Stop::Line, false)?;
-            return Ok(SugarBody::from_scratch(content, Groups::default()));
-        }
-        return Ok(SugarBody::from_scratch(content, scratch));
-    }
-
-    // Plain content, nothing of the owner's own on this line -- try a
-    // trailing connect after a gap (the same single-blank-line tolerance
-    // `parse_groups` grants every other sigil) -- `- content` followed
-    // by `  :{}` on the next line connects exactly as `- content :{}`
-    // does on one.
-    let content = parse_inline_seq(dialect, cur, Stop::Line, false)?;
-    let after_content = cur.pos();
-    let mut scratch = Groups::default();
-    // Confirm what follows the gap is actually a connect opener before
-    // calling into the real reader: a bracket-less sugar body has no
-    // `content`/`children` field of its own to hold a `[...]`/`|...`
-    // group, but `parse_groups_with_pipe_stack`'s ordinary `[`/`|` arms
-    // fire unconditionally whenever a fresh scratch element's `content`
-    // slot is empty (which it always is here) -- so without this guard,
-    // a *following* pipe-marked list continuation (`current_stack`'s own
-    // next `|`, not this scratch's) would get silently read and
-    // discarded as if it belonged to this line instead. Only `:`,
-    // `(`, `{` and `#(` are the connect family; `[`/`|` are never routed
-    // here at all.
-    let mut probe = *cur;
-    let is_connect_opener = skip_element_gap(&mut probe) <= 1
-        && (matches!(probe.peek(), Some('(') | Some('{') | Some(':'))
-            || (probe.peek() == Some('#') && probe.peek_at(1) == Some('(')));
-    if is_connect_opener {
-        parse_groups_with_pipe_stack(dialect, cur, &mut scratch, true, &[])?;
-        // Same guard as above, for the same reason: a second, colon-less
-        // group within this gap-tolerant read could still reach `[`/`|`.
-        if scratch.content.is_some() {
-            cur.set_pos(after_content);
-            return Ok(SugarBody::from_scratch(content, Groups::default()));
-        }
-    }
-    Ok(SugarBody::from_scratch(content, scratch))
-}
-
-pub(crate) fn parse_paren_value(dialect: Dialect, cur: &mut Cursor) -> Result<Value> {
+) -> Result<Value> {
     if !cur.eat_str("(") {
         return Err(err(cur.pos(), "expected '('"));
     }
@@ -846,7 +208,7 @@ pub(crate) fn parse_paren_value(dialect: Dialect, cur: &mut Cursor) -> Result<Va
     let v = if cur.peek() == Some(')') {
         Value::Map(Vec::new())
     } else {
-        parse_value_at(dialect, cur)?
+        cotomet_syntax::parse_value_at_with(cur, hook)?
     };
     skip_ws_newlines_and_comments(cur);
     if !cur.eat_str(")") {
@@ -891,53 +253,6 @@ fn parse_id_scalar(cur: &mut Cursor) -> Result<String> {
     Ok(raw.to_string())
 }
 
-/// Parses a `|content` run as a block sequence -- identical to `[content]`,
-/// bounded by the end of the marked run instead of `]`.
-///
-/// Also what a `key: | prose` value is (`crate::value::TometValueHook`), so
-/// an element's trailing prose and a map entry's prose are one grammar.
-pub(crate) fn parse_pipe_content(
-    dialect: Dialect,
-    cur: &mut Cursor,
-    parent_stack: &[usize],
-) -> Result<Vec<Block>> {
-    let col = cur.column();
-    if !cur.eat_str("|") {
-        return Err(err(cur.pos(), "expected '|'"));
-    }
-    let mut current_stack = parent_stack.to_vec();
-    current_stack.push(col);
-    skip_inline_ws(cur);
-    crate::document::parse_block_seq(
-        dialect,
-        cur,
-        crate::document::BlockStop::Eof,
-        &current_stack,
-    )
-}
-
-/// Parses a `[content]` group as a block sequence -- the same recursive
-/// grammar `Document.blocks`/`Section.blocks` use (sections, lists,
-/// elements, paragraphs), bounded by the closing `]` instead of EOF. A bare
-/// run with no block markers inside comes out as a single `Paragraph`, so
-/// ordinary inline usage (`@link(...)[Tomet]`) is unaffected; see
-/// `tmtroot/docs/spec/feature/content-shape.tmt`.
-fn parse_content(dialect: Dialect, cur: &mut Cursor) -> Result<Vec<Block>> {
-    if !cur.eat_str("[") {
-        return Err(err(cur.pos(), "expected '['"));
-    }
-    let content = crate::document::parse_block_seq(
-        dialect,
-        cur,
-        crate::document::BlockStop::Bracket(']'),
-        &[],
-    )?;
-    if !cur.eat_str("]") {
-        return Err(err(cur.pos(), "expected ']'"));
-    }
-    Ok(content)
-}
-
 /// Parses a `{...}` value group.
 ///
 /// `{}` is always data: entries are read uniformly, each either a
@@ -959,7 +274,11 @@ fn parse_content(dialect: Dialect, cur: &mut Cursor) -> Result<Vec<Block>> {
 /// slot instead (`@tags(1, 2, 3)`, already a `Seq` there) -- there is no
 /// live spelling anywhere in the corpus that needs `{...}` itself to hold
 /// one.
-pub(crate) fn parse_value_group(dialect: Dialect, cur: &mut Cursor) -> Result<Group> {
+pub(crate) fn parse_value_group(
+    dialect: Dialect,
+    embedded: &mut Embedded,
+    cur: &mut Cursor,
+) -> Result<Group> {
     let group_start = cur.pos();
     if !cur.eat_str("{") {
         return Err(err(cur.pos(), "expected '{'"));
@@ -970,7 +289,7 @@ pub(crate) fn parse_value_group(dialect: Dialect, cur: &mut Cursor) -> Result<Gr
         match cur.peek() {
             None => return Err(err(group_start, "unterminated '{', expected '}'")),
             Some('}') => break,
-            Some('(') => entries.push(Entry::Bare(parse_bare_entry(dialect, cur)?)),
+            Some('(') => entries.push(Entry::Bare(parse_bare_entry(embedded, cur)?)),
             // A named entry, `@args{ ... }`. Unambiguous: `is_ident_char`
             // excludes `@`, so a map key cannot begin with one, and this
             // position errors today -- `eat_ident` returns empty and the
@@ -992,20 +311,33 @@ pub(crate) fn parse_value_group(dialect: Dialect, cur: &mut Cursor) -> Result<Gr
             // there is no paragraph here for a `;` to break or a line to
             // fold into: an element that is the whole of its line is a block.
             _ if is_element_start(dialect, cur, at_line_start(cur)) => {
-                let block = at_line_start(cur) && element_stands_alone(dialect, cur);
-                let written = parse_written(dialect, cur, false, &[])?;
-                entries.push(
-                    if block {
-                        written.with_placement(Placement::Block)
-                    } else {
-                        written
+                let at_start = at_line_start(cur);
+                let Some(node) = embedded.node_at(cur.pos()) else {
+                    return Err(err(cur.pos(), "an element the CST did not read here"));
+                };
+                let (value, end) = crate::lower::lower_embedded(embedded.src(), node)?;
+                cur.set_pos(end);
+                // The whole of its line: nothing but white space and comments after it.
+                let block = at_start && ends_its_line(cur);
+                let entry = match value {
+                    Value::Hole(mut hole) => {
+                        if block {
+                            hole.placement = Placement::Block;
+                        }
+                        Entry::Hole(*hole)
                     }
-                    .into_entry(),
-                );
+                    Value::Element(element) => Entry::Element(if block {
+                        (*element).with_placement(Placement::Block)
+                    } else {
+                        *element
+                    }),
+                    _ => unreachable!("lower_embedded of an element node"),
+                };
+                entries.push(entry);
             }
             _ => {
                 let entry_start = cur.pos();
-                let (key, value) = parse_one_entry(dialect, cur)?;
+                let (key, value) = cotomet_syntax::parse_one_entry_with(cur, embedded)?;
                 if key == POSITIONAL_ENTRY_KEY {
                     return Err(err(
                         entry_start,
@@ -1047,14 +379,49 @@ pub(crate) fn parse_value_group(dialect: Dialect, cur: &mut Cursor) -> Result<Gr
 ///
 /// `allow_colon_connect: false`, matching the named entry above -- there
 /// is no enclosing construct inside a group for a connect to reach.
-fn parse_bare_entry(dialect: Dialect, cur: &mut Cursor) -> Result<Bare> {
+fn parse_bare_entry(embedded: &Embedded, cur: &mut Cursor) -> Result<Bare> {
     let start_pos = cur.pos();
-    let mut read = Groups::default();
-    parse_groups(dialect, cur, &mut read, false)?;
+    let src = cur.src();
+    let mut groups: Vec<SyntaxNode> = Vec::new();
+    let mut end = start_pos;
+    loop {
+        let mut look = *cur;
+        if skip_element_gap(&mut look) > 1 {
+            break;
+        }
+        // Each group once: a second `(args)` is the next entry's.
+        let Some(node) = embedded.node_at(look.pos()).filter(|n| {
+            matches!(
+                n.kind(),
+                K::ARGS | K::VALUE_DATA | K::MAP_LITERAL | K::CONTENT | K::ID_GROUP
+            ) && !groups.iter().any(|taken| taken.kind() == n.kind())
+        }) else {
+            break;
+        };
+        end = usize::from(node.text_range().end());
+        cur.set_pos(end);
+        groups.push(node.clone());
+    }
+    let read = crate::lower::lower_group_list(src, groups)?;
     Ok(Bare {
         data: read.data,
         content: read.content,
         id: read.id,
-        span: cur.span_from(start_pos),
+        span: Span::new(start_pos, end),
     })
+}
+
+/// Whether nothing but white space and comments follows `cur` on its line.
+fn ends_its_line(cur: &Cursor) -> bool {
+    let mut probe = *cur;
+    skip_inline_ws(&mut probe);
+    while probe.starts_with("//") || probe.starts_with("/*") {
+        if probe.starts_with("//") {
+            skip_line_comment(&mut probe);
+        } else if skip_block_comment(&mut probe).is_err() {
+            return false;
+        }
+        skip_inline_ws(&mut probe);
+    }
+    matches!(probe.peek(), None | Some('\n') | Some('\r'))
 }

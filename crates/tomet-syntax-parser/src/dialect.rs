@@ -19,15 +19,3 @@ pub(crate) enum Dialect {
     /// A pattern: a document in which `?` makes a hole.
     Pattern,
 }
-
-impl Dialect {
-    /// Whether `c`, the character under the cursor, may open an element in
-    /// this dialect. A cheap first filter; `is_element_start` decides.
-    pub(crate) fn opens_element(self, c: Option<char>) -> bool {
-        match c {
-            Some('@') => true,
-            Some('?') => self == Dialect::Pattern,
-            _ => false,
-        }
-    }
-}

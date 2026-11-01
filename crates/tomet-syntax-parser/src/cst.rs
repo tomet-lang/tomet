@@ -2,10 +2,11 @@
 //!
 //! Preserves 100% of source characters including trivia (whitespace, newlines, comments).
 //!
-//! The tree reads the same blocks the AST parser does: `tests/src/block_shape.rs`
-//! compares the two over every fixture, and a grammar change that only one of
-//! them takes fails there. It never fails itself, though: broken input still
-//! gets a tree, and the AST parser's errors are not reported here.
+//! This is the one reader of the grammar's shape -- where a block, an element, a
+//! group starts and ends. `parse_document` is this tree lowered into the AST
+//! (see `lower.rs`), so a grammar change is made here once. The parser itself
+//! never fails: broken input still gets a tree, and the errors a document is
+//! refused with are found when the tree is lowered.
 //!
 //! ```text
 //! ROOT
@@ -28,7 +29,7 @@
 //! `#(id)`) is represented, not flattened into inline text.
 //!
 //! Running text carries `EMPHASIS`, `STRONG`, `STRIKEOUT`, `CODE_SPAN` and
-//! `AUTOLINK` nodes where the AST parser reads an `em`, `strong`, `strikeout`,
+//! `AUTOLINK` nodes where the AST has an `em`, `strong`, `strikeout`,
 //! `raw` or `link` element. What opens a span, and where an address ends, is
 //! decided by the same functions in `inline.rs`, so the two cannot drift.
 //! The tokenizer reads text without context (`_em_` is one identifier, a `//`
@@ -40,8 +41,8 @@
 //! element's content (`@quote| text`, or `|` on the line after the element), a
 //! list item's (`-| text`), a heading's (`=| text`) or a `key: | prose` value.
 //! It ends at the first line that does not repeat its marker in the same column
-//! -- a blank line, or a `|` somewhere else, ends it too -- and the AST parser's
-//! error for that last case is not one here. The `|` that begins each later
+//! -- a blank line, or a `|` somewhere else, ends it too -- and the error for that
+//! last case (a marker in a column that continues nothing) is lowering's, not the tree's. The `|` that begins each later
 //! line is a `PIPE` token among the content's own, but the grammar reads it as
 //! white space, so the blocks of a run are the blocks the bracketed form has.
 
@@ -67,6 +68,18 @@ pub fn parse_cst_pattern(src: &str) -> SyntaxNode {
     parse_cst_in(src, true)
 }
 
+/// [`parse_cst`] for a source that is one value, as [`crate::parse_value`] reads
+/// it: the entries of its map (or its one value) under a `ROOT`, with the
+/// elements, `[content]` and `|` runs they embed as nodes.
+pub(crate) fn parse_cst_value(src: &str) -> SyntaxNode {
+    let mut parser = CstParser::new(src, tokenize(src));
+    parser.builder.start_node(K::ROOT.into());
+    // No closer: `ROOT` is never a token, so the entries run to the end.
+    parser.parse_entries(K::ROOT);
+    parser.builder.finish_node();
+    SyntaxNode::new_root(parser.builder.finish())
+}
+
 fn parse_cst_in(src: &str, pattern: bool) -> SyntaxNode {
     let raw_tokens = tokenize(src);
     let mut parser = CstParser::new(src, raw_tokens);
@@ -74,6 +87,9 @@ fn parse_cst_in(src: &str, pattern: bool) -> SyntaxNode {
     parser.parse_root();
     SyntaxNode::new_root(parser.builder.finish())
 }
+
+/// How many lines the groups a bracket-less body ends in may span.
+const MAX_TRAILING_GROUP_LINES: usize = 64;
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum InlineStop {
@@ -120,8 +136,8 @@ struct CstParser<'a> {
     run_ends: Vec<usize>,
     /// The start of every `|` that is a run's marker on a later line rather
     /// than its opener. The parser does not see them: [`CstParser::kind_at`]
-    /// answers `WHITESPACE` for them, which is what the AST parser does when
-    /// it folds a marker away with the newline before it. The tree still
+    /// answers `WHITESPACE` for them: the grammar folds a marker away with
+    /// the newline before it. The tree still
     /// gets them as `PIPE` tokens, because [`CstParser::bump`] emits what the
     /// tokenizer read.
     markers: HashSet<usize>,
@@ -339,7 +355,7 @@ impl<'a> CstParser<'a> {
     // --- `|` runs -----------------------------------------------------------
 
     /// The 1-based column, in characters, at which byte `at` stands in its
-    /// line -- what `Cursor::column` says for the AST parser.
+    /// line -- what `Cursor::column` says.
     fn column_at(&self, at: usize) -> usize {
         let line_start = self.src[..at].rfind('\n').map_or(0, |i| i + 1);
         self.src[line_start..at].chars().count() + 1
@@ -358,9 +374,9 @@ impl<'a> CstParser<'a> {
     /// run whose columns are `cols`, one for each run it is inside of?
     /// Returns the verdict and the index of the innermost marker.
     ///
-    /// The same rule as the AST parser's `pipe_run_state`, except that a
-    /// marker in the wrong column ends the run here instead of being an
-    /// error: the CST never fails.
+    /// A marker in the wrong column ends the run here instead of being an
+    /// error: the CST never fails. Lowering refuses it
+    /// (`reject_misaligned_marker`).
     fn continuation(&self, newline: usize, cols: &[usize]) -> (Continuation, Option<usize>) {
         let mut i = self.skip_raw_ws(newline + 1);
         if matches!(self.raw_kind_at(i), None | Some(K::NEWLINE)) {
@@ -529,20 +545,28 @@ impl<'a> CstParser<'a> {
     /// `::` is two `COLON` tokens; it is a sigil only with a name right after.
     fn sigil_len_at(&self, i: usize) -> Option<usize> {
         match self.kind_at(i) {
-            Some(K::AT) if self.kind_at(i + 1) == Some(K::IDENT) => Some(2),
+            Some(K::AT) if self.name_at(i + 1) => Some(2),
             // A hole: `?`, a matcher name if there is one, and a `(` against it.
             Some(K::QUESTION) if self.pattern => {
-                let n = 1 + usize::from(self.kind_at(i + 1) == Some(K::IDENT));
+                let n = 1 + usize::from(self.name_at(i + 1));
                 (self.kind_at(i + n) == Some(K::L_PAREN)).then_some(n)
             }
-            Some(K::COLON)
-                if self.kind_at(i + 1) == Some(K::COLON)
-                    && self.kind_at(i + 2) == Some(K::IDENT) =>
-            {
+            Some(K::COLON) if self.kind_at(i + 1) == Some(K::COLON) && self.name_at(i + 2) => {
                 Some(3)
             }
             _ => None,
         }
+    }
+
+    /// Token `i` starts a name: an identifier that begins as a name does, which
+    /// is ASCII (`@タグ` is text).
+    fn name_at(&self, i: usize) -> bool {
+        self.kind_at(i) == Some(K::IDENT)
+            && self
+                .tokens
+                .get(i)
+                .and_then(|(_, t)| t.chars().next())
+                .is_some_and(cotomet_syntax::is_name_start)
     }
 
     /// Is the `@` or `::` at `i` a block element: an element that owns the
@@ -668,10 +692,9 @@ impl<'a> CstParser<'a> {
             Some(K::EQUAL) => self.section_level_at(i).is_some(),
             Some(K::MINUS) => self.is_thematic_break_at(i) || self.is_list_start_at(i),
             Some(K::BACKTICK) => self.is_code_block_start_at(i),
-            Some(K::LT) => true,
             // A line-start `;` breaks the block; it is no block of its own.
             Some(K::SEMI) => true,
-            // So does a comment on a line of its own, as in the AST parser.
+            // So does a comment on a line of its own.
             Some(K::COMMENT) => true,
             // An `@` element is not here: a line that starts with one is
             // running text and folds into the paragraph. A `::` declaration
@@ -748,7 +771,6 @@ impl<'a> CstParser<'a> {
                 }
             }
             K::COLON if self.is_block_element_at(self.pos) => self.parse_block_element(),
-            K::LT => self.parse_block_element(),
             _ => self.parse_paragraph(),
         }
     }
@@ -763,7 +785,11 @@ impl<'a> CstParser<'a> {
             || (self.current_kind() == Some(K::HASH) && self.id_follows(self.pos));
         // A body with a title in it: text after white space, not a group or a comment.
         let sugar = !full_form
-            && self.src.as_bytes().get(self.start_of(self.pos).wrapping_sub(1)).is_some_and(|b| *b == b' ' || *b == b'\t')
+            && self
+                .src
+                .as_bytes()
+                .get(self.start_of(self.pos).wrapping_sub(1))
+                .is_some_and(|b| *b == b' ' || *b == b'\t')
             && !matches!(self.current_kind(), None | Some(K::NEWLINE | K::COMMENT));
         if full_form {
             self.parse_groups(true);
@@ -796,29 +822,130 @@ impl<'a> CstParser<'a> {
     }
 
     /// The rest of a bracket-less body (`= text`, `- text`): the text, and the
-    /// groups it ends in -- `#(id)`, `{value}`, `:connect` -- which the AST parser
-    /// finds with `find_trailing_connect`, and so does this, so the two cut the
-    /// line in the same place.
+    /// groups it ends in -- `#(id)`, `{value}`, `:connect` -- which are the owner's,
+    /// not the text's.
+    ///
+    /// Where they begin is the leftmost candidate from which the groups read
+    /// to the end of the line ([`CstParser::reads_to_line_end`]) and which the
+    /// text before it reaches without an element of its own in the way: a
+    /// `{value}` that an `@element` at the end of the text would take is
+    /// the element's.
     fn parse_sugar_tail(&mut self) {
         let from = self.start_of(self.pos);
-        let mut cursor = tomet_lexer::Cursor::new(self.src);
-        cursor.set_pos(from);
-        match crate::element::find_trailing_connect(crate::dialect::Dialect::Document, &cursor) {
-            Some(at) if at > from => {
+        let mut candidates = self.trailing_candidates(from).into_iter();
+        let mut resume = from;
+        loop {
+            let Some(at) = candidates.find(|&at| at >= resume && self.reads_to_line_end(at)) else {
+                self.parse_inline(InlineStop::Line);
+                return;
+            };
+            if at > self.start_of(self.pos) {
                 self.parse_inline(InlineStop::Offset(at));
-                let outer = std::mem::replace(&mut self.allow_connect, true);
-                self.parse_groups(false);
-                self.allow_connect = outer;
-                self.parse_inline(InlineStop::Line);
             }
-            Some(_) => {
-                let outer = std::mem::replace(&mut self.allow_connect, true);
-                self.parse_groups(false);
-                self.allow_connect = outer;
-                self.parse_inline(InlineStop::Line);
+            if self.start_of(self.pos) > at {
+                // An element in the text took the groups; look for one after it.
+                resume = self.start_of(self.pos);
+                continue;
             }
-            None => self.parse_inline(InlineStop::Line),
+            let outer = std::mem::replace(&mut self.allow_connect, true);
+            self.parse_groups(false);
+            self.allow_connect = outer;
+            self.parse_inline(InlineStop::Line);
+            return;
         }
+    }
+
+    /// The offsets on the line starting at `from` where a body's trailing groups
+    /// may begin: every `:`, and every `{` and `#(` that is not part of a
+    /// connect (`:{...}`, `:name(...)`) that starts earlier. A `(` alone is
+    /// not one -- a parenthetical remark is prose -- and only reaches here
+    /// through a `:`.
+    fn trailing_candidates(&self, from: usize) -> Vec<usize> {
+        let bytes = self.src.as_bytes();
+        let preceded_by_colon = |pos: usize| {
+            let mut i = pos;
+            while i > 0 && matches!(bytes[i - 1], b' ' | b'\t') {
+                i -= 1;
+            }
+            i > 0 && bytes[i - 1] == b':'
+        };
+        // Names are ASCII, so a byte compare is UTF-8-safe.
+        let preceded_by_name_char = |pos: usize| {
+            pos > 0
+                && matches!(bytes[pos - 1], b'a'..=b'z' | b'A'..=b'Z' | b'0'..=b'9' | b'_' | b'-')
+        };
+        let mut found = Vec::new();
+        let mut i = from;
+        while i < bytes.len() && !matches!(bytes[i], b'\n' | b'\r') {
+            let hash_paren = bytes[i] == b'#' && bytes.get(i + 1) == Some(&b'(');
+            if bytes[i] == b':' {
+                found.push(i);
+            } else if (hash_paren || bytes[i] == b'{')
+                && !preceded_by_colon(i)
+                && !preceded_by_name_char(i)
+            {
+                found.push(i);
+            }
+            i += if hash_paren { 2 } else { 1 };
+        }
+        found
+    }
+
+    /// Whether the groups that begin at `at` -- read as an element's are --
+    /// are valid, claim something, and end the line.
+    ///
+    /// "Valid" is what the AST says of them: the groups are read on their own
+    /// and lowered, so a `{x}` (a value group holds `key: value`) or a `#(a: 1)`
+    /// is text, as it always was. A trailing `[content]` or `|` run is not
+    /// the owner's: it has no slot for one.
+    fn reads_to_line_end(&self, at: usize) -> bool {
+        let slice = &self.src[at..self.balanced_line_end(at)];
+        let mut scratch = CstParser::new(slice, tokenize(slice));
+        scratch.pattern = self.pattern;
+        scratch.builder.start_node(K::ROOT.into());
+        scratch.parse_groups(false);
+        scratch.bump_while(K::WHITESPACE);
+        scratch.builder.finish_node();
+        if !scratch.is_eof() {
+            return false;
+        }
+        let root = SyntaxNode::new_root(scratch.builder.finish());
+        let dialect = if self.pattern {
+            crate::dialect::Dialect::Pattern
+        } else {
+            crate::dialect::Dialect::Document
+        };
+        crate::lower::in_dialect(dialect, || {
+            crate::lower::lower_group_list(slice, root.children())
+        })
+        .is_ok_and(|read| read.content.is_none() && crate::lower::claims_something(&read))
+    }
+
+    /// The end of the line at `at`, or of the last line a group opened on it runs
+    /// over: a group may span lines, so the line ends where its brackets have
+    /// closed. A blank line ends the search, and so do [`MAX_TRAILING_GROUP_LINES`]
+    /// lines: a trailing group does not span a blank line, and an unclosed bracket
+    /// in a line of prose must not make every such line read to the end of the file.
+    fn balanced_line_end(&self, at: usize) -> usize {
+        let mut depth = 0i32;
+        let mut lines = 0usize;
+        let mut line_start = at;
+        for (i, c) in self.src[at..].char_indices() {
+            match c {
+                '(' | '[' | '{' => depth += 1,
+                ')' | ']' | '}' => depth -= 1,
+                '\n' => {
+                    lines += 1;
+                    let blank = self.src[line_start..at + i].trim().is_empty() && line_start > at;
+                    if depth <= 0 || blank || lines >= MAX_TRAILING_GROUP_LINES {
+                        return at + i;
+                    }
+                    line_start = at + i + 1;
+                }
+                _ => {}
+            }
+        }
+        self.src.len()
     }
 
     fn parse_thematic_break(&mut self) {
@@ -869,7 +996,7 @@ impl<'a> CstParser<'a> {
 
     /// A list: items of one kind (`-` or `-.`) that stand in the same column or
     /// further out, and, inside an item, the list of the deeper marker that
-    /// follows it -- the AST parser's rule (`list.rs`), so `- a`, `  - b`, `- c`
+    /// follows it, so `- a`, `  - b`, `- c`
     /// are one list of two items and `b` is the sublist of the first.
     fn parse_list(&mut self) {
         let ordered = self.kind_at(self.pos + 1) == Some(K::DOT);
@@ -973,7 +1100,8 @@ impl<'a> CstParser<'a> {
             _ => false,
         };
         let at = self.pos;
-        if self.kind_at(at) == Some(K::AT) && at > 0 && self.kind_at(at - 1) != Some(K::WHITESPACE) {
+        if self.kind_at(at) == Some(K::AT) && at > 0 && self.kind_at(at - 1) != Some(K::WHITESPACE)
+        {
             return false;
         }
         if opens_full(at) {
@@ -990,7 +1118,7 @@ impl<'a> CstParser<'a> {
 
     /// A fenced code block: it closes on a line whose leading run of backticks
     /// is at least as long as the opening one and holds nothing else but
-    /// white space -- the AST parser's rule (`fence.rs`). A longer opening run
+    /// white space. A longer opening run
     /// is how a body holds a closing-looking line; a run in the middle of a
     /// line closes nothing.
     fn parse_code_block(&mut self) {
@@ -1090,8 +1218,8 @@ impl<'a> CstParser<'a> {
                     }
                 }
                 InlineStop::Delim(d) => {
-                    // A blank line ends the span unclosed, as it does in the
-                    // AST parser; so does the `]` of the group it stands in.
+                    // A blank line ends the span unclosed; so does the `]` of the
+                    // group it stands in.
                     if k == K::NEWLINE && self.blank_line_follows(self.pos) {
                         break;
                     }
@@ -1130,6 +1258,10 @@ impl<'a> CstParser<'a> {
     /// token is cut there and the answer is no, for now: the next token is
     /// the closer.
     fn closer_here(&mut self, delim: &str) -> bool {
+        // A comment is read whole: a delimiter inside it closes nothing.
+        if self.current_kind() == Some(K::COMMENT) {
+            return false;
+        }
         let start = self.start_of(self.pos);
         let text = self.text_at(self.pos);
         for (off, _) in text.char_indices() {
@@ -1146,7 +1278,7 @@ impl<'a> CstParser<'a> {
     }
 
     /// A closing delimiter stands at `at`: `delim` there, and not right after
-    /// a space. Same rule as the AST parser's `Stop::Delim`.
+    /// a space.
     fn closes_at(&self, at: usize, delim: &str) -> bool {
         self.src[at..].starts_with(delim) && !is_boundary(self.src[..at].chars().next_back())
     }
@@ -1282,7 +1414,7 @@ impl<'a> CstParser<'a> {
     fn try_parse_inline_element(&mut self) -> bool {
         let p = self.pos;
         let is_element = match self.current_kind() {
-            Some(K::AT) => self.kind_at(p + 1) == Some(K::IDENT) && self.groups_follow(p + 2),
+            Some(K::AT) => self.name_at(p + 1) && self.groups_follow(p + 2),
             Some(K::QUESTION) => self.sigil_len_at(p).is_some(),
             Some(K::DOLLAR) => {
                 self.kind_at(p + 1) == Some(K::L_BRACE)
@@ -1300,7 +1432,7 @@ impl<'a> CstParser<'a> {
         self.parse_sigil();
         if hole {
             let outer = std::mem::replace(&mut self.allow_connect, false);
-            self.parse_groups(false);
+            self.parse_groups(true);
             self.allow_connect = outer;
         } else if dollar {
             match self.current_kind() {
@@ -1309,7 +1441,8 @@ impl<'a> CstParser<'a> {
                 _ => {}
             }
         } else {
-            self.parse_groups(false);
+            // Like a block element's, an inline element's groups may begin on the next line.
+            self.parse_groups(true);
         }
         self.builder.finish_node();
         true
@@ -1320,18 +1453,6 @@ impl<'a> CstParser<'a> {
     fn parse_sigil(&mut self) {
         self.builder.start_node(K::SIGIL.into());
         match self.current_kind() {
-            Some(K::LT) => {
-                self.bump();
-                while let Some(k) = self.current_kind() {
-                    if matches!(k, K::GT | K::NEWLINE) {
-                        break;
-                    }
-                    self.bump();
-                }
-                if self.current_kind() == Some(K::GT) {
-                    self.bump();
-                }
-            }
             // `::name`
             Some(K::COLON) if self.sigil_len_at(self.pos) == Some(3) => {
                 self.bump();
@@ -1617,11 +1738,12 @@ impl<'a> CstParser<'a> {
                     self.builder.finish_node();
                 }
                 // `[ ... ]` as a value is blocks, the same `[content]` an
-                // element takes -- the AST parser's `TometValueHook` reads it
-                // so; the list literal it once was is gone. Read as a list it
-                // closed at the first `]`, even one inside `` `code` ``.
+                // element takes; the list literal it once was is gone. Read as
+                // a list it closed at the first `]`, even one inside `` `code` ``.
                 K::L_BRACKET => self.parse_content_group(),
                 K::L_PAREN => self.parse_args_group(),
+                // The `#(id)` of a bare entry, `(1)[text]#(a)`.
+                K::HASH if self.id_follows(self.pos) => self.parse_id_group(),
                 _ => {
                     if !self.try_parse_inline_element() {
                         self.bump();
@@ -1682,8 +1804,7 @@ mod tests {
 
     #[test]
     fn old_hash_heading_is_plain_paragraph() {
-        // `#` is free: a legacy ATX-style heading marker in the old
-        // `document.rs` pipeline, now plain text here too.
+        // `#` is free: it was an ATX-style heading marker once, and is plain text now.
         let root = parse_cst("#[ Title ]\n\nParagraph\n");
         assert_eq!(child_kinds(&root), [K::PARAGRAPH, K::PARAGRAPH]);
     }
@@ -1810,8 +1931,7 @@ mod tests {
         // text, not recognized as a nested group (nothing precedes `[`
         // that would make it one), so the outer group's own `]` -- the
         // *third* one here -- is the one that actually closes it.
-        // Depth-counted the same way the AST parser's `Stop::Paragraph`
-        // boundary tracking is.
+        // The paragraph's `]` is found by counting depth.
         let root = parse_cst("@a[ array[0] is nice ]\n");
         let content = find(&root, K::CONTENT).unwrap();
         assert_eq!(content.text().to_string(), "[ array[0] is nice ]");
@@ -1857,7 +1977,7 @@ mod tests {
         assert_eq!(item.text().to_string(), "list(p, q)");
         assert_eq!(count(&item, K::ARGS), 1);
         assert_eq!(count(&root, K::MAP_LITERAL), 1);
-        // `[1, 2]` as a value is blocks, as in the AST parser: a content, not a list.
+        // `[1, 2]` as a value is blocks: a content, not a list.
         assert_eq!(count(&root, K::CONTENT), 1);
         // `list(p, q)` and its `p` and `q`.
         assert_eq!(count(&root, K::SEQ_ITEM), 3);

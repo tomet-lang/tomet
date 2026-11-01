@@ -2,10 +2,9 @@ use super::*;
 
 /// The `Inline::Raw` text of `doc`'s first block, which must be a `@name`
 /// element whose `[content]` is a single nested backtick-fenced `@raw`
-/// element -- the replacement for the old `+++` raw-body fence (see
-/// `raw.rs`): `[...]` shares `document.rs::parse_block_seq` with the
-/// document root, so a fenced code block nests inside it exactly as it
-/// would at the top level.
+/// element -- the replacement for the old `+++` raw-body fence: `[...]`
+/// holds the same blocks the document root does, so a fenced code block
+/// nests inside it exactly as it would at the top level.
 fn nested_raw_body(doc: &tomet_ast::Document) -> &str {
     let outer_content = match &doc.blocks[0] {
         Block::Element(outer) => outer.content.as_deref(),

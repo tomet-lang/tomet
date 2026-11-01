@@ -63,23 +63,12 @@ fn parses_list_value_markers_and_trailing_attrs() {
 
 #[test]
 fn list_item_ending_in_an_element_does_not_error_on_a_trailing_brace() {
-    // `element.rs::parse_element`'s main loop always lets an element
-    // claim an adjacent *bare*, colon-less `{value}` group as its
-    // own -- just whitespace/one blank line, no colon needed --
-    // *before* the list item's own trailing-attrs guess
-    // (`list.rs::peek_trailing_attrs`) ever gets a say. Previously
-    // (before `allow_colon_connect` existed) this shape failed
-    // outright with "expected '{'" regardless of whether a colon was
-    // present: the attrs guess found the line's one `{`, assumed it
-    // belonged to the item, told inline parsing to stop right before
-    // it, but the element inside kept going and swallowed straight
-    // past that point anyway, leaving nothing at the assumed
-    // position to re-parse as the item's own attrs.
+    // An element always claims an adjacent *bare*, colon-less `{value}`
+    // group as its own -- just whitespace/one blank line, no colon
+    // needed -- before the list item's own trailing groups get a say.
     //
-    // Now the two shapes mean different things, on purpose (see
-    // `element::parse_element`'s `allow_colon_connect` doc comment,
-    // and `docs/spec/syntax.tmt`'s `##[ コネクト ]`,
-    // which had flagged exactly this as an unimplemented idea): a
+    // The two shapes mean different things, on purpose (see
+    // `docs/spec/syntax.tmt`'s `##[ コネクト ]`): a
     // *bare* `{...}` still always belongs to the element (matches
     // how the same input already behaves with no list item involved
     // at all), but a *colon-prefixed* `:{...}` is reserved for the
@@ -457,4 +446,26 @@ fn multiple_levels_of_nesting_still_work() {
         }
         other => panic!("expected list, got {other:?}"),
     }
+}
+
+#[test]
+fn a_continuation_line_that_opens_with_a_paren_is_prose_not_the_items_args() {
+    // Only a `:` on the next line hands a group over to the item; a parenthetical
+    // that happens to start the line is text.
+    let doc = parse_document("- a b\n(c). d\n").unwrap();
+    let Block::List(list) = &doc.blocks[0] else {
+        panic!()
+    };
+    assert_eq!(list.items[0].data.args, None);
+}
+
+#[test]
+fn a_brace_value_with_a_bare_value_in_it_is_text_at_the_end_of_an_item() {
+    // `{x}` would be an error as a group (a `{...}` holds `key: value` entries),
+    // so it is not the item's trailing group and stays in the text.
+    let doc = parse_document("- set {x}\n").unwrap();
+    let Block::List(list) = &doc.blocks[0] else {
+        panic!()
+    };
+    assert_eq!(list.items[0].data.value, None);
 }

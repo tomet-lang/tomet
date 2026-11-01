@@ -217,11 +217,9 @@ fn dollar_not_followed_by_brace_is_plain_text() {
 
 #[test]
 fn interp_trigger_on_next_line_does_not_end_paragraph() {
-    // Unlike `<T>`/`@name`, `${...}` is deliberately NOT added to
-    // `Stop::Paragraph`'s block-trigger disjunction (see
-    // `document.rs::parse_inline_seq`): a `${...}` embedded mid-prose
-    // (with text before/after it on the same line) stays inline
-    // content in the running paragraph. This case has trailing text
+    // `${...}` does not start a block of its own mid-prose: one embedded
+    // with text before/after it on the same line stays inline content in
+    // the running paragraph. This case has trailing text
     // after `${id}`, so it is not a standalone line, which is the only
     // place `${...}` becomes a `Block::Interp`.
     let doc = parse_document("first line\n${id} second line\n").unwrap();

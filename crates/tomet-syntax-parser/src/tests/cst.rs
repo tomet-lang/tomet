@@ -1,5 +1,5 @@
-//! `parse_cst` against the grammar `parse_document` reads: the CST must not
-//! leave structure flat that the AST parser turns into an element or a list.
+//! `parse_cst` against the grammar: the CST must not leave structure flat
+//! that `parse_document` turns into an element or a list.
 
 use tomet_cst::SyntaxKind as K;
 
@@ -46,7 +46,7 @@ fn every_marker_the_ast_parser_reads_as_a_list_is_a_list() {
         let root = crate::parse_cst(src);
         let top: Vec<K> = root.children().map(|n| n.kind()).collect();
         assert_eq!(top, [K::LIST], "{src:?}");
-        // The AST parser agrees.
+        // `parse_document` agrees.
         let doc = crate::parse_document(src).unwrap();
         assert!(
             matches!(doc.blocks.as_slice(), [tomet_ast::Block::List(_)]),
@@ -84,7 +84,7 @@ fn delimited_spans_are_nodes() {
 
 #[test]
 fn a_delimiter_can_close_in_the_middle_of_a_word() {
-    // The tokenizer reads `_em_s` as one identifier; the AST parser closes at
+    // The tokenizer reads `_em_s` as one identifier; `parse_document` closes at
     // the second `_` all the same.
     assert_eq!(texts("a _em_s b\n", K::EMPHASIS), ["_em_"]);
 }
@@ -173,7 +173,7 @@ fn a_url_does_not_start_inside_a_word() {
 
 // --- parity ---------------------------------------------------------------
 
-/// Whatever the AST parser turns into these elements, the CST has a node for.
+/// Whatever `parse_document` turns into these elements, the CST has a node for.
 #[test]
 fn the_cst_and_the_ast_agree_on_inline_structure() {
     use tomet_ast::{Block, Inline};
@@ -272,7 +272,7 @@ fn runs_nest_by_column() {
 
 #[test]
 fn a_marker_in_the_wrong_column_ends_the_run_and_loses_nothing() {
-    // The AST parser rejects this; the CST never fails.
+    // `parse_document` rejects this; the CST never fails.
     let src = "- (x)| a\n  - (y)| b\n| c\n";
     assert_eq!(texts(src, K::LIST_ITEM).len(), 2);
 }
@@ -325,7 +325,7 @@ fn a_pipe_run_is_a_value() {
 
 #[test]
 fn a_bracket_in_a_value_is_content_and_a_code_span_cannot_close_it() {
-    // The AST parser reads `[ ... ]` in a value as blocks (`Value::Blocks`).
+    // `[ ... ]` in a value is read as blocks (`Value::Blocks`).
     // Read as a list it closed at the `]` inside the code span.
     let src = "a @conflict(a: [ use `]` here ], b: [ x ]) b\n";
     assert!(crate::parse_document(src).is_ok());
@@ -414,7 +414,10 @@ fn a_deeper_marker_opens_the_sublist_of_the_item_before_it() {
     let top: Vec<_> = root.children().filter(|n| n.kind() == K::LIST).collect();
     assert_eq!(top.len(), 1, "one list at the top, not one per indentation");
     assert_eq!(
-        top[0].children().filter(|n| n.kind() == K::LIST_ITEM).count(),
+        top[0]
+            .children()
+            .filter(|n| n.kind() == K::LIST_ITEM)
+            .count(),
         2
     );
     assert_eq!(texts(src, K::LIST).len(), 2, "and the sublist inside it");
@@ -436,10 +439,14 @@ fn a_list_ends_where_the_kind_of_marker_changes() {
 
 #[test]
 fn a_group_may_stand_on_the_line_after_its_element() {
-    // The AST parser reads `[ text ]` here as the element's content; so does the CST.
+    // `[ text ]` here is the element's content.
     let src = "@file(a)\n[ text ]\n";
     assert_eq!(kinds(src, K::BLOCK_ELEMENT), 1);
-    assert_eq!(kinds(src, K::PARAGRAPH), 1, "the paragraph inside the content");
+    assert_eq!(
+        kinds(src, K::PARAGRAPH),
+        1,
+        "the paragraph inside the content"
+    );
     assert_eq!(texts(src, K::BLOCK_ELEMENT), ["@file(a)\n[ text ]"]);
     // A blank line in between ends the element.
     let src = "@file(a)\n\n[ text ]\n";

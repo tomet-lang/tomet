@@ -74,3 +74,55 @@ fn parses_caution_as_typed_element_not_bare_bracket() {
         other => panic!("expected element, got {other:?}"),
     }
 }
+
+#[test]
+fn an_element_folded_into_a_paragraph_still_takes_its_group_from_the_next_line() {
+    // The second `@file` is the second line of a paragraph, an inline element,
+    // and its `[content]` stands on the line after it all the same.
+    let doc = parse_document("@dir(a)\n[ x ]\n@file(b)\n[ y ]\n").unwrap();
+    let [Block::Paragraph(p)] = doc.blocks.as_slice() else {
+        panic!("expected one paragraph, got {:?}", doc.blocks);
+    };
+    let elements: Vec<&Element> = p
+        .content
+        .iter()
+        .filter_map(|i| match i {
+            Inline::Element(el) => Some(el),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(elements.len(), 2);
+    assert!(elements.iter().all(|el| el.content.is_some()));
+}
+
+#[test]
+fn an_angle_bracket_is_a_character_not_a_typed_element() {
+    let doc = parse_document("<embed>[alt](https://example.com/pic.png)\n").unwrap();
+    let [Block::Paragraph(p)] = doc.blocks.as_slice() else {
+        panic!("expected a paragraph, got {:?}", doc.blocks);
+    };
+    assert!(matches!(p.content.first(), Some(Inline::Text(t)) if t.value.starts_with("<embed>")));
+}
+
+#[test]
+fn a_name_must_be_ascii_to_start_an_element() {
+    let doc = parse_document("@タグ\n").unwrap();
+    assert!(matches!(doc.blocks.as_slice(), [Block::Paragraph(_)]));
+}
+
+#[test]
+fn a_bare_entry_takes_args_content_and_value_like_a_named_one() {
+    let doc = parse_document("@memo{ (1)[ ひとつ ]{ id: a } }\n").unwrap();
+    let Block::Element(el) = &doc.blocks[0] else {
+        panic!()
+    };
+    let Some(Group(entries)) = &el.data.value else {
+        panic!()
+    };
+    let [Entry::Bare(bare)] = entries.as_slice() else {
+        panic!("expected one bare entry, got {entries:?}");
+    };
+    assert_eq!(bare.data.args, Some(Value::Int(1)));
+    assert!(bare.content.is_some());
+    assert!(bare.data.value.is_some());
+}

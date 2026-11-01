@@ -1,289 +1,11 @@
-//! Parsing for inline sequences, text normalization, and inline delimiters (`*em*`, `_em_`, `**strong**`, `__strong__`, `~~strikeout~~`).
+//! What the CST parser and lowering share about running text: how a run of source
+//! becomes `Text` and `SoftBreak` items, trimming at the edges of an inline
+//! sequence, and the probes that say where a formatting delimiter (`*em*`, `_em_`,
+//! `**strong**`, `__strong__`, `~~strikeout~~`) or an autolink begins and ends.
 
-use crate::dialect::Dialect;
-use crate::element::{is_element_start, parse_written};
-use crate::error::Result;
-use crate::interp::{is_interp_start, parse_interpolation};
-use crate::list::peek_list_marker;
-use crate::raw::is_fenced_code_block_start;
-use crate::section::{is_thematic_break, is_titled_thematic_break_start};
-use crate::value::{err, skip_block_comment, skip_inline_ws, skip_line_comment};
-use tomet_ast::{Data, Element, Inline, Name, Placement, RawText, SoftBreak, Span, Text, Value};
+use crate::value::skip_inline_ws;
+use tomet_ast::{Inline, SoftBreak, Span, Text};
 use tomet_lexer::Cursor;
-use tomet_tree::{ElementExt, element_new};
-
-#[derive(Debug, Clone, Copy)]
-pub(crate) enum Stop<'a> {
-    Bracket(char),
-    /// A paragraph: ends at a blank line, a heading, a list marker, etc.
-    /// (see [`paragraph_breaks_here`]). `boundary`, when set, is the
-    /// closing character of the `[content]`/`{value}` group this paragraph
-    /// is nested inside (currently always `']'`) -- tracked with the same
-    /// depth-counting [`Stop::Bracket`] uses, so a literal `[`/`]` typed as
-    /// plain prose (`array[0]`) doesn't end the paragraph early, but the
-    /// group's own closing bracket does, even mid-line with no blank line
-    /// in front of it (`@card[ Hello world ]`). `None` at the top level,
-    /// where there is no enclosing group to stop short for.
-    Paragraph {
-        boundary: Option<char>,
-    },
-    Line,
-    Offset(usize),
-    Delim(&'static str),
-    /// A `|`-prefixed run: `[content]` spelled without brackets. `cols` is
-    /// the stack of 1-based columns of active ancestor and current `|` markers.
-    PipeRun {
-        cols: &'a [usize],
-    },
-}
-
-/// `allow_colon_connect` is threaded straight through to every element
-/// parsed here (including recursively, inside `**em**`/`__strong__`/
-/// `==mark==` spans) -- see `element::parse_element`'s own doc comment
-/// for what it gates and why. Only `list.rs::parse_list_internal`'s two
-/// top-level calls (a list item's own inline content) pass `false`;
-/// every other caller passes `true`, unchanged from before this
-/// parameter existed.
-pub(crate) fn parse_inline_seq<'a>(
-    dialect: Dialect,
-    cur: &mut Cursor,
-    stop: Stop<'a>,
-    allow_colon_connect: bool,
-) -> Result<Vec<Inline>> {
-    let mut items = Vec::new();
-    let mut text_start = cur.pos();
-    let mut bracket_depth: u32 = 0;
-    // A `|` run's markers are folded away with the newline they follow, so
-    // the run's text stays one contiguous slice of the source and comes out
-    // identical to the same content written between brackets.
-    let pipe_cols = match &stop {
-        Stop::PipeRun { cols } => *cols,
-        _ => &[],
-    };
-    loop {
-        match stop {
-            Stop::Bracket(c) => {
-                if cur.is_eof() {
-                    return Err(err(cur.pos(), format!("unterminated, expected '{c}'")));
-                }
-                if cur.peek() == Some(c) {
-                    if bracket_depth == 0 {
-                        break;
-                    }
-                    bracket_depth -= 1;
-                } else if cur.peek() == Some('[') {
-                    bracket_depth += 1;
-                }
-            }
-            Stop::Line => {
-                if cur.is_eof() || cur.peek() == Some('\n') {
-                    break;
-                }
-            }
-            Stop::Offset(target_pos) => {
-                if cur.pos() >= target_pos || cur.is_eof() {
-                    break;
-                }
-            }
-            Stop::Paragraph { boundary } => {
-                if cur.is_eof() {
-                    if let Some(c) = boundary {
-                        return Err(err(cur.pos(), format!("unterminated, expected '{c}'")));
-                    }
-                    break;
-                }
-                if let Some(c) = boundary {
-                    if cur.peek() == Some(c) {
-                        if bracket_depth == 0 {
-                            break;
-                        }
-                        bracket_depth -= 1;
-                    } else if cur.peek() == Some('[') {
-                        bracket_depth += 1;
-                    }
-                }
-                if cur.peek() == Some('\n') {
-                    let mut look = *cur;
-                    look.bump();
-                    skip_inline_ws(&mut look);
-                    if paragraph_breaks_here(dialect, &look) {
-                        break;
-                    }
-                }
-            }
-            Stop::Delim(d) => {
-                if cur.is_eof() {
-                    return Err(err(cur.pos(), format!("unterminated, expected '{d}'")));
-                }
-                if cur.starts_with(d) && !is_boundary(char_before(cur)) {
-                    break;
-                }
-                if cur.peek() == Some('\n') {
-                    let mut look = *cur;
-                    look.bump();
-                    skip_inline_ws(&mut look);
-                    if look.is_eof() || look.peek() == Some('\n') {
-                        return Err(err(cur.pos(), format!("unterminated, expected '{d}'")));
-                    }
-                }
-            }
-            Stop::PipeRun { cols } => {
-                if cur.is_eof() {
-                    break;
-                }
-                // `Empty` ends this *paragraph* (the block-sequence loop in
-                // `element::parse_pipe_content` starts a new one), same as
-                // `End` ends the whole run -- this call only ever builds
-                // one paragraph's content, so both stop it the same way.
-                // In addition, if the next line starts a list item, a section,
-                // a `;` or another block under the same pipe run, this paragraph
-                // ends here so the outer block parser can dispatch it.
-                if cur.peek() == Some('\n') {
-                    match pipe_run_state(cur, cols)? {
-                        PipeContinuation::Empty | PipeContinuation::End => break,
-                        PipeContinuation::Content => {
-                            let mut look = *cur;
-                            look.bump();
-                            for _ in 0..cols.len() {
-                                skip_inline_ws(&mut look);
-                                look.bump();
-                            }
-                            skip_inline_ws(&mut look);
-                            if paragraph_breaks_here(dialect, &look) {
-                                break;
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        if cur.peek() == Some('`') {
-            let before = cur.pos();
-            let mut probe = *cur;
-            let fence_len = probe.eat_while(|c| c == '`').len();
-            let inner_start = probe.pos();
-            let mut closed = false;
-            let mut inner_end = inner_start;
-            while let Some(c) = probe.peek() {
-                if c == '\n' || c == '\r' {
-                    break;
-                }
-                if c == '`' {
-                    let run_start = probe.pos();
-                    let run_len = probe.eat_while(|ch| ch == '`').len();
-                    if run_len == fence_len {
-                        inner_end = run_start;
-                        closed = true;
-                        break;
-                    }
-                } else {
-                    probe.bump();
-                }
-            }
-            if closed {
-                flush_text_upto(&mut items, cur, &mut text_start, before, pipe_cols);
-                let inner_text = cur.src()[inner_start..inner_end].to_string();
-                // The whole span, closing fence included: `cur` is still at the opening one.
-                let span = Span::new(before, probe.pos());
-                let content_span = Span::new(inner_start, inner_end);
-                let el = element_new(Name::bare("raw"))
-                    .with_placement(Placement::Inline)
-                    .with_span(span)
-                    .with_content(vec![tomet_ast::Block::Paragraph(
-                        tomet_ast::Paragraph::new(
-                            vec![Inline::Raw(RawText::new(inner_text, content_span))],
-                            content_span,
-                        ),
-                    )]);
-                items.push(Inline::Element(el));
-                cur.set_pos(probe.pos());
-                text_start = cur.pos();
-                continue;
-            }
-        }
-        if is_autolink_start(cur) {
-            let before = cur.pos();
-            if let Some(el) = try_autolink(cur, stop)? {
-                flush_text_upto(&mut items, cur, &mut text_start, before, pipe_cols);
-                items.push(Inline::Element(el));
-                text_start = cur.pos();
-                continue;
-            }
-        }
-        if cur.starts_with("/*") {
-            flush_text(&mut items, cur, &mut text_start, pipe_cols);
-            skip_block_comment(cur)?;
-            text_start = cur.pos();
-            continue;
-        }
-        if cur.starts_with("//") && is_boundary(char_before(cur)) {
-            flush_text(&mut items, cur, &mut text_start, pipe_cols);
-            skip_line_comment(cur);
-            text_start = cur.pos();
-            continue;
-        }
-        // An element met while reading running text is part of it, whatever
-        // line it opens: it is `Placement::Inline`. What makes an element a
-        // block is `parse_block_seq` seeing it as the whole of its line, with
-        // nothing folding into it.
-        // `\;` at the start of a line is a `;` that is text, not a block break.
-        if cur.starts_with("\\;") && at_marker_line_start(cur) {
-            flush_text(&mut items, cur, &mut text_start, pipe_cols);
-            cur.bump();
-            text_start = cur.pos();
-            cur.bump();
-            continue;
-        }
-        if dialect.opens_element(cur.peek()) && is_element_start(dialect, cur, false) {
-            flush_text(&mut items, cur, &mut text_start, pipe_cols);
-            let written = parse_written(dialect, cur, allow_colon_connect, &[])?;
-            items.push(written.with_placement(Placement::Inline).into_inline());
-            text_start = cur.pos();
-            continue;
-        }
-        if cur.peek() == Some('$') && is_interp_start(cur) {
-            flush_text(&mut items, cur, &mut text_start, pipe_cols);
-            items.push(Inline::Interp(parse_interpolation(cur)?));
-            text_start = cur.pos();
-            continue;
-        }
-        if matches!(cur.peek(), Some('*') | Some('_') | Some('~')) {
-            let before = cur.pos();
-            if let Some(el) = try_delimited(dialect, cur, allow_colon_connect)? {
-                flush_text_upto(&mut items, cur, &mut text_start, before, pipe_cols);
-                items.push(Inline::Element(el));
-                text_start = cur.pos();
-                continue;
-            }
-        }
-        if cur.bump().is_none() {
-            break;
-        }
-    }
-    flush_text(&mut items, cur, &mut text_start, pipe_cols);
-    Ok(trim_edges(items))
-}
-
-/// Whether a paragraph ends right after the newline `look` is already
-/// positioned past, with inline whitespace also already skipped.
-///
-/// A blank line, a `;`, a heading, a list marker, a comment, a thematic
-/// break, or a fenced code block all start something with its own identity,
-/// not more of this paragraph. An element or an interpolation does not: a
-/// line that starts with one is running text like any other, and it is folded
-/// into the paragraph unless a `;` or a blank line says otherwise.
-pub(crate) fn paragraph_breaks_here(dialect: Dialect, look: &Cursor) -> bool {
-    look.is_eof()
-        || look.peek() == Some('\n')
-        || look.peek() == Some(';')
-        || (look.peek() == Some('=') && crate::section::is_section_start(look))
-        || matches!(peek_list_marker(dialect, look), Ok(Some(_)))
-        || look.starts_with("//")
-        || look.starts_with("/*")
-        || is_titled_thematic_break_start(look)
-        || is_thematic_break(look)
-        || is_fenced_code_block_start(look)
-}
 
 /// Trims leading/trailing whitespace from a finished inline sequence.
 ///
@@ -397,61 +119,6 @@ pub(crate) fn delimited_probe(cur: &Cursor, delim: &str) -> bool {
     }
 }
 
-fn try_delimited(
-    dialect: Dialect,
-    cur: &mut Cursor,
-    allow_colon_connect: bool,
-) -> Result<Option<Element>> {
-    for (delim, kind) in DELIMITERS {
-        if let Some(el) = try_one_delimited(dialect, cur, delim, kind, allow_colon_connect)? {
-            return Ok(Some(el));
-        }
-    }
-    Ok(None)
-}
-
-fn try_one_delimited(
-    dialect: Dialect,
-    cur: &mut Cursor,
-    delim: &'static str,
-    kind: &str,
-    allow_colon_connect: bool,
-) -> Result<Option<Element>> {
-    let start_pos = cur.pos();
-    if !delimited_probe(cur, delim) {
-        return Ok(None);
-    }
-    let mut open = *cur;
-    open.eat_str(delim);
-
-    cur.set_pos(open.pos());
-    let inner = parse_inline_seq(dialect, cur, Stop::Delim(delim), allow_colon_connect)?;
-    if !cur.eat_str(delim) {
-        return Err(err(cur.pos(), format!("expected '{delim}'")));
-    }
-    let span = cur.span_from(start_pos);
-    let mut el = element_new(Name::bare(kind)).with_span(span);
-    // `em`/`strong`/`mark`/`strikeout` are inline-only content (see
-    // `tmtroot/docs/spec/feature/content-shape.tmt`): always exactly one
-    // `Paragraph` wrapping the inline run, never multiple blocks.
-    el.content = Some(vec![tomet_ast::Block::Paragraph(
-        tomet_ast::Paragraph::new(inner, span),
-    )]);
-    Ok(Some(el))
-}
-
-/// Whether only whitespace and `|` run markers precede `cur` on its line: the
-/// place a line-start `;` (a block break) may stand, in a `|` run as well.
-pub(crate) fn at_marker_line_start(cur: &Cursor) -> bool {
-    let src = cur.src();
-    let before = &src[..cur.pos()];
-    let line = match before.rfind('\n') {
-        Some(nl) => &before[nl + 1..],
-        None => before,
-    };
-    line.chars().all(|c| c.is_whitespace() || c == '|')
-}
-
 /// Whether only whitespace precedes `cur` on its line.
 pub(crate) fn at_line_start(cur: &Cursor) -> bool {
     let src = cur.src();
@@ -460,87 +127,6 @@ pub(crate) fn at_line_start(cur: &Cursor) -> bool {
         Some(nl) => before[nl + 1..].trim().is_empty(),
         None => before.trim().is_empty(),
     }
-}
-
-/// What the line after the newline at `cur` does to a `|` run opened in
-/// column `col`.
-pub(crate) enum PipeContinuation {
-    /// The next line carries the marker and real content after it: the run
-    /// continues, folded into the same paragraph as a `SoftBreak` (today's
-    /// behaviour, unchanged).
-    Content,
-    /// The next line is the marker alone, nothing after it before its own
-    /// end: the run continues, but this ends the *paragraph* -- the
-    /// block-sequence parser (`element::parse_pipe_content`) starts a new
-    /// one. This is `|content`'s only way to express more than one
-    /// paragraph, since an actually blank line (no marker at all) always
-    /// ends the whole run -- see `End` below.
-    Empty,
-    /// No `|` at all on the next line (or it's blank, or EOF): the run is
-    /// over.
-    End,
-}
-
-/// Whether the line after the newline at `cur` continues a `|` run with active
-/// columns `cols`, and whether that line carries any content of its own.
-///
-/// The markers are left where they are rather than consumed: `normalize_text`
-/// folds them away with the newline, which is what keeps the run's text one
-/// contiguous slice of the source.
-///
-/// A `|` in the wrong column is an error, not the end of the run. Ending
-/// quietly would drop the line into prose -- the failure that made a wrapped
-/// list item break every export -- and once lists nest, the column is the
-/// only thing that says which content a marker belongs to.
-pub(crate) fn pipe_run_state(cur: &Cursor, cols: &[usize]) -> Result<PipeContinuation> {
-    if cols.is_empty() {
-        return Ok(PipeContinuation::End);
-    }
-    let mut look = *cur;
-    look.bump();
-    skip_inline_ws(&mut look);
-    // A blank line closes every block, this one included.
-    if matches!(look.peek(), None | Some('\n') | Some('\r')) {
-        return Ok(PipeContinuation::End);
-    }
-    for &expected_col in cols {
-        if look.peek() != Some('|') {
-            return Ok(PipeContinuation::End);
-        }
-        let marker_col = look.column();
-        if marker_col != expected_col {
-            return Err(err(
-                look.pos(),
-                format!(
-                    "this `|` stands in column {marker_col}, and the content it would \
-                     continue opens in column {expected_col}: it lines up with no content"
-                ),
-            ));
-        }
-        look.bump(); // the marker itself
-        skip_inline_ws(&mut look);
-    }
-    if matches!(look.peek(), None | Some('\n') | Some('\r')) {
-        return Ok(PipeContinuation::Empty);
-    }
-    Ok(PipeContinuation::Content)
-}
-
-fn flush_text(items: &mut Vec<Inline>, cur: &Cursor, text_start: &mut usize, pipe_cols: &[usize]) {
-    flush_text_upto(items, cur, text_start, cur.pos(), pipe_cols);
-}
-
-fn flush_text_upto(
-    items: &mut Vec<Inline>,
-    cur: &Cursor,
-    text_start: &mut usize,
-    end: usize,
-    pipe_cols: &[usize],
-) {
-    let base = *text_start;
-    let raw = &cur.src()[base..end];
-    *text_start = end;
-    split_softbreaks(items, raw, base, pipe_cols);
 }
 
 /// Pushes a `Text`, merging into the previous item if it is also a `Text`.
@@ -564,11 +150,11 @@ pub(crate) fn push_text(items: &mut Vec<Inline>, value: String, span: Span) {
 }
 
 /// Appends `more` to `items`, merging across the join the same way
-/// [`push_text`]/[`push_soft_break`] do within a single flush -- used by
-/// `list.rs` when it appends a freshly parsed sequence onto content it
-/// already built up by hand (a list item's own trailing text after its
-/// groups), so the two don't leave an unmerged `Text`/`Text` or
-/// `SoftBreak`/`SoftBreak` pair sitting at the seam.
+/// [`push_text`]/[`push_soft_break`] do within a single flush -- used when
+/// lowering appends a freshly read sequence onto content it already built up
+/// by hand (a list item's own trailing text after its groups), so the two
+/// don't leave an unmerged `Text`/`Text` or `SoftBreak`/`SoftBreak` pair
+/// sitting at the seam.
 pub(crate) fn extend_merging(items: &mut Vec<Inline>, more: Vec<Inline>) {
     let mut more = more.into_iter();
     if let Some(first) = more.next() {
@@ -612,7 +198,12 @@ pub(crate) fn push_soft_break(items: &mut Vec<Inline>, span: Span) {
 /// output differs: the swallowed gap becomes a `SoftBreak` node spanning it,
 /// not a character. Deciding what that node renders as (a space, nothing,
 /// a real newline) is left to whoever consumes the tree.
-pub(crate) fn split_softbreaks(items: &mut Vec<Inline>, raw: &str, base: usize, pipe_cols: &[usize]) {
+pub(crate) fn split_softbreaks(
+    items: &mut Vec<Inline>,
+    raw: &str,
+    base: usize,
+    pipe_cols: &[usize],
+) {
     let mut text_start = 0usize;
     let mut chars = raw.char_indices().peekable();
     while let Some((i, c)) = chars.next() {
@@ -658,10 +249,6 @@ pub(crate) fn split_softbreaks(items: &mut Vec<Inline>, raw: &str, base: usize, 
         let span = Span::new(base + text_start, base + raw.len());
         push_text(items, raw[text_start..].to_string(), span);
     }
-}
-
-fn is_autolink_start(cur: &Cursor) -> bool {
-    autolink_scheme_at(cur).is_some()
 }
 
 /// The length of the scheme (`https://`, `http://`, `mailto:`) an autolink
@@ -731,88 +318,4 @@ pub(crate) fn autolink_end(
     }
 
     (end_pos > start + scheme_len).then_some(end_pos)
-}
-
-fn try_autolink(cur: &mut Cursor, stop: Stop) -> Result<Option<Element>> {
-    let start_pos = cur.pos();
-    let Some(scheme_len) = autolink_scheme_at(cur) else {
-        return Ok(None);
-    };
-
-    let mut probe = *cur;
-    let mut bracket_depth: u32 = 0;
-
-    loop {
-        if probe.is_eof() {
-            break;
-        }
-        match stop {
-            Stop::Bracket(c) => {
-                if probe.peek() == Some(c) && bracket_depth == 0 {
-                    break;
-                }
-                if probe.peek() == Some('[') {
-                    bracket_depth += 1;
-                } else if probe.peek() == Some(']') && bracket_depth > 0 {
-                    bracket_depth -= 1;
-                }
-            }
-            // A `|` run joins with the same line ending as any other
-            // fold, and a URL never survives one, so the run's marker is
-            // simply out of reach here.
-            Stop::Line | Stop::Paragraph { .. } | Stop::PipeRun { .. } => {
-                if probe.peek() == Some('\n') || probe.peek() == Some('\r') {
-                    break;
-                }
-            }
-            Stop::Offset(target_pos) => {
-                if probe.pos() >= target_pos {
-                    break;
-                }
-            }
-            Stop::Delim(d) => {
-                if probe.starts_with(d) && !is_boundary(char_before(&probe)) {
-                    break;
-                }
-                if probe.peek() == Some('\n') || probe.peek() == Some('\r') {
-                    break;
-                }
-            }
-        }
-
-        let ch = probe.peek().unwrap();
-        if ch == ' ' || ch == '\t' || ch == '\n' || ch == '\r' || ch < ' ' {
-            break;
-        }
-        probe.bump();
-    }
-
-    let src = cur.src();
-    let Some(end_pos) = autolink_end(src, start_pos, scheme_len, probe.pos()) else {
-        return Ok(None);
-    };
-
-    let url_str = src[start_pos..end_pos].to_string();
-    cur.set_pos(end_pos);
-    let span = cur.span_from(start_pos);
-
-    let el = Element {
-        name: Name::bare("link"),
-        // An autolink is found while scanning running text, so it is
-        // always part of it.
-        placement: Placement::Inline,
-        data: Data {
-            args: Some(Value::Map(vec![(
-                "target".to_string(),
-                Value::String(url_str),
-            )])),
-            value: None,
-        },
-        content: None,
-        id: None,
-        connects: Vec::new(),
-        span,
-    };
-
-    Ok(Some(el))
 }

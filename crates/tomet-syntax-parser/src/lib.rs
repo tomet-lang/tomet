@@ -24,39 +24,47 @@
 //!
 //! - (dialect) Which sigils may open an element: `@` always, `?` (a hole) only in a pattern.
 //!   `parse_document` and `parse_pattern` share every other function; each takes the dialect.
-//! - (document) Block-level dispatch loop (a blank line or a line-start `;` breaks a block), paragraphs, and document-level parsing.
-//! - (element) Typed elements (`<T>`, `@name`, bare `@`), group ordering, and connect syntax.
-//! - (section) Headings (`=[...]`) and thematic breaks (`---`, `---[ title ]---`).
-//! - (list) Ordered and unordered lists (`-`, `-.`), markers, and item attributes.
-//! - (raw/fence)| Fenced code blocks (``` ``` ```) and the
-//!              | line-oriented fence scan they share.
-//! - (inline) Inline scanning, formatting delimiters (`*em*`, `**strong**`, `==mark==`), autolinks.
+//! - (cst) The one reader of the grammar's shape: a lossless, resilient Concrete Syntax Tree
+//!   (blocks, sections, lists, elements and their groups, fences, `|` runs), powered by `tomet-cst`.
+//!   A blank line or a line-start `;` breaks a block here.
+//! - (lower) The CST read as an AST: `parse_document` and `parse_pattern` are `parse_cst` and
+//!   then this. It builds the typed tree and refuses what a document may not say.
+//! - (element) What makes `@` start an element, which characters open a group, and the readers
+//!   of a group's values: `(args)`, `{value}`, `#(id)`.
+//! - (value) The Tomet data grammar (maps, sequences, scalars, comments), from `cotomet-syntax`,
+//!   with a hook that finds what a value embeds -- an element, `[content]`, a `|` run -- in the CST.
+//! - (inline) What the CST and lowering share about running text: `Text`/`SoftBreak` items, the
+//!   probes for formatting delimiters (`*em*`, `**strong**`, `==mark==`) and autolinks.
 //! - (interp) `${...}` interpolation expressions (identifiers, member chains, calls, literals).
-//! - (value) Lightweight Tomet data grammar (maps, sequences, scalars, comments).
-//! - (cst) Lossless Concrete Syntax Tree parsing powered by `tomet-cst`.
-//! - (lower) The CST read as an AST (`lower_document`), built up construct by construct until it can replace the AST parser's grammar.
 //! - (error) Parse errors: a message plus a byte offset, with line and column resolved once at the entry points (`located_in`).
 
 pub mod cst;
 mod dialect;
-mod document;
 mod element;
 mod error;
-mod fence;
 mod inline;
 mod interp;
-mod list;
 mod lower;
-mod raw;
-mod section;
 mod value;
 
 pub use cst::{parse_cst, parse_cst_pattern};
-pub use document::{parse_document, parse_pattern};
 pub use error::{Error, Result};
-#[doc(hidden)]
-pub use lower::{UNSUPPORTED, lower_document, lower_pattern, lower_top_level_blocks};
 pub use value::{CotometValueHook, parse_value};
+
+/// Parse an entire source string as a markup [`tomet_ast::Document`]: the CST of
+/// the text ([`parse_cst`]), read as the AST it stands for.
+pub fn parse_document(src: &str) -> Result<tomet_ast::Document> {
+    lower::lower_document(src, &parse_cst(src))
+}
+
+/// Parse an entire source string as a pattern: a [`tomet_ast::Document`] in which
+/// `?name(args){options}[content]` is a hole ([`tomet_ast::Hole`]).
+///
+/// It is [`parse_document`] with one more sigil. Everything else is read by the same code, so a
+/// pattern is written in, and printed as, ordinary tomet.
+pub fn parse_pattern(src: &str) -> Result<tomet_ast::Document> {
+    lower::lower_pattern(src, &parse_cst_pattern(src))
+}
 
 /// Parse a `$func(args)` or `${expr}` interpolation directly from a string slice.
 pub fn parse_interpolation_str(source: &str) -> Result<tomet_ast::Interpolation> {

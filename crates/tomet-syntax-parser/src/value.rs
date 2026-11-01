@@ -1,26 +1,28 @@
 //! Parsing for `Value`: delegates core value and map parsing to the `cotomet-syntax` crate,
-//! while providing custom hooks for embedded elements (`@element`) and
-//! dollar expressions (`$interp`) within Tomet documents.
+//! while providing a hook for what a Tomet value embeds -- elements (`@element`),
+//! `[content]`, `|` runs and dollar expressions (`$interp`) -- which it reads off
+//! the CST.
+
+use std::collections::HashMap;
 
 use crate::dialect::Dialect;
 use crate::error::{Error, Result};
 use tomet_ast::Value;
+use tomet_cst::{SyntaxKind as K, SyntaxNode};
 use tomet_lexer::Cursor;
 
 pub(crate) use cotomet_syntax::{
     POSITIONAL_ENTRY_KEY, eat_name, eat_scalar_raw, is_name_start_at, skip_inline_ws,
-    skip_line_comment, skip_ws_and_newlines, skip_ws_newlines_and_comments,
+    skip_line_comment, skip_ws_newlines_and_comments,
 };
 
 /// Parse an entire source string as one `Value` (a data-only `.tmt`
 /// document -- no headings, prose, or top-level elements).
 pub fn parse_value(src: &str) -> Result<Value> {
-    cotomet_syntax::parse_value_with(
-        src,
-        &mut TometValueHook {
-            dialect: Dialect::Document,
-        },
-    )
+    let root = crate::cst::parse_cst_value(src);
+    crate::lower::in_dialect(Dialect::Document, || {
+        cotomet_syntax::parse_value_with(src, &mut Embedded::new(src, &root))
+    })
     .map_err(Into::into)
 }
 
@@ -68,83 +70,88 @@ impl cotomet_syntax::ValueHook for CotometValueHook {
     }
 }
 
-/// A [`cotomet_syntax::ValueHook`] allowing embedded elements (`@...`) and dollar expressions (`$...`)
-/// to be parsed inside value positions within Tomet.
-pub(crate) struct TometValueHook {
-    pub(crate) dialect: Dialect,
+/// What a value embeds, found in the CST: an element (`@name...`, `?hole(...)`),
+/// `[content]`, a `|` run, and the groups of a bare entry in a `{value}`.
+///
+/// The value grammar (maps, calls, scalars: `cotomet-syntax`) reads the text of a
+/// group, and wherever a value or an entry begins it asks this hook. The hook
+/// does not parse what stands there; it finds the CST node that starts at that
+/// offset and lowers it, so a group's shape is read once, by the CST parser.
+pub(crate) struct Embedded<'a> {
+    src: &'a str,
+    nodes: HashMap<usize, SyntaxNode>,
 }
 
-impl cotomet_syntax::ValueHook for TometValueHook {
-    fn try_parse_value(&mut self, cur: &mut Cursor) -> Option<cotomet_syntax::Result<Value>> {
-        // A real, `@`-sigiled element sitting in a value slot
-        if self.dialect.opens_element(cur.peek())
-            && crate::element::is_element_start(self.dialect, cur, false)
-        {
-            let written = match crate::element::parse_written(self.dialect, cur, false, &[]) {
-                Ok(written) => written,
-                Err(e) => {
-                    return Some(Err(cotomet_syntax::Error::at(
-                        e.message, e.line, e.column, e.offset,
-                    )));
-                }
-            };
-            return Some(Ok(written.into_value()));
-        }
+impl<'a> Embedded<'a> {
+    /// The embedded nodes below `scope`, by the offset they start at. A node
+    /// that is lowered as a whole (an element, a `[content]`) hides what it holds,
+    /// which its own lowering finds; a group (`( )`, `{ }`, `#( )`) does not,
+    /// because a call's arguments can hold an element.
+    pub(crate) fn new(src: &'a str, scope: &SyntaxNode) -> Self {
+        let mut nodes = HashMap::new();
+        collect(scope, &mut nodes);
+        Embedded { src, nodes }
+    }
 
-        // Delegate dollar expressions (`$name(args)`/`${...}`) to CotometValueHook.
-        if let Some(res) = CotometValueHook.try_parse_value(cur) {
-            return Some(res);
-        }
+    pub(crate) fn src(&self) -> &'a str {
+        self.src
+    }
 
-        // `key: [ ... ]` -- block content as a value (`Value::Blocks`),
-        // the same recursive grammar `[content]` uses, bounded by `]`
-        // instead of consuming an enclosing element's own closer. Without
-        // this hook, `cotomet`'s own value grammar rejects `[` outright
-        // ("'[...]' list literal was removed").
-        if cur.peek() == Some('[') {
-            cur.bump();
-            let blocks = match crate::document::parse_block_seq(
-                self.dialect,
-                cur,
-                crate::document::BlockStop::Bracket(']'),
-                &[],
-            ) {
-                Ok(blocks) => blocks,
-                Err(e) => {
-                    return Some(Err(cotomet_syntax::Error::at(
-                        e.message, e.line, e.column, e.offset,
-                    )));
-                }
-            };
-            if !cur.eat_str("]") {
-                return Some(Err(cotomet_syntax::Error::at_offset(
-                    "expected ']'",
-                    cur.pos(),
-                )));
-            }
-            return Some(Ok(Value::Blocks(blocks)));
-        }
-
-        // `key: | prose` -- the `|content` run as a value (`Value::Blocks`),
-        // the same grammar an element's trailing `| prose` uses. The run
-        // ends where the marker column stops continuing it, which is what
-        // keeps a `,` or `}` inside the prose from closing the entry.
-        if cur.peek() == Some('|') {
-            return Some(
-                crate::element::parse_pipe_content(self.dialect, cur, &[])
-                    .map(Value::Blocks)
-                    .map_err(|e| cotomet_syntax::Error::at(e.message, e.line, e.column, e.offset)),
-            );
-        }
-
-        None
+    pub(crate) fn node_at(&self, at: usize) -> Option<&SyntaxNode> {
+        self.nodes.get(&at)
     }
 }
 
-pub(crate) fn parse_value_at(dialect: Dialect, cur: &mut Cursor) -> Result<Value> {
-    cotomet_syntax::parse_value_at_with(cur, &mut TometValueHook { dialect }).map_err(Into::into)
+fn collect(node: &SyntaxNode, into: &mut HashMap<usize, SyntaxNode>) {
+    for child in node.children() {
+        let at = usize::from(child.text_range().start());
+        match child.kind() {
+            // `${...}` is an inline element of the CST too, but it is no element:
+            // the interpolation grammar reads it.
+            K::INLINE_ELEMENT | K::BLOCK_ELEMENT if !opens_with_element_sigil(&child) => {
+                collect(&child, into);
+            }
+            K::INLINE_ELEMENT | K::BLOCK_ELEMENT | K::CONTENT => {
+                into.entry(at).or_insert(child);
+            }
+            K::ARGS | K::VALUE_DATA | K::MAP_LITERAL | K::ID_GROUP => {
+                into.entry(at).or_insert_with(|| child.clone());
+                collect(&child, into);
+            }
+            _ => collect(&child, into),
+        }
+    }
 }
 
-pub(crate) fn parse_one_entry(dialect: Dialect, cur: &mut Cursor) -> Result<(String, Value)> {
-    cotomet_syntax::parse_one_entry_with(cur, &mut TometValueHook { dialect }).map_err(Into::into)
+/// Whether `node` is written with `@`, or `?` (a hole), and not `$`.
+fn opens_with_element_sigil(node: &SyntaxNode) -> bool {
+    node.children()
+        .find(|n| n.kind() == K::SIGIL)
+        .and_then(|n| n.first_token())
+        .is_some_and(|t| matches!(t.kind(), K::AT | K::QUESTION))
+}
+
+fn hooked(e: Error) -> cotomet_syntax::Error {
+    cotomet_syntax::Error::at(e.message, e.line, e.column, e.offset)
+}
+
+impl cotomet_syntax::ValueHook for Embedded<'_> {
+    fn try_parse_value(&mut self, cur: &mut Cursor) -> Option<cotomet_syntax::Result<Value>> {
+        if let Some(node) = self.nodes.get(&cur.pos())
+            && matches!(
+                node.kind(),
+                K::INLINE_ELEMENT | K::BLOCK_ELEMENT | K::CONTENT
+            )
+        {
+            return Some(match crate::lower::lower_embedded(self.src, node) {
+                Ok((value, end)) => {
+                    cur.set_pos(end);
+                    Ok(value)
+                }
+                Err(e) => Err(hooked(e)),
+            });
+        }
+        // `$name(args)`/`${...}` sitting where a value goes.
+        CotometValueHook.try_parse_value(cur)
+    }
 }
