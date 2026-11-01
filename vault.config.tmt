@@ -51,6 +51,7 @@
 }
 ::vocabularies{
   writ: @file(tmtroot/schema/vocabularies/writ.vocabulary.tmt)
+  rust: @file(tmtroot/schema/vocabularies/rust.vocabulary.tmt)
   bookmark: @file(tmtroot/schema/vocabularies/bookmark.vocabulary.tmt)
   node-graph: @file(tmtroot/schema/vocabularies/node-graph.vocabulary.tmt)
   scenario: @file(tmtroot/schema/vocabularies/scenario.vocabulary.tmt)

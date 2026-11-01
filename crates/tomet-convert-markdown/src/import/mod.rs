@@ -1,4 +1,4 @@
-//! CommonMark -> `tomet_ast::Document`, folding `pulldown-cmark`'s
+//! CommonMark -> `tomet_ast::File`, folding `pulldown-cmark`'s
 //! event stream directly (no intermediate tree) using an explicit frame
 //! stack, one frame per currently-open tag.
 //!
@@ -29,7 +29,7 @@
 
 use pulldown_cmark::{CodeBlockKind, Event, Options, Parser, Tag, TagEnd};
 use tomet_ast::{
-    Block, Data, Document, Element, Inline, LineBreak, List, ListItem, Name, Paragraph, Placement,
+    Block, Data, Element, File, Inline, LineBreak, List, ListItem, Name, Paragraph, Placement,
     RawText, Section, SoftBreak, Text, Value,
 };
 use tomet_span::Span;
@@ -68,7 +68,7 @@ enum Frame {
     Emphasis(Vec<Inline>),
     /// GFM's `~~x~~`. Tomet spells it the same way, so the tildes used to
     /// reach the output verbatim and be re-read by Tomet's own parser --
-    /// which produced the right file and the wrong `Document`, since
+    /// which produced the right file and the wrong `File`, since
     /// `from_markdown`'s own result held text rather than an element.
     Strikeout(Vec<Inline>),
     Strong(Vec<Inline>),
@@ -128,11 +128,11 @@ pub(super) fn wrap_inline_content(inlines: Vec<Inline>) -> Vec<Block> {
     }
 }
 
-pub fn from_markdown(src: &str) -> Document {
+pub fn from_markdown(src: &str) -> File {
     from_markdown_with_options(src, &ImportOptions::default())
 }
 
-pub fn from_markdown_with_options(src: &str, options: &ImportOptions) -> Document {
+pub fn from_markdown_with_options(src: &str, options: &ImportOptions) -> File {
     let (frontmatter, markdown_body) = frontmatter::extract_yaml_frontmatter(src);
     let preprocessed_body = preprocess_markdown_tables(markdown_body);
 
@@ -143,12 +143,13 @@ pub fn from_markdown_with_options(src: &str, options: &ImportOptions) -> Documen
     // Separate from `ENABLE_GFM`, which turns on GFM's block extensions
     // and not this. Without it `~~x~~` reaches the output as tildes, and
     // Tomet's parser reads them back as a `strikeout` -- the right file
-    // from the wrong `Document`, which anyone calling `from_markdown` as
+    // from the wrong `File`, which anyone calling `from_markdown` as
     // a library got the wrong half of.
     options_flags.insert(Options::ENABLE_STRIKETHROUGH);
     let parser = Parser::new_ext(&preprocessed_body, options_flags);
     let mut stack: Vec<Frame> = vec![Frame::Blocks(Vec::new())];
 
+    let mut header = Vec::new();
     if let Some(mut entries) = frontmatter {
         // The identity of a document is the declaration `::id`, not a field of `::meta`.
         let id = entries
@@ -165,12 +166,12 @@ pub fn from_markdown_with_options(src: &str, options: &ImportOptions) -> Documen
             entries.remove(pos);
             let mut id_declaration = declaration_new("id");
             id_declaration.data.args = Some(Value::String(text));
-            push_block(&mut stack, Block::Declaration(id_declaration));
+            header.push(id_declaration);
         }
         if !had_id || !entries.is_empty() {
             let mut meta_declaration = declaration_new("meta");
             meta_declaration.data.value = Some(tomet_ast::Group::from_map(Value::Map(entries)));
-            push_block(&mut stack, Block::Declaration(meta_declaration));
+            header.push(meta_declaration);
         }
     }
 
@@ -234,10 +235,11 @@ pub fn from_markdown_with_options(src: &str, options: &ImportOptions) -> Documen
     }
 
     let root = stack.pop().expect("root frame always present");
-    let mut doc = match root {
-        Frame::Blocks(blocks) => Document::new(structure_sections(blocks), Span::dummy()),
-        _ => Document::default(),
+    let body = match root {
+        Frame::Blocks(blocks) => structure_sections(blocks),
+        _ => Vec::new(),
     };
+    let mut doc = File::new(header, body, Span::dummy());
     wikilink::post_process_document_wikilinks(&mut doc);
     doc
 }
@@ -787,7 +789,7 @@ fn merge_block_into(content: &mut Vec<Inline>, block: Block) {
             content.push(Inline::Interp(interp));
         }
         // What a document says about itself is not content to flatten.
-        Block::Declaration(_) | Block::Hole(_) => {}
+        Block::Hole(_) => {}
         Block::Section(sec) => {
             extend_spaced(content, sec.title);
             for child in sec.blocks {

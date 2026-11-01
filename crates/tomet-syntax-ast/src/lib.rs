@@ -1,8 +1,8 @@
 //! =[ tomet-ast ]
 //!
-//! Shared AST and `Value` data models for the Tomet toolchain (`Document`, `Block`,
-//! `Inline`, `Element`, `ElementView`, `BodyView`, `Declaration`, `Interpolation`,
-//! `Hole`, `ListItem`, `Value`, `Span`).
+//! Shared AST and `Value` data models for the Tomet toolchain ([`File`], [`Block`],
+//! [`Inline`], [`Element`], [`ElementView`], [`BodyView`], [`Declaration`], [`Interpolation`],
+//! [`Hole`], [`ListItem`], [`Value`], [`Span`]).
 //!
 //! =[ Design Policy ]
 //!
@@ -15,9 +15,9 @@
 //!   | A `${...}` is an [`Interpolation`] (an expression and a span), not an [`Element`]:
 //!   | it has no name, no groups and no connects, so it is a variant of [`Block`],
 //!   | [`Inline`] and [`Value`] and no walker over elements ever meets one. Reach every
-//!   | interpolation of a document through `tomet_tree::for_each_interpolation`.
-//!   | A `::name(...)` is a [`Declaration`]: always a [`Block`], about the document and attached to
-//!   | nothing, so it has no placement and takes no connect.
+//!   | interpolation of a file through `tomet_tree::for_each_interpolation`.
+//!   | A `::name(...)` is a [`Declaration`]: sits in the file preamble header ([`File::header`]),
+//!   | about the file and attached to nothing, so it has no placement and takes no connect.
 //!   | A `:name(...)` is a [`Connect`]: metadata about its owner, with no id, no connects of its own
 //!   | and no placement. A `<?matcher(...)>` is a [`Hole`] (a matcher, optional, in place of a name).
 //!   | `<...>` is one family in the *syntax* (the CST has one `SLOT` node, whatever the mark inside); the
@@ -309,18 +309,6 @@ impl<'de> Deserialize<'de> for Value {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
-pub struct Document {
-    pub blocks: Vec<Block>,
-    pub span: Span,
-}
-
-impl Document {
-    pub fn new(blocks: Vec<Block>, span: Span) -> Self {
-        Self { blocks, span }
-    }
-}
-
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum Block {
     Paragraph(Paragraph),
@@ -329,8 +317,6 @@ pub enum Block {
     /// A `-`/`-.` list, first-class like [`Section`] rather than encoded as
     /// a named [`Element`]. See [`List`].
     List(List),
-    /// A `::name(...)` declaration about the document itself. See [`Declaration`].
-    Declaration(Declaration),
     /// A `<?matcher(...)>` hole standing as a block. See [`Hole`].
     Hole(Hole),
     /// A `${...}` that stands alone on its line, in block context. It is a
@@ -346,7 +332,6 @@ impl Block {
             Block::Element(e) => e.span,
             Block::Section(s) => s.span,
             Block::List(l) => l.span,
-            Block::Declaration(d) => d.span,
             Block::Hole(h) => h.span,
             Block::Interp(i) => i.span,
         }
@@ -757,17 +742,17 @@ pub enum Placement {
     Inline,
 }
 
-/// A `::name(args){data}[content]#(id)` declaration about the document itself,
+/// A `::name(args){data}[content]#(id)` declaration about the file itself,
 /// not content in it.
 ///
 /// It takes the groups an element does and is introduced by `::` instead of
-/// `@`. The sigil says *where* it belongs -- in the document's preamble, the
-/// run of `::` blocks at the top -- so the preamble can be found without
-/// loading any vocabulary. Which names may be written this way is the
+/// `@`. The sigil says *where* it belongs -- in the file's preamble header
+/// ([`File::header`]), the run of `::` declarations at the top -- so the preamble can be
+/// found without loading any vocabulary. Which names may be written this way is the
 /// `Region` a vocabulary declares for them, and whether one takes `[content]`
 /// is that vocabulary's call too, so the parser does not decide it.
 ///
-/// It is always a [`Block`]: a `::` has to open its line and stand alone on it,
+/// It sits in [`File::header`]: a `::` has to open its line and stand alone on it,
 /// and so has no [`Placement`]. And it is attached to nothing, so unlike an
 /// [`Element`] it takes no `:connect`.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -917,7 +902,7 @@ pub struct Element {
     pub placement: Placement,
     pub data: Data,
     /// `[content]` / `|content`, parsed with the exact same recursive block
-    /// grammar as `Document.blocks`/`Section.blocks`: a bare run with no
+    /// grammar as `file.body`/`Section.blocks`: a bare run with no
     /// block markers becomes `[Paragraph(...)]`, and blank lines, `=[...]`
     /// headings, lists etc. inside the brackets/pipe-run nest as their own
     /// `Block`s, same as at the top level. Whether a *given* element's
@@ -1389,13 +1374,23 @@ pub enum Literal {
     Null,
 }
 
-/// A standalone cotomet data file (`.ctmt`): its declarations at the top, then its map entries.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct File {
-    /// The `::name` declarations at the top, in order.
+/// A Tomet file: its `::name(...)` declarations in the preamble header, followed by its body.
+///
+/// For prose documents (`.tmt`), `body` defaults to `Vec<Block>`.
+/// For structured data files (`.ctmt`), `body` is [`Value`].
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
+pub struct File<B = Vec<Block>> {
+    /// The `::name(...)` declarations at the top of the file, in source order.
     pub header: Vec<Declaration>,
-    /// The entries: a [`Value::Map`] of `key: value`.
-    pub body: Value,
+    /// The main file content (blocks for prose, or a data value for cotomet).
+    pub body: B,
+    pub span: Span,
+}
+
+impl<B> File<B> {
+    pub fn new(header: Vec<Declaration>, body: B, span: Span) -> Self {
+        Self { header, body, span }
+    }
 }
 
 #[cfg(test)]

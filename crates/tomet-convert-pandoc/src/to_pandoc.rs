@@ -1,7 +1,7 @@
-//! `tomet_ast::Document` -> Pandoc's AST.
+//! `tomet_ast::File` -> Pandoc's AST.
 
 use tomet_ast::{
-    Bare, Block as TmBlock, BodyView, Document, ElementView, Entry, Group, Id, Inline as TmInline,
+    Bare, Block as TmBlock, BodyView, ElementView, Entry, File, Group, Id, Inline as TmInline,
     Interpolation, List, Placement, Value,
 };
 use tomet_semantics::{
@@ -22,9 +22,9 @@ use crate::ast::{
 /// `::meta{title: x}` survives into every output format. The sibling
 /// writers have nowhere to put `::meta` and drop it; this is deliberately
 /// not symmetric with them.
-pub fn to_pandoc(doc: &Document) -> PandocDoc {
+pub fn to_pandoc(doc: &File) -> PandocDoc {
     let mut blocks = Vec::new();
-    for block in &doc.blocks {
+    for block in &doc.body {
         blocks.extend(block_to_pandoc(block));
     }
     let mut out = PandocDoc::new(blocks);
@@ -97,9 +97,6 @@ fn block_to_pandoc(block: &TmBlock) -> Vec<Block> {
         TmBlock::Paragraph(p) => content_to_blocks(&p.content),
         TmBlock::Element(el) => element_to_blocks(el.as_view()),
         TmBlock::Interp(interp) => vec![Block::Para(vec![interp_inline(interp)])],
-        // What a declaration says about the document is `to_pandoc`'s metadata,
-        // not a block.
-        TmBlock::Declaration(_) => Vec::new(),
         TmBlock::Hole(hole) => vec![Block::Para(vec![hole_inline(hole)])],
         TmBlock::Section(sec) => {
             let mut blocks = if !sec.title.is_empty() {
@@ -301,7 +298,6 @@ fn blocks_to_inlines_lossy(blocks: &[TmBlock]) -> Vec<Inline> {
             TmBlock::Paragraph(p) => out.extend(inlines_to_pandoc(&p.content)),
             TmBlock::Element(el) => out.extend(element_to_inlines(el.as_view())),
             TmBlock::Interp(interp) => out.push(interp_inline(interp)),
-            TmBlock::Declaration(_) => {}
             TmBlock::Hole(hole) => out.push(hole_inline(hole)),
             TmBlock::Section(sec) => out.extend(inlines_to_pandoc(&sec.title)),
             TmBlock::List(list) => {
@@ -383,7 +379,6 @@ fn element_content_to_blocks(blocks: &[TmBlock]) -> Vec<Block> {
             }
             TmBlock::Element(el) => out.extend(element_to_blocks(el.as_view())),
             TmBlock::Interp(interp) => out.push(Block::Para(vec![interp_inline(interp)])),
-            TmBlock::Declaration(_) => {}
             TmBlock::Hole(hole) => out.push(Block::Para(vec![hole_inline(hole)])),
             // No direct Pandoc equivalent for a nested section; a header
             // plus its own blocks is the closest shape.
@@ -421,7 +416,6 @@ fn blocks_to_pandoc_inlines(blocks: &[TmBlock]) -> Vec<Inline> {
             TmBlock::Paragraph(p) => out.extend(inlines_to_pandoc(&p.content)),
             TmBlock::Element(el) => out.extend(element_to_inlines(el.as_view())),
             TmBlock::Interp(interp) => out.push(interp_inline(interp)),
-            TmBlock::Declaration(_) => {}
             TmBlock::Hole(hole) => out.push(hole_inline(hole)),
             TmBlock::Section(sec) => out.extend(inlines_to_pandoc(&sec.title)),
             TmBlock::List(list) => {
@@ -577,7 +571,7 @@ fn blocks_plain_text(blocks: &[TmBlock]) -> String {
         match block {
             TmBlock::Paragraph(p) => out.push_str(&plain_text(&p.content)),
             TmBlock::Element(el) => out.push_str(&blocks_plain_text(content_of(el.as_view()))),
-            TmBlock::Interp(_) | TmBlock::Declaration(_) => {}
+            TmBlock::Interp(_) => {}
             TmBlock::Hole(hole) => out.push_str(&tomet_printer::hole_to_tm(hole)),
             TmBlock::Section(sec) => out.push_str(&plain_text(&sec.title)),
             TmBlock::List(list) => {
@@ -843,11 +837,11 @@ fn code_attr(el: ElementView<'_>) -> Attr {
 mod tests {
     use super::*;
     use crate::ast::TableParts;
-    use tomet_ast_parser::parse_document;
+    use tomet_ast_parser::parse_file;
     use tomet_semantics::EXACT_DATA_KEY;
 
     fn convert(src: &str) -> Vec<Block> {
-        to_pandoc(&parse_document(src).unwrap()).blocks
+        to_pandoc(&parse_file(src).unwrap()).blocks
     }
 
     #[test]
@@ -951,7 +945,7 @@ mod tests {
 
     #[test]
     fn the_id_declaration_feeds_the_metadata_id() {
-        let doc = parse_document("::id(doc-1)\n::meta{title: Hello}\n\n本文\n").unwrap();
+        let doc = parse_file("::id(doc-1)\n::meta{title: Hello}\n\n本文\n").unwrap();
         let pandoc = to_pandoc(&doc);
         assert_eq!(
             pandoc.meta.get("id"),
@@ -962,7 +956,7 @@ mod tests {
 
     #[test]
     fn meta_feeds_the_document_metadata_map() {
-        let doc = parse_document("::meta{title: Hello, draft: true, tags: list(a, b)}\n\n本文\n")
+        let doc = parse_file("::meta{title: Hello, draft: true, tags: list(a, b)}\n\n本文\n")
             .unwrap();
         let pandoc = to_pandoc(&doc);
         assert_eq!(
@@ -982,7 +976,7 @@ mod tests {
 
         // list(...) call literal converts identically to [a, b]
         let doc_call =
-            parse_document("::meta{title: Hello, draft: true, tags: list(a, b)}\n\n本文\n")
+            parse_file("::meta{title: Hello, draft: true, tags: list(a, b)}\n\n本文\n")
                 .unwrap();
         let pandoc_call = to_pandoc(&doc_call);
         assert_eq!(
@@ -998,7 +992,7 @@ mod tests {
     fn a_meta_number_becomes_a_string() {
         // Pandoc metadata has no numeric type. Recorded rather than
         // hidden: this is the one lossy edge of the meta mapping.
-        let doc = parse_document("::meta{year: 2026}\n").unwrap();
+        let doc = parse_file("::meta{year: 2026}\n").unwrap();
         assert_eq!(
             to_pandoc(&doc).meta.get("year"),
             Some(&MetaValue::MetaString("2026".into()))
@@ -1165,7 +1159,7 @@ mod tests {
 
     #[test]
     fn the_whole_document_serializes_to_pandoc_json() {
-        let doc = parse_document("#[ T ]\n\n本文です。\n").unwrap();
+        let doc = parse_file("#[ T ]\n\n本文です。\n").unwrap();
         let json = serde_json::to_string(&to_pandoc(&doc)).unwrap();
         assert!(json.starts_with(r#"{"pandoc-api-version":[1,23,1],"meta":{},"blocks":["#));
     }

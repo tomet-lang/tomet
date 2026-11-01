@@ -1,6 +1,6 @@
 //! A generic three-way merge over any `PartialEq` slice, independent of
 //! `tomet_ast`. This is the primitive `merge()` in `lib.rs` applies at
-//! each level of the tree (`Document.blocks`, `Element.content`, ...);
+//! each level of the tree (`File.body`, `Element.content`, ...);
 //! it is tested here against plain `char`/`i32` fixtures precisely so
 //! those tests don't also have to construct AST nodes to exercise the
 //! alignment logic.

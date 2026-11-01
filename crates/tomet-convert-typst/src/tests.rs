@@ -1,8 +1,8 @@
 use super::*;
-use tomet_ast_parser::parse_document;
+use tomet_ast_parser::parse_file;
 
 fn typst(src: &str) -> String {
-    to_typst(&parse_document(src).unwrap())
+    to_typst(&parse_file(src).unwrap())
 }
 
 #[test]

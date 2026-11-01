@@ -49,7 +49,7 @@
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use tomet_ast::{Block, Document};
+use tomet_ast::{Block, File};
 use tomet_span::Span;
 use tomet_config::PrinterConfig;
 use tomet_expr::{
@@ -65,7 +65,7 @@ pub use tomet_transform::{Unresolved, UnresolvedKind};
 pub use tomet_validator::Diagnostic;
 
 /// Whether `doc` promises `::profile(standalone)`, which is a promise to be read without a vault.
-fn reads_alone(doc: &Document) -> bool {
+fn reads_alone(doc: &File) -> bool {
     tomet_declaration::document_profiles(doc).contains(&tomet_declaration::Profile::Standalone)
 }
 
@@ -118,9 +118,9 @@ pub fn validate_sources(
         .collect();
     let vault = Vault::from_sources(config, ".", &sources);
     let (doc, _) = vault.parse(source).map_err(|e| e.to_string())?;
-    let blueprints: Vec<Document> = blueprints
+    let blueprints: Vec<File> = blueprints
         .iter()
-        .filter_map(|src| tomet_ast_parser::parse_document(src).ok())
+        .filter_map(|src| tomet_ast_parser::parse_file(src).ok())
         .collect();
     Ok(vault.diagnostics(&doc, &blueprints))
 }
@@ -196,7 +196,7 @@ impl Vault {
     /// other file, so nothing but the document's own bytes answers an expression.
     fn reading<'a>(
         &'a self,
-        doc: &Document,
+        doc: &File,
         resolver: &'a dyn Resolver,
     ) -> (&'a Vault, &'a dyn Resolver) {
         if reads_alone(doc) {
@@ -208,7 +208,7 @@ impl Vault {
 
     /// The dictionaries `doc` looks its `@term` mentions up in: the vault's, or, for a document
     /// that reads alone, only itself, when it is a dictionary.
-    fn dictionaries_for(&self, doc: &Document) -> std::borrow::Cow<'_, LoadedDictionaries> {
+    fn dictionaries_for(&self, doc: &File) -> std::borrow::Cow<'_, LoadedDictionaries> {
         use std::borrow::Cow;
         if !reads_alone(doc) {
             return Cow::Borrowed(&self.dictionaries);
@@ -227,7 +227,7 @@ impl Vault {
     /// Only what changes the meaning is taken away. A constraint the vault puts on a document
     /// (a blueprint, the `type:` a metadata field must have) leaves what it means as it is, so it
     /// is still checked.
-    fn seen_by(&self, doc: &Document) -> &Vault {
+    fn seen_by(&self, doc: &File) -> &Vault {
         if reads_alone(doc) {
             self.alone.get_or_init(|| {
                 Box::new(Vault::new(
@@ -270,7 +270,7 @@ impl Vault {
     ) -> Self {
         let mut loaded = LoadedVocabularies::default();
         for (label, src) in vocabularies {
-            match tomet_ast_parser::parse_document(src) {
+            match tomet_ast_parser::parse_file(src) {
                 Ok(doc) => loaded.add(label, &doc),
                 Err(e) => loaded
                     .errors
@@ -290,7 +290,7 @@ impl Vault {
     /// gives. What does need it (an expression that reaches another document,
     /// finding the blueprint's file) is added by whoever has one:
     /// `tomet-load`'s `Vault::findings`.
-    pub fn diagnostics(&self, doc: &Document, blueprints: &[Document]) -> Vec<Diagnostic> {
+    pub fn diagnostics(&self, doc: &File, blueprints: &[File]) -> Vec<Diagnostic> {
         let bindings = self.bindings(doc);
         let mut diagnostics = tomet_validator::validate_document_with(doc, &bindings);
 
@@ -321,7 +321,7 @@ impl Vault {
 
     /// The `@term` mentions in `doc` that name no term of this vault's dictionaries. An `@term`
     /// with no argument is a definition (in a `::dictionary`), not a mention.
-    fn unresolved_terms(&self, doc: &Document) -> Vec<Diagnostic> {
+    fn unresolved_terms(&self, doc: &File) -> Vec<Diagnostic> {
         use tomet_semantics::{ElementKind, TermRef, ValueExt};
 
         let own = tomet_declaration::document_dictionary(doc);
@@ -356,13 +356,13 @@ impl Vault {
     /// This is what makes an element name mean something. Matching on a
     /// bare `Element::name` instead is the shortcut that drops the
     /// namespaced spelling of the same element.
-    pub fn bindings(&self, doc: &Document) -> Bindings {
+    pub fn bindings(&self, doc: &File) -> Bindings {
         self.seen_by(doc).loaded.bindings_for(doc)
     }
 
     /// Parses `src` and binds its names against this vault.
-    pub fn parse(&self, src: &str) -> Result<(Document, Bindings), tomet_ast_parser::Error> {
-        let doc = tomet_ast_parser::parse_document(src)?;
+    pub fn parse(&self, src: &str) -> Result<(File, Bindings), tomet_ast_parser::Error> {
+        let doc = tomet_ast_parser::parse_file(src)?;
         let bindings = self.bindings(&doc);
         Ok((doc, bindings))
     }
@@ -379,7 +379,7 @@ impl Vault {
     /// past it for one rewrite is how a rewrite ends up applied in three
     /// commands and missing from the fourth -- which is the state
     /// interpolation was in before this existed.
-    pub fn prepare(&self, doc: &mut Document, path: &Path, resolver: &dyn Resolver) -> Prepared {
+    pub fn prepare(&self, doc: &mut File, path: &Path, resolver: &dyn Resolver) -> Prepared {
         let (vault, resolver) = self.reading(doc, resolver);
         let scope = vault.scope(doc, path, resolver);
         let prepared = Prepared {
@@ -397,7 +397,7 @@ impl Vault {
     /// document promises `::profile(standalone)`: making that promise true is what it is for.
     pub fn prepare_selected(
         &self,
-        doc: &mut Document,
+        doc: &mut File,
         path: &Path,
         resolver: &dyn Resolver,
         selected: &dyn Fn(Span) -> bool,
@@ -411,7 +411,7 @@ impl Vault {
     /// Gives every `@term` mention that names a term the term's own text, unless the author wrote
     /// something between the brackets, so that a converter renders a word and need not know what a
     /// dictionary is. A mention that names no term is left as it is; `tomet check` reports it.
-    fn fill_terms(&self, doc: &mut Document) {
+    fn fill_terms(&self, doc: &mut File) {
         use tomet_ast::{Block, Inline, Paragraph, Text};
         use tomet_semantics::{ElementKind, TermRef, ValueExt};
 
@@ -456,7 +456,7 @@ impl Vault {
     /// rendering: they exist only when a document is created.
     pub fn evaluate(
         &self,
-        doc: &Document,
+        doc: &File,
         path: &Path,
         expr: &tomet_ast::InterpExpr,
         resolver: &dyn Resolver,
@@ -469,7 +469,7 @@ impl Vault {
     /// Everything an evaluation of something written in `doc` needs that is
     /// not the expression: where `self` is, what `#id` is answered from, the
     /// macros in scope.
-    fn scope<'a>(&self, doc: &Document, path: &Path, resolver: &'a dyn Resolver) -> Scope<'a> {
+    fn scope<'a>(&self, doc: &File, path: &Path, resolver: &'a dyn Resolver) -> Scope<'a> {
         let self_doc = self.doc_ref(path);
         let snapshot = Arc::new(doc.clone());
         let config = self.evaluation_config(doc);
@@ -530,10 +530,10 @@ impl Vault {
             heading_level: 0,
             notes: Default::default(),
         };
-        let mut holder = Document::new(blocks, Span::default());
+        let mut holder = File::new(vec![], blocks, Span::default());
         let unresolved = tomet_transform::resolve_expressions(&mut holder, &cx).len();
         Ok(PreparedBlocks {
-            blocks: holder.blocks,
+            blocks: holder.body,
             unresolved,
         })
     }
@@ -555,7 +555,7 @@ impl Vault {
     /// The document wins a collision, which is the direction every other
     /// scope in this format runs. Before this lived here it lived in the
     /// CLI, so a macro reached CommonMark and nothing else.
-    fn evaluation_config(&self, doc: &Document) -> tomet_semantics::DocumentConfig {
+    fn evaluation_config(&self, doc: &File) -> tomet_semantics::DocumentConfig {
         let mut config = tomet_semantics::document_config(doc);
         for (name, template) in &self.config.macros {
             config
@@ -711,7 +711,7 @@ mod tests {
         let mut dictionaries = tomet_semantics::LoadedDictionaries::default();
         dictionaries.add(
             "tomet.tmt",
-            &tomet_ast_parser::parse_document(
+            &tomet_ast_parser::parse_file(
                 "::dictionary(tomet){ \"vault.config.tmt\": @term[ The file that marks a vault. ]#(vault-config) }\n",
             )
             .expect("parses"),
@@ -775,7 +775,7 @@ mod tests {
         assert_eq!(text_of("a @term(tomet#gone) b\n"), [None]);
     }
 
-    fn prepared(vault: &Vault, path: &str, src: &str) -> (Document, Prepared) {
+    fn prepared(vault: &Vault, path: &str, src: &str) -> (File, Prepared) {
         let (mut doc, _) = vault.parse(src).expect("parses");
         let prepared = vault.prepare(&mut doc, Path::new(path), &NoResolver);
         (doc, prepared)
@@ -824,8 +824,8 @@ mod tests {
 
     /// The text of every paragraph, joined by a space. Two expressions on
     /// one line are two blocks, so a document is read as a whole.
-    fn text_of(doc: &Document) -> String {
-        doc.blocks
+    fn text_of(doc: &File) -> String {
+        doc.body
             .iter()
             .filter_map(|block| match block {
                 tomet_ast::Block::Paragraph(p) => Some(
@@ -994,7 +994,7 @@ mod tests {
     #[test]
     fn a_standalone_document_is_still_held_to_a_blueprint() {
         let vault = vault_with_a_macro();
-        let blueprint = tomet_ast_parser::parse_document(BLUEPRINT).unwrap();
+        let blueprint = tomet_ast_parser::parse_file(BLUEPRINT).unwrap();
         let src = format!("{PROMISE}::kind(note)\n\n=[ Other ]\n");
         let doc = vault.parse(&src).unwrap().0;
         let found = vault.diagnostics(&doc, &[blueprint]);

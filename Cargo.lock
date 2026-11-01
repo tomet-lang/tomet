@@ -1808,7 +1808,6 @@ dependencies = [
  "tomet-lexer",
  "tomet-lowering",
  "tomet-position",
- "tomet-semantics",
  "tomet-span",
  "tomet-tree",
 ]

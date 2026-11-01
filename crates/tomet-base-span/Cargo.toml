@@ -7,5 +7,5 @@ license.workspace = true
 repository.workspace = true
 
 [dependencies]
-#= Crates.io
+#--- Crates.io ---
 serde = { workspace = true }

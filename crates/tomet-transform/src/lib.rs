@@ -30,8 +30,8 @@ mod tests {
     use std::collections::HashMap;
     use tomet_ast::Value;
 
-    fn parse_doc(src: &str) -> tomet_ast::Document {
-        tomet_ast_parser::parse_document(src).expect("valid source")
+    fn parse_doc(src: &str) -> tomet_ast::File {
+        tomet_ast_parser::parse_file(src).expect("valid source")
     }
 
     #[test]
@@ -60,7 +60,7 @@ mod tests {
         assert!(promote_meta_type_to_kind(&mut doc));
 
         let mut names = Vec::new();
-        tomet_tree::for_each_top_level_declaration(&doc, |declaration| {
+        tomet_tree::for_each_declaration(&doc, |declaration| {
             names.push(declaration.name.clone());
         });
         assert!(names.iter().any(|n| n.is_bare_named("kind")));
@@ -75,7 +75,7 @@ mod tests {
 
         let mut id = None;
         let mut meta_keys = Vec::new();
-        tomet_tree::for_each_top_level_declaration(&doc, |declaration| {
+        tomet_tree::for_each_declaration(&doc, |declaration| {
             if declaration.name.is_bare_named("id") {
                 id = declaration.data.args.clone();
             }

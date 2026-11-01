@@ -2,14 +2,14 @@ use super::*;
 
 #[test]
 fn renders_list() {
-    let doc = parse_document("- one\n- two\n").unwrap();
+    let doc = parse_file("- one\n- two\n").unwrap();
     let body = render_body(&doc);
     assert_eq!(body, "<ul>\n<li>one</li>\n<li>two</li>\n</ul>\n");
 }
 
 #[test]
 fn renders_ordered_list_as_ol() {
-    let doc = parse_document("-. one\n-. two\n").unwrap();
+    let doc = parse_file("-. one\n-. two\n").unwrap();
     let body = render_body(&doc);
     assert_eq!(body, "<ol>\n<li>one</li>\n<li>two</li>\n</ol>\n");
 }
@@ -17,7 +17,7 @@ fn renders_ordered_list_as_ol() {
 #[test]
 fn renders_list_with_value_markers_and_attrs() {
     let doc =
-        parse_document("- (T) in-progress {tag: dev}\n- (\"?\") question #(task1)\n").unwrap();
+        parse_file("- (T) in-progress {tag: dev}\n- (\"?\") question #(task1)\n").unwrap();
     let body = render_body(&doc);
     assert_eq!(
         body,
@@ -31,14 +31,14 @@ fn renders_list_with_value_markers_and_attrs() {
 /// `@x[T] content` keeps both halves in one paragraph.
 #[test]
 fn bracket_after_a_list_marker_is_the_content_group() {
-    let doc = parse_document("- [T] content\n").unwrap();
+    let doc = parse_file("- [T] content\n").unwrap();
     let body = render_body(&doc);
     assert_eq!(body, "<ul>\n<li>T content</li>\n</ul>\n");
 }
 
 #[test]
 fn renders_key_value_list_marker_as_multiple_data_attrs() {
-    let doc = parse_document("- (color: red, priority: high) content\n").unwrap();
+    let doc = parse_file("- (color: red, priority: high) content\n").unwrap();
     let body = render_body(&doc);
     assert_eq!(
         body,
@@ -49,7 +49,7 @@ fn renders_key_value_list_marker_as_multiple_data_attrs() {
 #[test]
 fn renders_list_marker_with_embedded_element() {
     let doc =
-        parse_document("- (@em[Important]) content\n- (@link(https://example.com)[Wiki]) docs\n")
+        parse_file("- (@em[Important]) content\n- (@link(https://example.com)[Wiki]) docs\n")
             .unwrap();
     let body = render_body(&doc);
     assert_eq!(

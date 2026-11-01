@@ -73,14 +73,6 @@ pub enum Diagnostic {
         first: Span,
         duplicate: Span,
     },
-    /// An element that may only sit in the preamble, found after the
-    /// document's body has started.
-    ///
-    /// The preamble is the run of such elements at the top of the file;
-    /// the first block that is not one of them ends it. A `::kind` below
-    /// that point is a directive nobody reading top-down would meet in
-    /// time.
-    OutsidePreamble { name: String, span: Span },
     /// An element written with the sigil of the other kind: a declaration
     /// about the document written `@name` (it is `::name`), or content written
     /// `::name` (it is `@name`).
@@ -280,7 +272,6 @@ impl Diagnostic {
             Diagnostic::DisallowedByRule { span, .. } => *span,
             Diagnostic::ShapeMismatch { span, .. } => *span,
             Diagnostic::DuplicateSingleton { duplicate, .. } => *duplicate,
-            Diagnostic::OutsidePreamble { span, .. } => *span,
             Diagnostic::WrongSigil { span, .. } => *span,
             Diagnostic::VaultOnlyDeclaration { span, .. } => *span,
             Diagnostic::MetaIdMoved { span } => *span,
@@ -428,13 +419,6 @@ impl Diagnostic {
                     Some(loc) => write!(f, "; the first is at {loc}"),
                     None => Ok(()),
                 }
-            }
-            Diagnostic::OutsidePreamble { name, .. } => {
-                write!(
-                    f,
-                    "`{name}` belongs in the preamble -- before the document's body \
-                     starts, not after it"
-                )
             }
             Diagnostic::WrongSigil {
                 name,

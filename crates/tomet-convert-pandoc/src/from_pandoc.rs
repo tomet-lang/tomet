@@ -1,4 +1,4 @@
-//! Pandoc's AST -> `tomet_ast::Document`.
+//! Pandoc's AST -> `tomet_ast::File`.
 //!
 //! The inverse of [`crate::to_pandoc`], and deliberately not a perfect
 //! one. All three losses below are pinned by `tomet-tests`'
@@ -35,9 +35,8 @@
 //!   `Attr` is where data goes. Only the elements move.
 
 use tomet_ast::{
-    Bare, Block as TmBlock, Data, Declaration, Document, Element, Entry, Group, Id,
-    Inline as TmInline, LineBreak, List, Name, Paragraph, Placement, RawText, Section, SoftBreak,
-    Text, Value,
+    Bare, Block as TmBlock, Data, Declaration, Element, Entry, File, Group, Id, Inline as TmInline,
+    LineBreak, List, Name, Paragraph, Placement, RawText, Section, SoftBreak, Text, Value,
 };
 use tomet_span::Span;
 use tomet_semantics::EXACT_DATA_KEY;
@@ -52,7 +51,8 @@ use crate::ast::{Attr, Block, Inline, MetaValue, PandocDoc, Row, TableParts};
 const CLASS_PREFIX: &str = "tomet-";
 
 /// Converts a Pandoc document to a Tomet document.
-pub fn from_pandoc(doc: &PandocDoc) -> Document {
+pub fn from_pandoc(doc: &PandocDoc) -> File {
+    let mut header = Vec::new();
     let mut blocks = Vec::new();
     // Pandoc's `id` is the identity of the document: the declaration `::id(...)`, not a field of `::meta`.
     let mut meta = doc.meta.clone();
@@ -65,17 +65,17 @@ pub fn from_pandoc(doc: &PandocDoc) -> Document {
     if let Some(id) = id {
         let mut id_declaration = declaration_new("id");
         id_declaration.data.args = Some(Value::String(id));
-        blocks.push(TmBlock::Declaration(id_declaration));
+        header.push(id_declaration);
     }
     if !meta.is_empty() {
-        blocks.push(TmBlock::Declaration(meta_declaration(&meta)));
+        header.push(meta_declaration(&meta));
     }
     for block in &doc.blocks {
         if let Some(b) = block_from_pandoc(block) {
             blocks.push(b);
         }
     }
-    Document::new(structure_sections(blocks), Span::dummy())
+    File::new(header, structure_sections(blocks), Span::dummy())
 }
 
 fn structure_sections(blocks: Vec<TmBlock>) -> Vec<TmBlock> {
@@ -569,7 +569,7 @@ fn blocks_to_text_tm(blocks: &[TmBlock]) -> String {
                     out.push_str(&blocks_to_text_tm(&item.content));
                 }
             }
-            TmBlock::Interp(_) | TmBlock::Declaration(_) | TmBlock::Hole(_) => {}
+            TmBlock::Interp(_) | TmBlock::Hole(_) => {}
         }
     }
     out
@@ -744,22 +744,22 @@ fn assert_json_round_trip(v: &Value) {
 mod tests {
     use super::*;
     use crate::to_pandoc;
-    use tomet_ast_parser::parse_document;
+    use tomet_ast_parser::parse_file;
     use tomet_printer::document_to_tm;
 
     /// Tomet source -> Pandoc -> Tomet source.
     fn round_trip(src: &str) -> String {
-        let doc = parse_document(src).unwrap();
+        let doc = parse_file(src).unwrap();
         document_to_tm(&from_pandoc(&to_pandoc(&doc)))
     }
 
     #[test]
     fn prose_and_headings_survive_a_round_trip() {
         let back = from_pandoc(&to_pandoc(
-            &parse_document("=[ Title ]\n\n本文です。\n").unwrap(),
+            &parse_file("=[ Title ]\n\n本文です。\n").unwrap(),
         ));
-        let TmBlock::Section(sec) = &back.blocks[0] else {
-            panic!("expected a section, got {:?}", back.blocks[0]);
+        let TmBlock::Section(sec) = &back.body[0] else {
+            panic!("expected a section, got {:?}", back.body[0]);
         };
         assert_eq!(sec.level, 1);
         assert_eq!(sec.blocks.len(), 1);
@@ -771,9 +771,9 @@ mod tests {
         // Structure, not spelling: the printer re-emits an `em` element
         // as `@em[a]` rather than the `*a*` sugar it was written with.
         let back = from_pandoc(&to_pandoc(
-            &parse_document("*a* と **b** です。\n").unwrap(),
+            &parse_file("*a* と **b** です。\n").unwrap(),
         ));
-        let TmBlock::Paragraph(p) = &back.blocks[0] else {
+        let TmBlock::Paragraph(p) = &back.body[0] else {
             panic!("expected a paragraph");
         };
         let names: Vec<String> = p
@@ -818,10 +818,10 @@ mod tests {
     fn the_exact_copy_restores_both_groups() {
         // Without `tomet-data` the two groups cannot be told apart on the
         // way back; with it, they come back exactly as written.
-        let doc = parse_document("@deck.card(url: \"x\"){ id: c1, m: { k: v } }\n").unwrap();
+        let doc = parse_file("@deck.card(url: \"x\"){ id: c1, m: { k: v } }\n").unwrap();
         let back = from_pandoc(&to_pandoc(&doc));
-        let TmBlock::Element(el) = &back.blocks[0] else {
-            panic!("expected an element, got {:?}", back.blocks[0]);
+        let TmBlock::Element(el) = &back.body[0] else {
+            panic!("expected an element, got {:?}", back.body[0]);
         };
         assert_eq!(
             el.data.args,
@@ -847,9 +847,9 @@ mod tests {
     fn without_the_exact_copy_the_data_lands_in_the_value_group() {
         // The documented asymmetry: a flat `(args)` needs no exact copy,
         // so nothing records that it was `(args)` rather than `{value}`.
-        let doc = parse_document("@deck.card(a: 1)\n").unwrap();
+        let doc = parse_file("@deck.card(a: 1)\n").unwrap();
         let back = from_pandoc(&to_pandoc(&doc));
-        let TmBlock::Element(el) = &back.blocks[0] else {
+        let TmBlock::Element(el) = &back.body[0] else {
             panic!("expected an element");
         };
         assert_eq!(el.data.args, None);
@@ -864,11 +864,9 @@ mod tests {
 
     #[test]
     fn meta_survives_a_round_trip() {
-        let doc = parse_document("::meta{title: Hello, draft: true}\n\n本文\n").unwrap();
+        let doc = parse_file("::meta{title: Hello, draft: true}\n\n本文\n").unwrap();
         let back = from_pandoc(&to_pandoc(&doc));
-        let TmBlock::Declaration(declaration) = &back.blocks[0] else {
-            panic!("expected the meta declaration");
-        };
+        let declaration = &back.header[0];
         assert!(declaration.name.is_bare_named("meta"));
         assert_eq!(
             declaration.data.value.as_ref().map(|v| v.as_data()),
@@ -881,7 +879,7 @@ mod tests {
 
     #[test]
     fn the_id_declaration_survives_a_round_trip() {
-        let doc = parse_document("::id(doc-1)\n::meta{title: Hello}\n\n本文\n").unwrap();
+        let doc = parse_file("::id(doc-1)\n::meta{title: Hello}\n\n本文\n").unwrap();
         let back = from_pandoc(&to_pandoc(&doc));
         assert_eq!(
             tomet_declaration::document_id(&back).as_deref(),
@@ -908,9 +906,9 @@ mod tests {
 
     #[test]
     fn a_block_inside_content_comes_back_block_placed() {
-        let doc = parse_document("@deck.list[\n  @deck.item(1)[ one ]\n]\n").unwrap();
+        let doc = parse_file("@deck.list[\n  @deck.item(1)[ one ]\n]\n").unwrap();
         let back = from_pandoc(&to_pandoc(&doc));
-        let TmBlock::Element(outer) = &back.blocks[0] else {
+        let TmBlock::Element(outer) = &back.body[0] else {
             panic!("expected an element");
         };
         let inner = outer

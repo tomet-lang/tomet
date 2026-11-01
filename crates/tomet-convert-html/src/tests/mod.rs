@@ -10,4 +10,4 @@ mod raw;
 mod spans;
 
 use super::*;
-use tomet_ast_parser::parse_document;
+use tomet_ast_parser::parse_file;

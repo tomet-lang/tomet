@@ -18,11 +18,11 @@
 //!
 //! =[ Not here ]
 //!
-//! - `oneline`: it needs the lines of the source, which a parsed [`Document`] does not carry.
+//! - `oneline`: it needs the lines of the source, which a parsed [`File`] does not carry.
 //! - A vocabulary the document holds itself. No reader for one exists yet, so any element that is
 //!   not built in counts as taken from outside.
 
-use tomet_ast::{Document, ElementView};
+use tomet_ast::{ElementView, File};
 use tomet_span::Span;
 use tomet_declaration::{Profile, document_profiles};
 use tomet_expr::{OwnNames, Reach, reaches_outside};
@@ -66,7 +66,7 @@ pub struct Finding {
 
 /// Everything `doc` takes from outside itself, in the order it is written, whether or not it
 /// promises `standalone`.
-pub fn standalone_findings(doc: &Document) -> Vec<Finding> {
+pub fn standalone_findings(doc: &File) -> Vec<Finding> {
     let mut findings = Vec::new();
     expression_findings(doc, &mut findings);
     vocabulary_findings(doc, &mut findings);
@@ -78,7 +78,7 @@ pub fn standalone_findings(doc: &Document) -> Vec<Finding> {
 /// What `doc` breaks of the profiles it declares. Empty when it declares none that this checks.
 ///
 /// Only `standalone` is checked so far; `oneline` is not, see the module doc.
-pub fn validate_profile(doc: &Document) -> Vec<Diagnostic> {
+pub fn validate_profile(doc: &File) -> Vec<Diagnostic> {
     if !document_profiles(doc).contains(&Profile::Standalone) {
         return Vec::new();
     }
@@ -91,7 +91,7 @@ pub fn validate_profile(doc: &Document) -> Vec<Diagnostic> {
         .collect()
 }
 
-fn expression_findings(doc: &Document, findings: &mut Vec<Finding>) {
+fn expression_findings(doc: &File, findings: &mut Vec<Finding>) {
     let own = OwnNames::of_document(doc);
     tomet_tree::for_each_interpolation(doc, |interpolation| {
         for reaching in reaches_outside(&interpolation.expr, &own) {
@@ -105,7 +105,7 @@ fn expression_findings(doc: &Document, findings: &mut Vec<Finding>) {
 
 /// An element name no vocabulary is in scope for: the same classification `tomet check` makes,
 /// with nothing bound but what is built in.
-fn vocabulary_findings(doc: &Document, findings: &mut Vec<Finding>) {
+fn vocabulary_findings(doc: &File, findings: &mut Vec<Finding>) {
     let mut diagnostics = Vec::new();
     tomet_validator_core::validate_core(
         doc,
@@ -124,7 +124,7 @@ fn vocabulary_findings(doc: &Document, findings: &mut Vec<Finding>) {
 
 /// A `@term` mention that does not resolve when the only dictionary there is, is the document
 /// itself (if it is one).
-fn term_findings(doc: &Document, findings: &mut Vec<Finding>) {
+fn term_findings(doc: &File, findings: &mut Vec<Finding>) {
     use tomet_semantics::{ElementKind, LoadedDictionaries, TermRef, ValueExt};
 
     let own = tomet_declaration::document_dictionary(doc);

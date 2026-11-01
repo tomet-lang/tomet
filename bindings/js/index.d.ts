@@ -27,7 +27,7 @@ export type Id = string;
  * `${...}` (`Interpolation`), a `?` hole, an `@element`, or `[content]`
  * (`Block[]`). A reader tells them apart by their own keys.
  *
- * Only plain data and `Block[]` are read back when a `Document` is passed in.
+ * Only plain data and `Block[]` are read back when a `File` is passed in.
  */
 export type Value =
   | null
@@ -165,12 +165,12 @@ export type Block =
   | { Element: Element }
   | { Section: Section }
   | { List: List }
-  | { Declaration: Declaration }
   | { Hole: Hole }
   | { Interp: Interpolation };
 
-export interface Document {
-  blocks: Block[];
+export interface File {
+  header: Declaration[];
+  body: Block[];
   span: Span;
 }
 
@@ -180,9 +180,9 @@ export interface ValidationError {
 }
 
 /**
- * Parse `.tmt` markup source text into a JavaScript `Document` AST object.
+ * Parse `.tmt` markup source text into a JavaScript `File` AST object.
  */
-export function parseDocument(source: string): Document;
+export function parseFile(source: string): File;
 
 /**
  * Parse a data-only `.tmt` document into a native JavaScript object/primitive.
@@ -207,7 +207,7 @@ export interface TocItem {
   text: string;
 }
 
-export interface ProcessedDoc {
+export interface ProcessedFile {
   title: string | null;
   html: string;
   meta: Value | null;
@@ -216,37 +216,37 @@ export interface ProcessedDoc {
 }
 
 /**
- * Convert `.tmt` source text or a `Document` AST object into an HTML string.
+ * Convert `.tmt` source text or a `File` AST object into an HTML string.
  */
-export function toHtml(sourceOrDoc: string | Document, options?: ProcessOptions): string;
+export function toHtml(sourceOrFile: string | File, options?: ProcessOptions): string;
 
 /**
- * Process `.tmt` markup source text or a `Document` AST object into HTML, metadata, title, and TOC.
+ * Process `.tmt` markup source text or a `File` AST object into HTML, metadata, title, and TOC.
  */
-export function processDocument(
-  sourceOrDoc: string | Document,
+export function processFile(
+  sourceOrFile: string | File,
   options?: ProcessOptions,
-): ProcessedDoc;
+): ProcessedFile;
 
 /**
- * Convert `.tmt` source text or a `Document` AST object into a CommonMark Markdown string.
+ * Convert `.tmt` source text or a `File` AST object into a CommonMark Markdown string.
  */
-export function toMarkdown(sourceOrDoc: string | Document): string;
+export function toMarkdown(sourceOrFile: string | File): string;
 
 /**
- * Convert `.tmt` source text or a `Document` AST object into a Typst markup string.
+ * Convert `.tmt` source text or a `File` AST object into a Typst markup string.
  */
-export function toTypst(sourceOrDoc: string | Document): string;
+export function toTypst(sourceOrFile: string | File): string;
 
 /**
- * Parse CommonMark Markdown text into a `Document` AST object.
+ * Parse CommonMark Markdown text into a `File` AST object.
  */
-export function fromMarkdown(markdown: string): Document;
+export function fromMarkdown(markdown: string): File;
 
 /**
- * Serialize a `Document` AST object back into formatted `.tmt` source code.
+ * Serialize a `File` AST object back into formatted `.tmt` source code.
  */
-export function printDocument(doc: Document): string;
+export function printFile(file: File): string;
 
 /**
  * Format `.tmt` source text with lossless whitespace hygiene and span preservation.

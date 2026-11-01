@@ -22,8 +22,8 @@ fn para_inlines(blocks: &[Block]) -> &[Inline] {
 #[test]
 fn heading_and_paragraph() {
     let doc = from_markdown("# Title\n\nHello world.\n");
-    assert_eq!(doc.blocks.len(), 1);
-    match &doc.blocks[0] {
+    assert_eq!(doc.body.len(), 1);
+    match &doc.body[0] {
         Block::Section(sec) => {
             assert_eq!(sec.level, 1);
             assert_eq!(
@@ -46,7 +46,7 @@ fn heading_and_paragraph() {
 #[test]
 fn emphasis_and_strong() {
     let doc = from_markdown("a *em* b **strong** c\n");
-    match &doc.blocks[0] {
+    match &doc.body[0] {
         Block::Paragraph(p) => {
             let kinds: Vec<_> = p
                 .content
@@ -65,7 +65,7 @@ fn emphasis_and_strong() {
 #[test]
 fn flat_bullet_list() {
     let doc = from_markdown("- one\n- two\n");
-    match &doc.blocks[0] {
+    match &doc.body[0] {
         Block::List(list) => {
             assert!(!list.ordered);
             assert_eq!(
@@ -84,7 +84,7 @@ fn flat_bullet_list() {
 #[test]
 fn ordered_list() {
     let doc = from_markdown("1. one\n2. two\n");
-    match &doc.blocks[0] {
+    match &doc.body[0] {
         Block::List(list) => assert!(list.ordered),
         other => panic!("expected list, got {other:?}"),
     }
@@ -93,7 +93,7 @@ fn ordered_list() {
 #[test]
 fn nested_list_preserves_children_hierarchy() {
     let doc = from_markdown("- a\n  - b\n- c\n");
-    match &doc.blocks[0] {
+    match &doc.body[0] {
         Block::List(list) => {
             let items = &list.items;
             assert_eq!(items.len(), 2);
@@ -119,7 +119,7 @@ fn nested_list_preserves_children_hierarchy() {
 #[test]
 fn link() {
     let doc = from_markdown("[Wiki](https://example.com)\n");
-    match &doc.blocks[0] {
+    match &doc.body[0] {
         Block::Paragraph(p) => match &p.content[0] {
             Inline::Element(el) => {
                 assert_eq!(el.name, Name::bare("link"));
@@ -144,7 +144,7 @@ fn link() {
 #[test]
 fn autolink_is_a_plain_link_element() {
     let doc = from_markdown("<https://example.com>\n");
-    match &doc.blocks[0] {
+    match &doc.body[0] {
         Block::Paragraph(p) => match &p.content[0] {
             Inline::Element(el) => assert_eq!(el.name, Name::bare("link")),
             other => panic!("expected element, got {other:?}"),
@@ -156,7 +156,7 @@ fn autolink_is_a_plain_link_element() {
 #[test]
 fn image_becomes_embed_element() {
     let doc = from_markdown("![a cat](assets/pic.png)\n");
-    match &doc.blocks[0] {
+    match &doc.body[0] {
         Block::Paragraph(p) => match &p.content[0] {
             Inline::Element(el) => {
                 assert_eq!(el.name, Name::bare("embed"));
@@ -181,7 +181,7 @@ fn image_becomes_embed_element() {
 #[test]
 fn thematic_break() {
     let doc = from_markdown("---\n");
-    match &doc.blocks[0] {
+    match &doc.body[0] {
         Block::Element(el) => assert_eq!(el.name, Name::bare("hr")),
         other => panic!("expected hr element, got {other:?}"),
     }
@@ -190,7 +190,7 @@ fn thematic_break() {
 #[test]
 fn fenced_code_block() {
     let doc = from_markdown("```rust\nfn main() {}\n```\n");
-    match &doc.blocks[0] {
+    match &doc.body[0] {
         Block::Element(el) => {
             assert_eq!(el.name, Name::bare("raw"));
             assert_eq!(
@@ -215,7 +215,7 @@ fn fenced_code_block() {
 #[test]
 fn simple_block_quote() {
     let doc = from_markdown("> quoted text\n");
-    match &doc.blocks[0] {
+    match &doc.body[0] {
         Block::Element(el) => {
             assert_eq!(el.name, Name::bare("quote"));
             assert_eq!(el.data.args, None);
@@ -237,7 +237,7 @@ fn heading_nested_inside_a_block_quote_splices_its_title_text_in() {
     // end up wrapped as a nested `Inline::Element(@heading(...))`,
     // which is what the generic `Block::Element` arm would produce.
     let doc = from_markdown("> # Quoted Title\n>\n> more text\n");
-    match &doc.blocks[0] {
+    match &doc.body[0] {
         Block::Element(el) => {
             assert_eq!(el.name, Name::bare("quote"));
             let content = para_inlines(el.content.as_ref().expect("content"));
@@ -262,7 +262,7 @@ fn heading_nested_inside_a_block_quote_splices_its_title_text_in() {
 fn inline_code_span_becomes_raw_element() {
     let doc = from_markdown("call `foo()` now\n");
     assert_eq!(
-        doc.blocks[0],
+        doc.body[0],
         Block::Paragraph(Paragraph::new(
             vec![
                 Inline::Text(Text::new("call ", Span::dummy())),
@@ -288,7 +288,7 @@ fn a_code_span_keeps_the_sigils_inside_it() {
         ("write to `@x` please\n", "@x"),
     ] {
         let doc = from_markdown(src);
-        let Block::Paragraph(p) = &doc.blocks[0] else {
+        let Block::Paragraph(p) = &doc.body[0] else {
             panic!("expected a paragraph for {src:?}")
         };
         let has_raw = p.content.iter().any(|inl| match inl {
@@ -314,7 +314,7 @@ fn a_code_span_keeps_the_sigils_inside_it() {
 #[test]
 fn a_bare_sigil_is_still_protected() {
     let doc = from_markdown("a bare // comment\n");
-    let Block::Paragraph(p) = &doc.blocks[0] else {
+    let Block::Paragraph(p) = &doc.body[0] else {
         panic!("expected a paragraph")
     };
     let Inline::Text(t) = &p.content[0] else {
@@ -326,7 +326,7 @@ fn a_bare_sigil_is_still_protected() {
 #[test]
 fn a_code_span_holding_a_backtick_survives_import() {
     let doc = from_markdown("``a`b``\n");
-    let Block::Paragraph(p) = &doc.blocks[0] else {
+    let Block::Paragraph(p) = &doc.body[0] else {
         panic!("expected a paragraph");
     };
     assert_eq!(
@@ -338,9 +338,9 @@ fn a_code_span_holding_a_backtick_survives_import() {
 #[test]
 fn html_block_is_dropped() {
     let doc = from_markdown("<div>raw html</div>\n\nreal paragraph\n");
-    assert_eq!(doc.blocks.len(), 1);
+    assert_eq!(doc.body.len(), 1);
     assert_eq!(
-        doc.blocks[0],
+        doc.body[0],
         Block::Paragraph(Paragraph::new(
             vec![Inline::Text(Text::new("real paragraph", Span::dummy()))],
             Span::dummy()
@@ -352,8 +352,8 @@ fn html_block_is_dropped() {
 fn wikilink_converts_to_tomet_element() {
     let src = "Check [[name]] and [[name|display]] here.\n";
     let doc = from_markdown(src);
-    assert_eq!(doc.blocks.len(), 1);
-    let Block::Paragraph(p) = &doc.blocks[0] else {
+    assert_eq!(doc.body.len(), 1);
+    let Block::Paragraph(p) = &doc.body[0] else {
         panic!("expected paragraph");
     };
     assert_eq!(p.content.len(), 5);
@@ -408,8 +408,8 @@ fn wikilink_converts_to_tomet_element() {
 fn table_converts_to_tomet_element() {
     let src = "| col1 | col2 |\n| --- | --- |\n| val1 | val2 |\n";
     let doc = from_markdown(src);
-    assert_eq!(doc.blocks.len(), 1);
-    match &doc.blocks[0] {
+    assert_eq!(doc.body.len(), 1);
+    match &doc.body[0] {
         Block::Element(el) => {
             assert_eq!(el.name, Name::bare("table"));
             assert!(el.content.is_some());
@@ -422,8 +422,8 @@ fn table_converts_to_tomet_element() {
 fn test_nested_list_import() {
     let md = "- a\n  - b\n";
     let doc = from_markdown(md);
-    assert_eq!(doc.blocks.len(), 1);
-    let Block::List(list) = &doc.blocks[0] else {
+    assert_eq!(doc.body.len(), 1);
+    let Block::List(list) = &doc.body[0] else {
         panic!("expected list");
     };
     let items = &list.items;
@@ -445,7 +445,7 @@ fn test_nested_list_import() {
 fn table_converts_default_without_width_adjustment() {
     let src = "| title | sdfasdf |\n| --- | --- |\n| title | sdfddfasdf |\n";
     let doc = from_markdown(src);
-    let Block::Element(el) = &doc.blocks[0] else {
+    let Block::Element(el) = &doc.body[0] else {
         panic!("expected element");
     };
     let content = para_inlines(el.content.as_ref().unwrap());
@@ -466,7 +466,7 @@ fn table_converts_with_width_adjustment_option() {
         table_align: None,
     };
     let doc = from_markdown_with_options(src, &opts);
-    let Block::Element(el) = &doc.blocks[0] else {
+    let Block::Element(el) = &doc.body[0] else {
         panic!("expected element");
     };
     let content = para_inlines(el.content.as_ref().unwrap());
@@ -488,7 +488,7 @@ fn table_converts_with_auto_width_adjustment_stops_at_wide_column() {
         table_align: None,
     };
     let doc = from_markdown_with_options(src, &opts);
-    let Block::Element(el) = &doc.blocks[0] else {
+    let Block::Element(el) = &doc.body[0] else {
         panic!("expected element");
     };
     let content = para_inlines(el.content.as_ref().unwrap());
@@ -513,7 +513,7 @@ fn table_converts_with_markdown_alignments() {
         table_align: Some("left".to_string()),
     };
     let doc = from_markdown_with_options(src, &opts);
-    let Block::Element(el) = &doc.blocks[0] else {
+    let Block::Element(el) = &doc.body[0] else {
         panic!("expected element");
     };
     let content = para_inlines(el.content.as_ref().unwrap());
@@ -532,8 +532,8 @@ fn table_converts_with_markdown_alignments() {
 fn text_with_sigil_chars_encloses_them_in_backticks() {
     let md = "Contact @user at <foo> or $100 and <> with 2 * 3 ^ 2 and **.\n";
     let doc = from_markdown(md);
-    assert_eq!(doc.blocks.len(), 1);
-    let Block::Paragraph(p) = &doc.blocks[0] else {
+    assert_eq!(doc.body.len(), 1);
+    let Block::Paragraph(p) = &doc.body[0] else {
         panic!("expected paragraph");
     };
     assert_eq!(
@@ -550,8 +550,8 @@ fn text_with_sigil_chars_encloses_them_in_backticks() {
 fn checkbox_task_list_markers_and_custom_markers_import_as_typed_markers() {
     let md = "- [x] task1\n- [ ] task2\n- [c] con item\n- [p] pro item\n- (x) task3\n";
     let doc = from_markdown(md);
-    assert_eq!(doc.blocks.len(), 1);
-    let Block::List(list) = &doc.blocks[0] else {
+    assert_eq!(doc.body.len(), 1);
+    let Block::List(list) = &doc.body[0] else {
         panic!("expected list");
     };
     let items = &list.items;
@@ -587,8 +587,8 @@ fn checkbox_task_list_markers_and_custom_markers_import_as_typed_markers() {
 fn embed_wikilinks_and_images_import_as_embed_elements() {
     let md = "![[name|display]] and ![display](_path)\n";
     let doc = from_markdown(md);
-    assert_eq!(doc.blocks.len(), 1);
-    let Block::Paragraph(p) = &doc.blocks[0] else {
+    assert_eq!(doc.body.len(), 1);
+    let Block::Paragraph(p) = &doc.body[0] else {
         panic!("expected paragraph");
     };
     let Inline::Element(embed1) = &p.content[0] else {
@@ -628,8 +628,8 @@ fn embed_wikilinks_and_images_import_as_embed_elements() {
 fn test_wikilink_with_at_prefix_not_enclosed_in_backticks() {
     let md = "Check [[@file_name]] and [[@Templater|display]]\n";
     let doc = from_markdown(md);
-    assert_eq!(doc.blocks.len(), 1);
-    let Block::Paragraph(p) = &doc.blocks[0] else {
+    assert_eq!(doc.body.len(), 1);
+    let Block::Paragraph(p) = &doc.body[0] else {
         panic!("expected paragraph");
     };
 
@@ -669,8 +669,8 @@ fn test_multiline_paragraph_linebreaks_preserved() {
     // into `Text.value` overclaimed what was actually preserved.
     let md = "Line 1\nLine 2\nLine 3\n";
     let doc = from_markdown(md);
-    assert_eq!(doc.blocks.len(), 1);
-    let Block::Paragraph(p) = &doc.blocks[0] else {
+    assert_eq!(doc.body.len(), 1);
+    let Block::Paragraph(p) = &doc.body[0] else {
         panic!("expected paragraph");
     };
     assert_eq!(
@@ -693,8 +693,8 @@ fn test_multiline_paragraph_linebreaks_preserved() {
 fn test_obsidian_callout_blockquote_import() {
     let md = "> [!info] 2025/04/29 11:09\n> コレさすがに草www\n> お前なら[[$2025-04-26|どうするんだ]]？\n";
     let doc = from_markdown(md);
-    assert_eq!(doc.blocks.len(), 1);
-    let Block::Element(el) = &doc.blocks[0] else {
+    assert_eq!(doc.body.len(), 1);
+    let Block::Element(el) = &doc.body[0] else {
         panic!("expected element");
     };
     assert_eq!(el.name, Name::bare("callout"));
@@ -711,7 +711,7 @@ fn test_obsidian_callout_blockquote_import() {
 
     let md_plain = "> Plain quote\n";
     let doc_plain = from_markdown(md_plain);
-    let Block::Element(el_plain) = &doc_plain.blocks[0] else {
+    let Block::Element(el_plain) = &doc_plain.body[0] else {
         panic!("expected plain quote element");
     };
     assert_eq!(el_plain.name, Name::bare("quote"));
@@ -722,7 +722,7 @@ fn test_obsidian_callout_blockquote_import() {
 fn test_comment_sigils_enclosed_in_backticks() {
     let md = "Comment // double slash and /// triple slash and /* block start */ block end and single / slash.\n";
     let doc = from_markdown(md);
-    let Block::Paragraph(p) = &doc.blocks[0] else {
+    let Block::Paragraph(p) = &doc.body[0] else {
         panic!("expected paragraph");
     };
     let Inline::Text(t) = &p.content[0] else {
@@ -738,7 +738,7 @@ fn test_comment_sigils_enclosed_in_backticks() {
 fn test_callout_with_empty_leading_line_import() {
     let md = "> [!done]+ 06:49\n>\n> なんか、[[@美|きれい]]にいろいろ書きたいなって思っちゃうけど、だめよな\n> 過去のことを書きたくなるけど、今のほうがいいよな。\n";
     let doc = from_markdown(md);
-    let Block::Element(el) = &doc.blocks[0] else {
+    let Block::Element(el) = &doc.body[0] else {
         panic!("expected element");
     };
     let content = para_inlines(el.content.as_ref().unwrap());

@@ -2,8 +2,8 @@ use super::*;
 
 #[test]
 fn section_supports_inline_colon_connection() {
-    let doc = parse_document("=[ Overview ]:{ id: intro, tag: main }\n").unwrap();
-    match &doc.blocks[0] {
+    let doc = parse_file("=[ Overview ]:{ id: intro, tag: main }\n").unwrap();
+    match &doc.body[0] {
         Block::Section(s) => {
             assert_eq!(
                 s.data.value,
@@ -19,8 +19,8 @@ fn section_supports_inline_colon_connection() {
 
 #[test]
 fn element_supports_inline_colon_connection() {
-    let doc = parse_document("@task[ Task A ]:{ id: taskA, priority: high }\n").unwrap();
-    match &doc.blocks[0] {
+    let doc = parse_file("@task[ Task A ]:{ id: taskA, priority: high }\n").unwrap();
+    match &doc.body[0] {
         Block::Element(el) => {
             assert_eq!(el.name, Name::bare("task"));
             assert_eq!(
@@ -37,8 +37,8 @@ fn element_supports_inline_colon_connection() {
 
 #[test]
 fn remote_id_target_element_supports_colon_connection() {
-    let doc = parse_document("@id(taskA):{ priority: high, tag: dev }\n").unwrap();
-    match &doc.blocks[0] {
+    let doc = parse_file("@id(taskA):{ priority: high, tag: dev }\n").unwrap();
+    match &doc.body[0] {
         Block::Element(el) => {
             assert_eq!(el.name, Name::bare("id"));
             assert_eq!(el.data.args, Some(Value::String("taskA".into())));
@@ -56,8 +56,8 @@ fn remote_id_target_element_supports_colon_connection() {
 
 #[test]
 fn named_connect_reads_into_connects() {
-    let doc = parse_document("@section[ x ]:rule(allow: list(card))\n").unwrap();
-    match &doc.blocks[0] {
+    let doc = parse_file("@section[ x ]:rule(allow: list(card))\n").unwrap();
+    match &doc.body[0] {
         Block::Element(el) => {
             assert_eq!(el.name, Name::bare("section"));
             assert_eq!(el.connects.len(), 1);
@@ -77,8 +77,8 @@ fn named_connect_reads_into_connects() {
 
 #[test]
 fn multiple_named_connects_stack_flat_not_nested() {
-    let doc = parse_document("@x(a: 1):as(y):rule(allow: list(card))\n").unwrap();
-    match &doc.blocks[0] {
+    let doc = parse_file("@x(a: 1):as(y):rule(allow: list(card))\n").unwrap();
+    match &doc.body[0] {
         Block::Element(el) => {
             assert_eq!(el.connects.len(), 2);
             assert_eq!(el.connects[0].name, Name::bare("as"));
@@ -92,8 +92,8 @@ fn multiple_named_connects_stack_flat_not_nested() {
 fn bare_colon_merge_is_unaffected_by_named_connect_support() {
     // No name after the colon -- must still take the old bare-merge
     // path, not be misread as a nameless connect.
-    let doc = parse_document("@memo(a:1):{b:2}\n").unwrap();
-    match &doc.blocks[0] {
+    let doc = parse_file("@memo(a:1):{b:2}\n").unwrap();
+    match &doc.body[0] {
         Block::Element(el) => {
             assert!(el.connects.is_empty());
             assert_eq!(
@@ -110,8 +110,8 @@ fn bare_colon_merge_is_unaffected_by_named_connect_support() {
 
 #[test]
 fn section_supports_named_connect() {
-    let doc = parse_document("=[ h ]:rule(allow: list(card))\n").unwrap();
-    match &doc.blocks[0] {
+    let doc = parse_file("=[ h ]:rule(allow: list(card))\n").unwrap();
+    match &doc.body[0] {
         Block::Section(s) => {
             assert_eq!(s.connects.len(), 1);
             assert_eq!(s.connects[0].name, Name::bare("rule"));
@@ -134,8 +134,8 @@ fn sugar_list_item_and_heading_support_a_bare_connect() {
             Some(Value::Int(2)),
         ),
     ] {
-        let doc = parse_document(src).unwrap_or_else(|e| panic!("{src:?} failed: {e}"));
-        match &doc.blocks[0] {
+        let doc = parse_file(src).unwrap_or_else(|e| panic!("{src:?} failed: {e}"));
+        match &doc.body[0] {
             Block::List(list) => {
                 let items = &list.items;
                 assert_eq!(
@@ -161,8 +161,8 @@ fn sugar_list_item_and_heading_support_a_bare_connect() {
         }
     }
 
-    let doc = parse_document("= title :(x: 1){y: 2}\n").unwrap();
-    match &doc.blocks[0] {
+    let doc = parse_file("= title :(x: 1){y: 2}\n").unwrap();
+    match &doc.body[0] {
         Block::Section(s) => {
             assert_eq!(
                 s.data.args,
@@ -188,8 +188,8 @@ fn sugar_heading_supports_a_named_connect_matching_its_bracketed_form() {
     // because `parse_sugar_body` had no colon handling of any kind
     // before -- `ConnectMode::Full` closes that gap rather than leaving
     // the sugar form one step behind the bracketed one.
-    let doc = parse_document("= h :rule(allow: list(card))\n").unwrap();
-    match &doc.blocks[0] {
+    let doc = parse_file("= h :rule(allow: list(card))\n").unwrap();
+    match &doc.body[0] {
         Block::Section(s) => {
             assert_eq!(s.connects.len(), 1);
             assert_eq!(s.connects[0].name, Name::bare("rule"));
@@ -203,8 +203,8 @@ fn sugar_list_item_supports_a_named_connect_matching_its_bracketed_form() {
     // A list item's sugar body now supports `:name(...)` too -- matching
     // both its own full-bracketed form (just above) and a heading's sugar
     // form, now that `element_list_item` carries `connects`.
-    let doc = parse_document("- content :rule(allow: list(card))\n").unwrap();
-    match &doc.blocks[0] {
+    let doc = parse_file("- content :rule(allow: list(card))\n").unwrap();
+    match &doc.body[0] {
         Block::List(list) => {
             let items = &list.items;
             assert_eq!(items[0].connects.len(), 1);
@@ -220,8 +220,8 @@ fn sugar_connect_tolerates_one_blank_line_but_not_two() {
     // element's own groups: a trailing connect may start on the very
     // next line, or after exactly one blank line, but a second blank
     // line ends the block before the connect is ever reached.
-    let doc = parse_document("- content\n:{y: 2}\n").unwrap();
-    match &doc.blocks[0] {
+    let doc = parse_file("- content\n:{y: 2}\n").unwrap();
+    match &doc.body[0] {
         Block::List(list) => {
             let items = &list.items;
             assert_eq!(
@@ -231,10 +231,10 @@ fn sugar_connect_tolerates_one_blank_line_but_not_two() {
         }
         other => panic!("expected list, got {other:?}"),
     }
-    assert_eq!(doc.blocks.len(), 1, "no stray paragraph split off");
+    assert_eq!(doc.body.len(), 1, "no stray paragraph split off");
 
-    let doc = parse_document("- content\n\n:{y: 2}\n").unwrap();
-    match &doc.blocks[0] {
+    let doc = parse_file("- content\n\n:{y: 2}\n").unwrap();
+    match &doc.body[0] {
         Block::List(list) => {
             let items = &list.items;
             assert_eq!(item_attrs(&items[0]), None);
@@ -242,13 +242,13 @@ fn sugar_connect_tolerates_one_blank_line_but_not_two() {
         other => panic!("expected list, got {other:?}"),
     }
     assert_eq!(
-        doc.blocks.len(),
+        doc.body.len(),
         2,
         "two blank lines end the item before the connect"
     );
 
-    let doc = parse_document("= title\n:{y: 2}\n").unwrap();
-    match &doc.blocks[0] {
+    let doc = parse_file("= title\n:{y: 2}\n").unwrap();
+    match &doc.body[0] {
         Block::Section(s) => {
             assert_eq!(
                 s.data.value,

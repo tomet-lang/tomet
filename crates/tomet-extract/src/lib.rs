@@ -11,7 +11,7 @@
 //! This crate extracts contiguous comment blocks from source code across multiple
 //! programming languages (Rust, Python, JavaScript/TypeScript, Java, C/C++, Go,
 //! Shell, etc.), strips comment prefixes while mapping every byte offset back to the original file,
-//! and parses the extracted text into Tomet AST [`tomet_ast::Document`]s.
+//! and parses the extracted text into Tomet AST [`tomet_ast::File`]s.
 //!
 //! By preserving original source locations, links and rule references inside comments
 //! can be checked by tools like `tomet check-links` or `twrit` with exact line and
@@ -24,7 +24,7 @@ use std::path::{Path, PathBuf};
 
 pub use comment::{ExtractOptions, extract_comments};
 pub use lang::Language;
-use tomet_ast::{Document, Element};
+use tomet_ast::{Element, File};
 use tomet_span::Span;
 use tomet_ast_parser::Error as ParseError;
 
@@ -115,7 +115,7 @@ impl CommentSourceMap {
 #[derive(Debug, Clone)]
 pub struct ParsedComment {
     /// The parsed Tomet AST document.
-    pub doc: Document,
+    pub doc: File,
     /// The kind of comment block.
     pub kind: CommentKind,
     /// Location mapping back to the original source file.
@@ -155,7 +155,7 @@ pub fn parse_comments(
     let mut errors = Vec::new();
 
     for block in blocks {
-        match tomet_ast_parser::parse_document(&block.text) {
+        match tomet_ast_parser::parse_file(&block.text) {
             Ok(doc) => {
                 parsed.push(ParsedComment {
                     doc,

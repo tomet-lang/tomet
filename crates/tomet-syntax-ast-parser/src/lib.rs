@@ -6,16 +6,16 @@
 //! =[ Architecture & Responsibilities ]
 //!
 //! - (Standard Parsing Facade)
-//!   -| Provides text-to-AST entry points: [`parse_document`], [`parse_value`], [`parse_file`].
+//!   -| Provides text-to-AST entry points: [`parse_file`], [`parse_value`], [`parse_data_file`].
 //!   -| Bridges lossless CST parsing and typed AST representations.
 
 pub use tomet_lowering::{Error, Result};
 
-/// Parse an entire source string as a markup [`tomet_ast::Document`]: the CST of
+/// Parse an entire source string as a markup [`tomet_ast::File`]: the CST of
 /// the text ([`tomet_cst_parser::parse_cst`]), read as the AST it stands for.
-pub fn parse_document(src: &str) -> Result<tomet_ast::Document> {
+pub fn parse_file(src: &str) -> Result<tomet_ast::File> {
     let cst = tomet_cst_parser::parse_cst(src);
-    tomet_lowering::lower_document(&cst).map_err(|e| e.located_in(src))
+    tomet_lowering::lower_file(&cst).map_err(|e| e.located_in(src))
 }
 
 /// Parse an entire source string as one `Value` (a data-only `.tmt`
@@ -27,7 +27,7 @@ pub fn parse_value(src: &str) -> Result<tomet_ast::Value> {
 
 /// Parse an entire source string as a standalone cotomet data file (`.ctmt`):
 /// optional `::declaration` header at the top, followed by `key: value` map entries.
-pub fn parse_file(src: &str) -> Result<tomet_ast::File> {
+pub fn parse_data_file(src: &str) -> Result<tomet_ast::File<tomet_ast::Value>> {
     let trimmed = src.trim_start();
     if trimmed.is_empty()
         || (trimmed.starts_with("//")
@@ -35,10 +35,11 @@ pub fn parse_file(src: &str) -> Result<tomet_ast::File> {
                 .lines()
                 .all(|l| l.trim().is_empty() || l.trim().starts_with("//")))
     {
-        return Ok(tomet_ast::File {
-            header: Vec::new(),
-            body: tomet_ast::Value::Map(Vec::new()),
-        });
+        return Ok(tomet_ast::File::new(
+            Vec::new(),
+            tomet_ast::Value::Map(Vec::new()),
+            tomet_span::Span::new(0, src.len()),
+        ));
     }
 
     let cst = tomet_cst_parser::parse_cst(src);
@@ -47,14 +48,7 @@ pub fn parse_file(src: &str) -> Result<tomet_ast::File> {
     let mut seen_body = false;
 
     for child in cst.children() {
-        let is_decl = child.kind() == tomet_cst::SyntaxKind::BLOCK_ELEMENT
-            && child
-                .children()
-                .find(|n| n.kind() == tomet_cst::SyntaxKind::SIGIL)
-                .and_then(|n| n.first_token())
-                .is_some_and(|t| t.kind() == tomet_cst::SyntaxKind::COLON);
-
-        if is_decl {
+        if tomet_lowering::is_declaration(&child) {
             if seen_body {
                 let start = usize::from(child.text_range().start());
                 let lines = tomet_position::LineIndex::new(src);
@@ -66,6 +60,28 @@ pub fn parse_file(src: &str) -> Result<tomet_ast::File> {
                     offset: start,
                 });
             }
+            let d = tomet_lowering::lower_declaration(&child).map_err(|e| e.located_in(src))?;
+            if let Some(pos) = d
+                .data
+                .args
+                .as_ref()
+                .and_then(tomet_lowering::value::find_interp_in_value)
+                .or_else(|| {
+                    d.data
+                        .value
+                        .as_ref()
+                        .and_then(tomet_lowering::value::find_interp_in_group)
+                })
+            {
+                let at = tomet_position::LineIndex::new(src).line_col(pos);
+                return Err(tomet_lowering::Error {
+                    message: "a declaration takes no expression".to_string(),
+                    line: at.line,
+                    column: at.column,
+                    offset: pos,
+                });
+            }
+            header.push(d);
             last_decl_end = usize::from(child.text_range().end());
         } else if !matches!(
             child.kind(),
@@ -77,46 +93,17 @@ pub fn parse_file(src: &str) -> Result<tomet_ast::File> {
         }
     }
 
-    if last_decl_end > 0 {
-        let header_src = &src[..last_decl_end];
-        let doc = parse_document(header_src)?;
-        for block in doc.blocks {
-            if let tomet_ast::Block::Declaration(d) = block {
-                if let Some(pos) = d
-                    .data
-                    .args
-                    .as_ref()
-                    .and_then(tomet_lowering::value::find_interp_in_value)
-                    .or_else(|| {
-                        d.data
-                            .value
-                            .as_ref()
-                            .and_then(tomet_lowering::value::find_interp_in_group)
-                    })
-                {
-                    let at = tomet_position::LineIndex::new(src).line_col(pos);
-                    return Err(tomet_lowering::Error {
-                        message: "a declaration takes no expression".to_string(),
-                        line: at.line,
-                        column: at.column,
-                        offset: pos,
-                    });
-                }
-                header.push(d);
-            }
-        }
-    }
-
     let body_src = &src[last_decl_end..];
     if body_src.trim().is_empty() {
-        return Ok(tomet_ast::File {
+        return Ok(tomet_ast::File::new(
             header,
-            body: tomet_ast::Value::Map(Vec::new()),
-        });
+            tomet_ast::Value::Map(Vec::new()),
+            tomet_span::Span::new(0, src.len()),
+        ));
     }
 
     let root = tomet_cst_parser::parse_cst_value(body_src);
-    let mut file = match tomet_lowering::lower_file(&root, body_src) {
+    let mut file = match tomet_lowering::lower_data_file(&root, body_src) {
         Ok(f) => f,
         Err(mut e) => {
             e.offset += last_decl_end;
@@ -131,6 +118,7 @@ pub fn parse_file(src: &str) -> Result<tomet_ast::File> {
         tomet_lowering::value::shift_spans(&mut file.body, last_decl_end);
     }
     file.header = header;
+    file.span = tomet_span::Span::new(0, src.len());
 
     Ok(file)
 }

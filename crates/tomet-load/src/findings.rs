@@ -7,7 +7,7 @@
 
 use std::path::Path;
 
-use tomet_ast::Document;
+use tomet_ast::File;
 
 use crate::{Unresolved, Vault};
 
@@ -50,7 +50,7 @@ impl Vault {
     /// copy of it is prepared, to report what could not be resolved; `doc`
     /// itself is not changed, so the spans in the findings are the ones in the
     /// text the caller has.
-    pub fn findings(&self, path: &Path, doc: &Document) -> Findings {
+    pub fn findings(&self, path: &Path, doc: &File) -> Findings {
         // The blueprint for the document's kind, if the vault declares one:
         // the one part of the check that needs the disk.
         let blueprint = tomet_declaration::document_kind(doc)
@@ -59,7 +59,7 @@ impl Vault {
                 tomet_workspace::blueprint::find_blueprint(&self.root, &kind, &self.config)
             })
             .and_then(|path| std::fs::read_to_string(path).ok())
-            .and_then(|src| tomet_ast_parser::parse_document(&src).ok());
+            .and_then(|src| tomet_ast_parser::parse_file(&src).ok());
         let mut diagnostics = self.diagnostics(doc, blueprint.as_slice());
 
         // What only the vault config may set has no effect anywhere else. This
@@ -102,7 +102,7 @@ impl Vault {
 /// so there is nothing for the setting to fail to affect. A folder config
 /// ([`tomet_load_config::FOLDER_CONFIG_FILE`]) and an ordinary document are the
 /// layers it would be wrongly written in.
-fn may_set_vault_only(path: &Path, doc: &Document) -> bool {
+fn may_set_vault_only(path: &Path, doc: &File) -> bool {
     let name = path.file_name().and_then(|name| name.to_str());
     if name == Some(tomet_load_config::VAULT_CONFIG_FILE) {
         return true;
@@ -115,7 +115,7 @@ impl Vault {
     /// The entries of `doc`'s `::blueprints`, `::vocabularies` and `::dictionaries` whose key is not the name the
     /// registered file gives itself. A file that cannot be read or parsed is not reported here: the
     /// vault reports that once, where it loads it.
-    fn registry_name_mismatches(&self, doc: &Document) -> Vec<tomet_validator::Diagnostic> {
+    fn registry_name_mismatches(&self, doc: &File) -> Vec<tomet_validator::Diagnostic> {
         use tomet_declaration::DeclKind;
 
         let mut out = Vec::new();
@@ -129,14 +129,14 @@ impl Vault {
             for (name, path) in tomet_config::registry_entries(doc, found.kind) {
                 let Some(registered) = std::fs::read_to_string(self.root.join(&path))
                     .ok()
-                    .and_then(|src| tomet_ast_parser::parse_document(&src).ok())
+                    .and_then(|src| tomet_ast_parser::parse_file(&src).ok())
                 else {
                     continue;
                 };
                 let declared = match found.kind {
                     DeclKind::Blueprints => tomet_declaration::document_blueprint(&registered),
                     DeclKind::Dictionaries => tomet_declaration::document_dictionary(&registered),
-                    _ => tomet_semantics::Vocabulary::from_document(&registered)
+                    _ => tomet_semantics::Vocabulary::from_file(&registered)
                         .map(|vocabulary| vocabulary.namespace),
                 };
                 if declared.as_deref() != Some(name.as_str()) {

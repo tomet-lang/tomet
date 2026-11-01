@@ -2,8 +2,8 @@ use super::*;
 
 #[test]
 fn parses_emphasis_and_strong() {
-    let doc = parse_document("a *em* b **strong** c _em2_ d __strong2__\n").unwrap();
-    match &doc.blocks[0] {
+    let doc = parse_file("a *em* b **strong** c _em2_ d __strong2__\n").unwrap();
+    match &doc.body[0] {
         Block::Paragraph(p) => {
             let kinds: Vec<_> = p
                 .content
@@ -35,8 +35,8 @@ fn parses_emphasis_and_strong() {
 
 #[test]
 fn underscore_does_not_trigger_inside_a_word() {
-    let doc = parse_document("foo_bar_baz\n").unwrap();
-    match &doc.blocks[0] {
+    let doc = parse_file("foo_bar_baz\n").unwrap();
+    match &doc.body[0] {
         Block::Paragraph(p) => {
             assert_eq!(&p.content, &vec![Inline::Text("foo_bar_baz".into())]);
         }
@@ -46,8 +46,8 @@ fn underscore_does_not_trigger_inside_a_word() {
 
 #[test]
 fn unmatched_delimiter_falls_back_to_literal_text() {
-    let doc = parse_document("this *word never closes\n").unwrap();
-    match &doc.blocks[0] {
+    let doc = parse_file("this *word never closes\n").unwrap();
+    match &doc.body[0] {
         Block::Paragraph(p) => {
             assert_eq!(
                 &p.content,
@@ -63,8 +63,8 @@ fn unmatched_delimiter_falls_back_to_literal_text() {
 /// `softbreak_join`, rather than asserting the paragraph parses to a
 /// single merged `Text` (it no longer does; see `Inline::SoftBreak`).
 fn paragraph_text(src: &str) -> String {
-    let doc = parse_document(src).unwrap();
-    match &doc.blocks[0] {
+    let doc = parse_file(src).unwrap();
+    match &doc.body[0] {
         Block::Paragraph(p) => {
             let items = &p.content;
             let mut out = String::new();
@@ -121,8 +121,8 @@ fn ambiguous_width_counts_as_narrow_at_a_fold() {
 
 #[test]
 fn bare_at_is_plain_text_when_not_an_element() {
-    let doc = parse_document("contact me@example.com please\n").unwrap();
-    match &doc.blocks[0] {
+    let doc = parse_file("contact me@example.com please\n").unwrap();
+    match &doc.body[0] {
         Block::Paragraph(p) => {
             assert_eq!(
                 &p.content,
@@ -135,8 +135,8 @@ fn bare_at_is_plain_text_when_not_an_element() {
 
 #[test]
 fn element_or_span_inside_quotes_in_prose_is_read_as_element_or_span() {
-    let doc = parse_document("He said \"@note[important] and *bold text* here\"\n").unwrap();
-    let Block::Paragraph(p) = &doc.blocks[0] else {
+    let doc = parse_file("He said \"@note[important] and *bold text* here\"\n").unwrap();
+    let Block::Paragraph(p) = &doc.body[0] else {
         panic!("expected paragraph");
     };
     let has_el = p.content.iter().any(|i| matches!(i, Inline::Element(e) if e.name == Name::bare("note")));
@@ -147,8 +147,8 @@ fn element_or_span_inside_quotes_in_prose_is_read_as_element_or_span() {
 
 #[test]
 fn delimiters_and_names_read_as_before() {
-    let doc = parse_document("__strong__ snake_case_name @my_name(1) :a-b(2)\n").unwrap();
-    let Block::Paragraph(p) = &doc.blocks[0] else {
+    let doc = parse_file("__strong__ snake_case_name @my_name(1) :a-b(2)\n").unwrap();
+    let Block::Paragraph(p) = &doc.body[0] else {
         panic!("expected paragraph");
     };
     let has_strong = p.content.iter().any(|i| matches!(i, Inline::Element(e) if e.name == Name::bare("strong")));
@@ -182,9 +182,9 @@ fn the_cst_and_the_ast_agree_on_inline_structure() {
         "`*not em*` and _em_\n",
         "x _two words_ y\n",
     ] {
-        let doc = parse_document(src).unwrap();
+        let doc = parse_file(src).unwrap();
         let mut ast = Vec::new();
-        for b in &doc.blocks {
+        for b in &doc.body {
             if let Block::Paragraph(p) = b {
                 names(&p.content, &mut ast);
             }

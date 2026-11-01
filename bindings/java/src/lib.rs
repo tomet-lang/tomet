@@ -16,7 +16,7 @@ fn throw_err(env: &mut JNIEnv, msg: impl std::fmt::Display) -> jstring {
 /// The facade has no bare parse on purpose (see `tomet`'s crate doc), and
 /// nothing here but `validateJsonWith` needs one: reading a document as
 /// `std` alone is exactly what an empty vault does.
-fn parse(source: &str) -> Result<tomet::Document, String> {
+fn parse(source: &str) -> Result<tomet::File, String> {
     Vault::from_sources(PrinterConfig::default(), ".", &[])
         .parse(source)
         .map(|(doc, _bindings)| doc)
@@ -29,9 +29,9 @@ fn get_string(env: &mut JNIEnv, j_str: &JString) -> Result<String, String> {
         .map_err(|e| e.to_string())
 }
 
-/// Parse full `.tmt` markup source text into a JSON string representing the Document AST.
+/// Parse full `.tmt` markup source text into a JSON string representing the File AST.
 #[unsafe(no_mangle)]
-pub extern "system" fn Java_org_tomet_tomet_Tomet_parseDocumentJson(
+pub extern "system" fn Java_org_tomet_tomet_Tomet_parseFileJson(
     mut env: JNIEnv,
     _class: JClass,
     source: JString,
@@ -161,9 +161,9 @@ pub extern "system" fn Java_org_tomet_tomet_Tomet_fromMarkdownJson(
         .unwrap_or(std::ptr::null_mut())
 }
 
-/// Serialize a `Document` AST JSON string back into formatted `.tmt` source code.
+/// Serialize a `File` AST JSON string back into formatted `.tmt` source code.
 #[unsafe(no_mangle)]
-pub extern "system" fn Java_org_tomet_tomet_Tomet_printDocumentJson(
+pub extern "system" fn Java_org_tomet_tomet_Tomet_printFileJson(
     mut env: JNIEnv,
     _class: JClass,
     doc_json: JString,
@@ -172,7 +172,7 @@ pub extern "system" fn Java_org_tomet_tomet_Tomet_printDocumentJson(
         Ok(s) => s,
         Err(e) => return throw_err(&mut env, e),
     };
-    let doc: tomet::Document = match serde_json::from_str(&json_str) {
+    let doc: tomet::File = match serde_json::from_str(&json_str) {
         Ok(d) => d,
         Err(e) => return throw_err(&mut env, e),
     };

@@ -1,0 +1,38 @@
+=[ 一つの大きな本、"tome"に変換させたものの名前を、"tomed"と呼ぶ。 ]
+
+=[ 階層 ]
+
+-. Vault   -- 全体
+-. Folder  -- フォルダ
+-. File    -- `.tmt`
+-. Section -- セクション
+-. Block   -- ブロック
+
+=
+
+; tomet の -et は英語・フランス語の指小辞（diminutive: 小さいもの、例: tablet, booklet,
+packet）です。つまり、tomet とは本来「小さな書物、小冊子、一片の巻物」 を意味します。
+; 一方、tome は「分厚い大冊、学術書、完全な一書（ラテン語 tomus、ギリシャ語
+tomos）」を意味します。
+; これを、Section も File も、共通して Header（:: 宣言群や見出しメタデータ）と Body（本文ブロック群・子ノード群） を持つ対称的な構造へと進化させます。
+; Node
+
+1. Step 1: AST の同型・対称化（ミクロの地固め）
+    • ast-body-view.md でノード共通の Body（見出し＋子）ビューを確立。
+    • File<B> を「見出し部（header: Vec<Declaration>）＋子ブロック（body: Vec<B>）」の対称構造に統一（旧 Document を File へ一元化）。
+2. Step 2: フォルダ自己記述ファイル（self.tmt）の導入
+    • フォルダ直下に self.tmt を置く規約を策定し、.config.tmt をその見出し部へ吸収。
+3. Step 3: tomet-tome クレートの導入
+    • 物理ツリー（Vault / Folder / File）を再帰走査し、単一の論理木 Tome
+    を構築するエンジンを実装。
+4. Step 4: CLI インターフェース（tomet tomed）
+    • tomet tome（あるいは tomet tomed）で、Vault 全体を単一の Tome
+    として検証・操作・出力できるようにする。
+
+pub struct Header {
+    pub title: Option<Vec<Inline>>,     // Section なら Some("タイトル"), File なら None
+    pub declarations: Vec<Declaration>, // ::kind, ::rule, ::vars などの宣言群
+    pub data: Data,                     // (args) や {attrs}
+    pub id: Option<Id>,
+    pub connects: Vec<Connect>,         // :meta(), :as() などの後置コネクト
+}

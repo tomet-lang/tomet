@@ -20,7 +20,7 @@ fn extract_spans(html: &str) -> Vec<(usize, usize)> {
 
 #[test]
 fn spans_are_absent_unless_opted_in() {
-    let doc = parse_document("hello world\n").unwrap();
+    let doc = parse_file("hello world\n").unwrap();
     let html = render_body(&doc);
     assert!(!html.contains("data-tmt-start"));
 }
@@ -28,7 +28,7 @@ fn spans_are_absent_unless_opted_in() {
 #[test]
 fn a_paragraph_is_tagged_with_its_own_span() {
     let src = "hello world\n";
-    let doc = parse_document(src).unwrap();
+    let doc = parse_file(src).unwrap();
     let options = RenderOptions {
         emit_source_spans: true,
         ..RenderOptions::default()
@@ -42,7 +42,7 @@ fn a_paragraph_is_tagged_with_its_own_span() {
 #[test]
 fn a_heading_and_the_paragraph_after_it_each_get_their_own_span() {
     let src = "=[ Title ]\n\nbody text\n";
-    let doc = parse_document(src).unwrap();
+    let doc = parse_file(src).unwrap();
     let options = RenderOptions {
         emit_source_spans: true,
         ..RenderOptions::default()
@@ -65,7 +65,7 @@ fn a_heading_and_the_paragraph_after_it_each_get_their_own_span() {
 #[test]
 fn list_items_are_tagged_individually_and_the_list_itself_is_not() {
     let src = "- one\n- two\n";
-    let doc = parse_document(src).unwrap();
+    let doc = parse_file(src).unwrap();
     let options = RenderOptions {
         emit_source_spans: true,
         ..RenderOptions::default()
@@ -86,7 +86,7 @@ fn list_items_are_tagged_individually_and_the_list_itself_is_not() {
 #[test]
 fn a_non_list_non_heading_block_is_tagged_as_one_opaque_leaf() {
     let src = "@quote[ said something ]\n";
-    let doc = parse_document(src).unwrap();
+    let doc = parse_file(src).unwrap();
     let options = RenderOptions {
         emit_source_spans: true,
         ..RenderOptions::default()

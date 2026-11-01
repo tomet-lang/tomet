@@ -3,7 +3,7 @@
 use std::fs;
 use std::path::Path;
 
-use tomet_ast_parser::parse_document;
+use tomet_ast_parser::parse_file;
 use tomet_printer::document_to_tm;
 use tomet_search::{StructuralQuery, count_structural_matches};
 use tomet_transform::{StructuralAction, apply_structural_action};
@@ -37,7 +37,7 @@ impl StructuralEngine {
 
         for path in paths {
             if let Ok(src) = fs::read_to_string(&path)
-                && let Ok(doc) = parse_document(&src)
+                && let Ok(doc) = parse_file(&src)
             {
                 let count = count_structural_matches(&doc, query);
                 if count > 0 {
@@ -51,7 +51,7 @@ impl StructuralEngine {
     /// Apply structural refactoring action to matched items.
     pub fn apply_action(matches: &mut [FileDiff], action: &StructuralAction) {
         for m in matches.iter_mut() {
-            if let Ok(mut doc) = parse_document(&m.original_src) {
+            if let Ok(mut doc) = parse_file(&m.original_src) {
                 let count = apply_structural_action(&mut doc, action);
                 if count > 0 {
                     m.changes_count = count;

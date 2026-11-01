@@ -4,16 +4,16 @@
 //! - (ValueExt) Inspection and accessor methods on [`tomet_ast::Value`].
 //! - (ElementExt) Builders and name helpers on [`tomet_ast::Element`].
 //! - (DataExt) Property access on [`tomet_ast::Data`], shared by every node that carries `(args)` and `{value}`.
-//! - (DocumentExt) Block-level manipulation helpers on [`tomet_ast::Document`].
+//! - (FileExt) Block-level manipulation helpers on [`tomet_ast::File`].
 //! - (walk) One definition of what sits inside what ([`children`]), the one recursion over it ([`walk`]), and the walkers built on that.
 
-pub mod document;
 pub mod element;
+pub mod file;
 pub mod value;
 pub mod walk;
 
-pub use document::*;
 pub use element::*;
+pub use file::*;
 pub use value::*;
 pub use walk::*;
 
@@ -68,34 +68,34 @@ pub fn element_attrs_mut(el: &mut tomet_ast::Element) -> Option<&mut tomet_ast::
     el.data.attrs_mut()
 }
 
-pub fn insert_block_at(doc: &mut tomet_ast::Document, index: usize, block: tomet_ast::Block) {
-    doc.insert_block(index, block);
+pub fn insert_block_at(file: &mut tomet_ast::File, index: usize, block: tomet_ast::Block) {
+    file.insert_block(index, block);
 }
 
-pub fn remove_block_at(doc: &mut tomet_ast::Document, index: usize) -> Option<tomet_ast::Block> {
-    doc.remove_block(index)
+pub fn remove_block_at(file: &mut tomet_ast::File, index: usize) -> Option<tomet_ast::Block> {
+    file.remove_block(index)
 }
 
 pub fn replace_block_at(
-    doc: &mut tomet_ast::Document,
+    file: &mut tomet_ast::File,
     index: usize,
     new_block: tomet_ast::Block,
 ) -> Option<tomet_ast::Block> {
-    doc.replace_block(index, new_block)
+    file.replace_block(index, new_block)
 }
 
-pub fn find_block_index<F>(doc: &tomet_ast::Document, predicate: F) -> Option<usize>
+pub fn find_block_index<F>(file: &tomet_ast::File, predicate: F) -> Option<usize>
 where
     F: FnMut(&tomet_ast::Block) -> bool,
 {
-    doc.find_block_index(predicate)
+    file.find_block_index(predicate)
 }
 
-pub fn find_element_block_index<F>(doc: &tomet_ast::Document, predicate: F) -> Option<usize>
+pub fn find_element_block_index<F>(file: &tomet_ast::File, predicate: F) -> Option<usize>
 where
     F: FnMut(&tomet_ast::Element) -> bool,
 {
-    doc.find_element_block_index(predicate)
+    file.find_element_block_index(predicate)
 }
 
 #[cfg(test)]
@@ -104,8 +104,8 @@ mod tests {
     use tomet_ast::{Block, Inline, Name, Text, Value};
     use tomet_span::Span;
 
-    fn parse(src: &str) -> tomet_ast::Document {
-        tomet_ast_parser::parse_document(src).expect("valid Tomet source")
+    fn parse(src: &str) -> tomet_ast::File {
+        tomet_ast_parser::parse_file(src).expect("valid Tomet source")
     }
 
     #[test]
@@ -138,9 +138,9 @@ mod tests {
     }
 
     #[test]
-    fn test_document_extension_traits_and_walk() {
-        let mut doc = parse("#[ Heading ]\n\n- item\n");
-        assert_eq!(doc.blocks.len(), 2);
+    fn test_file_extension_traits_and_walk() {
+        let mut file = parse("#[ Heading ]\n\n- item\n");
+        assert_eq!(file.body.len(), 2);
 
         let third = Block::Paragraph(tomet_ast::Paragraph {
             content: vec![Inline::Text(Text {
@@ -149,16 +149,16 @@ mod tests {
             })],
             span: Span::dummy(),
         });
-        doc.insert_block(1, third);
-        assert_eq!(doc.blocks.len(), 3);
+        file.insert_block(1, third);
+        assert_eq!(file.body.len(), 3);
 
         // The bare list item (`- item`) is a `ListItem`, not an `Element`,
         // so only `for_each_list_item` visits it.
         let mut elements = 0;
-        for_each_element(&doc, |_el| elements += 1);
+        for_each_element(&file, |_el| elements += 1);
         assert_eq!(elements, 0);
         let mut items = 0;
-        for_each_list_item(&doc, |_item| items += 1);
+        for_each_list_item(&file, |_item| items += 1);
         assert_eq!(items, 1);
     }
 }

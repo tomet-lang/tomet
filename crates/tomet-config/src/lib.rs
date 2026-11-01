@@ -38,7 +38,7 @@ pub use layer::{ConfigLayer, registry_entries};
 pub use schema::{ConfigEntrySpec, ConfigGroupSpec, ConfigSpecProvider, all_config_specs};
 pub use tomet_spec_derive::Config;
 
-use tomet_ast::{Document, Value};
+use tomet_ast::{File, Value};
 use tree::merge_entry;
 
 /// Full Tomet document / vault configuration.
@@ -60,7 +60,7 @@ pub type PrinterConfig = Config;
 
 impl Config {
     /// The config one file declares, with nothing under or over it.
-    pub fn from_doc(doc: &Document) -> Self {
+    pub fn from_doc<B>(doc: &File<B>) -> Self {
         Self::from_layers([&ConfigLayer::from_doc(doc)])
     }
 

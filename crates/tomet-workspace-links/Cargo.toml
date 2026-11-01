@@ -16,11 +16,11 @@ cache = ["dep:directories", "dep:rusqlite"]
 [dependencies]
 tomet-address = { workspace = true }
 tomet-ast = { workspace = true }
-tomet-span = { workspace = true }
+tomet-ast-parser = { workspace = true }
 tomet-config = { workspace = true }
 tomet-indexer = { workspace = true }
-tomet-ast-parser = { workspace = true }
 tomet-semantics = { workspace = true }
+tomet-span = { workspace = true }
 tomet-tree = { workspace = true }
 
 #= Crates.io

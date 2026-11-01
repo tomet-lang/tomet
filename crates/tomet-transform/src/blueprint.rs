@@ -1,13 +1,10 @@
 //! Blueprint schema extraction, transformation, and instantiation.
 
-use tomet_ast::{Document, Name, Value};
+use tomet_ast::{File, Name, Value};
 use tomet_expr::EvalContext;
 use tomet_semantics::DeclKind;
 use tomet_semantics::{ElementKind, classify_declaration_lenient, normalized_declaration_args};
-use tomet_tree::{
-    ValueExt, for_each_top_level_declaration, for_each_top_level_declaration_mut,
-    retain_top_level_declarations,
-};
+use tomet_tree::{ValueExt, for_each_declaration, for_each_declaration_mut};
 
 use crate::expressions::{Unresolved, resolve_expressions};
 
@@ -20,9 +17,9 @@ pub struct BlueprintInfo {
 }
 
 /// Extracts [`BlueprintInfo`] from `doc` if it declares a top-level `::blueprint` directive.
-pub fn extract_blueprint_info(doc: &Document) -> Option<BlueprintInfo> {
+pub fn extract_blueprint_info(doc: &File) -> Option<BlueprintInfo> {
     let mut result = None;
-    for_each_top_level_declaration(doc, |declaration| {
+    for_each_declaration(doc, |declaration| {
         if result.is_some()
             || classify_declaration_lenient(declaration)
                 != ElementKind::Declaration(DeclKind::Blueprint)
@@ -77,7 +74,7 @@ pub struct Instantiated {
 /// 1. Promoting/converting `::blueprint(target)` to `::kind(target)` and stripping schema blocks.
 /// 2. Resolving every `${...}` in it, with `cx` -- which is a creating context
 ///    (`Phase::Create`), the only place `generate.*` exists.
-pub fn instantiate_blueprint(doc: &mut Document, cx: &EvalContext) -> Instantiated {
+pub fn instantiate_blueprint(doc: &mut File, cx: &EvalContext) -> Instantiated {
     let mut changed = false;
 
     // Step 0: drop the blueprint's own `::kind(blueprint)`.
@@ -88,7 +85,7 @@ pub fn instantiate_blueprint(doc: &mut Document, cx: &EvalContext) -> Instantiat
     // promotion below -- which is what running `tomet new` for the first
     // time after the shape was decided actually produced.
     let mut dropped_own_kind = false;
-    retain_top_level_declarations(doc, |declaration| {
+    doc.header.retain(|declaration| {
         if classify_declaration_lenient(declaration) != ElementKind::Declaration(DeclKind::Kind) {
             return true;
         }
@@ -107,7 +104,7 @@ pub fn instantiate_blueprint(doc: &mut Document, cx: &EvalContext) -> Instantiat
     // The blueprint's `::vars` are its inputs. They have been given their values
     // by now (see `tomet-workspace`), and a document made from it has none to ask for.
     let mut dropped_vars = false;
-    retain_top_level_declarations(doc, |declaration| {
+    doc.header.retain(|declaration| {
         let is_vars =
             classify_declaration_lenient(declaration) == ElementKind::Declaration(DeclKind::Vars);
         dropped_vars |= is_vars;
@@ -116,7 +113,7 @@ pub fn instantiate_blueprint(doc: &mut Document, cx: &EvalContext) -> Instantiat
     changed |= dropped_vars;
 
     // Step 1: Transform ::blueprint -> ::kind
-    for_each_top_level_declaration_mut(doc, |declaration| {
+    for_each_declaration_mut(doc, |declaration| {
         if classify_declaration_lenient(declaration)
             == ElementKind::Declaration(DeclKind::Blueprint)
         {
@@ -171,8 +168,8 @@ mod tests {
         }
     }
 
-    fn instantiate(src: &str, vars: EvalValue) -> (Document, Instantiated) {
-        let mut doc = tomet_ast_parser::parse_document(src).unwrap();
+    fn instantiate(src: &str, vars: EvalValue) -> (File, Instantiated) {
+        let mut doc = tomet_ast_parser::parse_file(src).unwrap();
         let macros = HashMap::new();
         let cx = EvalContext {
             phase: Phase::Create,
@@ -205,7 +202,7 @@ mod tests {
         );
 
         let mut kinds = Vec::new();
-        for_each_top_level_declaration(&doc, |declaration| {
+        for_each_declaration(&doc, |declaration| {
             if classify_declaration_lenient(declaration) == ElementKind::Declaration(DeclKind::Kind)
                 && let Some(s) = declaration.data.args.as_ref().and_then(|v| v.as_str())
             {
@@ -219,7 +216,7 @@ mod tests {
     fn extracts_blueprint_info() {
         let src =
             "::blueprint(daily-note){\n  description: \"Daily note\"\n}\n\n=[ Plan ]#(plan)\n";
-        let doc = tomet_ast_parser::parse_document(src).unwrap();
+        let doc = tomet_ast_parser::parse_file(src).unwrap();
         let info = extract_blueprint_info(&doc).unwrap();
         assert_eq!(info.target_kind, "daily-note");
         assert_eq!(info.description.as_deref(), Some("Daily note"));
@@ -237,7 +234,7 @@ mod tests {
         assert!(report.unresolved.is_empty(), "{:?}", report.unresolved);
 
         let mut top_level = Vec::new();
-        for_each_top_level_declaration(&doc, |declaration| top_level.push(declaration.clone()));
+        for_each_declaration(&doc, |declaration| top_level.push(declaration.clone()));
 
         let kind = top_level
             .iter()

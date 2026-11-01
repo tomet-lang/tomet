@@ -10,14 +10,14 @@ import { existsSync, promises as fs } from 'node:fs';
 import { basename, dirname, isAbsolute, join, normalize, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import initWasm, {
-  processDocument,
+  processFile,
   setVaultFiles,
   type ProcessOptions,
-  type ProcessedDoc,
+  type ProcessedFile,
   type TocItem,
 } from '@tomet/wasm';
 
-export type { ProcessOptions, ProcessedDoc, TocItem };
+export type { ProcessOptions, ProcessedFile, TocItem };
 
 let wasmReady: Promise<void> | null = null;
 
@@ -37,16 +37,16 @@ export async function ensureWasm(): Promise<void> {
  */
 export async function renderTomet(source: string, options?: ProcessOptions): Promise<string> {
   await ensureWasm();
-  const res = processDocument(source, options);
+  const res = processFile(source, options);
   return res.html;
 }
 
 /**
- * Process a single `.tmt` source string to a `ProcessedDoc` in-process.
+ * Process a single `.tmt` source string to a `ProcessedFile` in-process.
  */
-export async function processTomet(source: string, options?: ProcessOptions): Promise<ProcessedDoc> {
+export async function processTomet(source: string, options?: ProcessOptions): Promise<ProcessedFile> {
   await ensureWasm();
-  return processDocument(source, options);
+  return processFile(source, options);
 }
 
 export interface TometLoaderOptions {
@@ -325,7 +325,7 @@ export function tometLoader(options: TometLoaderOptions): Loader {
           }
 
           const content = await fs.readFile(file.absPath, 'utf8');
-          const processed: ProcessedDoc = processDocument(content, {
+          const processed: ProcessedFile = processFile(content, {
             advanced,
             numberHeadings: advanced,
             autoSlugHeadings: advanced,

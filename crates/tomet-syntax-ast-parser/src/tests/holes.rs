@@ -1,4 +1,4 @@
-//! Holes (`<?matcher(name, args){options}>[content]`), read by `parse_document` like
+//! Holes (`<?matcher(name, args){options}>[content]`), read by `parse_file` like
 //! any other syntax. See `tmtroot/spec/syntax/hole.tmt`.
 
 use super::*;
@@ -6,8 +6,8 @@ use tomet_ast::{Hole, Name};
 
 /// The one paragraph's inline run of a document.
 fn inlines(src: &str) -> Vec<Inline> {
-    let doc = parse_document(src).unwrap();
-    match <[Block; 1]>::try_from(doc.blocks).expect("one block") {
+    let doc = parse_file(src).unwrap();
+    match <[Block; 1]>::try_from(doc.body).expect("one block") {
         [Block::Paragraph(p)] => p.content,
         [other] => panic!("expected one paragraph, got {other:?}"),
     }
@@ -15,8 +15,8 @@ fn inlines(src: &str) -> Vec<Inline> {
 
 /// The one block-level hole of a document.
 fn hole(src: &str) -> Hole {
-    let doc = parse_document(src).unwrap();
-    match <[Block; 1]>::try_from(doc.blocks).expect("one block") {
+    let doc = parse_file(src).unwrap();
+    match <[Block; 1]>::try_from(doc.body).expect("one block") {
         [Block::Hole(hole)] => hole,
         [other] => panic!("expected one hole, got {other:?}"),
     }
@@ -24,8 +24,8 @@ fn hole(src: &str) -> Hole {
 
 /// The one block element of a document.
 fn element(src: &str) -> Element {
-    let doc = parse_document(src).unwrap();
-    match <[Block; 1]>::try_from(doc.blocks).expect("one block") {
+    let doc = parse_file(src).unwrap();
+    match <[Block; 1]>::try_from(doc.body).expect("one block") {
         [Block::Element(el)] => el,
         [other] => panic!("expected one element, got {other:?}"),
     }
@@ -202,9 +202,9 @@ fn a_box_that_does_not_close_is_text() {
 fn the_old_spelling_is_text() {
     // `?name(...)` is gone; a `?` is an ordinary character again.
     for src in ["?(x)", "adr-?int(n)", "本当に?(はい)", "?()", "?int(n)"] {
-        let doc = parse_document(src).unwrap();
-        let [Block::Paragraph(p)] = doc.blocks.as_slice() else {
-            panic!("`{src}` should be one paragraph, got {:?}", doc.blocks);
+        let doc = parse_file(src).unwrap();
+        let [Block::Paragraph(p)] = doc.body.as_slice() else {
+            panic!("`{src}` should be one paragraph, got {:?}", doc.body);
         };
         assert_eq!(p.content.len(), 1, "`{src}` is one run of text");
         assert!(matches!(&p.content[0], Inline::Text(t) if t.value == src));
@@ -229,16 +229,16 @@ fn a_hole_takes_no_id() {
 fn a_matcher_is_not_an_element_name() {
     // `<?meta>` is a hole with the matcher `meta`; it is not the `meta` element, and
     // is not reached by the walkers that visit elements.
-    let doc = parse_document("<?meta>").unwrap();
+    let doc = parse_file("<?meta>").unwrap();
     let mut elements = 0;
     tomet_tree::for_each_element(&doc, |_| elements += 1);
     assert_eq!(elements, 0);
     assert_eq!(hole("<?meta>").matcher, matcher("meta"));
 }
 
-/// How many holes `parse_document` finds anywhere in `src`.
+/// How many holes `parse_file` finds anywhere in `src`.
 fn holes_in(src: &str) -> usize {
-    let doc = parse_document(src).unwrap();
+    let doc = parse_file(src).unwrap();
     let mut count = 0;
     tomet_tree::for_each_hole(&doc, |_| count += 1);
     count

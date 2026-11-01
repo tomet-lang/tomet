@@ -12,10 +12,14 @@ name = "tomet"
 path = "src/main.rs"
 
 [dependencies]
+cotomet = { workspace = true }
+cotomet-eval = { workspace = true }
 tomet-ast = { workspace = true }
-tomet-expr = { workspace = true }
+tomet-ast-parser = { workspace = true }
 tomet-config = { workspace = true }
 tomet-convert-standalone = { workspace = true }
+tomet-declaration = { workspace = true }
+tomet-expr = { workspace = true }
 tomet-formatter = { workspace = true }
 tomet-html = { workspace = true }
 tomet-indexer = { workspace = true }
@@ -25,9 +29,7 @@ tomet-load = { workspace = true }
 tomet-load-config = { workspace = true }
 tomet-markdown = { workspace = true }
 tomet-pandoc = { workspace = true }
-tomet-ast-parser = { workspace = true }
 tomet-printer = { workspace = true }
-tomet-declaration = { workspace = true }
 tomet-semantics = { workspace = true }
 tomet-spec = { workspace = true }
 tomet-stats = { workspace = true }
@@ -35,8 +37,6 @@ tomet-tree = { workspace = true }
 tomet-typst = { workspace = true }
 tomet-validator = { workspace = true }
 tomet-workspace = { workspace = true }
-cotomet = { workspace = true }
-cotomet-eval = { workspace = true }
 
 #= Crates.io
 anyhow = { workspace = true }

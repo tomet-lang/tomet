@@ -1,6 +1,6 @@
 //! Configuration reference generator from [`ConfigGroupSpec`] schemas.
 
-use tomet_ast::{Block, Document, ListItem, Section, Value};
+use tomet_ast::{Block, File, ListItem, Section, Value};
 use tomet_config::{ConfigEntrySpec, ConfigGroupSpec, PrinterConfig};
 use tomet_tree::declaration_new;
 
@@ -19,18 +19,17 @@ pub fn render(
     tomet_formatter::format_source_with_config(&printed, config)
 }
 
-/// Builds a Tomet [`Document`] AST representing the configuration groups and entries.
+/// Builds a Tomet [`File`] AST representing the configuration groups and entries.
 pub fn document(
     groups: &[ConfigGroupSpec],
     doc_id: &str,
     title: &str,
     intro_paragraphs: &[&str],
-) -> Document {
+) -> File {
     let mut id = declaration_new("id");
     id.data.args = Some(Value::String(doc_id.to_string()));
 
     let mut blocks = vec![
-        Block::Declaration(id),
         Block::Section(Section::new(1, vec![text(title)], dummy())),
     ];
 
@@ -44,7 +43,7 @@ pub fn document(
         push_group(group, &mut blocks);
     }
 
-    Document::new(blocks, dummy())
+    File::new(vec![id], blocks, dummy())
 }
 
 /// Appends a level-2 section and entry list for `group` into `out`.

@@ -1,6 +1,6 @@
 use std::path::{Path, PathBuf};
 
-use tomet_ast::{Block, Document, Element, Inline, Paragraph, Text, Value};
+use tomet_ast::{Block, Element, File, Inline, Paragraph, Text, Value};
 use tomet_span::Span;
 use tomet_semantics::{
     ElementKind, TargetScheme, classify_std_lenient, link_target, target_scheme,
@@ -108,7 +108,7 @@ impl TargetMode {
 /// - Resolved links have their target rewritten according to `mode`.
 /// - Unresolved links are rewritten to the `unresolved:` scheme (e.g. `unresolved:Note Name`).
 pub fn resolve_document_links<F>(
-    doc: &mut Document,
+    doc: &mut File,
     from_path: Option<&Path>,
     resolver: F,
     mode: &TargetMode,
@@ -237,8 +237,8 @@ fn update_element_target(el: &mut Element, new_target: String) {
 mod tests {
     use super::*;
 
-    fn parse_doc(src: &str) -> Document {
-        tomet_ast_parser::parse_document(src).expect("valid source")
+    fn parse_doc(src: &str) -> File {
+        tomet_ast_parser::parse_file(src).expect("valid source")
     }
 
     #[test]

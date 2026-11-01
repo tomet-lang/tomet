@@ -219,7 +219,7 @@ impl LinkCache {
             path: path_str.clone(),
             source: e,
         })?;
-        let doc = tomet_ast_parser::parse_document(&src).map_err(|e| LinkCacheError::Parse {
+        let doc = tomet_ast_parser::parse_file(&src).map_err(|e| LinkCacheError::Parse {
             path: path_str.clone(),
             source: e,
         })?;

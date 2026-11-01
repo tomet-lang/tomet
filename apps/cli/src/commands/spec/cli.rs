@@ -22,10 +22,10 @@ mod tests {
     use crate::commands::spec::{SpecTarget, spec_cmd};
     use clap::Command;
     use std::fs;
-    use tomet_ast::{Block, Document, Entry};
+    use tomet_ast::{Block, Entry, File};
     use tomet_spec::util::{guard_triggers, inlines};
 
-    fn document(root: &mut Command) -> Document {
+    fn document(root: &mut Command) -> File {
         tomet_spec::cli::document(root, DOC_ID, NOTICE)
     }
 
@@ -51,7 +51,7 @@ mod tests {
     #[test]
     fn the_output_is_valid_tmt_and_already_formatted() {
         let text = rendered();
-        tomet_ast_parser::parse_document(&text).expect("the generated reference parses");
+        tomet_ast_parser::parse_file(&text).expect("the generated reference parses");
         assert_eq!(
             tomet_formatter::format_source_with_config(&text, &PrinterConfig::default()),
             text,
@@ -72,18 +72,17 @@ mod tests {
                     Block::Element(_) => {}
                     Block::List(_) => {}
                     Block::Interp(_) | Block::Hole(_) => {}
-                    Block::Declaration(_) => {}
                 }
             }
         }
         let mut root = Cli::command();
         root.build();
         let (mut want_s, mut want_p) = (0, 0);
-        count(&document(&mut root).blocks, &mut want_s, &mut want_p);
+        count(&document(&mut root).body, &mut want_s, &mut want_p);
 
-        let parsed = tomet_ast_parser::parse_document(&rendered()).unwrap();
+        let parsed = tomet_ast_parser::parse_file(&rendered()).unwrap();
         let (mut got_s, mut got_p) = (0, 0);
-        count(&parsed.blocks, &mut got_s, &mut got_p);
+        count(&parsed.body, &mut got_s, &mut got_p);
         assert_eq!((got_s, got_p), (want_s, want_p));
     }
 
@@ -144,7 +143,7 @@ mod tests {
                         }
                     }
                     Block::List(list) => walk_list(list, found),
-                    Block::Interp(_) | Block::Declaration(_) | Block::Hole(_) => {}
+                    Block::Interp(_) | Block::Hole(_) => {}
                 }
             }
         }
@@ -156,9 +155,9 @@ mod tests {
                 }
             }
         }
-        let parsed = tomet_ast_parser::parse_document(&rendered()).unwrap();
+        let parsed = tomet_ast_parser::parse_file(&rendered()).unwrap();
         let mut found = Vec::new();
-        walk(&parsed.blocks, &mut found);
+        walk(&parsed.body, &mut found);
         assert!(found.is_empty(), "text came back as elements: {found:?}");
 
         assert_eq!(guard_triggers("Overrides @config.").len(), 3);

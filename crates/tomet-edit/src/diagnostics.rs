@@ -5,8 +5,8 @@
 //! to source text, parses it with the AST parser (`parse_document`), and runs
 //! `validate_document` to report duplicate IDs or validation warnings.
 
-use tomet_ast::Document;
-use tomet_ast_parser::{Error as ParseError, parse_document};
+use tomet_ast::File;
+use tomet_ast_parser::{Error as ParseError, parse_file};
 use tomet_validator::{Diagnostic, validate_document};
 use tomet_vault::Vault;
 
@@ -22,14 +22,14 @@ pub enum PostEditReport {
     Validation(Vec<Diagnostic>),
 }
 
-/// Diagnoses an [`EditDoc`] by exporting to source, parsing with [`parse_document`],
+/// Diagnoses an [`EditDoc`] by exporting to source, parsing with [`parse_file`],
 /// and running [`validate_document`].
 ///
 /// That knows `std` alone, as a document in a vault with no settings and no
 /// vocabularies would; [`diagnose_doc_in`] is the report for a document in a vault.
 pub fn diagnose_doc(doc: &EditDoc) -> PostEditReport {
     let source = export_doc(doc);
-    match parse_document(&source) {
+    match parse_file(&source) {
         Ok(ast) => PostEditReport::Validation(validate_document(&ast)),
         Err(err) => PostEditReport::ParseFailure(err),
     }
@@ -39,9 +39,9 @@ pub fn diagnose_doc(doc: &EditDoc) -> PostEditReport {
 /// finds without the disk ([`Vault::diagnostics`]) -- the vocabularies the
 /// document has in scope, the types the vault's settings declare for `::meta`
 /// fields, and the blueprint of `blueprints` that its `::kind` names.
-pub fn diagnose_doc_in(doc: &EditDoc, vault: &Vault, blueprints: &[Document]) -> PostEditReport {
+pub fn diagnose_doc_in(doc: &EditDoc, vault: &Vault, blueprints: &[File]) -> PostEditReport {
     let source = export_doc(doc);
-    match parse_document(&source) {
+    match parse_file(&source) {
         Ok(ast) => PostEditReport::Validation(vault.diagnostics(&ast, blueprints)),
         Err(err) => PostEditReport::ParseFailure(err),
     }

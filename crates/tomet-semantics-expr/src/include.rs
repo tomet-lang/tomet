@@ -145,7 +145,7 @@ fn select(
                 return Err(not_a_section());
             }
             let loaded = load(doc, cx)?;
-            Ok((doc.clone(), strip_declarations(loaded.blocks.clone())))
+            Ok((doc.clone(), loaded.body.clone()))
         }
         EvalValue::Node { doc, node } => match &**node {
             Node::Section(section) => {
@@ -210,17 +210,6 @@ fn element_block(element: &Element) -> Block {
     }
 }
 
-/// The blocks without the document's own declarations: what a document says
-/// about itself does not go along when its body is included. The `::` says so;
-/// no name is looked up, which also covers a vocabulary's own preamble
-/// elements (`::character`) that no list of standard names could.
-fn strip_declarations(blocks: Vec<Block>) -> Vec<Block> {
-    blocks
-        .into_iter()
-        .filter(|block| !matches!(block, Block::Declaration(_)))
-        .collect()
-}
-
 // ---- heading levels ---------------------------------------------------------
 
 /// The shallowest section among `blocks`.
@@ -244,11 +233,6 @@ fn shift_levels(blocks: &mut [Block], delta: isize) {
             }
             Block::Element(element) => {
                 if let Some(content) = &mut element.content {
-                    shift_levels(content, delta);
-                }
-            }
-            Block::Declaration(declaration) => {
-                if let Some(content) = &mut declaration.content {
                     shift_levels(content, delta);
                 }
             }

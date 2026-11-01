@@ -18,14 +18,14 @@
 //! Go through [`Vault`]. It finds the config that governs the file, loads
 //! the vocabularies that config declares, parses, and binds names -- the
 //! four steps that have to happen together. The bare parser is deliberately
-//! not re-exported: a caller that parses on its own gets a [`Document`]
+//! not re-exported: a caller that parses on its own gets a [`File`]
 //! whose user-vocabulary elements silently do not resolve.
 //!
 //! ```no_run
 //! use std::path::Path;
 //!
-//! let (doc, _bindings) = tomet::load_document(Path::new("docs/intro.tmt"))?;
-//! # let _ = doc;
+//! let (file, _bindings) = tomet::load_file(Path::new("docs/intro.tmt"))?;
+//! # let _ = file;
 //! # Ok::<(), tomet::LoadError>(())
 //! ```
 //!
@@ -71,9 +71,9 @@
 //! [`Vault::prepare`] first; see `tomet-load` for why that is a separate
 //! step from reading.
 
-/// The syntax tree: [`Document`], [`ast::Element`], [`ast::Value`], ...
+/// The syntax tree: [`File`], [`ast::Element`], [`ast::Value`], ...
 pub use tomet_ast as ast;
-pub use tomet_ast::Document;
+pub use tomet_ast::File;
 /// `PrinterConfig` and how a vault's config is found and read.
 pub use tomet_config as config;
 /// What an element means: vocabularies, bindings, built-in classification.
@@ -84,7 +84,7 @@ pub use tomet_transform as transform;
 /// Diagnostics for a parsed document.
 pub use tomet_validator as validator;
 
-pub use tomet_load::{DiskResolver, LoadError, Prepared, Unresolved, Vault, load_document};
+pub use tomet_load::{DiskResolver, LoadError, Prepared, Unresolved, Vault, load_file};
 /// Parses a data-only document into a [`ast::Value`]. Not a way to read a
 /// document; use [`Vault`] for that.
 pub use tomet_ast_parser::parse_value;
@@ -93,7 +93,7 @@ pub use tomet_ast_parser::parse_value;
 #[cfg(feature = "parser")]
 pub use tomet_ast_parser as parser;
 #[cfg(feature = "parser")]
-pub use tomet_ast_parser::parse_document;
+pub use tomet_ast_parser::parse_file;
 
 /// Lossless editable document tree model (opt-in feature `edit`).
 #[cfg(feature = "edit")]
@@ -136,9 +136,9 @@ pub use tomet_typst as typst;
 
 /// Measures statistics for a single document on disk.
 #[cfg(feature = "stats")]
-pub fn measure_document(path: &std::path::Path) -> Result<tomet_stats::Stats, LoadError> {
-    let (doc, _) = load_document(path)?;
-    Ok(tomet_stats::measure(&doc))
+pub fn measure_file(path: &std::path::Path) -> Result<tomet_stats::Stats, LoadError> {
+    let (file, _) = load_file(path)?;
+    Ok(tomet_stats::measure(&file))
 }
 
 #[cfg(test)]
@@ -150,8 +150,8 @@ mod tests {
     fn parse_and_edit_features() {
         #[cfg(feature = "parser")]
         {
-            let doc = parse_document("Hello world.\n").unwrap();
-            assert_eq!(doc.blocks.len(), 1);
+            let doc = parse_file("Hello world.\n").unwrap();
+            assert_eq!(doc.body.len(), 1);
         }
 
         #[cfg(feature = "edit")]

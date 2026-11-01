@@ -21,7 +21,7 @@ pub fn diagnostics_for(text: &str) -> Vec<Diagnostic> {
     }
 
     // 2. High-level parser errors if document structure is invalid
-    if let Err(err) = tomet_ast_parser::parse_document(text) {
+    if let Err(err) = tomet_ast_parser::parse_file(text) {
         diags.push(Diagnostic {
             range: error_range(&err, &positions),
             severity: Some(DiagnosticSeverity::ERROR),

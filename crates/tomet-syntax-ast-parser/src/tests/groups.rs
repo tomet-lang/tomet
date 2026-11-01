@@ -33,14 +33,16 @@ fn every_sigil_takes_every_group_opener() {
     const KNOWN_GAPS: &[(&str, char)] = &[];
 
     fn produced(src: &str) -> Option<String> {
-        let doc = parse_document(src).ok()?;
-        match doc.blocks.first()? {
+        let doc = parse_file(src).ok()?;
+        if let Some(d) = doc.header.first() {
+            return Some(d.name.name.clone());
+        }
+        match doc.body.first()? {
             Block::Element(el) => Some(el.name.name.clone()),
             Block::Section(_) => Some("section".into()),
             Block::Paragraph(_) => None,
             Block::List(list) => Some(if list.ordered { "ol" } else { "ul" }.into()),
             Block::Interp(_) | Block::Hole(_) => None,
-            Block::Declaration(d) => Some(d.name.name.clone()),
         }
     }
 
@@ -83,9 +85,9 @@ fn a_bare_bracket_pair_inside_a_content_no_longer_truncates_it() {
     // of the content as stray trailing text. Applies to every ordinary
     // (non-raw) `[content]`, not just an opt-in one.
     let doc =
-        parse_document("@caution[\nline one\nline two with * and [brackets] inside\n]\n").unwrap();
-    assert_eq!(doc.blocks.len(), 1);
-    match &doc.blocks[0] {
+        parse_file("@caution[\nline one\nline two with * and [brackets] inside\n]\n").unwrap();
+    assert_eq!(doc.body.len(), 1);
+    match &doc.body[0] {
         Block::Element(el) => {
             assert_eq!(
                 el.content,
@@ -102,7 +104,7 @@ fn a_bare_bracket_pair_inside_a_content_no_longer_truncates_it() {
 
 #[test]
 fn an_unbalanced_bracket_inside_a_content_still_errors() {
-    assert!(parse_document("@caution[ has an [ that never closes\n]\n").is_err());
+    assert!(parse_file("@caution[ has an [ that never closes\n]\n").is_err());
 }
 
 #[test]
@@ -110,8 +112,8 @@ fn empty_paren_and_brace_groups_are_a_deliberately_empty_map() {
     // `()`/`{}` written out (as opposed to the group being omitted
     // entirely, which leaves `args`/`value` as `None`) is a valid,
     // deliberately-empty map -- matches the spec's own `::meta{}` etc.
-    let doc = parse_document("@T()\n").unwrap();
-    match &doc.blocks[0] {
+    let doc = parse_file("@T()\n").unwrap();
+    match &doc.body[0] {
         Block::Element(el) => {
             assert_eq!(el.data.args, Some(Value::Map(vec![])));
             assert_eq!(el.content, None);
@@ -119,13 +121,10 @@ fn empty_paren_and_brace_groups_are_a_deliberately_empty_map() {
         other => panic!("expected an element, got {other:?}"),
     }
 
-    let doc = parse_document("::meta{}\n").unwrap();
-    match &doc.blocks[0] {
-        Block::Declaration(d) => {
-            assert_eq!(d.data.value, Some(Group::from_map(Value::Map(vec![]))));
-        }
-        other => panic!("expected a declaration, got {other:?}"),
-    }
+    let doc = parse_file("::meta{}\n").unwrap();
+    assert_eq!(doc.header.len(), 1);
+    let d = &doc.header[0];
+    assert_eq!(d.data.value, Some(Group::from_map(Value::Map(vec![]))));
 }
 
 #[test]
@@ -134,7 +133,7 @@ fn a_second_group_written_against_the_first_is_an_error() {
     // to fall through instead: the group stayed where it stood and was
     // read as prose, which also cost the element its block placement,
     // so `@T(a:1)(b:2)` quietly became a paragraph.
-    let err = parse_document("@T(a:1)(b:2)\n").expect_err("a second (args) group should not parse");
+    let err = parse_file("@T(a:1)(b:2)\n").expect_err("a second (args) group should not parse");
     assert!(
         err.message.contains("a second `(args)` group"),
         "{}",
@@ -153,7 +152,7 @@ fn every_kind_of_group_written_twice_against_itself_is_an_error() {
         ("a @T(a:1)(b:2) b\n", "a second `(args)` group", 9),
         ("@T#(a)#(b)\n", "a second `#(...)`", 6),
     ] {
-        let err = parse_document(src).expect_err(src);
+        let err = parse_file(src).expect_err(src);
         assert!(err.message.contains(kind), "`{src}`: {}", err.message);
         assert_eq!(err.offset, at, "`{src}`: {}", err.message);
     }
@@ -168,7 +167,7 @@ fn a_second_group_apart_from_the_first_is_not_an_error() {
         "- (a)(b)\n",
         "=[ t ](a)(b)\n",
     ] {
-        assert!(parse_document(src).is_ok(), "`{src}` should parse");
+        assert!(parse_file(src).is_ok(), "`{src}` should parse");
     }
 }
 
@@ -178,10 +177,10 @@ fn a_parenthesis_after_an_element_is_prose() {
     // to be written *against* the element to count as a second one.
     // `@file(x) (it was ...)` is how `docs/.writ.tmt` and
     // `tmtroot/agents.tmt` both write, and both parse.
-    let doc = parse_document("@T(a:1) (b:2)\n").unwrap();
-    assert_eq!(doc.blocks.len(), 1);
-    let Block::Paragraph(p) = &doc.blocks[0] else {
-        panic!("expected a paragraph, got {:?}", doc.blocks[0]);
+    let doc = parse_file("@T(a:1) (b:2)\n").unwrap();
+    assert_eq!(doc.body.len(), 1);
+    let Block::Paragraph(p) = &doc.body[0] else {
+        panic!("expected a paragraph, got {:?}", doc.body[0]);
     };
     assert_eq!(p.content.len(), 2);
     assert_eq!(&p.content[1], &Inline::Text(" (b:2)".into()));
@@ -202,9 +201,9 @@ fn a_comment_between_groups_does_not_detach_the_next_group() {
     // used to fall outside the whitespace/newline gap tolerance,
     // ending the element early and leaving the next group as
     // unrelated trailing text.
-    let doc = parse_document("@T(a:1) // note\n[content]\n").unwrap();
-    assert_eq!(doc.blocks.len(), 1);
-    match &doc.blocks[0] {
+    let doc = parse_file("@T(a:1) // note\n[content]\n").unwrap();
+    assert_eq!(doc.body.len(), 1);
+    match &doc.body[0] {
         Block::Element(el) => {
             assert_eq!(
                 el.data.args,

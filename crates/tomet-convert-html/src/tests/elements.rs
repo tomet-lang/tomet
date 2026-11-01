@@ -2,14 +2,14 @@ use super::*;
 
 #[test]
 fn meta_element_has_no_visible_output() {
-    let doc = parse_document("::meta{ key: value }\n").unwrap();
+    let doc = parse_file("::meta{ key: value }\n").unwrap();
     let body = render_body(&doc);
     assert_eq!(body, "");
 }
 
 #[test]
 fn config_element_has_no_visible_output() {
-    let doc = parse_document("::export(type:commonmark)\n").unwrap();
+    let doc = parse_file("::export(type:commonmark)\n").unwrap();
     let body = render_body(&doc);
     assert_eq!(body, "");
 }
@@ -28,7 +28,7 @@ fn adjacent_meta_blocks_have_no_visible_output() {
     // just confirms it still renders each one as empty output rather
     // than leaking a stray whitespace-only `<p>` -- garbage in,
     // harmless out.
-    let doc = parse_document(
+    let doc = parse_file(
         "::meta{ key: value }\n::meta{ key: value }\n::meta{ key: value }\n\n=[ next ]\n",
     )
     .unwrap();
@@ -38,7 +38,7 @@ fn adjacent_meta_blocks_have_no_visible_output() {
 
 #[test]
 fn renders_typed_element_generically() {
-    let doc = parse_document("@caution[ be careful ]\n").unwrap();
+    let doc = parse_file("@caution[ be careful ]\n").unwrap();
     let body = render_body(&doc);
     assert_eq!(
         body,
@@ -55,7 +55,7 @@ fn renders_typed_element_generically() {
 /// `doc` is a `RESERVED_NAMESPACES` entry).
 #[test]
 fn custom_element_hook_renders_doc_icon() {
-    let doc = parse_document("a @doc.icon(\"star\", pkg:\"lucide\") b\n").unwrap();
+    let doc = parse_file("a @doc.icon(\"star\", pkg:\"lucide\") b\n").unwrap();
     let options = RenderOptions {
         custom_element: Some(CustomElementRenderer::new(|ctx| {
             if ctx.kind != "doc.icon" {
@@ -91,7 +91,7 @@ fn custom_element_hook_renders_doc_icon() {
 /// existing generic rendering, same as having no hook at all.
 #[test]
 fn custom_element_hook_falling_through_matches_generic_rendering() {
-    let doc = parse_document("@doc.icon(\"star\", pkg:\"lucide\")\n").unwrap();
+    let doc = parse_file("@doc.icon(\"star\", pkg:\"lucide\")\n").unwrap();
     let without_hook = render_body(&doc);
     let options = RenderOptions {
         custom_element: Some(CustomElementRenderer::new(|_ctx| None)),
@@ -118,7 +118,7 @@ fn custom_element_hook_falling_through_matches_generic_rendering() {
 #[test]
 fn an_unprepared_interpolation_renders_as_its_own_source() {
     let doc =
-        parse_document("Issue: $gh(42)\nFooter: ${copyright}\nMath: ${add(10, 5)}\n").unwrap();
+        parse_file("Issue: $gh(42)\nFooter: ${copyright}\nMath: ${add(10, 5)}\n").unwrap();
     assert_eq!(
         render_body(&doc),
         "<p>Issue: ${gh(42)} Footer: ${copyright} Math: ${add(10, 5)}</p>\n"
@@ -128,7 +128,7 @@ fn an_unprepared_interpolation_renders_as_its_own_source() {
 #[test]
 fn test_renders_wrap_sections() {
     let src = "=[ Chapter 1 ]\n\nParagraph in chapter.\n\n==[ Section 1.1 ]\n\nNested paragraph.\n";
-    let doc = parse_document(src).unwrap();
+    let doc = parse_file(src).unwrap();
     let options = RenderOptions {
         wrap_sections: true,
         ..RenderOptions::default()
@@ -141,7 +141,7 @@ fn test_renders_wrap_sections() {
 #[test]
 fn test_renders_tag_element() {
     let src = "Prose with @tag(rust, tomet) tags.\n";
-    let doc = parse_document(src).unwrap();
+    let doc = parse_file(src).unwrap();
     let html = render_body(&doc);
 
     assert!(html.contains("<span class=\"tmt-tag-list\"><span class=\"tmt-tag\">#rust</span> <span class=\"tmt-tag\">#tomet</span></span>"), "got {html}");
@@ -150,7 +150,7 @@ fn test_renders_tag_element() {
 #[test]
 fn test_renders_task_element() {
     let src = "@task(done)[ Finished work ]\n\n@task(todo)[ Pending work ]\n";
-    let doc = parse_document(src).unwrap();
+    let doc = parse_file(src).unwrap();
     let html = render_body(&doc);
 
     assert!(html.contains("<div class=\"tm-element tm-task\" data-status=\"done\"><input type=\"checkbox\" class=\"tm-task-checkbox\" disabled checked> Finished work</div>\n"), "got {html}");
@@ -162,7 +162,7 @@ fn test_renders_task_element() {
 /// readable projection, and the exact copy keeps it.
 #[test]
 fn a_key_that_is_not_an_attribute_name_cannot_add_attributes() {
-    let doc = parse_document("@x(\"a onclick=alert(1)\": 1, plain: 2)\n").unwrap();
+    let doc = parse_file("@x(\"a onclick=alert(1)\": 1, plain: 2)\n").unwrap();
     let body = render_body(&doc);
     // The key appears only inside the quoted value of `data-tomet-data`.
     assert_eq!(
@@ -174,7 +174,7 @@ fn a_key_that_is_not_an_attribute_name_cannot_add_attributes() {
 
 #[test]
 fn a_path_key_stays_out_of_data_attributes_and_in_the_exact_copy() {
-    let doc = parse_document("@x(\"tmtroot/a.tmt\": 1)\n").unwrap();
+    let doc = parse_file("@x(\"tmtroot/a.tmt\": 1)\n").unwrap();
     let body = render_body(&doc);
     assert!(!body.contains("data-tmtroot"), "{body}");
     assert!(body.contains("tmtroot/a.tmt"), "exact copy: {body}");

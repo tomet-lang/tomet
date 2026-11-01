@@ -1,11 +1,11 @@
 //! Reading what the standard declarations say, from a [`Declaration`] or from a whole document.
 //!
 //! One reader per thing a declaration states. The `document_*` functions are the same readers
-//! applied to the first (or every) declaration of that name at the top of a [`Document`].
+//! applied to the first (or every) declaration of that name at the top of a [`File`].
 
 use std::collections::BTreeMap;
 
-use tomet_ast::{Document, Value};
+use tomet_ast::{File, Value};
 use tomet_tree::ValueExt;
 
 use crate::declaration::{Declaration, declarations};
@@ -128,7 +128,7 @@ pub(crate) fn entries(declaration: &Declaration) -> Vec<(String, Value)> {
     args.into_iter().chain(data).collect()
 }
 
-fn first(doc: &Document, kind: DeclKind) -> Option<Declaration> {
+fn first<B>(doc: &File<B>, kind: DeclKind) -> Option<Declaration> {
     declarations(doc)
         .into_iter()
         .find(|found| found.kind == kind)
@@ -137,7 +137,7 @@ fn first(doc: &Document, kind: DeclKind) -> Option<Declaration> {
 
 /// The profiles this document promises with its first `::profile(...)`, each once, in the order written. A name
 /// that is not a profile is left out here and reported by [`check_declarations`](crate::check_declarations).
-pub fn document_profiles(doc: &Document) -> Vec<Profile> {
+pub fn document_profiles<B>(doc: &File<B>) -> Vec<Profile> {
     let Some(declaration) = first(doc, DeclKind::Profile) else {
         return Vec::new();
     };
@@ -153,39 +153,39 @@ pub fn document_profiles(doc: &Document) -> Vec<Profile> {
 }
 
 /// The kind this document declares with its first `::kind(...)`.
-pub fn document_kind(doc: &Document) -> Option<String> {
+pub fn document_kind<B>(doc: &File<B>) -> Option<String> {
     kind_name(&first(doc, DeclKind::Kind)?)
 }
 
 /// The identity this document declares with its first `::id(...)`.
-pub fn document_id(doc: &Document) -> Option<String> {
+pub fn document_id<B>(doc: &File<B>) -> Option<String> {
     id_name(&first(doc, DeclKind::Id)?)
 }
 
 /// The kind a blueprint document is for; `None` for a document that is not a blueprint.
-pub fn document_blueprint(doc: &Document) -> Option<String> {
+pub fn document_blueprint<B>(doc: &File<B>) -> Option<String> {
     blueprint_target(&first(doc, DeclKind::Blueprint)?)
 }
 
 /// The name of the dictionary a document is; `None` for a document that is not one.
-pub fn document_dictionary(doc: &Document) -> Option<String> {
+pub fn document_dictionary<B>(doc: &File<B>) -> Option<String> {
     dictionary_name(&first(doc, DeclKind::Dictionary)?)
 }
 
 /// The language version this document declares, as written.
-pub fn document_version(doc: &Document) -> Option<String> {
+pub fn document_version<B>(doc: &File<B>) -> Option<String> {
     version_string(&first(doc, DeclKind::Version)?)
 }
 
 /// The data of the document's first `::meta`. Only the first is read: `::meta` is written once.
-pub fn document_meta(doc: &Document) -> Option<Value> {
+pub fn document_meta<B>(doc: &File<B>) -> Option<Value> {
     meta(&first(doc, DeclKind::Meta)?)
 }
 
 /// The `(name, value)` entries of the document's first declaration of `kind` whose body is a map
 /// (`::format{ ... }`, `::fields{ ... }`, `::blueprints{ ... }`): `(args)` first, then `{data}`.
 /// Empty when the document does not write it.
-pub fn document_entries(doc: &Document, kind: DeclKind) -> Vec<(String, Value)> {
+pub fn document_entries<B>(doc: &File<B>, kind: DeclKind) -> Vec<(String, Value)> {
     first(doc, kind)
         .map(|found| entries(&found))
         .unwrap_or_default()
@@ -193,7 +193,7 @@ pub fn document_entries(doc: &Document, kind: DeclKind) -> Vec<(String, Value)> 
 
 /// Every macro the document defines, in the order written; a name defined twice appears twice,
 /// and the later one is the one that stands.
-pub fn document_macros(doc: &Document) -> Vec<(String, String)> {
+pub fn document_macros<B>(doc: &File<B>) -> Vec<(String, String)> {
     declarations(doc)
         .iter()
         .filter(|found| found.kind == DeclKind::Macros)
@@ -203,7 +203,7 @@ pub fn document_macros(doc: &Document) -> Vec<(String, String)> {
 
 /// Every variable the document declares that can be read, by name. A name declared twice is the later
 /// declaration. An entry that is not a declaration is left out; `tomet check` says why.
-pub fn document_vars(doc: &Document) -> Vec<(String, VarDecl)> {
+pub fn document_vars<B>(doc: &File<B>) -> Vec<(String, VarDecl)> {
     let mut vars: Vec<(String, VarDecl)> = Vec::new();
     let mut index: BTreeMap<String, usize> = BTreeMap::new();
     for found in declarations(doc)
@@ -245,8 +245,8 @@ fn scalar_text_or_debug(value: &Value) -> String {
 mod tests {
     use super::*;
 
-    fn parse(src: &str) -> Document {
-        tomet_ast_parser::parse_document(src).expect("parses")
+    fn parse(src: &str) -> File {
+        tomet_ast_parser::parse_file(src).expect("parses")
     }
 
     #[test]

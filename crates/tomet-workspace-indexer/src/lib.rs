@@ -28,7 +28,7 @@ use std::path::{Path, PathBuf};
 use ignore::WalkBuilder;
 use tomet_ast::Value;
 use tomet_config::PrinterConfig;
-use tomet_ast_parser::parse_document;
+use tomet_ast_parser::parse_file;
 use tomet_semantics::{classify_declaration_lenient, classify_std_lenient};
 
 pub mod workspace_scan;
@@ -332,7 +332,7 @@ pub fn collect_metadata_table(
         .into_iter()
         .filter_map(|file| {
             let src = std::fs::read_to_string(&file).ok()?;
-            let doc = parse_document(&src).ok()?;
+            let doc = parse_file(&src).ok()?;
             let fields = document_fields(&doc, &file, config_root);
             Some(FileMetadata { path: file, fields })
         })
@@ -347,7 +347,7 @@ pub fn collect_metadata_table(
 /// slashes, which is the spelling [`resolve_document_relative`] reads back
 /// and the spelling a generated `@file(...)` has to carry.
 pub fn document_fields(
-    doc: &tomet_ast::Document,
+    doc: &tomet_ast::File,
     file: &Path,
     project_root: &Path,
 ) -> BTreeMap<String, Value> {
@@ -391,7 +391,7 @@ fn flatten_into(prefix: &str, value: &Value, out: &mut BTreeMap<String, Value>) 
 
 pub fn extract_metadata(src: &str) -> BTreeMap<String, String> {
     let mut map = BTreeMap::new();
-    if let Ok(doc) = parse_document(src) {
+    if let Ok(doc) = parse_file(src) {
         tomet_tree::for_each_element(&doc, |el| {
             let kind = classify_std_lenient(el.as_view());
             if kind.as_str() == "meta" {
@@ -598,7 +598,7 @@ mod metadata_table_tests {
     use super::*;
 
     fn fields_of(src: &str) -> BTreeMap<String, Value> {
-        let doc = parse_document(src).expect("valid source");
+        let doc = parse_file(src).expect("valid source");
         document_fields(
             &doc,
             Path::new("/vault/docs/guide/cheatsheet.tmt"),

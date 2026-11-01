@@ -51,7 +51,7 @@ mod parse {
             bencher
                 .counter(divan::counter::BytesCount::new(input.text.len()))
                 .bench(|| {
-                    let _ = divan::black_box(tomet_ast_parser::parse_document(divan::black_box(
+                    let _ = divan::black_box(tomet_ast_parser::parse_file(divan::black_box(
                         &input.text,
                     )));
                 });
@@ -64,7 +64,7 @@ mod parse {
             bencher
                 .counter(divan::counter::BytesCount::new(input.text.len()))
                 .bench(|| {
-                    let _ = divan::black_box(tomet_ast_parser::parse_document(divan::black_box(
+                    let _ = divan::black_box(tomet_ast_parser::parse_file(divan::black_box(
                         &input.text,
                     )));
                 });
@@ -78,7 +78,7 @@ mod parse {
                 .counter(divan::counter::BytesCount::new(total_bytes))
                 .bench(|| {
                     for i in &fx {
-                        let _ = divan::black_box(tomet_ast_parser::parse_document(divan::black_box(
+                        let _ = divan::black_box(tomet_ast_parser::parse_file(divan::black_box(
                             &i.text,
                         )));
                     }

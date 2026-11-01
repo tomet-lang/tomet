@@ -1,10 +1,9 @@
 use super::*;
-use tomet_semantics::classify_std_lenient;
 
 #[test]
 fn parses_list() {
-    let doc = parse_document("- one\n- two\n").unwrap();
-    match &doc.blocks[0] {
+    let doc = parse_file("- one\n- two\n").unwrap();
+    match &doc.body[0] {
         Block::List(list) => {
             assert!(!list.ordered);
             let items = &list.items;
@@ -24,8 +23,8 @@ fn parses_list() {
 
 #[test]
 fn parses_list_value_markers_and_trailing_attrs() {
-    let doc = parse_document("- (T) todo {tag: dev}\n- (\"?\") question {id: task1}\n").unwrap();
-    match &doc.blocks[0] {
+    let doc = parse_file("- (T) todo {tag: dev}\n- (\"?\") question {id: task1}\n").unwrap();
+    match &doc.body[0] {
         Block::List(list) => {
             assert!(!list.ordered);
             let items = &list.items;
@@ -75,8 +74,8 @@ fn list_item_ending_in_an_element_does_not_error_on_a_trailing_brace() {
     // item itself, specifically so `id:breakfast` here can be the
     // item's own metadata rather than forced onto `@link`.
     let bare = "- @link(ref:x) {id:breakfast}\n";
-    let doc = parse_document(bare).unwrap_or_else(|e| panic!("{bare:?} failed: {e}"));
-    match &doc.blocks[0] {
+    let doc = parse_file(bare).unwrap_or_else(|e| panic!("{bare:?} failed: {e}"));
+    match &doc.body[0] {
         Block::List(list) => {
             let items = &list.items;
             assert_eq!(items.len(), 1, "{bare:?}");
@@ -103,8 +102,8 @@ fn list_item_ending_in_an_element_does_not_error_on_a_trailing_brace() {
         "- @link(ref:x) :{id:breakfast}\n",
         "- @link(ref:@other) :{id:breakfast}\n",
     ] {
-        let doc = parse_document(src).unwrap_or_else(|e| panic!("{src:?} failed: {e}"));
-        match &doc.blocks[0] {
+        let doc = parse_file(src).unwrap_or_else(|e| panic!("{src:?} failed: {e}"));
+        match &doc.body[0] {
             Block::List(list) => {
                 let items = &list.items;
                 assert_eq!(items.len(), 1, "{src:?}");
@@ -140,8 +139,8 @@ fn list_item_colon_connect_supports_an_empty_braced_value() {
     // reader a trailing sugar connect's `{value}` now goes through)
     // already special-cases an empty body into an empty map rather than
     // erroring, so this just confirms the sugar path inherits that.
-    let doc = parse_document("- () xxxxxx :{}\n").unwrap();
-    match &doc.blocks[0] {
+    let doc = parse_file("- () xxxxxx :{}\n").unwrap();
+    match &doc.body[0] {
         Block::List(list) => {
             let items = &list.items;
             assert_eq!(items.len(), 1);
@@ -157,8 +156,8 @@ fn list_item_colon_connect_supports_an_empty_braced_value() {
 
 #[test]
 fn list_marker_supports_explicit_key_value() {
-    let doc = parse_document("- (color: red, priority: high) content\n").unwrap();
-    match &doc.blocks[0] {
+    let doc = parse_file("- (color: red, priority: high) content\n").unwrap();
+    match &doc.body[0] {
         Block::List(list) => {
             let items = &list.items;
             assert_eq!(
@@ -175,8 +174,8 @@ fn list_marker_supports_explicit_key_value() {
 
 #[test]
 fn list_marker_quoted_scalar_avoids_colon_misparse() {
-    let doc = parse_document("- (\"12:01\") woke up\n").unwrap();
-    match &doc.blocks[0] {
+    let doc = parse_file("- (\"12:01\") woke up\n").unwrap();
+    match &doc.body[0] {
         Block::List(list) => {
             let items = &list.items;
             assert_eq!(items[0].data.args, Some(Value::String("12:01".into())));
@@ -192,8 +191,8 @@ fn bracket_after_a_list_marker_is_the_content_group() {
     // `None` because no `(...)` was written. Trailing text joins the
     // item rather than falling out as a block of its own, matching
     // `@x[T] content`, where both halves stay in one paragraph.
-    let doc = parse_document("- [T] content\n").unwrap();
-    match &doc.blocks[0] {
+    let doc = parse_file("- [T] content\n").unwrap();
+    match &doc.body[0] {
         Block::List(list) => {
             let items = &list.items;
             assert_eq!(items[0].data.args, None);
@@ -215,21 +214,21 @@ fn bracket_after_a_list_marker_is_the_content_group() {
 fn a_bracketed_list_item_may_span_lines() {
     // The bracket-less sugar is single-line by design; a group is the
     // explicit trigger that lets an item spread out.
-    let doc = parse_document("- ()[ first\n  second ]\n- ()[ third ]\n").unwrap();
-    match &doc.blocks[0] {
+    let doc = parse_file("- ()[ first\n  second ]\n- ()[ third ]\n").unwrap();
+    match &doc.body[0] {
         Block::List(list) => {
             let items = &list.items;
             assert_eq!(items.len(), 2, "both items belong to one list");
         }
         other => panic!("expected list, got {other:?}"),
     }
-    assert_eq!(doc.blocks.len(), 1, "no stray paragraph split off");
+    assert_eq!(doc.body.len(), 1, "no stray paragraph split off");
 }
 
 #[test]
 fn parses_ordered_list() {
-    let doc = parse_document("-. one\n-. two\n").unwrap();
-    match &doc.blocks[0] {
+    let doc = parse_file("-. one\n-. two\n").unwrap();
+    match &doc.body[0] {
         Block::List(list) => {
             assert!(list.ordered);
             let items = &list.items;
@@ -254,8 +253,8 @@ fn full_form_list_item_supports_a_bare_trailing_connect() {
     // uses for this -- previously `allow_colon_connect` was hardcoded
     // `false` for the item's own groups, so none of these forms attached
     // anywhere; the trailing `:...` became literal text instead.
-    let doc = parse_document("- [ content ]:(x: 1)\n").unwrap();
-    match &doc.blocks[0] {
+    let doc = parse_file("- [ content ]:(x: 1)\n").unwrap();
+    match &doc.body[0] {
         Block::List(list) => {
             let items = &list.items;
             assert_eq!(
@@ -266,8 +265,8 @@ fn full_form_list_item_supports_a_bare_trailing_connect() {
         other => panic!("expected list, got {other:?}"),
     }
 
-    let doc = parse_document("- [ content ]:{y: 2}\n").unwrap();
-    match &doc.blocks[0] {
+    let doc = parse_file("- [ content ]:{y: 2}\n").unwrap();
+    match &doc.body[0] {
         Block::List(list) => {
             let items = &list.items;
             assert_eq!(
@@ -282,8 +281,8 @@ fn full_form_list_item_supports_a_bare_trailing_connect() {
     // the second is claimed by the item's own, still-empty slot the same
     // way it would be with no colon at all (see `parse_groups_with_pipe_stack`'s
     // colon branch).
-    let doc = parse_document("- [ content ]:(x: 1){y: 2}\n").unwrap();
-    match &doc.blocks[0] {
+    let doc = parse_file("- [ content ]:(x: 1){y: 2}\n").unwrap();
+    match &doc.body[0] {
         Block::List(list) => {
             let items = &list.items;
             assert_eq!(
@@ -305,8 +304,8 @@ fn full_form_list_item_supports_a_named_connect() {
     // `@name`'s or a heading's -- `element_list_item` carries `connects`
     // too, so `:rule(...)` attaches to the item instead of becoming
     // literal trailing text.
-    let doc = parse_document("- [ content ]:rule(allow: list(card))\n").unwrap();
-    match &doc.blocks[0] {
+    let doc = parse_file("- [ content ]:rule(allow: list(card))\n").unwrap();
+    match &doc.body[0] {
         Block::List(list) => {
             let items = &list.items;
             assert_eq!(items[0].connects.len(), 1);
@@ -329,8 +328,8 @@ fn a_trailing_connect_may_hold_a_pipe_run_on_the_same_line() {
     // `:note| text` is `[content]` spelled without brackets: the connect `note` holds `text`, whether
     // the item's own text is bracket-less (`- item`) or the connect follows a group.
     for src in ["- item :note| the note text\n", "- item :rule(allow: x)| the note text\n"] {
-        let doc = parse_document(src).unwrap();
-        let Block::List(list) = &doc.blocks[0] else {
+        let doc = parse_file(src).unwrap();
+        let Block::List(list) = &doc.body[0] else {
             panic!("expected list for {src:?}")
         };
         let item = &list.items[0];
@@ -349,9 +348,9 @@ fn a_trailing_connect_may_hold_a_pipe_run_on_the_same_line() {
 
 #[test]
 fn mixed_list_markers_split_into_separate_lists() {
-    let doc = parse_document("- one\n-. two\n").unwrap();
-    assert_eq!(doc.blocks.len(), 2);
-    match (&doc.blocks[0], &doc.blocks[1]) {
+    let doc = parse_file("- one\n-. two\n").unwrap();
+    assert_eq!(doc.body.len(), 2);
+    match (&doc.body[0], &doc.body[1]) {
         (Block::List(l1), Block::List(l2)) if !l1.ordered && l2.ordered => {}
         other => panic!("expected two separate lists, got {other:?}"),
     }
@@ -364,8 +363,8 @@ fn combine_notation_reads_a_named_item_with_content_and_connects() {
     // would produce, with its own `[content]`, bare `:(){}` merge, and
     // named `:rule(...)` connect all landing on it directly -- no
     // marker, no second grammar.
-    let doc = parse_document("-@task()[content]:rule(allow:list(card))\n").unwrap();
-    match &doc.blocks[0] {
+    let doc = parse_file("-@task()[content]:rule(allow:list(card))\n").unwrap();
+    match &doc.body[0] {
         Block::List(list) => {
             let items = &list.items;
             assert_eq!(items.len(), 1);
@@ -387,8 +386,8 @@ fn combine_notation_reads_a_named_item_with_content_and_connects() {
 fn combine_notation_supports_a_bare_trailing_connect() {
     // `:(){}` merges into the combine item's own `args`/`value`, the same
     // slot a standalone `@task():(x: 1){y: 2}` would use.
-    let doc = parse_document("-@task():(x: 1){y: 2}\n").unwrap();
-    match &doc.blocks[0] {
+    let doc = parse_file("-@task():(x: 1){y: 2}\n").unwrap();
+    match &doc.body[0] {
         Block::List(list) => {
             let item = &list.items[0];
             assert_eq!(
@@ -406,36 +405,28 @@ fn combine_notation_supports_a_bare_trailing_connect() {
 
 #[test]
 fn combine_notation_has_no_naming_constraint() {
-    // `-@task()` and a standalone, top-level `@task()` classify
-    // identically -- position (list item vs. document block) and naming
-    // (what kind of thing it is) are orthogonal axes. Asserted via
-    // `classify_std_lenient` since `classify_in` (which also resolves a
-    // vocabulary's own bindings) lives in `tomet-semantics-validator`,
-    // a layer above this crate.
-    let combine_doc = parse_document("-@task()\n").unwrap();
-    let Block::List(list) = &combine_doc.blocks[0] else {
+    let combine_doc = parse_file("-@task()\n").unwrap();
+    let Block::List(list) = &combine_doc.body[0] else {
         panic!("expected list");
     };
     let combine_el = list.items[0].as_element_view().expect("a named item");
 
-    let standalone_doc = parse_document("@task()\n").unwrap();
-    let Block::Element(standalone_el) = &standalone_doc.blocks[0] else {
+    let standalone_doc = parse_file("@task()\n").unwrap();
+    let Block::Element(standalone_el) = &standalone_doc.body[0] else {
         panic!("expected element");
     };
 
     assert_eq!(combine_el.name, &standalone_el.name);
-    assert_eq!(
-        classify_std_lenient(combine_el),
-        classify_std_lenient(standalone_el.as_view())
-    );
+    assert_eq!(combine_el.placement, standalone_el.placement);
+    assert_eq!(combine_el.data, &standalone_el.data);
 }
 
 #[test]
 fn a_nested_list_becomes_the_items_own_sublist() {
     // `- a\n  - b\n` -- the indented `- b` is `a`'s own `sublist`
     // (`Option<List>`), not a block inside `a`'s own `content`.
-    let doc = parse_document("- a\n  - b\n").unwrap();
-    match &doc.blocks[0] {
+    let doc = parse_file("- a\n  - b\n").unwrap();
+    match &doc.body[0] {
         Block::List(list) => {
             assert_eq!(list.items.len(), 1);
             let item = &list.items[0];
@@ -454,8 +445,8 @@ fn a_nested_list_becomes_the_items_own_sublist() {
 
 #[test]
 fn multiple_levels_of_nesting_still_work() {
-    let doc = parse_document("- a\n  - b\n    - c\n").unwrap();
-    match &doc.blocks[0] {
+    let doc = parse_file("- a\n  - b\n    - c\n").unwrap();
+    match &doc.body[0] {
         Block::List(list) => {
             let a = &list.items[0];
             assert_eq!(a.content, wrap(vec![Inline::Text("a".into())]).unwrap());
@@ -475,8 +466,8 @@ fn multiple_levels_of_nesting_still_work() {
 fn a_continuation_line_that_opens_with_a_paren_is_prose_not_the_items_args() {
     // Only a `:` on the next line hands a group over to the item; a parenthetical
     // that happens to start the line is text.
-    let doc = parse_document("- a b\n(c). d\n").unwrap();
-    let Block::List(list) = &doc.blocks[0] else {
+    let doc = parse_file("- a b\n(c). d\n").unwrap();
+    let Block::List(list) = &doc.body[0] else {
         panic!()
     };
     assert_eq!(list.items[0].data.args, None);
@@ -486,8 +477,8 @@ fn a_continuation_line_that_opens_with_a_paren_is_prose_not_the_items_args() {
 fn a_brace_value_with_a_bare_value_in_it_is_text_at_the_end_of_an_item() {
     // `{x}` would be an error as a group (a `{...}` holds `key: value` entries),
     // so it is not the item's trailing group and stays in the text.
-    let doc = parse_document("- set {x}\n").unwrap();
-    let Block::List(list) = &doc.blocks[0] else {
+    let doc = parse_file("- set {x}\n").unwrap();
+    let Block::List(list) = &doc.body[0] else {
         panic!()
     };
     assert_eq!(list.items[0].data.value, None);

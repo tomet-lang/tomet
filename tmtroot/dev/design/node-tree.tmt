@@ -1,3 +1,5 @@
+- これができれば、wikiとかの、上部がタイトルになるみたいなのなくせるかも。
+
 =[ ノードの木: Section・File・Folder・Vault は同じもの ]
 
 Status: 議論中。方向は著者が気に入っている段階で、どれも実装していない。決まっていないことは「未決」に分けた。2026-10 の議論。
@@ -26,8 +28,8 @@ Section と File は実は同じではないか、という問いから始まっ
 
 ==[ 今の実装との距離 ]
 
-- `Section` は `args` `value` `id` `connects` `blocks` を持つ。`Document` が持つのは `blocks` と `span` だけである。文書宣言は、先頭に並ぶ `Block::Element` である。
-- cotomet の `File { header, body }` は、この見出し部と本文の分け方をすでにしている。
+- `Section` は `args` `value` `id` `connects` `blocks` を持つ。`File<B>` は `header` と `body` を持つ。文書宣言は、先頭の並びである `header` に集約された。
+- cotomet とマークアップ文書は共通の `File<B>` 構造（`header` と `body`）に統一された。
 - Folder には、重なって継承される `.config.tmt` がある。下の階層が上の宣言を継ぐのは、Section のスコープそのものである。ただし書けるのは設定だけで、フォルダ自身の本文も、他の宣言も置けない。
 
 ==[ 得られるもの ]

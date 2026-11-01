@@ -38,7 +38,7 @@ does not relax the rule to fit the change it wanted to make.
     3: list( "crates/tomet-semantics*", "crates/cotomet" )
     2: list( "crates/tomet-syntax-*", "crates/serde_cotomet" )
     1: list( "crates/tomet-base-*" )
-    0: list( "crates/tree-sitter-tomet", "crates/tree-sitter-cotomet" )
+    0: list( @crate(tree-sitter-tomet), @crate(tree-sitter-cotomet) )
   }
 }
 
@@ -51,12 +51,19 @@ Layer 0 depends on no workspace member at all. Things may depend on it --
 is the hand-maintained grammar approximation and is only worth having while
 it stays independent of the parser.
 
+The base layer, `crates/tomet-base-*`, sits just above it and below the syntax layer. It holds what any layer needs to say where
+something is in a source text, and it knows no grammar: @dir(crates/tomet-base-span) is a byte range, and
+@dir(crates/tomet-base-position) turns a byte offset into the line and column a person reads. Each depends on nothing in the
+workspace. They are not syntax -- the AST carries a range on every node, and the tools that show a position (the command line, the
+language server, extraction, the validators) never parse -- and they are below it because the syntax crates need them to say where
+an error is.
+
 @dir(crates/serde_cotomet) is listed by name in layer 2. cotomet is the data language dual to tomet.
 `serde_cotomet` reads and writes Rust types through serde, and depends on `tomet-ast` and `tomet-ast-parser`. It shares no prefix with the tomet syntax group.
 
 @dir(crates/cotomet) is the public facade over `serde_cotomet`, `tomet-ast`, and `tomet-ast-parser`. It sits in layer 3.
 
-@dir(crates/tomet-extract) and @dir(crates/tomet-search) are listed by name in layer 5. They are pure in-memory extraction and query
+@dir(crates/tomet-extract) and @dir(crates/tomet-search) are listed by name in the layer of `crates/tomet-format*`. They are pure in-memory extraction and query
 engines rather than internal syntax or semantics producers, and their names carry no prefix shared with the producer groups.
 
 @dir(crates/tomet-edit) is likewise listed by name: it is a backend-neutral in-memory editing model that apps bridge to external
@@ -72,7 +79,7 @@ editing runtimes, and it shares no prefix with the producer groups.
 
 @dir(crates/tomet-vault) is likewise listed by name: it is the disk-free half of what `tomet-load` assembles (a vault's config and vocabularies, parse, bind, prepare), so that a caller with no filesystem can use it. `tomet-load` sits above it and adds the reading.
 
-@dir(crates/tomet) is the public facade over every layer below it. It sits in layer 7 with the applications, is listed by name because its name shares no prefix with the crates it re-exports, and holds no logic of its own.
+@dir(crates/tomet) is the public facade over every layer below it. It sits in the top layer with the applications, is listed by name because its name shares no prefix with the crates it re-exports, and holds no logic of its own.
 
 A pattern ending in `*` matches by prefix; every other pattern is exact.
 Patterns are directory paths relative to the workspace root, because the
@@ -86,7 +93,7 @@ to get a parser for its own tests -- `tomet-syntax-tree` and
 ---[ Why ]---
 
 The order is what keeps a change local. Touching the parser today means
-reading `crates/tomet-syntax-*` and nothing else; the moment an edge runs
+reading `crates/tomet-syntax-*` and `crates/tomet-base-*` and nothing else; the moment an edge runs
 upward, it means reading the applications too.
 
 The layer is derived from the directory name, not the package name. The two

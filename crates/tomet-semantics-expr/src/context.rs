@@ -9,7 +9,7 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
 use time::OffsetDateTime;
-use tomet_ast::{Block, Document};
+use tomet_ast::{Block, File};
 
 use super::value::{DirRef, DocRef, EvalValue};
 
@@ -29,7 +29,7 @@ pub enum Phase {
 /// Errors are the text to show; the evaluator wraps them.
 pub trait Resolver {
     /// The parsed document at `doc`.
-    fn document(&self, doc: &DocRef) -> Result<Arc<Document>, String>;
+    fn document(&self, doc: &DocRef) -> Result<Arc<File>, String>;
     /// The document a note name or identifier stands for (`ref("name")`).
     fn note(&self, name: &str) -> Result<DocRef, String>;
     /// Every document under `dir`, subdirectories included.
@@ -116,7 +116,7 @@ impl Notes {
 pub struct NoResolver;
 
 impl Resolver for NoResolver {
-    fn document(&self, doc: &DocRef) -> Result<Arc<Document>, String> {
+    fn document(&self, doc: &DocRef) -> Result<Arc<File>, String> {
         Err(format!("no vault to find the document `{}` in", doc.0))
     }
     fn note(&self, name: &str) -> Result<DocRef, String> {

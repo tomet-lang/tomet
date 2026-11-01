@@ -124,12 +124,14 @@ repository = "https://github.com/tomet-lang/tomet"
 #--- Facade ---
 tomet = { path = "crates/tomet", version = "0.5.0" }
 cotomet = { path = "crates/cotomet", version = "0.5.0" }
+#--- Base ---
+tomet-position = { path = "crates/tomet-base-position", version = "0.5.0" }
+tomet-span = { path = "crates/tomet-base-span", version = "0.5.0" }
+tomet-type = { path = "crates/tomet-base-type", version = "0.5.0" }
 #--- Syntax ---
 tomet-ast = { path = "crates/tomet-syntax-ast", version = "0.5.0" }
 tomet-cst = { path = "crates/tomet-syntax-cst", version = "0.5.0" }
-tomet-span = { path = "crates/tomet-base-span", version = "0.5.0" }
 tomet-lexer = { path = "crates/tomet-syntax-lexer", version = "0.5.0" }
-tomet-position = { path = "crates/tomet-base-position", version = "0.5.0" }
 tomet-cst-parser = { path = "crates/tomet-syntax-cst-parser", version = "0.5.0" }
 tomet-lowering = { path = "crates/tomet-syntax-lowering", version = "0.5.0" }
 tomet-ast-parser = { path = "crates/tomet-syntax-ast-parser", version = "0.5.0" }
@@ -138,10 +140,9 @@ tomet-tree = { path = "crates/tomet-syntax-tree", version = "0.5.0" }
 #--- Semantics ---
 tomet-address = { path = "crates/tomet-semantics-address", version = "0.5.0" }
 tomet-expr = { path = "crates/tomet-semantics-expr", version = "0.5.0" }
-tomet-type = { path = "crates/tomet-base-type", version = "0.5.0" }
-tomet-semantics-core = { path = "crates/tomet-semantics-core", version = "0.5.0" }
 tomet-declaration = { path = "crates/tomet-semantics-declaration", version = "0.5.0" }
 tomet-semantics = { path = "crates/tomet-semantics", version = "0.5.0" }
+tomet-semantics-core = { path = "crates/tomet-semantics-core", version = "0.5.0" }
 cotomet-eval = { path = "crates/tomet-semantics-eval", version = "0.5.0" }
 #--- Validator ---
 tomet-validator = { path = "crates/tomet-validator", version = "0.5.0" }

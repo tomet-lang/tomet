@@ -26,7 +26,7 @@ use std::sync::Arc;
 use crate::block::render_block;
 use crate::elements::{HeadingState, render_footnotes};
 use crate::util::{escape_attr, escape_html};
-use tomet_ast::{Block, Document, Value};
+use tomet_ast::{Block, File, Value};
 use tomet_semantics::{Bindings, FootnoteRegistry, builtin_doc_vocabularies};
 
 const DEFAULT_STYLE: &str = "\
@@ -166,14 +166,14 @@ impl fmt::Debug for CustomElementRenderer {
 
 /// Render a full standalone HTML document with the plain (unnumbered)
 /// heading style. See [`render_page_with`] for the numbered variant.
-pub fn render_page(doc: &Document, title: &str) -> String {
+pub fn render_page(doc: &File, title: &str) -> String {
     render_page_with(doc, title, &RenderOptions::default())
 }
 
 /// Render a full standalone HTML document, applying `options` (e.g.
 /// `RenderOptions { number_headings: true }` for the "advanced",
 /// sequentially-numbered heading style).
-pub fn render_page_with(doc: &Document, title: &str, options: &RenderOptions) -> String {
+pub fn render_page_with(doc: &File, title: &str, options: &RenderOptions) -> String {
     let lang = options.lang.as_deref().unwrap_or("ja");
     format!(
         "<!DOCTYPE html>\n<html lang=\"{lang}\">\n<head>\n<meta charset=\"utf-8\">\n<title>{title}</title>\n<style>{style}</style>\n</head>\n<body>\n{body}</body>\n</html>\n",
@@ -207,12 +207,12 @@ pub struct HeadingInfo {
 
 /// Render just the body content, without the surrounding `<html>` shell,
 /// with the plain (unnumbered) heading style.
-pub fn render_body(doc: &Document) -> String {
+pub fn render_body(doc: &File) -> String {
     render_body_with(doc, &RenderOptions::default())
 }
 
 /// Render just the body content, applying `options`.
-pub fn render_body_with(doc: &Document, options: &RenderOptions) -> String {
+pub fn render_body_with(doc: &File, options: &RenderOptions) -> String {
     render_body_with_outline(doc, options).0
 }
 
@@ -221,7 +221,7 @@ pub fn render_body_with(doc: &Document, options: &RenderOptions) -> String {
 /// The HTML is byte-for-byte what [`render_body_with`] produces; the outline
 /// lists every heading the renderer emitted, in document order.
 pub fn render_body_with_outline(
-    doc: &Document,
+    doc: &File,
     options: &RenderOptions,
 ) -> (String, Vec<HeadingInfo>) {
     let mut out = String::new();
@@ -232,13 +232,13 @@ pub fn render_body_with_outline(
     // that key (not the parser's positional sentinel) for `custom_element`
     // hooks to read it by name.
     let bindings = Bindings::for_document(doc, builtin_doc_vocabularies());
-    let footnotes = FootnoteRegistry::from_document(doc);
+    let footnotes = FootnoteRegistry::from_file(doc);
     let cx = RenderCtx {
         options,
         bindings: &bindings,
         footnotes: &footnotes,
     };
-    for block in &doc.blocks {
+    for block in &doc.body {
         render_block(&cx, block, &mut out, &mut state);
     }
     render_footnotes(&cx, &mut out);

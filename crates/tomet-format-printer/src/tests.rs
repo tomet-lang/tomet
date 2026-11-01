@@ -1,6 +1,6 @@
 use super::*;
 use tomet_ast::{
-    Bare, Block, Data, Document, Entry, Group, Inline, Name, Paragraph, Section, Value,
+    Bare, Block, Data, Entry, File, Group, Inline, Name, Paragraph, Section, Value,
 };
 use tomet_span::Span;
 use tomet_config::{FieldConfig, FormatConfig, GroupOrder, MetaConfig, load_config_from_str};
@@ -10,7 +10,7 @@ use tomet_tree::element_new;
 
 #[test]
 fn test_printer_config_space_inside_brackets() {
-    let doc = tomet_ast_parser::parse_document("=[Title]\n").unwrap();
+    let doc = tomet_ast_parser::parse_file("=[Title]\n").unwrap();
     let cfg = PrinterConfig {
         format: FormatConfig {
             heading_space_inside_brackets: true,
@@ -30,7 +30,7 @@ fn nested_inline_heading_does_not_reserialize_as_hash_sugar() {
     // headings; the shared, recursively-called `render_element` has no
     // heading arm at all (mirrors `tomet-html`/
     // `tomet-markdown`'s equivalent nested-heading tests).
-    let doc = tomet_ast_parser::parse_document("@memo[@heading(2)[Nested]]\n").unwrap();
+    let doc = tomet_ast_parser::parse_file("@memo[@heading(2)[Nested]]\n").unwrap();
     let printed = document_to_tm(&doc);
     assert!(!printed.contains("##["), "got: {printed:?}");
     assert!(printed.contains("@heading(2)[Nested]"), "got: {printed:?}");
@@ -38,7 +38,7 @@ fn nested_inline_heading_does_not_reserialize_as_hash_sugar() {
 
 #[test]
 fn a_named_connect_round_trips_on_a_plain_element() {
-    let doc = tomet_ast_parser::parse_document("@section[ x ]:rule(allow: list(card))\n").unwrap();
+    let doc = tomet_ast_parser::parse_file("@section[ x ]:rule(allow: list(card))\n").unwrap();
     let printed = document_to_tm(&doc);
     assert!(
         printed.contains(":rule(allow: list(card))"),
@@ -48,7 +48,7 @@ fn a_named_connect_round_trips_on_a_plain_element() {
 
 #[test]
 fn stacked_connects_round_trip_in_order() {
-    let doc = tomet_ast_parser::parse_document("@x(a: 1):as(y):rule(allow: list(card))\n").unwrap();
+    let doc = tomet_ast_parser::parse_file("@x(a: 1):as(y):rule(allow: list(card))\n").unwrap();
     let printed = document_to_tm(&doc);
     assert!(
         printed.contains(":as(y):rule(allow: list(card))"),
@@ -58,7 +58,7 @@ fn stacked_connects_round_trip_in_order() {
 
 #[test]
 fn a_named_connect_round_trips_on_a_heading() {
-    let doc = tomet_ast_parser::parse_document("=[ h ]:rule(allow: list(card))\n").unwrap();
+    let doc = tomet_ast_parser::parse_file("=[ h ]:rule(allow: list(card))\n").unwrap();
     let printed = document_to_tm(&doc);
     assert!(
         printed.contains(":rule(allow: list(card))"),
@@ -78,8 +78,8 @@ fn connects_survive_the_specially_printed_kinds() {
         "@hr:rule(allow: list(card))\n",
         "@raw[x]:rule(allow: list(card))\n",
     ] {
-        let doc = tomet_ast_parser::parse_document(src).unwrap();
-        let el = match &doc.blocks[0] {
+        let doc = tomet_ast_parser::parse_file(src).unwrap();
+        let el = match &doc.body[0] {
             Block::Element(el) => el,
             other => panic!("expected element, got {other:?}"),
         };
@@ -94,7 +94,7 @@ fn connects_survive_the_specially_printed_kinds() {
 
 #[test]
 fn connects_survive_a_specially_styled_callout() {
-    let doc = tomet_ast_parser::parse_document("@callout(info)[x]:rule(allow: list(card))\n").unwrap();
+    let doc = tomet_ast_parser::parse_file("@callout(info)[x]:rule(allow: list(card))\n").unwrap();
     let cfg = PrinterConfig {
         format: FormatConfig {
             callout_content_style: Some("block".to_string()),
@@ -461,7 +461,7 @@ fn test_link_no_space_setting() {
 
 #[test]
 fn inline_raw_prints_as_backticks() {
-    let doc = tomet_ast_parser::parse_document("call `foo()` now\n").unwrap();
+    let doc = tomet_ast_parser::parse_file("call `foo()` now\n").unwrap();
     let printed = document_to_tm(&doc);
     assert_eq!(printed.trim(), "call `foo()` now");
 }
@@ -497,13 +497,13 @@ fn test_container_children_indentation() {
     let mut links = element_new(Name::bare("links"));
     links.data.value = Some(Group(vec![note(1, "note 1"), note(2, "note 2")]));
 
-    let doc = Document::new(vec![Block::Element(links)], Span::dummy());
+    let doc = File::new(Vec::new(), vec![Block::Element(links)], Span::dummy());
     let printed = document_to_tm(&doc);
     assert!(printed.contains("@links{\n  (1)[note 1]\n  (2)[note 2]\n}"));
 
     // Verify re-parsing
-    let re_parsed = tomet_ast_parser::parse_document(&printed).expect("valid doc");
-    assert_eq!(re_parsed.blocks.len(), 1);
+    let re_parsed = tomet_ast_parser::parse_file(&printed).expect("valid doc");
+    assert_eq!(re_parsed.body.len(), 1);
 }
 
 #[test]
@@ -515,7 +515,7 @@ fn test_group_order_content_first() {
         Span::dummy(),
     ))]);
 
-    let doc = Document::new(vec![Block::Element(el)], Span::dummy());
+    let doc = File::new(Vec::new(), vec![Block::Element(el)], Span::dummy());
 
     let mut config = PrinterConfig {
         format: tomet_config::FormatConfig {
@@ -550,7 +550,7 @@ fn test_group_order_content_first() {
 
 #[test]
 fn test_tag_printing() {
-    let doc = tomet_ast_parser::parse_document("@tag(rust, tomet)\n").expect("valid doc");
+    let doc = tomet_ast_parser::parse_file("@tag(rust, tomet)\n").expect("valid doc");
     let printed = document_to_tm(&doc);
     assert_eq!(printed.trim(), "@tag(rust, tomet)");
 }
@@ -562,16 +562,16 @@ fn test_id_printing_is_tight_on_a_plain_element_but_spaced_on_a_section() {
     // matches that -- but a section already puts a space before its
     // own trailing `{value}` for readability, and `#(id)` matches
     // *that* convention there instead, for the same reason.
-    let doc = tomet_ast_parser::parse_document("@memo(a: 1)#(myid)\n").expect("valid doc");
+    let doc = tomet_ast_parser::parse_file("@memo(a: 1)#(myid)\n").expect("valid doc");
     assert_eq!(document_to_tm(&doc).trim(), "@memo(a: 1)#(myid)");
 
-    let doc = tomet_ast_parser::parse_document("=[ Title ]#(intro)\n").expect("valid doc");
+    let doc = tomet_ast_parser::parse_file("=[ Title ]#(intro)\n").expect("valid doc");
     assert_eq!(document_to_tm(&doc).trim(), "=[Title] #(intro)");
 }
 
 #[test]
 fn test_old_hash_tag_sugar_prints_as_plain_text() {
-    let doc = tomet_ast_parser::parse_document("#(rust, tomet)\n").expect("valid doc");
+    let doc = tomet_ast_parser::parse_file("#(rust, tomet)\n").expect("valid doc");
     let printed = document_to_tm(&doc);
     assert_eq!(printed.trim(), "#(rust, tomet)");
 }
@@ -605,7 +605,7 @@ fn test_section_blocks_blank_lines() {
 
         span: Span::dummy(),
     };
-    let doc = Document::new(vec![Block::Section(sec)], Span::dummy());
+    let doc = File::new(Vec::new(), vec![Block::Section(sec)], Span::dummy());
     let printed = document_to_tm(&doc);
     assert_eq!(printed, "=[Title]\nParagraph 1\n\nParagraph 2\n");
 }
@@ -633,7 +633,7 @@ fn test_headingless_section_printing() {
 
         span: Span::dummy(),
     };
-    let doc = Document::new(vec![Block::Section(sec)], Span::dummy());
+    let doc = File::new(Vec::new(), vec![Block::Section(sec)], Span::dummy());
     let printed = document_to_tm(&doc);
     assert_eq!(printed, "=\nContent\n");
 }
@@ -643,7 +643,7 @@ fn test_headingless_section_printing() {
 #[test]
 fn a_number_reading_would_change_is_printed_as_written() {
     let src = "::meta{ rev: 1.10, ratio: 2.5, big: 12345678901234567890, zero: -0 }\n\n@x(1.10)\n";
-    let doc = tomet_ast_parser::parse_document(src).unwrap();
+    let doc = tomet_ast_parser::parse_file(src).unwrap();
     let printed = document_to_tm_with_config(&doc, &PrinterConfig::default());
     for kept in [
         "rev: 1.10",
@@ -654,7 +654,7 @@ fn a_number_reading_would_change_is_printed_as_written() {
     ] {
         assert!(printed.contains(kept), "{kept} in {printed}");
     }
-    let again = tomet_ast_parser::parse_document(&printed).unwrap();
+    let again = tomet_ast_parser::parse_file(&printed).unwrap();
     assert_eq!(
         document_to_tm_with_config(&again, &PrinterConfig::default()),
         printed
@@ -667,10 +667,10 @@ fn a_semicolon_that_is_text_at_the_start_of_a_line_is_printed_with_a_backslash()
     // so a text `;` there is written `\;` -- after a soft break and at the
     // start of a paragraph alike. In the middle of a line it needs nothing.
     for src in ["a\n\\;b\n", "\\;a\n", "a;b\n"] {
-        let doc = tomet_ast_parser::parse_document(src).unwrap();
+        let doc = tomet_ast_parser::parse_file(src).unwrap();
         let printed = document_to_tm(&doc);
         assert_eq!(printed, src, "{src:?}");
-        let again = tomet_ast_parser::parse_document(&printed).unwrap();
-        assert_eq!(again.blocks.len(), doc.blocks.len(), "{src:?}");
+        let again = tomet_ast_parser::parse_file(&printed).unwrap();
+        assert_eq!(again.body.len(), doc.body.len(), "{src:?}");
     }
 }

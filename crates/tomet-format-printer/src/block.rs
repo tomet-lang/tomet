@@ -11,6 +11,20 @@ use crate::element::{
 use crate::id::render_id;
 use crate::inline::{render_content_blocks, render_inlines};
 
+pub(crate) fn render_file(file: &tomet_ast::File, config: &PrinterConfig, out: &mut String) {
+    for (i, decl) in file.header.iter().enumerate() {
+        if i > 0 {
+            out.push('\n');
+        }
+        out.push_str(&render_declaration(decl, config));
+        out.push('\n');
+    }
+    if !file.header.is_empty() && !file.body.is_empty() {
+        out.push('\n');
+    }
+    render_blocks(&file.body, config, out);
+}
+
 /// Renders a run of sibling blocks -- a document's, a section's, an element's `[content]` -- with a
 /// blank line between each. Without one, two paragraphs read back as one, and an element that
 /// starts the next line joins the paragraph before it.
@@ -76,10 +90,6 @@ pub(crate) fn render_block(block: &Block, config: &PrinterConfig, out: &mut Stri
         }
         Block::Element(el) => {
             out.push_str(&render_element(el.as_view(), config));
-            out.push('\n');
-        }
-        Block::Declaration(declaration) => {
-            out.push_str(&render_declaration(declaration, config));
             out.push('\n');
         }
         Block::Hole(hole) => {

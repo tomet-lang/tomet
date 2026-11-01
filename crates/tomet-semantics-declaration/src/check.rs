@@ -349,10 +349,10 @@ fn var_problem(decl: &VarDecl) -> Option<String> {
 mod tests {
     use super::*;
     use crate::declaration::declarations;
-    use tomet_ast::Document;
+    use tomet_ast::File;
 
-    fn parse(src: &str) -> Document {
-        tomet_ast_parser::parse_document(src).expect("parses")
+    fn parse(src: &str) -> File {
+        tomet_ast_parser::parse_file(src).expect("parses")
     }
 
     fn problems_of(src: &str) -> Vec<Problem> {

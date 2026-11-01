@@ -10,5 +10,5 @@ description = "Serde support for cotomet: read and write Rust types as cotomet d
 tomet-ast = { workspace = true }
 tomet-ast-parser = { workspace = true }
 
-#= Crates.io
+#--- Crates.io ---
 serde = { workspace = true }

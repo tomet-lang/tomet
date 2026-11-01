@@ -1,7 +1,7 @@
 //! =[ tomet-lowering ]
 //!
 //! Lowering the Tomet Concrete Syntax Tree (CST) into typed AST representations
-//! ([`tomet_ast::Document`], [`tomet_ast::Value`], [`tomet_ast::File`]).
+//! ([`tomet_ast::File`], [`tomet_ast::Value`]).
 //!
 //! =[ Architecture & Responsibilities ]
 //!
@@ -21,5 +21,5 @@ pub mod lower;
 pub mod value;
 
 pub use error::{Error, Result};
-pub use lower::lower_document;
-pub use value::{lower_file, lower_value};
+pub use lower::{is_declaration, lower_declaration, lower_file};
+pub use value::{lower_data_file, lower_value};

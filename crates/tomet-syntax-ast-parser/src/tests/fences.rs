@@ -5,11 +5,13 @@ use super::*;
 /// element -- the replacement for the old `+++` raw-body fence: `[...]`
 /// holds the same blocks the document root does, so a fenced code block
 /// nests inside it exactly as it would at the top level.
-fn nested_raw_body(doc: &tomet_ast::Document) -> &str {
-    let outer_content = match &doc.blocks[0] {
-        Block::Element(outer) => outer.content.as_deref(),
-        Block::Declaration(outer) => outer.content.as_deref(),
-        other => panic!("expected an element or a declaration, got {other:?}"),
+fn nested_raw_body(doc: &tomet_ast::File) -> &str {
+    let outer_content = if let Some(d) = doc.header.first() {
+        d.content.as_deref()
+    } else if let Some(Block::Element(outer)) = doc.body.first() {
+        outer.content.as_deref()
+    } else {
+        panic!("expected an element or a declaration, got {doc:?}");
     };
     let content = outer_content.unwrap_or(&[]);
     let Some(Block::Element(raw)) = content.first() else {
@@ -27,7 +29,7 @@ fn nested_raw_body(doc: &tomet_ast::Document) -> &str {
 #[test]
 fn a_fenced_raw_body_nested_in_content_preserves_brackets_and_newlines_losslessly() {
     let doc =
-        parse_document("@memo[\n```\nline one\nline two with * and [brackets] inside\n```\n]\n")
+        parse_file("@memo[\n```\nline one\nline two with * and [brackets] inside\n```\n]\n")
             .unwrap();
     assert_eq!(
         nested_raw_body(&doc),
@@ -40,13 +42,13 @@ fn a_fenced_raw_body_in_content_is_not_confused_by_an_apostrophe() {
     // Free-form prose gives no guarantee its `'`/`"` occurrences are
     // balanced; a fence has no such problem -- it ends at a line, so
     // nothing inside it can be miscounted.
-    let doc = parse_document("@memo[\n```\ndon't forget [this]\n```\n]\n").unwrap();
+    let doc = parse_file("@memo[\n```\ndon't forget [this]\n```\n]\n").unwrap();
     assert_eq!(nested_raw_body(&doc), "don't forget [this]");
 }
 
 #[test]
 fn a_fenced_raw_body_in_content_is_not_confused_by_an_unquoted_brace() {
-    let doc = parse_document("@memo[\n```\na: \"}\"\nb: 1\n```\n]\n").unwrap();
+    let doc = parse_file("@memo[\n```\na: \"}\"\nb: 1\n```\n]\n").unwrap();
     assert_eq!(nested_raw_body(&doc), "a: \"}\"\nb: 1");
 }
 
@@ -55,7 +57,7 @@ fn interpolation_does_not_expand_inside_a_fenced_raw_body_in_content() {
     // `default.config.tmt` stores macro templates such as
     // `"https://github.com/.../${1}"` that must reach
     // `tomet-transform`'s `MacroPattern::from_template` verbatim.
-    let doc = parse_document("::config[\n```\n{\"gh\": \"x/${1}\"}\n```\n]\n").unwrap();
+    let doc = parse_file("::config[\n```\n{\"gh\": \"x/${1}\"}\n```\n]\n").unwrap();
     assert_eq!(nested_raw_body(&doc), "{\"gh\": \"x/${1}\"}");
 }
 
@@ -64,8 +66,8 @@ fn content_raw_is_now_just_an_ordinary_argument() {
     // `(content:raw)` no longer changes how `[...]` is lexed -- that
     // was one of the four places the parser consulted an element's
     // own arguments. Line breaks collapse per the usual rule.
-    let doc = parse_document("@memo(content:raw)[\nline one\nline two\n]\n").unwrap();
-    match &doc.blocks[0] {
+    let doc = parse_file("@memo(content:raw)[\nline one\nline two\n]\n").unwrap();
+    match &doc.body[0] {
         Block::Element(el) => {
             assert_eq!(
                 el.content,
@@ -82,8 +84,8 @@ fn content_raw_is_now_just_an_ordinary_argument() {
 
 #[test]
 fn parses_a_fenced_code_block_with_lang() {
-    let doc = parse_document("```rust\nfn main() {}\n```\n").unwrap();
-    match &doc.blocks[0] {
+    let doc = parse_file("```rust\nfn main() {}\n```\n").unwrap();
+    match &doc.body[0] {
         Block::Element(el) => {
             assert_eq!(el.name, Name::bare("raw"));
             assert_eq!(
@@ -101,8 +103,8 @@ fn parses_a_fenced_code_block_with_lang() {
 
 #[test]
 fn parses_a_fenced_code_block_without_lang() {
-    let doc = parse_document("```\nplain\n```\n").unwrap();
-    match &doc.blocks[0] {
+    let doc = parse_file("```\nplain\n```\n").unwrap();
+    match &doc.body[0] {
         Block::Element(el) => {
             assert_eq!(el.name, Name::bare("raw"));
             assert_eq!(el.data.args, None);
@@ -126,9 +128,9 @@ fn fenced_code_block_and_bracket_raw_produce_the_same_ast() {
     // already have shown the gap (its line breaks fold/`SoftBreak`
     // like any other prose, not staying verbatim). What still matches
     // is sigil/args/value and the rendered text.
-    let fenced = parse_document("```rust\nfn main() {}\n```\n").unwrap();
-    let bracket = parse_document("@raw(lang:rust)[fn main() {}]\n").unwrap();
-    match (&fenced.blocks[0], &bracket.blocks[0]) {
+    let fenced = parse_file("```rust\nfn main() {}\n```\n").unwrap();
+    let bracket = parse_file("@raw(lang:rust)[fn main() {}]\n").unwrap();
+    match (&fenced.body[0], &bracket.body[0]) {
         (Block::Element(a), Block::Element(b)) => {
             assert_eq!(a.name, b.name);
             assert_eq!(a.data.args, b.data.args);
@@ -145,8 +147,8 @@ fn fenced_code_block_closing_fence_needs_at_least_the_opening_backtick_count() {
     // A closing fence with fewer backticks than the opening one doesn't
     // close it -- it's just consumed as ordinary body content, same as
     // CommonMark.
-    let doc = parse_document("````\ncode\n```\nmore code\n````\n").unwrap();
-    match &doc.blocks[0] {
+    let doc = parse_file("````\ncode\n```\nmore code\n````\n").unwrap();
+    match &doc.body[0] {
         Block::Element(el) => {
             assert_eq!(
                 el.content,
@@ -159,8 +161,8 @@ fn fenced_code_block_closing_fence_needs_at_least_the_opening_backtick_count() {
 
 #[test]
 fn fenced_code_block_closing_fence_can_have_more_backticks_than_opening() {
-    let doc = parse_document("```\ncode\n`````\n").unwrap();
-    match &doc.blocks[0] {
+    let doc = parse_file("```\ncode\n`````\n").unwrap();
+    match &doc.body[0] {
         Block::Element(el) => {
             assert_eq!(el.content, wrap(vec![Inline::Raw("code".into())]));
         }
@@ -170,8 +172,8 @@ fn fenced_code_block_closing_fence_can_have_more_backticks_than_opening() {
 
 #[test]
 fn fenced_code_block_body_can_contain_short_backtick_runs() {
-    let doc = parse_document("```\nsee `foo` and ``bar``\n```\n").unwrap();
-    match &doc.blocks[0] {
+    let doc = parse_file("```\nsee `foo` and ``bar``\n```\n").unwrap();
+    match &doc.body[0] {
         Block::Element(el) => {
             assert_eq!(
                 el.content,
@@ -187,8 +189,8 @@ fn unterminated_fenced_code_block_runs_to_eof_without_error() {
     // Deliberately asymmetric with `<raw>[...]`'s hard EOF error
     // (see `parse_fenced_code_block`'s doc comment) -- matches
     // CommonMark's own spec for an unclosed fence.
-    let doc = parse_document("```\nline one\nline two").unwrap();
-    match &doc.blocks[0] {
+    let doc = parse_file("```\nline one\nline two").unwrap();
+    match &doc.body[0] {
         Block::Element(el) => {
             assert_eq!(
                 el.content,
@@ -206,9 +208,9 @@ fn unterminated_inline_backtick_falls_back_to_literal_text() {
     // across paragraph boundaries, collapsing newlines to spaces along
     // the way. It must now fall back to a literal '`' and let the
     // paragraph end normally at the blank line.
-    let doc = parse_document("keep `this open\n\nnext paragraph\n").unwrap();
-    assert_eq!(doc.blocks.len(), 2);
-    match (&doc.blocks[0], &doc.blocks[1]) {
+    let doc = parse_file("keep `this open\n\nnext paragraph\n").unwrap();
+    assert_eq!(doc.body.len(), 2);
+    match (&doc.body[0], &doc.body[1]) {
         (Block::Paragraph(a), Block::Paragraph(b)) => {
             assert_eq!(&a.content, &vec![Inline::Text("keep `this open".into())]);
             assert_eq!(&b.content, &vec![Inline::Text("next paragraph".into())]);
@@ -219,8 +221,8 @@ fn unterminated_inline_backtick_falls_back_to_literal_text() {
 
 #[test]
 fn backtick_span_still_closes_normally_on_the_same_line() {
-    let doc = parse_document("call `foo()` now\n").unwrap();
-    match &doc.blocks[0] {
+    let doc = parse_file("call `foo()` now\n").unwrap();
+    match &doc.body[0] {
         Block::Paragraph(p) => {
             assert_eq!(p.content.len(), 3);
             assert_eq!(p.content[0], Inline::Text("call ".into()));
@@ -239,9 +241,9 @@ fn backtick_span_still_closes_normally_on_the_same_line() {
 }
 
 fn line_raw_text(src: &str) -> String {
-    let doc = parse_document(src).unwrap();
-    let [Block::Element(el)] = doc.blocks.as_slice() else {
-        panic!("expected one raw element, got {:?}", doc.blocks);
+    let doc = parse_file(src).unwrap();
+    let [Block::Element(el)] = doc.body.as_slice() else {
+        panic!("expected one raw element, got {:?}", doc.body);
     };
     assert_eq!(el.name, Name::bare("raw"));
     assert_eq!(el.placement, Placement::Block);
@@ -272,21 +274,21 @@ fn consecutive_line_raw_lines_are_one_raw_block() {
         "one\ntwo\n\nthree"
     );
     // A blank line ends it.
-    let doc = parse_document("`` one\n\n`` two\n").unwrap();
-    assert_eq!(doc.blocks.len(), 2);
+    let doc = parse_file("`` one\n\n`` two\n").unwrap();
+    assert_eq!(doc.body.len(), 2);
 }
 
 #[test]
 fn a_line_raw_breaks_the_paragraph_before_it_and_not_a_fence_after_it() {
-    let doc = parse_document("text\n`` raw\n```\nfence\n```\n").unwrap();
-    assert!(matches!(doc.blocks[0], Block::Paragraph(_)));
-    assert_eq!(doc.blocks.len(), 3, "{:?}", doc.blocks);
+    let doc = parse_file("text\n`` raw\n```\nfence\n```\n").unwrap();
+    assert!(matches!(doc.body[0], Block::Paragraph(_)));
+    assert_eq!(doc.body.len(), 3, "{:?}", doc.body);
 }
 
 #[test]
 fn two_backticks_inside_a_line_are_still_an_inline_raw() {
-    let doc = parse_document("a ``b`c`` d\n").unwrap();
-    let [Block::Paragraph(p)] = doc.blocks.as_slice() else {
+    let doc = parse_file("a ``b`c`` d\n").unwrap();
+    let [Block::Paragraph(p)] = doc.body.as_slice() else {
         panic!()
     };
     assert!(
@@ -295,8 +297,8 @@ fn two_backticks_inside_a_line_are_still_an_inline_raw() {
             .any(|i| matches!(i, Inline::Element(el) if el.name == Name::bare("raw")))
     );
     // And in a `[content]`, where it is the first thing after the bracket.
-    let doc = parse_document("@x[ ``b`c`` ]\n").unwrap();
-    let Block::Element(el) = &doc.blocks[0] else {
+    let doc = parse_file("@x[ ``b`c`` ]\n").unwrap();
+    let Block::Element(el) = &doc.body[0] else {
         panic!()
     };
     assert!(matches!(el.content.as_deref(), Some([Block::Paragraph(_)])));
@@ -304,8 +306,8 @@ fn two_backticks_inside_a_line_are_still_an_inline_raw() {
 
 #[test]
 fn a_line_raw_in_a_pipe_run_loses_the_markers() {
-    let doc = parse_document("@quote\n| `` one\n| `` two\n").unwrap();
-    let Block::Element(q) = &doc.blocks[0] else {
+    let doc = parse_file("@quote\n| `` one\n| `` two\n").unwrap();
+    let Block::Element(q) = &doc.body[0] else {
         panic!()
     };
     let Some([Block::Element(raw)]) = q.content.as_deref() else {

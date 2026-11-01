@@ -1,21 +1,26 @@
-//! In-memory anchor (`#(id)`) resolution and lookup across a [`Document`].
+//! In-memory anchor (`#(id)`) resolution and lookup across a [`File`].
 //!
 //! Searches for matching [`Element::id`], [`Section::id`], or [`List::id`]
 //! definitions anywhere in a parsed AST. Pure in-memory (no I/O).
 
 use tomet_ast::{
-    Bare, Block, Connect, Data, Document, Element, Entry, Group, Inline, List, ListItem, Value,
+    Bare, Block, Connect, Data, Declaration, Element, Entry, File, Group, Inline, List, ListItem, Value,
 };
 use tomet_span::Span;
 
-/// Returns whether an anchor with the given ID exists anywhere in `doc`.
-pub fn has_anchor(doc: &Document, anchor: &str) -> bool {
-    find_anchor(doc, anchor).is_some()
+/// Returns whether an anchor with the given ID exists anywhere in `file`.
+pub fn has_anchor(file: &File, anchor: &str) -> bool {
+    find_anchor(file, anchor).is_some()
 }
 
-/// Finds the [`Span`] of the node defining the given anchor ID in `doc`, if any.
-pub fn find_anchor(doc: &Document, anchor: &str) -> Option<Span> {
-    for block in &doc.blocks {
+/// Finds the [`Span`] of the node defining the given anchor ID in `file`, if any.
+pub fn find_anchor(file: &File, anchor: &str) -> Option<Span> {
+    for decl in &file.header {
+        if let Some(span) = find_in_declaration(decl, anchor) {
+            return Some(span);
+        }
+    }
+    for block in &file.body {
         if let Some(span) = find_in_block(block, anchor) {
             return Some(span);
         }
@@ -23,13 +28,33 @@ pub fn find_anchor(doc: &Document, anchor: &str) -> Option<Span> {
     None
 }
 
-/// Collects all anchor IDs defined in `doc` along with their [`Span`]s, in document order.
-pub fn collect_anchors(doc: &Document) -> Vec<(String, Span)> {
+/// Collects all anchor IDs defined in `file` along with their [`Span`]s, in document order.
+pub fn collect_anchors(file: &File) -> Vec<(String, Span)> {
     let mut anchors = Vec::new();
-    for block in &doc.blocks {
+    for decl in &file.header {
+        collect_in_declaration(decl, &mut anchors);
+    }
+    for block in &file.body {
         collect_in_block(block, &mut anchors);
     }
     anchors
+}
+
+fn find_in_declaration(d: &Declaration, anchor: &str) -> Option<Span> {
+    if let Some(id) = &d.id
+        && id.0 == anchor
+    {
+        return Some(d.span);
+    }
+    find_in_content(d.content.as_deref(), anchor).or_else(|| find_in_data(&d.data, anchor))
+}
+
+fn collect_in_declaration(d: &Declaration, anchors: &mut Vec<(String, Span)>) {
+    if let Some(id) = &d.id {
+        anchors.push((id.0.clone(), d.span));
+    }
+    collect_in_content(d.content.as_deref(), anchors);
+    collect_in_data(&d.data, anchors);
 }
 
 fn find_in_block(block: &Block, anchor: &str) -> Option<Span> {
@@ -60,14 +85,6 @@ fn find_in_block(block: &Block, anchor: &str) -> Option<Span> {
         Block::Element(el) => find_in_element(el, anchor),
         // A hole exists only in a pattern, which has no anchors.
         Block::Hole(_) => None,
-        Block::Declaration(d) => {
-            if let Some(id) = &d.id
-                && id.0 == anchor
-            {
-                return Some(d.span);
-            }
-            find_in_content(d.content.as_deref(), anchor).or_else(|| find_in_data(&d.data, anchor))
-        }
         Block::Paragraph(p) => {
             for inline in &p.content {
                 if let Some(span) = find_in_inline(inline, anchor) {
@@ -226,13 +243,6 @@ fn collect_in_block(block: &Block, anchors: &mut Vec<(String, Span)>) {
             }
         }
         Block::Element(el) => collect_in_element(el, anchors),
-        Block::Declaration(d) => {
-            if let Some(id) = &d.id {
-                anchors.push((id.0.clone(), d.span));
-            }
-            collect_in_content(d.content.as_deref(), anchors);
-            collect_in_data(&d.data, anchors);
-        }
         Block::Paragraph(p) => {
             for inline in &p.content {
                 collect_in_inline(inline, anchors);
@@ -347,8 +357,15 @@ fn collect_in_value(value: &Value, anchors: &mut Vec<(String, Span)>) {
 mod tests {
     use super::*;
 
-    fn parse_doc(src: &str) -> Document {
-        tomet_ast_parser::parse_document(src).unwrap()
+    fn parse_doc(src: &str) -> File {
+        tomet_ast_parser::parse_file(src).unwrap()
+    }
+
+    #[test]
+    fn finds_declaration_anchor_in_header() {
+        let doc = parse_doc("::meta#(doc-meta){ id: x }\n\nSome body text.\n");
+        assert!(has_anchor(&doc, "doc-meta"));
+        assert!(find_anchor(&doc, "doc-meta").is_some());
     }
 
     #[test]

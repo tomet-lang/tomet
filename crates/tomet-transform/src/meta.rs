@@ -1,14 +1,14 @@
 //! Metadata element manipulation in documents.
 
-use tomet_ast::{Block, Document, Group, Value};
+use tomet_ast::{File, Group, Value};
 use tomet_semantics::{classify_declaration_lenient, classify_std_lenient};
 use tomet_tree::{
-    DataExt, declaration_new, for_each_element_mut, for_each_top_level_declaration_mut,
+    DataExt, declaration_new, for_each_declaration_mut, for_each_element_mut,
 };
 
 /// Updates or inserts a key-value pair in a target directive/metadata block (e.g. `::meta`).
 /// If the target block is not found, prepends a new directive block at position 0.
-pub fn set_meta_in_doc(doc: &mut Document, target_element: &str, key: &str, new_val: &str) -> bool {
+pub fn set_meta_in_doc(doc: &mut File, target_element: &str, key: &str, new_val: &str) -> bool {
     let mut found = false;
 
     for_each_element_mut(doc, |el| {
@@ -18,7 +18,7 @@ pub fn set_meta_in_doc(doc: &mut Document, target_element: &str, key: &str, new_
             el.data.set_prop(key, Value::String(new_val.to_string()));
         }
     });
-    for_each_top_level_declaration_mut(doc, |declaration| {
+    for_each_declaration_mut(doc, |declaration| {
         let kind = classify_declaration_lenient(declaration);
         if kind.as_str() == target_element {
             found = true;
@@ -36,7 +36,7 @@ pub fn set_meta_in_doc(doc: &mut Document, target_element: &str, key: &str, new_
             key.to_string(),
             Value::String(new_val.to_string()),
         )])));
-        doc.blocks.insert(0, Block::Declaration(declaration));
+        doc.header.insert(0, declaration);
     }
 
     true

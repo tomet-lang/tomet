@@ -5,7 +5,7 @@ use std::fs;
 use std::path::PathBuf;
 
 use tomet_indexer::extract_metadata;
-use tomet_ast_parser::parse_document;
+use tomet_ast_parser::parse_file;
 use tomet_printer::document_to_tm;
 use tomet_transform::set_meta_in_doc;
 
@@ -76,7 +76,7 @@ impl BatchMetaEngine {
     ) {
         for file in files.iter_mut() {
             file.ensure_loaded();
-            if let Ok(mut doc) = parse_document(&file.original_src)
+            if let Ok(mut doc) = parse_file(&file.original_src)
                 && set_meta_in_doc(&mut doc, target_element, key, new_value)
             {
                 file.modified_src = document_to_tm(&doc);

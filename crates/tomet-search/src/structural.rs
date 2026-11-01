@@ -3,7 +3,7 @@
 //! Provides pure in-memory querying over Tomet AST elements by tag,
 //! attribute/property key, and value content.
 
-use tomet_ast::{Data, Declaration, Document, Element, Value};
+use tomet_ast::{Data, Declaration, Element, File, Value};
 use tomet_span::Span;
 use tomet_semantics::{classify_declaration_lenient, classify_std_lenient};
 use tomet_tree::{DataExt, for_each_declaration, for_each_element};
@@ -75,13 +75,13 @@ fn matches_parts(tag: &str, data: &Data, query: &StructuralQuery) -> bool {
 }
 
 /// Counts matching elements and declarations in `doc` for `query`.
-pub fn count_structural_matches(doc: &Document, query: &StructuralQuery) -> usize {
+pub fn count_structural_matches(doc: &File, query: &StructuralQuery) -> usize {
     find_structural_matches(doc, query).len()
 }
 
 /// Finds all matching element and declaration occurrences in `doc` for
 /// `query`, in document order.
-pub fn find_structural_matches(doc: &Document, query: &StructuralQuery) -> Vec<StructuralMatch> {
+pub fn find_structural_matches(doc: &File, query: &StructuralQuery) -> Vec<StructuralMatch> {
     let mut matches = Vec::new();
     for_each_element(doc, |el| {
         if matches_query(el, query) {
@@ -120,11 +120,11 @@ fn value_contains_str(v: &Value, sub: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tomet_ast_parser::parse_document;
+    use tomet_ast_parser::parse_file;
 
     #[test]
     fn matches_query_by_tag() {
-        let doc = parse_document("::meta{author: \"Alice\"}\n#[ Title ]\n").unwrap();
+        let doc = parse_file("::meta{author: \"Alice\"}\n#[ Title ]\n").unwrap();
         let query = StructuralQuery {
             tag: Some("meta".to_string()),
             ..Default::default()
@@ -137,7 +137,7 @@ mod tests {
 
     #[test]
     fn matches_query_by_key() {
-        let doc = parse_document("::meta{author: \"Alice\", draft: true}\n").unwrap();
+        let doc = parse_file("::meta{author: \"Alice\", draft: true}\n").unwrap();
         let q_author = StructuralQuery {
             key: Some("author".to_string()),
             ..Default::default()
@@ -153,7 +153,7 @@ mod tests {
 
     #[test]
     fn matches_query_by_value_contains() {
-        let doc = parse_document("::meta{author: \"Alice Wonderland\"}\n").unwrap();
+        let doc = parse_file("::meta{author: \"Alice Wonderland\"}\n").unwrap();
         let q_val = StructuralQuery {
             value_contains: Some("Wonder".to_string()),
             ..Default::default()

@@ -7,13 +7,18 @@ use tomet_span::Span;
 
 /// Computes folding ranges for the given document text.
 pub fn folding_ranges_for(text: &str) -> Vec<FoldingRange> {
-    let Ok(doc) = tomet_ast_parser::parse_document(text) else {
+    let Ok(doc) = tomet_ast_parser::parse_file(text) else {
         return Vec::new();
     };
 
     let mut ranges = Vec::new();
     let index = &LineIndex::new(text);
-    for block in &doc.blocks {
+    for decl in &doc.header {
+        for child in decl.content.iter().flatten() {
+            collect_block_folding_ranges(index, child, &mut ranges);
+        }
+    }
+    for block in &doc.body {
         collect_block_folding_ranges(index, block, &mut ranges);
     }
 
@@ -77,12 +82,6 @@ fn collect_block_folding_ranges(
             }
         }
         Block::Paragraph(_) => {}
-        // A declaration is a line or a few; what it holds folds on its own.
-        Block::Declaration(declaration) => {
-            for child in declaration.content.iter().flatten() {
-                collect_block_folding_ranges(index, child, ranges);
-            }
-        }
         Block::List(list) => collect_list_folding_ranges(index, list, ranges),
         Block::Interp(interp) => {
             let start_line = line0(index, interp.span.start);
@@ -171,7 +170,6 @@ fn block_end_line(index: &LineIndex<'_>, block: &Block) -> u32 {
         Block::Paragraph(p) => span_end_line(index, &p.span),
         Block::List(list) => span_end_line(index, &list.span),
         Block::Interp(interp) => span_end_line(index, &interp.span),
-        Block::Declaration(declaration) => span_end_line(index, &declaration.span),
         Block::Hole(hole) => span_end_line(index, &hole.span),
     }
 }

@@ -101,7 +101,7 @@ pub(crate) fn check(path: &Path, data: bool, quiet: bool, json: bool) -> anyhow:
                 return check_ctmt(file, &src, json);
             }
 
-            let doc = match tomet_ast_parser::parse_document(&src) {
+            let doc = match tomet_ast_parser::parse_file(&src) {
                 Ok(doc) => doc,
                 Err(err) => return parse_failure(file, &src, &err, json),
             };
@@ -533,7 +533,7 @@ mod tests {
         let vault = tomet_load::Vault::discover(&root);
         let unresolved = |name: &str| {
             let path = root.join(name);
-            let doc = tomet_ast_parser::parse_document(&fs::read_to_string(&path).unwrap()).unwrap();
+            let doc = tomet_ast_parser::parse_file(&fs::read_to_string(&path).unwrap()).unwrap();
             vault.findings(&path, &doc).unresolved
         };
 

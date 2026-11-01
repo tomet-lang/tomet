@@ -1,4 +1,4 @@
-//! `tomet_ast::Document` -> CommonMark, hand-written: the output space
+//! `tomet_ast::File` -> CommonMark, hand-written: the output space
 //! is much smaller than the input space, so there is no crate worth
 //! pulling in for it.
 //!
@@ -16,7 +16,7 @@ mod tests;
 use escape::{escape_attr, escape_text, fence_for};
 
 use tomet_ast::{
-    Block, Document, ElementView, Inline, Interpolation, List, Placement, Section, Value,
+    Block, ElementView, File, Inline, Interpolation, List, Placement, Section, Value,
 };
 use tomet_semantics::{
     FootnoteRegistry, TargetScheme, classify_std_lenient, extract_tags, heading_level,
@@ -38,13 +38,13 @@ struct MarkdownCtx<'a> {
 /// `tomet_load::Vault::prepare`), because four converters deciding it
 /// independently is how the same document came to produce three different
 /// answers.
-pub fn to_markdown(doc: &Document) -> String {
-    let footnotes = FootnoteRegistry::from_document(doc);
+pub fn to_markdown(doc: &File) -> String {
+    let footnotes = FootnoteRegistry::from_file(doc);
     let cx = MarkdownCtx {
         footnotes: &footnotes,
     };
     let mut out = String::new();
-    for block in &doc.blocks {
+    for block in &doc.body {
         render_block(&cx, block, &mut out);
     }
     render_footnotes(&cx, &mut out);
@@ -77,8 +77,6 @@ fn render_block(cx: &MarkdownCtx, block: &Block, out: &mut String) {
             out.push_str(&render_interp(interp));
             out.push_str("\n\n");
         }
-        // What a document says about itself has no rendering.
-        Block::Declaration(_) => {}
         // A hole is shown as it was written.
         Block::Hole(hole) => {
             out.push_str(&escape_text(&tomet_printer::hole_to_tm(hole)));
@@ -557,7 +555,7 @@ fn blocks_to_plain(blocks: &[Block]) -> String {
                     s.push_str(&blocks_to_plain(&item.content));
                 }
             }
-            Block::Interp(_) | Block::Declaration(_) => {}
+            Block::Interp(_) => {}
             Block::Hole(hole) => s.push_str(&tomet_printer::hole_to_tm(hole)),
         }
     }

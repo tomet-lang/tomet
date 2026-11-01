@@ -2,21 +2,21 @@ use super::*;
 
 #[test]
 fn escapes_paragraph_text() {
-    let doc = parse_document("a < b & c\n").unwrap();
+    let doc = parse_file("a < b & c\n").unwrap();
     let body = render_body(&doc);
     assert_eq!(body, "<p>a &lt; b &amp; c</p>\n");
 }
 
 #[test]
 fn renders_thematic_break_as_hr() {
-    let doc = parse_document("---\n").unwrap();
+    let doc = parse_file("---\n").unwrap();
     let body = render_body(&doc);
     assert_eq!(body, "<hr>\n");
 }
 
 #[test]
 fn renders_titled_thematic_break() {
-    let doc = parse_document("---[ Title ]---\n").unwrap();
+    let doc = parse_file("---[ Title ]---\n").unwrap();
     let body = render_body(&doc);
     assert_eq!(
         body,
@@ -26,7 +26,7 @@ fn renders_titled_thematic_break() {
 
 #[test]
 fn renders_emphasis_strong_and_mark() {
-    let doc = parse_document("a *em* b **strong** c @mark[mark]\n").unwrap();
+    let doc = parse_file("a *em* b **strong** c @mark[mark]\n").unwrap();
     let body = render_body(&doc);
     assert_eq!(
         body,
@@ -36,7 +36,7 @@ fn renders_emphasis_strong_and_mark() {
 
 #[test]
 fn renders_ruby() {
-    let doc = parse_document("a @ruby[漢字](rt:\"かんじ\") b\n").unwrap();
+    let doc = parse_file("a @ruby[漢字](rt:\"かんじ\") b\n").unwrap();
     let body = render_body(&doc);
     assert_eq!(body, "<p>a <ruby>漢字<rt>かんじ</rt></ruby> b</p>\n");
 }
@@ -44,7 +44,7 @@ fn renders_ruby() {
 #[test]
 fn renders_table_element_to_html() {
     let src = "@table()[\n[ title ][  sdfasdf   ][    fasdf    ][ sdffdsf ]\n[ title ][ sdfddfasdf ][ fasddfdfdff ][ sdffdsf ]\n[ title ][  sdfasdf   ][   fasdf     ][ sdffdsf ]\n]{}\n";
-    let doc = parse_document(src).unwrap();
+    let doc = parse_file(src).unwrap();
     let body = render_body(&doc);
     assert_eq!(
         body,
@@ -78,7 +78,7 @@ fn renders_table_element_to_html() {
 #[test]
 fn test_renders_inline_footnote() {
     let src = "Prose with @ftn[a short note] here.\n";
-    let doc = parse_document(src).unwrap();
+    let doc = parse_file(src).unwrap();
     let html = render_body(&doc);
 
     assert!(
@@ -101,7 +101,7 @@ fn test_renders_inline_footnote() {
 fn test_renders_separated_footnote_with_multiple_references() {
     let src =
         "Prose A@ftn(note1) and Prose B@ftn(note1).\n\n@ftn(note1)[Shared footnote explanation.]\n";
-    let doc = parse_document(src).unwrap();
+    let doc = parse_file(src).unwrap();
     let html = render_body(&doc);
 
     assert!(

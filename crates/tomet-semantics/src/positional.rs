@@ -345,7 +345,7 @@ mod tests {
             "tomet#name(\"vault.config.tmt\")",
             "\"vault.config.tmt\"",
         ] {
-            let doc = tomet_ast_parser::parse_document(&format!("a @term({written}) b\n"))
+            let doc = tomet_ast_parser::parse_file(&format!("a @term({written}) b\n"))
                 .expect("a mention parses");
             let mut found = None;
             tomet_tree::for_each_element(&doc, |el| {

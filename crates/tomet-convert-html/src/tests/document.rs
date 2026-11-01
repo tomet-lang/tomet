@@ -3,7 +3,7 @@ use super::*;
 #[test]
 fn a_nested_map_survives_as_an_exact_copy() {
     // It used to render as `data-m=""` -- key kept, contents gone.
-    let doc = parse_document("@deck.x(a: 1, m: { k: v })[ 本文 ]\n").unwrap();
+    let doc = parse_file("@deck.x(a: 1, m: { k: v })[ 本文 ]\n").unwrap();
     let html = render_body(&doc);
     assert!(html.contains(r#"data-a="1""#), "got {html}");
     assert!(
@@ -16,7 +16,7 @@ fn a_nested_map_survives_as_an_exact_copy() {
 
 #[test]
 fn flat_args_need_no_exact_copy() {
-    let doc = parse_document("@deck.x(a: 1, tags: list(p, q))[ 本文 ]\n").unwrap();
+    let doc = parse_file("@deck.x(a: 1, tags: list(p, q))[ 本文 ]\n").unwrap();
     let html = render_body(&doc);
     assert!(html.contains(r#"data-tags="p, q""#), "got {html}");
     assert!(!html.contains("data-tomet-data="), "got {html}");
@@ -24,7 +24,7 @@ fn flat_args_need_no_exact_copy() {
 
 #[test]
 fn render_page_defaults_to_japanese_lang() {
-    let doc = parse_document("=[ One ]\n").unwrap();
+    let doc = parse_file("=[ One ]\n").unwrap();
     let page = render_page(&doc, "Title");
     assert!(
         page.contains("<html lang=\"ja\">"),
@@ -34,7 +34,7 @@ fn render_page_defaults_to_japanese_lang() {
 
 #[test]
 fn render_page_with_honors_lang_override() {
-    let doc = parse_document("=[ One ]\n").unwrap();
+    let doc = parse_file("=[ One ]\n").unwrap();
     let page = render_page_with(
         &doc,
         "Title",

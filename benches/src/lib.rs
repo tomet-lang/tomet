@@ -107,7 +107,7 @@ pub fn external_sets() -> Vec<(String, Vec<Input>)> {
             .into_iter()
             .filter_map(|path| {
                 let text = std::fs::read_to_string(&path).ok()?;
-                tomet_ast_parser::parse_document(&text).ok()?;
+                tomet_ast_parser::parse_file(&text).ok()?;
                 Some(Input {
                     name: path
                         .strip_prefix(&dir)
@@ -133,7 +133,7 @@ pub fn external_sets() -> Vec<(String, Vec<Input>)> {
 
 /// Panics, naming the input, unless `tomet-parser` accepts it.
 pub fn assert_parses(input: &Input) {
-    if let Err(e) = tomet_ast_parser::parse_document(&input.text) {
+    if let Err(e) = tomet_ast_parser::parse_file(&input.text) {
         panic!("benchmark input `{}` does not parse: {e}", input.name);
     }
 }

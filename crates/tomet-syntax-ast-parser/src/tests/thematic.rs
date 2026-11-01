@@ -2,8 +2,8 @@ use super::*;
 
 #[test]
 fn parses_thematic_break() {
-    let doc = parse_document("---\n").unwrap();
-    match &doc.blocks[0] {
+    let doc = parse_file("---\n").unwrap();
+    match &doc.body[0] {
         Block::Element(el) => {
             assert_eq!(el.name, Name::bare("hr"));
             assert_eq!(el.content, None);
@@ -14,8 +14,8 @@ fn parses_thematic_break() {
 
 #[test]
 fn parses_thematic_break_with_more_than_three_dashes() {
-    let doc = parse_document("-----\n").unwrap();
-    match &doc.blocks[0] {
+    let doc = parse_file("-----\n").unwrap();
+    match &doc.body[0] {
         Block::Element(el) => assert_eq!(el.name, Name::bare("hr")),
         other => panic!("expected hr element, got {other:?}"),
     }
@@ -23,8 +23,8 @@ fn parses_thematic_break_with_more_than_three_dashes() {
 
 #[test]
 fn parses_titled_thematic_break() {
-    let doc = parse_document("---[ Title ]---\n").unwrap();
-    match &doc.blocks[0] {
+    let doc = parse_file("---[ Title ]---\n").unwrap();
+    match &doc.body[0] {
         Block::Element(el) => {
             assert_eq!(el.name, Name::bare("hr"));
             assert_eq!(el.content, wrap(vec![Inline::Text("Title".into())]));
@@ -35,8 +35,8 @@ fn parses_titled_thematic_break() {
 
 #[test]
 fn titled_thematic_break_dash_runs_need_not_match_in_length() {
-    let doc = parse_document("-----[ Title ]---\n").unwrap();
-    match &doc.blocks[0] {
+    let doc = parse_file("-----[ Title ]---\n").unwrap();
+    match &doc.body[0] {
         Block::Element(el) => {
             assert_eq!(el.content, wrap(vec![Inline::Text("Title".into())]));
         }
@@ -46,12 +46,12 @@ fn titled_thematic_break_dash_runs_need_not_match_in_length() {
 
 #[test]
 fn titled_thematic_break_needs_three_or_more_closing_dashes() {
-    assert!(parse_document("---[ Title ]--\n").is_err());
+    assert!(parse_file("---[ Title ]--\n").is_err());
 }
 
 #[test]
 fn titled_thematic_break_rejects_trailing_junk() {
-    assert!(parse_document("---[ Title ]--- stray text\n").is_err());
+    assert!(parse_file("---[ Title ]--- stray text\n").is_err());
 }
 
 #[test]
@@ -59,8 +59,8 @@ fn a_dash_run_not_followed_by_a_bracket_is_plain_text() {
     // `---<embed>---` doesn't commit to the titled form (no `[` right
     // after the dashes) and isn't a plain break either (trailing
     // content isn't just whitespace) -- it's ordinary paragraph text.
-    let doc = parse_document("---@embed---\n").unwrap();
-    match &doc.blocks[0] {
+    let doc = parse_file("---@embed---\n").unwrap();
+    match &doc.body[0] {
         Block::Paragraph(p) => {
             assert_eq!(&p.content, &vec![Inline::Text("---@embed---".into())]);
         }

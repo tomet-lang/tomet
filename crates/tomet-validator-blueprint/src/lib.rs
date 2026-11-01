@@ -4,11 +4,11 @@
 //! `:rule` constraints) from blueprint documents (`::kind(blueprint)`), and validates
 //! target documents for conformance.
 
-use tomet_ast::{Block, Connect, Document, ElementView, Inline, Section, Value};
+use tomet_ast::{Block, Connect, ElementView, File, Inline, Section, Value};
 use tomet_span::Span;
 use tomet_semantics::DeclKind;
 use tomet_semantics::{Bindings, ElementKind, classify_declaration_lenient, classify_std_lenient};
-use tomet_tree::{ValueExt, for_each_top_level_declaration, for_each_top_level_element};
+use tomet_tree::{ValueExt, for_each_top_level_element};
 use tomet_validator_core::Diagnostic;
 use tomet_validator_rule::{RuleArgs, check_descendants_against_rule, decode_rule_args};
 
@@ -32,13 +32,13 @@ pub struct RequiredSection {
 }
 
 /// Extracts the [`BlueprintSchema`] requirements from a blueprint document.
-pub fn extract_blueprint_schema(blueprint: &Document) -> Option<BlueprintSchema> {
+pub fn extract_blueprint_schema(blueprint: &File) -> Option<BlueprintSchema> {
     let mut target_kind = "unknown".to_string();
     let mut required_meta_keys = Vec::new();
     let mut required_sections = Vec::new();
     let mut found_blueprint = false;
 
-    for_each_top_level_declaration(blueprint, |declaration| {
+    for declaration in &blueprint.header {
         let span = declaration.span;
         match classify_declaration_lenient(declaration) {
             ElementKind::Declaration(DeclKind::Blueprint) => {
@@ -76,7 +76,7 @@ pub fn extract_blueprint_schema(blueprint: &Document) -> Option<BlueprintSchema>
             }
             _ => {}
         }
-    });
+    }
     for_each_top_level_element(blueprint, |el| {
         let view = el.as_view();
         if classify_std_lenient(view) == ElementKind::Heading {
@@ -94,7 +94,7 @@ pub fn extract_blueprint_schema(blueprint: &Document) -> Option<BlueprintSchema>
         }
     });
 
-    walk_blueprint_sections(&blueprint.blocks, &mut required_sections);
+    walk_blueprint_sections(&blueprint.body, &mut required_sections);
 
     if found_blueprint {
         Some(BlueprintSchema {
@@ -108,14 +108,14 @@ pub fn extract_blueprint_schema(blueprint: &Document) -> Option<BlueprintSchema>
 }
 
 /// Validates `doc` against `blueprint` using standard bindings.
-pub fn validate_against_blueprint(doc: &Document, blueprint: &Document) -> Vec<Diagnostic> {
+pub fn validate_against_blueprint(doc: &File, blueprint: &File) -> Vec<Diagnostic> {
     validate_against_blueprint_with(doc, blueprint, &Bindings::default())
 }
 
 /// Validates `doc` against `blueprint` with explicit vocabulary `bindings`.
 pub fn validate_against_blueprint_with(
-    doc: &Document,
-    blueprint: &Document,
+    doc: &File,
+    blueprint: &File,
     bindings: &Bindings,
 ) -> Vec<Diagnostic> {
     let Some(schema) = extract_blueprint_schema(blueprint) else {
@@ -126,7 +126,7 @@ pub fn validate_against_blueprint_with(
 
 /// Validates `doc` against an extracted [`BlueprintSchema`].
 pub fn validate_against_schema(
-    doc: &Document,
+    doc: &File,
     schema: &BlueprintSchema,
     bindings: &Bindings,
 ) -> Vec<Diagnostic> {
@@ -137,7 +137,7 @@ pub fn validate_against_schema(
     let mut doc_meta_keys = Vec::new();
     let mut doc_meta_span = doc_span;
 
-    for_each_top_level_declaration(doc, |declaration| {
+    for declaration in &doc.header {
         if classify_declaration_lenient(declaration) == ElementKind::Declaration(DeclKind::Id) {
             doc_meta_keys.push("id".to_string());
         } else if classify_declaration_lenient(declaration)
@@ -162,7 +162,7 @@ pub fn validate_against_schema(
                 }
             }
         }
-    });
+    }
 
     for (req_key, _) in &schema.required_meta_keys {
         if !doc_meta_keys.contains(req_key) {
@@ -176,7 +176,7 @@ pub fn validate_against_schema(
 
     // 2. Verify required sections and apply section-level rules
     let mut doc_sections: Vec<&Section> = Vec::new();
-    collect_doc_sections(&doc.blocks, &mut doc_sections);
+    collect_doc_sections(&doc.body, &mut doc_sections);
 
     for req_sec in &schema.required_sections {
         let matching_sec = doc_sections.iter().find(|sec| {
@@ -294,13 +294,13 @@ fn collect_doc_sections<'a>(blocks: &'a [Block], doc_sections: &mut Vec<&'a Sect
 mod tests {
     use super::*;
 
-    fn parse(src: &str) -> Document {
-        tomet_ast_parser::parse_document(src).unwrap()
+    fn parse(src: &str) -> File {
+        tomet_ast_parser::parse_file(src).unwrap()
     }
 
     #[test]
     fn a_plain_kind_document_is_not_a_blueprint() {
-        let doc = tomet_ast_parser::parse_document(
+        let doc = tomet_ast_parser::parse_file(
             "::kind(daily-note)\n::id(doc-1)\n\n=[ Plan ] {id: plan}\n",
         )
         .unwrap();
@@ -312,7 +312,7 @@ mod tests {
 
     #[test]
     fn a_blueprint_still_extracts_its_schema() {
-        let doc = tomet_ast_parser::parse_document(
+        let doc = tomet_ast_parser::parse_file(
             "::kind(blueprint)\n::blueprint(daily-note)\n\n=[ Plan ] {id: plan}\n",
         )
         .unwrap();

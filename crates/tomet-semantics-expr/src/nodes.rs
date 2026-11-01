@@ -1,6 +1,6 @@
 //! Documents, directories and the nodes inside documents.
 
-use tomet_ast::{Block, Connect, Document, Group, Value};
+use tomet_ast::{Block, Connect, File, Group, Value};
 
 use super::args::Args;
 use super::context::EvalContext;
@@ -9,7 +9,7 @@ use super::methods::index_into;
 use super::value::{DirRef, DocRef, EvalValue, Node};
 
 /// The document behind a reference.
-pub(crate) fn load(doc: &DocRef, cx: &EvalContext) -> Result<std::sync::Arc<Document>, EvalError> {
+pub(crate) fn load(doc: &DocRef, cx: &EvalContext) -> Result<std::sync::Arc<File>, EvalError> {
     cx.resolver
         .document(doc)
         .map_err(|why| EvalError::Unresolved(format!("document `{}`: {why}", doc.0)))
@@ -63,7 +63,7 @@ fn directory_docs(
 
 /// The node with unique id `id`: an element, a declaration, a section, a list or a list item,
 /// wherever it sits in the document, in a `:connect` too.
-pub(crate) fn find_node(doc: &Document, id: &str) -> Option<Node> {
+pub(crate) fn find_node(doc: &File, id: &str) -> Option<Node> {
     let found = tomet_tree::walk(doc, &mut |node, _| {
         if node.id().is_some_and(|i| i.0 == id)
             && let Some(found) = expr_node(node)
@@ -89,9 +89,7 @@ fn expr_node(node: tomet_tree::Node<'_>) -> Option<Node> {
     }
     match node {
         tomet_tree::Node::Block(Block::Section(s)) => Some(Node::Section(Box::new(s.clone()))),
-        tomet_tree::Node::Block(Block::Declaration(d)) => {
-            Some(Node::Declaration(Box::new(d.clone())))
-        }
+        tomet_tree::Node::Declaration(d) => Some(Node::Declaration(Box::new(d.clone()))),
         tomet_tree::Node::Item(item) => Some(Node::Item(Box::new(item.clone()))),
         _ => None,
     }
@@ -116,7 +114,7 @@ pub(crate) fn root_item(
 ) -> Result<EvalValue, EvalError> {
     let document = load(doc, cx)?;
     let blocks: Vec<EvalValue> = document
-        .blocks
+        .body
         .iter()
         .map(|b| block_value(doc, b))
         .collect();
@@ -128,10 +126,6 @@ fn block_value(doc: &DocRef, block: &Block) -> EvalValue {
         Block::Element(el) => EvalValue::Node {
             doc: doc.clone(),
             node: Box::new(Node::Element(Box::new(el.clone()))),
-        },
-        Block::Declaration(declaration) => EvalValue::Node {
-            doc: doc.clone(),
-            node: Box::new(Node::Declaration(Box::new(declaration.clone()))),
         },
         Block::Section(sec) => EvalValue::Node {
             doc: doc.clone(),

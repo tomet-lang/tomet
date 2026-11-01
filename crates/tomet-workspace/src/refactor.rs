@@ -3,12 +3,12 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use tomet_ast::Document;
+use tomet_ast::File;
 use tomet_config::PrinterConfig;
 use tomet_formatter::format_source;
 use tomet_indexer::{collect_tm_files_with_config, is_excluded_by_config};
 use tomet_load_config::find_config_file;
-use tomet_ast_parser::parse_document;
+use tomet_ast_parser::parse_file;
 use tomet_printer::document_to_tm_with_config;
 use tomet_transform::{
     MacroSet, promote_meta_id_to_id, promote_meta_type_to_kind, transform_link_targets_with_macros,
@@ -42,9 +42,9 @@ impl Default for RefactorOptions {
     }
 }
 
-/// Applies configured refactoring transformations to a parsed [`Document`].
-pub fn refactor_document(
-    doc: &mut Document,
+/// Applies configured refactoring transformations to a parsed [`File`].
+pub fn refactor_file(
+    doc: &mut File,
     config: &PrinterConfig,
     options: &RefactorOptions,
 ) -> usize {
@@ -73,8 +73,8 @@ pub fn refactor_document(
 
 /// Refactors source text, returning the transformed and formatted text alongside the changes count.
 ///
-/// **Lossy: this drops comments.** It parses to a `Document` and prints
-/// the whole document back, and `tomet_ast` has no comment node at all --
+/// **Lossy: this drops comments.** It parses to a `File` and prints
+/// the whole file back, and `tomet_ast` has no comment node at all --
 /// `//` and `/* */` exist in the source text and nowhere in the tree, so
 /// anything that round-trips through the AST loses them. Measured, not
 /// assumed: a file carrying `::meta{ type: note }` and a `//` line comes
@@ -90,8 +90,8 @@ pub fn refactor_source(
     config: &PrinterConfig,
     options: &RefactorOptions,
 ) -> anyhow::Result<(String, usize)> {
-    let mut doc = parse_document(src).map_err(|e| anyhow::anyhow!("parse error: {e}"))?;
-    let changes = refactor_document(&mut doc, config, options);
+    let mut doc = parse_file(src).map_err(|e| anyhow::anyhow!("parse error: {e}"))?;
+    let changes = refactor_file(&mut doc, config, options);
 
     let rendered = document_to_tm_with_config(&doc, config);
     let formatted = format_source(&rendered);

@@ -24,10 +24,10 @@ use std::fmt::Write as _;
 use std::path::PathBuf;
 
 use tomet_ast::{
-    Bare, Block, Connect, Data, Document, ElementView, Entry, Group, Hole, Inline,
+    Bare, Block, Connect, Data, Declaration, ElementView, Entry, File, Group, Hole, Inline,
     InterpExpr, Interpolation, List, ListItem, Placement, Value,
 };
-use tomet_ast_parser::parse_document;
+use tomet_ast_parser::parse_file;
 
 /// One documented construct: a heading it files under, a one-line note in
 /// Japanese, and the source to run through the parser.
@@ -599,9 +599,9 @@ fn emit_case(out: &mut String, case: &Case, rejected_section: bool) {
     }
     let _ = write!(out, "\n### {}\n\n```tmt\n{}```\n\n", case.note, case.src);
 
-    match parse_document(case.src) {
+    match parse_file(case.src) {
         Ok(doc) => {
-            let _ = write!(out, "```\n{}```\n", dump_document(&doc));
+            let _ = write!(out, "```\n{}```\n", dump_file(&doc));
             // Parsing and validating are separate on purpose: the parser
             // consults no element vocabulary, so "is this a real element"
             // is only answerable here.
@@ -621,7 +621,7 @@ fn emit_case(out: &mut String, case: &Case, rejected_section: bool) {
     // A case in the rejected half that parses anyway is worth calling
     // out: either it means something other than it looks, or it was meant
     // to be gone and is not.
-    if rejected_section && parse_document(case.src).is_ok() {
+    if rejected_section && parse_file(case.src).is_ok() {
         out.push_str("\n> **パースは通る。** 上が実際の結果。\n");
     }
 }
@@ -644,16 +644,34 @@ fn anchor(section: &str) -> String {
 // Compact AST dump
 // ---------------------------------------------------------------------
 //
-// `{:?}` on a `Document` is unreadable here: every node carries a `Span`
+// `{:?}` on a `File` is unreadable here: every node carries a `Span`
 // with three fields, which is most of the output and none of the meaning.
 // This prints the shape only.
 
-fn dump_document(doc: &Document) -> String {
+fn dump_file(file: &File) -> String {
     let mut out = String::new();
-    for block in &doc.blocks {
+    for decl in &file.header {
+        dump_declaration(&mut out, decl, 0);
+    }
+    for block in &file.body {
         dump_block(&mut out, block, 0);
     }
     out
+}
+
+fn dump_declaration(out: &mut String, declaration: &Declaration, depth: usize) {
+    indent(out, depth);
+    let _ = writeln!(out, "Declaration ::{}", declaration.name);
+    dump_groups(
+        out,
+        &declaration.data,
+        declaration.content.as_deref(),
+        depth,
+    );
+    if let Some(id) = &declaration.id {
+        indent(out, depth + 1);
+        let _ = writeln!(out, "id      {:?}", id.0);
+    }
 }
 
 fn indent(out: &mut String, depth: usize) {
@@ -673,20 +691,6 @@ fn dump_block(out: &mut String, block: &Block, depth: usize) {
         }
         Block::Element(el) => dump_element(out, el.as_view(), depth),
         Block::Interp(interp) => dump_interp(out, interp, depth),
-        Block::Declaration(declaration) => {
-            indent(out, depth);
-            let _ = writeln!(out, "Block  ::{}", declaration.name);
-            dump_groups(
-                out,
-                &declaration.data,
-                declaration.content.as_deref(),
-                depth,
-            );
-            if let Some(id) = &declaration.id {
-                indent(out, depth + 1);
-                let _ = writeln!(out, "id      {:?}", id.0);
-            }
-        }
         Block::Section(sec) => {
             indent(out, depth);
             let _ = writeln!(out, "Section level={}", sec.level);

@@ -4,7 +4,7 @@ use tomet_ast::{
     Block, BodyView, Connect, Declaration, ElementView, Entry, Group, Inline, List,
 };
 use tomet_config::{GroupOrder, PrinterConfig};
-use tomet_ast_parser::parse_document;
+use tomet_ast_parser::parse_file;
 
 /// Byte offset of the `close` matching the `open` at `open_pos` in
 /// `src` (which must be `open`), tracking nested `open`/`close` depth
@@ -89,8 +89,14 @@ struct SwapTarget {
 }
 
 fn collect_swaps(src: &str, config: &PrinterConfig, swaps: &mut Vec<SwapTarget>, limit: usize) {
-    let Ok(doc) = parse_document(src) else { return };
-    for block in &doc.blocks {
+    let Ok(doc) = parse_file(src) else { return };
+    for decl in &doc.header {
+        collect_swaps_in_declaration(decl, src, config, swaps, limit);
+        if swaps.len() >= limit {
+            return;
+        }
+    }
+    for block in &doc.body {
         collect_swaps_in_block(block, src, config, swaps, limit);
         if swaps.len() >= limit {
             break;
@@ -119,9 +125,6 @@ fn collect_swaps_in_block(
         }
         Block::Element(el) => {
             collect_swaps_in_element(el.as_view(), src, config, swaps, limit);
-        }
-        Block::Declaration(declaration) => {
-            collect_swaps_in_declaration(declaration, src, config, swaps, limit);
         }
         Block::Section(sec) => {
             for inline in &sec.title {

@@ -1,8 +1,8 @@
-//! `tomet_ast::Document` -> Typst markup source, hand-written (same
+//! `tomet_ast::File` -> Typst markup source, hand-written (same
 //! reasoning as `tomet-convert-markdown`: the output space is much
 //! smaller than the input space, so no need for a crate here).
 //!
-//! One-directional (`Document -> Typst` only, no importer) and lossy for
+//! One-directional (`File -> Typst` only, no importer) and lossy for
 //! constructs with no clean Typst equivalent:
 //! -| Heading `id`/`cssclass` attrs have no Typst markup form and are
 //!  | dropped, same as `tomet-convert-markdown`'s heading handling.

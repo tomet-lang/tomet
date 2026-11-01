@@ -2,7 +2,7 @@
 name = "tomet-lowering"
 version.workspace = true
 edition.workspace = true
-description = "Lowering the Tomet Concrete Syntax Tree (CST) into typed AST representations (Document, Value, File)."
+description = "Lowering the Tomet Concrete Syntax Tree (CST) into typed AST representations (File, Value)."
 license.workspace = true
 repository.workspace = true
 

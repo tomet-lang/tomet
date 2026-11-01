@@ -13,7 +13,7 @@ use lsp_types::{GotoDefinitionResponse, Location, Position, Range, Uri};
 use tomet_expr::{DocRef, EvalValue, Resolver};
 use tomet_load::Vault;
 
-use crate::definition::{Reference, Target, find_def_in_blocks, reference_at};
+use crate::definition::{Reference, Target, find_def_in_file, reference_at};
 use crate::position::TextPositions;
 
 /// Where the reference at `pos` in `text`, a document of `vault` at `path`,
@@ -35,7 +35,7 @@ pub(crate) fn definition(
 
     let (target_path, range) = match reference {
         Reference::Id(id) => {
-            let span = find_def_in_blocks(&doc.blocks, &id)?;
+            let span = find_def_in_file(&doc, &id)?;
             (path.to_path_buf(), positions.range(&span))
         }
         Reference::In { document, id } => {
@@ -57,7 +57,7 @@ pub(crate) fn definition(
                         Some(open) => open.clone(),
                         None => std::fs::read_to_string(&target_path).ok()?,
                     };
-                    let span = find_def_in_blocks(&target_doc.blocks, &id)?;
+                    let span = find_def_in_file(&target_doc, &id)?;
                     TextPositions::new(&target_text).range(&span)
                 }
             };

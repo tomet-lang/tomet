@@ -1,4 +1,4 @@
-//! Serializes a `tomet_ast::Document` back to `.tmt` source text
+//! Serializes a `tomet_ast::File` back to `.tmt` source text
 //! (no span info required, unlike `tomet-formatter`, which
 //! re-formats existing `.tmt` text losslessly using spans -- this crate
 //! is for documents that never had `.tmt` source to begin with, e.g.
@@ -22,11 +22,11 @@ mod tests;
 pub use element::render_element;
 pub use id::ensure_document_id_with_config;
 
-use tomet_ast::Document;
+use tomet_ast::File;
 use tomet_config::PrinterConfig;
 
-/// Serialize a [`Document`] AST into Tomet (`.tmt`) source string using document-level config or defaults.
-pub fn document_to_tm(doc: &Document) -> String {
+/// Serialize a [`File`] AST into Tomet (`.tmt`) source string using document-level config or defaults.
+pub fn document_to_tm(doc: &File) -> String {
     let config = PrinterConfig::from_doc(doc);
     document_to_tm_with_config(doc, &config)
 }
@@ -40,8 +40,8 @@ pub fn hole_to_tm(hole: &tomet_ast::Hole) -> String {
     element::render_hole(hole, &PrinterConfig::default())
 }
 
-pub fn document_to_tm_with_config(doc: &Document, config: &PrinterConfig) -> String {
+pub fn document_to_tm_with_config(doc: &File, config: &PrinterConfig) -> String {
     let mut out = String::new();
-    block::render_blocks(&doc.blocks, config, &mut out);
+    block::render_file(doc, config, &mut out);
     tomet_formatter::format_source(&out)
 }

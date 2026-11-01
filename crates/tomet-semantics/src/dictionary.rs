@@ -19,7 +19,7 @@
 
 use std::collections::BTreeMap;
 
-use tomet_ast::{Block, Document, Value};
+use tomet_ast::{Block, File, Value};
 use tomet_declaration::{DeclKind, dictionary_name};
 
 use crate::kind::{ElementKind, classify_std_lenient};
@@ -184,7 +184,7 @@ impl LoadedDictionaries {
     /// Not accepted: a document that declares no `::dictionary(name)`, and a name another dictionary
     /// already has. Only the entry is left out for an identifier used twice and for an entry that is
     /// not an `@term`. (A term written twice is a parse error: a map has no repeated key.)
-    pub fn add(&mut self, label: &str, doc: &Document) {
+    pub fn add<B>(&mut self, label: &str, doc: &File<B>) {
         let Some(found) = tomet_declaration::declarations(doc)
             .into_iter()
             .find(|found| found.kind == DeclKind::Dictionary)
@@ -313,7 +313,7 @@ mod tests {
     fn loaded(sources: &[(&str, &str)]) -> LoadedDictionaries {
         let mut loaded = LoadedDictionaries::default();
         for (label, src) in sources {
-            loaded.add(label, &tomet_ast_parser::parse_document(src).expect("parses"));
+            loaded.add(label, &tomet_ast_parser::parse_file(src).expect("parses"));
         }
         loaded
     }

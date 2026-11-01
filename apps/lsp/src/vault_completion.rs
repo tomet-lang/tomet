@@ -8,7 +8,7 @@
 //! answer from.
 
 use lsp_types::{CompletionItem, CompletionItemKind, Position, Uri};
-use tomet_ast::Document;
+use tomet_ast::File;
 use tomet_expr::{DirRef, DocRef, Resolver};
 use tomet_load::Vault;
 
@@ -211,7 +211,7 @@ fn vocabulary_elements(vault: &Vault, text: &str, pos: Position) -> Vec<Completi
 /// bracket -- and the rest of the document is what the completion is about. So
 /// when `text` does not read, the line with the cursor on it is left out and
 /// the rest is read.
-fn parse_while_typing(vault: &Vault, text: &str, pos: Position) -> Option<Document> {
+fn parse_while_typing(vault: &Vault, text: &str, pos: Position) -> Option<File> {
     if let Ok((doc, _)) = vault.parse(text) {
         return Some(doc);
     }

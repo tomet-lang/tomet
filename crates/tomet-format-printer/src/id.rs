@@ -1,17 +1,17 @@
 //! ID generation and rendering helpers.
 
-use tomet_ast::{Block, Declaration, Document, Id, Value};
+use tomet_ast::{Declaration, File, Id, Value};
 use tomet_config::PrinterConfig;
 use tomet_field_utils::{generate_id_for_field, is_valid_id_format};
 use tomet_style::quote_scalar_string;
-use tomet_tree::{DocumentExt, ValueExt, declaration_new, for_each_top_level_declaration_mut};
+use tomet_tree::{ValueExt, declaration_new};
 
 /// Ensures that a document has an `::id(...)` declaration if configured to do so.
 ///
 /// The generation is configured by the vault's `id` meta field (`type`, `force`, `overwrite`, ...).
 /// A new declaration goes after the leading `::version` / `::kind`, so the preamble reads
 /// `::kind`, `::id`, `::meta`.
-pub fn ensure_document_id_with_config(doc: &mut Document, config: &PrinterConfig) {
+pub fn ensure_document_id_with_config(doc: &mut File, config: &PrinterConfig) {
     let Some(id_cfg) = config.meta.fields.get("id") else {
         return;
     };
@@ -23,25 +23,25 @@ pub fn ensure_document_id_with_config(doc: &mut Document, config: &PrinterConfig
     let overwrite = id_cfg.overwrite.unwrap_or(false);
 
     let mut found = false;
-    for_each_top_level_declaration_mut(doc, |declaration| {
+    for declaration in &mut doc.header {
         if found || !declaration.name.is_bare_named("id") {
-            return;
+            continue;
         }
         found = true;
         if overwrite && !declared_id(declaration).is_some_and(|id| is_valid_id_format(id, id_cfg)) {
             declaration.data.args = Some(Value::String(generate_id_for_field(id_cfg)));
         }
-    });
+    }
 
     if !found && (force || overwrite) {
         let at = ["kind", "version"]
             .iter()
-            .filter_map(|name| doc.find_declaration_block_index(|d| d.name.is_bare_named(name)))
+            .filter_map(|name| doc.header.iter().position(|d| d.name.is_bare_named(name)))
             .max()
             .map_or(0, |index| index + 1);
         let mut declaration = declaration_new("id");
         declaration.data.args = Some(Value::String(generate_id_for_field(id_cfg)));
-        doc.insert_block(at, Block::Declaration(declaration));
+        doc.header.insert(at, declaration);
     }
 }
 

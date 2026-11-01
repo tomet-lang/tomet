@@ -22,7 +22,7 @@ use crate::error::{Error, Result};
 use crate::inline::{DELIMITERS, extend_merging, push_soft_break, push_text, trim_edges};
 use crate::value::err;
 use tomet_ast::{
-    Block, Connect, Data, Declaration, Document, Element, Inline, List, Name, Paragraph, Placement,
+    Block, Connect, Data, Declaration, Element, File, Inline, List, Name, Paragraph, Placement,
     RawText, Section, Value,
 };
 use tomet_cst::{
@@ -43,11 +43,38 @@ fn unsupported(what: impl std::fmt::Display) -> Error {
     }
 }
 
-/// Reads the CST root as an AST [`Document`].
-pub fn lower_document(root: &SyntaxNode) -> Result<Document> {
+/// Reads the CST root as an AST [`File`].
+pub fn lower_file(root: &SyntaxNode) -> Result<File> {
     reject_too_deep(root)?;
-    let blocks = lower_blocks(root)?;
-    Ok(Document::new(
+    let mut header = Vec::new();
+    let mut blocks = Vec::new();
+    let mut seen_content = false;
+
+    for child in root.children_with_tokens() {
+        match child {
+            // Trivia, and the `;` that only breaks a block, leave nothing behind.
+            SyntaxElement::Token(t) if t.kind().is_trivia() || t.kind() == K::SEMI => {}
+            SyntaxElement::Token(t) => return Err(unsupported(format!("token {:?}", t.kind()))),
+            SyntaxElement::Node(n) if n.kind() == K::ERROR => return Err(lower_error(&n)),
+            SyntaxElement::Node(n) => {
+                if is_declaration(&n) {
+                    if seen_content {
+                        return Err(err(
+                            range_of(&n).0,
+                            "a declaration belongs at the top of the file",
+                        ));
+                    }
+                    header.push(lower_declaration(&n)?);
+                } else if let Some(block) = lower_block(&n)? {
+                    seen_content = true;
+                    blocks.push(block);
+                }
+            }
+        }
+    }
+
+    Ok(File::new(
+        header,
         blocks,
         Span::new(0, usize::from(root.text_range().len())),
     ))
@@ -602,28 +629,35 @@ fn name_of(node: &SyntaxNode) -> Result<Name> {
     Ok(Name { namespace, name })
 }
 
-/// A block element: `@name` and the groups that follow it, or `::name` and
-/// its groups, a declaration about the document.
+/// Whether `node` is a `::name(...)` block declaration.
+pub fn is_declaration(node: &SyntaxNode) -> bool {
+    node.kind() == K::BLOCK_ELEMENT
+        && node
+            .children()
+            .find(|n| n.kind() == K::SIGIL)
+            .and_then(|n| n.first_token())
+            .is_some_and(|t| t.kind() == K::COLON)
+}
+
+/// A block element: `@name` and the groups that follow it.
 fn lower_block_element(node: &SyntaxNode) -> Result<Block> {
     if let Some(slot) = slot_of(node) {
         let mut hole = lower_slot(&slot)?;
         hole.placement = Placement::Block;
         return Ok(Block::Hole(hole));
     }
-    let sigil = node
-        .children()
-        .find(|n| n.kind() == K::SIGIL)
-        .and_then(|n| n.first_token())
-        .map(|t| t.kind());
-    if sigil == Some(K::COLON) {
-        return lower_declaration(node).map(Block::Declaration);
+    if is_declaration(node) {
+        return Err(err(
+            range_of(node).0,
+            "a declaration belongs at the top of the file",
+        ));
     }
     let element = lower_element(node)?.with_placement(Placement::Block);
     Ok(Block::Element(element))
 }
 
 /// `::name(args){value}[content]#(id)`.
-fn lower_declaration(node: &SyntaxNode) -> Result<Declaration> {
+pub fn lower_declaration(node: &SyntaxNode) -> Result<Declaration> {
     let sigil = node
         .children()
         .find(|n| n.kind() == K::SIGIL)
@@ -842,7 +876,6 @@ fn title_from_content(at: usize, mut blocks: Vec<Block>) -> Result<Vec<Inline>> 
             }
             Some(Block::Section(_)) => Err(only("a nested section")),
             Some(Block::List(_)) => Err(only("a list")),
-            Some(Block::Declaration(_)) => Err(only("a `::` declaration")),
             None => unreachable!(),
         },
         _ => Err(err(

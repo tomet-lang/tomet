@@ -32,7 +32,7 @@ fn every_fixture_parses_except_the_known_exceptions() {
 
     for rel in corpus() {
         let src = read_fixture(&rel);
-        let parsed = tomet_ast_parser::parse_document(&src);
+        let parsed = tomet_ast_parser::parse_file(&src);
         match (parsed, is_known_unparseable(&rel)) {
             (Err(e), false) => unexpected_failures.push(format!("{}: {e}", rel.display())),
             (Ok(_), true) => unexpected_successes.push(rel.display().to_string()),

@@ -1,4 +1,4 @@
-//! `tomet_ast::Document` <-> Pandoc's AST, over Pandoc's own JSON
+//! `tomet_ast::File` <-> Pandoc's AST, over Pandoc's own JSON
 //! encoding.
 //!
 //! Speaking that JSON is all it takes to reach every format Pandoc reads

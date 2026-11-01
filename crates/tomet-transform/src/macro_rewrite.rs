@@ -1,7 +1,7 @@
 //! Reverse URL-to-macro pattern matching and rewriting.
 
 use std::collections::HashMap;
-use tomet_ast::{Document, Value};
+use tomet_ast::{File, Value};
 use tomet_semantics::{ElementKind, classify_std_lenient};
 use tomet_tree::{DataExt, transform_elements};
 
@@ -137,7 +137,7 @@ impl MacroSet {
 }
 
 /// Transforms link targets in `doc` matching any macro in `macro_set` into `$macro(...)` invocations.
-pub fn transform_link_targets_with_macros(doc: &mut Document, macro_set: &MacroSet) -> usize {
+pub fn transform_link_targets_with_macros(doc: &mut File, macro_set: &MacroSet) -> usize {
     transform_elements(
         doc,
         |el| {

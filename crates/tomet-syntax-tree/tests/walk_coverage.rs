@@ -5,7 +5,7 @@
 //! below are exact: a walker that starts to miss a position, or to reach a new
 //! one, fails here. Where two walkers differ, the comment says which is meant.
 
-use tomet_ast::{Block, Document, Entry, Inline, Value};
+use tomet_ast::{Block, Entry, File, Inline, Value};
 use tomet_tree::*;
 
 const SRC: &str = "\
@@ -31,8 +31,8 @@ text <?(h2)>[@s_hole_inline_content()]
   - sub @s_sub()#(i_in_sub)
 ";
 
-fn doc() -> Document {
-    tomet_ast_parser::parse_document(SRC).expect("the walk document parses")
+fn doc() -> File {
+    tomet_ast_parser::parse_file(SRC).expect("the walk document parses")
 }
 
 fn sentinel(el: &tomet_ast::Element) -> Option<String> {
@@ -195,7 +195,7 @@ fn the_top_level_walkers_see_only_the_top() {
         ["s_para_inline", "s_block", "s_host"]
     );
     assert_eq!(
-        names(|v| for_each_top_level_declaration(&doc, |d| v.push(d.name.name.clone()))),
+        names(|v| v.extend(doc.header.iter().map(|d| d.name.name.clone()))),
         ["meta", "kind"]
     );
 }

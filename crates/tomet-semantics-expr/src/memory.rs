@@ -3,7 +3,7 @@
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
-use tomet_ast::{Block, Document, Value};
+use tomet_ast::{Block, File, Value};
 
 use super::context::{PreparedBlocks, Resolver};
 use super::value::{DirRef, DocRef, EvalValue};
@@ -15,7 +15,7 @@ use super::value::{DirRef, DocRef, EvalValue};
 /// resolver, which knows the settings, is what gives the typed view.
 #[derive(Default)]
 pub struct MemoryResolver {
-    docs: BTreeMap<String, Arc<Document>>,
+    docs: BTreeMap<String, Arc<File>>,
 }
 
 impl MemoryResolver {
@@ -24,21 +24,21 @@ impl MemoryResolver {
     }
 
     /// Adds an already parsed document at `path`.
-    pub fn with_document(mut self, path: &str, doc: Arc<Document>) -> Self {
+    pub fn with_document(mut self, path: &str, doc: Arc<File>) -> Self {
         self.docs.insert(path.to_string(), doc);
         self
     }
 
     /// Adds the document read from `source` at `path`.
     pub fn with_source(mut self, path: &str, source: &str) -> Result<Self, tomet_ast_parser::Error> {
-        let doc = tomet_ast_parser::parse_document(source)?;
+        let doc = tomet_ast_parser::parse_file(source)?;
         self.docs.insert(path.to_string(), Arc::new(doc));
         Ok(self)
     }
 }
 
 impl Resolver for MemoryResolver {
-    fn document(&self, doc: &DocRef) -> Result<Arc<Document>, String> {
+    fn document(&self, doc: &DocRef) -> Result<Arc<File>, String> {
         self.docs
             .get(&doc.0)
             .cloned()

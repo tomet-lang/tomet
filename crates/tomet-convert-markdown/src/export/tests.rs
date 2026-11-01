@@ -1,5 +1,7 @@
 use super::*;
-use tomet_ast::{Data, Declaration, Element, Group, Name, Paragraph, Placement, RawText, Text};
+use tomet_ast::{
+    Data, Declaration, Element, File, Group, Name, Paragraph, Placement, RawText, Text,
+};
 use tomet_span::Span;
 
 /// Wraps a flat inline sequence as `Element.content` (`Vec<Block>`
@@ -8,13 +10,21 @@ fn wrap_content(inlines: Vec<Inline>) -> Vec<Block> {
     vec![Block::Paragraph(Paragraph::new(inlines, Span::dummy()))]
 }
 
+fn doc_from_blocks(blocks: Vec<Block>) -> File {
+    File {
+        header: Vec::new(),
+        body: blocks,
+        span: Span::dummy(),
+    }
+}
+
 #[test]
 fn a_backtick_span_survives_export_unescaped() {
     // Tomet keeps `` `x` `` as literal text (the parser only shields
     // the run from further markup), so it reaches the writer looking
     // like prose. Escaping it turned every `` `spec/` `` in the docs
     // into a literal ``\`spec/\``.
-    let doc = tomet_ast_parser::parse_document("地の文に `code` と `spec/` があります。\n").unwrap();
+    let doc = tomet_ast_parser::parse_file("地の文に `code` と `spec/` があります。\n").unwrap();
     assert_eq!(
         to_markdown(&doc).trim(),
         "地の文に `code` と `spec/` があります。"
@@ -23,7 +33,7 @@ fn a_backtick_span_survives_export_unescaped() {
 
 #[test]
 fn ruby_exports_as_raw_html() {
-    let doc = tomet_ast_parser::parse_document("a @ruby[漢字](rt:\"かんじ\") b\n").unwrap();
+    let doc = tomet_ast_parser::parse_file("a @ruby[漢字](rt:\"かんじ\") b\n").unwrap();
     assert_eq!(
         to_markdown(&doc).trim(),
         "a <ruby>漢字<rt>かんじ</rt></ruby> b"
@@ -34,14 +44,14 @@ fn ruby_exports_as_raw_html() {
 fn an_unpaired_backtick_is_still_escaped() {
     // No closing backtick on the line -- not a span, so it stays an
     // escaped literal, exactly as before.
-    let doc = tomet_ast_parser::parse_document("値段は 100` です\n").unwrap();
+    let doc = tomet_ast_parser::parse_file("値段は 100` です\n").unwrap();
     assert_eq!(to_markdown(&doc).trim(), "値段は 100\\` です");
 }
 
 #[test]
 fn a_backtick_span_is_not_escaped_inside_a_table_cell() {
     let doc =
-        tomet_ast_parser::parse_document("@table()[\n[ Dir ][ Lang ]\n[ `spec/` ][ 日本語 ]\n]{}\n")
+        tomet_ast_parser::parse_file("@table()[\n[ Dir ][ Lang ]\n[ `spec/` ][ 日本語 ]\n]{}\n")
             .unwrap();
     assert!(
         to_markdown(&doc).contains("| `spec/` |"),
@@ -64,7 +74,7 @@ fn directives_have_no_markdown_output() {
         "::use(deck)\n",
         "::meta{type: note}\n",
     ] {
-        let doc = tomet_ast_parser::parse_document(src).unwrap();
+        let doc = tomet_ast_parser::parse_file(src).unwrap();
         assert_eq!(to_markdown(&doc).trim(), "", "for {src:?}");
     }
 }
@@ -85,16 +95,16 @@ fn adjacent_meta_blocks_have_no_visible_output() {
         };
         declaration
     }
-    let doc = Document {
-        blocks: vec![
-            Block::Declaration(meta_declaration("json")),
-            Block::Declaration(meta_declaration("yaml")),
-            Block::Declaration(meta_declaration("toml")),
-            Block::Element(heading_element(
-                1,
-                vec![Inline::Text(Text::new("next", Span::dummy()))],
-            )),
+    let doc = File {
+        header: vec![
+            meta_declaration("json"),
+            meta_declaration("yaml"),
+            meta_declaration("toml"),
         ],
+        body: vec![Block::Element(heading_element(
+            1,
+            vec![Inline::Text(Text::new("next", Span::dummy()))],
+        ))],
         span: Span::dummy(),
     };
     assert_eq!(to_markdown(&doc), "# next\n\n");
@@ -123,19 +133,16 @@ fn heading_element(level: i64, content: Vec<Inline>) -> Element {
 
 #[test]
 fn heading_and_paragraph() {
-    let doc = Document {
-        blocks: vec![
-            Block::Element(heading_element(
-                2,
-                vec![Inline::Text(Text::new("Title", Span::dummy()))],
-            )),
-            Block::Paragraph(Paragraph::new(
-                vec![Inline::Text(Text::new("Hello.", Span::dummy()))],
-                Span::dummy(),
-            )),
-        ],
-        span: Span::dummy(),
-    };
+    let doc = doc_from_blocks(vec![
+        Block::Element(heading_element(
+            2,
+            vec![Inline::Text(Text::new("Title", Span::dummy()))],
+        )),
+        Block::Paragraph(Paragraph::new(
+            vec![Inline::Text(Text::new("Hello.", Span::dummy()))],
+            Span::dummy(),
+        )),
+    ]);
     assert_eq!(to_markdown(&doc), "## Title\n\nHello.\n\n");
 }
 
@@ -147,111 +154,102 @@ fn nested_inline_heading_does_not_export_as_bare_hash_line() {
     // generic/custom rendering instead (raw HTML passthrough, per this
     // module's documented fallback for constructs with no CommonMark
     // form).
-    let doc = Document {
-        blocks: vec![Block::Paragraph(Paragraph::new(
-            vec![
-                Inline::Text(Text::new("before ", Span::dummy())),
-                Inline::Element(heading_element(
-                    2,
-                    vec![Inline::Text(Text::new("Nested", Span::dummy()))],
-                )),
-                Inline::Text(Text::new(" after", Span::dummy())),
-            ],
-            Span::dummy(),
-        ))],
-        span: Span::dummy(),
-    };
+    let doc = doc_from_blocks(vec![Block::Paragraph(Paragraph::new(
+        vec![
+            Inline::Text(Text::new("before ", Span::dummy())),
+            Inline::Element(heading_element(
+                2,
+                vec![Inline::Text(Text::new("Nested", Span::dummy()))],
+            )),
+            Inline::Text(Text::new(" after", Span::dummy())),
+        ],
+        Span::dummy(),
+    ))]);
     let md = to_markdown(&doc);
     assert!(!md.contains("## Nested"), "got: {md:?}");
 }
 
 #[test]
 fn bullet_and_ordered_list() {
-    let doc = Document {
-        blocks: vec![Block::List(tomet_tree::list(
-            true,
-            vec![
-                tomet_tree::list_item(
-                    None,
-                    wrap_content(vec![Inline::Text(Text::new("one", Span::dummy()))]),
-                    None,
-                    None,
-                    None,
-                    Vec::new(),
-                    None,
-                    Span::dummy(),
-                ),
-                tomet_tree::list_item(
-                    None,
-                    wrap_content(vec![Inline::Text(Text::new("two", Span::dummy()))]),
-                    None,
-                    None,
-                    None,
-                    Vec::new(),
-                    None,
-                    Span::dummy(),
-                ),
-            ],
-            Span::dummy(),
-        ))],
-        span: Span::dummy(),
-    };
+    let doc = doc_from_blocks(vec![Block::List(tomet_tree::list(
+        true,
+        vec![
+            tomet_tree::list_item(
+                None,
+                wrap_content(vec![Inline::Text(Text::new("one", Span::dummy()))]),
+                None,
+                None,
+                None,
+                Vec::new(),
+                None,
+                Span::dummy(),
+            ),
+            tomet_tree::list_item(
+                None,
+                wrap_content(vec![Inline::Text(Text::new("two", Span::dummy()))]),
+                None,
+                None,
+                None,
+                Vec::new(),
+                None,
+                Span::dummy(),
+            ),
+        ],
+        Span::dummy(),
+    ))]);
     assert_eq!(to_markdown(&doc), "1. one\n2. two\n\n");
 }
 
 #[test]
 fn emphasis_and_strong() {
-    let doc = Document {
-        blocks: vec![Block::Paragraph(Paragraph::new(
-            vec![
-                Inline::Element(Element {
-                    name: Name::bare("em"),
+    let doc = doc_from_blocks(vec![Block::Paragraph(Paragraph::new(
+        vec![
+            Inline::Element(Element {
+                name: Name::bare("em"),
 
-                    placement: Placement::Inline,
+                placement: Placement::Inline,
 
-                    data: Data {
-                        args: None,
-                        value: None,
-                    },
+                data: Data {
+                    args: None,
+                    value: None,
+                },
 
-                    content: Some(wrap_content(vec![Inline::Text(Text::new(
-                        "a",
-                        Span::dummy(),
-                    ))])),
+                content: Some(wrap_content(vec![Inline::Text(Text::new(
+                    "a",
+                    Span::dummy(),
+                ))])),
 
-                    id: None,
+                id: None,
 
-                    connects: Vec::new(),
+                connects: Vec::new(),
 
-                    span: Span::dummy(),
-                }),
-                Inline::Text(Text::new(" ", Span::dummy())),
-                Inline::Element(Element {
-                    name: Name::bare("strong"),
+                span: Span::dummy(),
+            }),
+            Inline::Text(Text::new(" ", Span::dummy())),
+            Inline::Element(Element {
+                name: Name::bare("strong"),
 
-                    placement: Placement::Inline,
+                placement: Placement::Inline,
 
-                    data: Data {
-                        args: None,
-                        value: None,
-                    },
+                data: Data {
+                    args: None,
+                    value: None,
+                },
 
-                    content: Some(wrap_content(vec![Inline::Text(Text::new(
-                        "b",
-                        Span::dummy(),
-                    ))])),
+                content: Some(wrap_content(vec![Inline::Text(Text::new(
+                    "b",
+                    Span::dummy(),
+                ))])),
 
-                    id: None,
+                id: None,
 
-                    connects: Vec::new(),
+                connects: Vec::new(),
 
-                    span: Span::dummy(),
-                }),
-            ],
-            Span::dummy(),
-        ))],
-        span: Span::dummy(),
-    };
+                span: Span::dummy(),
+            }),
+        ],
+        Span::dummy(),
+    ))]);
     assert_eq!(to_markdown(&doc), "*a* **b**\n\n");
 }
 
@@ -281,13 +279,10 @@ fn link_round_trips() {
 
         span: Span::dummy(),
     };
-    let doc = Document {
-        blocks: vec![Block::Paragraph(Paragraph::new(
-            vec![Inline::Element(el)],
-            Span::dummy(),
-        ))],
-        span: Span::dummy(),
-    };
+    let doc = doc_from_blocks(vec![Block::Paragraph(Paragraph::new(
+        vec![Inline::Element(el)],
+        Span::dummy(),
+    ))]);
     assert_eq!(to_markdown(&doc), "[Wiki](https://example.com)\n\n");
 }
 
@@ -317,13 +312,10 @@ fn embed_becomes_image() {
 
         span: Span::dummy(),
     };
-    let doc = Document {
-        blocks: vec![Block::Paragraph(Paragraph::new(
-            vec![Inline::Element(el)],
-            Span::dummy(),
-        ))],
-        span: Span::dummy(),
-    };
+    let doc = doc_from_blocks(vec![Block::Paragraph(Paragraph::new(
+        vec![Inline::Element(el)],
+        Span::dummy(),
+    ))]);
     assert_eq!(to_markdown(&doc), "![a cat](pic.png)\n\n");
 }
 
@@ -353,10 +345,7 @@ fn raw_block_uses_fence_and_lang() {
 
         span: Span::dummy(),
     };
-    let doc = Document {
-        blocks: vec![Block::Element(el)],
-        span: Span::dummy(),
-    };
+    let doc = doc_from_blocks(vec![Block::Element(el)]);
     assert_eq!(to_markdown(&doc), "```rust\nfn main() {}\n```\n\n");
 }
 
@@ -383,26 +372,20 @@ fn raw_inline_uses_backticks() {
 
         span: Span::dummy(),
     };
-    let doc = Document {
-        blocks: vec![Block::Paragraph(Paragraph::new(
-            vec![
-                Inline::Text(Text::new("call ", Span::dummy())),
-                Inline::Element(el),
-                Inline::Text(Text::new(" now", Span::dummy())),
-            ],
-            Span::dummy(),
-        ))],
-        span: Span::dummy(),
-    };
+    let doc = doc_from_blocks(vec![Block::Paragraph(Paragraph::new(
+        vec![
+            Inline::Text(Text::new("call ", Span::dummy())),
+            Inline::Element(el),
+            Inline::Text(Text::new(" now", Span::dummy())),
+        ],
+        Span::dummy(),
+    ))]);
     assert_eq!(to_markdown(&doc), "call `foo()` now\n\n");
 }
 
 #[test]
 fn thematic_break() {
-    let doc = Document {
-        blocks: vec![Block::Element(tomet_tree::element_new(Name::bare("hr")))],
-        span: Span::dummy(),
-    };
+    let doc = doc_from_blocks(vec![Block::Element(tomet_tree::element_new(Name::bare("hr")))]);
     assert_eq!(to_markdown(&doc), "---\n\n");
 }
 
@@ -413,8 +396,9 @@ fn a_declaration_exports_as_nothing() {
         "type".to_string(),
         Value::String("commonmark".to_string()),
     )]));
-    let doc = Document {
-        blocks: vec![Block::Declaration(declaration)],
+    let doc = File {
+        header: vec![declaration],
+        body: Vec::new(),
         span: Span::dummy(),
     };
     assert_eq!(to_markdown(&doc), "");
@@ -431,10 +415,7 @@ fn titled_thematic_break_is_not_a_setext_heading() {
         "Title",
         Span::dummy(),
     ))]));
-    let doc = Document {
-        blocks: vec![Block::Element(el)],
-        span: Span::dummy(),
-    };
+    let doc = doc_from_blocks(vec![Block::Element(el)]);
     assert_eq!(to_markdown(&doc), "**Title**\n\n---\n\n");
 }
 
@@ -456,23 +437,20 @@ fn wikilink_exports_to_markdown() {
         Span::dummy(),
     ))]));
 
-    let doc = Document {
-        blocks: vec![Block::Paragraph(Paragraph::new(
-            vec![
-                Inline::Element(el1),
-                Inline::Text(Text::new(" and ", Span::dummy())),
-                Inline::Element(el2),
-            ],
-            Span::dummy(),
-        ))],
-        span: Span::dummy(),
-    };
+    let doc = doc_from_blocks(vec![Block::Paragraph(Paragraph::new(
+        vec![
+            Inline::Element(el1),
+            Inline::Text(Text::new(" and ", Span::dummy())),
+            Inline::Element(el2),
+        ],
+        Span::dummy(),
+    ))]);
     assert_eq!(to_markdown(&doc), "[[name]] and [[name|display]]\n\n");
 }
 
 /// A paragraph holding one `@link(target)`, with `label` as its content when
 /// there is one.
-fn link_doc(target: &str, label: Option<&str>) -> Document {
+fn link_doc(target: &str, label: Option<&str>) -> File {
     let mut el = tomet_tree::element_new(Name::bare("link"));
     el.data.args = Some(Value::Map(vec![(
         "target".to_string(),
@@ -484,13 +462,10 @@ fn link_doc(target: &str, label: Option<&str>) -> Document {
             Span::dummy(),
         ))]));
     }
-    Document {
-        blocks: vec![Block::Paragraph(Paragraph::new(
-            vec![Inline::Element(el)],
-            Span::dummy(),
-        ))],
-        span: Span::dummy(),
-    }
+    doc_from_blocks(vec![Block::Paragraph(Paragraph::new(
+        vec![Inline::Element(el)],
+        Span::dummy(),
+    ))])
 }
 
 /// A path with no label used to come out bare, which is text and not a link
@@ -533,10 +508,7 @@ fn table_exports_to_markdown() {
         "[ col1 ][ col2 ]\n[ val1 ][ val2 ]",
         Span::dummy(),
     ))]));
-    let doc = Document {
-        blocks: vec![Block::Element(el)],
-        span: Span::dummy(),
-    };
+    let doc = doc_from_blocks(vec![Block::Element(el)]);
     assert_eq!(
         to_markdown(&doc),
         "| col1 | col2 |\n| --- | --- |\n| val1 | val2 |\n\n"
@@ -562,7 +534,7 @@ fn an_unprepared_interpolation_renders_as_its_own_source() {
     // still folded a wrapped line into a space before this crate ever
     // saw it.
     let doc =
-        tomet_ast_parser::parse_document("Issue: $gh(42)\nFooter: ${copyright}\nMath: ${add(10, 5)}\n")
+        tomet_ast_parser::parse_file("Issue: $gh(42)\nFooter: ${copyright}\nMath: ${add(10, 5)}\n")
             .unwrap();
     assert_eq!(
         to_markdown(&doc),
@@ -573,7 +545,7 @@ fn an_unprepared_interpolation_renders_as_its_own_source() {
 #[test]
 fn inline_footnote_exports_to_markdown() {
     let doc =
-        tomet_ast_parser::parse_document("This has a footnote @ftn[a short note] in text.\n").unwrap();
+        tomet_ast_parser::parse_file("This has a footnote @ftn[a short note] in text.\n").unwrap();
     let md = to_markdown(&doc);
     assert!(
         md.contains("This has a footnote [^1] in text."),
@@ -590,7 +562,7 @@ Prose B @ftn(shared).
 
 @ftn(shared)[Shared footnote explanation.]
 ";
-    let doc = tomet_ast_parser::parse_document(src).unwrap();
+    let doc = tomet_ast_parser::parse_file(src).unwrap();
     let md = to_markdown(&doc);
     assert!(md.contains("Prose A [^1]."), "got: {md}");
     assert!(md.contains("Prose B [^1]."), "got: {md}");
@@ -605,7 +577,7 @@ Prose B @ftn(shared).
 #[test]
 fn tag_elements_export_to_markdown() {
     let src = "@tag(rust, tomet) and @tag(spec)\n";
-    let doc = tomet_ast_parser::parse_document(src).unwrap();
+    let doc = tomet_ast_parser::parse_file(src).unwrap();
     let md = to_markdown(&doc);
     assert_eq!(md.trim(), "#rust #tomet and #spec");
 }
@@ -617,7 +589,7 @@ fn task_elements_export_to_markdown() {
 -@task(todo)[ Todo task ]
 -@task(\" \")[ Unchecked task ]
 ";
-    let doc = tomet_ast_parser::parse_document(src).unwrap();
+    let doc = tomet_ast_parser::parse_file(src).unwrap();
     let md = to_markdown(&doc);
     assert_eq!(
         md.trim(),
@@ -628,14 +600,14 @@ fn task_elements_export_to_markdown() {
 #[test]
 fn standalone_task_element_exports_to_markdown() {
     let src = "@task(done)[ Single task ]\n";
-    let doc = tomet_ast_parser::parse_document(src).unwrap();
+    let doc = tomet_ast_parser::parse_file(src).unwrap();
     let md = to_markdown(&doc);
     assert_eq!(md.trim(), "[x] Single task");
 }
 
 #[test]
 fn a_key_that_is_not_an_attribute_name_adds_no_attribute() {
-    let doc = tomet_ast_parser::parse_document("@x(\"a onclick=alert(1)\": 1, plain: 2)\n").unwrap();
+    let doc = tomet_ast_parser::parse_file("@x(\"a onclick=alert(1)\": 1, plain: 2)\n").unwrap();
     let md = to_markdown(&doc);
     assert!(md.contains(" data-plain=\"2\""), "{md}");
     assert!(!md.contains("onclick="), "{md}");

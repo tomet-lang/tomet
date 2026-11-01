@@ -4,7 +4,7 @@
 //! (`tomet-load-config`), load the vocabularies and dictionaries that config declares
 //! (this crate's own `vocabulary` and `dictionary` modules), parse the source, and bind
 //! the names. A caller that skips the middle two gets a
-//! `Document` whose element names resolve against `std` alone, which
+//! `File` whose element names resolve against `std` alone, which
 //! silently drops every user-vocabulary element. `twrit` shipped exactly
 //! that against this workspace's own writs: `@layers` was found and the
 //! equally legal `@writ.layers` was not, so the rule it was written to
@@ -77,7 +77,7 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, OnceLock};
 
 use dictionary::load_dictionaries;
-use tomet_ast::Document;
+use tomet_ast::File;
 use tomet_config::PrinterConfig;
 use tomet_semantics::Bindings;
 use vocabulary::load_vocabularies;
@@ -98,7 +98,7 @@ pub use tomet_vault::{Prepared, Unresolved, UnresolvedKind};
 /// [`bindings`](tomet_vault::Vault::bindings), the `config`/`root` fields --
 /// is the inner vault's, reached through `Deref`. What is added here is
 /// finding it ([`Vault::discover`]), reading a file in it
-/// ([`Vault::document`]), and the vault-wide table an index query is
+/// ([`Vault::file`]), and the vault-wide table an index query is
 /// answered from, which is a walk of the disk.
 ///
 /// "Vault" is the directory the config file sits in: `find_config_file`
@@ -108,7 +108,7 @@ pub struct Vault {
     core: tomet_vault::Vault,
     /// Documents already read for the evaluator, by vault-relative path.
     /// A `Mutex` so a `Vault` stays `Sync`.
-    docs: Mutex<HashMap<String, Arc<Document>>>,
+    docs: Mutex<HashMap<String, Arc<File>>>,
     /// The names of the vault's files, built on the first `ref("note")`.
     links: OnceLock<tomet_links::VaultLinkIndex>,
 }
@@ -155,7 +155,7 @@ impl Vault {
         DiskResolver::new(self)
     }
 
-    pub(crate) fn cached_document(&self, path: &str) -> Option<Arc<Document>> {
+    pub(crate) fn cached_file(&self, path: &str) -> Option<Arc<File>> {
         self.docs
             .lock()
             .expect("the document cache is never held across a panic")
@@ -163,7 +163,7 @@ impl Vault {
             .cloned()
     }
 
-    pub(crate) fn cache_document(&self, path: &str, doc: Document) -> Arc<Document> {
+    pub(crate) fn cache_file(&self, path: &str, doc: File) -> Arc<File> {
         let doc = Arc::new(doc);
         self.docs
             .lock()
@@ -192,7 +192,7 @@ impl Vault {
     pub fn set_buffer(&self, path: &Path, text: &str) {
         match self.parse(text) {
             Ok((doc, _)) => {
-                self.cache_document(&self.doc_ref(path).0, doc);
+                self.cache_file(&self.doc_ref(path).0, doc);
             }
             Err(_) => self.remove_buffer(path),
         }
@@ -208,7 +208,7 @@ impl Vault {
     }
 
     /// Reads, parses, and binds one file in this vault.
-    pub fn document(&self, path: &Path) -> Result<(Document, Bindings), LoadError> {
+    pub fn file(&self, path: &Path) -> Result<(File, Bindings), LoadError> {
         let src = std::fs::read_to_string(path).map_err(|source| LoadError::Io {
             path: path.to_path_buf(),
             source,
@@ -223,7 +223,7 @@ impl Vault {
     /// a converter should see. What that means is
     /// `tomet_vault::Vault::prepare`'s doc; this supplies the files the
     /// expressions ask about.
-    pub fn prepare(&self, doc: &mut Document, path: &Path) -> Prepared {
+    pub fn prepare(&self, doc: &mut File, path: &Path) -> Prepared {
         self.core.prepare(doc, path, &self.resolver())
     }
 
@@ -233,17 +233,17 @@ impl Vault {
     /// ones it has open.
     pub fn evaluate(
         &self,
-        doc: &Document,
+        doc: &File,
         path: &Path,
         expr: &tomet_ast::InterpExpr,
     ) -> Result<tomet_expr::EvalValue, tomet_expr::EvalError> {
         self.core.evaluate(doc, path, expr, &self.resolver())
     }
 
-    /// [`Vault::document`] followed by [`Vault::prepare`] -- what anything
+    /// [`Vault::file`] followed by [`Vault::prepare`] -- what anything
     /// about to render a document wants.
-    pub fn prepared_document(&self, path: &Path) -> Result<(Document, Bindings), LoadError> {
-        let (mut doc, bindings) = self.document(path)?;
+    pub fn prepared_file(&self, path: &Path) -> Result<(File, Bindings), LoadError> {
+        let (mut doc, bindings) = self.file(path)?;
         self.prepare(&mut doc, path);
         Ok((doc, bindings))
     }
@@ -252,10 +252,10 @@ impl Vault {
 /// Reads one document correctly, discovering its vault first.
 ///
 /// For more than one document in the same vault, use [`Vault::discover`]
-/// once and [`Vault::document`] per file: this function reloads every
+/// once and [`Vault::file`] per file: this function reloads every
 /// declared vocabulary on each call.
-pub fn load_document(path: &Path) -> Result<(Document, Bindings), LoadError> {
-    Vault::discover(path).document(path)
+pub fn load_file(path: &Path) -> Result<(File, Bindings), LoadError> {
+    Vault::discover(path).file(path)
 }
 
 /// Why a document could not be read.
@@ -299,7 +299,7 @@ mod tests {
     use tomet_ast::{Block, Inline};
 
     /// The text of every paragraph and the target of every link, in order.
-    fn flat(doc: &Document) -> Vec<String> {
+    fn flat(doc: &File) -> Vec<String> {
         fn inlines(out: &mut Vec<String>, items: &[Inline]) {
             for inline in items {
                 match inline {
@@ -327,7 +327,7 @@ mod tests {
             }
         }
         let mut out = Vec::new();
-        blocks(&mut out, &doc.blocks);
+        blocks(&mut out, &doc.body);
         out
     }
 
@@ -363,7 +363,7 @@ mod tests {
 
         let vault = Vault::discover(&root);
         let (doc, _bindings) = vault
-            .prepared_document(&root.join("index.tmt"))
+            .prepared_file(&root.join("index.tmt"))
             .expect("prepared");
         assert_eq!(
             flat(&doc),
@@ -373,7 +373,7 @@ mod tests {
         let _ = fs::remove_dir_all(&root);
     }
 
-    /// The reason `prepare` is a separate door from `document`: a caller
+    /// The reason `prepare` is a separate door from `file`: a caller
     /// that only wants one file read gets it as written, expressions and all.
     #[test]
     fn reading_a_document_does_not_evaluate_it() {
@@ -381,14 +381,14 @@ mod tests {
         fs::write(root.join("plain.tmt"), "sum ${add(1, 2)}\n").expect("plain");
 
         let vault = Vault::discover(&root);
-        let (doc, _) = vault.document(&root.join("plain.tmt")).expect("read");
+        let (doc, _) = vault.file(&root.join("plain.tmt")).expect("read");
         assert!(
             flat(&doc).iter().all(|t| !t.contains('3')),
             "{:?}",
             flat(&doc)
         );
         let (prepared, _) = vault
-            .prepared_document(&root.join("plain.tmt"))
+            .prepared_file(&root.join("plain.tmt"))
             .expect("prepared");
         assert_eq!(flat(&prepared), ["sum ", "3"]);
 
@@ -404,15 +404,15 @@ mod tests {
         }
 
         let vault = Vault::discover(&root);
-        let (first, _) = vault.prepared_document(&root.join("a.tmt")).expect("a");
+        let (first, _) = vault.prepared_file(&root.join("a.tmt")).expect("a");
         let cached = vault
-            .cached_document("notes/go.tmt")
+            .cached_file("notes/go.tmt")
             .expect("read by the first query");
-        let (second, _) = vault.prepared_document(&root.join("b.tmt")).expect("b");
+        let (second, _) = vault.prepared_file(&root.join("b.tmt")).expect("b");
 
         assert_eq!(flat(&first), flat(&second));
         assert!(
-            Arc::ptr_eq(&cached, &vault.cached_document("notes/go.tmt").unwrap()),
+            Arc::ptr_eq(&cached, &vault.cached_file("notes/go.tmt").unwrap()),
             "the document was read again for the second one"
         );
 
@@ -429,7 +429,7 @@ mod tests {
         .expect("index");
 
         let vault = Vault::discover(&root);
-        let (mut doc, _) = vault.document(&root.join("index.tmt")).expect("read");
+        let (mut doc, _) = vault.file(&root.join("index.tmt")).expect("read");
         let prepared = vault.prepare(&mut doc, &root.join("index.tmt"));
         assert_eq!(prepared.unresolved.len(), 1);
         assert!(
@@ -449,7 +449,7 @@ mod tests {
     // ---- include -------------------------------------------------------------
 
     /// `level:title` for each section and `text` for each paragraph, in order.
-    fn outline(doc: &Document) -> Vec<String> {
+    fn outline(doc: &File) -> Vec<String> {
         fn text(inlines: &[Inline]) -> String {
             inlines
                 .iter()
@@ -472,7 +472,7 @@ mod tests {
             }
         }
         let mut out = Vec::new();
-        walk(&mut out, &doc.blocks);
+        walk(&mut out, &doc.body);
         out
     }
 
@@ -516,7 +516,7 @@ mod tests {
         )
         .unwrap();
         let vault = Vault::discover(&root);
-        let doc = tomet_ast_parser::parse_document(&fs::read_to_string(&path).unwrap()).unwrap();
+        let doc = tomet_ast_parser::parse_file(&fs::read_to_string(&path).unwrap()).unwrap();
         let mismatches: Vec<(String, String)> = vault
             .findings(&path, &doc)
             .diagnostics
@@ -552,7 +552,7 @@ mod tests {
         );
         let vault = Vault::discover(&root);
         let findings_of = |path: &std::path::Path| {
-            let doc = tomet_ast_parser::parse_document(&fs::read_to_string(path).unwrap()).unwrap();
+            let doc = tomet_ast_parser::parse_file(&fs::read_to_string(path).unwrap()).unwrap();
             vault.findings(path, &doc)
         };
         let reported = |findings: &Findings| {
@@ -599,7 +599,7 @@ mod tests {
         );
         let vault = Vault::discover(&root);
         let (doc, _) = vault
-            .prepared_document(&root.join("host.tmt"))
+            .prepared_file(&root.join("host.tmt"))
             .expect("host");
         assert_eq!(
             outline(&doc),
@@ -626,7 +626,7 @@ mod tests {
             ],
         );
         let vault = Vault::discover(&root);
-        let (doc, _) = vault.prepared_document(&root.join("top.tmt")).expect("top");
+        let (doc, _) = vault.prepared_file(&root.join("top.tmt")).expect("top");
         assert_eq!(outline(&doc), ["1:Top", "2:Mid", "3:Leaf", "leaf text"]);
         let _ = fs::remove_dir_all(&root);
     }
@@ -641,7 +641,7 @@ mod tests {
             ],
         );
         let vault = Vault::discover(&root);
-        let (mut doc, _) = vault.document(&root.join("a.tmt")).expect("a");
+        let (mut doc, _) = vault.file(&root.join("a.tmt")).expect("a");
         let prepared = vault.prepare(&mut doc, &root.join("a.tmt"));
         // `a` includes `b`, and `b` includes `a` back: that last include is
         // the cycle, and it stays as written inside `b`. `a` itself, which
@@ -672,7 +672,7 @@ mod tests {
         );
         let vault = Vault::discover(&root);
         let prepared = |vault: &Vault| {
-            let (doc, _) = vault.prepared_document(&root.join("host.tmt")).unwrap();
+            let (doc, _) = vault.prepared_file(&root.join("host.tmt")).unwrap();
             outline(&doc)
         };
         assert_eq!(prepared(&vault), ["1:Host", "2:Saved"]);
@@ -704,7 +704,7 @@ mod tests {
         );
         let vault = Vault::discover(&root);
         let host = root.join("host.tmt");
-        let (doc, _) = vault.document(&host).unwrap();
+        let (doc, _) = vault.file(&host).unwrap();
         let eval = |src: &str| {
             let expr = tomet_ast_parser::parse_interpolation_str(&format!("${{{src}}}"))
                 .unwrap()
@@ -749,7 +749,7 @@ mod tests {
         );
         let vault = Vault::discover(&root);
         let (doc, _) = vault
-            .prepared_document(&root.join("host.tmt"))
+            .prepared_file(&root.join("host.tmt"))
             .expect("host");
         assert_eq!(outline(&doc), ["1:Host", "use this", "2:Deep", "and this"]);
         let _ = fs::remove_dir_all(&root);

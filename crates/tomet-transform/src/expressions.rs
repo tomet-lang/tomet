@@ -32,8 +32,8 @@
 //! in a resolver that returns the document from before this pass rewrote it.
 
 use tomet_ast::{
-    Block, Connect, Data, Document, Element, Entry, Group, Id, Inline, InterpExpr, List, ListItem,
-    Paragraph, Text, Value,
+    Block, Connect, Data, Declaration, Element, Entry, File, Group, Id, Inline, InterpExpr, List,
+    ListItem, Paragraph, Text, Value,
 };
 use tomet_span::Span;
 use tomet_expr::{EvalContext, EvalValue, Note, evaluate, evaluate_data};
@@ -82,7 +82,7 @@ impl Unresolved {
 }
 
 /// Replaces every `${...}` in `doc` with what it stands for.
-pub fn resolve_expressions(doc: &mut Document, cx: &EvalContext) -> Vec<Unresolved> {
+pub fn resolve_expressions(doc: &mut File, cx: &EvalContext) -> Vec<Unresolved> {
     resolve(doc, cx, None)
 }
 
@@ -95,7 +95,7 @@ pub fn resolve_expressions(doc: &mut Document, cx: &EvalContext) -> Vec<Unresolv
 /// This is what makes a file hold its own values for only some of its expressions: the ones
 /// that depend on where it sits, and none of the ones it can still evaluate for itself.
 pub fn resolve_expressions_where(
-    doc: &mut Document,
+    doc: &mut File,
     cx: &EvalContext,
     selected: &dyn Fn(Span) -> bool,
 ) -> Vec<Unresolved> {
@@ -103,7 +103,7 @@ pub fn resolve_expressions_where(
 }
 
 fn resolve(
-    doc: &mut Document,
+    doc: &mut File,
     cx: &EvalContext,
     selected: Option<&dyn Fn(Span) -> bool>,
 ) -> Vec<Unresolved> {
@@ -113,7 +113,11 @@ fn resolve(
         level: cx.heading_level,
         selected,
     };
-    doc.blocks = std::mem::take(&mut doc.blocks)
+    doc.header = std::mem::take(&mut doc.header)
+        .into_iter()
+        .map(|declaration| pass.declaration(declaration))
+        .collect();
+    doc.body = std::mem::take(&mut doc.body)
         .into_iter()
         .flat_map(|block| pass.block(block))
         .collect();
@@ -209,6 +213,12 @@ impl Pass<'_> {
         }
     }
 
+    fn declaration(&mut self, mut declaration: Declaration) -> Declaration {
+        declaration.data = self.data(declaration.data);
+        declaration.content = self.content(declaration.content);
+        declaration
+    }
+
     // ---- blocks -------------------------------------------------------------
 
     fn block(&mut self, block: Block) -> Vec<Block> {
@@ -218,11 +228,6 @@ impl Pass<'_> {
                 vec![Block::Paragraph(p)]
             }
             Block::Element(el) => vec![Block::Element(self.element(el))],
-            Block::Declaration(mut declaration) => {
-                declaration.data = self.data(declaration.data);
-                declaration.content = self.content(declaration.content);
-                vec![Block::Declaration(declaration)]
-            }
             // A hole exists only in a pattern, which has no expressions to resolve.
             Block::Hole(hole) => vec![Block::Hole(hole)],
             Block::Interp(interp) if !self.is_selected(interp.span) => vec![Block::Interp(interp)],

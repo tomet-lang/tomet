@@ -49,7 +49,7 @@ pub(crate) fn blocks_to_plain(blocks: &[Block]) -> String {
                     s.push_str(&blocks_to_plain(&item.content));
                 }
             }
-            Block::Interp(_) | Block::Declaration(_) => {}
+            Block::Interp(_) => {}
             Block::Hole(hole) => s.push_str(&tomet_printer::hole_to_tm(hole)),
         }
     }

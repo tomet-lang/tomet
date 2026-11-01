@@ -9,7 +9,6 @@ repository.workspace = true
 [dependencies]
 tomet-config = { workspace = true }
 tomet-type = { workspace = true }
-
-#= Crates.io
+#--- Crates.io ---
 nanoid = { workspace = true }
 uuid = { workspace = true }

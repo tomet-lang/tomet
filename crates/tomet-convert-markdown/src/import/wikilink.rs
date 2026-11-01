@@ -5,12 +5,12 @@
 //! round-trip as literal text rather than being misread as `.tmt`
 //! syntax on export.
 
-use tomet_ast::{Block, Document, Element, Inline, List, Name, Text, Value};
+use tomet_ast::{Block, Element, File, Inline, List, Name, Text, Value};
 use tomet_span::Span;
 use tomet_tree::element_new;
 
-pub(super) fn post_process_document_wikilinks(doc: &mut Document) {
-    for block in &mut doc.blocks {
+pub(super) fn post_process_document_wikilinks(doc: &mut File) {
+    for block in &mut doc.body {
         post_process_block_wikilinks(block);
     }
 }
@@ -23,7 +23,6 @@ fn post_process_block_wikilinks(block: &mut Block) {
         Block::Element(el) => {
             post_process_element_wikilinks(el);
         }
-        Block::Declaration(_) => {}
         Block::Section(sec) => {
             sec.title = post_process_inlines_wikilinks(std::mem::take(&mut sec.title));
             for child in &mut sec.blocks {

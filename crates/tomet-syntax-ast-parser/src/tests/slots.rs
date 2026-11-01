@@ -66,7 +66,7 @@ fn a_shape_that_does_not_fit_is_text() {
         "<?int (n)>",
     ] {
         assert_eq!(boxes(src), Vec::<String>::new(), "`{src}` has no box");
-        assert!(parse_document(src).is_ok(), "`{src}` is never an error");
+        assert!(parse_file(src).is_ok(), "`{src}` is never an error");
     }
 }
 
@@ -75,7 +75,7 @@ fn html_shaped_text_is_not_a_box() {
     // `!` and `/` are never marks, so these stay text and raise nothing.
     for src in ["<!doctype html>", "<!-- x -->", "</x>", "<x/>", "<br/>"] {
         assert_eq!(boxes(src), Vec::<String>::new(), "`{src}` has no box");
-        assert!(parse_document(src).is_ok(), "`{src}` is never an error");
+        assert!(parse_file(src).is_ok(), "`{src}` is never an error");
     }
 }
 
@@ -105,9 +105,9 @@ fn a_closer_inside_a_group_or_a_string_closes_nothing() {
 fn a_tag_lowers_to_text() {
     // Tomet gives a name tag no meaning, so the AST has no node for it.
     let src = "--out <PATH> と <ファイル>";
-    let doc = parse_document(src).unwrap();
-    let [Block::Paragraph(p)] = doc.blocks.as_slice() else {
-        panic!("one paragraph, got {:?}", doc.blocks);
+    let doc = parse_file(src).unwrap();
+    let [Block::Paragraph(p)] = doc.body.as_slice() else {
+        panic!("one paragraph, got {:?}", doc.body);
     };
     assert_eq!(p.content.len(), 1, "one run of text");
     assert!(matches!(&p.content[0], Inline::Text(t) if t.value == src));
@@ -115,15 +115,15 @@ fn a_tag_lowers_to_text() {
 
 #[test]
 fn a_tag_in_a_value_is_its_text() {
-    let doc = parse_document("@opt(<name>)").unwrap();
-    let [Block::Element(el)] = doc.blocks.as_slice() else {
-        panic!("one element, got {:?}", doc.blocks);
+    let doc = parse_file("@opt(<name>)").unwrap();
+    let [Block::Element(el)] = doc.body.as_slice() else {
+        panic!("one element, got {:?}", doc.body);
     };
     assert_eq!(el.data.args, Some(Value::String("<name>".into())));
 
-    let doc = parse_document("@opt(key: <name>)").unwrap();
-    let [Block::Element(el)] = doc.blocks.as_slice() else {
-        panic!("one element, got {:?}", doc.blocks);
+    let doc = parse_file("@opt(key: <name>)").unwrap();
+    let [Block::Element(el)] = doc.body.as_slice() else {
+        panic!("one element, got {:?}", doc.body);
     };
     assert_eq!(
         el.data.args,

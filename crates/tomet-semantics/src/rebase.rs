@@ -6,7 +6,7 @@
 //! body's knowledge, so the evaluator does not do this itself: it asks the host
 //! (`tomet_expr::Resolver::rebase_links`), and a host that knows tomet documents calls this.
 
-use tomet_ast::{Block, Document, Element, Value};
+use tomet_ast::{Block, Element, File, Value};
 use tomet_span::Span;
 use tomet_tree::for_each_element_mut;
 
@@ -24,7 +24,7 @@ pub fn rebase_relative_links(blocks: Vec<Block>, from: &str, to: &str) -> Vec<Bl
     if from_dir == to_dir {
         return blocks;
     }
-    let mut holder = Document::new(blocks, Span::default());
+    let mut holder = File::new(Vec::new(), blocks, Span::default());
     for_each_element_mut(&mut holder, |element| {
         let Some((_, target)) = link_target_of(element.as_view()) else {
             return;
@@ -44,7 +44,7 @@ pub fn rebase_relative_links(blocks: Vec<Block>, from: &str, to: &str) -> Vec<Bl
             format!("{}{anchor}", relative_to(&to_dir, &resolved)),
         );
     });
-    holder.blocks
+    holder.body
 }
 
 /// The directory part of a vault-relative path, as components.
@@ -107,7 +107,7 @@ mod tests {
          A file @file(./src/lib.rs) and @embed(./img/b.png).\n";
 
     fn targets(blocks: &[Block]) -> Vec<String> {
-        let mut doc = Document::new(blocks.to_vec(), Span::default());
+        let mut doc = File::new(Vec::new(), blocks.to_vec(), Span::default());
         let mut out = Vec::new();
         for_each_element_mut(&mut doc, |el| {
             if let Some((_, target)) = link_target_of(el.as_view()) {
@@ -118,7 +118,7 @@ mod tests {
     }
 
     fn rebased(to: &str) -> Vec<String> {
-        let blocks = tomet_ast_parser::parse_document(GUIDE).unwrap().blocks;
+        let blocks = tomet_ast_parser::parse_file(GUIDE).unwrap().body;
         targets(&rebase_relative_links(blocks, "docs/guide.tmt", to))
     }
 
@@ -161,18 +161,18 @@ mod tests {
 
     #[test]
     fn a_file_mention_names_a_path_and_is_left_alone() {
-        let blocks = tomet_ast_parser::parse_document("@file(./src/lib.rs)\n")
+        let blocks = tomet_ast_parser::parse_file("@file(./src/lib.rs)\n")
             .unwrap()
-            .blocks;
+            .body;
         let moved = rebase_relative_links(blocks.clone(), "docs/guide.tmt", "here.tmt");
         assert_eq!(moved, blocks);
     }
 
     #[test]
     fn a_target_that_climbs_out_of_the_vault_is_left_as_it_was() {
-        let blocks = tomet_ast_parser::parse_document("@link(../../x.md)\n")
+        let blocks = tomet_ast_parser::parse_file("@link(../../x.md)\n")
             .unwrap()
-            .blocks;
+            .body;
         let moved = rebase_relative_links(blocks.clone(), "docs/guide.tmt", "here.tmt");
         assert_eq!(moved, blocks);
     }

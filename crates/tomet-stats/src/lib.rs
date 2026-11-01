@@ -2,7 +2,7 @@
 //!
 //! This crate calculates document metrics (prose characters, words,
 //! elements, headings, and internal links) directly from a parsed
-//! [`Document`] AST. It performs no disk I/O, filesystem access, or database
+//! [`File`] AST. It performs no disk I/O, filesystem access, or database
 //! queries, making it suitable for WebAssembly, mobile apps, and parallel
 //! processing pipelines.
 //!
@@ -23,7 +23,7 @@
 use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
-use tomet_ast::{Block, Document, ElementView, Inline};
+use tomet_ast::{Block, ElementView, File, Inline};
 use tomet_semantics::{ElementKind, TargetScheme, link_target_of, path_target_of, target_scheme};
 
 pub use tomet_address::LinkKind;
@@ -127,7 +127,7 @@ impl Stats {
 }
 
 /// Measures one parsed document.
-pub fn measure(doc: &Document) -> Stats {
+pub fn measure(doc: &File) -> Stats {
     let mut stats = Stats {
         files: 1,
         ..Stats::default()
@@ -184,7 +184,7 @@ pub fn measure(doc: &Document) -> Stats {
         }
     });
 
-    count_headings(&doc.blocks, &mut stats);
+    count_headings(&doc.body, &mut stats);
     stats
 }
 
@@ -204,7 +204,7 @@ mod tests {
 
     #[test]
     fn test_empty_document() {
-        let doc = tomet_ast_parser::parse_document("").unwrap();
+        let doc = tomet_ast_parser::parse_file("").unwrap();
         let stats = measure(&doc);
         assert_eq!(stats.files, 1);
         assert_eq!(stats.characters, 0);
@@ -226,7 +226,7 @@ This is a paragraph with @link(readme.md)[custom text].
 - Bare item 2
 @custom_tag[Hello world]
 "#;
-        let doc = tomet_ast_parser::parse_document(input).unwrap();
+        let doc = tomet_ast_parser::parse_file(input).unwrap();
         let stats = measure(&doc);
 
         assert_eq!(stats.files, 1);
@@ -245,8 +245,8 @@ This is a paragraph with @link(readme.md)[custom text].
 
     #[test]
     fn test_merge() {
-        let doc1 = tomet_ast_parser::parse_document("=[ H1 ]\nHello").unwrap();
-        let doc2 = tomet_ast_parser::parse_document("==[ H2 ]\nWorld").unwrap();
+        let doc1 = tomet_ast_parser::parse_file("=[ H1 ]\nHello").unwrap();
+        let doc2 = tomet_ast_parser::parse_file("==[ H2 ]\nWorld").unwrap();
 
         let mut s1 = measure(&doc1);
         let s2 = measure(&doc2);

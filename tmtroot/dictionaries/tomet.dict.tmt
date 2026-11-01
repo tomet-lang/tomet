@@ -1,0 +1,29 @@
+::kind(dictionary)
+::id(dictionary.tomet)
+::dictionary(tomet){
+  "vault": @term[ @term(#vault-config) のあるディレクトリと、その下の文書の全体。tomet が設定と語彙を読む単位。 ]#(vault)
+  "vault.config.tmt": @term[ @term(#vault) の境目を示す設定ファイル。上の階層の vault 設定は、ここで打ち切られる。詳しくは @file(tmtroot/spec/features/config.tmt)。 ]#(vault-config)
+  ".config.tmt": @term[ フォルダごとの設定。そのフォルダと下の文書に、@term(#vault-config) の上に重ねて効く。 ]#(folder-config)
+  "tomet": @term[]
+  "cotomet": @term[]
+  "sytax": @term[]
+  "prose": @term[散文。`[]`や`|`の中でかく文字]
+  "data": @term[データ。`{}`や`()`、Cotomet内で書くやつ。]
+  "sigil": @term[記号]
+  "form": @term[`@`, `$`, `::`などの記号で構造を表すものの総称]
+  "division": @term[File, Folder, Section, Vaultを@term("tome")から見て、まとめた言い方。]
+  "tome": @term[@term("tomet")に対して、Vaultをすべての一つのtometだと考えたときの名前]
+  "tomed": @term[@term("tome")化すること、したもの。]
+  "dictionary": @term[]
+  "kind": @term[]
+  "id": @term[]
+  "element": @term[]
+  "vocabulary": @term[]
+  "blueprint": @term[]
+  "schema": @term[]
+  "tandr": @term[]
+  "twrit": @term[]
+  "index": @term[]
+  "slot": @term[`<>`]
+  "hole": @term[``]
+}

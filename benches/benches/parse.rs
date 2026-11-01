@@ -31,7 +31,7 @@ fn sizes() -> Vec<usize> {
 type ParseFn = fn(&str);
 
 fn document(src: &str) {
-    let _ = black_box(tomet_ast_parser::parse_document(black_box(src)));
+    let _ = black_box(tomet_ast_parser::parse_file(black_box(src)));
 }
 
 fn cst(src: &str) {

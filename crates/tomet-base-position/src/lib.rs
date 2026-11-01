@@ -1,4 +1,4 @@
-//! =[ tomet-position ]
+//! =[ About ]
 //!
 //! Mapping between byte offsets and 1-based line/column positions ([`LineIndex`], [`LineCol`]).
 //!

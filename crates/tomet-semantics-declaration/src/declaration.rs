@@ -1,6 +1,4 @@
-//! A declaration as the readers see it, whichever document it was written in.
-
-use tomet_ast::{Document, Value};
+use tomet_ast::{File, Value};
 use tomet_span::Span;
 
 use crate::kind::DeclKind;
@@ -68,12 +66,15 @@ pub struct Found {
     pub span: Span,
 }
 
-/// The standard declarations at the top level of `doc`, in the order written.
-///
-/// Top level is [`tomet_tree::for_each_top_level_declaration`].
-pub fn declarations(doc: &Document) -> Vec<Found> {
+/// The standard declarations at the top level of `file`, in the order written.
+pub fn declarations<B>(file: &File<B>) -> Vec<Found> {
+    declarations_from_header(&file.header)
+}
+
+/// The standard declarations from a file header, in the order written.
+pub fn declarations_from_header(header: &[tomet_ast::Declaration]) -> Vec<Found> {
     let mut found = Vec::new();
-    tomet_tree::for_each_top_level_declaration(doc, |written| {
+    for written in header {
         if let Some(declaration) = Declaration::from_ast(written)
             && let Some(kind) = declaration.kind()
         {
@@ -83,7 +84,7 @@ pub fn declarations(doc: &Document) -> Vec<Found> {
                 span: written.span,
             });
         }
-    });
+    }
     found
 }
 
@@ -91,8 +92,8 @@ pub fn declarations(doc: &Document) -> Vec<Found> {
 mod tests {
     use super::*;
 
-    fn parse(src: &str) -> Document {
-        tomet_ast_parser::parse_document(src).expect("parses")
+    fn parse(src: &str) -> File {
+        tomet_ast_parser::parse_file(src).expect("parses")
     }
 
     #[test]

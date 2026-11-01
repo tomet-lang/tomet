@@ -7,16 +7,16 @@ use wasm_bindgen::prelude::*;
 /// The facade has no bare parse on purpose (see `tomet`'s crate doc), and
 /// nothing here but `validateWith` needs one: reading a document as `std`
 /// alone is exactly what an empty vault does.
-fn parse_plain(source: &str) -> Result<tomet::Document, String> {
+fn parse_plain(source: &str) -> Result<tomet::File, String> {
     Vault::from_sources(PrinterConfig::default(), ".", &[])
         .parse(source)
         .map(|(doc, _bindings)| doc)
         .map_err(|e| e.to_string())
 }
 
-/// Parse `.tmt` markup source text into a JavaScript `Document` AST object.
-#[wasm_bindgen(js_name = parseDocument)]
-pub fn parse_document(source: &str) -> Result<JsValue, JsValue> {
+/// Parse `.tmt` markup source text into a JavaScript `File` AST object.
+#[wasm_bindgen(js_name = parseFile)]
+pub fn parse_file(source: &str) -> Result<JsValue, JsValue> {
     let doc = parse_plain(source).map_err(|e| JsValue::from_str(&e.to_string()))?;
     serde_wasm_bindgen::to_value(&doc).map_err(|e| JsValue::from_str(&e.to_string()))
 }
@@ -81,28 +81,23 @@ pub fn clear_vault_files() {
     *lock = None;
 }
 
-fn prepare_document(mut doc: tomet::ast::Document, opts: &ProcessOptions) -> tomet::ast::Document {
+fn prepare_file(mut doc: tomet::ast::File, opts: &ProcessOptions) -> tomet::ast::File {
     // 1. Inject the macros and variables of an external workspace config, if provided
     if let Some(cfg_src) = &opts.config
         && let Ok(cfg_doc) = parse_plain(cfg_src)
     {
-        let mut prefix_blocks = Vec::new();
-        for block in cfg_doc.blocks {
-            if let tomet::ast::Block::Element(el) = &block {
-                let kind = tomet::semantics::classify_std_lenient(el.as_view());
-                if matches!(
-                    kind,
-                    tomet::semantics::ElementKind::Declaration(
-                        tomet::declaration::DeclKind::Macros | tomet::declaration::DeclKind::Vars
-                    )
-                ) {
-                    prefix_blocks.push(block);
-                }
+        let mut prefix_header = Vec::new();
+        for decl in cfg_doc.header {
+            if matches!(
+                tomet::declaration::DeclKind::from_name(&decl.name.name),
+                Some(tomet::declaration::DeclKind::Macros | tomet::declaration::DeclKind::Vars)
+            ) {
+                prefix_header.push(decl);
             }
         }
-        if !prefix_blocks.is_empty() {
-            prefix_blocks.append(&mut doc.blocks);
-            doc.blocks = prefix_blocks;
+        if !prefix_header.is_empty() {
+            prefix_header.append(&mut doc.header);
+            doc.header = prefix_header;
         }
     }
 
@@ -153,9 +148,9 @@ pub struct TocItem {
     pub text: String,
 }
 
-/// High-level output of processing a `.tmt` document.
+/// High-level output of processing a `.tmt` file.
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
-pub struct ProcessedDoc {
+pub struct ProcessedFile {
     pub title: Option<String>,
     pub html: String,
     pub meta: Option<tomet::ast::Value>,
@@ -163,11 +158,11 @@ pub struct ProcessedDoc {
     pub is_data_only: bool,
 }
 
-pub fn process_document_internal(
-    mut doc: tomet::ast::Document,
+pub fn process_file_internal(
+    mut doc: tomet::ast::File,
     opts: &ProcessOptions,
-) -> ProcessedDoc {
-    doc = prepare_document(doc, opts);
+) -> ProcessedFile {
+    doc = prepare_file(doc, opts);
     let render_opts = opts.to_render_options();
     let html = tomet::html::render_body_with(&doc, &render_opts);
     let is_data_only = html.trim().is_empty();
@@ -230,7 +225,7 @@ pub fn process_document_internal(
 
     let title = meta_title.or(first_h1);
 
-    ProcessedDoc {
+    ProcessedFile {
         title,
         html,
         meta,
@@ -239,9 +234,9 @@ pub fn process_document_internal(
     }
 }
 
-/// Convert `.tmt` source text or a `Document` AST object into an HTML body string.
+/// Convert `.tmt` source text or a `File` AST object into an HTML body string.
 #[wasm_bindgen(js_name = toHtml)]
-pub fn to_html(source_or_doc: &JsValue, options: Option<JsValue>) -> Result<String, JsValue> {
+pub fn to_html(source_or_file: &JsValue, options: Option<JsValue>) -> Result<String, JsValue> {
     let opts: ProcessOptions = if let Some(opts_val) = options {
         serde_wasm_bindgen::from_value(opts_val).map_err(|e| JsValue::from_str(&e.to_string()))?
     } else {
@@ -249,21 +244,21 @@ pub fn to_html(source_or_doc: &JsValue, options: Option<JsValue>) -> Result<Stri
     };
     let render_opts = opts.to_render_options();
 
-    let mut doc = if let Some(src) = source_or_doc.as_string() {
+    let mut doc = if let Some(src) = source_or_file.as_string() {
         parse_plain(&src).map_err(|e| JsValue::from_str(&e.to_string()))?
     } else {
-        let doc: tomet::ast::Document = serde_wasm_bindgen::from_value(source_or_doc.clone())
+        let doc: tomet::ast::File = serde_wasm_bindgen::from_value(source_or_file.clone())
             .map_err(|e| JsValue::from_str(&e.to_string()))?;
         doc
     };
-    doc = prepare_document(doc, &opts);
+    doc = prepare_file(doc, &opts);
     Ok(tomet::html::render_body_with(&doc, &render_opts))
 }
 
-/// Process `.tmt` markup source text or a `Document` AST object into HTML, metadata, title, and TOC.
-#[wasm_bindgen(js_name = processDocument)]
-pub fn process_document(
-    source_or_doc: &JsValue,
+/// Process `.tmt` markup source text or a `File` AST object into HTML, metadata, title, and TOC.
+#[wasm_bindgen(js_name = processFile)]
+pub fn process_file(
+    source_or_file: &JsValue,
     options: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
     let opts: ProcessOptions = if let Some(opts_val) = options {
@@ -272,55 +267,55 @@ pub fn process_document(
         ProcessOptions::default()
     };
 
-    let processed = if let Some(src) = source_or_doc.as_string() {
+    let processed = if let Some(src) = source_or_file.as_string() {
         let doc = parse_plain(&src).map_err(|e| JsValue::from_str(&e.to_string()))?;
-        process_document_internal(doc, &opts)
+        process_file_internal(doc, &opts)
     } else {
-        let doc: tomet::ast::Document = serde_wasm_bindgen::from_value(source_or_doc.clone())
+        let doc: tomet::ast::File = serde_wasm_bindgen::from_value(source_or_file.clone())
             .map_err(|e| JsValue::from_str(&e.to_string()))?;
-        process_document_internal(doc, &opts)
+        process_file_internal(doc, &opts)
     };
 
     serde_wasm_bindgen::to_value(&processed).map_err(|e| JsValue::from_str(&e.to_string()))
 }
 
-/// Convert `.tmt` source text or a `Document` AST object into a CommonMark Markdown string.
+/// Convert `.tmt` source text or a `File` AST object into a CommonMark Markdown string.
 #[wasm_bindgen(js_name = toMarkdown)]
-pub fn to_markdown(source_or_doc: &JsValue) -> Result<String, JsValue> {
-    if let Some(src) = source_or_doc.as_string() {
+pub fn to_markdown(source_or_file: &JsValue) -> Result<String, JsValue> {
+    if let Some(src) = source_or_file.as_string() {
         let doc = parse_plain(&src).map_err(|e| JsValue::from_str(&e.to_string()))?;
         Ok(tomet::markdown::to_markdown(&doc))
     } else {
-        let doc: tomet::ast::Document = serde_wasm_bindgen::from_value(source_or_doc.clone())
+        let doc: tomet::ast::File = serde_wasm_bindgen::from_value(source_or_file.clone())
             .map_err(|e| JsValue::from_str(&e.to_string()))?;
         Ok(tomet::markdown::to_markdown(&doc))
     }
 }
 
-/// Convert `.tmt` source text or a `Document` AST object into a Typst markup string.
+/// Convert `.tmt` source text or a `File` AST object into a Typst markup string.
 #[wasm_bindgen(js_name = toTypst)]
-pub fn to_typst(source_or_doc: &JsValue) -> Result<String, JsValue> {
-    if let Some(src) = source_or_doc.as_string() {
+pub fn to_typst(source_or_file: &JsValue) -> Result<String, JsValue> {
+    if let Some(src) = source_or_file.as_string() {
         let doc = parse_plain(&src).map_err(|e| JsValue::from_str(&e.to_string()))?;
         Ok(tomet::typst::to_typst(&doc))
     } else {
-        let doc: tomet::ast::Document = serde_wasm_bindgen::from_value(source_or_doc.clone())
+        let doc: tomet::ast::File = serde_wasm_bindgen::from_value(source_or_file.clone())
             .map_err(|e| JsValue::from_str(&e.to_string()))?;
         Ok(tomet::typst::to_typst(&doc))
     }
 }
 
-/// Parse CommonMark Markdown text into a `Document` AST object.
+/// Parse CommonMark Markdown text into a `File` AST object.
 #[wasm_bindgen(js_name = fromMarkdown)]
 pub fn from_markdown(markdown: &str) -> Result<JsValue, JsValue> {
     let doc = tomet::markdown::from_markdown(markdown);
     serde_wasm_bindgen::to_value(&doc).map_err(|e| JsValue::from_str(&e.to_string()))
 }
 
-/// Serialize a `Document` AST object back into formatted `.tmt` source code.
-#[wasm_bindgen(js_name = printDocument)]
-pub fn print_document(doc_val: &JsValue) -> Result<String, JsValue> {
-    let doc: tomet::ast::Document = serde_wasm_bindgen::from_value(doc_val.clone())
+/// Serialize a `File` AST object back into formatted `.tmt` source code.
+#[wasm_bindgen(js_name = printFile)]
+pub fn print_file(doc_val: &JsValue) -> Result<String, JsValue> {
+    let doc: tomet::ast::File = serde_wasm_bindgen::from_value(doc_val.clone())
         .map_err(|e| JsValue::from_str(&e.to_string()))?;
     Ok(tomet::printer::document_to_tm(&doc))
 }
@@ -428,7 +423,7 @@ mod tests {
             advanced: Some(true),
             ..Default::default()
         };
-        let res = process_document_internal(doc, &opts);
+        let res = process_file_internal(doc, &opts);
         assert_eq!(res.title.as_deref(), Some("My Meta Title"));
         assert!(!res.is_data_only);
         assert_eq!(res.toc.len(), 1);
@@ -445,7 +440,7 @@ mod tests {
             advanced: Some(true),
             ..Default::default()
         };
-        let res = process_document_internal(doc, &opts);
+        let res = process_file_internal(doc, &opts);
         assert_eq!(res.title.as_deref(), Some("First Heading Title"));
         assert!(!res.is_data_only);
         assert_eq!(res.toc.len(), 2);
@@ -460,7 +455,7 @@ mod tests {
         let src = "::version(1.0)\n::meta{\n  title: \"Just Config\"\n}\n";
         let doc = parse_plain(src).unwrap();
         let opts = ProcessOptions::default();
-        let res = process_document_internal(doc, &opts);
+        let res = process_file_internal(doc, &opts);
         assert_eq!(res.title.as_deref(), Some("Just Config"));
         assert!(res.is_data_only);
         assert!(res.toc.is_empty());
@@ -480,7 +475,7 @@ mod tests {
             current_path: Some("10-19 Journal/daily/memo.tmt".into()),
             ..Default::default()
         };
-        let res = process_document_internal(doc, &opts);
+        let res = process_file_internal(doc, &opts);
         assert!(
             res.html
                 .contains("href=\"/docs/30-39 Knowledge/Linux\">Go to Linux</a>")

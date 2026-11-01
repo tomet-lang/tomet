@@ -567,7 +567,7 @@ mod pipe_content_tests {
 
     fn assert_readable(text: &str) {
         assert!(
-            tomet_ast_parser::parse_document(text).is_ok(),
+            tomet_ast_parser::parse_file(text).is_ok(),
             "the merged text is not a document the parser reads:\n{text}"
         );
     }

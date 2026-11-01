@@ -2,7 +2,7 @@ use super::*;
 
 #[test]
 fn renders_raw_with_lang() {
-    let doc = parse_document("@raw(lang:rust)[fn main() {}]\n").unwrap();
+    let doc = parse_file("@raw(lang:rust)[fn main() {}]\n").unwrap();
     let body = render_body(&doc);
     assert_eq!(
         body,
@@ -12,7 +12,7 @@ fn renders_raw_with_lang() {
 
 #[test]
 fn fenced_raw_block_renders_the_same_as_bracket_raw() {
-    let doc = parse_document("```rust\nfn main() {}\n```\n").unwrap();
+    let doc = parse_file("```rust\nfn main() {}\n```\n").unwrap();
     let body = render_body(&doc);
     assert_eq!(
         body,
@@ -22,7 +22,7 @@ fn fenced_raw_block_renders_the_same_as_bracket_raw() {
 
 #[test]
 fn raw_content_stays_literal_not_interpreted_as_markup() {
-    let doc = parse_document("```rust\nlet x = *ptr; let y = @T; @deco `q`\n```\n").unwrap();
+    let doc = parse_file("```rust\nlet x = *ptr; let y = @T; @deco `q`\n```\n").unwrap();
     let body = render_body(&doc);
     assert_eq!(
         body,
@@ -32,7 +32,7 @@ fn raw_content_stays_literal_not_interpreted_as_markup() {
 
 #[test]
 fn raw_with_a_nested_bracket_is_not_truncated_early() {
-    let doc = parse_document("@raw(lang:rust)[let v = [1, 2, 3];]\n").unwrap();
+    let doc = parse_file("@raw(lang:rust)[let v = [1, 2, 3];]\n").unwrap();
     let body = render_body(&doc);
     assert_eq!(
         body,
@@ -42,7 +42,7 @@ fn raw_with_a_nested_bracket_is_not_truncated_early() {
 
 #[test]
 fn renders_inline_backtick_as_code() {
-    let doc = parse_document("call `foo()` and `@kind(doc.index)` now\n").unwrap();
+    let doc = parse_file("call `foo()` and `@kind(doc.index)` now\n").unwrap();
     let body = render_body(&doc);
     assert_eq!(
         body,
@@ -52,7 +52,7 @@ fn renders_inline_backtick_as_code() {
 
 #[test]
 fn renders_explicit_inline_raw() {
-    let doc = parse_document("use @raw[Ctrl+C] or @raw(rust)[x = 1] here\n").unwrap();
+    let doc = parse_file("use @raw[Ctrl+C] or @raw(rust)[x = 1] here\n").unwrap();
     let body = render_body(&doc);
     assert_eq!(
         body,
@@ -62,7 +62,7 @@ fn renders_explicit_inline_raw() {
 
 #[test]
 fn raw_value_group_is_id_cssclass_metadata_not_code() {
-    let doc = parse_document("@raw(lang:rust)#(snippet1){cssclass:card}[fn main() {}]\n").unwrap();
+    let doc = parse_file("@raw(lang:rust)#(snippet1){cssclass:card}[fn main() {}]\n").unwrap();
     let body = render_body(&doc);
     assert_eq!(
         body,
@@ -72,7 +72,7 @@ fn raw_value_group_is_id_cssclass_metadata_not_code() {
 
 #[test]
 fn renders_raw_with_positional_lang_arg() {
-    let doc = parse_document("@raw(\"rust\")[fn main() {}]\n").unwrap();
+    let doc = parse_file("@raw(\"rust\")[fn main() {}]\n").unwrap();
     let body = render_body(&doc);
     assert_eq!(
         body,

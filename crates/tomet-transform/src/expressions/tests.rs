@@ -30,7 +30,7 @@ fn vault() -> MemoryResolver {
 }
 
 /// Resolves `src` as the document `here.tmt` of the small vault above.
-fn run_with(src: &str, phase: Phase, vars: &EvalValue) -> (Document, Vec<Unresolved>) {
+fn run_with(src: &str, phase: Phase, vars: &EvalValue) -> (File, Vec<Unresolved>) {
     let resolver = vault();
     run_in(src, &resolver, phase, vars)
 }
@@ -40,7 +40,7 @@ fn run_in(
     resolver: &dyn Resolver,
     phase: Phase,
     vars: &EvalValue,
-) -> (Document, Vec<Unresolved>) {
+) -> (File, Vec<Unresolved>) {
     let mut macros = HashMap::new();
     macros.insert("gh".to_string(), "https://x/issues/${1}".to_string());
     let cx = EvalContext {
@@ -55,17 +55,17 @@ fn run_in(
         heading_level: 0,
         notes: Default::default(),
     };
-    let mut doc = tomet_ast_parser::parse_document(src).expect("source parses");
+    let mut doc = tomet_ast_parser::parse_file(src).expect("source parses");
     let unresolved = resolve_expressions(&mut doc, &cx);
     (doc, unresolved)
 }
 
-fn run(src: &str) -> (Document, Vec<Unresolved>) {
+fn run(src: &str) -> (File, Vec<Unresolved>) {
     run_with(src, Phase::Output, &EvalValue::Null)
 }
 
 /// Every text node in the document, in order, joined with `|` between blocks.
-fn text_of(doc: &Document) -> String {
+fn text_of(doc: &File) -> String {
     fn inlines(out: &mut String, items: &[Inline]) {
         for inline in items {
             match inline {
@@ -108,13 +108,12 @@ fn text_of(doc: &Document) -> String {
                     out.push_str(&format!("<{}>", el.name.to_string()));
                 }
                 Block::Interp(interp) => out.push_str(&format!("${{{}}}", interp.expr)),
-                Block::Declaration(d) => out.push_str(&format!("::{}", d.name)),
                 Block::Hole(_) => {}
             }
         }
     }
     let mut out = String::new();
-    blocks(&mut out, &doc.blocks);
+    blocks(&mut out, &doc.body);
     out
 }
 
@@ -264,7 +263,7 @@ fn macro_table_cases() {
     };
     let test_run = |expr: &str| {
         let src = format!("Test {}.\n", expr);
-        let mut doc = tomet_ast_parser::parse_document(&src).unwrap();
+        let mut doc = tomet_ast_parser::parse_file(&src).unwrap();
         let unresolved = resolve_expressions(&mut doc, &cx);
         (text_of(&doc), unresolved)
     };
@@ -313,7 +312,7 @@ fn macro_table_cases() {
 fn a_value_in_an_element_argument_keeps_its_type() {
     let (doc, unresolved) = run("@card(n: ${add(1, 2)}, label: ${\"x\"})\n");
     assert!(unresolved.is_empty(), "{unresolved:?}");
-    let Block::Element(el) = &doc.blocks[0] else {
+    let Block::Element(el) = &doc.body[0] else {
         panic!("an element block");
     };
     assert_eq!(
@@ -330,9 +329,7 @@ fn a_value_in_a_value_group_keeps_its_type_and_a_list_stays_a_list() {
     let (doc, unresolved) =
         run("::meta{ n: ${add(1, 1)}, names: ${addr(dir:docs).docs.map(d => d.path)} }\n");
     assert!(unresolved.is_empty(), "{unresolved:?}");
-    let Block::Declaration(declaration) = &doc.blocks[0] else {
-        panic!("an element block");
-    };
+    let declaration = &doc.header[0];
     let Some(Group(entries)) = &declaration.data.value else {
         panic!("a group");
     };
@@ -355,7 +352,7 @@ fn a_value_in_a_value_group_keeps_its_type_and_a_list_stays_a_list() {
 fn a_document_cannot_be_stored_as_data_and_the_expression_stays() {
     let (doc, unresolved) = run("@card(doc: ${self})\n");
     assert!(reasons(&unresolved)[0].contains("cannot be stored as data"));
-    let Block::Element(el) = &doc.blocks[0] else {
+    let Block::Element(el) = &doc.body[0] else {
         panic!("an element block");
     };
     // Still the expression, so the author sees what did not resolve.
@@ -368,13 +365,13 @@ fn a_document_cannot_be_stored_as_data_and_the_expression_stays() {
 #[test]
 fn expressions_inside_an_elements_content_are_resolved_too() {
     let (doc, _) = run("@callout[ value is ${add(2, 3)} ]\n");
-    let Block::Element(el) = &doc.blocks[0] else {
+    let Block::Element(el) = &doc.body[0] else {
         panic!("an element block");
     };
     let content = el.content.as_ref().unwrap();
     assert_eq!(
-        text_of(&Document {
-            blocks: content.clone(),
+        text_of(&File {
+            body: content.clone(),
             ..doc.clone()
         }),
         "value is 5"
@@ -399,9 +396,7 @@ fn creating_a_document_reads_var_and_generates() {
         &vars,
     );
     assert!(unresolved.is_empty(), "{unresolved:?}");
-    let Block::Declaration(declaration) = &doc.blocks[0] else {
-        panic!("meta");
-    };
+    let declaration = &doc.header[0];
     let Some(Group(entries)) = &declaration.data.value else {
         panic!("a group");
     };
@@ -413,22 +408,14 @@ fn creating_a_document_reads_var_and_generates() {
         entries[1],
         tomet_ast::Entry::Pair("title".into(), Value::String("Plan".into()))
     );
-    assert_eq!(
-        text_of(&Document {
-            blocks: doc.blocks[1..].to_vec(),
-            ..doc.clone()
-        }),
-        "Plan for Plan"
-    );
+    assert_eq!(text_of(&doc), "Plan for Plan");
 }
 
 #[test]
 fn creation_only_names_are_refused_when_rendering() {
     let (doc, unresolved) = run("::meta{ id: ${generate.uuid()} }\n");
     assert!(reasons(&unresolved)[0].contains("when a document is being created"));
-    let Block::Declaration(declaration) = &doc.blocks[0] else {
-        panic!("meta");
-    };
+    let declaration = &doc.header[0];
     // The expression is still there.
     let Some(Group(entries)) = &declaration.data.value else {
         panic!("a group");
@@ -441,7 +428,7 @@ fn creation_only_names_are_refused_when_rendering() {
 
 #[test]
 fn with_no_vault_a_reference_to_another_document_fails_and_stays() {
-    let mut doc = tomet_ast_parser::parse_document("see ${tmt(\"x.tmt\")#a.id}\n").unwrap();
+    let mut doc = tomet_ast_parser::parse_file("see ${tmt(\"x.tmt\")#a.id}\n").unwrap();
     let macros = HashMap::new();
     let vars = EvalValue::Null;
     let cx = EvalContext {
@@ -466,7 +453,7 @@ fn a_macro_in_an_element_argument_is_expanded_and_stays_text() {
     // What `expand_document_macros` did, for the one binding that called it.
     let (doc, unresolved) = run("- @link(${macro.gh(7)})\n");
     assert!(unresolved.is_empty(), "{unresolved:?}");
-    let Block::List(list) = &doc.blocks[0] else {
+    let Block::List(list) = &doc.body[0] else {
         panic!("a list");
     };
     let content = &list.items[0].content;
@@ -500,7 +487,7 @@ fn an_id_used_twice_after_an_include_keeps_the_first_and_reports_the_later() {
     assert!(!unresolved[0].message().contains("${"), "{unresolved:?}");
 
     let ids: Vec<Option<String>> = doc
-        .blocks
+        .body
         .iter()
         .filter_map(|b| match b {
             Block::Element(el) => Some(el.id.as_ref().map(|i| i.0.clone())),
@@ -530,7 +517,7 @@ fn ids_that_are_each_used_once_are_left_alone() {
     let (doc, unresolved) = run("@card(n: 1)#(a)\n\n@card(n: 2)#(b)\n");
     assert!(unresolved.is_empty(), "{unresolved:?}");
     let ids: Vec<String> = doc
-        .blocks
+        .body
         .iter()
         .filter_map(|b| match b {
             Block::Element(el) => el.id.as_ref().map(|i| i.0.clone()),
@@ -545,7 +532,7 @@ fn a_section_id_is_claimed_too() {
     let (doc, unresolved) = run("=[ One ]#(s)\n\n=[ Two ]#(s)\n");
     assert_eq!(unresolved.len(), 1, "{unresolved:?}");
     let ids: Vec<Option<String>> = doc
-        .blocks
+        .body
         .iter()
         .filter_map(|b| match b {
             Block::Section(s) => Some(s.id.as_ref().map(|i| i.0.clone())),
@@ -559,7 +546,7 @@ fn a_section_id_is_claimed_too() {
 fn an_include_lands_one_heading_below_the_section_it_sits_in() {
     let (doc, unresolved) = run("=[ Host ]\n\n${include(tmt(\"here.tmt\")#top)}\n");
     assert!(unresolved.is_empty(), "{unresolved:?}");
-    let Block::Section(host) = &doc.blocks[0] else {
+    let Block::Section(host) = &doc.body[0] else {
         panic!("a section");
     };
     let included: Vec<usize> = host
@@ -592,7 +579,7 @@ fn only_the_selected_expressions_are_resolved() {
         heading_level: 0,
         notes: Default::default(),
     };
-    let mut doc = tomet_ast_parser::parse_document(src).expect("source parses");
+    let mut doc = tomet_ast_parser::parse_file(src).expect("source parses");
     // Pick every expression that mentions `path`, by the span it is written at.
     let mut picked = Vec::new();
     tomet_tree::for_each_interpolation(&doc, |interp| {

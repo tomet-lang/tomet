@@ -1,5 +1,5 @@
 use lsp_types::{TextEdit, Uri};
-use tomet_ast::Document;
+use tomet_ast::File;
 
 use crate::position::{uri_to_file_path, whole_document_range};
 
@@ -29,7 +29,7 @@ pub fn format_edits(text: &str, uri: Option<&Uri>) -> Vec<TextEdit> {
 ///    (see `tomet_load_config`), for the macros and variables they declare
 /// 2. The document's own `::macros` and `::vars` (highest precedence)
 pub fn resolve_effective_config(
-    doc: &Document,
+    doc: &File,
     uri: Option<&Uri>,
 ) -> tomet_semantics::DocumentConfig {
     let mut config = tomet_semantics::document_config(doc);

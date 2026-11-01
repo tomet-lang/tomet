@@ -19,7 +19,7 @@ use tomet_tests::{assert_snapshot, parseable_corpus, snapshot_name};
 #[test]
 fn html_output_matches_reference() {
     for (rel, src) in parseable_corpus() {
-        let doc = tomet_ast_parser::parse_document(&src)
+        let doc = tomet_ast_parser::parse_file(&src)
             .unwrap_or_else(|e| panic!("{} failed to parse: {e}", rel.display()));
         // `render_body` rather than `render_page`: the page wrapper is
         // boilerplate, and pinning it would make every fixture's
@@ -31,7 +31,7 @@ fn html_output_matches_reference() {
 #[test]
 fn markdown_output_matches_reference() {
     for (rel, src) in parseable_corpus() {
-        let doc = tomet_ast_parser::parse_document(&src)
+        let doc = tomet_ast_parser::parse_file(&src)
             .unwrap_or_else(|e| panic!("{} failed to parse: {e}", rel.display()));
         assert_snapshot(
             &snapshot_name(&rel, "md"),
@@ -43,7 +43,7 @@ fn markdown_output_matches_reference() {
 #[test]
 fn typst_output_matches_reference() {
     for (rel, src) in parseable_corpus() {
-        let doc = tomet_ast_parser::parse_document(&src)
+        let doc = tomet_ast_parser::parse_file(&src)
             .unwrap_or_else(|e| panic!("{} failed to parse: {e}", rel.display()));
         assert_snapshot(&snapshot_name(&rel, "typ"), &tomet_typst::to_typst(&doc));
     }
@@ -55,7 +55,7 @@ fn printed_source_matches_reference() {
     // checks that the result reparses to the same document; this pins
     // what it actually looks like, which reparsing alone does not.
     for (rel, src) in parseable_corpus() {
-        let doc = tomet_ast_parser::parse_document(&src)
+        let doc = tomet_ast_parser::parse_file(&src)
             .unwrap_or_else(|e| panic!("{} failed to parse: {e}", rel.display()));
         assert_snapshot(
             &snapshot_name(&rel, "printed.tmt"),
@@ -70,7 +70,7 @@ fn markdown_import_export_is_stable() {
     // design, so this does not assert a round trip -- it pins where the
     // losses currently land.
     for (rel, src) in parseable_corpus() {
-        let doc = tomet_ast_parser::parse_document(&src)
+        let doc = tomet_ast_parser::parse_file(&src)
             .unwrap_or_else(|e| panic!("{} failed to parse: {e}", rel.display()));
         let exported = tomet_markdown::to_markdown(&doc);
         let reimported = tomet_markdown::from_markdown(&exported);
@@ -87,7 +87,7 @@ fn pandoc_output_matches_reference() {
     // `pandoc -f json` reads, so the reference is the wire format
     // itself -- a change here is a change to what Pandoc will accept.
     for (rel, src) in parseable_corpus() {
-        let doc = tomet_ast_parser::parse_document(&src)
+        let doc = tomet_ast_parser::parse_file(&src)
             .unwrap_or_else(|e| panic!("{} failed to parse: {e}", rel.display()));
         let json = serde_json::to_string_pretty(&tomet_pandoc::to_pandoc(&doc))
             .expect("the Pandoc AST serializes");
@@ -106,7 +106,7 @@ fn pandoc_output_matches_reference() {
 #[test]
 fn a_bare_entry_does_not_come_back_as_an_element_named_bare() {
     let src = "@deck.card{ title: t, (a)[ x ] }\n";
-    let doc = tomet_ast_parser::parse_document(src).unwrap();
+    let doc = tomet_ast_parser::parse_file(src).unwrap();
     let back = tomet_pandoc::from_pandoc(&tomet_pandoc::to_pandoc(&doc));
 
     let mut names = Vec::new();
@@ -128,7 +128,7 @@ fn pandoc_round_trip_is_stable() {
     // trip -- it pins where the losses land, so a change in them shows up
     // as a diff rather than as a surprise.
     for (rel, src) in parseable_corpus() {
-        let doc = tomet_ast_parser::parse_document(&src)
+        let doc = tomet_ast_parser::parse_file(&src)
             .unwrap_or_else(|e| panic!("{} failed to parse: {e}", rel.display()));
         let back = tomet_pandoc::from_pandoc(&tomet_pandoc::to_pandoc(&doc));
         assert_snapshot(

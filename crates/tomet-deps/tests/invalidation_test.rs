@@ -2,7 +2,7 @@ use tomet_deps::{
     Change, Dependency, DependencyGraph, DependencyKind, DocumentNode, compute_affected_paths,
     extract_document_node, fnv1a_hash,
 };
-use tomet_ast_parser::parse_document;
+use tomet_ast_parser::parse_file;
 
 fn make_node(
     path: &str,
@@ -274,7 +274,7 @@ fn test_extract_document_node_from_ast() {
 Welcome to the documentation.
 Check out @link("guide/setup") or @embed("snippets/code").
 "#;
-    let doc = parse_document(src).expect("valid tomet source");
+    let doc = parse_file(src).expect("valid tomet source");
 
     let resolve = |from: &str, raw: &str| -> Option<String> {
         if raw.starts_with('/') {

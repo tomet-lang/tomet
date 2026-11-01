@@ -53,7 +53,7 @@ impl std::error::Error for ConfigError {
 }
 
 pub fn load_config_from_str(src: &str) -> Result<Config, ConfigError> {
-    let doc = tomet_ast_parser::parse_document(src)
+    let doc = tomet_ast_parser::parse_file(src)
         .map_err(|source| ConfigError::Parse { path: None, source })?;
     Ok(Config::from_doc(&doc))
 }

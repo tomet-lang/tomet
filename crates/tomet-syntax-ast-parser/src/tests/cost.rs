@@ -13,7 +13,7 @@ const LIMIT: Duration = Duration::from_secs(30);
 
 fn within_the_limit(name: &str, src: &str) {
     let started = Instant::now();
-    let _ = parse_document(src);
+    let _ = parse_file(src);
     let took = started.elapsed();
     assert!(took < LIMIT, "{name}: {took:?} for {} bytes", src.len());
 }
@@ -55,8 +55,8 @@ fn list_items_in_the_groups_of_list_items_cost_no_more_per_level() {
 }
 
 fn only_item(src: &str) -> tomet_ast::ListItem {
-    let doc = parse_document(src).unwrap();
-    match doc.blocks.into_iter().next() {
+    let doc = parse_file(src).unwrap();
+    match doc.body.into_iter().next() {
         Some(Block::List(mut list)) => list.items.remove(0),
         other => panic!("expected a list, got {other:?}"),
     }

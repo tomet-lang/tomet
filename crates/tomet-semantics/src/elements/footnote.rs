@@ -3,7 +3,7 @@
 use crate::kind::{ElementKind, classify_std_lenient};
 use crate::positional::normalized_element_args;
 use std::collections::HashMap;
-use tomet_ast::{Document, Element, ElementView, Placement};
+use tomet_ast::{Element, ElementView, File, Placement};
 use tomet_span::Span;
 use tomet_tree::{ValueExt, for_each_element};
 
@@ -69,11 +69,11 @@ fn note_reference(
 
 impl FootnoteRegistry {
     /// Scans `doc` in document order and resolves all footnotes and references.
-    pub fn from_document(doc: &Document) -> Self {
+    pub fn from_file(file: &File) -> Self {
         // Pass 1: Collect definitions, `@ftn(id)[text]`. One without content,
         // `@ftn(id)`, is a reference to one and defines nothing.
         let mut defs: HashMap<String, Element> = HashMap::new();
-        for_each_element(doc, |el| {
+        for_each_element(file, |el| {
             let view = el.as_view();
             if classify_std_lenient(view) == ElementKind::Footnote
                 && el.content.is_some()
@@ -87,7 +87,7 @@ impl FootnoteRegistry {
         let mut registry = Self::default();
         let mut id_to_index: HashMap<String, usize> = HashMap::new();
 
-        for_each_element(doc, |el| {
+        for_each_element(file, |el| {
             let view = el.as_view();
             let kind = classify_std_lenient(view);
             match kind {
@@ -183,13 +183,13 @@ fn value_to_id(val: &tomet_ast::Value) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tomet_ast_parser::parse_document;
+    use tomet_ast_parser::parse_file;
 
     #[test]
     fn test_inline_footnote_numbering() {
         let src = "First@ftn[one] and second@ftn[two].\n";
-        let doc = parse_document(src).unwrap();
-        let registry = FootnoteRegistry::from_document(&doc);
+        let doc = parse_file(src).unwrap();
+        let registry = FootnoteRegistry::from_file(&doc);
 
         assert_eq!(registry.items.len(), 2);
         assert_eq!(registry.items[0].index, 1);
@@ -201,8 +201,8 @@ mod tests {
     #[test]
     fn test_numeric_footnote_id_resolution() {
         let src = "Item @ftn(1) and @ftn(2).\n\n@ftn(1)[Note 1]\n@ftn(2)[Note 2]\n";
-        let doc = parse_document(src).unwrap();
-        let registry = FootnoteRegistry::from_document(&doc);
+        let doc = parse_file(src).unwrap();
+        let registry = FootnoteRegistry::from_file(&doc);
 
         assert_eq!(registry.items.len(), 2);
         assert_eq!(registry.items[0].index, 1);
@@ -219,8 +219,8 @@ mod tests {
     #[test]
     fn ftn_defines_with_content_and_refers_without() {
         let src = "See @ftn(intro) and @ftn(intro) and @ftn(other).\n\n@ftn(intro)[Introduction text]\n\n@ftn(other)| Other text\n";
-        let doc = parse_document(src).unwrap();
-        let registry = FootnoteRegistry::from_document(&doc);
+        let doc = parse_file(src).unwrap();
+        let registry = FootnoteRegistry::from_file(&doc);
 
         assert_eq!(registry.items.len(), 2);
         assert_eq!(registry.items[0].index, 1);
@@ -241,7 +241,7 @@ mod tests {
     #[test]
     fn a_reference_before_its_definition_and_a_missing_one_are_both_fine() {
         let src = "A@ftn(later) and B@ftn(nowhere).\n\n@ftn(later)[Defined below]\n";
-        let registry = FootnoteRegistry::from_document(&parse_document(src).unwrap());
+        let registry = FootnoteRegistry::from_file(&parse_file(src).unwrap());
         assert_eq!(registry.items.len(), 2);
         assert!(registry.items[0].definition.is_some());
         assert!(registry.items[1].definition.is_none());
@@ -250,7 +250,7 @@ mod tests {
     #[test]
     fn ftn_inline_with_content_is_an_unnamed_footnote() {
         let src = "First@ftn[one] and second@ftn[two].\n";
-        let registry = FootnoteRegistry::from_document(&parse_document(src).unwrap());
+        let registry = FootnoteRegistry::from_file(&parse_file(src).unwrap());
         assert_eq!(registry.items.len(), 2);
         assert_eq!(registry.items[0].id, None);
     }

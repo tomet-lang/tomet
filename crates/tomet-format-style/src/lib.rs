@@ -2,9 +2,9 @@
 //! link-key spacing (`target`, `@link`/`<embed>`'s one shared key), per-field
 //! `::meta` formatting) to a single
 //! `tomet_ast::Value`, `Element` or `Declaration`, returning `.tmt`-syntax text.
-//! Deliberately scoped to single nodes -- no `Document`, no tree
+//! Deliberately scoped to single nodes -- no `File`, no tree
 //! position, no recursion into sibling/child elements of other kinds --
-//! so both `tomet-printer` (rebuilds a whole `Document`) and
+//! so both `tomet-printer` (rebuilds a whole `File`) and
 //! `tomet-formatter` (patches specific spans of existing `.tmt` text)
 //! can depend on this without a circular dependency (`tomet-printer`
 //! already depends on `tomet-formatter`). `render_meta_declaration`
@@ -13,7 +13,7 @@
 //! `Group::from_map(Value::Map(...))`) -- not the general
 //! element-rendering logic for every other sigil/kind, which stays in
 //! `tomet-printer` since it recurses into inline/child content and
-//! is genuinely part of rebuilding a whole document from its AST.
+//! is genuinely part of rebuilding a whole file from its AST.
 
 use tomet_ast::{Block, Declaration, Entry, Group, Inline, Value};
 

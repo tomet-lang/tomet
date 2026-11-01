@@ -4,7 +4,7 @@
 
 use std::sync::Arc;
 
-use tomet_ast::{Block, Document, Value};
+use tomet_ast::{Block, File, Value};
 use tomet_config::{FieldConfig, PrinterConfig};
 use tomet_expr::{DirRef, DocRef, EvalValue, PreparedBlocks, Resolver, typed_value};
 use tomet_type::Type;
@@ -23,7 +23,7 @@ use tomet_type::Type;
 ///  | reading it is an error and a typo cannot turn into an answer of "no".
 ///
 /// Keys the document writes without declaring them are kept as written.
-pub fn typed_meta(config: &PrinterConfig, doc: &Document, doc_ref: &DocRef) -> EvalValue {
+pub fn typed_meta(config: &PrinterConfig, doc: &File, doc_ref: &DocRef) -> EvalValue {
     let written = match tomet_declaration::document_meta(doc) {
         Some(Value::Map(entries)) => entries,
         _ => Vec::new(),
@@ -64,13 +64,13 @@ fn typed(field: &FieldConfig, value: Option<(&Value, &DocRef)>) -> EvalValue {
 /// a half-rewritten one when `${#intro}` is resolved.
 pub struct Overlay<'a> {
     pub path: DocRef,
-    pub snapshot: Arc<Document>,
+    pub snapshot: Arc<File>,
     pub meta: EvalValue,
     pub inner: &'a dyn Resolver,
 }
 
 impl Resolver for Overlay<'_> {
-    fn document(&self, doc: &DocRef) -> Result<Arc<Document>, String> {
+    fn document(&self, doc: &DocRef) -> Result<Arc<File>, String> {
         if *doc == self.path {
             Ok(self.snapshot.clone())
         } else {
@@ -127,7 +127,7 @@ mod tests {
 ";
 
     fn meta_of(src: &str) -> EvalValue {
-        let doc = tomet_ast_parser::parse_document(src).unwrap();
+        let doc = tomet_ast_parser::parse_file(src).unwrap();
         typed_meta(&config(SETTINGS), &doc, &DocRef("a.tmt".into()))
     }
 
@@ -233,7 +233,7 @@ mod tests {
             .unwrap()
             .with_source("b.tmt", "::meta{ title: B }\n")
             .unwrap();
-        let rewritten = Arc::new(tomet_ast_parser::parse_document("::meta{ title: mine }\n").unwrap());
+        let rewritten = Arc::new(tomet_ast_parser::parse_file("::meta{ title: mine }\n").unwrap());
         let overlay = Overlay {
             path: DocRef("a.tmt".into()),
             snapshot: rewritten.clone(),

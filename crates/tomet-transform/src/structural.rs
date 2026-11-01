@@ -4,9 +4,9 @@ pub use tomet_search::structural::{
     StructuralMatch, StructuralQuery, count_structural_matches, matches_query,
 };
 
-use tomet_ast::{Data, Document, Name, Value};
+use tomet_ast::{Data, File, Name, Value};
 use tomet_semantics::{classify_declaration_lenient, classify_std_lenient};
-use tomet_tree::{DataExt, for_each_element_mut, for_each_top_level_declaration_mut};
+use tomet_tree::{DataExt, for_each_declaration_mut, for_each_element_mut};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum StructuralAction {
@@ -17,13 +17,13 @@ pub enum StructuralAction {
 
 /// Applies a structural refactoring action to all matching elements in `doc`.
 /// Returns the number of transformations applied.
-pub fn apply_structural_action(doc: &mut Document, action: &StructuralAction) -> usize {
+pub fn apply_structural_action(doc: &mut File, action: &StructuralAction) -> usize {
     let mut count = 0;
     for_each_element_mut(doc, |el| {
         let kind = classify_std_lenient(el.as_view());
         count += apply_to(action, kind.as_str(), Some(&mut el.name), &mut el.data);
     });
-    for_each_top_level_declaration_mut(doc, |declaration| {
+    for_each_declaration_mut(doc, |declaration| {
         let kind = classify_declaration_lenient(declaration);
         count += apply_to(
             action,

@@ -9,7 +9,7 @@ pub(crate) fn ast(file: &PathBuf, data: bool) -> anyhow::Result<()> {
             .map_err(|e| anyhow::anyhow!("{}", format_parse_error(file, &src, &e)))?;
         println!("{value:#?}");
     } else {
-        let doc = tomet_ast_parser::parse_document(&src)
+        let doc = tomet_ast_parser::parse_file(&src)
             .map_err(|e| anyhow::anyhow!("{}", format_parse_error(file, &src, &e)))?;
         println!("{doc:#?}");
     }

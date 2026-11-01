@@ -202,11 +202,11 @@ fn a_quoted_string_without_a_colon_is_still_a_value() {
 #[test]
 fn a_repeated_key_is_an_error_in_args_and_in_a_group() {
     for src in ["::meta(a: 1, a: 2)\n", "::meta{\n  a: 1\n  a: 2\n}\n"] {
-        let err = parse_document(src).unwrap_err().to_string();
+        let err = parse_file(src).unwrap_err().to_string();
         assert!(err.contains("duplicate key `a`"), "{src:?}: {err}");
     }
     for src in ["::meta(a: 1, b: 2)\n", "::meta{\n  a: 1\n  b: 2\n}\n"] {
-        assert!(parse_document(src).is_ok(), "{src:?}");
+        assert!(parse_file(src).is_ok(), "{src:?}");
     }
 }
 
@@ -292,9 +292,9 @@ fn a_number_reading_would_change_keeps_its_text_in_an_argument() {
         ("1.10.0", Value::String("1.10.0".into())),
         ("2026-10-25", Value::String("2026-10-25".into())),
     ] {
-        let doc = parse_document(&format!("@x({src})\n")).unwrap();
-        let Some(Block::Element(el)) = doc.blocks.first() else {
-            panic!("{src}: expected an element, got {:?}", doc.blocks);
+        let doc = parse_file(&format!("@x({src})\n")).unwrap();
+        let Some(Block::Element(el)) = doc.body.first() else {
+            panic!("{src}: expected an element, got {:?}", doc.body);
         };
         assert_eq!(el.data.args, Some(want), "{src}");
     }

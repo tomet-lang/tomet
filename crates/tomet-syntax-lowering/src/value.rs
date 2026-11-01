@@ -10,14 +10,15 @@ pub fn lower_value(root: &SyntaxNode) -> Result<Value> {
     crate::element::lower_value(root)
 }
 
-/// Lowers a CST root from `parse_cst_value` into a [`File`].
-pub fn lower_file(root: &SyntaxNode, src: &str) -> Result<File> {
+/// Lowers a CST root from `parse_cst_value` into a data [`File<Value>`].
+pub fn lower_data_file(root: &SyntaxNode, src: &str) -> Result<File<Value>> {
     crate::lower::reject_too_deep(root).map_err(|e| e.located_in(src))?;
     let body = crate::element::lower_file_body(root).map_err(|e| e.located_in(src))?;
-    Ok(File {
-        header: Vec::new(),
+    Ok(File::new(
+        Vec::new(),
         body,
-    })
+        tomet_span::Span::new(0, src.len()),
+    ))
 }
 
 /// Shifts spans of all interpolations in `value` by `delta`.

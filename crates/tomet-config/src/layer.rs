@@ -15,7 +15,7 @@
 
 use std::collections::HashMap;
 
-use tomet_ast::{Document, Element, Value};
+use tomet_ast::{Element, File, Value};
 use tomet_declaration::{DeclKind, VarDecl, document_entries};
 use tomet_tree::ValueExt;
 
@@ -34,7 +34,7 @@ pub struct ConfigLayer {
 
 impl ConfigLayer {
     /// What `doc` declares.
-    pub fn from_doc(doc: &Document) -> Self {
+    pub fn from_doc<B>(doc: &File<B>) -> Self {
         Self {
             format: document_entries(doc, DeclKind::Format),
             fields: document_entries(doc, DeclKind::Fields),
@@ -139,7 +139,7 @@ impl ConfigLayer {
 
 /// The `(name, path)` pairs a document registers in its `::blueprints`, `::vocabularies` or
 /// `::dictionaries` (`kind`), in the order written. An entry that is not a reference to a file is left out.
-pub fn registry_entries(doc: &Document, kind: DeclKind) -> Vec<(String, String)> {
+pub fn registry_entries<B>(doc: &File<B>, kind: DeclKind) -> Vec<(String, String)> {
     document_entries(doc, kind)
         .into_iter()
         .filter_map(|(name, value)| registered_path(&value).map(|path| (name, path)))
@@ -185,7 +185,7 @@ mod tests {
     use crate::Config;
 
     fn layer(src: &str) -> ConfigLayer {
-        ConfigLayer::from_doc(&tomet_ast_parser::parse_document(src).expect("parse"))
+        ConfigLayer::from_doc(&tomet_ast_parser::parse_file(src).expect("parse"))
     }
 
     #[test]

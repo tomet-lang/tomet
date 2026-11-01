@@ -1,6 +1,6 @@
 use lsp_types::{GotoDefinitionResponse, Location, Position, Uri};
 use tomet_ast::{
-    Block, Connect, Document, Element, Inline, InterpExpr, InterpExprKind, List, Value,
+    Block, Connect, Declaration, Element, File, Inline, InterpExpr, InterpExprKind, List, Value,
 };
 use tomet_span::Span;
 use tomet_semantics::TargetScheme;
@@ -36,14 +36,14 @@ pub(crate) enum Target {
 /// document. One into another document needs the vault
 /// ([`Workspace::definition`](crate::Workspace::definition)).
 pub fn definition_for(text: &str, pos: Position, uri: &Uri) -> Option<GotoDefinitionResponse> {
-    let doc = tomet_ast_parser::parse_document(text).ok()?;
+    let doc = tomet_ast_parser::parse_file(text).ok()?;
     let positions = TextPositions::new(text);
     let Some(Reference::Id(target_id)) = reference_at(&doc, positions.offset(pos)) else {
         return None;
     };
 
     // Find the node that defines this id
-    let found_span = find_def_in_blocks(&doc.blocks, &target_id);
+    let found_span = find_def_in_file(&doc, &target_id);
 
     found_span.map(|span| {
         GotoDefinitionResponse::Scalar(Location {
@@ -54,7 +54,7 @@ pub fn definition_for(text: &str, pos: Position, uri: &Uri) -> Option<GotoDefini
 }
 
 /// The reference the cursor is on, if it is on one.
-pub(crate) fn reference_at(doc: &Document, offset: usize) -> Option<Reference> {
+pub(crate) fn reference_at(doc: &File, offset: usize) -> Option<Reference> {
     struct Finder {
         offset: usize,
         found: Option<Reference>,
@@ -204,6 +204,27 @@ fn references_in(expr: &InterpExpr, out: &mut Vec<(Span, Reference)>) {
     }
 }
 
+pub(crate) fn find_def_in_file(file: &File, target_id: &str) -> Option<Span> {
+    for decl in &file.header {
+        if let Some(span) = find_def_in_declaration(decl, target_id) {
+            return Some(span);
+        }
+    }
+    find_def_in_blocks(&file.body, target_id)
+}
+
+fn find_def_in_declaration(declaration: &Declaration, target_id: &str) -> Option<Span> {
+    if declaration.id.as_ref().is_some_and(|id| id.0 == target_id) {
+        return Some(declaration.span);
+    }
+    if let Some(content) = &declaration.content
+        && let Some(span) = find_def_in_blocks(content, target_id)
+    {
+        return Some(span);
+    }
+    None
+}
+
 pub(crate) fn find_def_in_blocks(blocks: &[Block], target_id: &str) -> Option<Span> {
     for block in blocks {
         match block {
@@ -222,16 +243,6 @@ pub(crate) fn find_def_in_blocks(blocks: &[Block], target_id: &str) -> Option<Sp
             }
             Block::Element(el) => {
                 if let Some(span) = find_def_in_element(el, target_id) {
-                    return Some(span);
-                }
-            }
-            Block::Declaration(declaration) => {
-                if declaration.id.as_ref().is_some_and(|id| id.0 == target_id) {
-                    return Some(declaration.span);
-                }
-                if let Some(content) = &declaration.content
-                    && let Some(span) = find_def_in_blocks(content, target_id)
-                {
                     return Some(span);
                 }
             }

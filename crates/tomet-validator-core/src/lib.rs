@@ -9,7 +9,7 @@ pub mod id;
 pub use diagnostic::{CstValidationError, Diagnostic, Severity};
 pub use id::{collect_ids, collect_ids_cst};
 
-use tomet_ast::{Block, Document, ElementView, Inline};
+use tomet_ast::{Block, ElementView, File, Inline};
 use tomet_span::Span;
 use tomet_cst::{SyntaxNode, TextRange};
 use tomet_semantics::DeclKind;
@@ -50,7 +50,7 @@ impl Written<'_> {
 /// notation (`-@name(...)`) too: an item with a name is an element in a list,
 /// and is held to everything an element is. A plain `- content` has no name
 /// and is not passed.
-fn for_each_element_and_item(doc: &Document, mut f: impl FnMut(ElementView<'_>)) {
+fn for_each_element_and_item(doc: &File, mut f: impl FnMut(ElementView<'_>)) {
     tomet_tree::for_each_element(doc, |el| f(el.as_view()));
     tomet_tree::for_each_list_item(doc, |item| {
         if let Some(view) = item.as_element_view() {
@@ -96,7 +96,7 @@ pub fn shape_str(shape: Shape) -> &'static str {
 }
 
 /// Runs core element, ID, region, and argument validations on `doc`.
-pub fn validate_core(doc: &Document, bindings: &Bindings, errors: &mut Vec<Diagnostic>) {
+pub fn validate_core(doc: &File, bindings: &Bindings, errors: &mut Vec<Diagnostic>) {
     let mut seen: Vec<(String, Span)> = Vec::new();
 
     for_each_element_and_item(doc, |el| {
@@ -164,7 +164,7 @@ pub fn validate_core(doc: &Document, bindings: &Bindings, errors: &mut Vec<Diagn
 
 /// Enforces the `singleton` and `region` axes.
 pub fn check_singletons_and_regions(
-    doc: &Document,
+    doc: &File,
     bindings: &Bindings,
     errors: &mut Vec<Diagnostic>,
 ) {
@@ -172,16 +172,9 @@ pub fn check_singletons_and_regions(
     use tomet_semantics::Region;
 
     /// What the validator holds an element to.
-    ///
-    /// `region` is where the element *belongs*: a `::name` is a declaration
-    /// whatever its name, so it is held to the preamble even when no
-    /// vocabulary is in scope to say what it is. `declared` is what the
-    /// name's own declaration says, when it can be classified at all -- the
-    /// two differ exactly when the sigil is wrong.
     struct Held {
         name: String,
         singleton: bool,
-        region: Region,
         declared: Option<Region>,
         document: bool,
     }
@@ -205,29 +198,21 @@ pub fn check_singletons_and_regions(
             Err(_) if document => (false, None),
             Err(_) => return None,
         };
-        let region = if document {
-            Region::Preamble
-        } else {
-            declared?
-        };
         Some(Held {
             name: name.to_string(),
             singleton,
-            region,
             declared,
             document,
         })
     };
 
-    let mut in_preamble = true;
     let mut seen: Vec<(String, Span)> = Vec::new();
 
-    let mut visit = |written: Written<'_>, in_place: bool| {
+    let mut visit = |written: Written<'_>| {
         let span = written.span();
         let Some(Held {
             name,
             singleton,
-            region,
             declared,
             document,
         }) = constraints(written)
@@ -261,88 +246,50 @@ pub fn check_singletons_and_regions(
                 seen.push((name.clone(), span));
             }
         }
-        if region == Region::Preamble && !in_place {
-            errors.push(Diagnostic::OutsidePreamble { name, span });
-        }
     };
 
-    for block in &doc.blocks {
+    for decl in &doc.header {
+        visit(Written::Declaration(decl));
+    }
+
+    for block in &doc.body {
         match block {
             Block::Element(el) => {
-                let still_preamble = constraints(Written::Element(el.as_view()))
-                    .map(|held| held.region == Region::Preamble)
-                    .unwrap_or(false);
-                visit(Written::Element(el.as_view()), in_preamble);
-                if !still_preamble {
-                    in_preamble = false;
-                }
-            }
-            Block::Declaration(d) => {
-                let still_preamble = constraints(Written::Declaration(d))
-                    .map(|held| held.region == Region::Preamble)
-                    .unwrap_or(false);
-                visit(Written::Declaration(d), in_preamble);
-                if !still_preamble {
-                    in_preamble = false;
-                }
+                visit(Written::Element(el.as_view()));
             }
             Block::Paragraph(p) => {
                 for inline in &p.content {
-                    match inline {
-                        Inline::Element(el) => {
-                            let still_preamble = constraints(Written::Element(el.as_view()))
-                                .map(|held| held.region == Region::Preamble)
-                                .unwrap_or(false);
-                            visit(Written::Element(el.as_view()), in_preamble);
-                            if !still_preamble {
-                                in_preamble = false;
-                            }
-                            tomet_tree::for_each_descendant(el, false, |child| {
-                                visit_child(child, &mut visit)
-                            });
-                        }
-                        Inline::Text(t) if !t.value.trim().is_empty() => {
-                            in_preamble = false;
-                        }
-                        Inline::Interp(_) => {
-                            in_preamble = false;
-                        }
-                        _ => {}
+                    if let Inline::Element(el) = inline {
+                        visit(Written::Element(el.as_view()));
+                        tomet_tree::for_each_descendant(el, false, |child| {
+                            visit_child(child, &mut visit)
+                        });
                     }
                 }
             }
-            // Below the top, nothing is in the preamble: every element, named list item and
-            // declaration standing in a section's body is held to its own constraints.
             Block::Section(_) | Block::List(_) => {
-                in_preamble = false;
                 visit_all(Node::Block(block), Place::Top, &mut visit);
             }
-            Block::Interp(_) => {
-                in_preamble = false;
-            }
+            Block::Interp(_) => {}
             Block::Hole(_) => visit_all(Node::Block(block), Place::Top, &mut visit),
         }
     }
 }
 
-/// Everything written in `node` and under it, none of it in the preamble: an element, a list item
-/// that names one, and a declaration standing as a block of a section's body.
+/// Everything written in `node` and under it: an element, and a list item that names one.
 ///
 /// `(args)`, the value of a `key: value` entry and a `:connect` are left out, as a descendant walk
 /// leaves them out: they describe their owner and are not part of what it holds.
-fn visit_all(node: Node<'_>, place: Place, visit: &mut impl FnMut(Written<'_>, bool)) {
+fn visit_all(node: Node<'_>, place: Place, visit: &mut impl FnMut(Written<'_>)) {
     let _ = tomet_tree::walk_node(node, place, &mut |node, place| {
         if matches!(place, Place::Args | Place::PairValue | Place::Connect) {
             return Visit::<()>::Skip;
         }
         match node {
-            Node::Block(Block::Declaration(d)) if matches!(place, Place::Top | Place::Body) => {
-                visit(Written::Declaration(d), false)
-            }
             Node::Item(item) => visit_child(tomet_tree::Child::Item(item), visit),
             other => {
                 if let Some(el) = other.element() {
-                    visit(Written::Element(el.as_view()), false);
+                    visit(Written::Element(el.as_view()));
                 }
             }
         }
@@ -352,18 +299,18 @@ fn visit_all(node: Node<'_>, place: Place, visit: &mut impl FnMut(Written<'_>, b
 
 /// What a child is held to: an element as itself, a list item as the element it
 /// is when it has a name, and nothing when it has none.
-fn visit_child(child: tomet_tree::Child<'_>, visit: &mut impl FnMut(Written<'_>, bool)) {
+fn visit_child(child: tomet_tree::Child<'_>, visit: &mut impl FnMut(Written<'_>)) {
     match child {
-        tomet_tree::Child::Element(el) => visit(Written::Element(el.as_view()), false),
+        tomet_tree::Child::Element(el) => visit(Written::Element(el.as_view())),
         tomet_tree::Child::Item(item) => {
             if let Some(view) = item.as_element_view() {
-                visit(Written::Element(view), false);
+                visit(Written::Element(view));
             }
         }
     }
 }
 
-pub fn check_unfinished(doc: &Document, errors: &mut Vec<Diagnostic>) {
+pub fn check_unfinished(doc: &File, errors: &mut Vec<Diagnostic>) {
     for_each_element_and_item(doc, |el| {
         let kind = match tomet_semantics::classify_std(el) {
             Ok(kind) => kind,
@@ -405,7 +352,7 @@ fn note_text(el: ElementView<'_>) -> String {
     out.trim().to_string()
 }
 
-pub fn check_arguments(doc: &Document, bindings: &Bindings, errors: &mut Vec<Diagnostic>) {
+pub fn check_arguments(doc: &File, bindings: &Bindings, errors: &mut Vec<Diagnostic>) {
     for_each_element_and_item(doc, |el| {
         check_arguments_of(
             el.name,
@@ -415,7 +362,7 @@ pub fn check_arguments(doc: &Document, bindings: &Bindings, errors: &mut Vec<Dia
             errors,
         );
     });
-    tomet_tree::for_each_declaration(doc, |declaration| {
+    for declaration in &doc.header {
         check_arguments_of(
             &declaration.name,
             tomet_semantics::normalized_declaration_args_in(declaration, bindings),
@@ -423,7 +370,7 @@ pub fn check_arguments(doc: &Document, bindings: &Bindings, errors: &mut Vec<Dia
             bindings,
             errors,
         );
-    });
+    }
 }
 
 /// The arguments written for `name` (already bound to the slots it has),
@@ -491,7 +438,7 @@ fn check_arguments_of(
 
 /// Runs checks on the standard declarations in `doc`, mapping each [`Problem`]
 /// back to a [`Diagnostic`] with the declaration element's span.
-pub fn check_document_declarations(doc: &Document, errors: &mut Vec<Diagnostic>) {
+pub fn check_document_declarations(doc: &File, errors: &mut Vec<Diagnostic>) {
     use tomet_declaration::{Host, Problem, check_declarations, declarations};
 
     let found = declarations(doc);
@@ -611,7 +558,7 @@ pub fn check_ctmt_declarations(declarations: &[Declared], errors: &mut Vec<Diagn
     }
 }
 
-pub fn check_content_shape(doc: &Document, bindings: &Bindings, errors: &mut Vec<Diagnostic>) {
+pub fn check_content_shape(doc: &File, bindings: &Bindings, errors: &mut Vec<Diagnostic>) {
     for_each_element_and_item(doc, |el| {
         let Some(content) = el.content else { return };
         let Ok(kind) = classify_in(el, bindings) else {
@@ -667,13 +614,11 @@ pub fn check_content_shape(doc: &Document, bindings: &Bindings, errors: &mut Vec
     });
 }
 
-/// What sits directly in `content`: elements, and declarations, which are
-/// blocks of their own.
+/// What sits directly in `content`: elements.
 fn for_each_direct_content_item<'a>(content: &'a [Block], mut f: impl FnMut(Written<'a>)) {
     for block in content {
         match block {
             Block::Element(el) => f(Written::Element(el.as_view())),
-            Block::Declaration(d) => f(Written::Declaration(d)),
             Block::Paragraph(p) => {
                 for inline in &p.content {
                     if let Inline::Element(el) = inline {
@@ -690,21 +635,21 @@ fn for_each_direct_content_item<'a>(content: &'a [Block], mut f: impl FnMut(Writ
 /// no type, a `default:` that is not of its `type:`. The same findings are reported
 /// where a vault reads the vocabulary ([`tomet_semantics::LoadedVocabularies`]);
 /// this is for checking the vocabulary file itself.
-pub fn check_vocabulary_params(doc: &Document, errors: &mut Vec<Diagnostic>) {
+pub fn check_vocabulary_params(doc: &File, errors: &mut Vec<Diagnostic>) {
     use tomet_semantics::{ElementKind, Vocabulary, classify_declaration_lenient};
 
-    let Some(vocab) = Vocabulary::from_document(doc) else {
+    let Some(vocab) = Vocabulary::from_file(doc) else {
         return;
     };
     let mut elements_span = None;
-    tomet_tree::for_each_top_level_declaration(doc, |declaration| {
+    for declaration in &doc.header {
         if elements_span.is_none()
             && classify_declaration_lenient(declaration)
                 == ElementKind::Declaration(DeclKind::Elements)
         {
             elements_span = Some(declaration.span);
         }
-    });
+    }
     let Some(span) = elements_span else { return };
     for problem in vocab.param_problems() {
         errors.push(Diagnostic::InvalidDefinition {
@@ -720,8 +665,8 @@ pub fn check_vocabulary_params(doc: &Document, errors: &mut Vec<Diagnostic>) {
 ///
 /// The caller decides whether the document is allowed to write them (the vault config is; a folder
 /// config and an ordinary document are not), because that takes the path, which this crate never has.
-pub fn check_vault_only_declarations(doc: &Document, errors: &mut Vec<Diagnostic>) {
-    tomet_tree::for_each_top_level_declaration(doc, |declaration| {
+pub fn check_vault_only_declarations(doc: &File, errors: &mut Vec<Diagnostic>) {
+    for declaration in &doc.header {
         if let tomet_semantics::ElementKind::Declaration(kind) =
             tomet_semantics::classify_declaration_lenient(declaration)
             && kind.is_vault_only()
@@ -731,7 +676,7 @@ pub fn check_vault_only_declarations(doc: &Document, errors: &mut Vec<Diagnostic
                 span: declaration.span,
             });
         }
-    });
+    }
 }
 
 /// Checks the form of the `::meta` fields the settings declare a `type:` for.
@@ -744,7 +689,7 @@ pub fn check_vault_only_declarations(doc: &Document, errors: &mut Vec<Diagnostic
 /// document does not write, an empty one (the state in which `tomet format`
 /// generates one), and a `${...}` not yet evaluated are not reported.
 pub fn check_field_types(
-    doc: &Document,
+    doc: &File,
     field_types: &std::collections::BTreeMap<String, String>,
     errors: &mut Vec<Diagnostic>,
 ) {
@@ -756,7 +701,7 @@ pub fn check_field_types(
     }
     let mut checked_meta = false;
     let mut checked_id = false;
-    tomet_tree::for_each_top_level_declaration(doc, |declaration| {
+    for declaration in &doc.header {
         match tomet_semantics::classify_declaration_lenient(declaration) {
             tomet_semantics::ElementKind::Declaration(DeclKind::Meta) if !checked_meta => {
                 checked_meta = true;
@@ -792,7 +737,7 @@ pub fn check_field_types(
             }
             _ => {}
         }
-    });
+    }
 }
 
 /// The diagnostic for `value` as the field `field`, if the settings declare a `type:` for the
@@ -842,7 +787,7 @@ fn describe_value(value: &tomet_ast::Value) -> String {
     }
 }
 
-pub fn check_dangling_anchors(doc: &Document, errors: &mut Vec<Diagnostic>) {
+pub fn check_dangling_anchors(doc: &File, errors: &mut Vec<Diagnostic>) {
     for_each_element_and_item(doc, |el| {
         let Some((_, raw_target)) = tomet_semantics::link_target_of(el) else {
             return;

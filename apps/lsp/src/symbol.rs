@@ -8,13 +8,16 @@ use crate::position::TextPositions;
 
 /// Provides document symbols for outline navigation in the editor.
 pub fn document_symbols_for(text: &str) -> Vec<DocumentSymbol> {
-    let Ok(doc) = tomet_ast_parser::parse_document(text) else {
+    let Ok(doc) = tomet_ast_parser::parse_file(text) else {
         return Vec::new();
     };
 
     let mut symbols = Vec::new();
     let positions = TextPositions::new(text);
-    for block in &doc.blocks {
+    for declaration in &doc.header {
+        collect_declaration_symbol(&positions, declaration, &mut symbols);
+    }
+    for block in &doc.body {
         collect_block_symbols(&positions, block, &mut symbols);
     }
     symbols
@@ -63,9 +66,6 @@ fn collect_block_symbols(
         }
         Block::List(list) => collect_list_symbol(positions, list, symbols),
         Block::Interp(interp) => collect_interp_symbol(positions, interp, symbols),
-        Block::Declaration(declaration) => {
-            collect_declaration_symbol(positions, declaration, symbols)
-        }
         Block::Hole(_) => {}
     }
 }
@@ -266,7 +266,7 @@ pub(crate) fn extract_blocks_text(blocks: &[Block]) -> String {
                 }
             }
             Block::Interp(_) => out.push_str("${...}"),
-            Block::Declaration(_) | Block::Hole(_) => {}
+            Block::Hole(_) => {}
         }
     }
     out

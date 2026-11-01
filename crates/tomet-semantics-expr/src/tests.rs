@@ -586,6 +586,8 @@ const HERE: &str = "::kind(note)
   tags: list(a, b)
 }
 
+@card(n: 0)
+
 =[ Intro ]#(intro)
 
 Some body.
@@ -767,9 +769,9 @@ fn the_meta_a_resolver_gives_is_what_is_read() {
 
 #[test]
 fn root_items_are_numbered_from_zero_and_a_section_is_a_node() {
-    assert_eq!(in_vault("#item(0).name").unwrap(), text("kind"));
-    assert_eq!(in_vault("self#item(2).id").unwrap(), text("intro"));
-    assert_eq!(in_vault("self.item(1).name").unwrap(), text("meta"));
+    assert_eq!(in_vault("#item(0).name").unwrap(), text("card"));
+    assert_eq!(in_vault("self#item(1).id").unwrap(), text("intro"));
+    assert_eq!(in_vault("self.item(1).name").unwrap(), text("section"));
     assert!(in_vault("#item(99)").is_err());
 }
 
@@ -1117,7 +1119,7 @@ fn an_element_with_an_id_links_to_that_id() {
 
 #[test]
 fn an_element_without_an_id_cannot_be_linked() {
-    let err = in_vault("self#item(1).link()").unwrap_err();
+    let err = in_vault("self#item(0).link()").unwrap_err();
     assert!(err.to_string().contains("without an id"), "{err}");
 }
 
@@ -1454,9 +1456,9 @@ fn includes_nested_too_deep_stop() {
 /// so the id is set on the tree. The list is addressed by the rules the
 /// element and the section already follow, which is what these pin down.
 fn list_vault() -> MemoryResolver {
-    let mut doc = tomet_ast_parser::parse_document("Lead.\n\n- one #(i1)\n- two\n- three\n").unwrap();
+    let mut doc = tomet_ast_parser::parse_file("Lead.\n\n- one #(i1)\n- two\n- three\n").unwrap();
     let mut named = 0;
-    for block in &mut doc.blocks {
+    for block in &mut doc.body {
         if let tomet_ast::Block::List(list) = block {
             list.id = Some(tomet_ast::Id("shopping".to_string()));
             named += 1;

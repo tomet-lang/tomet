@@ -2,7 +2,7 @@ use super::*;
 
 #[test]
 fn renders_heading_with_id_and_cssclass() {
-    let doc = parse_document("=[ Hello ]#(header1){ cssclass:card }\n").unwrap();
+    let doc = parse_file("=[ Hello ]#(header1){ cssclass:card }\n").unwrap();
     let body = render_body(&doc);
     assert_eq!(body, "<h1 id=\"header1\" class=\"card\">Hello</h1>\n");
 }
@@ -15,7 +15,7 @@ fn nested_inline_heading_falls_back_to_generic_rendering() {
     // `render_element`'s generic rendering, keyed on its kind name.
     // (This used to be demonstrated with a nested `@heading`; headings
     // are block-shaped now, so an inline one is not expressible.)
-    let doc = parse_document("@quote[ @deck.badge(2)[Nested] ]\n").unwrap();
+    let doc = parse_file("@quote[ @deck.badge(2)[Nested] ]\n").unwrap();
     let body = render_body(&doc);
     assert_eq!(
         body,
@@ -25,7 +25,7 @@ fn nested_inline_heading_falls_back_to_generic_rendering() {
 
 #[test]
 fn default_options_leave_headings_unnumbered() {
-    let doc = parse_document("=[ One ]\n").unwrap();
+    let doc = parse_file("=[ One ]\n").unwrap();
     assert_eq!(
         render_body_with(&doc, &RenderOptions::default()),
         render_body(&doc),
@@ -35,7 +35,7 @@ fn default_options_leave_headings_unnumbered() {
 
 #[test]
 fn auto_slug_headings_generates_ids_from_text() {
-    let doc = parse_document("=[ Hello World ]\n").unwrap();
+    let doc = parse_file("=[ Hello World ]\n").unwrap();
     let body = render_body_with(
         &doc,
         &RenderOptions {
@@ -48,7 +48,7 @@ fn auto_slug_headings_generates_ids_from_text() {
 
 #[test]
 fn auto_slug_headings_keeps_non_ascii_letters() {
-    let doc = parse_document("=[ 見出し テスト ]\n").unwrap();
+    let doc = parse_file("=[ 見出し テスト ]\n").unwrap();
     let body = render_body_with(
         &doc,
         &RenderOptions {
@@ -61,7 +61,7 @@ fn auto_slug_headings_keeps_non_ascii_letters() {
 
 #[test]
 fn auto_slug_headings_disambiguates_duplicates() {
-    let doc = parse_document("=[ Intro ]\n==[ Intro ]\n==[ Intro ]\n").unwrap();
+    let doc = parse_file("=[ Intro ]\n==[ Intro ]\n==[ Intro ]\n").unwrap();
     let body = render_body_with(
         &doc,
         &RenderOptions {
@@ -79,7 +79,7 @@ fn auto_slug_headings_disambiguates_duplicates() {
 
 #[test]
 fn auto_slug_headings_never_overrides_an_explicit_id() {
-    let doc = parse_document("=[ Hello World ]#(custom)\n").unwrap();
+    let doc = parse_file("=[ Hello World ]#(custom)\n").unwrap();
     let body = render_body_with(
         &doc,
         &RenderOptions {
@@ -92,7 +92,7 @@ fn auto_slug_headings_never_overrides_an_explicit_id() {
 
 #[test]
 fn numbers_headings_by_nesting_level() {
-    let doc = parse_document(
+    let doc = parse_file(
         "=[ One ]\n==[ One One ]\n==[ One Two ]\n=[ Two ]\n==[ Two One ]\n===[ Two One One ]\n",
     )
     .unwrap();
@@ -115,7 +115,7 @@ fn numbers_headings_by_nesting_level() {
 }
 
 fn outline_of(src: &str, options: &RenderOptions) -> Vec<HeadingInfo> {
-    let doc = parse_document(src).unwrap();
+    let doc = parse_file(src).unwrap();
     render_body_with_outline(&doc, options).1
 }
 
@@ -190,7 +190,7 @@ fn a_document_without_headings_has_an_empty_outline() {
 #[test]
 fn the_outline_does_not_change_the_html() {
     // render_body_with is now a thin wrapper; guard against it drifting.
-    let doc = parse_document("=[ One ]\n\n==[ Two ]\n\ntext\n").unwrap();
+    let doc = parse_file("=[ One ]\n\n==[ Two ]\n\ntext\n").unwrap();
     let options = RenderOptions {
         number_headings: true,
         auto_slug_headings: true,

@@ -1,9 +1,9 @@
 //! Pure, I/O-free extraction of every `File`/`Embed`/`Tm`/`Ref` link out of
-//! a parsed `Document` (`@link(target:...)`'s target scheme, or `@embed`
+//! a parsed `File` (`@link(target:...)`'s target scheme, or `@embed`
 //! unconditionally). `Url`/`Id` are deliberately excluded -- see this
 //! crate's module doc.
 
-use tomet_ast::Document;
+use tomet_ast::File;
 use tomet_span::Span;
 use tomet_semantics::{ElementKind, TargetScheme, link_target_of, path_target_of, target_scheme};
 use tomet_tree::for_each_element;
@@ -41,7 +41,7 @@ pub struct DocumentLink {
     pub span: Span,
 }
 
-pub fn collect_links(doc: &Document) -> Vec<DocumentLink> {
+pub fn collect_links(doc: &File) -> Vec<DocumentLink> {
     let mut links = Vec::new();
     for_each_element(doc, |el| {
         let view = el.as_view();
@@ -87,7 +87,7 @@ mod tests {
 
 @link(target:tmt:foo/bar#some-id)
 "#;
-        let doc = tomet_ast_parser::parse_document(src).unwrap();
+        let doc = tomet_ast_parser::parse_file(src).unwrap();
         let links = collect_links(&doc);
 
         assert_eq!(links.len(), 4, "links: {links:?}");
@@ -121,7 +121,7 @@ mod tests {
         // same way, but `Url` stays excluded from this crate regardless --
         // see this module's doc comment.
         let src = "@link(/etc/hosts)[Hosts]\n\n@link(https://example.com)[External2]\n";
-        let doc = tomet_ast_parser::parse_document(src).unwrap();
+        let doc = tomet_ast_parser::parse_file(src).unwrap();
         let links = collect_links(&doc);
 
         assert_eq!(links.len(), 1, "links: {links:?}");

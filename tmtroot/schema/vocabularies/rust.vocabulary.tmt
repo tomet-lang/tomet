@@ -1,0 +1,20 @@
+::kind(vocabulary)
+::vocabulary(rust){
+  version: "1.0.0"
+}
+
+::elements{
+  crate: {
+    display: inline
+    singleton: false
+    about: | A reference to a Rust crate within the workspace or ecosystem.
+    args: {
+      name: {
+        type: string
+        positional: true
+        required: true
+        about: | The crate name (e.g. "tomet-span", "tomet-parser").
+      }
+    }
+  }
+}

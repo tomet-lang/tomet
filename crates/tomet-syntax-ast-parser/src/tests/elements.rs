@@ -3,8 +3,8 @@ use tomet_ast::Entry;
 
 #[test]
 fn parses_section_with_attrs() {
-    let doc = parse_document("=[ Hello ]{ id:header1 }\n").unwrap();
-    match &doc.blocks[0] {
+    let doc = parse_file("=[ Hello ]{ id:header1 }\n").unwrap();
+    match &doc.body[0] {
         Block::Section(s) => {
             assert_eq!(s.level, 1);
             assert_eq!(s.title, vec![Inline::Text("Hello".into())]);
@@ -22,10 +22,10 @@ fn parses_section_with_attrs() {
 
 #[test]
 fn parses_link_with_order_free_groups() {
-    let a = parse_document("@link(target:https://example.com)[Wiki]").unwrap();
-    let b = parse_document("@link[Wiki](target:https://example.com)").unwrap();
+    let a = parse_file("@link(target:https://example.com)[Wiki]").unwrap();
+    let b = parse_file("@link[Wiki](target:https://example.com)").unwrap();
     assert_eq!(a, b);
-    match &a.blocks[0] {
+    match &a.body[0] {
         Block::Element(el) => {
             assert_eq!(el.name, Name::bare("link"));
             assert_eq!(
@@ -43,8 +43,8 @@ fn parses_link_with_order_free_groups() {
 
 #[test]
 fn parses_links_container_with_bare_children() {
-    let doc = parse_document("@links {\n  (1)[ note ]\n  (anotation1)[ note ]\n}\n").unwrap();
-    match &doc.blocks[0] {
+    let doc = parse_file("@links {\n  (1)[ note ]\n  (anotation1)[ note ]\n}\n").unwrap();
+    match &doc.body[0] {
         Block::Element(el) => {
             assert_eq!(el.name, Name::bare("links"));
             match &el.data.value {
@@ -65,8 +65,8 @@ fn parses_links_container_with_bare_children() {
 
 #[test]
 fn parses_caution_as_typed_element_not_bare_bracket() {
-    let doc = parse_document("@caution[ be careful ]\n").unwrap();
-    match &doc.blocks[0] {
+    let doc = parse_file("@caution[ be careful ]\n").unwrap();
+    match &doc.body[0] {
         Block::Element(el) => {
             assert_eq!(el.name, Name::bare("caution"));
             assert_eq!(el.content, wrap(vec![Inline::Text("be careful".into())]));
@@ -79,9 +79,9 @@ fn parses_caution_as_typed_element_not_bare_bracket() {
 fn an_element_folded_into_a_paragraph_still_takes_its_group_from_the_next_line() {
     // The second `@file` is the second line of a paragraph, an inline element,
     // and its `[content]` stands on the line after it all the same.
-    let doc = parse_document("@dir(a)\n[ x ]\n@file(b)\n[ y ]\n").unwrap();
-    let [Block::Paragraph(p)] = doc.blocks.as_slice() else {
-        panic!("expected one paragraph, got {:?}", doc.blocks);
+    let doc = parse_file("@dir(a)\n[ x ]\n@file(b)\n[ y ]\n").unwrap();
+    let [Block::Paragraph(p)] = doc.body.as_slice() else {
+        panic!("expected one paragraph, got {:?}", doc.body);
     };
     let elements: Vec<&Element> = p
         .content
@@ -97,23 +97,23 @@ fn an_element_folded_into_a_paragraph_still_takes_its_group_from_the_next_line()
 
 #[test]
 fn an_angle_bracket_is_a_character_not_a_typed_element() {
-    let doc = parse_document("<embed>[alt](https://example.com/pic.png)\n").unwrap();
-    let [Block::Paragraph(p)] = doc.blocks.as_slice() else {
-        panic!("expected a paragraph, got {:?}", doc.blocks);
+    let doc = parse_file("<embed>[alt](https://example.com/pic.png)\n").unwrap();
+    let [Block::Paragraph(p)] = doc.body.as_slice() else {
+        panic!("expected a paragraph, got {:?}", doc.body);
     };
     assert!(matches!(p.content.first(), Some(Inline::Text(t)) if t.value.starts_with("<embed>")));
 }
 
 #[test]
 fn a_name_must_be_ascii_to_start_an_element() {
-    let doc = parse_document("@タグ\n").unwrap();
-    assert!(matches!(doc.blocks.as_slice(), [Block::Paragraph(_)]));
+    let doc = parse_file("@タグ\n").unwrap();
+    assert!(matches!(doc.body.as_slice(), [Block::Paragraph(_)]));
 }
 
 #[test]
 fn a_bare_entry_takes_args_content_and_value_like_a_named_one() {
-    let doc = parse_document("@memo{ (1)[ ひとつ ]{ id: a } }\n").unwrap();
-    let Block::Element(el) = &doc.blocks[0] else {
+    let doc = parse_file("@memo{ (1)[ ひとつ ]{ id: a } }\n").unwrap();
+    let Block::Element(el) = &doc.body[0] else {
         panic!()
     };
     let Some(Group(entries)) = &el.data.value else {

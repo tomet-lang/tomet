@@ -3,7 +3,7 @@
 use std::path::Path;
 use std::sync::Arc;
 
-use tomet_ast::{Block, Document};
+use tomet_ast::{Block, File};
 use tomet_expr::{DirRef, DocRef, EvalValue, PreparedBlocks, Resolver};
 
 use crate::Vault;
@@ -30,14 +30,14 @@ impl<'v> DiskResolver<'v> {
 }
 
 impl Resolver for DiskResolver<'_> {
-    fn document(&self, doc: &DocRef) -> Result<Arc<Document>, String> {
-        if let Some(cached) = self.vault.cached_document(&doc.0) {
+    fn document(&self, doc: &DocRef) -> Result<Arc<File>, String> {
+        if let Some(cached) = self.vault.cached_file(&doc.0) {
             return Ok(cached);
         }
         let path = self.vault.root.join(&doc.0);
         let src = std::fs::read_to_string(&path).map_err(|e| e.to_string())?;
-        let parsed = tomet_ast_parser::parse_document(&src).map_err(|e| e.to_string())?;
-        Ok(self.vault.cache_document(&doc.0, parsed))
+        let parsed = tomet_ast_parser::parse_file(&src).map_err(|e| e.to_string())?;
+        Ok(self.vault.cache_file(&doc.0, parsed))
     }
 
     fn note(&self, name: &str) -> Result<DocRef, String> {

@@ -1,8 +1,8 @@
 //! Whitespace-hygiene formatting preserving verbatim raw spans (fenced code
 //! blocks, and any `(content:raw)` element).
 
-use tomet_ast::{Block, Document, ElementView, Value};
-use tomet_ast_parser::parse_document;
+use tomet_ast::{Block, ElementView, File, Value};
+use tomet_ast_parser::parse_file;
 use tomet_tree::{Node, Place, Visit, walk};
 
 /// Normalizes whitespace (LF line endings, no trailing whitespace, collapsed excess
@@ -14,7 +14,7 @@ pub fn clean_whitespace(normalized: &str) -> String {
     }
 
     let mut raw_spans = Vec::new();
-    if let Ok(doc) = parse_document(normalized) {
+    if let Ok(doc) = parse_file(normalized) {
         collect_raw_spans(&doc, &mut raw_spans);
     }
 
@@ -85,7 +85,7 @@ pub(crate) fn is_raw_element(el: ElementView<'_>) -> bool {
 /// a list item included. A raw element can sit anywhere an element can: in a `:connect` too, and
 /// in a hole's content. What is in `(args)` or is the value of a `key: value` entry is not text of
 /// the document, and is not looked at.
-pub(crate) fn collect_raw_spans(doc: &Document, out: &mut Vec<(usize, usize)>) {
+pub(crate) fn collect_raw_spans(doc: &File, out: &mut Vec<(usize, usize)>) {
     fn push_spans(content: Option<&[Block]>, out: &mut Vec<(usize, usize)>) {
         for block in content.into_iter().flatten() {
             let Block::Paragraph(p) = block else { continue };

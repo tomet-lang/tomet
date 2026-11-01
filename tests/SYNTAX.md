@@ -371,7 +371,7 @@ unknown element `memo`: only `std` and this document's own `::kind` may be writt
 ```
 
 ```
-Block  ::config
+Declaration ::config
   content
     Block  @raw
       content
@@ -1686,9 +1686,9 @@ Paragraph
 ```
 
 ```
-Block  ::kind
+Declaration ::kind
   args    "note"
-Block  ::meta
+Declaration ::meta
   group
     id: "x"
 ```
@@ -1706,7 +1706,7 @@ Block  ::meta
 ```
 
 ```
-Block  ::x
+Declaration ::x
   args    "a"
   content
     Paragraph
@@ -1730,9 +1730,9 @@ unknown element `x`: only `std` and this document's own `::kind` may be written 
 ```
 
 ```
-Block  ::kind
+Declaration ::kind
   args    "note"
-Block  ::use
+Declaration ::use
   args    "deck"
 ```
 

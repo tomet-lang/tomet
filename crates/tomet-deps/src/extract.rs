@@ -1,13 +1,13 @@
 //! Pure in-memory dependency and export extraction from parsed Tomet ASTs.
 
-use tomet_ast::{Block, Document};
+use tomet_ast::File;
 use tomet_semantics::{ElementKind, TargetScheme, link_target_of, path_target_of, target_scheme};
 use tomet_tree::for_each_element;
 
 use crate::model::{Dependency, DependencyKind, DocumentNode, fnv1a_hash};
 
-/// Extracts raw outgoing targets alongside their dependency kind from an AST Document.
-pub fn extract_raw_dependencies(doc: &Document) -> Vec<(String, DependencyKind)> {
+/// Extracts raw outgoing targets alongside their dependency kind from an AST File.
+pub fn extract_raw_dependencies(doc: &File) -> Vec<(String, DependencyKind)> {
     let mut out = Vec::new();
     for_each_element(doc, |el| {
         let view = el.as_view();
@@ -39,22 +39,20 @@ pub fn extract_raw_dependencies(doc: &Document) -> Vec<(String, DependencyKind)>
 }
 
 /// Computes a hash of document declarations (such as `::meta`, `::title`, `::kind`, `::slug`, etc.).
-pub fn extract_exports_hash(doc: &Document) -> u64 {
+pub fn extract_exports_hash(doc: &File) -> u64 {
     let mut hash_bytes = Vec::new();
-    for block in &doc.blocks {
-        if let Block::Declaration(declaration) = block {
-            hash_bytes.extend_from_slice(declaration.name.name.as_bytes());
-            if let Some(args) = &declaration.data.args
-                && let Some(text) = args.scalar_text()
-            {
-                hash_bytes.extend_from_slice(text.as_bytes());
-            }
-            if let Some(val) = &declaration.data.value {
-                for (k, v) in val.pairs() {
-                    hash_bytes.extend_from_slice(k.as_bytes());
-                    if let Some(text) = v.scalar_text() {
-                        hash_bytes.extend_from_slice(text.as_bytes());
-                    }
+    for declaration in &doc.header {
+        hash_bytes.extend_from_slice(declaration.name.name.as_bytes());
+        if let Some(args) = &declaration.data.args
+            && let Some(text) = args.scalar_text()
+        {
+            hash_bytes.extend_from_slice(text.as_bytes());
+        }
+        if let Some(val) = &declaration.data.value {
+            for (k, v) in val.pairs() {
+                hash_bytes.extend_from_slice(k.as_bytes());
+                if let Some(text) = v.scalar_text() {
+                    hash_bytes.extend_from_slice(text.as_bytes());
                 }
             }
         }
@@ -66,7 +64,7 @@ pub fn extract_exports_hash(doc: &Document) -> u64 {
 pub fn extract_document_node<F>(
     path: &str,
     source: &str,
-    doc: &Document,
+    doc: &File,
     resolve_target: F,
 ) -> DocumentNode
 where

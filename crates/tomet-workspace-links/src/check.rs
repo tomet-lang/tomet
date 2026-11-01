@@ -123,7 +123,7 @@ fn check_document_anchor(path: &Path, anchor: &str) -> bool {
     let Ok(content) = std::fs::read_to_string(path) else {
         return false;
     };
-    let Ok(doc) = tomet_ast_parser::parse_document(&content) else {
+    let Ok(doc) = tomet_ast_parser::parse_file(&content) else {
         return false;
     };
     tomet_address::has_anchor(&doc, anchor)

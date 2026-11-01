@@ -57,7 +57,7 @@ fn a_file_in_a_vault_is_written_out_standalone() {
     assert!(!text.contains("${self.path}"), "{text}");
 
     // The promise is kept: the validator finds nothing in what was written.
-    let written = tomet_ast_parser::parse_document(&text).unwrap();
+    let written = tomet_ast_parser::parse_file(&text).unwrap();
     assert_eq!(tomet_validator::standalone_findings(&written), vec![]);
     // The original is as it was.
     assert_eq!(

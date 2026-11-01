@@ -1,7 +1,7 @@
 use tomet_semantics::DeclKind;
 
 use lsp_types::{Hover, HoverContents, MarkupContent, MarkupKind, Position, Range, Uri};
-use tomet_ast::{Declaration, Document, Element, InterpExpr, Value};
+use tomet_ast::{Declaration, Element, File, InterpExpr, Value};
 use tomet_span::Span;
 use tomet_expr::{DocRef, EvalContext, EvalValue, MemoryResolver, Phase, SystemGenerate, evaluate};
 use tomet_semantics::{
@@ -19,7 +19,7 @@ use crate::symbol::list_item_marker_text;
 /// What an expression comes to, for a hover: given the document it is written
 /// in, and the expression.
 pub type Evaluate<'a> =
-    &'a dyn Fn(&Document, &tomet_ast::InterpExpr) -> Result<EvalValue, tomet_expr::EvalError>;
+    &'a dyn Fn(&File, &tomet_ast::InterpExpr) -> Result<EvalValue, tomet_expr::EvalError>;
 
 /// Provides hover information for the symbol under the cursor, from the text
 /// alone.
@@ -28,7 +28,7 @@ pub type Evaluate<'a> =
 /// what reaches for another file fails and says so. A document that has a
 /// vault is better served by [`hover_in`], with the vault's evaluation.
 pub fn hover_for(text: &str, pos: Position, uri: Option<&Uri>) -> Option<Hover> {
-    let doc = tomet_ast_parser::parse_document(text).ok()?;
+    let doc = tomet_ast_parser::parse_file(text).ok()?;
     let config = resolve_effective_config(&doc, uri);
     hover_in(text, pos, &|doc, expr| {
         evaluate_for_hover(doc, expr, &config)
@@ -37,12 +37,12 @@ pub fn hover_for(text: &str, pos: Position, uri: Option<&Uri>) -> Option<Hover> 
 
 /// [`hover_for`], with `evaluate` deciding what an expression comes to.
 pub fn hover_in(text: &str, pos: Position, evaluate: Evaluate<'_>) -> Option<Hover> {
-    let doc = tomet_ast_parser::parse_document(text).ok()?;
+    let doc = tomet_ast_parser::parse_file(text).ok()?;
     let positions = TextPositions::new(text);
     let offset = positions.offset(pos);
 
     struct HoverFinder<'a> {
-        doc: &'a Document,
+        doc: &'a File,
         evaluate: Evaluate<'a>,
         text: &'a str,
         positions: &'a TextPositions<'a>,
@@ -422,7 +422,7 @@ fn find_interp_in_value(val: &Value) -> Option<tomet_ast::InterpExpr> {
         Value::String(s) => {
             let trimmed = s.trim();
             if trimmed.starts_with('$')
-                && let Ok(parsed) = tomet_ast_parser::parse_document(trimmed)
+                && let Ok(parsed) = tomet_ast_parser::parse_file(trimmed)
             {
                 let mut found = None;
                 for_each_interpolation(&parsed, |interp| {
@@ -458,7 +458,7 @@ fn find_interp_in_value(val: &Value) -> Option<tomet_ast::InterpExpr> {
 
 fn macro_hover(
     positions: &TextPositions<'_>,
-    doc: &Document,
+    doc: &File,
     evaluate: Evaluate<'_>,
     el: &Element,
 ) -> Option<Hover> {
@@ -470,7 +470,7 @@ fn macro_hover(
 /// or why it does not.
 fn macro_result_hover(
     positions: &TextPositions<'_>,
-    doc: &Document,
+    doc: &File,
     evaluate: Evaluate<'_>,
     expr: &InterpExpr,
     span: Span,
@@ -511,7 +511,7 @@ fn is_web_url(s: &str) -> bool {
 /// reaches for another file fails and says so; `generate.*` fails too,
 /// because rendering never runs it. A variable is at its `default`.
 fn evaluate_for_hover(
-    doc: &Document,
+    doc: &File,
     expr: &tomet_ast::InterpExpr,
     config: &tomet_semantics::DocumentConfig,
 ) -> Result<EvalValue, tomet_expr::EvalError> {

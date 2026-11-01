@@ -59,7 +59,7 @@ struct Stack {
 fn read_layer(path: &Path) -> ConfigLayer {
     std::fs::read_to_string(path)
         .ok()
-        .and_then(|src| tomet_ast_parser::parse_document(&src).ok())
+        .and_then(|src| tomet_ast_parser::parse_file(&src).ok())
         .map(|doc| ConfigLayer::from_doc(&doc))
         .unwrap_or_default()
 }
@@ -132,7 +132,7 @@ pub fn load_config_from_file(path: &Path) -> Result<Config, ConfigError> {
         path: path.to_path_buf(),
         source,
     })?;
-    let doc = tomet_ast_parser::parse_document(&src).map_err(|source| ConfigError::Parse {
+    let doc = tomet_ast_parser::parse_file(&src).map_err(|source| ConfigError::Parse {
         path: Some(path.to_path_buf()),
         source,
     })?;
@@ -150,7 +150,7 @@ pub fn config_for(path: Option<&Path>, src: &str) -> Config {
         .and_then(find_stack)
         .map(|stack| stack.layers)
         .unwrap_or_default();
-    if let Ok(doc) = tomet_ast_parser::parse_document(src) {
+    if let Ok(doc) = tomet_ast_parser::parse_file(src) {
         let mut own = ConfigLayer::from_doc(&doc);
         own.strip_vault_only();
         layers.push(own);

@@ -8,7 +8,7 @@
 //! This test ensures any builtin element with block-content arguments renders
 //! its contents faithfully across all converters without lossy placeholders.
 
-use tomet_ast::Document;
+use tomet_ast::File;
 
 /// Builtin kinds whose `(args)` intentionally carry `Value::Blocks`.
 /// Currently `@conflict(a: [...], b: [...])`.
@@ -16,7 +16,7 @@ const BLOCK_BEARING_KINDS: &[&str] = &["conflict"];
 
 const LOSSY_PLACEHOLDER_SUBSTRING: &str = "block(s)>";
 
-fn convert_all(doc: &Document) -> [(&'static str, String); 4] {
+fn convert_all(doc: &File) -> [(&'static str, String); 4] {
     let html = tomet_html::render_body(doc);
     let md = tomet_markdown::to_markdown(doc);
     let typ = tomet_typst::to_typst(doc);
@@ -45,7 +45,7 @@ fn conflict_named_block_arguments_preserve_content_across_all_converters() {
   ]
 )
 "#;
-    let doc = tomet_ast_parser::parse_document(src).expect("document should parse cleanly");
+    let doc = tomet_ast_parser::parse_file(src).expect("document should parse cleanly");
     let outputs = convert_all(&doc);
 
     for (format, text) in outputs {
@@ -72,7 +72,7 @@ fn conflict_positional_block_arguments_preserve_content_across_all_converters() 
   [PositionalBetaContent]
 )
 "#;
-    let doc = tomet_ast_parser::parse_document(src).expect("document should parse cleanly");
+    let doc = tomet_ast_parser::parse_file(src).expect("document should parse cleanly");
     let outputs = convert_all(&doc);
 
     for (format, text) in outputs {

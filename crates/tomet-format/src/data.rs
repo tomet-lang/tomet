@@ -12,11 +12,11 @@
 /// starts in text the parser does not accept; so is any result that would
 /// read back as a different value.
 pub fn format_data_source(src: &str) -> String {
-    let Ok(before) = tomet_ast_parser::parse_file(src) else {
+    let Ok(before) = tomet_ast_parser::parse_data_file(src) else {
         return src.to_string();
     };
     let formatted = scan(src);
-    match tomet_ast_parser::parse_file(&formatted) {
+    match tomet_ast_parser::parse_data_file(&formatted) {
         Ok(after) if after == before => formatted,
         _ => src.to_string(),
     }
@@ -154,8 +154,8 @@ mod tests {
             "\"k  \": \"v \r\n w\"\r\n",
             "",
         ] {
-            let before = tomet_ast_parser::parse_file(src).unwrap();
-            let after = tomet_ast_parser::parse_file(&format_data_source(src)).unwrap();
+            let before = tomet_ast_parser::parse_data_file(src).unwrap();
+            let after = tomet_ast_parser::parse_data_file(&format_data_source(src)).unwrap();
             assert_eq!(before, after, "{src:?}");
         }
     }
@@ -168,8 +168,8 @@ mod tests {
             "::kind(catalog, 2)\n\n::meta{ id: x }\n\n\"a\": 1\n"
         );
         // the value is the same, header included
-        let before = tomet_ast_parser::parse_file(src).unwrap();
-        let after = tomet_ast_parser::parse_file(&format_data_source(src)).unwrap();
+        let before = tomet_ast_parser::parse_data_file(src).unwrap();
+        let after = tomet_ast_parser::parse_data_file(&format_data_source(src)).unwrap();
         assert_eq!(before, after);
     }
 
@@ -198,8 +198,8 @@ mod tests {
             format_data_source(src),
             "::macros{ vocab: \"x\" }\n\nkey: ${macro.vocab}\n"
         );
-        let before = tomet_ast_parser::parse_file(src).unwrap();
-        let after = tomet_ast_parser::parse_file(&format_data_source(src)).unwrap();
+        let before = tomet_ast_parser::parse_data_file(src).unwrap();
+        let after = tomet_ast_parser::parse_data_file(&format_data_source(src)).unwrap();
         assert_eq!(before, after);
     }
 }

@@ -2,14 +2,14 @@ use super::*;
 
 #[test]
 fn line_comment_alone_produces_no_blocks() {
-    let doc = parse_document("// just a note\n").unwrap();
-    assert_eq!(doc.blocks, vec![]);
+    let doc = parse_file("// just a note\n").unwrap();
+    assert_eq!(doc.body, vec![]);
 }
 
 #[test]
 fn line_comment_without_trailing_newline_is_not_an_error() {
-    let doc = parse_document("// trailing note, no newline").unwrap();
-    assert_eq!(doc.blocks, vec![]);
+    let doc = parse_file("// trailing note, no newline").unwrap();
+    assert_eq!(doc.body, vec![]);
 }
 
 #[test]
@@ -18,9 +18,9 @@ fn line_comment_is_discarded_between_blocks() {
     // like a blank line already does (e.g. two `-` runs separated by a
     // blank line are two `Block::List`s, not one) -- it doesn't merge
     // into either neighbor, it just produces no block of its own.
-    let doc = parse_document("=[ one ]\n// skip this\n=[ two ]\n").unwrap();
-    assert_eq!(doc.blocks.len(), 2);
-    match (&doc.blocks[0], &doc.blocks[1]) {
+    let doc = parse_file("=[ one ]\n// skip this\n=[ two ]\n").unwrap();
+    assert_eq!(doc.body.len(), 2);
+    match (&doc.body[0], &doc.body[1]) {
         (Block::Section(a), Block::Section(b)) => {
             assert_eq!(a.title, vec![Inline::Text("one".into())]);
             assert_eq!(b.title, vec![Inline::Text("two".into())]);
@@ -31,18 +31,18 @@ fn line_comment_is_discarded_between_blocks() {
 
 #[test]
 fn indented_line_comment_is_recognized_at_block_level() {
-    let doc = parse_document("=[ one ]\n\n  // indented note\n\n=[ two ]\n").unwrap();
-    assert_eq!(doc.blocks.len(), 2);
-    assert!(matches!(&doc.blocks[0], Block::Section(_)));
-    assert!(matches!(&doc.blocks[1], Block::Section(_)));
+    let doc = parse_file("=[ one ]\n\n  // indented note\n\n=[ two ]\n").unwrap();
+    assert_eq!(doc.body.len(), 2);
+    assert!(matches!(&doc.body[0], Block::Section(_)));
+    assert!(matches!(&doc.body[1], Block::Section(_)));
 }
 
 #[test]
 fn indented_block_comment_is_recognized_at_block_level() {
-    let doc = parse_document("=[ one ]\n\n  /* indented note */\n\n=[ two ]\n").unwrap();
-    assert_eq!(doc.blocks.len(), 2);
-    assert!(matches!(&doc.blocks[0], Block::Section(_)));
-    assert!(matches!(&doc.blocks[1], Block::Section(_)));
+    let doc = parse_file("=[ one ]\n\n  /* indented note */\n\n=[ two ]\n").unwrap();
+    assert_eq!(doc.body.len(), 2);
+    assert!(matches!(&doc.body[0], Block::Section(_)));
+    assert!(matches!(&doc.body[1], Block::Section(_)));
 }
 
 #[test]
@@ -51,9 +51,9 @@ fn line_comment_interrupts_a_paragraph_with_no_blank_line_before_it() {
     // check -- a comment line ends the paragraph even with no blank
     // line separating them, rather than being swallowed as running
     // text.
-    let doc = parse_document("text\n// a comment, not more paragraph text\nmore\n").unwrap();
-    assert_eq!(doc.blocks.len(), 2);
-    match (&doc.blocks[0], &doc.blocks[1]) {
+    let doc = parse_file("text\n// a comment, not more paragraph text\nmore\n").unwrap();
+    assert_eq!(doc.body.len(), 2);
+    match (&doc.body[0], &doc.body[1]) {
         (Block::Paragraph(a), Block::Paragraph(b)) => {
             assert_eq!(&a.content, &vec![Inline::Text("text".into())]);
             assert_eq!(&b.content, &vec![Inline::Text("more".into())]);
@@ -64,9 +64,9 @@ fn line_comment_interrupts_a_paragraph_with_no_blank_line_before_it() {
 
 #[test]
 fn indented_line_comment_interrupts_a_paragraph_with_no_blank_line_before_it() {
-    let doc = parse_document("text\n  // indented, still interrupts\nmore\n").unwrap();
-    assert_eq!(doc.blocks.len(), 2);
-    match (&doc.blocks[0], &doc.blocks[1]) {
+    let doc = parse_file("text\n  // indented, still interrupts\nmore\n").unwrap();
+    assert_eq!(doc.body.len(), 2);
+    match (&doc.body[0], &doc.body[1]) {
         (Block::Paragraph(a), Block::Paragraph(b)) => {
             assert_eq!(&a.content, &vec![Inline::Text("text".into())]);
             assert_eq!(&b.content, &vec![Inline::Text("more".into())]);
@@ -77,12 +77,12 @@ fn indented_line_comment_interrupts_a_paragraph_with_no_blank_line_before_it() {
 
 #[test]
 fn block_comment_spans_multiple_lines_and_blank_lines() {
-    let doc = parse_document(
+    let doc = parse_file(
             "before\n\n/* this whole\nchunk, including\n\na blank line and #[ not a heading ]\nis discarded */\n\nafter\n",
         )
         .unwrap();
-    assert_eq!(doc.blocks.len(), 2);
-    match (&doc.blocks[0], &doc.blocks[1]) {
+    assert_eq!(doc.body.len(), 2);
+    match (&doc.body[0], &doc.body[1]) {
         (Block::Paragraph(a), Block::Paragraph(b)) => {
             assert_eq!(&a.content, &vec![Inline::Text("before".into())]);
             assert_eq!(&b.content, &vec![Inline::Text("after".into())]);
@@ -93,13 +93,13 @@ fn block_comment_spans_multiple_lines_and_blank_lines() {
 
 #[test]
 fn unterminated_block_comment_at_block_level_is_an_error() {
-    assert!(parse_document("/* never closed\n").is_err());
+    assert!(parse_file("/* never closed\n").is_err());
 }
 
 #[test]
 fn inline_block_comment_is_removed_from_paragraph_text() {
-    let doc = parse_document("keep /* drop this */ also keep\n").unwrap();
-    match &doc.blocks[0] {
+    let doc = parse_file("keep /* drop this */ also keep\n").unwrap();
+    match &doc.body[0] {
         Block::Paragraph(p) => {
             // The comment's source is excluded entirely, and the text
             // flushed before it and after it are merged back into one
@@ -116,8 +116,8 @@ fn inline_block_comment_is_removed_from_paragraph_text() {
 
 #[test]
 fn inline_block_comment_works_inside_content() {
-    let doc = parse_document("@caution[ keep /* drop */ this ]\n").unwrap();
-    match &doc.blocks[0] {
+    let doc = parse_file("@caution[ keep /* drop */ this ]\n").unwrap();
+    match &doc.body[0] {
         Block::Element(el) => {
             assert_eq!(el.content, wrap(vec![Inline::Text("keep  this".into())]));
         }
@@ -127,13 +127,13 @@ fn inline_block_comment_works_inside_content() {
 
 #[test]
 fn unterminated_inline_block_comment_is_an_error() {
-    assert!(parse_document("keep /* never closes\n").is_err());
+    assert!(parse_file("keep /* never closes\n").is_err());
 }
 
 #[test]
 fn double_slash_inside_a_url_is_not_treated_as_a_comment() {
-    let doc = parse_document("see https://example.com for more\n").unwrap();
-    match &doc.blocks[0] {
+    let doc = parse_file("see https://example.com for more\n").unwrap();
+    match &doc.body[0] {
         Block::Paragraph(p) => {
             assert_eq!(p.content.len(), 3);
             assert_eq!(p.content[0], Inline::Text("see ".into()));
@@ -157,8 +157,8 @@ fn double_slash_inside_a_url_is_not_treated_as_a_comment() {
 
 #[test]
 fn inline_double_slash_comment_is_stripped_when_preceded_by_whitespace() {
-    let doc = parse_document("aaa // asdasd\n").unwrap();
-    match &doc.blocks[0] {
+    let doc = parse_file("aaa // asdasd\n").unwrap();
+    match &doc.body[0] {
         Block::Paragraph(p) => {
             assert_eq!(&p.content, &vec![Inline::Text("aaa".into())]);
         }
@@ -168,8 +168,8 @@ fn inline_double_slash_comment_is_stripped_when_preceded_by_whitespace() {
 
 #[test]
 fn inline_double_slash_comment_works_inside_content() {
-    let doc = parse_document("@caution[ keep // drop this\n]\n").unwrap();
-    match &doc.blocks[0] {
+    let doc = parse_file("@caution[ keep // drop this\n]\n").unwrap();
+    match &doc.body[0] {
         Block::Element(el) => {
             // The comment's own trailing newline (left in place by
             // `skip_line_comment`, which stops before it) flushes as
@@ -189,15 +189,15 @@ fn inline_double_slash_comment_works_inside_content() {
 #[test]
 fn a_double_slash_line_inside_a_multiline_content_is_a_comment() {
     // `[content]` is parsed as a real block sequence now (the same
-    // grammar `Document.blocks`/`Section.blocks` use), so a `//` line
+    // grammar `File.body`/`Section.blocks` use), so a `//` line
     // inside it ends the current paragraph exactly the way it does at
     // the top level (`paragraph_breaks_here`) -- a comment is no longer
     // specially transparent glue inside content the way it was when
     // content had no block-level dispatch of its own. "keep"/"keep2"
     // land in two separate `Paragraph`s, not one inline run joined by a
     // `SoftBreak`.
-    let doc = parse_document("@caution[\n  keep\n  // drop this line\n  keep2\n]\n").unwrap();
-    match &doc.blocks[0] {
+    let doc = parse_file("@caution[\n  keep\n  // drop this line\n  keep2\n]\n").unwrap();
+    match &doc.body[0] {
         Block::Element(el) => {
             assert_eq!(
                 el.content,
@@ -221,37 +221,31 @@ fn a_double_slash_line_inside_a_multiline_content_is_a_comment() {
 fn own_line_comment_works_inside_a_paren_group() {
     // The original trigger case: a `//` comment on its own line between
     // entries in `::config(...)`'s `(args)` map.
-    let doc = parse_document("::config(\n  format:json\n  // a note\n)\n").unwrap();
-    match &doc.blocks[0] {
-        Block::Declaration(d) => {
-            assert_eq!(d.name, Name::bare("config"));
-            assert_eq!(
-                d.data.args,
-                Some(Value::Map(vec![(
-                    "format".into(),
-                    Value::String("json".into())
-                )]))
-            );
-        }
-        other => panic!("expected a declaration, got {other:?}"),
-    }
+    let doc = parse_file("::config(\n  format:json\n  // a note\n)\n").unwrap();
+    assert_eq!(doc.header.len(), 1);
+    let d = &doc.header[0];
+    assert_eq!(d.name, Name::bare("config"));
+    assert_eq!(
+        d.data.args,
+        Some(Value::Map(vec![(
+            "format".into(),
+            Value::String("json".into())
+        )]))
+    );
 }
 
 #[test]
 fn own_line_comment_works_inside_a_lightweight_value_group() {
-    let doc = parse_document("::meta{\n  key: value\n  // a note\n}\n").unwrap();
-    match &doc.blocks[0] {
-        Block::Declaration(d) => {
-            assert_eq!(
-                d.data.value,
-                Some(Group::from_map(Value::Map(vec![(
-                    "key".into(),
-                    Value::String("value".into())
-                )])))
-            );
-        }
-        other => panic!("expected a declaration, got {other:?}"),
-    }
+    let doc = parse_file("::meta{\n  key: value\n  // a note\n}\n").unwrap();
+    assert_eq!(doc.header.len(), 1);
+    let d = &doc.header[0];
+    assert_eq!(
+        d.data.value,
+        Some(Group::from_map(Value::Map(vec![(
+            "key".into(),
+            Value::String("value".into())
+        )])))
+    );
 }
 
 #[test]
@@ -306,8 +300,8 @@ fn a_bare_scalar_starting_with_double_slash_needs_quoting() {
 
 #[test]
 fn comment_between_quotes_in_prose_is_a_comment() {
-    let doc = parse_document("\"hello /*a comment*/ world\"\n").unwrap();
-    match &doc.blocks[0] {
+    let doc = parse_file("\"hello /*a comment*/ world\"\n").unwrap();
+    match &doc.body[0] {
         Block::Paragraph(p) => {
             let combined: String = p.content.iter().filter_map(|i| match i {
                 Inline::Text(t) => Some(t.value.as_str()),
@@ -323,8 +317,8 @@ fn comment_between_quotes_in_prose_is_a_comment() {
 
 #[test]
 fn comment_marker_inside_a_string_in_a_value_group_is_part_of_the_string() {
-    let doc = parse_document("@elem(allow: \"spec/**/*.tmt\")\n").unwrap();
-    match &doc.blocks[0] {
+    let doc = parse_file("@elem(allow: \"spec/**/*.tmt\")\n").unwrap();
+    match &doc.body[0] {
         Block::Element(el) => {
             let v = el.data.args.as_ref().unwrap();
             let Value::Map(entries) = v else { panic!("expected map, got {v:?}") };
@@ -341,8 +335,8 @@ fn comment_marker_inside_a_string_in_a_value_group_is_part_of_the_string() {
 
 #[test]
 fn comment_marker_inside_a_code_span_is_text() {
-    let doc = parse_document("`/* not a comment */` and `// also not a comment`\n").unwrap();
-    match &doc.blocks[0] {
+    let doc = parse_file("`/* not a comment */` and `// also not a comment`\n").unwrap();
+    match &doc.body[0] {
         Block::Paragraph(p) => {
             assert_eq!(p.content.len(), 3);
             match (&p.content[0], &p.content[1], &p.content[2]) {
@@ -362,8 +356,8 @@ fn comment_marker_inside_a_code_span_is_text() {
 
 #[test]
 fn block_comment_over_several_lines() {
-    let doc = parse_document("before /* line 1\nline 2\nline 3 */ after\n").unwrap();
-    match &doc.blocks[0] {
+    let doc = parse_file("before /* line 1\nline 2\nline 3 */ after\n").unwrap();
+    match &doc.body[0] {
         Block::Paragraph(p) => {
             let combined: String = p.content.iter().filter_map(|i| match i {
                 Inline::Text(t) => Some(t.value.as_str()),

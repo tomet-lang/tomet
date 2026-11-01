@@ -7,7 +7,7 @@ pub mod decode;
 
 pub use decode::{RuleArgs, decode_rule_args};
 
-use tomet_ast::{Connect, Document};
+use tomet_ast::{Connect, File};
 use tomet_span::Span;
 use tomet_semantics::Bindings;
 use tomet_tree::Child;
@@ -16,7 +16,7 @@ use tomet_validator_core::{Diagnostic, child_kind_name};
 /// Enforces every `:rule(allow:list(...))` connect found anywhere in the
 /// document -- on an ordinary element's own `connects`, on a heading's
 /// (`Section.connects`), and on a list's own (`List.connects`).
-pub fn check_rule_connects(doc: &Document, bindings: &Bindings, errors: &mut Vec<Diagnostic>) {
+pub fn check_rule_connects(doc: &File, bindings: &Bindings, errors: &mut Vec<Diagnostic>) {
     tomet_tree::for_each_element(doc, |el| {
         for connect in &el.connects {
             check_one_connect(connect, bindings, errors, |direct, f| {

@@ -17,7 +17,7 @@
 //! `|` has started deciding something, and this test says so.
 
 use tomet_ast::Block;
-use tomet_ast_parser::parse_document;
+use tomet_ast_parser::parse_file;
 
 /// A construct written both ways. The two sources must parse to the same
 /// document -- `Span`'s `PartialEq` is unconditionally true, so this
@@ -139,9 +139,9 @@ const SAME: &[(&str, &str, &str)] = &[
 #[test]
 fn a_marked_run_parses_the_same_as_the_bracketed_form() {
     for (label, marked, bracketed) in SAME {
-        let from_marked = parse_document(marked)
+        let from_marked = parse_file(marked)
             .unwrap_or_else(|e| panic!("{label}: the `|` form did not parse: {e}"));
-        let from_brackets = parse_document(bracketed)
+        let from_brackets = parse_file(bracketed)
             .unwrap_or_else(|e| panic!("{label}: the bracketed form did not parse: {e}"));
         assert_eq!(
             from_marked, from_brackets,
@@ -166,8 +166,8 @@ fn a_marked_run_parses_the_same_as_the_bracketed_form() {
 #[test]
 fn the_printer_expands_a_marked_run_into_brackets() {
     for (label, marked, bracketed) in SAME {
-        let from_marked = parse_document(marked).unwrap();
-        let from_brackets = parse_document(bracketed).unwrap();
+        let from_marked = parse_file(marked).unwrap();
+        let from_brackets = parse_file(bracketed).unwrap();
         let expanded = tomet_printer::document_to_tm(&from_marked);
 
         assert!(
@@ -180,11 +180,11 @@ fn the_printer_expands_a_marked_run_into_brackets() {
             "{label}: the expansion is not what the explicit form prints"
         );
 
-        let explicit_round_trips = parse_document(&tomet_printer::document_to_tm(&from_brackets))
+        let explicit_round_trips = parse_file(&tomet_printer::document_to_tm(&from_brackets))
             .is_ok_and(|back| back == from_brackets);
         if explicit_round_trips {
             assert_eq!(
-                parse_document(&expanded).unwrap(),
+                parse_file(&expanded).unwrap(),
                 from_marked,
                 "{label}: the expansion does not round-trip:\n{expanded}"
             );
@@ -198,7 +198,7 @@ fn the_printer_expands_a_marked_run_into_brackets() {
 /// list item in every export.
 #[test]
 fn a_marker_standing_in_the_wrong_column_is_rejected() {
-    let err = parse_document("- (x)| a\n  - (y)| b\n| c\n")
+    let err = parse_file("- (x)| a\n  - (y)| b\n| c\n")
         .expect_err("a marker lining up with nothing should not parse");
     assert!(
         err.message.contains("lines up with no content"),
@@ -212,22 +212,22 @@ fn a_marker_standing_in_the_wrong_column_is_rejected() {
 /// happens to begin with `|` has to stay writable.
 #[test]
 fn a_marker_with_nothing_to_continue_is_prose() {
-    let doc = parse_document("| a | b |\n").unwrap();
-    assert_eq!(doc.blocks.len(), 1);
+    let doc = parse_file("| a | b |\n").unwrap();
+    assert_eq!(doc.body.len(), 1);
     assert!(
-        matches!(doc.blocks[0], Block::Paragraph(_)),
+        matches!(doc.body[0], Block::Paragraph(_)),
         "expected a paragraph, got {:?}",
-        doc.blocks[0]
+        doc.body[0]
     );
 }
 
 /// A blank line closes every block, and a run is no exception.
 #[test]
 fn a_blank_line_closes_a_run() {
-    let doc = parse_document("@quote\n| a\n| b\n\n| c\n").unwrap();
-    assert_eq!(doc.blocks.len(), 2);
-    assert!(matches!(doc.blocks[0], Block::Element(_)));
-    assert!(matches!(doc.blocks[1], Block::Paragraph(_)));
+    let doc = parse_file("@quote\n| a\n| b\n\n| c\n").unwrap();
+    assert_eq!(doc.body.len(), 2);
+    assert!(matches!(doc.body[0], Block::Element(_)));
+    assert!(matches!(doc.body[1], Block::Paragraph(_)));
 }
 
 /// The node shape of a CST: the kinds of its nodes, nested, with every token

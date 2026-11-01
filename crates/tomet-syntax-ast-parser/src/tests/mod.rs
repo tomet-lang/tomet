@@ -23,7 +23,7 @@ mod values;
 use super::*;
 pub(crate) use tomet_cst_parser::parse_cst;
 use tomet_ast::{
-    Block, Declaration, Element, Group, Inline, InterpExpr, InterpExprKind, Literal, Name,
+    Block, Element, Group, Inline, InterpExpr, InterpExprKind, Literal, Name,
     Paragraph, Placement, SoftBreak, Value,
 };
 use tomet_span::Span;

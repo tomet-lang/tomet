@@ -108,63 +108,56 @@ fn yaml_key_to_string(k: serde_yaml::Value) -> String {
 #[cfg(test)]
 mod tests {
     use crate::import::from_markdown;
-    use tomet_ast::{Block, Name, Value};
+    use tomet_ast::{Name, Value};
 
     #[test]
     fn yaml_frontmatter_converts_to_meta() {
         let src = "---\ntitle: \"Hello\"\nauthor: Alice\ndraft: false\n---\n\n# Main Title\n";
         let doc = from_markdown(src);
-        assert_eq!(doc.blocks.len(), 2);
-        match &doc.blocks[0] {
-            Block::Declaration(declaration) => {
-                assert_eq!(declaration.name, Name::bare("meta"));
-                assert_eq!(
-                    declaration.data.value,
-                    Some(tomet_ast::Group::from_map(Value::Map(vec![
-                        ("title".to_string(), Value::String("Hello".to_string())),
-                        ("author".to_string(), Value::String("Alice".to_string())),
-                        ("draft".to_string(), Value::Bool(false)),
-                    ])))
-                );
-            }
-            other => panic!("expected a meta declaration, got {other:?}"),
-        }
+        assert_eq!(doc.header.len(), 1);
+        assert_eq!(doc.body.len(), 1);
+        let declaration = &doc.header[0];
+        assert_eq!(declaration.name, Name::bare("meta"));
+        assert_eq!(
+            declaration.data.value,
+            Some(tomet_ast::Group::from_map(Value::Map(vec![
+                ("title".to_string(), Value::String("Hello".to_string())),
+                ("author".to_string(), Value::String("Alice".to_string())),
+                ("draft".to_string(), Value::Bool(false)),
+            ])))
+        );
     }
 
     #[test]
     fn yaml_frontmatter_with_arrays_converts_to_meta() {
         let src = "---\ntitle: \"Doc\"\ntags:\n  - rust\n  - tomet\n---\n\n# Main\n";
         let doc = from_markdown(src);
-        assert_eq!(doc.blocks.len(), 2);
-        match &doc.blocks[0] {
-            Block::Declaration(declaration) => {
-                assert_eq!(declaration.name, Name::bare("meta"));
-                assert_eq!(
-                    declaration.data.value,
-                    Some(tomet_ast::Group::from_map(Value::Map(vec![
-                        ("title".to_string(), Value::String("Doc".to_string())),
-                        (
-                            "tags".to_string(),
-                            Value::Seq(vec![
-                                Value::String("rust".to_string()),
-                                Value::String("tomet".to_string()),
-                            ])
-                        ),
-                    ])))
-                );
-            }
-            other => panic!("expected a meta declaration, got {other:?}"),
-        }
+        assert_eq!(doc.header.len(), 1);
+        assert_eq!(doc.body.len(), 1);
+        let declaration = &doc.header[0];
+        assert_eq!(declaration.name, Name::bare("meta"));
+        assert_eq!(
+            declaration.data.value,
+            Some(tomet_ast::Group::from_map(Value::Map(vec![
+                ("title".to_string(), Value::String("Doc".to_string())),
+                (
+                    "tags".to_string(),
+                    Value::Seq(vec![
+                        Value::String("rust".to_string()),
+                        Value::String("tomet".to_string()),
+                    ])
+                ),
+            ])))
+        );
     }
 
     #[test]
     fn frontmatter_wikilinks_convert_to_ref_maps() {
         let src = "---\ntopics:\n  - \"[[@Templater]]\"\n  - \"[[@QuickAdd]]\"\n---\n\n# Title\n";
         let doc = from_markdown(src);
-        assert_eq!(doc.blocks.len(), 2);
-        let Block::Declaration(declaration) = &doc.blocks[0] else {
-            panic!("expected a meta declaration");
-        };
+        assert_eq!(doc.header.len(), 1);
+        assert_eq!(doc.body.len(), 1);
+        let declaration = &doc.header[0];
         assert_eq!(
             declaration.data.value,
             Some(tomet_ast::Group::from_map(Value::Map(vec![(

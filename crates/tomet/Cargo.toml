@@ -31,8 +31,7 @@ tomet-semantics = { workspace = true }
 tomet-transform = { workspace = true }
 tomet-validator = { workspace = true }
 tomet-vault = { workspace = true }
-
-#= Optional
+#--- Optional ---
 tomet-deps = { workspace = true, optional = true }
 tomet-edit = { workspace = true, optional = true }
 tomet-formatter = { workspace = true, optional = true }

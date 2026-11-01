@@ -1,14 +1,25 @@
-use tomet_ast::{Block, Connect, Data, Document, Element, Entry, Group, Inline, List, Value};
+use tomet_ast::{Block, Connect, Data, Element, Entry, File, Group, Inline, List, Value};
 use tomet_span::Span;
 
 /// Walks every node in `doc` and returns `(id, span)` for each
 /// [`Element::id`]/[`Section::id`] found, in document order.
-pub fn collect_ids(doc: &Document) -> Vec<(String, Span)> {
+pub fn collect_ids(doc: &File) -> Vec<(String, Span)> {
     let mut ids = Vec::new();
-    for block in &doc.blocks {
+    for decl in &doc.header {
+        collect_declaration_ids(decl, &mut ids);
+    }
+    for block in &doc.body {
         collect_block_ids(block, &mut ids);
     }
     ids
+}
+
+fn collect_declaration_ids(d: &tomet_ast::Declaration, ids: &mut Vec<(String, Span)>) {
+    if let Some(id) = &d.id {
+        ids.push((id.0.clone(), d.span));
+    }
+    collect_data_ids(&d.data, ids);
+    collect_content_ids(d.content.as_deref(), ids);
 }
 
 fn collect_block_ids(block: &Block, ids: &mut Vec<(String, Span)>) {
@@ -28,13 +39,6 @@ fn collect_block_ids(block: &Block, ids: &mut Vec<(String, Span)>) {
             }
         }
         Block::Element(el) => collect_element_ids(el, ids),
-        Block::Declaration(d) => {
-            if let Some(id) = &d.id {
-                ids.push((id.0.clone(), d.span));
-            }
-            collect_data_ids(&d.data, ids);
-            collect_content_ids(d.content.as_deref(), ids);
-        }
         Block::Paragraph(p) => {
             for inline in &p.content {
                 collect_inline_ids(inline, ids);

@@ -4,7 +4,7 @@ use std::cell::RefCell;
 use std::collections::HashSet;
 
 use tomet_ast::{
-    Block, Document, ElementView, Inline, Interpolation, List, Placement, Section, Value,
+    Block, ElementView, File, Inline, Interpolation, List, Placement, Section, Value,
 };
 use tomet_semantics::{
     FootnoteRegistry, TargetScheme, classify_std_lenient, extract_tags, heading_level,
@@ -17,14 +17,14 @@ pub(crate) struct TypstCtx<'a> {
     pub(crate) rendered_footnotes: RefCell<HashSet<usize>>,
 }
 
-pub fn to_typst(doc: &Document) -> String {
-    let footnotes = FootnoteRegistry::from_document(doc);
+pub fn to_typst(doc: &File) -> String {
+    let footnotes = FootnoteRegistry::from_file(doc);
     let cx = TypstCtx {
         footnotes: &footnotes,
         rendered_footnotes: RefCell::new(HashSet::new()),
     };
     let mut out = String::new();
-    for block in &doc.blocks {
+    for block in &doc.body {
         render_block(&cx, block, &mut out);
     }
     render_leftover_footnotes(&cx, &mut out);
@@ -73,8 +73,6 @@ fn render_block(cx: &TypstCtx, block: &Block, out: &mut String) {
             out.push_str(&render_interp(interp));
             out.push_str("\n\n");
         }
-        // What a document says about itself has no rendering.
-        Block::Declaration(_) => {}
         // A hole is shown as it was written.
         Block::Hole(hole) => {
             out.push_str(&escape_text(&tomet_printer::hole_to_tm(hole)));
@@ -689,7 +687,7 @@ fn blocks_to_plain(blocks: &[Block]) -> String {
                     s.push_str(&blocks_to_plain(&item.content));
                 }
             }
-            Block::Interp(_) | Block::Declaration(_) => {}
+            Block::Interp(_) => {}
             Block::Hole(hole) => s.push_str(&tomet_printer::hole_to_tm(hole)),
         }
     }

@@ -26,7 +26,7 @@ mod tests {
     #[test]
     fn the_output_is_valid_tmt_and_already_formatted() {
         let text = rendered();
-        tomet_ast_parser::parse_document(&text).expect("the generated config spec parses");
+        tomet_ast_parser::parse_file(&text).expect("the generated config spec parses");
         assert_eq!(
             tomet_formatter::format_source_with_config(&text, &PrinterConfig::default()),
             text,
@@ -69,7 +69,7 @@ mod tests {
             .or_else(|_| std::fs::read_to_string(format!("../../{file}")))
             .unwrap_or_else(|_| panic!("{file} must exist"));
 
-        let doc = tomet_ast_parser::parse_document(&root_config).unwrap();
+        let doc = tomet_ast_parser::parse_file(&root_config).unwrap();
         let specs = all_config_specs();
         let all_keys: std::collections::HashSet<String> = specs
             .iter()

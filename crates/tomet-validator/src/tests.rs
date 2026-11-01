@@ -1,7 +1,8 @@
 use super::*;
+use tomet_ast::File;
 
-fn parse(source: &str) -> Document {
-    tomet_ast_parser::parse_document(source).expect("valid Tomet source")
+fn parse(source: &str) -> File {
+    tomet_ast_parser::parse_file(source).expect("valid Tomet source")
 }
 
 #[test]
@@ -59,12 +60,12 @@ fn a_repeated_standard_declaration_says_where_the_first_is() {
 /// two rules.
 #[test]
 fn a_vocabularys_singleton_is_enforced_too() {
-    let vocab = tomet_ast_parser::parse_document(
+    let vocab = tomet_ast_parser::parse_file(
         "::kind(vocabulary)\n::vocabulary(deck)\n\n::elements{ spread: { singleton: true } }\n",
     )
     .expect("vocabulary parses");
     let bindings = Bindings {
-        kind: tomet_semantics::Vocabulary::from_document(&vocab),
+        kind: tomet_semantics::Vocabulary::from_file(&vocab),
         ..Bindings::default()
     };
 
@@ -83,7 +84,7 @@ fn a_vocabularys_singleton_is_enforced_too() {
 /// element's `[content]` also trips the unrelated, pre-existing
 /// `ShapeMismatch` check (inline position vs. block-required kind),
 /// which is real but has nothing to do with what these tests check.
-fn rule_errors(doc: &Document, bindings: &Bindings) -> Vec<Diagnostic> {
+fn rule_errors(doc: &File, bindings: &Bindings) -> Vec<Diagnostic> {
     let mut errors = Vec::new();
     check_rule_connects(doc, bindings, &mut errors);
     errors
@@ -147,14 +148,14 @@ fn a_typoed_connect_name_is_reported() {
 /// requires this check to live in the validator rather than earlier.
 #[test]
 fn allow_list_resolves_a_namespaced_custom_element_via_bindings() {
-    let vocab = tomet_ast_parser::parse_document(
+    let vocab = tomet_ast_parser::parse_file(
         "::kind(vocabulary)\n::vocabulary(ns)\n\n::elements{ mycard: {} }\n",
     )
     .expect("vocabulary parses");
     let bindings = Bindings {
         used: std::collections::BTreeMap::from([(
             "ns".to_string(),
-            tomet_semantics::Vocabulary::from_document(&vocab).expect("valid vocabulary"),
+            tomet_semantics::Vocabulary::from_file(&vocab).expect("valid vocabulary"),
         )]),
         ..Bindings::default()
     };
@@ -217,17 +218,10 @@ fn a_heading_rule_connect_is_not_misclassified_as_an_unknown_element() {
 }
 
 /// The preamble is the run of preamble-region elements at the top.
-/// The first block that is not one of them ends it.
+/// A misplaced declaration after body has started is rejected at parse/lowering time.
 #[test]
 fn a_preamble_element_after_the_body_is_reported() {
-    let doc = parse("::kind(note)\n\n#[ T ]\n\n::use(deck)\n");
-    let errors = validate_document(&doc);
-    assert!(
-        errors
-            .iter()
-            .any(|e| matches!(e, Diagnostic::OutsidePreamble { name, .. } if name == "use")),
-        "{errors:?}"
-    );
+    assert!(tomet_ast_parser::parse_file("::kind(note)\n\n#[ T ]\n\n::use(deck)\n").is_err());
 }
 
 /// Several `::use` in the preamble is fine -- you bring in several
@@ -240,7 +234,7 @@ fn several_preamble_elements_are_fine_when_they_are_not_singletons() {
     assert!(
         !errors.iter().any(|e| matches!(
             e,
-            Diagnostic::DuplicateSingleton { .. } | Diagnostic::OutsidePreamble { .. }
+            Diagnostic::DuplicateSingleton { .. }
         )),
         "{errors:?}"
     );
@@ -255,13 +249,7 @@ fn a_double_colon_declaration_after_the_body_is_reported() {
         "::kind(note)\n\n=[ T ]\n\n::use(deck)\n",
         "::kind(note)\n\ntext\n\n::nonesuch{}\n",
     ] {
-        let errors = validate_document(&parse(src));
-        assert!(
-            errors
-                .iter()
-                .any(|e| matches!(e, Diagnostic::OutsidePreamble { .. })),
-            "{src:?}: {errors:?}"
-        );
+        assert!(tomet_ast_parser::parse_file(src).is_err(), "{src:?}");
     }
 }
 
@@ -273,7 +261,6 @@ fn a_run_of_double_colon_declarations_at_the_top_is_the_preamble() {
         !errors.iter().any(|e| matches!(
             e,
             Diagnostic::DuplicateSingleton { .. }
-                | Diagnostic::OutsidePreamble { .. }
                 | Diagnostic::WrongSigil { .. }
         )),
         "{errors:?}"
@@ -290,13 +277,8 @@ fn the_two_spellings_share_one_preamble_and_one_singleton_count() {
             .any(|e| matches!(e, Diagnostic::DuplicateSingleton { name, .. } if name == "kind")),
         "{errors:?}"
     );
-    let errors = validate_document(&parse("::kind(note)\n::meta{ id: x }\n\n=[ T ]\n"));
-    assert!(
-        !errors
-            .iter()
-            .any(|e| matches!(e, Diagnostic::OutsidePreamble { .. })),
-        "{errors:?}"
-    );
+    let errors = validate_document(&parse("::kind(note)\n::meta{ title: x }\n\n=[ T ]\n"));
+    assert!(errors.is_empty(), "{errors:?}");
 }
 
 /// The sigil says "this describes the document", so it is wrong on an element
@@ -315,7 +297,7 @@ fn a_body_element_written_with_double_colon_is_reported_with_the_sigil_to_use() 
 
 #[test]
 fn a_user_declared_preamble_element_is_a_declaration() {
-    let vocab = tomet_semantics::Vocabulary::from_document(&parse(
+    let vocab = tomet_semantics::Vocabulary::from_file(&parse(
         "::kind(vocabulary)\n::vocabulary(deck){}\n\n::elements{ character: { region: preamble, singleton: true } }\n",
     ))
     .expect("a vocabulary");
@@ -325,7 +307,7 @@ fn a_user_declared_preamble_element_is_a_declaration() {
     assert!(
         !errors.iter().any(|e| matches!(
             e,
-            Diagnostic::WrongSigil { .. } | Diagnostic::OutsidePreamble { .. }
+            Diagnostic::WrongSigil { .. }
         )),
         "{errors:?}"
     );
@@ -333,7 +315,7 @@ fn a_user_declared_preamble_element_is_a_declaration() {
 
 /// A vocabulary with a declared parameter list.
 fn deck_with_params() -> Bindings {
-    let vocab = tomet_semantics::Vocabulary::from_document(&parse(
+    let vocab = tomet_semantics::Vocabulary::from_file(&parse(
         r#"::kind(vocabulary)
 ::vocabulary(deck){}
 
@@ -386,7 +368,7 @@ fn an_undeclared_argument_is_reported() {
 /// A vocabulary with `content: { allow: }` declared, for
 /// `check_content_shape`'s own tests.
 fn deck_with_content_allow() -> Bindings {
-    let vocab = tomet_semantics::Vocabulary::from_document(&parse(
+    let vocab = tomet_semantics::Vocabulary::from_file(&parse(
         r#"::kind(vocabulary)
 ::vocabulary(deck){}
 
@@ -716,14 +698,14 @@ fn the_dissolved_config_and_settings_are_unknown_declarations() {
 /// closed, so the namespace has to actually be in scope now, and
 /// saying so here is what keeps these tests about duplicate ids.
 fn with_deck() -> Bindings {
-    let vocab = tomet_ast_parser::parse_document(
+    let vocab = tomet_ast_parser::parse_file(
         "::kind(vocabulary)\n::vocabulary(deck)\n\n::elements{ task: {}, ref: {} }\n",
     )
     .expect("vocabulary parses");
     Bindings {
         used: [(
             "deck".to_string(),
-            tomet_semantics::Vocabulary::from_document(&vocab).expect("has a header"),
+            tomet_semantics::Vocabulary::from_file(&vocab).expect("has a header"),
         )]
         .into_iter()
         .collect(),
@@ -1199,7 +1181,7 @@ const TYPED_DECK: &str = r#"::kind(vocabulary)
 
 fn typed_deck() -> Bindings {
     let vocab =
-        tomet_semantics::Vocabulary::from_document(&parse(TYPED_DECK)).expect("a vocabulary");
+        tomet_semantics::Vocabulary::from_file(&parse(TYPED_DECK)).expect("a vocabulary");
     Bindings::for_document(&parse("::kind(deck)\n"), [vocab])
 }
 

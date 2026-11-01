@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use tomet_ast::{Document, Value};
+use tomet_ast::{File, Value};
 use tomet_tree::ValueExt;
 
 use tomet_declaration::{DeclKind, VarDecl};
@@ -73,7 +73,7 @@ impl DocumentConfig {
 ///
 /// `::export` is read in either form, `(type: commonmark, path: "README.md")` or the same keys in
 /// `{...}`; a `path` is one path for every type, or a map of format to path.
-pub fn document_config(doc: &Document) -> DocumentConfig {
+pub fn document_config<B>(doc: &File<B>) -> DocumentConfig {
     let mut config = DocumentConfig::default();
 
     for (key, value) in tomet_declaration::document_entries(doc, DeclKind::Export) {
@@ -142,12 +142,12 @@ fn clean_path_value(v: &Value) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tomet_ast_parser::parse_document;
+    use tomet_ast_parser::parse_file;
 
     #[test]
     fn parses_the_export_declaration_args() {
         let doc =
-            parse_document("::export(\n  type: commonmark\n  path: \"README.md\"\n)\n").unwrap();
+            parse_file("::export(\n  type: commonmark\n  path: \"README.md\"\n)\n").unwrap();
 
         let config = document_config(&doc);
         assert_eq!(config.export_type, vec![ExportType::CommonMark]);
@@ -160,7 +160,7 @@ mod tests {
 
     #[test]
     fn parses_the_export_declaration_data_with_sequence_and_map_paths() {
-        let doc = parse_document(
+        let doc = parse_file(
             "::export{\n  type: list(commonmark, html)\n  path: {\n    commonmark: \"README.md\"\n    html: \"index.html\"\n  }\n}\n",
         )
         .unwrap();
@@ -182,14 +182,14 @@ mod tests {
 
     #[test]
     fn handles_no_declarations() {
-        let doc = parse_document("#[ Hello ]\n").unwrap();
+        let doc = parse_file("#[ Hello ]\n").unwrap();
         let config = document_config(&doc);
         assert_eq!(config, DocumentConfig::default());
     }
 
     #[test]
     fn parses_the_macros_declaration() {
-        let doc = parse_document("::macros{\n  gh: \"https://github.com/org/repo/issues/$1\"\n  jira: \"https://jira.org/browse/$1\"\n}\n").unwrap();
+        let doc = parse_file("::macros{\n  gh: \"https://github.com/org/repo/issues/$1\"\n  jira: \"https://jira.org/browse/$1\"\n}\n").unwrap();
         let config = document_config(&doc);
         assert_eq!(
             config.macros.get("gh").map(|s| s.as_str()),
@@ -203,7 +203,7 @@ mod tests {
 
     #[test]
     fn the_macros_declaration_reads_every_entry() {
-        let doc = parse_document("::macros{\n  a: \"1\"\n  b: \"2\"\n}\n").unwrap();
+        let doc = parse_file("::macros{\n  a: \"1\"\n  b: \"2\"\n}\n").unwrap();
         let config = document_config(&doc);
         assert_eq!(config.macros.len(), 2);
     }

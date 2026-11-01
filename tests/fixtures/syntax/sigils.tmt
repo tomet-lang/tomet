@@ -1,5 +1,6 @@
 ::kind(fixture)
 ::id(doc-sigils)
+::use(deck)
 
 =[ シジルは形を表す ]
 
@@ -11,8 +12,6 @@
 @memo[ 行だけで終われば要素。それ以外は段落の一部 ]
 
 @deck.bookmark(name: foo, count: 3)[ 名前空間つき ]
-
-::use(deck)
 
 =[ インライン要素 ]
 

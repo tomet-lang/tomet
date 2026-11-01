@@ -29,14 +29,14 @@
 //!
 //! =[ Not here ]
 //!
-//! - Printing. The result is a [`Document`]; the command prints it the way the vault prints.
+//! - Printing. The result is a [`File`]; the command prints it the way the vault prints.
 //! - A vocabulary, `self.meta` typed by `::fields`, and `@term`: each is left and reported. A file
 //!   cannot hold a vocabulary or its own `::fields` yet, and a term is not frozen yet.
 //!   `Options::freeze_fields` is the way out for `self.meta`.
 
 use std::path::Path;
 
-use tomet_ast::{Block, Data, Document, Entry, Group, Name, Value};
+use tomet_ast::{Data, Entry, File, Group, Name, Value};
 use tomet_span::Span;
 use tomet_declaration::{Profile, document_profiles};
 use tomet_expr::{Reach, Resolver};
@@ -74,7 +74,7 @@ pub struct Change {
 /// The result of [`make_standalone`].
 #[derive(Debug, Clone)]
 pub struct Converted {
-    pub document: Document,
+    pub document: File,
     /// Every finding of the original, with what was done.
     pub changes: Vec<Change>,
     /// What the validator still finds in `document`, positioned in it. Empty when the file is
@@ -88,7 +88,7 @@ pub struct Converted {
 /// document is rendered.
 pub fn make_standalone(
     vault: &Vault,
-    doc: &Document,
+    doc: &File,
     path: &Path,
     resolver: &dyn Resolver,
     options: &Options,
@@ -264,7 +264,7 @@ fn is_among(spans: &[Span], span: Span) -> bool {
 }
 
 /// Writes the macros and variables the carried expressions use into the file.
-fn carry(vault: &Vault, groups: &[Place<'_>], decisions: &[Decision], document: &mut Document) {
+fn carry(vault: &Vault, groups: &[Place<'_>], decisions: &[Decision], document: &mut File) {
     let mut macros: Vec<(String, Value)> = Vec::new();
     let mut vars: Vec<(String, Value)> = Vec::new();
     for (group, decision) in groups.iter().zip(decisions) {
@@ -312,32 +312,17 @@ fn var_declaration(decl: &tomet_declaration::VarDecl) -> Value {
     Value::Map(fields)
 }
 
-/// How many declarations the document opens with: where the preamble ends.
-fn preamble_end(document: &Document) -> usize {
-    document
-        .blocks
-        .iter()
-        .take_while(|block| matches!(block, Block::Declaration(_)))
-        .count()
-}
-
-/// Adds `entries` to the document's `::name{ ... }`, writing one after the preamble if it has none.
-fn add_entries(document: &mut Document, name: &str, entries: Vec<(String, Value)>) {
+/// Adds `entries` to the document's `::name{ ... }`, writing one if it has none.
+fn add_entries(document: &mut File, name: &str, entries: Vec<(String, Value)>) {
     if entries.is_empty() {
         return;
     }
     let entries = entries
         .into_iter()
         .map(|(key, value)| Entry::Pair(key, value));
-    let end = preamble_end(document);
-    let existing = document.blocks[..end]
+    let existing = document.header
         .iter_mut()
-        .find_map(|block| match block {
-            Block::Declaration(declaration) if declaration.name == Name::bare(name) => {
-                Some(declaration)
-            }
-            _ => None,
-        });
+        .find(|declaration| declaration.name == Name::bare(name));
     match existing {
         Some(declaration) => declaration
             .data
@@ -345,24 +330,21 @@ fn add_entries(document: &mut Document, name: &str, entries: Vec<(String, Value)
             .get_or_insert_with(Group::default)
             .0
             .extend(entries),
-        None => document.blocks.insert(
-            end,
-            Block::Declaration(tomet_ast::Declaration {
-                name: Name::bare(name),
-                data: Data {
-                    args: None,
-                    value: Some(Group(entries.collect())),
-                },
-                content: None,
-                id: None,
-                span: Span::dummy(),
-            }),
-        ),
+        None => document.header.push(tomet_ast::Declaration {
+            name: Name::bare(name),
+            data: Data {
+                args: None,
+                value: Some(Group(entries.collect())),
+            },
+            content: None,
+            id: None,
+            span: Span::dummy(),
+        }),
     }
 }
 
 /// Makes the document declare `::profile(standalone)`, keeping the profiles it already declares.
-fn declare_standalone(document: &mut Document) {
+fn declare_standalone(document: &mut File) {
     let mut names: Vec<&str> = document_profiles(document)
         .into_iter()
         .map(Profile::name)
@@ -372,18 +354,15 @@ fn declare_standalone(document: &mut Document) {
     }
     names.push(Profile::Standalone.name());
     // Read from text so the arguments have the shape the parser gives them, whatever it is.
-    let written = tomet_ast_parser::parse_document(&format!("::profile({})\n", names.join(", ")))
+    let mut written = tomet_ast_parser::parse_file(&format!("::profile({})\n", names.join(", ")))
         .expect("`::profile(...)` of known names parses");
-    let Some(Block::Declaration(declaration)) = written.blocks.into_iter().next() else {
-        unreachable!("a line that starts with `::` is a declaration")
-    };
-    let end = preamble_end(document);
-    let existing = document.blocks[..end].iter().position(
-        |block| matches!(block, Block::Declaration(held) if held.name == Name::bare("profile")),
+    let declaration = written.header.pop().expect("header has declaration");
+    let existing = document.header.iter().position(
+        |held| held.name == Name::bare("profile"),
     );
     match existing {
-        Some(index) => document.blocks[index] = Block::Declaration(declaration),
-        None => document.blocks.insert(end, Block::Declaration(declaration)),
+        Some(index) => document.header[index] = declaration,
+        None => document.header.push(declaration),
     }
 }
 

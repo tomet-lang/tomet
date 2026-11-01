@@ -35,13 +35,13 @@ public final class Tomet {
     }
 
     /**
-     * Parses full .tmt markup source text into a JSON string representing the Document AST.
+     * Parses full .tmt markup source text into a JSON string representing the File AST.
      *
      * @param source the Tomet source text
-     * @return JSON string representing the Document AST
+     * @return JSON string representing the File AST
      * @throws TometException if syntax parsing fails
      */
-    public static native String parseDocumentJson(String source) throws TometException;
+    public static native String parseFileJson(String source) throws TometException;
 
     /**
      * Parses a data-only .tmt document into a JSON string.
@@ -80,22 +80,22 @@ public final class Tomet {
     public static native String toTypst(String source) throws TometException;
 
     /**
-     * Parses CommonMark Markdown text into a Document AST JSON string.
+     * Parses CommonMark Markdown text into a File AST JSON string.
      *
      * @param markdown CommonMark source text
-     * @return JSON string representing the Document AST
+     * @return JSON string representing the File AST
      * @throws TometException if parsing fails
      */
     public static native String fromMarkdownJson(String markdown) throws TometException;
 
     /**
-     * Serializes a Document AST JSON string back into formatted .tmt source code.
+     * Serializes a File AST JSON string back into formatted .tmt source code.
      *
-     * @param docJson JSON string representing the Document AST
+     * @param fileJson JSON string representing the File AST
      * @return formatted .tmt source text
      * @throws TometException if serialization fails
      */
-    public static native String printDocumentJson(String docJson) throws TometException;
+    public static native String printFileJson(String fileJson) throws TometException;
 
     /**
      * Formats .tmt source text with lossless whitespace hygiene and span preservation.

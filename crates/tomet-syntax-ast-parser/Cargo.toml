@@ -7,14 +7,13 @@ license.workspace = true
 repository.workspace = true
 
 [dependencies]
+tomet-ast = { workspace = true }
 tomet-cst = { workspace = true }
 tomet-cst-parser = { workspace = true }
-tomet-lowering = { workspace = true }
-tomet-ast = { workspace = true }
 tomet-span = { workspace = true }
 tomet-position = { workspace = true }
 tomet-lexer = { workspace = true }
+tomet-lowering = { workspace = true }
 
 [dev-dependencies]
-tomet-semantics = { workspace = true }
 tomet-tree = { workspace = true }

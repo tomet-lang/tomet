@@ -111,10 +111,10 @@ pub fn read_var_decls(declaration: &Declaration) -> Vec<(String, Result<VarDecl,
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tomet_ast_parser::parse_document;
+    use tomet_ast_parser::parse_file;
 
     fn decls(src: &str) -> Vec<(String, Result<VarDecl, String>)> {
-        let doc = parse_document(src).unwrap();
+        let doc = parse_file(src).unwrap();
         crate::declarations(&doc)
             .iter()
             .filter(|found| found.kind == crate::DeclKind::Vars)

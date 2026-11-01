@@ -1,4 +1,4 @@
-//! =[ tomet-span ]
+//! =[ About ]
 //!
 //! Source span representations ([`Span`]) for the Tomet toolchain.
 //!

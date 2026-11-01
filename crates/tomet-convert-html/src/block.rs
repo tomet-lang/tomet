@@ -69,8 +69,6 @@ pub(crate) fn render_block(
         Block::Section(sec) => render_section(cx, sec, out, state),
         Block::List(list) => render_list(cx, list, out),
         Block::Interp(interp) => render_interp(interp, out),
-        // What a document says about itself has no rendering.
-        Block::Declaration(_) => {}
         // A hole is shown as it was written, in a paragraph of its own.
         Block::Hole(hole) => {
             let para = Paragraph::new(vec![Inline::Hole(hole.clone())], hole.span);

@@ -19,8 +19,8 @@
 //!   | settings -- stays with the host, which matches on [`DeclKind`]. This crate never calls the
 //!   | host back.
 //! - (A leaf)
-//!   | It depends on [`tomet_ast`] for [`Value`], [`Element`] and [`Document`], on
-//!   | [`tomet_tree`] to walk a document's top level, and on [`tomet_type`] for the types a
+//!   | It depends on [`tomet_ast`] for [`Value`], [`Element`] and [`File`], on
+//!   | [`tomet_tree`] to walk a file's top level, and on [`tomet_type`] for the types a
 //!   | `::vars` entry names. It does not know a body element, a vocabulary or a vault.
 //! - (Two hosts, one input)
 //!   | A `.tmt` document gives its declarations as [`Declaration`]s through
@@ -35,7 +35,7 @@
 //! - AST-anchored diagnostics with source spans: they live in `tomet-validator-core`, which
 //!   maps [`Problem`] back to an element's span.
 
-pub use tomet_ast::{Document, Element, Value};
+pub use tomet_ast::{Element, File, Value};
 
 mod check;
 mod declaration;
@@ -45,7 +45,7 @@ mod read;
 mod vars;
 
 pub use check::{Problem, check_declarations};
-pub use declaration::{Declaration, Found, declarations};
+pub use declaration::{Declaration, Found, declarations, declarations_from_header};
 pub use kind::{Cardinality, DeclKind, Host, Scope, Spec};
 pub use profile::Profile;
 pub use read::{

@@ -11,8 +11,8 @@
 //!   | can define configuration schemas and render `.tmt` specifications by
 //!   | depending only on `tomet-spec`.
 //! - (Pure In-Memory AST & `.tmt` Generators)
-//!   - ([`cli`]) Converts `clap::Command` introspection trees into `.tmt` [`Document`](tomet_ast::Document) ASTs and formatted strings.
-//!   - ([`config`]) Converts [`ConfigGroupSpec`] slices into `.tmt` [`Document`](tomet_ast::Document) ASTs and formatted strings.
+//!   - ([`cli`]) Converts `clap::Command` introspection trees into `.tmt` [`File`](tomet_ast::File) ASTs and formatted strings.
+//!   - ([`config`]) Converts [`ConfigGroupSpec`] slices into `.tmt` [`File`](tomet_ast::File) ASTs and formatted strings.
 //!   - ([`util`]) Shared inline code escaping and AST construction utilities.
 
 extern crate self as tomet_spec;
@@ -63,8 +63,8 @@ mod tests {
             &PrinterConfig::default(),
         );
 
-        let parsed = tomet_ast_parser::parse_document(&rendered).expect("valid .tmt output");
-        assert!(!parsed.blocks.is_empty());
+        let parsed = tomet_ast_parser::parse_file(&rendered).expect("valid .tmt output");
+        assert!(!parsed.body.is_empty());
         assert!(rendered.contains("==[catasto]") || rendered.contains("==[ catasto ]"));
         assert!(rendered.contains("`catasto.strict` (bool, default: `true`)"));
         assert!(rendered.contains("Aliases: `ignore`."));

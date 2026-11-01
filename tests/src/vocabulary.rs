@@ -23,9 +23,9 @@
 //! down -- a branch the parser used to have, and would fail again the
 //! moment one was reintroduced.
 
-use tomet_ast::{Data, Document, Name, Value};
-use tomet_ast_parser::parse_document;
-use tomet_tree::{for_each_element_mut, for_each_top_level_declaration_mut};
+use tomet_ast::{Data, File, Name, Value};
+use tomet_ast_parser::parse_file;
+use tomet_tree::for_each_element_mut;
 
 /// Which kind of identifier a case renames.
 #[derive(Clone, Copy)]
@@ -128,7 +128,7 @@ const CASES: &[Case] = &[
 /// A guard that cannot be shown to fail is not known to work, and this one
 /// is the only thing standing behind `no-vocabulary`.
 fn compare_case(case: &Case) -> Option<String> {
-    let mut known = match parse_document(case.known) {
+    let mut known = match parse_file(case.known) {
         Ok(doc) => doc,
         Err(e) => {
             return Some(format!(
@@ -137,7 +137,7 @@ fn compare_case(case: &Case) -> Option<String> {
             ));
         }
     };
-    let mut unknown = match parse_document(case.unknown) {
+    let mut unknown = match parse_file(case.unknown) {
         Ok(doc) => doc,
         Err(e) => {
             return Some(format!(
@@ -202,17 +202,19 @@ fn the_guard_reports_a_difference_it_is_given() {
 
 /// Rewrites every occurrence of `ident` in `doc` to [`PLACEHOLDER`], so that
 /// two trees built from differently-named sources can be compared directly.
-fn normalize(doc: &mut Document, ident: &str, kind: Ident) {
+fn normalize(doc: &mut File, ident: &str, kind: Ident) {
     for_each_element_mut(doc, |el| match kind {
         Ident::ElementName => rename_name(Some(&mut el.name), ident),
         Ident::Namespace => rename_namespace(Some(&mut el.name), ident),
         Ident::ArgKey => rename_arg_key(&mut el.data, ident),
     });
-    for_each_top_level_declaration_mut(doc, |declaration| match kind {
-        Ident::ElementName => rename_name(Some(&mut declaration.name), ident),
-        Ident::Namespace => rename_namespace(Some(&mut declaration.name), ident),
-        Ident::ArgKey => rename_arg_key(&mut declaration.data, ident),
-    });
+    for declaration in &mut doc.header {
+        match kind {
+            Ident::ElementName => rename_name(Some(&mut declaration.name), ident),
+            Ident::Namespace => rename_namespace(Some(&mut declaration.name), ident),
+            Ident::ArgKey => rename_arg_key(&mut declaration.data, ident),
+        }
+    }
 }
 
 fn rename_name(name: Option<&mut Name>, ident: &str) {

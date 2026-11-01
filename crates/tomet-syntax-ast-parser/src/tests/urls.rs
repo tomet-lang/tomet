@@ -3,8 +3,8 @@ use super::*;
 #[test]
 fn bare_url_autolink_strips_trailing_punctuation() {
     let doc =
-        parse_document("Check https://example.com/foo! and https://example.com/bar.\n").unwrap();
-    match &doc.blocks[0] {
+        parse_file("Check https://example.com/foo! and https://example.com/bar.\n").unwrap();
+    match &doc.body[0] {
         Block::Paragraph(p) => {
             assert_eq!(p.content.len(), 5);
             assert_eq!(p.content[0], Inline::Text("Check ".into()));
@@ -39,9 +39,9 @@ fn bare_url_autolink_strips_trailing_punctuation() {
 
 #[test]
 fn bare_url_autolink_handles_parentheses() {
-    let doc = parse_document("Visit (https://example.com/foo) or https://example.com/path(bar)\n")
+    let doc = parse_file("Visit (https://example.com/foo) or https://example.com/path(bar)\n")
         .unwrap();
-    match &doc.blocks[0] {
+    match &doc.body[0] {
         Block::Paragraph(p) => {
             assert_eq!(p.content[0], Inline::Text("Visit (".into()));
             if let Inline::Element(el) = &p.content[1] {
@@ -74,8 +74,8 @@ fn bare_url_autolink_handles_parentheses() {
 
 #[test]
 fn bare_url_autolink_supports_http_https_mailto() {
-    let doc = parse_document("http://a.com https://b.com mailto:user@example.com\n").unwrap();
-    match &doc.blocks[0] {
+    let doc = parse_file("http://a.com https://b.com mailto:user@example.com\n").unwrap();
+    match &doc.body[0] {
         Block::Paragraph(p) => {
             assert_eq!(p.content.len(), 5);
             if let Inline::Element(el) = &p.content[0] {
@@ -114,8 +114,8 @@ fn bare_url_autolink_supports_http_https_mailto() {
 
 #[test]
 fn code_span_does_not_autolink_bare_url() {
-    let doc = parse_document("`https://example.com`\n").unwrap();
-    match &doc.blocks[0] {
+    let doc = parse_file("`https://example.com`\n").unwrap();
+    match &doc.body[0] {
         Block::Paragraph(p) => {
             assert_eq!(p.content.len(), 1);
             match &p.content[0] {
@@ -142,8 +142,8 @@ fn bare_absolute_path_parses_as_a_plain_scalar() {
         parse_value("/readme.md").unwrap(),
         Value::String("/readme.md".into())
     );
-    let doc = parse_document("@link(/etc/hosts)[Hosts]\n").unwrap();
-    match &doc.blocks[0] {
+    let doc = parse_file("@link(/etc/hosts)[Hosts]\n").unwrap();
+    match &doc.body[0] {
         Block::Element(el) => {
             assert_eq!(el.data.args, Some(Value::String("/etc/hosts".into())));
         }
@@ -165,8 +165,8 @@ fn bare_scheme_uri_parses_as_one_scalar_not_a_map() {
         parse_value("file://some/where").unwrap(),
         Value::String("file://some/where".into())
     );
-    let doc = parse_document("@link(https://example.com)[Site]\n").unwrap();
-    match &doc.blocks[0] {
+    let doc = parse_file("@link(https://example.com)[Site]\n").unwrap();
+    match &doc.body[0] {
         Block::Element(el) => {
             assert_eq!(
                 el.data.args,
@@ -198,9 +198,9 @@ fn bare_url_autolink_preserves_query_param_placeholder() {
     // holding nothing but a URL is a paragraph with one link in it --
     // not a block-placed element. Only an explicit `@name` standing on
     // its own line is a block.
-    let doc = parse_document("http://127.0.0.1:8888/search?lang=ja&q=@query\n").unwrap();
-    let Block::Paragraph(p) = &doc.blocks[0] else {
-        panic!("expected a paragraph, got {:?}", doc.blocks[0]);
+    let doc = parse_file("http://127.0.0.1:8888/search?lang=ja&q=@query\n").unwrap();
+    let Block::Paragraph(p) = &doc.body[0] else {
+        panic!("expected a paragraph, got {:?}", doc.body[0]);
     };
     match &p.content[0] {
         Inline::Element(el) => {

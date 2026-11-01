@@ -62,7 +62,7 @@ fn on_small_stack<T: Send + 'static>(f: impl FnOnce() -> T + Send + 'static) -> 
 fn nesting_to_the_limit_is_read() {
     for (name, _, shape) in shapes() {
         let src = shape(MAX_DEPTH);
-        let ok = on_small_stack(move || parse_document(&src).is_ok());
+        let ok = on_small_stack(move || parse_file(&src).is_ok());
         assert!(ok, "{name}: {MAX_DEPTH} levels should read");
     }
 }
@@ -75,7 +75,7 @@ fn nesting_past_the_limit_is_an_error_and_not_a_crash() {
             let (cst_has_it, err) = on_small_stack(move || {
                 let root = parse_cst(&src);
                 let has = root.descendants().any(|d| d.kind() == K::TOO_DEEP);
-                (has, parse_document(&src).err())
+                (has, parse_file(&src).err())
             });
             assert!(
                 cst_has_it,

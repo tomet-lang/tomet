@@ -1,4 +1,4 @@
-//! One definition of what sits inside what in a [`Document`], and the walkers built on it.
+//! One definition of what sits inside what in a [`File`], and the walkers built on it.
 //!
 //! [`children`] says, for any [`Node`], which nodes sit directly inside it and in which [`Place`].
 //! [`walk`] is the one recursion over that. Every other walker here is [`walk`] with a filter
@@ -14,7 +14,7 @@
 
 use std::ops::ControlFlow;
 use tomet_ast::{
-    Block, Connect, Data, Declaration, Document, Element, Entry, Group, Hole, Id, Inline,
+    Block, Connect, Data, Declaration, Element, Entry, File, Group, Hole, Id, Inline,
     Interpolation, List, ListItem, Section, Value,
 };
 use tomet_span::Span;
@@ -22,7 +22,9 @@ use tomet_span::Span;
 /// Where a node sits in the node that holds it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Place {
-    /// A block of the document itself.
+    /// A declaration in the file preamble header.
+    Header,
+    /// A block of the file itself.
     Top,
     /// An inline of a paragraph.
     Text,
@@ -48,13 +50,14 @@ pub enum Place {
     Sublist,
 }
 
-/// A thing in a document's tree, together with what it is in.
+/// A thing in a file's tree, together with what it is in.
 ///
 /// An element is not a node of its own: it is the `Block`, `Inline`, `Value` or `Entry` it stands
-/// as (see [`Node::element`]). A list at the top of a document is a `Block`; the list nested in an
+/// as (see [`Node::element`]). A list at the top of a file is a `Block`; the list nested in an
 /// item is a [`Node::List`].
 #[derive(Debug, Clone, Copy)]
 pub enum Node<'a> {
+    Declaration(&'a Declaration),
     Block(&'a Block),
     Inline(&'a Inline),
     Value(&'a Value),
@@ -91,7 +94,7 @@ impl<'a> Node<'a> {
 
     pub fn declaration(self) -> Option<&'a Declaration> {
         match self {
-            Node::Block(Block::Declaration(d)) => Some(d),
+            Node::Declaration(d) => Some(d),
             _ => None,
         }
     }
@@ -115,7 +118,7 @@ impl<'a> Node<'a> {
     /// section, a list, a list item or a bare entry.
     pub fn id(self) -> Option<&'a Id> {
         match self {
-            Node::Block(Block::Declaration(d)) => d.id.as_ref(),
+            Node::Declaration(d) => d.id.as_ref(),
             Node::Block(Block::Section(s)) => s.id.as_ref(),
             Node::Block(Block::List(l)) | Node::List(l) => l.id.as_ref(),
             Node::Item(item) => item.id.as_ref(),
@@ -153,10 +156,10 @@ pub enum Visit<B = ()> {
 /// or an entry holds what the element or hole holds.
 pub fn children<'a>(node: Node<'a>, f: &mut dyn FnMut(Node<'a>, Place)) {
     match node {
+        Node::Declaration(d) => groups(&d.data, d.content.as_deref(), f),
         Node::Block(block) => match block {
             Block::Paragraph(p) => inlines(&p.content, Place::Text, f),
             Block::Element(el) => element(el, f),
-            Block::Declaration(d) => groups(&d.data, d.content.as_deref(), f),
             Block::Hole(h) => groups(&h.data, h.content.as_deref(), f),
             Block::Section(s) => {
                 inlines(&s.title, Place::Title, f);
@@ -266,13 +269,16 @@ fn data<'a>(d: &'a Data, f: &mut dyn FnMut(Node<'a>, Place)) {
     }
 }
 
-/// Shows `f` every node of `doc`, each before what it holds, in document order, and goes into
+/// Shows `f` every node of `file`, each before what it holds, in document order, and goes into
 /// what `f` answers [`Visit::Descend`] to. [`Visit::Break`] stops the walk and is handed back.
 pub fn walk<'a, B>(
-    doc: &'a Document,
+    file: &'a File,
     f: &mut impl FnMut(Node<'a>, Place) -> Visit<B>,
 ) -> ControlFlow<B> {
-    for block in &doc.blocks {
+    for decl in &file.header {
+        walk_node(Node::Declaration(decl), Place::Header, f)?;
+    }
+    for block in &file.body {
         walk_node(Node::Block(block), Place::Top, f)?;
     }
     ControlFlow::Continue(())
@@ -298,21 +304,21 @@ pub fn walk_node<'a, B>(
     flow
 }
 
-/// Visits every node of `doc` in document order, each before what it holds, wherever it sits:
+/// Visits every node of `file` in document order, each before what it holds, wherever it sits:
 /// running text, section titles, `:connect`s, and inside a [`Value`] (`Seq`, `Map`, `Call`, a
 /// nested element, `[...]` blocks). It is the walk that skips nothing.
-pub fn for_each_node(doc: &Document, mut f: impl FnMut(Node<'_>)) {
-    let _ = walk(doc, &mut |node, _| {
+pub fn for_each_node(file: &File, mut f: impl FnMut(Node<'_>)) {
+    let _ = walk(file, &mut |node, _| {
         f(node);
         Visit::<()>::Descend
     });
 }
 
-/// Every node of `doc` that is part of what the document says: [`for_each_node`] without the
+/// Every node of `file` that is part of what the document says: [`for_each_node`] without the
 /// `:connect`s, which are metadata about their owner and not a part of the document (see
 /// [`for_each_descendant`]). The element, list and section walkers are filters over this.
-fn for_each_part(doc: &Document, mut f: impl FnMut(Node<'_>)) {
-    let _ = walk(doc, &mut |node, place| {
+fn for_each_part(file: &File, mut f: impl FnMut(Node<'_>)) {
+    let _ = walk(file, &mut |node, place| {
         if place == Place::Connect {
             return Visit::<()>::Skip;
         }
@@ -321,102 +327,100 @@ fn for_each_part(doc: &Document, mut f: impl FnMut(Node<'_>)) {
     });
 }
 
-/// Traverses all elements in `doc` in document order and executes `f` for each.
+/// Traverses all elements in `file` in document order and executes `f` for each.
 ///
 /// An element in a `:connect` is not reached.
-pub fn for_each_element(doc: &Document, mut f: impl FnMut(&Element)) {
-    for_each_part(doc, |node| {
+pub fn for_each_element(file: &File, mut f: impl FnMut(&Element)) {
+    for_each_part(file, |node| {
         if let Some(el) = node.element() {
             f(el);
         }
     });
 }
 
-/// Traverses every [`Inline`] in `doc` in document order: paragraph content, section titles and
+/// Traverses every [`Inline`] in `file` in document order: paragraph content, section titles and
 /// every `[content]`. An `Inline::Element` is itself passed to `f`, and then descended into.
-pub fn for_each_inline(doc: &Document, mut f: impl FnMut(&Inline)) {
-    for_each_part(doc, |node| {
+pub fn for_each_inline(file: &File, mut f: impl FnMut(&Inline)) {
+    for_each_part(file, |node| {
         if let Node::Inline(inline) = node {
             f(inline);
         }
     });
 }
 
-/// Visits every [`ListItem`] in `doc`, in document order, at any depth: a list item is not an
+/// Visits every [`ListItem`] in `file`, in document order, at any depth: a list item is not an
 /// [`Element`], so [`for_each_element`] never passes one.
-pub fn for_each_list_item(doc: &Document, mut f: impl FnMut(&ListItem)) {
-    for_each_part(doc, |node| {
+pub fn for_each_list_item(file: &File, mut f: impl FnMut(&ListItem)) {
+    for_each_part(file, |node| {
         if let Node::Item(item) = node {
             f(item);
         }
     });
 }
 
-/// Visits every [`List`] in `doc`, in document order: those standing as a block, wherever the
+/// Visits every [`List`] in `file`, in document order: those standing as a block, wherever the
 /// block is, and the ones nested in a list item.
-pub fn for_each_list(doc: &Document, mut f: impl FnMut(&List)) {
-    for_each_part(doc, |node| {
+pub fn for_each_list(file: &File, mut f: impl FnMut(&List)) {
+    for_each_part(file, |node| {
         if let Some(list) = node.list() {
             f(list);
         }
     });
 }
 
-/// Visits every [`Section`] in `doc`, in document order, including ones nested under another
+/// Visits every [`Section`] in `file`, in document order, including ones nested under another
 /// section's body or in an element's content: a heading's own `:name(...)` connect is checked
 /// against its `blocks` ([`for_each_descendant_in_blocks`]) the way an element's connect is
 /// checked against its own content.
-pub fn for_each_section(doc: &Document, mut f: impl FnMut(&Section)) {
-    for_each_part(doc, |node| {
+pub fn for_each_section(file: &File, mut f: impl FnMut(&Section)) {
+    for_each_part(file, |node| {
         if let Some(section) = node.section() {
             f(section);
         }
     });
 }
 
-/// Visits every [`Interpolation`] in `doc`, in document order, wherever it sits.
+/// Visits every [`Interpolation`] in `file`, in document order, wherever it sits.
 ///
 /// An interpolation is not an [`Element`], so the element walkers never pass one to their
 /// visitor; this is the walker to ask for "every `${...}` in the document".
-pub fn for_each_interpolation(doc: &Document, mut f: impl FnMut(&Interpolation)) {
-    for_each_node(doc, |node| {
+pub fn for_each_interpolation(file: &File, mut f: impl FnMut(&Interpolation)) {
+    for_each_node(file, |node| {
         if let Some(interp) = node.interpolation() {
             f(interp);
         }
     });
 }
 
-/// Visits every [`Declaration`] in `doc`, in document order, wherever it sits: a declaration is a
-/// [`Block`], and a block can be in a section's body or an element's content as well as at the
-/// top, where only it belongs. [`for_each_top_level_declaration`] is the preamble.
-pub fn for_each_declaration(doc: &Document, mut f: impl FnMut(&Declaration)) {
-    for_each_node(doc, |node| {
+/// Visits every [`Declaration`] in `file`, in document order, wherever it sits.
+pub fn for_each_declaration(file: &File, mut f: impl FnMut(&Declaration)) {
+    for_each_node(file, |node| {
         if let Some(declaration) = node.declaration() {
             f(declaration);
         }
     });
 }
 
-/// Visits every [`Hole`] in `doc`, in document order, wherever it sits: as a block, in running
+/// Visits every [`Hole`] in `file`, in document order, wherever it sits: as a block, in running
 /// text, as an entry of a `{...}` group or as a value.
-pub fn for_each_hole(doc: &Document, mut f: impl FnMut(&Hole)) {
-    for_each_node(doc, |node| {
+pub fn for_each_hole(file: &File, mut f: impl FnMut(&Hole)) {
+    for_each_node(file, |node| {
         if let Some(hole) = node.hole() {
             f(hole);
         }
     });
 }
 
-/// Visits every element a reader would find by scanning only the top of the document, in
+/// Visits every element a reader would find by scanning only the top of the file, in
 /// document order: every `Block::Element`, and every `Inline::Element` sitting directly in a
 /// `Block::Paragraph`'s own content (an element that shares its paragraph with other text is
 /// still at the top; something nested inside another element is not).
 ///
 /// This is the one place that decision lives. A caller that wants "the elements at the top of
-/// this document" should call this instead of walking `doc.blocks` by hand. Declarations are not
-/// elements: see [`for_each_top_level_declaration`].
-pub fn for_each_top_level_element(doc: &Document, mut f: impl FnMut(&Element)) {
-    for block in &doc.blocks {
+/// this file" should call this instead of walking `file.body` by hand. Declarations are in
+/// `file.header`.
+pub fn for_each_top_level_element(file: &File, mut f: impl FnMut(&Element)) {
+    for block in &file.body {
         match block {
             Block::Element(el) => f(el),
             Block::Paragraph(p) => {
@@ -428,47 +432,10 @@ pub fn for_each_top_level_element(doc: &Document, mut f: impl FnMut(&Element)) {
             }
             Block::Section(_)
             | Block::List(_)
-            | Block::Declaration(_)
             | Block::Hole(_)
             | Block::Interp(_) => {}
         }
     }
-}
-
-/// Visits every declaration at the top level of `doc`, in order.
-///
-/// A declaration is always a [`Block`] of its own, so "the declarations at the top of this
-/// document" is `doc.blocks` and nothing else: one in a section's body or an element's content is
-/// misplaced, and the validator reports it (`OutsidePreamble`). A caller that wants the preamble
-/// should call this instead of walking `doc.blocks` by hand.
-pub fn for_each_top_level_declaration(doc: &Document, mut f: impl FnMut(&Declaration)) {
-    for block in &doc.blocks {
-        if let Block::Declaration(declaration) = block {
-            f(declaration);
-        }
-    }
-}
-
-/// [`for_each_top_level_declaration`], mutably -- for a caller that rewrites a top-level
-/// declaration in place (`::blueprint(x)` becoming `::kind(x)`, say) without changing how many
-/// there are.
-pub fn for_each_top_level_declaration_mut(doc: &mut Document, mut f: impl FnMut(&mut Declaration)) {
-    for block in &mut doc.blocks {
-        if let Block::Declaration(declaration) = block {
-            f(declaration);
-        }
-    }
-}
-
-/// [`for_each_top_level_declaration`], removing every one `keep` rejects.
-pub fn retain_top_level_declarations(
-    doc: &mut Document,
-    mut keep: impl FnMut(&Declaration) -> bool,
-) {
-    doc.blocks.retain(|block| match block {
-        Block::Declaration(declaration) => keep(declaration),
-        _ => true,
-    });
 }
 
 /// Something nested in a node: an element, or a list item. What a `:rule(allow:...)` constrains,
@@ -611,14 +578,15 @@ struct MutWalk<'s, S: Sink> {
 }
 
 impl<S: Sink> MutWalk<'_, S> {
+    fn declaration(&mut self, d: &mut Declaration) {
+        self.sink.id(&mut d.id, d.span);
+        self.groups(&mut d.data, d.content.as_deref_mut());
+    }
+
     fn block(&mut self, block: &mut Block) {
         match block {
             Block::Paragraph(p) => self.inlines(&mut p.content),
             Block::Element(el) => self.element(el),
-            Block::Declaration(d) => {
-                self.sink.id(&mut d.id, d.span);
-                self.groups(&mut d.data, d.content.as_deref_mut());
-            }
             Block::Hole(h) => self.groups(&mut h.data, h.content.as_deref_mut()),
             Block::Section(s) => {
                 self.sink.id(&mut s.id, s.span);
@@ -728,49 +696,59 @@ impl<S: Sink> MutWalk<'_, S> {
     }
 }
 
-fn walk_mut(doc: &mut Document, sink: &mut impl Sink, connects: bool) {
+fn walk_mut(file: &mut File, sink: &mut impl Sink, connects: bool) {
     let mut walk = MutWalk { sink, connects };
-    for block in &mut doc.blocks {
+    for decl in &mut file.header {
+        walk.declaration(decl);
+    }
+    for block in &mut file.body {
         walk.block(block);
     }
 }
 
-/// Traverses all elements in `doc` mutably in document order and executes `f` for each in place.
+/// Traverses all elements in `file` mutably in document order and executes `f` for each in place.
 /// It reaches what [`for_each_element`] reaches, in the same order: an element in a `:connect` is
 /// not reached.
-pub fn for_each_element_mut(doc: &mut Document, f: impl FnMut(&mut Element)) {
+pub fn for_each_element_mut(file: &mut File, f: impl FnMut(&mut Element)) {
     struct Elements<F>(F);
     impl<F: FnMut(&mut Element)> Sink for Elements<F> {
         fn element(&mut self, el: &mut Element) {
             (self.0)(el);
         }
     }
-    walk_mut(doc, &mut Elements(f), false);
+    walk_mut(file, &mut Elements(f), false);
 }
 
-/// Hands `f` the `#(id)` of every node of `doc` that can carry one (an element, a declaration, a
+/// Traverses all declarations in `file` mutably in document order and executes `f` for each in place.
+pub fn for_each_declaration_mut(file: &mut File, mut f: impl FnMut(&mut Declaration)) {
+    for decl in &mut file.header {
+        f(decl);
+    }
+}
+
+/// Hands `f` the `#(id)` of every node of `file` that can carry one (an element, a declaration, a
 /// section, a list, a list item, a bare entry), with the node's span, in document order, each node
 /// before what it holds. It goes into `:connect`s too, as [`for_each_node`] does; the nodes it
 /// reaches are those for which [`Node::id`] answers.
-pub fn for_each_id_mut(doc: &mut Document, f: impl FnMut(&mut Option<Id>, Span)) {
+pub fn for_each_id_mut(file: &mut File, f: impl FnMut(&mut Option<Id>, Span)) {
     struct Ids<F>(F);
     impl<F: FnMut(&mut Option<Id>, Span)> Sink for Ids<F> {
         fn id(&mut self, id: &mut Option<Id>, span: Span) {
             (self.0)(id, span);
         }
     }
-    walk_mut(doc, &mut Ids(f), true);
+    walk_mut(file, &mut Ids(f), true);
 }
 
-/// Mutates all elements in `doc` matching `filter` by applying `transform`.
+/// Mutates all elements in `file` matching `filter` by applying `transform`.
 /// Returns the number of elements transformed.
-pub fn transform_elements<F, T>(doc: &mut Document, mut filter: F, mut transform: T) -> usize
+pub fn transform_elements<F, T>(file: &mut File, mut filter: F, mut transform: T) -> usize
 where
     F: FnMut(&Element) -> bool,
     T: FnMut(&mut Element) -> bool,
 {
     let mut count = 0;
-    for_each_element_mut(doc, |el| {
+    for_each_element_mut(file, |el| {
         if filter(el) && transform(el) {
             count += 1;
         }
@@ -783,8 +761,8 @@ mod tests {
     use super::*;
     use tomet_ast::Block;
 
-    fn element_of(doc: &Document) -> &Element {
-        match &doc.blocks[0] {
+    fn element_of(file: &File) -> &Element {
+        match &file.body[0] {
             Block::Element(el) => el,
             other => panic!("expected an element, got {other:?}"),
         }
@@ -800,22 +778,22 @@ mod tests {
 
     #[test]
     fn direct_only_stops_at_the_first_level() {
-        let doc = tomet_ast_parser::parse_document("@outer[ @mid[ @inner[ text ] ] ]\n").unwrap();
-        let outer = element_of(&doc);
+        let file = tomet_ast_parser::parse_file("@outer[ @mid[ @inner[ text ] ] ]\n").unwrap();
+        let outer = element_of(&file);
         assert_eq!(names(outer, true), vec!["mid"]);
     }
 
     #[test]
     fn every_descendant_walks_every_depth() {
-        let doc = tomet_ast_parser::parse_document("@outer[ @mid[ @inner[ text ] ] ]\n").unwrap();
-        let outer = element_of(&doc);
+        let file = tomet_ast_parser::parse_file("@outer[ @mid[ @inner[ text ] ] ]\n").unwrap();
+        let outer = element_of(&file);
         assert_eq!(names(outer, false), vec!["mid", "inner"]);
     }
 
     #[test]
     fn descendant_walk_never_visits_the_element_itself() {
-        let doc = tomet_ast_parser::parse_document("@outer[ @mid[ text ] ]\n").unwrap();
-        let outer = element_of(&doc);
+        let file = tomet_ast_parser::parse_file("@outer[ @mid[ text ] ]\n").unwrap();
+        let outer = element_of(&file);
         assert!(!names(outer, false).contains(&"outer".to_string()));
     }
 
@@ -830,9 +808,9 @@ mod tests {
                    @x(a: ${arg}, b: list(${nested})){ k: ${val} }[ ${content} ]:as(${connect})\n\
                    \n\
                    - item ${item}\n";
-        let doc = tomet_ast_parser::parse_document(src).unwrap();
+        let file = tomet_ast_parser::parse_file(src).unwrap();
         let mut found = Vec::new();
-        for_each_interpolation(&doc, |i| found.push(i.expr.to_string()));
+        for_each_interpolation(&file, |i| found.push(i.expr.to_string()));
         found.sort();
         let mut expected = vec![
             "title", "conn", "block", "inline", "arg", "nested", "val", "content", "connect",

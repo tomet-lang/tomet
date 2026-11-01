@@ -10,7 +10,7 @@
 //! sorted here, and a test holds the sorting to the list of functions, so a function added there
 //! has to be given a verdict here.
 
-use tomet_ast::{Document, InterpExpr, InterpExprKind, Literal};
+use tomet_ast::{File, InterpExpr, InterpExprKind, Literal};
 use tomet_span::Span;
 
 use crate::address;
@@ -97,7 +97,7 @@ pub struct OwnNames {
 
 impl OwnNames {
     /// The macros and variables `doc` itself declares.
-    pub fn of_document(doc: &Document) -> OwnNames {
+    pub fn of_document<B>(doc: &File<B>) -> OwnNames {
         OwnNames {
             macros: tomet_declaration::document_macros(doc)
                 .into_iter()
@@ -334,7 +334,7 @@ mod tests {
 
     #[test]
     fn the_names_a_document_defines_are_read_from_the_document() {
-        let doc = tomet_ast_parser::parse_document(
+        let doc = tomet_ast_parser::parse_file(
             "::macros{ gh: \"https://x/${1}\" }\n::vars{ topic: { type: string } }\n",
         )
         .unwrap();

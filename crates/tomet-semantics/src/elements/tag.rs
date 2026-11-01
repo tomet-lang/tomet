@@ -80,11 +80,6 @@ fn blocks_to_plain(blocks: &[Block]) -> String {
             }
             Block::List(list) => s.push_str(&list_to_plain(list)),
             Block::Interp(_) | Block::Hole(_) => {}
-            Block::Declaration(d) => {
-                if let Some(content) = &d.content {
-                    s.push_str(&blocks_to_plain(content));
-                }
-            }
         }
     }
     s
