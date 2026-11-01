@@ -14,6 +14,7 @@ mod interpolation;
 mod lists;
 mod paragraphs;
 mod sections;
+mod slots;
 mod thematic;
 mod urls;
 mod values;

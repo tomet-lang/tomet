@@ -195,6 +195,8 @@ fn lower_inlines(src: &str, parent: &SyntaxNode, from: usize, to: usize) -> Resu
                 text_start = end;
             }
             SyntaxElement::Token(_) => {}
+            // A name tag is running text: tomet gives it no meaning, so the run goes on through it.
+            SyntaxElement::Node(n) if n.kind() == K::SLOT => {}
             SyntaxElement::Node(n) => {
                 push_text_run(src, &mut items, text_start, start, depth)?;
                 text_start = end;
@@ -242,6 +244,9 @@ fn lower_inline(src: &str, node: &SyntaxNode) -> Result<Inline> {
 
 /// `@name(...)[...]` in running text, or a `${...}` interpolation.
 fn lower_inline_element(src: &str, node: &SyntaxNode) -> Result<Inline> {
+    if let Some(slot) = slot_of(node) {
+        return lower_slot(src, &slot).map(Inline::Hole);
+    }
     let sigil = node
         .children()
         .find(|n| n.kind() == K::SIGIL)
@@ -491,6 +496,11 @@ fn name_at(src: &str, at: usize) -> Result<Name> {
 /// A block element: `@name` and the groups that follow it, or `::name` and
 /// its groups, a declaration about the document.
 fn lower_block_element(src: &str, node: &SyntaxNode) -> Result<Block> {
+    if let Some(slot) = slot_of(node) {
+        let mut hole = lower_slot(src, &slot)?;
+        hole.placement = Placement::Block;
+        return Ok(Block::Hole(hole));
+    }
     let sigil = node
         .children()
         .find(|n| n.kind() == K::SIGIL)
@@ -590,6 +600,7 @@ pub(crate) fn lower_group_list(
             // nodes of its text, lowered by the item itself.
             K::LIST
             | K::INLINE_ELEMENT
+            | K::SLOT
             | K::EMPHASIS
             | K::STRONG
             | K::STRIKEOUT
@@ -627,6 +638,12 @@ pub(crate) fn lower_embedded(src: &str, node: &SyntaxNode) -> Result<(Value, usi
         K::CONTENT => {
             let (_, end) = range_of(node);
             Ok((Value::Blocks(lower_content(src, node)?), end))
+        }
+        _ if slot_of(node).is_some() => {
+            let slot = slot_of(node).expect("checked");
+            let hole = lower_slot(src, &slot)?;
+            let end = hole.span.end;
+            Ok((Value::Hole(Box::new(hole)), end))
         }
         _ if first_sigil(node) == Some(K::QUESTION) => {
             let hole = lower_hole(src, node)?;
@@ -1285,6 +1302,34 @@ fn reject_unclosed_comment(src: &str, at: usize) -> Result<()> {
         skip_block_comment(&mut cursor_at(src, at))?;
     }
     Ok(())
+}
+
+/// The box an element node holds, if it is one: `<?matcher...>` is an element of
+/// the tree, where a name tag (`<name>`) is a `SLOT` among the text and never wrapped.
+pub(crate) fn slot_of(node: &SyntaxNode) -> Option<SyntaxNode> {
+    node.children().find(|n| n.kind() == K::SLOT)
+}
+
+/// `<?matcher(args){value}>[content]#(id)`: a hole, from the `SLOT` node of a marked box.
+fn lower_slot(src: &str, slot: &SyntaxNode) -> Result<tomet_ast::Hole> {
+    let (start, end) = range_of(slot);
+    let name = slot
+        .children_with_tokens()
+        .filter_map(|e| e.into_token())
+        .find(|t| matches!(t.kind(), K::IDENT | K::TRUE_KW | K::FALSE_KW | K::NULL_KW));
+    let matcher = match name {
+        Some(t) => Some(name_at(src, usize::from(t.text_range().start()))?),
+        None => None,
+    };
+    let read = lower_groups(src, slot)?;
+    Ok(tomet_ast::Hole {
+        matcher,
+        placement: Placement::Inline,
+        data: read.data,
+        content: read.content,
+        id: read.id,
+        span: Span::new(start, end),
+    })
 }
 
 /// `?matcher(args){value}[content]#(id)`, in a pattern.

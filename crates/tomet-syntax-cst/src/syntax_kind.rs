@@ -100,6 +100,12 @@ pub enum SyntaxKind {
     /// A bare `https://`, `http://` or `mailto:` address in running text,
     /// without the punctuation that closes the sentence around it.
     AUTOLINK,
+    /// `<name>`, `<?matcher(args){data}>` and the `[content]` a marked one takes
+    /// after its `>`: a seat for a value that is not there yet. The head is
+    /// inside the angle brackets; one family in the syntax whatever its mark.
+    /// The AST gives it a node only where tomet interprets it (a hole is a
+    /// `Hole`); a plain name tag lowers to text.
+    SLOT,
     ERROR,
 
     // Must be the last variant

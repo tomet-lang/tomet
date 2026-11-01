@@ -123,12 +123,14 @@ fn collect(node: &SyntaxNode, into: &mut HashMap<usize, SyntaxNode>) {
     }
 }
 
-/// Whether `node` is written with `@`, or `?` (a hole), and not `$`.
+/// Whether `node` is written with `@`, or is a hole (`?` or a box), and not `$`.
 fn opens_with_element_sigil(node: &SyntaxNode) -> bool {
-    node.children()
-        .find(|n| n.kind() == K::SIGIL)
-        .and_then(|n| n.first_token())
-        .is_some_and(|t| matches!(t.kind(), K::AT | K::QUESTION))
+    crate::lower::slot_of(node).is_some()
+        || node
+            .children()
+            .find(|n| n.kind() == K::SIGIL)
+            .and_then(|n| n.first_token())
+            .is_some_and(|t| matches!(t.kind(), K::AT | K::QUESTION))
 }
 
 fn hooked(e: Error) -> cotomet_syntax::Error {

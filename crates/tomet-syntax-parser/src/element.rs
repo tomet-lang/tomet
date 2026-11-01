@@ -310,7 +310,11 @@ pub(crate) fn parse_value_group(
             // `{value}` groups are a flat list of entries, not prose, so
             // there is no paragraph here for a `;` to break or a line to
             // fold into: an element that is the whole of its line is a block.
-            _ if is_element_start(dialect, cur, at_line_start(cur)) => {
+            _ if is_element_start(dialect, cur, at_line_start(cur))
+                || embedded
+                    .node_at(cur.pos())
+                    .is_some_and(|n| crate::lower::slot_of(n).is_some()) =>
+            {
                 let at_start = at_line_start(cur);
                 let Some(node) = embedded.node_at(cur.pos()) else {
                     return Err(err(cur.pos(), "an element the CST did not read here"));

@@ -478,9 +478,92 @@ impl<'a> CstParser<'a> {
         }
     }
 
+    // --- boxes ------------------------------------------------------------------
+
+    /// Is token `i` the name of a box: one identifier (or `true`, `false`, `null`,
+    /// which the tokenizer reads apart) whose first character `first` accepts?
+    fn slot_name_at(&self, i: usize, first: impl Fn(char) -> bool) -> bool {
+        matches!(
+            self.kind_at(i),
+            Some(K::IDENT | K::TRUE_KW | K::FALSE_KW | K::NULL_KW)
+        ) && self.text_at(i).chars().next().is_some_and(first)
+    }
+
+    /// The box that starts at the `<` at `i`, if the tokens form one: whether it
+    /// has a mark, and the index of its closing `>`. `None` leaves the `<` as text.
+    ///
+    /// A box is tight: no white space inside its head. An unmarked one is a name
+    /// tag, `<` a letter-first name and `>`. A marked one is `<?`, an optional name,
+    /// an optional `(args)` and an optional `{data}`, and `>`. The `>` is the first
+    /// one outside those groups, which a string or a nested bracket cannot close.
+    fn slot_at(&self, i: usize) -> Option<(bool, usize)> {
+        if self.kind_at(i) != Some(K::LT) {
+            return None;
+        }
+        let marked = self.kind_at(i + 1) == Some(K::QUESTION);
+        let mut j = i + 1 + usize::from(marked);
+        if !marked {
+            if !self.slot_name_at(j, char::is_alphabetic) {
+                return None;
+            }
+            return (self.kind_at(j + 1) == Some(K::GT)).then_some((false, j + 1));
+        }
+        if self.slot_name_at(j, cotomet_syntax::is_name_start) {
+            j += 1;
+        }
+        let (mut args, mut value) = (false, false);
+        loop {
+            match self.kind_at(j) {
+                Some(K::L_PAREN) if !args => {
+                    args = true;
+                    j = self.group_end(j)?;
+                }
+                Some(K::L_BRACE) if !value => {
+                    value = true;
+                    j = self.group_end(j)?;
+                }
+                _ => break,
+            }
+        }
+        (self.kind_at(j) == Some(K::GT)).then_some((true, j))
+    }
+
+    /// Index just past the box at `i` and what a marked one owns after its `>`:
+    /// a `[content]` and a `#(id)`, each at most once and with no gap.
+    fn slot_end(&self, i: usize) -> usize {
+        let Some((marked, close)) = self.slot_at(i) else {
+            return i + 1;
+        };
+        let mut j = close + 1;
+        if marked {
+            let (mut content, mut id) = (false, false);
+            loop {
+                let group = match self.kind_at(j) {
+                    Some(K::L_BRACKET) if !content => {
+                        content = true;
+                        self.group_end(j)
+                    }
+                    Some(K::HASH) if !id && self.id_follows(j) => {
+                        id = true;
+                        self.group_end(j + 1)
+                    }
+                    _ => break,
+                };
+                match group {
+                    Some(e) => j = e,
+                    None => return self.tokens.len(),
+                }
+            }
+        }
+        j
+    }
+
     /// Index just past everything an element starting at `i` (its sigil is
     /// `@name`) owns, using only bracket matching.
     fn element_end(&self, mut i: usize) -> usize {
+        if self.kind_at(i) == Some(K::LT) {
+            return self.slot_end(i);
+        }
         i += self.sigil_len_at(i).unwrap_or(2); // `@name`, or `::name`
         let mut seen = [false; 3]; // args, content, value: each at most once
         let mut seen_id = false;
@@ -580,7 +663,9 @@ impl<'a> CstParser<'a> {
     /// Is the `@` or `::` at `i` a block element: an element that owns the
     /// rest of its line?
     fn is_block_element_at(&self, i: usize) -> bool {
-        if self.sigil_len_at(i).is_none() {
+        // A name tag is text and never a block; a marked box is one like `@name(...)`.
+        let box_here = matches!(self.slot_at(i), Some((true, _)));
+        if self.sigil_len_at(i).is_none() && !box_here {
             return false;
         }
         let end = self.element_end(i);
@@ -777,7 +862,7 @@ impl<'a> CstParser<'a> {
             K::BACKTICK if self.is_code_block_start_at(self.pos) => self.parse_code_block(),
             // An `@` element that is the whole of its line is a block, unless
             // the next line folds into it; then the line is running text.
-            K::AT | K::QUESTION if self.is_block_element_at(self.pos) => {
+            K::AT | K::QUESTION | K::LT if self.is_block_element_at(self.pos) => {
                 if self.element_line_folds(self.pos) {
                     self.parse_folded_element_paragraph()
                 } else {
@@ -973,14 +1058,77 @@ impl<'a> CstParser<'a> {
         self.builder.finish_node();
     }
 
-    fn parse_block_element(&mut self) {
-        self.builder.start_node(K::BLOCK_ELEMENT.into());
+    /// The head of an element that stands as a block: its sigil and groups, or a box.
+    fn parse_block_head(&mut self) {
+        if self.current_kind() == Some(K::LT) {
+            self.parse_slot();
+            return;
+        }
         let hole = self.current_kind() == Some(K::QUESTION);
         self.parse_sigil();
         let outer = self.allow_connect;
         self.allow_connect = outer && !hole;
         self.parse_groups(true);
         self.allow_connect = outer;
+    }
+
+    /// A box, at the `<` the cursor stands on ([`CstParser::slot_at`] said it is one):
+    /// `<`, the mark, the name, the `(args)` and `{data}` of the head, the `>`, and
+    /// for a marked one the `[content]` and `#(id)` after it.
+    fn parse_slot(&mut self) {
+        self.builder.start_node(K::SLOT.into());
+        let marked = self.kind_at(self.pos + 1) == Some(K::QUESTION);
+        self.bump(); // '<'
+        if marked {
+            self.bump(); // '?'
+        }
+        if matches!(
+            self.current_kind(),
+            Some(K::IDENT | K::TRUE_KW | K::FALSE_KW | K::NULL_KW)
+        ) {
+            self.bump();
+        }
+        if marked {
+            let (mut args, mut value) = (false, false);
+            loop {
+                match self.current_kind() {
+                    Some(K::L_PAREN) if !args => {
+                        args = true;
+                        self.parse_args_group();
+                    }
+                    Some(K::L_BRACE) if !value => {
+                        value = true;
+                        self.parse_value_group();
+                    }
+                    _ => break,
+                }
+            }
+        }
+        if self.current_kind() == Some(K::GT) {
+            self.bump();
+        }
+        if marked {
+            let (mut content, mut id) = (false, false);
+            loop {
+                match self.current_kind() {
+                    Some(K::L_BRACKET) if !content => {
+                        content = true;
+                        self.parse_content_group();
+                    }
+                    Some(K::HASH) if !id && self.id_follows(self.pos) => {
+                        id = true;
+                        self.parse_id_group();
+                    }
+                    _ => break,
+                }
+            }
+        }
+        self.builder.finish_node();
+    }
+
+    fn parse_block_element(&mut self) {
+        self.builder.start_node(K::BLOCK_ELEMENT.into());
+        self.parse_block_head();
         while matches!(self.current_kind(), Some(K::WHITESPACE | K::COMMENT)) {
             self.bump();
         }
@@ -994,12 +1142,7 @@ impl<'a> CstParser<'a> {
     fn parse_folded_element_paragraph(&mut self) {
         self.builder.start_node(K::PARAGRAPH.into());
         self.builder.start_node(K::INLINE_ELEMENT.into());
-        let hole = self.current_kind() == Some(K::QUESTION);
-        self.parse_sigil();
-        let outer = self.allow_connect;
-        self.allow_connect = outer && !hole;
-        self.parse_groups(true);
-        self.allow_connect = outer;
+        self.parse_block_head();
         while matches!(self.current_kind(), Some(K::WHITESPACE | K::COMMENT)) {
             self.bump();
         }
@@ -1454,6 +1597,20 @@ impl<'a> CstParser<'a> {
     /// Parses an element at the cursor if the tokens form one.
     fn try_parse_inline_element(&mut self) -> bool {
         let p = self.pos;
+        if self.current_kind() == Some(K::LT) {
+            let Some((marked, _)) = self.slot_at(p) else {
+                return false;
+            };
+            // A marked box is an element of the tree; a name tag stays running text.
+            if marked {
+                self.builder.start_node(K::INLINE_ELEMENT.into());
+                self.parse_slot();
+                self.builder.finish_node();
+            } else {
+                self.parse_slot();
+            }
+            return true;
+        }
         let is_element = match self.current_kind() {
             Some(K::AT) => self.name_at(p + 1) && self.groups_follow(p + 2),
             Some(K::QUESTION) => self.sigil_len_at(p).is_some(),
