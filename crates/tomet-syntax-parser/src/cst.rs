@@ -35,9 +35,10 @@
 //! `AUTOLINK` nodes where the AST has an `em`, `strong`, `strikeout`,
 //! `raw` or `link` element. What opens a span, and where an address ends, is
 //! decided by the same functions in `inline.rs`, so the two cannot drift.
-//! The tokenizer reads text without context (`_em_` is one identifier, a `//`
-//! inside backticks starts a comment), so a token is split where such a span
-//! starts or ends: the tree is the same text, cut at other places.
+//! The tokenizer is context-free and emits tokens finely enough that delimiters
+//! and structural boundaries are already token boundaries. The parser never cuts
+//! tokens; it assembles compound structures (such as string literals in value
+//! contexts and compound identifiers) where the grammar requires them.
 //!
 //! A `|` run is `[content]` spelled without brackets, and so it is the same
 //! node: a `CONTENT` that opens with a `PIPE` and has no closing `]`. It is an
@@ -67,7 +68,8 @@ use SyntaxKind as K;
 ///
 /// Guaranteed Invariant: `parse_cst(src).text().to_string() == src`.
 pub fn parse_cst(src: &str) -> SyntaxNode {
-    let mut parser = CstParser::new(src, tokenize(src));
+    let tokens = tokenize(src);
+    let mut parser = CstParser::new(src, &tokens);
     parser.parse_root();
     SyntaxNode::new_root(parser.builder.finish())
 }
@@ -76,7 +78,8 @@ pub fn parse_cst(src: &str) -> SyntaxNode {
 /// it: the entries of its map (or its one value) under a `ROOT`, with the
 /// elements, `[content]` and `|` runs they embed as nodes.
 pub(crate) fn parse_cst_value(src: &str) -> SyntaxNode {
-    let mut parser = CstParser::new(src, tokenize(src));
+    let tokens = tokenize(src);
+    let mut parser = CstParser::new(src, &tokens);
     parser.builder.start_node(K::ROOT.into());
     // No closer: `ROOT` is never a token, so the entries run to the end.
     parser.parse_entries(K::ROOT);
@@ -120,11 +123,9 @@ enum TailVerdict {
     NotGroups,
 }
 
-struct CstParser<'a> {
+struct CstParser<'a, 't> {
     src: &'a str,
-    /// The tokens of `src`, in order, each a slice of it. A token is split in
-    /// two (see [`CstParser::split_at`]) where a span starts or ends inside it.
-    tokens: Tokens<'a>,
+    tokens: &'t [(SyntaxKind, &'a str)],
     pos: usize,
     builder: GreenNodeBuilder<'static>,
     /// Whether an element may claim a `:name(...)` group that follows it.
@@ -161,55 +162,10 @@ struct CstParser<'a> {
     /// What the grammar said of the groups that begin at each offset of the text being read (see
     /// [`CstParser::tail_verdict`]). Shared with the trial parsers, whose slices it is asked about.
     tail_verdicts: Rc<RefCell<HashMap<usize, TailVerdict>>>,
-}
-
-/// The tokens of the text, kept as two stacks around the cursor.
-///
-/// A token is cut in two where a span starts or ends inside it, and the cut is
-/// always at or just after the cursor. In one vector that insertion moves every
-/// token after it, which made a text with many `_em_` quadratic; here the
-/// tokens ahead are stored last first, so a cut near the cursor moves only the
-/// few tokens between it and the cursor. Positions are still plain indices into
-/// the whole sequence.
-struct Tokens<'a> {
-    /// The tokens before the cursor, in order.
-    behind: Vec<(SyntaxKind, &'a str)>,
-    /// The tokens from the cursor on, the last one first: the next is at the end.
-    ahead: Vec<(SyntaxKind, &'a str)>,
-}
-
-impl<'a> Tokens<'a> {
-    fn new(mut all: Vec<(SyntaxKind, &'a str)>) -> Self {
-        all.reverse();
-        Self {
-            behind: Vec::new(),
-            ahead: all,
-        }
-    }
-
-    fn len(&self) -> usize {
-        self.behind.len() + self.ahead.len()
-    }
-
-    fn get(&self, i: usize) -> Option<(SyntaxKind, &'a str)> {
-        match i.checked_sub(self.behind.len()) {
-            None => self.behind.get(i).copied(),
-            Some(k) => self.ahead.len().checked_sub(k + 1).map(|j| self.ahead[j]),
-        }
-    }
-
-    /// Moves the cursor past the next token.
-    fn advance(&mut self) {
-        if let Some(token) = self.ahead.pop() {
-            self.behind.push(token);
-        }
-    }
-
-    /// Replaces token `i`, which must not be behind the cursor, by `pieces`.
-    fn replace(&mut self, i: usize, pieces: Vec<(SyntaxKind, &'a str)>) {
-        let j = self.ahead.len() - 1 - (i - self.behind.len());
-        self.ahead.splice(j..=j, pieces.into_iter().rev());
-    }
+    /// Token indices of all `COMMENT_BLOCK_CLOSE` (`*/`) tokens.
+    block_closers: Vec<usize>,
+    /// True while inside a raw/fenced code block where comments are not parsed.
+    in_raw_block: bool,
 }
 
 /// What the line after a run's last read line does to it.
@@ -222,11 +178,28 @@ enum Continuation {
     Content,
 }
 
-impl<'a> CstParser<'a> {
-    fn new(src: &'a str, tokens: Vec<(SyntaxKind, &'a str)>) -> Self {
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum MapKey {
+    String,
+    Name,
+    Simple,
+}
+
+impl<'a, 't> CstParser<'a, 't> {
+    fn new(src: &'a str, tokens: &'t [(SyntaxKind, &'a str)]) -> Self {
+        let mut block_closers = Vec::new();
+        for i in 0..tokens.len().saturating_sub(1) {
+            if tokens[i].0 == K::STAR && tokens[i + 1].0 == K::SLASH {
+                let start_star = tokens[i].1.as_ptr() as usize;
+                let start_slash = tokens[i + 1].1.as_ptr() as usize;
+                if start_slash == start_star + 1 {
+                    block_closers.push(i + 1);
+                }
+            }
+        }
         Self {
             src,
-            tokens: Tokens::new(tokens),
+            tokens,
             pos: 0,
             builder: GreenNodeBuilder::new(),
             allow_connect: true,
@@ -238,6 +211,8 @@ impl<'a> CstParser<'a> {
             delimiters: DelimiterIndex::new(src),
             base: 0,
             tail_verdicts: Rc::default(),
+            block_closers,
+            in_raw_block: false,
         }
     }
 
@@ -247,6 +222,16 @@ impl<'a> CstParser<'a> {
         self.pos >= self.tokens.len()
     }
 
+    fn is_block_comment_open_at(&self, i: usize) -> bool {
+        if self.raw_kind_at(i) == Some(K::SLASH) && self.raw_kind_at(i + 1) == Some(K::STAR) {
+            let start_slash = self.start_of(i);
+            let start_star = self.start_of(i + 1);
+            start_star == start_slash + 1
+        } else {
+            false
+        }
+    }
+
     /// The kind of token `i` as the grammar sees it: a run's marker on a later
     /// line is white space.
     fn kind_at(&self, i: usize) -> Option<SyntaxKind> {
@@ -254,90 +239,328 @@ impl<'a> CstParser<'a> {
             K::PIPE if !self.markers.is_empty() && self.markers.contains(&self.start_of(i)) => {
                 Some(K::WHITESPACE)
             }
+            K::COMMENT_LINE_OPEN => {
+                if self.in_raw_block {
+                    Some(K::TEXT_CHUNK)
+                } else {
+                    Some(K::COMMENT)
+                }
+            }
+            K::SLASH if self.is_block_comment_open_at(i) => {
+                if self.in_raw_block {
+                    Some(K::SLASH)
+                } else {
+                    Some(K::COMMENT)
+                }
+            }
             k => Some(k),
         }
     }
 
     /// The kind of token `i` as the tokenizer read it, markers included.
     fn raw_kind_at(&self, i: usize) -> Option<SyntaxKind> {
-        self.tokens.get(i).map(|(k, _)| k)
+        self.tokens.get(i).map(|(k, _)| *k)
     }
 
     fn text_at(&self, i: usize) -> &'a str {
-        self.tokens.get(i).map_or("", |(_, t)| t)
+        self.tokens.get(i).map_or("", |(_, t)| *t)
     }
 
     fn current_kind(&self) -> Option<SyntaxKind> {
         self.kind_at(self.pos)
     }
 
-    fn bump(&mut self) {
-        if let Some((kind, text)) = self.tokens.get(self.pos) {
-            // The tree tells a run's margin from a bar: the grammar reads it as white space
-            // (see [`CstParser::kind_at`]), and the tree keeps it as what it is.
-            let kind = if kind == K::PIPE && self.markers.contains(&self.start_of(self.pos)) {
-                K::MARGIN
+    /// How many tokens form the comment starting at `from`.
+    ///
+    /// For line comments (`COMMENT_LINE_OPEN`), runs to the next newline.
+    /// For block comments (`SLASH` + `STAR`), runs to the matching closer (`STAR` + `SLASH`),
+    /// or if unclosed, to the end of the line (newline).
+    fn comment_len_at(&self, from: usize) -> usize {
+        if self.raw_kind_at(from) == Some(K::COMMENT_LINE_OPEN) {
+            let mut j = from + 1;
+            while let Some(k) = self.raw_kind_at(j) {
+                if k == K::NEWLINE {
+                    break;
+                }
+                j += 1;
+            }
+            return j - from;
+        }
+        if self.is_block_comment_open_at(from) {
+            let next_close = self.block_closers.partition_point(|&c| c <= from + 2);
+            if let Some(&close_tok) = self.block_closers.get(next_close) {
+                return (close_tok + 1) - from;
             } else {
-                kind
-            };
-            self.builder.token(kind.into(), text);
-            self.tokens.advance();
-            self.pos += 1;
+                // Block comment never closed: runs to the end of the line.
+                let mut j = from + 1;
+                while let Some(k) = self.raw_kind_at(j) {
+                    if k == K::NEWLINE {
+                        break;
+                    }
+                    j += 1;
+                }
+                return j - from;
+            }
+        }
+        0
+    }
+
+    /// Assembles a single `COMMENT` token in the green tree spanning all constituent tokens
+    /// of the comment, advancing parser position past them.
+    fn bump_comment(&mut self) {
+        let count = self.comment_len_at(self.pos);
+        if count == 0 {
+            self.bump();
+            return;
+        }
+        let start = self.start_of(self.pos);
+        let end = if self.pos + count >= self.tokens.len() {
+            self.src.len()
+        } else {
+            self.start_of(self.pos + count)
+        };
+        self.builder.token(K::COMMENT.into(), &self.src[start..end]);
+        self.pos += count;
+    }
+
+    fn bump(&mut self) {
+        if let Some(&(kind, text)) = self.tokens.get(self.pos) {
+            match kind {
+                K::COMMENT_LINE_OPEN if !self.in_raw_block => {
+                    self.bump_comment();
+                }
+                K::SLASH if self.is_block_comment_open_at(self.pos) && !self.in_raw_block => {
+                    self.bump_comment();
+                }
+                K::COMMENT_LINE_OPEN => {
+                    self.builder.token(K::TEXT_CHUNK.into(), text);
+                    self.pos += 1;
+                }
+                K::PIPE if self.markers.contains(&self.start_of(self.pos)) => {
+                    self.builder.token(K::MARGIN.into(), text);
+                    self.pos += 1;
+                }
+                _ => {
+                    self.builder.token(kind.into(), text);
+                    self.pos += 1;
+                }
+            }
         }
     }
 
     /// Emits the current token as `kind`, whatever the tokenizer called it.
     fn bump_as(&mut self, kind: SyntaxKind) {
-        if let Some((_, text)) = self.tokens.get(self.pos) {
+        if let Some(&(_, text)) = self.tokens.get(self.pos) {
             self.builder.token(kind.into(), text);
-            self.tokens.advance();
             self.pos += 1;
         }
     }
 
     /// The byte offset in `src` at which token `i` starts (`src.len()` past
     /// the last one). Tokens are slices of `src`, so this is pointer
-    /// arithmetic, not a running sum that a split would have to keep right.
+    /// arithmetic.
     fn start_of(&self, i: usize) -> usize {
         match self.tokens.get(i) {
             Some((_, text)) => text.as_ptr() as usize - self.src.as_ptr() as usize,
-            None => self.src.len(),
+            None => self.tokens.last().map_or(self.src.len(), |(_, text)| {
+                text.as_ptr() as usize - self.src.as_ptr() as usize + text.len()
+            }),
         }
     }
 
-    /// Makes `byte` the boundary between two tokens, cutting the token that
-    /// spans it and tokenizing each half again: the halves are what the
-    /// tokenizer would have read had the text been split there to begin with.
-    ///
-    /// Only ever called at or after the current token, so `pos` stays valid;
-    /// a byte behind the cursor is left alone.
-    fn split_at(&mut self, byte: usize) {
-        // The first token at or after the cursor that ends past `byte`.
-        let (mut lo, mut hi) = (self.pos, self.tokens.len());
-        while lo < hi {
-            let mid = lo + (hi - lo) / 2;
-            if self.token_end(self.text_at(mid)) <= byte {
-                lo = mid + 1;
-            } else {
-                hi = mid;
+    fn token_at_offset(&self, offset: usize) -> usize {
+        self.tokens.partition_point(|(_, t)| {
+            (t.as_ptr() as usize - self.src.as_ptr() as usize) < offset
+        })
+    }
+
+    fn name_tokens_at(&self, from: usize) -> usize {
+        let Some(first_kind) = self.raw_kind_at(from) else {
+            return 0;
+        };
+        let first_text = self.text_at(from);
+        let valid_start = match first_kind {
+            K::IDENT => first_text.chars().next().is_some_and(cotomet_syntax::is_name_start),
+            K::UNDERSCORE => true,
+            K::TRUE_KW | K::FALSE_KW | K::NULL_KW => {
+                let next = from + 1;
+                self.start_of(next) == self.start_of(from) + first_text.len()
+                    && matches!(
+                        self.raw_kind_at(next),
+                        Some(K::UNDERSCORE | K::MINUS | K::DOT | K::IDENT | K::INT_NUMBER)
+                    )
+            }
+            _ => false,
+        };
+        if !valid_start {
+            return 0;
+        }
+        let mut count = 1;
+        let mut last_end = self.start_of(from) + first_text.len();
+        while let Some(kind) = self.raw_kind_at(from + count) {
+            let tok_start = self.start_of(from + count);
+            if tok_start != last_end {
+                break;
+            }
+            let tok_text = self.text_at(from + count);
+            let is_cont = match kind {
+                K::IDENT
+                | K::INT_NUMBER
+                | K::UNDERSCORE
+                | K::MINUS
+                | K::TRUE_KW
+                | K::FALSE_KW
+                | K::NULL_KW => true,
+                K::DOT => {
+                    let next = from + count + 1;
+                    let next_start = self.start_of(next);
+                    if next_start == tok_start + tok_text.len() {
+                        matches!(
+                            self.raw_kind_at(next),
+                            Some(
+                                K::IDENT
+                                    | K::INT_NUMBER
+                                    | K::UNDERSCORE
+                                    | K::MINUS
+                                    | K::TRUE_KW
+                                    | K::FALSE_KW
+                                    | K::NULL_KW
+                            )
+                        )
+                    } else {
+                        false
+                    }
+                }
+                _ => false,
+            };
+            if !is_cont {
+                break;
+            }
+            last_end = tok_start + tok_text.len();
+            count += 1;
+        }
+        count
+    }
+
+    fn name_at(&self, i: usize) -> bool {
+        self.name_tokens_at(i) > 0
+    }
+
+    fn bump_name(&mut self) {
+        let count = self.name_tokens_at(self.pos);
+        if count == 0 {
+            return;
+        }
+        let start = self.start_of(self.pos);
+        let end = self.start_of(self.pos + count);
+        self.builder.token(K::IDENT.into(), &self.src[start..end]);
+        self.pos += count;
+    }
+
+    fn bump_string_literal(&mut self) {
+        let start = self.start_of(self.pos);
+        let bytes = self.src.as_bytes();
+        if start >= bytes.len() {
+            self.bump();
+            return;
+        }
+        let quote = bytes[start];
+        let mut cur = start + 1;
+        let mut escaped = false;
+        while cur < bytes.len() {
+            let b = bytes[cur];
+            if b == b'\n' {
+                break;
+            }
+            cur += 1;
+            if escaped {
+                escaped = false;
+            } else if b == b'\\' {
+                escaped = true;
+            } else if b == quote {
+                break;
             }
         }
-        let Some((_, text)) = self.tokens.get(lo) else {
-            return;
-        };
-        let start = self.start_of(lo);
-        debug_assert!(start <= byte, "split behind the cursor");
-        if start >= byte {
-            return;
-        }
-        let (head, tail) = text.split_at(byte - start);
-        let mut pieces = tokenize(head);
-        pieces.extend(tokenize(tail));
-        self.tokens.replace(lo, pieces);
+        let end = cur;
+        let tok_end = self.token_at_offset(end);
+        let count = tok_end.saturating_sub(self.pos).max(1);
+        self.builder.token(K::STRING_LITERAL.into(), &self.src[start..end]);
+        self.pos += count;
     }
 
-    fn token_end(&self, text: &str) -> usize {
-        text.as_ptr() as usize - self.src.as_ptr() as usize + text.len()
+    fn map_key_at(&self, from: usize) -> Option<MapKey> {
+        match self.raw_kind_at(from)? {
+            K::QUOTE => {
+                let start = self.start_of(from);
+                let bytes = self.src.as_bytes();
+                if start >= bytes.len() {
+                    return None;
+                }
+                let quote = bytes[start];
+                let mut cur = start + 1;
+                let mut escaped = false;
+                while cur < bytes.len() {
+                    let b = bytes[cur];
+                    if b == b'\n' {
+                        break;
+                    }
+                    cur += 1;
+                    if escaped {
+                        escaped = false;
+                    } else if b == b'\\' {
+                        escaped = true;
+                    } else if b == quote {
+                        break;
+                    }
+                }
+                let after_str_tok = self.token_at_offset(cur);
+                let colon_tok = self.skip_ws_from(after_str_tok);
+                if self.kind_at(colon_tok) == Some(K::COLON) {
+                    Some(MapKey::String)
+                } else {
+                    None
+                }
+            }
+            K::INT_NUMBER | K::FLOAT_NUMBER => {
+                let colon_tok = self.skip_ws_from(from + 1);
+                if self.kind_at(colon_tok) == Some(K::COLON) {
+                    Some(MapKey::Simple)
+                } else {
+                    None
+                }
+            }
+            K::TRUE_KW | K::FALSE_KW | K::NULL_KW => {
+                let n = self.name_tokens_at(from);
+                if n > 1 {
+                    let colon_tok = self.skip_ws_from(from + n);
+                    if self.kind_at(colon_tok) == Some(K::COLON) {
+                        Some(MapKey::Name)
+                    } else {
+                        None
+                    }
+                } else {
+                    let colon_tok = self.skip_ws_from(from + 1);
+                    if self.kind_at(colon_tok) == Some(K::COLON) {
+                        Some(MapKey::Simple)
+                    } else {
+                        None
+                    }
+                }
+            }
+            _ => {
+                let n = self.name_tokens_at(from);
+                if n > 0 {
+                    let colon_tok = self.skip_ws_from(from + n);
+                    if self.kind_at(colon_tok) == Some(K::COLON) {
+                        Some(MapKey::Name)
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                }
+            }
+        }
     }
 
     fn bump_while(&mut self, kind: SyntaxKind) {
@@ -476,6 +699,31 @@ impl<'a> CstParser<'a> {
         let mut depth = 0usize;
         let mut j = i;
         while let Some(k) = self.kind_at(j) {
+            if k == K::QUOTE {
+                let start = self.start_of(j);
+                let bytes = self.src.as_bytes();
+                if start < bytes.len() {
+                    let quote = bytes[start];
+                    let mut cur = start + 1;
+                    let mut escaped = false;
+                    while cur < bytes.len() {
+                        let b = bytes[cur];
+                        if b == b'\n' {
+                            break;
+                        }
+                        cur += 1;
+                        if escaped {
+                            escaped = false;
+                        } else if b == b'\\' {
+                            escaped = true;
+                        } else if b == quote {
+                            break;
+                        }
+                    }
+                    j = self.token_at_offset(cur);
+                    continue;
+                }
+            }
             if k == open {
                 depth += 1;
             } else if k == close {
@@ -497,7 +745,7 @@ impl<'a> CstParser<'a> {
             Some(K::L_PAREN | K::L_BRACKET | K::L_BRACE | K::PIPE) => true,
             Some(K::HASH) => self.id_follows(i),
             Some(K::COLON) => {
-                Self::is_opener(self.kind_at(i + 1)) || self.kind_at(i + 1) == Some(K::IDENT)
+                Self::is_opener(self.kind_at(i + 1)) || self.name_at(i + 1)
             }
             _ => false,
         }
@@ -505,13 +753,66 @@ impl<'a> CstParser<'a> {
 
     // --- boxes ------------------------------------------------------------------
 
-    /// Is token `i` the name of a box: one identifier (or `true`, `false`, `null`,
-    /// which the tokenizer reads apart) whose first character `first` accepts?
-    fn slot_name_at(&self, i: usize, first: impl Fn(char) -> bool) -> bool {
-        matches!(
-            self.kind_at(i),
-            Some(K::IDENT | K::TRUE_KW | K::FALSE_KW | K::NULL_KW)
-        ) && self.text_at(i).chars().next().is_some_and(first)
+    fn slot_name_tokens_at(&self, i: usize, first: impl Fn(char) -> bool) -> usize {
+        let Some(first_kind) = self.raw_kind_at(i) else {
+            return 0;
+        };
+        let first_text = self.text_at(i);
+        let valid_start = match first_kind {
+            K::IDENT | K::TRUE_KW | K::FALSE_KW | K::NULL_KW => {
+                first_text.chars().next().is_some_and(first)
+            }
+            K::UNDERSCORE => first('_'),
+            _ => false,
+        };
+        if !valid_start {
+            return 0;
+        }
+        let mut count = 1;
+        let mut last_end = self.start_of(i) + first_text.len();
+        while let Some(kind) = self.raw_kind_at(i + count) {
+            let tok_start = self.start_of(i + count);
+            if tok_start != last_end {
+                break;
+            }
+            let tok_text = self.text_at(i + count);
+            let is_cont = match kind {
+                K::IDENT
+                | K::INT_NUMBER
+                | K::UNDERSCORE
+                | K::MINUS
+                | K::TRUE_KW
+                | K::FALSE_KW
+                | K::NULL_KW => true,
+                K::DOT => {
+                    let next = i + count + 1;
+                    let next_start = self.start_of(next);
+                    if next_start == tok_start + tok_text.len() {
+                        matches!(
+                            self.raw_kind_at(next),
+                            Some(
+                                K::IDENT
+                                    | K::INT_NUMBER
+                                    | K::UNDERSCORE
+                                    | K::MINUS
+                                    | K::TRUE_KW
+                                    | K::FALSE_KW
+                                    | K::NULL_KW
+                            )
+                        )
+                    } else {
+                        false
+                    }
+                }
+                _ => false,
+            };
+            if !is_cont {
+                break;
+            }
+            last_end = tok_start + tok_text.len();
+            count += 1;
+        }
+        count
     }
 
     /// The box that starts at the `<` at `i`, if the tokens form one: whether it
@@ -528,13 +829,16 @@ impl<'a> CstParser<'a> {
         let marked = self.kind_at(i + 1) == Some(K::QUESTION);
         let mut j = i + 1 + usize::from(marked);
         if !marked {
-            if !self.slot_name_at(j, char::is_alphabetic) {
+            let n = self.slot_name_tokens_at(j, char::is_alphabetic);
+            if n == 0 {
                 return None;
             }
-            return (self.kind_at(j + 1) == Some(K::GT)).then_some((false, j + 1));
+            j += n;
+            return (self.kind_at(j) == Some(K::GT)).then_some((false, j));
         }
-        if self.slot_name_at(j, cotomet_syntax::is_name_start) {
-            j += 1;
+        let n = self.slot_name_tokens_at(j, cotomet_syntax::is_name_start);
+        if n > 0 {
+            j += n;
         }
         let (mut args, mut value) = (false, false);
         loop {
@@ -563,7 +867,7 @@ impl<'a> CstParser<'a> {
             let mut j = self.skip_ws_from(i);
             // A comment after the element does not end it either.
             while self.kind_at(j) == Some(K::COMMENT) {
-                j = self.skip_ws_from(j + 1);
+                j = self.skip_ws_from(j + self.comment_len_at(j));
             }
             // A group may stand on the line after the element's own, with no
             // blank line between: `@file(a)` and then `[ text ]`.
@@ -606,8 +910,8 @@ impl<'a> CstParser<'a> {
                 }
                 Some(K::COLON) => {
                     let mut e = j + 1;
-                    if self.kind_at(e) == Some(K::IDENT) {
-                        e += 1;
+                    if self.name_at(e) {
+                        e += self.name_tokens_at(e);
                     }
                     if Self::is_opener(self.kind_at(e)) {
                         match self.group_end(e) {
@@ -628,34 +932,35 @@ impl<'a> CstParser<'a> {
     /// `::` is two `COLON` tokens; it is a sigil only with a name right after.
     fn sigil_len_at(&self, i: usize) -> Option<usize> {
         match self.kind_at(i) {
-            Some(K::AT) if self.name_at(i + 1) => Some(2),
-            Some(K::COLON) if self.kind_at(i + 1) == Some(K::COLON) && self.name_at(i + 2) => {
-                Some(3)
+            Some(K::AT) if self.name_at(i + 1) => Some(1 + self.name_tokens_at(i + 1)),
+            Some(K::COLON) if self.is_double_colon_sigil_at(i) => {
+                Some(2 + self.name_tokens_at(i + 2))
             }
             _ => None,
         }
     }
 
-    /// Token `i` starts a name: an identifier that begins as a name does, which
-    /// is ASCII (`@タグ` is text).
-    fn name_at(&self, i: usize) -> bool {
-        self.kind_at(i) == Some(K::IDENT)
-            && self
-                .tokens
-                .get(i)
-                .and_then(|(_, t)| t.chars().next())
-                .is_some_and(cotomet_syntax::is_name_start)
+    fn is_double_colon_sigil_at(&self, i: usize) -> bool {
+        self.kind_at(i) == Some(K::COLON)
+            && self.kind_at(i + 1) == Some(K::COLON)
+            && self.name_at(i + 2)
     }
 
     /// Is the `::` at `i` a declaration that owns the rest of its line? (An `@` element or a box
     /// is told from a paragraph after it is read: see [`CstParser::parse_element_line`].)
     fn is_block_element_at(&self, i: usize) -> bool {
-        if self.sigil_len_at(i) != Some(3) {
+        if !self.is_double_colon_sigil_at(i) {
             return false;
         }
         let mut j = self.element_end(i);
-        while matches!(self.kind_at(j), Some(K::WHITESPACE | K::COMMENT)) {
-            j += 1;
+        while let Some(k) = self.kind_at(j) {
+            if k == K::WHITESPACE {
+                j += 1;
+            } else if k == K::COMMENT {
+                j += self.comment_len_at(j);
+            } else {
+                break;
+            }
         }
         self.kind_at(j).is_none_or(|k| k == K::NEWLINE)
     }
@@ -682,8 +987,14 @@ impl<'a> CstParser<'a> {
 
     /// Index of the first token from `i` that is not white space or a comment.
     fn past_blanks(&self, mut i: usize) -> usize {
-        while matches!(self.kind_at(i), Some(K::WHITESPACE | K::COMMENT)) {
-            i += 1;
+        while let Some(k) = self.kind_at(i) {
+            if k == K::WHITESPACE {
+                i += 1;
+            } else if k == K::COMMENT {
+                i += self.comment_len_at(i);
+            } else {
+                break;
+            }
         }
         i
     }
@@ -839,8 +1150,8 @@ impl<'a> CstParser<'a> {
             // marked as the mistake.
             K::COLON
                 if self.pipe_cols.is_empty()
-                    && self.sigil_len_at(self.pos) == Some(3)
-                    && self.groups_follow(self.pos + 3) =>
+                    && self.is_double_colon_sigil_at(self.pos)
+                    && self.groups_follow(self.pos + 2 + self.name_tokens_at(self.pos + 2)) =>
             {
                 self.parse_declaration_with_stray_text()
             }
@@ -964,8 +1275,9 @@ impl<'a> CstParser<'a> {
         verdict
     }
 
-    /// The groups from `at` to the end of the line, read on their own and lowered: what the AST
-    /// says of them is what counts, so a `{x}` (a value group holds `key: value`) or a `#(a: 1)` is
+    /// The groups from `at` to the end of the line, read on a subslice of the existing
+    /// token stream (without re-tokenizing) and lowered: what the AST says of them is
+    /// what counts, so a `{x}` (a value group holds `key: value`) or a `#(a: 1)` is
     /// text, as it always was, and so is a trailing `[content]` or `|` run: the owner has no slot
     /// for one.
     ///
@@ -976,8 +1288,10 @@ impl<'a> CstParser<'a> {
         let Some(end) = line.chain(at) else {
             return TailVerdict::NotGroups;
         };
+        let tok_start = self.token_at_offset(at);
+        let tok_end = self.token_at_offset(end);
         let slice = &self.src[at..end];
-        let mut scratch = CstParser::new(slice, tokenize(slice));
+        let mut scratch = CstParser::new(slice, &self.tokens[tok_start..tok_end]);
         scratch.base = self.base + at;
         scratch.depth = self.depth;
         scratch.tail_verdicts = Rc::clone(&self.tail_verdicts);
@@ -1043,11 +1357,26 @@ impl<'a> CstParser<'a> {
         if marked {
             self.bump(); // '?'
         }
-        if matches!(
-            self.current_kind(),
-            Some(K::IDENT | K::TRUE_KW | K::FALSE_KW | K::NULL_KW)
-        ) {
-            self.bump();
+        let first_pred: fn(char) -> bool = if marked {
+            cotomet_syntax::is_name_start
+        } else {
+            char::is_alphabetic
+        };
+        let n = self.slot_name_tokens_at(self.pos, first_pred);
+        if n > 0 {
+            let start = self.start_of(self.pos);
+            let end = self.start_of(self.pos + n);
+            let kind = if n == 1
+                && matches!(
+                    self.raw_kind_at(self.pos),
+                    Some(K::TRUE_KW | K::FALSE_KW | K::NULL_KW)
+                ) {
+                self.raw_kind_at(self.pos).unwrap()
+            } else {
+                K::IDENT
+            };
+            self.builder.token(kind.into(), &self.src[start..end]);
+            self.pos += n;
         }
         if marked {
             let (mut args, mut value) = (false, false);
@@ -1105,6 +1434,10 @@ impl<'a> CstParser<'a> {
         self.builder.start_node(K::TOO_DEEP.into());
         let mut depth = 1usize;
         while let Some(k) = self.current_kind() {
+            if k == K::QUOTE {
+                self.bump_string_literal();
+                continue;
+            }
             if k == open {
                 depth += 1;
             } else if k == close {
@@ -1138,10 +1471,11 @@ impl<'a> CstParser<'a> {
         let element = match self.current_kind() {
             // A bare `@name` is an element only alone on its line; with a group it is one anywhere.
             Some(K::AT) => {
-                self.name_at(p + 1)
-                    && (self.groups_follow(p + 2)
+                let n = self.name_tokens_at(p + 1);
+                n > 0
+                    && (self.groups_follow(p + 1 + n)
                         || self
-                            .kind_at(self.past_blanks(p + 2))
+                            .kind_at(self.past_blanks(p + 1 + n))
                             .is_none_or(|k| k == K::NEWLINE))
             }
             Some(K::LT) => matches!(self.slot_at(p), Some((true, _))),
@@ -1324,6 +1658,8 @@ impl<'a> CstParser<'a> {
         for _ in 0..count {
             self.bump();
         }
+        let prev_raw = self.in_raw_block;
+        self.in_raw_block = true;
         // The rest of the opening line is the info string.
         self.bump_line();
         while !self.is_eof() && !self.at_run_end() {
@@ -1345,6 +1681,7 @@ impl<'a> CstParser<'a> {
             }
             self.bump_line();
         }
+        self.in_raw_block = prev_raw;
         self.builder.finish_node();
     }
 
@@ -1352,6 +1689,8 @@ impl<'a> CstParser<'a> {
     /// lines under it that open with two backticks of their own are more of the
     /// same block. A blank line, or any other line, ends it.
     fn parse_line_raw(&mut self) {
+        let prev_raw = self.in_raw_block;
+        self.in_raw_block = true;
         loop {
             self.bump();
             self.bump();
@@ -1368,6 +1707,7 @@ impl<'a> CstParser<'a> {
                 self.bump();
             }
         }
+        self.in_raw_block = prev_raw;
     }
 
     /// Reads the rest of the line, its `NEWLINE` included.
@@ -1395,28 +1735,11 @@ impl<'a> CstParser<'a> {
             if self.at_run_end() {
                 break;
             }
-            // In running text a quote is a character, not the start of a
-            // string: the tokenizer, which cannot tell, read everything up to
-            // the closing quote or the end of the line as one token, and what
-            // stood in it -- an element, a `*span*`, a `@conflict` -- was lost.
-            // Split the quote off and read the rest again.
-            if k == K::STRING_LITERAL {
-                let at = self.start_of(self.pos);
-                let quote = self
-                    .text_at(self.pos)
-                    .chars()
-                    .next()
-                    .map_or(1, char::len_utf8);
-                self.split_at(at + quote);
-                self.bump_as(K::TEXT_CHUNK);
-                continue;
-            }
             match stop {
                 InlineStop::Offset(at) => {
                     if self.start_of(self.pos) >= at {
                         break;
                     }
-                    self.split_at(at);
                 }
                 InlineStop::Line if k == K::NEWLINE => {
                     self.bump();
@@ -1461,7 +1784,11 @@ impl<'a> CstParser<'a> {
                 || self.try_parse_inline_element()
                 || self.try_parse_delimited())
             {
-                self.bump();
+                if self.current_kind() == Some(K::QUOTE) {
+                    self.bump_as(K::TEXT_CHUNK);
+                } else {
+                    self.bump();
+                }
             }
         }
     }
@@ -1472,28 +1799,13 @@ impl<'a> CstParser<'a> {
         matches!(self.kind_at(j), None | Some(K::NEWLINE))
     }
 
-    /// Does the closing `delim` of the span being read start at the current
-    /// token? If it starts later inside it (`_em_s` is one identifier), the
-    /// token is cut there and the answer is no, for now: the next token is
-    /// the closer.
-    fn closer_here(&mut self, delim: &str) -> bool {
+    /// Does the closing `delim` of the span being read start at the current token?
+    fn closer_here(&self, delim: &str) -> bool {
         // A comment is read whole: a delimiter inside it closes nothing.
         if self.current_kind() == Some(K::COMMENT) {
             return false;
         }
-        let start = self.start_of(self.pos);
-        let text = self.text_at(self.pos);
-        for (off, _) in text.char_indices() {
-            let at = start + off;
-            if self.closes_at(at, delim) {
-                if off == 0 {
-                    return true;
-                }
-                self.split_at(at);
-                return false;
-            }
-        }
-        false
+        self.closes_at(self.start_of(self.pos), delim)
     }
 
     /// A closing delimiter stands at `at`: `delim` there, and not right after
@@ -1541,11 +1853,9 @@ impl<'a> CstParser<'a> {
     }
 
     /// Emits the delimiter at the cursor one character per token, each as the
-    /// token it is, however the tokenizer read it (`__` is part of an `IDENT`).
+    /// token it is.
     fn bump_delimiter(&mut self, delim: &str) {
         for c in delim.chars() {
-            let at = self.start_of(self.pos);
-            self.split_at(at + c.len_utf8());
             self.bump_as(match c {
                 '*' => K::STAR,
                 '_' => K::UNDERSCORE,
@@ -1585,8 +1895,6 @@ impl<'a> CstParser<'a> {
         let Some(inner_end) = inner_end else {
             return false;
         };
-        self.split_at(inner_end);
-        self.split_at(inner_end + fence);
         self.builder.start_node(K::CODE_SPAN.into());
         while self.start_of(self.pos) < inner_start {
             self.bump_as(K::BACKTICK);
@@ -1625,7 +1933,6 @@ impl<'a> CstParser<'a> {
         let Some(end) = autolink_end(self.src, start, scheme_len, scanned) else {
             return false;
         };
-        self.split_at(end);
         self.builder.start_node(K::AUTOLINK.into());
         while self.start_of(self.pos) < end && !self.is_eof() {
             match self.current_kind() {
@@ -1656,11 +1963,14 @@ impl<'a> CstParser<'a> {
             return true;
         }
         let is_element = match self.current_kind() {
-            Some(K::AT) => self.name_at(p + 1) && self.groups_follow(p + 2),
+            Some(K::AT) => {
+                let n = self.name_tokens_at(p + 1);
+                n > 0 && self.groups_follow(p + 1 + n)
+            }
             Some(K::DOLLAR) => {
                 self.kind_at(p + 1) == Some(K::L_BRACE)
-                    || (self.kind_at(p + 1) == Some(K::IDENT)
-                        && self.kind_at(p + 2) == Some(K::L_PAREN))
+                    || (self.name_at(p + 1)
+                        && self.kind_at(p + 1 + self.name_tokens_at(p + 1)) == Some(K::L_PAREN))
             }
             _ => false,
         };
@@ -1690,15 +2000,15 @@ impl<'a> CstParser<'a> {
         self.builder.start_node(K::SIGIL.into());
         match self.current_kind() {
             // `::name`
-            Some(K::COLON) if self.sigil_len_at(self.pos) == Some(3) => {
+            Some(K::COLON) if self.is_double_colon_sigil_at(self.pos) => {
                 self.bump();
                 self.bump();
-                self.bump();
+                self.bump_name();
             }
             Some(_) => {
                 self.bump();
-                if self.current_kind() == Some(K::IDENT) {
-                    self.bump();
+                if self.name_at(self.pos) {
+                    self.bump_name();
                 }
             }
             None => {}
@@ -1728,7 +2038,7 @@ impl<'a> CstParser<'a> {
         loop {
             let mut j = self.skip_ws_from(self.pos);
             while cross_newline && self.kind_at(j) == Some(K::COMMENT) {
-                j = self.skip_ws_from(j + 1);
+                j = self.skip_ws_from(j + self.comment_len_at(j));
             }
             if cross_newline && self.kind_at(j) == Some(K::NEWLINE) {
                 let k = self.skip_ws_from(j + 1);
@@ -1876,8 +2186,8 @@ impl<'a> CstParser<'a> {
 
     fn connect_follows(&self, colon: usize) -> bool {
         let mut e = colon + 1;
-        if self.kind_at(e) == Some(K::IDENT) {
-            e += 1;
+        if self.name_at(e) {
+            e += self.name_tokens_at(e);
         }
         Self::is_opener(self.kind_at(e))
     }
@@ -1885,8 +2195,8 @@ impl<'a> CstParser<'a> {
     fn parse_connect(&mut self, strict: bool) {
         self.builder.start_node(K::CONNECT.into());
         self.bump(); // ':'
-        if self.current_kind() == Some(K::IDENT) {
-            self.bump();
+        if self.name_at(self.pos) {
+            self.bump_name();
         }
         // The groups of a connect are an element's: `(args)`, `{value}` and
         // `[content]` in any order, each once -- but not a sibling `:connect`,
@@ -1910,6 +2220,10 @@ impl<'a> CstParser<'a> {
                         self.bump();
                         break;
                     }
+                }
+                K::QUOTE => {
+                    self.bump_string_literal();
+                    continue;
                 }
                 _ => {}
             }
@@ -1985,20 +2299,14 @@ impl<'a> CstParser<'a> {
     }
 
     fn parse_entry(&mut self, close: SyntaxKind) {
-        let is_map = matches!(
-            self.current_kind(),
-            Some(
-                K::IDENT
-                    | K::STRING_LITERAL
-                    | K::INT_NUMBER
-                    | K::TRUE_KW
-                    | K::FALSE_KW
-                    | K::NULL_KW
-            )
-        ) && self.kind_at(self.skip_ws_from(self.pos + 1)) == Some(K::COLON);
-        if is_map {
+        let key = self.map_key_at(self.pos);
+        if let Some(k) = key {
             self.builder.start_node(K::MAP_ENTRY.into());
-            self.bump(); // key
+            match k {
+                MapKey::String => self.bump_string_literal(),
+                MapKey::Name => self.bump_name(),
+                MapKey::Simple => self.bump(),
+            }
             self.bump_while(K::WHITESPACE);
             self.bump(); // ':'
         } else {
@@ -2035,9 +2343,14 @@ impl<'a> CstParser<'a> {
                 K::L_PAREN => self.parse_args_group(),
                 // The `#(id)` of a bare entry, `(1)[text]#(a)`.
                 K::HASH if self.id_follows(self.pos) => self.parse_id_group(),
+                K::QUOTE => self.bump_string_literal(),
                 _ => {
                     if !self.try_parse_inline_element() {
-                        self.bump();
+                        if self.name_at(self.pos) {
+                            self.bump_name();
+                        } else {
+                            self.bump();
+                        }
                     }
                 }
             }

@@ -355,3 +355,26 @@ fn cotomet_value_hook_declines_elements_brackets_and_pipe() {
     };
     assert!(!matches!(entries[0].1, Value::Element(_)));
 }
+
+#[test]
+fn string_in_value_group_holding_special_characters_is_one_string() {
+    let src1 = r#"@e(key: "* _ ` #( #(id) // \"escaped\"")"#;
+    let root1 = crate::parse_cst(src1);
+    let str_tokens1: Vec<_> = root1
+        .descendants_with_tokens()
+        .filter_map(|e| e.into_token())
+        .filter(|t| t.kind() == tomet_cst::SyntaxKind::STRING_LITERAL)
+        .map(|t| t.text().to_string())
+        .collect();
+    assert_eq!(str_tokens1, vec![r#""* _ ` #( #(id) // \"escaped\"""#]);
+
+    let src2 = "@e(key: \"unterminated holding * and _\nother: 1)\n";
+    let root2 = crate::parse_cst(src2);
+    let str_tokens2: Vec<_> = root2
+        .descendants_with_tokens()
+        .filter_map(|e| e.into_token())
+        .filter(|t| t.kind() == tomet_cst::SyntaxKind::STRING_LITERAL)
+        .map(|t| t.text().to_string())
+        .collect();
+    assert_eq!(str_tokens2, vec!["\"unterminated holding * and _"]);
+}

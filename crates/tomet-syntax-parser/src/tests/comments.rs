@@ -303,3 +303,88 @@ fn a_bare_scalar_starting_with_double_slash_needs_quoting() {
     );
     assert!(parse_value("path: //example.com/x").is_err());
 }
+
+#[test]
+fn comment_between_quotes_in_prose_is_a_comment() {
+    let doc = parse_document("\"hello /*a comment*/ world\"\n").unwrap();
+    match &doc.blocks[0] {
+        Block::Paragraph(p) => {
+            let combined: String = p.content.iter().filter_map(|i| match i {
+                Inline::Text(t) => Some(t.value.as_str()),
+                _ => None,
+            }).collect();
+            assert_eq!(combined, "\"hello  world\"");
+        }
+        other => panic!("expected paragraph, got {other:?}"),
+    }
+    let cst = parse_cst("\"hello /*a comment*/ world\"\n");
+    assert!(cst.descendants_with_tokens().any(|e| e.kind() == tomet_cst::SyntaxKind::COMMENT));
+}
+
+#[test]
+fn comment_marker_inside_a_string_in_a_value_group_is_part_of_the_string() {
+    let doc = parse_document("@elem(allow: \"spec/**/*.tmt\")\n").unwrap();
+    match &doc.blocks[0] {
+        Block::Element(el) => {
+            let v = el.data.args.as_ref().unwrap();
+            let Value::Map(entries) = v else { panic!("expected map, got {v:?}") };
+            let (k, val) = &entries[0];
+            assert_eq!(k, "allow");
+            assert_eq!(
+                val,
+                &Value::String("spec/**/*.tmt".into())
+            );
+        }
+        other => panic!("expected element, got {other:?}"),
+    }
+}
+
+#[test]
+fn comment_marker_inside_a_code_span_is_text() {
+    let doc = parse_document("`/* not a comment */` and `// also not a comment`\n").unwrap();
+    match &doc.blocks[0] {
+        Block::Paragraph(p) => {
+            assert_eq!(p.content.len(), 3);
+            match (&p.content[0], &p.content[1], &p.content[2]) {
+                (Inline::Element(e1), Inline::Text(t), Inline::Element(e2)) => {
+                    assert_eq!(e1.name, Name::bare("raw"));
+                    assert_eq!(e1.content, wrap(vec![Inline::Raw(tomet_ast::RawText::new("/* not a comment */", Span::new(1, 20)))]));
+                    assert_eq!(t.value.as_str(), " and ");
+                    assert_eq!(e2.name, Name::bare("raw"));
+                    assert_eq!(e2.content, wrap(vec![Inline::Raw(tomet_ast::RawText::new("// also not a comment", Span::new(26, 49)))]));
+                }
+                other => panic!("unexpected content {other:?}"),
+            }
+        }
+        other => panic!("expected paragraph, got {other:?}"),
+    }
+}
+
+#[test]
+fn block_comment_over_several_lines() {
+    let doc = parse_document("before /* line 1\nline 2\nline 3 */ after\n").unwrap();
+    match &doc.blocks[0] {
+        Block::Paragraph(p) => {
+            let combined: String = p.content.iter().filter_map(|i| match i {
+                Inline::Text(t) => Some(t.value.as_str()),
+                _ => None,
+            }).collect();
+            assert_eq!(combined, "before  after");
+        }
+        other => panic!("expected paragraph, got {other:?}"),
+    }
+}
+
+#[test]
+fn unclosed_block_comment_ends_at_the_end_of_the_line() {
+    let cst = parse_cst("first /* unclosed\nsecond\n");
+    let mut comments = Vec::new();
+    for token in cst.descendants_with_tokens().filter_map(|e| e.into_token()) {
+        if token.kind() == tomet_cst::SyntaxKind::COMMENT {
+            comments.push(token.text().to_string());
+        }
+    }
+    assert_eq!(comments, vec!["/* unclosed"]);
+}
+
+

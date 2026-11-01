@@ -132,3 +132,31 @@ fn bare_at_is_plain_text_when_not_an_element() {
         other => panic!("expected paragraph, got {other:?}"),
     }
 }
+
+#[test]
+fn element_or_span_inside_quotes_in_prose_is_read_as_element_or_span() {
+    let doc = parse_document("He said \"@note[important] and *bold text* here\"\n").unwrap();
+    let Block::Paragraph(p) = &doc.blocks[0] else {
+        panic!("expected paragraph");
+    };
+    let has_el = p.content.iter().any(|i| matches!(i, Inline::Element(e) if e.name == Name::bare("note")));
+    let has_em = p.content.iter().any(|i| matches!(i, Inline::Element(e) if e.name == Name::bare("em")));
+    assert!(has_el, "should parse @note element inside quotes in prose");
+    assert!(has_em, "should parse *bold text* span inside quotes in prose");
+}
+
+#[test]
+fn delimiters_and_names_read_as_before() {
+    let doc = parse_document("__strong__ snake_case_name @my_name(1) :a-b(2)\n").unwrap();
+    let Block::Paragraph(p) = &doc.blocks[0] else {
+        panic!("expected paragraph");
+    };
+    let has_strong = p.content.iter().any(|i| matches!(i, Inline::Element(e) if e.name == Name::bare("strong")));
+    assert!(has_strong, "expected __strong__ to be parsed as strong");
+    let el = p.content.iter().find_map(|i| match i {
+        Inline::Element(e) if e.name == Name::bare("my_name") => Some(e),
+        _ => None,
+    }).expect("found @my_name");
+    assert_eq!(el.connects.len(), 1);
+    assert_eq!(el.connects[0].name, Name::bare("a-b"));
+}

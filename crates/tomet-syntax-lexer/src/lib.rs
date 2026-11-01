@@ -4,16 +4,30 @@
 //!
 //! =[ Overview & Design ]
 //!
-//! - (Context-Sensitive Scanning)
-//!   | Tomet's grammar is context-sensitive -- `<`, `@`, `(`, `[`, `{` are only
-//!   | structural right after specific triggers (an element sigil/name), and plain
-//!   | prose text otherwise. [`Cursor`] provides scanning and consumption helpers.
+//! - (Context-Free Tokenization)
+//!   | The tokenizer is strictly context-free: a token decision never depends on
+//!   | anything past the token itself and at most one character of lookbehind. The
+//!   | tokenizer never scans ahead across lines, never searches for closing markers
+//!   | like `*/`, and never tracks grammatical nesting state.
+//! - (Parser Assembly)
+//!   | The tokenizer emits fine-grained token pieces. Where the grammar requires
+//!   | larger semantic tokens -- strings in value contexts (`STRING_LITERAL`),
+//!   | compound identifiers (`IDENT`), and comments (`COMMENT` assembled from line
+//!   | openers `//` or block openers `/*` to `*/` or newline) -- the parser assembles
+//!   | them. In running prose, quotes and individual comment pieces outside comment
+//!   | contexts remain plain text. Inside strings and code spans, comment pieces are
+//!   | accepted as plain text.
 //! - (Zero-Copy & Copyable)
 //!   | [`Cursor`] holds only `&'a str` and byte offset `pos: usize`, making it `Copy`
 //!   | and strictly zero-copy.
 //! - (Lossless Tokenization)
 //!   | [`tokenize`] splits source text into `(SyntaxKind, &str)` tokens preserving 100%
-//!   | of input characters and whitespace for CST construction.
+//!   | of input characters and whitespace for CST construction. Concatenating all tokens
+//!   | exactly reproduces the original source.
+//! - (Lookbehind Invariants)
+//!   | Word-internal apostrophes (`don't`) are emitted as text rather than quote tokens.
+//!   | `//` starts a line comment token (`COMMENT_LINE_OPEN`) only after whitespace or
+//!   | at the start of source.
 //! - (Core Capabilities)
 //!   | Scanning & Consumption: `bump()`, `eat_char()`, `eat_str()`, `eat_while()`, `eat_whitespace()`.
 //!   | Lookahead & Peeking: `peek()`, `peek_at()`, `starts_with()`.
@@ -135,8 +149,11 @@ impl<'a> Cursor<'a> {
     /// to the previous line start, so it costs the length of the line and never
     /// the length of the file.
     pub fn column(&self) -> usize {
-        let line_start = self.src[..self.pos].rfind('\n').map_or(0, |i| i + 1);
-        self.src[line_start..self.pos].chars().count() + 1
+        let start_of_line = self.src[..self.pos]
+            .bytes()
+            .rposition(|b| b == b'\n')
+            .map_or(0, |i| i + 1);
+        self.src[start_of_line..self.pos].chars().count() + 1
     }
 
     /// Returns a [`Span`] from `start_pos` byte offset to the current cursor position.
@@ -145,7 +162,7 @@ impl<'a> Cursor<'a> {
     }
 }
 
-pub use tomet_cst::SyntaxKind;
+use tomet_cst::SyntaxKind;
 
 /// Losslessly tokenizes `src` into a list of `(SyntaxKind, &str)` tokens.
 ///
@@ -167,28 +184,18 @@ pub fn tokenize(src: &str) -> Vec<(SyntaxKind, &str)> {
                 cursor.eat_while(|ch| ch == ' ' || ch == '\t' || ch == '\r');
                 tokens.push((SyntaxKind::WHITESPACE, cursor.slice_from(start)));
             }
-            // `//` starts a comment only after whitespace (or at the start of
-            // the source), as in the inline parser: `https://x` is not one.
+            // `//` starts a line comment only after whitespace (or at the start of
+            // the source): `https://x` is not one. Emits the opener token; the parser
+            // assembles the comment.
             '/' if cursor.starts_with("//")
                 && src[..start]
                     .chars()
                     .next_back()
                     .is_none_or(|p| matches!(p, ' ' | '\t' | '\n' | '\r')) =>
             {
-                cursor.eat_while(|ch| ch != '\n');
-                tokens.push((SyntaxKind::COMMENT, cursor.slice_from(start)));
-            }
-            // `/* ... */`, anywhere the inline parser skips one, up to the
-            // first `*/` after the opening (they do not nest). The parser
-            // refuses one that is never closed; a lossless tokenizer cannot,
-            // so it runs to the end, which is what an editor shows while the
-            // closing `*/` is not typed yet.
-            '/' if cursor.starts_with("/*") => {
-                let len = src[start + 2..]
-                    .find("*/")
-                    .map_or(src.len() - start, |i| i + 4);
-                cursor.set_pos(start + len);
-                tokens.push((SyntaxKind::COMMENT, cursor.slice_from(start)));
+                cursor.bump();
+                cursor.bump();
+                tokens.push((SyntaxKind::COMMENT_LINE_OPEN, cursor.slice_from(start)));
             }
             '@' => {
                 cursor.bump();
@@ -298,6 +305,10 @@ pub fn tokenize(src: &str) -> Vec<(SyntaxKind, &str)> {
                 cursor.bump();
                 tokens.push((SyntaxKind::SEMI, cursor.slice_from(start)));
             }
+            '_' => {
+                cursor.bump();
+                tokens.push((SyntaxKind::UNDERSCORE, cursor.slice_from(start)));
+            }
             // An apostrophe inside a word (`don't`) is text, not a quote.
             '\'' if src[..start]
                 .chars()
@@ -307,26 +318,9 @@ pub fn tokenize(src: &str) -> Vec<(SyntaxKind, &str)> {
                 cursor.bump();
                 tokens.push((SyntaxKind::TEXT_CHUNK, cursor.slice_from(start)));
             }
-            // A string ends at its closing quote or, unterminated, at the end
-            // of the line: a stray quote must not swallow the rest of the file.
             '"' | '\'' => {
-                let quote = c;
                 cursor.bump();
-                let mut escaped = false;
-                while let Some(ch) = cursor.peek() {
-                    if ch == '\n' {
-                        break;
-                    }
-                    cursor.bump();
-                    if escaped {
-                        escaped = false;
-                    } else if ch == '\\' {
-                        escaped = true;
-                    } else if ch == quote {
-                        break;
-                    }
-                }
-                tokens.push((SyntaxKind::STRING_LITERAL, cursor.slice_from(start)));
+                tokens.push((SyntaxKind::QUOTE, cursor.slice_from(start)));
             }
             '0'..='9' => {
                 cursor.eat_while(|ch| ch.is_ascii_digit());
@@ -362,47 +356,34 @@ pub fn tokenize(src: &str) -> Vec<(SyntaxKind, &str)> {
 }
 
 fn is_ident_start(c: char) -> bool {
-    c.is_alphabetic() || c == '_'
+    c.is_alphabetic()
 }
 
 fn is_ident_continue(c: char) -> bool {
-    c.is_alphanumeric() || c == '_' || c == '-' || c == '.'
+    c.is_alphanumeric()
 }
 
 #[cfg(test)]
 mod tests {
+
     #[test]
     fn double_slash_is_a_comment_only_after_a_boundary() {
         let kinds =
             |src| -> Vec<SyntaxKind> { tokenize(src).into_iter().map(|(k, _)| k).collect() };
-        assert!(kinds("a // c").contains(&SyntaxKind::COMMENT));
-        assert!(kinds("// c").contains(&SyntaxKind::COMMENT));
-        assert!(!kinds("https://x").contains(&SyntaxKind::COMMENT));
+        assert!(kinds("a // c").contains(&SyntaxKind::COMMENT_LINE_OPEN));
+        assert!(kinds("// c").contains(&SyntaxKind::COMMENT_LINE_OPEN));
+        assert!(!kinds("https://x").contains(&SyntaxKind::COMMENT_LINE_OPEN));
     }
 
     #[test]
-    fn a_block_comment_runs_to_the_first_closer_and_does_not_nest() {
-        let comments = |src| -> Vec<String> {
-            tokenize(src)
-                .into_iter()
-                .filter(|(k, _)| *k == SyntaxKind::COMMENT)
-                .map(|(_, t)| t.to_string())
-                .collect()
-        };
-        assert_eq!(comments("a /* b */ c"), ["/* b */"]);
-        assert_eq!(comments("a/* b */c"), ["/* b */"]);
-        assert_eq!(comments("/* a\nb */ c"), ["/* a\nb */"]);
-        assert_eq!(comments("/* a /* b */ c */"), ["/* a /* b */"]);
-        // `/*/` does not close itself.
-        assert_eq!(comments("/*/ x */"), ["/*/ x */"]);
-        // Never closed: to the end, and the text stays whole.
-        assert_eq!(comments("a /* b\nc"), ["/* b\nc"]);
+    fn comment_pieces_are_emitted_by_tokenizer() {
+        let toks = tokenize("a /* b */ c // d\n");
+        assert!(toks.contains(&(SyntaxKind::SLASH, "/")));
+        assert!(toks.contains(&(SyntaxKind::STAR, "*")));
+        assert!(toks.contains(&(SyntaxKind::COMMENT_LINE_OPEN, "//")));
         assert_eq!(
-            tokenize("a /* b\nc")
-                .iter()
-                .map(|(_, t)| *t)
-                .collect::<String>(),
-            "a /* b\nc"
+            toks.iter().map(|(_, t)| *t).collect::<String>(),
+            "a /* b */ c // d\n"
         );
     }
 
@@ -410,19 +391,42 @@ mod tests {
     fn a_slash_that_opens_nothing_is_a_slash() {
         let kinds =
             |src| -> Vec<SyntaxKind> { tokenize(src).into_iter().map(|(k, _)| k).collect() };
-        assert!(!kinds("a / b").contains(&SyntaxKind::COMMENT));
-        assert!(!kinds("a */ b").contains(&SyntaxKind::COMMENT));
+        assert!(kinds("a / b").contains(&SyntaxKind::SLASH));
+        assert!(kinds("a */ b").contains(&SyntaxKind::STAR));
+        assert!(kinds("a */ b").contains(&SyntaxKind::SLASH));
     }
 
     #[test]
-    fn strings_stop_at_the_line_and_apostrophes_in_words_are_text() {
+    fn quotes_are_single_tokens_and_apostrophes_in_words_are_text() {
         let toks = tokenize("\"open\nnext");
-        assert_eq!(toks[0], (SyntaxKind::STRING_LITERAL, "\"open"));
-        assert_eq!(toks[1].0, SyntaxKind::NEWLINE);
+        assert_eq!(toks[0], (SyntaxKind::QUOTE, "\""));
+        assert_eq!(toks[1], (SyntaxKind::IDENT, "open"));
+        assert_eq!(toks[2].0, SyntaxKind::NEWLINE);
         assert!(
             tokenize("don't")
                 .iter()
-                .all(|(k, _)| *k != SyntaxKind::STRING_LITERAL)
+                .all(|(k, _)| *k != SyntaxKind::QUOTE)
+        );
+        let delim_toks = |src| -> Vec<SyntaxKind> {
+            tokenize(src).into_iter().map(|(k, _)| k).collect()
+        };
+        assert_eq!(
+            delim_toks("__strong__"),
+            vec![
+                SyntaxKind::UNDERSCORE,
+                SyntaxKind::UNDERSCORE,
+                SyntaxKind::IDENT,
+                SyntaxKind::UNDERSCORE,
+                SyntaxKind::UNDERSCORE,
+            ]
+        );
+        assert_eq!(
+            delim_toks("a-b"),
+            vec![SyntaxKind::IDENT, SyntaxKind::MINUS, SyntaxKind::IDENT]
+        );
+        assert_eq!(
+            delim_toks("a.b"),
+            vec![SyntaxKind::IDENT, SyntaxKind::DOT, SyntaxKind::IDENT]
         );
     }
 

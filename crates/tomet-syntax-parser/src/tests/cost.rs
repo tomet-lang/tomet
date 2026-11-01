@@ -86,3 +86,33 @@ fn the_tail_starts_after_the_last_group_that_is_not_valid() {
         wrap(vec![Inline::Text("a {x}".into())]).unwrap()
     );
 }
+
+#[test]
+fn a_line_of_quotes_parses_in_proportional_time() {
+    let n = 100_000;
+    within_the_limit("100k double quotes", &format!("- {}\n", "\"".repeat(n)));
+    let mut mixed = String::with_capacity(n);
+    for i in 0..n {
+        mixed.push(if i % 2 == 0 { '"' } else { '\'' });
+    }
+    within_the_limit("100k mixed quotes", &format!("- {}\n", mixed));
+}
+
+#[test]
+fn comment_shapes_parse_in_proportional_time() {
+    let n = 40_000;
+    within_the_limit("40k a/*x*/ on one line", &format!("{}\n", "a/*x*/ ".repeat(n)));
+    within_the_limit("40k a //x on one line", &format!("{}\n", "a //x ".repeat(n)));
+    within_the_limit("40k lines of a /* open", &"a /* open\n".repeat(n));
+    within_the_limit("40k /* openers on one line", &format!("{}\n", "/*".repeat(n)));
+    let mut s5 = String::with_capacity(n * 5);
+    for i in 0..n {
+        match i % 3 {
+            0 => s5.push('"'),
+            1 => s5.push_str("/*"),
+            _ => s5.push_str("*/"),
+        }
+    }
+    s5.push('\n');
+    within_the_limit("40k quotes mixed with block comments", &s5);
+}
