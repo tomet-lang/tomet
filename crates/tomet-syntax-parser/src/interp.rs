@@ -5,7 +5,7 @@ use crate::value::{err, parse_quoted};
 use tomet_ast::{BinaryOp, InterpExpr, InterpExprKind, Interpolation, Literal};
 use tomet_lexer::Cursor;
 
-pub use cotomet_syntax::{is_interp_ident_char, is_interp_ident_start, is_interp_start};
+pub use cotomet_syntax::{is_interp_ident_char, is_interp_ident_start};
 
 /// `${ Expr }` or `$func(args)` or `$macro.func(args)`.
 pub(crate) fn parse_interpolation(cur: &mut Cursor) -> Result<Interpolation> {

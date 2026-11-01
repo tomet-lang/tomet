@@ -192,18 +192,14 @@ pub(crate) fn push_soft_break(items: &mut Vec<Inline>, span: Span) {
 /// `' '` in the text (or nothing, between two East-Asian-wide characters) --
 /// see [`Inline::SoftBreak`]'s doc comment for why that destroyed information
 /// this needs to keep. What a break swallows is unchanged: the newline, the
-/// whitespace after it, and -- inside a `|` run, when `fold_pipes` is set --
-/// the next line's own `|` marker and the whitespace after that, so
-/// `x| a\n| b` still swallows exactly what `x[ a\n  b ]` does. Only the
+/// whitespace after it, and -- inside a `|` run -- the next line's own `|` margin
+/// and the whitespace after that, so `x| a\n| b` still swallows exactly what
+/// `x[ a\n  b ]` does. `margins` are the offsets of the `MARGIN` tokens the tree
+/// holds, in order: a `|` that is not one of them is text. Only the
 /// output differs: the swallowed gap becomes a `SoftBreak` node spanning it,
 /// not a character. Deciding what that node renders as (a space, nothing,
 /// a real newline) is left to whoever consumes the tree.
-pub(crate) fn split_softbreaks(
-    items: &mut Vec<Inline>,
-    raw: &str,
-    base: usize,
-    pipe_cols: &[usize],
-) {
+pub(crate) fn split_softbreaks(items: &mut Vec<Inline>, raw: &str, base: usize, margins: &[usize]) {
     let mut text_start = 0usize;
     let mut chars = raw.char_indices().peekable();
     while let Some((i, c)) = chars.next() {
@@ -223,19 +219,17 @@ pub(crate) fn split_softbreaks(
                 break;
             }
         }
-        if !pipe_cols.is_empty() {
-            for _ in pipe_cols {
-                if let Some(&(j, '|')) = chars.peek() {
-                    gap_end = j + '|'.len_utf8();
+        // The margins of a `|` run that begin the next line, each with the blanks after it.
+        while let Some(&(j, '|')) = chars.peek() {
+            if margins.binary_search(&(base + j)).is_err() {
+                break;
+            }
+            gap_end = j + '|'.len_utf8();
+            chars.next();
+            while let Some(&(k, wc)) = chars.peek() {
+                if matches!(wc, ' ' | '\t') {
+                    gap_end = k + wc.len_utf8();
                     chars.next();
-                    while let Some(&(k, wc)) = chars.peek() {
-                        if matches!(wc, ' ' | '\t') {
-                            gap_end = k + wc.len_utf8();
-                            chars.next();
-                        } else {
-                            break;
-                        }
-                    }
                 } else {
                     break;
                 }

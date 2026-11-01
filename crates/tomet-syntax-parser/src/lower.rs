@@ -20,7 +20,7 @@
 use crate::element::{Groups, parse_hash_id, parse_paren_value, parse_value_group};
 use crate::error::{Error, Result};
 use crate::inline::{DELIMITERS, extend_merging, push_text, split_softbreaks, trim_edges};
-use crate::interp::{is_interp_start, parse_interpolation};
+use crate::interp::parse_interpolation;
 use crate::value::{Embedded, eat_name, err, skip_block_comment, skip_inline_ws};
 use tomet_ast::{
     Block, Connect, Data, Declaration, Document, Element, Inline, List, Name, Paragraph, Placement,
@@ -141,16 +141,23 @@ fn lower_paragraph(src: &str, node: &SyntaxNode) -> Result<Option<Block>> {
 /// interpolations are the children of `parent`: the text between them becomes
 /// `Text` and `SoftBreak`, a comment is left out, and the ends are trimmed.
 fn lower_inlines(src: &str, parent: &SyntaxNode, from: usize, to: usize) -> Result<Vec<Inline>> {
-    let depth = pipe_depth(parent);
+    // The margins of a `|` run in these lines: a bar that is layout and not text.
+    let margins: Vec<usize> = parent
+        .children_with_tokens()
+        .filter_map(|e| e.into_token())
+        .filter(|t| t.kind() == K::MARGIN)
+        .map(|t| usize::from(t.text_range().start()))
+        .collect();
     let mut items = Vec::new();
     let mut text_start = from;
     for child in parent.children_with_tokens() {
         let range = child.text_range();
         let (start, end) = (usize::from(range.start()), usize::from(range.end()));
-        // A node that starts inside the text is part of it, even if what it holds
-        // (a `/*` that never closes) runs past the end of the line.
-        let beyond = match child {
+        // A node, or a comment, that starts inside the text is part of it, even if what it
+        // holds (a `/*` that never closes) runs past the end of the line.
+        let beyond = match &child {
             SyntaxElement::Node(_) => start >= to,
+            SyntaxElement::Token(t) if t.kind() == K::COMMENT => start >= to,
             SyntaxElement::Token(_) => end > to,
         };
         if start < from || beyond {
@@ -159,20 +166,20 @@ fn lower_inlines(src: &str, parent: &SyntaxNode, from: usize, to: usize) -> Resu
         match child {
             SyntaxElement::Token(t) if t.kind() == K::COMMENT => {
                 reject_unclosed_comment(src, start)?;
-                push_text_run(src, &mut items, text_start, start, depth)?;
+                push_text_run(src, &mut items, text_start, start, &margins)?;
                 text_start = end;
             }
             SyntaxElement::Token(_) => {}
             // A name tag is running text: tomet gives it no meaning, so the run goes on through it.
             SyntaxElement::Node(n) if n.kind() == K::SLOT => {}
             SyntaxElement::Node(n) => {
-                push_text_run(src, &mut items, text_start, start, depth)?;
+                push_text_run(src, &mut items, text_start, start, &margins)?;
                 text_start = end;
                 items.push(lower_inline(src, &n)?);
             }
         }
     }
-    push_text_run(src, &mut items, text_start, to, depth)?;
+    push_text_run(src, &mut items, text_start, to, &margins)?;
     Ok(trim_edges(items))
 }
 
@@ -183,19 +190,17 @@ fn push_text_run(
     items: &mut Vec<Inline>,
     from: usize,
     to: usize,
-    depth: usize,
+    margins: &[usize],
 ) -> Result<()> {
     if from >= to {
         return Ok(());
     }
-    reject_broken_constructs(src, from, to)?;
-    let cols = vec![0usize; depth];
     let mut at = from;
     for backslash in escaped_semicolons(src, from, to) {
-        split_softbreaks(items, &src[at..backslash], at, &cols);
+        split_softbreaks(items, &src[at..backslash], at, margins);
         at = backslash + 1;
     }
-    split_softbreaks(items, &src[at..to], at, &cols);
+    split_softbreaks(items, &src[at..to], at, margins);
     Ok(())
 }
 
@@ -1194,23 +1199,6 @@ fn reject_unterminated(src: &str, content: &SyntaxNode) -> Result<()> {
         .is_some_and(|e| e.kind() == K::R_BRACKET);
     if bracketed && !closed {
         return Err(err(src.len(), "unterminated, expected ']'"));
-    }
-    Ok(())
-}
-
-/// What the CST left as text that the AST parser would have read as a construct
-/// and found broken: a `${` that does not close, a `/*` that does not close.
-fn reject_broken_constructs(src: &str, from: usize, to: usize) -> Result<()> {
-    let text = &src[from..to];
-    for (i, _) in text.match_indices("${") {
-        let mut cur = cursor_at(src, from + i);
-        if is_interp_start(&cur) {
-            parse_interpolation(&mut cur)?;
-        }
-    }
-    for (i, _) in text.match_indices("/*") {
-        let mut cur = cursor_at(src, from + i);
-        skip_block_comment(&mut cur)?;
     }
     Ok(())
 }
