@@ -1,6 +1,6 @@
 ::kind(api)
 
-::meta{crate: tomet-semantics, dependencies: list(cotomet-syntax, tomet-address, tomet-ast, tomet-declaration, tomet-parser, tomet-tree, tomet-type), dependents: list(tomet, tomet-cli, tomet-config, tomet-deps, tomet-html, tomet-indexer, tomet-links, tomet-load, tomet-lsp, tomet-markdown, tomet-pandoc, tomet-parser, tomet-printer, tomet-search, tomet-stats, tomet-style, tomet-tests, tomet-transform, tomet-typst, tomet-validator, tomet-validator-blueprint, tomet-validator-core, tomet-validator-rule, tomet-vault, tomet-workspace)}
+::meta{crate: tomet-semantics, dependencies: list(cotomet-syntax, tomet-address, tomet-ast, tomet-declaration, tomet-parser, tomet-tree, tomet-type), dependents: list(tomet, tomet-cli, tomet-config, tomet-deps, tomet-html, tomet-indexer, tomet-links, tomet-load, tomet-lsp, tomet-markdown, tomet-pandoc, tomet-parser, tomet-printer, tomet-search, tomet-stats, tomet-style, tomet-tests, tomet-transform, tomet-typst, tomet-validator, tomet-validator-blueprint, tomet-validator-core, tomet-validator-profile, tomet-validator-rule, tomet-vault, tomet-workspace)}
 
 =[tomet-semantics]
 
@@ -18,7 +18,7 @@ classify elements without pulling in the parser.
 their slots, how often each may be written, what reading one gives -- is
 `tomet-declaration`'s, so a `.ctmt` file reads them the same way. This crate keeps
 what only a tomet document does with them: [`ElementKind::Declaration`] classifies one,
-[`DocumentConfig`] fills the settings from `::config` and `::settings`, and a vocabulary
+[`DocumentConfig`] fills the export settings from `::export`, and a vocabulary
 binds through `::use`. Which elements carry an address (`@link`, `@embed`, `@file`,
 `@dir`) is `tomet-address`'s.
 
@@ -32,11 +32,12 @@ prefix classification (`Url`, `File`, `Tm`, `Id`, `Ref`) via [`TargetScheme`].
 - @em[]Positional Argument Normalization (`positional`))
 
 | Unifies positional argument mapping
-| (e.g. `@raw(rust)` -> `{lang: "rust"}`) for built-in and `::settings` custom schemas.
+| (e.g. `@raw(rust)` -> `{lang: "rust"}`) for built-in and vocabulary-declared schemas.
 
-- ("Document Configuration (`config`)") Merges `::config` and `::settings` blocks across
-a document into a structured [`DocumentConfig`], with the `::macros` and `::vars` it
-declares.
+- ("Document Configuration (`config`)") Reads a document's `::export` into a structured [`DocumentConfig`], with the `::macros` and
+`::vars` it declares.
+- ("Dictionaries (`dictionary`)") Reads a `::dictionary(name)` document into a [`Dictionary`] of [`Term`]s, collects the ones a
+vault registers in [`LoadedDictionaries`], and resolves what a `@term` names ([`TermRef`]).
 - ("Structural Helpers") Heading level clamping (`heading`) and
 table parsing (`table`).
 - ("Element Data Extraction (`data`)") Extracts and normalizes an element's `{...}` data group via [`data::element_data`].
@@ -50,15 +51,76 @@ An element's value as data.
 
 `{...}` is the only data syntax cotomet has; `element_data` is the single
 place every caller reads an element's `{...}` group through, so none of
-them need to know `ElementValue::Group`'s shape themselves.
+them need to know `Group`'s shape themselves.
 
 ===[Functions]
 
 ====[fn element_data]
 
 An element's value as data: a `{...}` group's `key: value` pairs, or
-`None` if the element has no value group at all (or an interpolated
-one, `${...}`, which is not data).
+`None` if the element has no value group at all.
+
+====[fn declaration_data]
+
+[`element_data`] for a declaration.
+
+==[Module dictionary]
+
+Dictionaries of terms: reading a `::dictionary` document, and looking a term up.
+
+A dictionary defines words a vault's documents use, once, so that a document mentions one with
+`@term` instead of writing it out. It is a document of its own:
+
+```text
+::dictionary(tomet){
+  "vault.config.tmt": @term[ The file that marks a vault. ]#(vault-config)
+}
+```
+
+The key is the term, quoted, so a word in any language fits. The content of the `@term` is its
+description. `#(vault-config)` is an optional stable identifier: the term may be renamed and a
+mention by identifier does not change. A term and an identifier are each unique within their
+dictionary, the way an id is unique within its document.
+
+This is the pure half. Finding and reading the files a vault registers with `::dictionaries` is
+`tomet-load`'s, the same split as for vocabularies ([`crate::vocabulary`]).
+
+===[Structs]
+
+====[struct Term]
+
+One term a dictionary defines.
+
+====[struct Dictionary]
+
+A dictionary: a name and its terms, in the order written.
+
+====[struct LoadedDictionaries]
+
+The dictionaries a vault registered, by the name each gives itself.
+
+A dictionary that cannot be accepted is reported in `errors` and left out, not fatal: one bad
+file must not hide the state of every document.
+
+===[Enums]
+
+====[enum TermRef]
+
+What a `@term` mention names, read from its one argument.
+
+```text
+@term(tomet#vault-config)               by identifier, in a dictionary
+@term(tomet#name("vault.config.tmt"))   by name, in a dictionary
+@term("vault.config.tmt")               by name, in any dictionary
+```
+
+This is the shape `<document>#<place>` with the dictionary as the document, and `name("...")` as a
+step like `item(2)`. Nothing on the left of the `#` means this document, as it does everywhere: inside
+a dictionary, `#vault-config` is a term of that dictionary.
+
+====[enum TermProblem]
+
+Why a mention names no term.
 
 ==[Module elements]
 
@@ -84,7 +146,8 @@ built-in element families:
 
 =====[struct DocumentConfig]
 
-Extracted document configuration settings from top-level `::config` elements.
+What a document declares about itself that is not formatting or a registry: where it is exported
+(`::export`), and the macros and variables it defines (`::macros`, `::vars`).
 
 ====[Enums]
 
@@ -96,12 +159,10 @@ Supported target format for document exports.
 
 =====[fn document_config]
 
-Returns this document's `::config` and `::settings` settings, and its
-`::macros`, merged from all those declarations in the document -- top-level per
-[`tomet_tree::for_each_top_level_element`], which still counts a
-`::config`/`::settings` that joined an adjacent paragraph
-(`docs/spec/syntax.tmt`'s `##[ 区切り ]`), not just a raw `doc.blocks`
-walk.
+Returns this document's `::export`, `::macros` and `::vars`.
+
+`::export` is read in either form, `(type: commonmark, path: "README.md")` or the same keys in
+`{...}`; a `path` is one path for every type, or a map of format to path.
 
 ===[Module footnote]
 
@@ -259,9 +320,8 @@ The empty key is the positional marker and is not judged here.
 
 Flattens `el`'s `(args)` and `{value}` for an attribute map.
 
-A `${...}` interpolation is not data and is skipped; so are the
-element children a `{...}` group may hold, which belong in the
-output's body rather than its attributes.
+The element children a `{...}` group may hold are skipped: they belong
+in the output's body rather than its attributes.
 
 ====[fn flatten_data]
 

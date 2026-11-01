@@ -43,7 +43,8 @@ Workspace-level configuration for vault indexing and file discovery.
 
 ==[ registry ]
 
-Blueprint and vocabulary file registry declarations.
+Blueprint, vocabulary and dictionary file registry declarations.
 
 - `blueprints` (list(string)): Blueprint files this vault declares, as paths relative to the config's directory.
 - `vocabularies` (list(string)): Vocabulary files this vault declares, each naming itself with `::vocabulary(ns)`.
+- `dictionaries` (list(string)): Dictionary files this vault declares, each naming itself with `::dictionary(name)`.

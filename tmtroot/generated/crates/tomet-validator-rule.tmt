@@ -11,7 +11,7 @@ descendants of elements, sections, or lists comply with allowed kind specificati
 
 ==[Module decode]
 
-Decodes a `:rule(allow:list(...), direct:@bool)` connect element's own
+Decodes a `:rule(allow:list(...), direct:@bool)` connect's own
 `args` into a usable [`RuleArgs`].
 
 ===[Structs]
@@ -24,7 +24,7 @@ The decoded arguments of one `:rule(...)` connect.
 
 ====[fn decode_rule_args]
 
-Reads `connect_el.args` for a `:rule(...)` connect, or `None` if the
+Reads `connect.data.args` for a `:rule(...)` connect, or `None` if the
 shape isn't recognized.
 
 ==[Functions]

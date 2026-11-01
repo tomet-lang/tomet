@@ -1,6 +1,6 @@
 ::kind(api)
 
-::meta{crate: tomet-printer, dependencies: list(cotomet-syntax, tomet-ast, tomet-config, tomet-field-utils, tomet-formatter, tomet-markdown, tomet-parser, tomet-semantics, tomet-style, tomet-tree), dependents: list(tomet, tomet-cli, tomet-pandoc, tomet-spec, tomet-tests, tomet-workspace)}
+::meta{crate: tomet-printer, dependencies: list(cotomet-syntax, tomet-ast, tomet-config, tomet-field-utils, tomet-formatter, tomet-markdown, tomet-parser, tomet-semantics, tomet-style, tomet-tree), dependents: list(tomet, tomet-cli, tomet-convert-standalone, tomet-pandoc, tomet-spec, tomet-tests, tomet-workspace)}
 
 =[tomet-printer]
 
@@ -32,6 +32,21 @@ Rendering elements, values, args, and connects.
 Render an [`Element`] AST node into Tomet syntax:
 `<sigil><name>(args)[content]{value}`.
 
+====[fn render_bare]
+
+Render a [`Bare`] entry into Tomet syntax: `(args)[content]{value}#(id)`,
+with no head.
+
+====[fn render_hole]
+
+Render a [`Hole`] AST node into Tomet syntax:
+`?matcher(args)[content]{value}#(id)`.
+
+====[fn render_declaration]
+
+Render a [`Declaration`] AST node into Tomet syntax:
+`::name(args)[content]{value}#(id)`.
+
 ==[Module id]
 
 ID generation and rendering helpers.
@@ -40,7 +55,11 @@ ID generation and rendering helpers.
 
 ====[fn ensure_document_id_with_config]
 
-Ensures that a document has an `id` field in its `::meta` block if configured to do so.
+Ensures that a document has an `::id(...)` declaration if configured to do so.
+
+The generation is configured by the vault's `id` meta field (`type`, `force`, `overwrite`, ...).
+A new declaration goes after the leading `::version` / `::kind`, so the preamble reads
+`::kind`, `::id`, `::meta`.
 
 ==[Module inline]
 

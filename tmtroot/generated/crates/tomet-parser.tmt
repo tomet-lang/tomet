@@ -1,6 +1,6 @@
 ::kind(api)
 
-::meta{crate: tomet-parser, dependencies: list(cotomet-syntax, tomet-ast, tomet-cst, tomet-lexer, tomet-semantics, tomet-tree), dependents: list(cotomet-eval, tomet, tomet-address, tomet-benches, tomet-cli, tomet-config, tomet-declaration, tomet-deps, tomet-edit, tomet-expr, tomet-extract, tomet-formatter, tomet-html, tomet-indexer, tomet-links, tomet-load, tomet-load-config, tomet-lsp, tomet-markdown, tomet-pandoc, tomet-printer, tomet-search, tomet-semantics, tomet-spec, tomet-stats, tomet-tests, tomet-transform, tomet-tree, tomet-typst, tomet-validator, tomet-validator-blueprint, tomet-validator-rule, tomet-vault, tomet-workspace)}
+::meta{crate: tomet-parser, dependencies: list(cotomet-syntax, tomet-ast, tomet-cst, tomet-lexer, tomet-semantics, tomet-tree), dependents: list(cotomet-eval, tomet, tomet-address, tomet-benches, tomet-cli, tomet-config, tomet-convert-standalone, tomet-declaration, tomet-deps, tomet-edit, tomet-expr, tomet-extract, tomet-formatter, tomet-highlight, tomet-html, tomet-indexer, tomet-links, tomet-load, tomet-load-config, tomet-lsp, tomet-markdown, tomet-merge, tomet-pandoc, tomet-printer, tomet-search, tomet-semantics, tomet-spec, tomet-stats, tomet-tests, tomet-transform, tomet-tree, tomet-typst, tomet-validator, tomet-validator-blueprint, tomet-validator-profile, tomet-validator-rule, tomet-vault, tomet-workspace)}
 
 =[tomet-parser]
 
@@ -19,7 +19,7 @@ linear/predictable time complexity.
 - ("Documents And Patterns")
   - `parse_document` reads an ordinary document, where `?` is text.
 `parse_pattern` reads the same grammar with one more sigil, `?`, which makes a
-hole (`Sigil::Question`). The parser only builds the hole; what a matcher is and
+hole (see [`tomet_ast::Hole`]). The parser only builds the hole; what a matcher is and
 what a hole matches belongs to the caller (tandr), never to this crate.
 - ("Tree-sitter Synchronization")
   - `tomet-parser` is the single source of truth for grammar definitions.
@@ -32,16 +32,28 @@ editor syntax highlighting.
 
 `parse_document` and `parse_pattern` share every other function; each takes the dialect.
 
-- (document) Block-level dispatch loop, paragraphs, and document-level parsing.
-- (element) Typed elements (`<T>`, `@name`, bare `@`), group ordering, and connect syntax.
-- (section) Headings (`=[...]`) and thematic breaks (`---`, `---[ title ]---`).
-- (list) Ordered and unordered lists (`-`, `-.`), markers, and item attributes.
-- (raw/fence) Fenced code blocks (` ` ```) and the
-line-oriented fence scan they share.
-- (inline) Inline scanning, formatting delimiters (`*em*`, `**strong**`, `==mark==`), autolinks.
+- (cst) The one reader of the grammar's shape: a lossless, resilient Concrete Syntax Tree
+
+, powered by `tomet-cst`.
+A blank line or a line-start `;` breaks a block here.
+
+- (lower) The CST read as an AST: `parse_document` and `parse_pattern` are `parse_cst` and
+
+then this. It builds the typed tree and refuses what a document may not say.
+
+- (element) What makes `@` start an element, which characters open a group, and the readers
+
+of a group's values: `(args)`, `{value}`, `#(id)`.
+
+- (value) The Tomet data grammar (maps, sequences, scalars, comments), from `cotomet-syntax`,
+
+with a hook that finds what a value embeds -- an element, `[content]`, a `|` run -- in the CST.
+
+- (inline) What the CST and lowering share about running text: `Text`/`SoftBreak` items, the
+
+probes for formatting delimiters (`*em*`, `**strong**`, `==mark==`) and autolinks.
+
 - (interp) `${...}` interpolation expressions (identifiers, member chains, calls, literals).
-- (value) Lightweight Tomet data grammar (maps, sequences, scalars, comments).
-- (cst) Lossless Concrete Syntax Tree parsing powered by `tomet-cst`.
 - (error) Parse errors: a message plus a byte offset, with line and column resolved once at the entry points (`located_in`).
 
 ==[Module cst]
@@ -50,9 +62,11 @@ Resilient, lossless Concrete Syntax Tree (CST) parser for Tomet.
 
 Preserves 100% of source characters including trivia (whitespace, newlines, comments).
 
-The tree follows the current surface syntax, not the AST parser's exact
-decisions: it never fails, and where the two could disagree it prefers
-the reading that keeps more structure.
+This is the one reader of the grammar's shape -- where a block, an element, a
+group starts and ends. `parse_document` is this tree lowered into the AST
+(see `lower.rs`), so a grammar change is made here once. The parser itself
+never fails: broken input still gets a tree, and the errors a document is
+refused with are found when the tree is lowered.
 
 ```text
 ROOT
@@ -66,15 +80,31 @@ its groups -- `ARGS` `( )`, `VALUE_DATA` `{ }`, `CONTENT` `[ ]`, at most
 one of each -- then any `CONNECT` (`:name(...)`).
 `${ ... }` is an `INTERP_EXPR`. Inside `ARGS`/`VALUE_DATA` an entry is a
 `MAP_ENTRY` (`key: value`) or a `SEQ_ITEM`, and nested groups are
-`MAP_LITERAL`, `SEQ_LITERAL` or (a call such as `list(...)`) `ARGS`.
+`MAP_LITERAL`, `CONTENT` (a value written `[ ... ]` is blocks, as in the AST
+parser; the list literal is gone) or (a call such as `list(...)`) `ARGS`.
 `CONTENT` recurses into the same block grammar `ROOT`/`SECTION` use
 (`SECTION`, `LIST`, `BLOCK_ELEMENT`, `CODE_BLOCK`, `THEMATIC_BREAK`,
 `PARAGRAPH`), bounded by the group's own closing `]` instead of EOF or
 a shallower section -- a block nested inside `[content]` (and its own
 `#(id)`) is represented, not flattened into inline text.
 
-Emphasis (`*em*`) and `|`-marked content runs are not modelled: they stay
-flat tokens in their paragraph.
+Running text carries `EMPHASIS`, `STRONG`, `STRIKEOUT`, `CODE_SPAN` and
+`AUTOLINK` nodes where the AST has an `em`, `strong`, `strikeout`,
+`raw` or `link` element. What opens a span, and where an address ends, is
+decided by the same functions in `inline.rs`, so the two cannot drift.
+The tokenizer reads text without context (`_em_` is one identifier, a `//`
+inside backticks starts a comment), so a token is split where such a span
+starts or ends: the tree is the same text, cut at other places.
+
+A `|` run is `[content]` spelled without brackets, and so it is the same
+node: a `CONTENT` that opens with a `PIPE` and has no closing `]`. It is an
+element's content (`@quote| text`, or `|` on the line after the element), a
+list item's (`-| text`), a heading's (`=| text`) or a `key: | prose` value.
+It ends at the first line that does not repeat its marker in the same column
+-- a blank line, or a `|` somewhere else, ends it too -- and the error for that
+last case (a marker in a column that continues nothing) is lowering's, not the tree's. The `|` that begins each later
+line is a `PIPE` token among the content's own, but the grammar reads it as
+white space, so the blocks of a run are the blocks the bracketed form has.
 
 ===[Functions]
 
@@ -84,8 +114,26 @@ Parse `src` into a lossless, resilient [`SyntaxNode`].
 
 Guaranteed Invariant: `parse_cst(src).text().to_string() == src`.
 
+====[fn parse_cst_pattern]
+
+[`parse_cst`] for a pattern: `?matcher(...)` is a hole, an element of its own
+kind, where in a document `?` is text.
+
 ==[Functions]
 
-===[fn parse_dollar_element_str]
+===[fn parse_document]
 
-Parse a `$func(args)` or `${expr}` dollar element directly from a string slice.
+Parse an entire source string as a markup [`tomet_ast::Document`]: the CST of
+the text ([`parse_cst`]), read as the AST it stands for.
+
+===[fn parse_pattern]
+
+Parse an entire source string as a pattern: a [`tomet_ast::Document`] in which
+`?name(args){options}[content]` is a hole ([`tomet_ast::Hole`]).
+
+It is [`parse_document`] with one more sigil. Everything else is read by the same code, so a
+pattern is written in, and printed as, ordinary tomet.
+
+===[fn parse_interpolation_str]
+
+Parse a `$func(args)` or `${expr}` interpolation directly from a string slice.

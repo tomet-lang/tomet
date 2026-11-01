@@ -1,6 +1,6 @@
 ::kind(api)
 
-::meta{crate: tomet-tree, dependencies: list(tomet-ast, tomet-parser), dependents: list(tomet-address, tomet-cli, tomet-config, tomet-declaration, tomet-deps, tomet-edit, tomet-expr, tomet-extract, tomet-html, tomet-indexer, tomet-links, tomet-lsp, tomet-markdown, tomet-pandoc, tomet-parser, tomet-printer, tomet-search, tomet-semantics, tomet-spec, tomet-stats, tomet-style, tomet-tests, tomet-transform, tomet-typst, tomet-validator-blueprint, tomet-validator-core, tomet-validator-rule, tomet-vault, tomet-workspace)}
+::meta{crate: tomet-tree, dependencies: list(tomet-ast, tomet-parser), dependents: list(tomet-address, tomet-cli, tomet-config, tomet-convert-standalone, tomet-declaration, tomet-deps, tomet-edit, tomet-expr, tomet-extract, tomet-html, tomet-indexer, tomet-links, tomet-lsp, tomet-markdown, tomet-pandoc, tomet-parser, tomet-printer, tomet-search, tomet-semantics, tomet-spec, tomet-stats, tomet-style, tomet-tests, tomet-transform, tomet-typst, tomet-validator-blueprint, tomet-validator-core, tomet-validator-profile, tomet-validator-rule, tomet-vault, tomet-workspace)}
 
 =[tomet-tree]
 
@@ -9,7 +9,8 @@ AST node accessors, extension traits, builders, and recursive tree traversal for
 Provides:
 
 - (ValueExt) Inspection and accessor methods on [`tomet_ast::Value`].
-- (ElementExt) Attribute manipulation and helpers on [`tomet_ast::Element`].
+- (ElementExt) Builders and name helpers on [`tomet_ast::Element`].
+- (DataExt) Property access on [`tomet_ast::Data`], shared by every node that carries `(args)` and `{value}`.
 - (DocumentExt) Block-level manipulation helpers on [`tomet_ast::Document`].
 - (walk) Generic recursive tree visitors ([`walk_document`], [`walk_document_mut`]).
 
@@ -25,7 +26,7 @@ Extension trait providing block-level operations on [`Document`].
 
 ==[Module element]
 
-Extension trait, attribute helpers, and constructors for [`tomet_ast::Element`].
+Extension traits, property helpers, and constructors for [`tomet_ast::Element`], [`tomet_ast::Declaration`] and [`tomet_ast::Data`].
 
 ===[Traits]
 
@@ -33,14 +34,25 @@ Extension trait, attribute helpers, and constructors for [`tomet_ast::Element`].
 
 Extension trait providing accessors, attribute manipulations, and inspections on [`Element`].
 
+====[trait DataExt]
+
+Extension trait providing property access on [`Data`]: what every node that
+carries `(args)` and a `{value}` group shares, so an element, a declaration,
+a section and a connect read and write their properties the same way.
+
 ===[Functions]
 
 ====[fn element_new]
 
-Creates a new [`Element`] with given `sigil` and default empty fields.
+Creates a new [`Element`] with given `name` and default empty fields.
 
 The placement is [`Placement::Inline`]; a caller building a block uses
 [`ElementExt::with_placement`], and the parser sets it from position.
+
+====[fn declaration_new]
+
+Creates a new [`Declaration`] named with the bare name `name` and every
+group empty.
 
 ====[fn list]
 
@@ -48,9 +60,9 @@ A list constructor (ordered if `ordered`, i.e. `-.`, else `-`).
 
 ====[fn list_item]
 
-A list item constructor. `sigil` is `Sigil::Bare` for a plain `- content`
-item, or `Sigil::Named(name)` for the `-@name(...)` combine form -- the
-exact same `Element` shape a standalone `@name(...)` would produce.
+A list item constructor. `name` is `None` for a plain `- content` item, or
+the element's name for the `-@name(...)` combine form -- which takes the
+same groups a standalone `@name(...)` would.
 
 `id` is a real parameter, not hardcoded to `None` -- list items are a
 first-class consumer of `#(id)` like everything else `parse_groups`
@@ -71,6 +83,18 @@ Extension trait providing accessors and inspections on [`Value`].
 ==[Module walk]
 
 Generic recursive traversal of a [`tomet_ast::Document`]'s tree.
+
+===[Enums]
+
+====[enum Child]
+
+Something nested in a node: an element, or a list item. What a
+`:rule(allow:...)` constrains, and what the region rules run over.
+
+====[enum Node]
+
+What [`for_each_node`] hands over: a thing in the tree that is not an
+element, together with the position it was found at.
 
 ===[Traits]
 
@@ -106,53 +130,36 @@ document's own top level themselves and need the elements below it.
 
 ====[fn for_each_top_level_element]
 
-Visits every element a reader would find by scanning only the top of
-the document, in document order.
-
-Before `docs/spec/syntax.tmt`'s `##[ 区切り ]`, that was simply every
-`Block::Element` in `doc.blocks` -- a bare element with nothing
-adjacent to join always stood alone, so `::kind`/`::blueprint`/`::meta`/
-`::vocabulary`/... were always found this way, and more than one
-caller across the workspace grew its own copy of that same loop. Now
-one can join an adjacent paragraph instead (no blank line, no `;`
-separator) and come back as an `Inline::Element` inside a
-`Block::Paragraph`, a tree-shape choice that says nothing about
-whether it still opened its own line -- so this visits both: every
-`Block::Element`, and every `Inline::Element` sitting directly in a
-`Block::Paragraph`'s own content (not recursed into that element's
-\@em[own] content/children -- something nested three levels deep inside
-unrelated prose was never a document-level declaration and still
-is not).
+Visits every element a reader would find by scanning only the top of the
+document, in document order: every `Block::Element`, and every
+`Inline::Element` sitting directly in a `Block::Paragraph`'s own content
+(an element that shares its paragraph with other text is still at the
+top; something nested inside another element is not).
 
 This is the one place that decision lives. A caller that wants "the
-declarations at the top of this document" should call this instead of
-walking `doc.blocks` by hand -- that hand-rolled loop is exactly what
-stopped finding a joined `::blueprint`/`::vocabulary`/`::meta` the moment
-this rule shipped, in more than one crate at once.
+elements at the top of this document" should call this instead of walking
+`doc.blocks` by hand. Declarations are not elements: see
+[`for_each_top_level_declaration`].
 
-====[fn for_each_top_level_element_mut]
+====[fn for_each_top_level_declaration]
 
-[`for_each_top_level_element`], mutably -- for a caller that rewrites a
+Visits every declaration at the top level of `doc`, in order.
+
+A declaration is always a [`Block`] of its own, so "the declarations at
+the top of this document" is `doc.blocks` and nothing else: one in a
+section's body or an element's content is misplaced, and the validator
+reports it (`OutsidePreamble`). A caller that wants the preamble should
+call this instead of walking `doc.blocks` by hand.
+
+====[fn for_each_top_level_declaration_mut]
+
+[`for_each_top_level_declaration`], mutably -- for a caller that rewrites a
 top-level declaration in place (`::blueprint(x)` becoming `::kind(x)`,
-say) without changing how many elements are there.
+say) without changing how many there are.
 
-====[fn retain_top_level_elements]
+====[fn retain_top_level_declarations]
 
-[`for_each_top_level_element`], removing every one `keep` rejects --
-from `doc.blocks` directly for a `Block::Element`, or from a
-`Block::Paragraph`'s own content for an `Inline::Element` found there.
-A removal from inside a paragraph closes the gap it leaves the same
-way the normal parse path already would: the `SoftBreak` immediately
-before the removed item goes with it (so two joined items never end up
-separated by two adjacent `SoftBreak`s), and a `SoftBreak` left
-leading the paragraph (the removed item was first) is dropped too, the
-same trim [`parse_inline_seq`] already applies to a freshly parsed
-paragraph's edges.
-
-The paragraph itself is never dropped, even if this empties it --
-nothing downstream needs that (`render_block` already treats an
-all-whitespace paragraph as producing nothing), and deciding that here
-would be a second place holding a rule a printer already holds.
+[`for_each_top_level_declaration`], removing every one `keep` rejects.
 
 ====[fn walk_document]
 
@@ -169,7 +176,7 @@ Mutable counterpart of [`walk_document`].
 ====[fn for_each_descendant]
 
 Every descendant of `el` (not `el` itself), in document order --
-`content`, `children`, and `ElementValue::Group` entries. `:rule`'s own
+`content`, `children`, and `Group` entries. `:rule`'s own
 use is the only caller, so "descendant" means what `:rule(allow:...)`
 means by it: content and children the reader encounters @em[underneath]
 `el`, not configuration carried @em[on] `el`.
@@ -180,7 +187,7 @@ since elements were allowed to sit in value position): an element
 embedded in `el`'s own `(args)` -- `@thing(icon: @doc.icon("x"))` --
 describes `thing`, the same way `el.connects` does, so it is exempt
 for the same reason. `el.connects` itself is skipped for a related but
-distinct reason: a connect (`Sigil::Named` carrying `:name(...)`'s own
+distinct reason: a connect (a [`Connect`] carrying `:name(...)`'s own
 args/content/value, e.g. `:rule(...)`) is not a descendant of the
 document `el` sits in at all -- it is metadata about `el` itself,
 consumed only by the dedicated check that understands the closed set
@@ -190,13 +197,18 @@ confusion a `:rule(...)` element (or an `@doc.icon` describing `thing`)
 being reported as a disallowed @em[descendant] would be.
 
 `direct_only` restricts to immediate children only -- one level of
-`content`/`children`/`ElementValue::Group`, not recursed further --
+`content`/`children`/`Group`, not recursed further --
 for `:rule(direct:true)`; `false` walks every descendant at any
 depth, same as [`walk_element`].
 
+====[fn for_each_descendant_of_item]
+
+[`for_each_descendant`] for a list item: what is nested in its content and
+in its `{value}` group, not its `sublist` and not its `(args)` marker.
+
 ====[fn for_each_descendant_in_blocks]
 
-Every descendant element reachable from `blocks`, in document order --
+Every descendant reachable from `blocks`, in document order --
 [`for_each_descendant`]'s own `content` handling factored out, since a
 [`tomet_ast::Section`]'s `blocks` is exactly the same shape (a general
 block sequence that may hold a `Paragraph`, an `Element`, or a nested
@@ -212,8 +224,17 @@ themselves, not what's inside each one's own content" -- same meaning
 `for_each_descendant`'s `direct_only` already has.
 
 Deliberately never reads `list.connects` or any `ListItem`'s own
-`element.connects` -- see [`for_each_descendant`]'s doc comment for why
-that must stay true structurally, not just by convention.
+`connects` -- see [`for_each_descendant`]'s doc comment for why that
+must stay true structurally, not just by convention.
+
+====[fn for_each_list_item]
+
+Visits every [`ListItem`] in `doc`, in document order, at any depth: a
+list item is not an [`Element`], so [`for_each_element`] never passes one.
+
+====[fn for_each_list_item_mut]
+
+[`for_each_list_item`], mutably.
 
 ====[fn for_each_list]
 
@@ -237,6 +258,40 @@ is checked against its own content.
 
 Mutates all elements in `doc` matching `filter` by applying `transform`.
 Returns the number of elements transformed.
+
+====[fn for_each_node]
+
+Visits every [`Block`], [`Inline`], [`Value`] and [`Entry`] in `doc`, in document
+order, wherever it sits, each before what it holds.
+
+Unlike [`walk_document`] and the walkers written beside it, this one has no
+position it skips: it reaches running text and section titles, blocks
+standing alone, an element's, a section's, a declaration's and a list
+item's `(args)` / `{value}` / `[content]`, every `:connect`, and inside a
+[`Value`] (`Seq`, `Map`, `Call`, a nested element, `[...]` blocks). It is
+what the walkers for things that are not elements are written on:
+[`for_each_interpolation`], [`for_each_declaration`] and [`for_each_hole`].
+
+====[fn for_each_interpolation]
+
+Visits every [`Interpolation`] in `doc`, in document order, wherever it sits.
+
+An interpolation is not an [`Element`], so the element walkers never pass
+one to their visitor; this is the walker to ask for "every `${...}` in the
+document".
+
+====[fn for_each_declaration]
+
+Visits every [`Declaration`] in `doc`, in document order, wherever it sits:
+a declaration is a [`Block`], and a block can be in a section's body or an
+element's content as well as at the top, where only it belongs.
+[`for_each_top_level_declaration`] is the preamble.
+
+====[fn for_each_hole]
+
+Visits every [`Hole`] in `doc`, in document order, wherever it sits: as a
+block, in running text, as an entry of a `{...}` group or as a value. A
+document has none; a pattern read by `parse_pattern` has them.
 
 ==[Functions]
 

@@ -1,6 +1,6 @@
 ::kind(api)
 
-::meta{crate: tomet-validator, dependencies: list(tomet-ast, tomet-cst, tomet-declaration, tomet-lexer, tomet-parser, tomet-semantics, tomet-validator-blueprint, tomet-validator-core, tomet-validator-rule), dependents: list(tomet, tomet-cli, tomet-edit, tomet-load, tomet-lsp, tomet-tests, tomet-vault)}
+::meta{crate: tomet-validator, dependencies: list(tomet-ast, tomet-cst, tomet-declaration, tomet-lexer, tomet-parser, tomet-semantics, tomet-validator-blueprint, tomet-validator-core, tomet-validator-profile, tomet-validator-rule), dependents: list(tomet, tomet-cli, tomet-edit, tomet-load, tomet-lsp, tomet-tests, tomet-vault)}
 
 =[tomet-validator]
 
@@ -17,6 +17,7 @@ by `tomet-address` and `tomet-links`), and no AST mutations.
 - `tomet-validator-core`: Base semantic element, ID duplicate, and argument checks.
 - `tomet-validator-rule`: Node constraint and `:rule` connect validation engine.
 - `tomet-validator-blueprint`: Document structural blueprint extraction and conformance.
+- `tomet-validator-profile`: Whether a document keeps the promise of its `::profile(...)`.
 
 ==[Functions]
 

@@ -1,0 +1,66 @@
+::kind(api)
+
+::meta{crate: tomet-convert-standalone, dependencies: list(tomet-ast, tomet-config, tomet-declaration, tomet-expr, tomet-markdown, tomet-parser, tomet-printer, tomet-tree, tomet-type, tomet-validator-profile, tomet-vault), dependents: list(tomet-cli)}
+
+=[tomet-convert-standalone]
+
+==[tomet-convert-standalone]
+
+Makes a document standalone: what it takes from its vault is carried into the file, or frozen
+to the value it has there, so that it can be taken out and still mean the same.
+
+==[Architecture & Responsibilities]
+
+- ("The worklist is the validator's") [`make_standalone`] starts from [`tomet_validator_profile::standalone_findings`], the same list
+`tomet check` reports for a file that promises `::profile(standalone)`. Each finding is
+carried in, frozen, or left and reported. When it is done the same check is run on the result
+and what it still finds is [`Converted::remaining`], so the report is what the file is, not
+what this crate meant to do.
+- ("Carry what is a definition") A macro or a variable the vault defines and the file uses is written into the file's
+`::macros` / `::vars`. The expressions that use it stay expressions.
+- ("Freeze what is a place") What depends on where the file sits or on other files -- `self.path`, `vault`, `include`,
+an address into another document -- has no definition to carry. The `${...}` is replaced by
+the value it has in the vault. That loses the expression, so the change is always reported.
+An expression that is frozen as a whole is not also carried: a macro called with `self.path`
+in it needs no definition once the call is a value.
+- ("The minimum", "and options") By default the file gets what it needs to work and no more. What more it could get is an
+[`Options`] field the person turns on.
+- ("The promise") The result declares `::profile(standalone)`, adding `standalone` to a `::profile` that is
+already there.
+
+==[Not here]
+
+- Printing. The result is a [`Document`]; the command prints it the way the vault prints.
+- A vocabulary, `self.meta` typed by `::fields`, and `@term`: each is left and reported. A file
+
+cannot hold a vocabulary or its own `::fields` yet, and a term is not frozen yet.
+`Options::freeze_fields` is the way out for `self.meta`.
+
+==[Structs]
+
+===[struct Options]
+
+What more than the minimum a conversion may do. The default does none of it.
+
+===[struct Change]
+
+One finding of the original document and what was done about it.
+
+===[struct Converted]
+
+The result of [`make_standalone`].
+
+==[Enums]
+
+===[enum Treatment]
+
+What was done about one thing the document took from outside.
+
+==[Functions]
+
+===[fn make_standalone]
+
+Makes `doc`, which sits at `path` in `vault`, standalone.
+
+`resolver` answers what the document's expressions ask of other files, as it does when the
+document is rendered.

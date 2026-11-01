@@ -1,6 +1,6 @@
 ::kind(api)
 
-::meta{crate: tomet-validator-core, dependencies: list(tomet-address, tomet-ast, tomet-cst, tomet-declaration, tomet-lexer, tomet-semantics, tomet-tree, tomet-type), dependents: list(tomet-validator, tomet-validator-blueprint, tomet-validator-rule)}
+::meta{crate: tomet-validator-core, dependencies: list(tomet-address, tomet-ast, tomet-cst, tomet-declaration, tomet-lexer, tomet-semantics, tomet-tree, tomet-type), dependents: list(tomet-validator, tomet-validator-blueprint, tomet-validator-profile, tomet-validator-rule)}
 
 =[tomet-validator-core]
 
@@ -67,6 +67,12 @@ A declaration paired with its source span.
 
 Classifies `el` against `std` and the namespaces in scope.
 
+===[fn child_kind_name]
+
+The name a rule's `allow:` list knows a child of a node by: an element by
+its kind, a list item by the element it is when it has a name, and a plain
+list item by [`PLAIN_ITEM_KIND_NAME`].
+
 ===[fn shape_str]
 
 ===[fn validate_core]
@@ -104,7 +110,12 @@ no type, a `default:` that is not of its `type:`. The same findings are reported
 where a vault reads the vocabulary ([`tomet_semantics::LoadedVocabularies`]);
 this is for checking the vocabulary file itself.
 
-===[fn check_retired_settings_keys]
+===[fn check_vault_only_declarations]
+
+Reports each top-level declaration only the vault config may write (`DeclKind::is_vault_only`).
+
+The caller decides whether the document is allowed to write them (the vault config is; a folder
+config and an ordinary document are not), because that takes the path, which this crate never has.
 
 ===[fn check_field_types]
 
@@ -121,3 +132,10 @@ generates one), and a `${...}` not yet evaluated are not reported.
 ===[fn check_dangling_anchors]
 
 ===[fn validate_cst]
+
+==[Constants]
+
+===[const PLAIN_ITEM_KIND_NAME]
+
+What a `:rule(allow: list(...))` calls a plain `- item`, which has no name
+to be called by.

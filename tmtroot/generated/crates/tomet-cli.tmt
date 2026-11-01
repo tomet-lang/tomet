@@ -1,6 +1,6 @@
 ::kind(api)
 
-::meta{crate: tomet-cli, dependencies: list(cotomet, cotomet-eval, tomet-ast, tomet-config, tomet-declaration, tomet-expr, tomet-formatter, tomet-html, tomet-indexer, tomet-lexer, tomet-links, tomet-load, tomet-load-config, tomet-markdown, tomet-pandoc, tomet-parser, tomet-printer, tomet-semantics, tomet-spec, tomet-stats, tomet-tree, tomet-typst, tomet-validator, tomet-workspace), dependents: list()}
+::meta{crate: tomet-cli, dependencies: list(cotomet, cotomet-eval, tomet-ast, tomet-config, tomet-convert-standalone, tomet-declaration, tomet-expr, tomet-formatter, tomet-html, tomet-indexer, tomet-lexer, tomet-links, tomet-load, tomet-load-config, tomet-markdown, tomet-pandoc, tomet-parser, tomet-printer, tomet-semantics, tomet-spec, tomet-stats, tomet-tree, tomet-typst, tomet-validator, tomet-workspace), dependents: list()}
 
 =[tomet-cli]
 
@@ -14,7 +14,7 @@ validator, formatter, and converter components for `.tmt` document processing.
 ==[Subcommands]
 
 - ("Inspection & Validation") `check`, `check-links`, `ast`, `roundtrip`, and `stats`.
-- ("Transformation & Formatting") `format` and `refactor`.
+- ("Transformation & Formatting") `format`, `refactor` and `standalone`.
 - (Converters) `html`, `to-md`, `from-md`, `to-typst`, `to-pandoc`, `from-pandoc`, and `export`.
 - (Authoring) `new`.
 - (Documentation) `spec`.

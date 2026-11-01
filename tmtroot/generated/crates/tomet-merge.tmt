@@ -1,6 +1,6 @@
 ::kind(api)
 
-::meta{crate: tomet-merge, dependencies: list(tomet-edit), dependents: list(tomet)}
+::meta{crate: tomet-merge, dependencies: list(tomet-cst, tomet-edit, tomet-parser), dependents: list(tomet)}
 
 =[tomet-merge]
 
@@ -47,3 +47,19 @@ untouched entry slices and brace padding, narrowing conflicting
 values to `@conflict(a: <local>, b: <remote>)`.
 3. @strong[Block-level fallback] — when block kinds or counts disagree,
 emit a block-level `@conflict(a: [ ... ], b: [ ... ])` element.
+
+A value that is written as a `|` run (`about: | text`) cannot stand
+inside `@conflict(a: ..., b: ...)`, where it would swallow the `, b: ...`;
+it is written there as the `[ ... ]` it means.
+
+# Conflicts
+
+[`find_conflicts`] lists the markers of a document and [`resolve`],
+[`resolve_all`] and [`resolve_single`] take them out by choosing a side. They read the
+CST, so a marker is found wherever the text has one -- a paragraph, a list
+item, a heading, an element's content, a value -- and each comes with its
+byte span and its sides as written, never printed again.
+
+A marker that cannot be read (unclosed, a side missing, a third key) is a
+[`ConflictError`], not a marker to step over: [`has_conflicts`] says `true`
+for it, and nothing resolves past it.

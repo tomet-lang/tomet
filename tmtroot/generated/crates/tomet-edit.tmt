@@ -141,7 +141,7 @@ Imports an existing Rowan CST [`SyntaxNode`] into an [`EditDoc`].
 
 ====[fn import_attr_slot]
 
-Imports an `ARGS`, `VALUE_DATA`, `MAP_LITERAL`, or `SEQ_LITERAL` CST node into an [`AttrSlot`].
+Imports an `ARGS`, `VALUE_DATA`, or `MAP_LITERAL` CST node into an [`AttrSlot`].
 
 ====[fn parse_edit_value_str]
 

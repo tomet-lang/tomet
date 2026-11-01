@@ -1,0 +1,58 @@
+::kind(api)
+
+::meta{crate: tomet-highlight, dependencies: list(tomet-cst, tomet-parser), dependents: list(tomet)}
+
+=[tomet-highlight]
+
+==[tomet-highlight]
+
+What each part of a Tomet text is, for coloring it: [`highlight`] gives a
+list of ranges, each with a [`Tag`]. Nothing here knows a color; an editor
+maps tags to its own.
+
+==[Where the answer comes from]
+
+From the CST, [`tomet_parser::parse_cst`], and from nothing else. A token
+is a heading mark, a key or a string because of the node it stands in, not
+because of how it looks: `"x"` is a string inside `@note("x")` and text in
+a sentence; `true` is an atom in an argument and a word in a paragraph.
+The CST never fails and keeps every character, so a text that is half
+typed still gets its ranges.
+
+==[The ranges]
+
+- Offsets are bytes of the source, as the CST counts them. An editor that
+
+counts UTF-16 code units converts.
+
+- They are in order, do not overlap, and each lies between two characters.
+- Text with no tag has no range. A range is as long as it can be: the
+
+neighbours with the same tag are one.
+
+- Where two kinds of node meet, the inner one decides: the `code` inside
+
+`*em*` is code.
+
+==[Tags]
+
+The names are plain words, so they can be used as they are for a style
+name. See [`Tag`] for what each one covers.
+
+==[Structs]
+
+===[struct HighlightSpan]
+
+A range of the source and what it is.
+
+==[Enums]
+
+===[enum Tag]
+
+What a range of the text is.
+
+==[Functions]
+
+===[fn highlight]
+
+The ranges of `src` that have a [`Tag`], in order and without overlap.

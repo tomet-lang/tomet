@@ -16,20 +16,62 @@ Shares the `tomet-load` name prefix deliberately: both crates are
 `tomet-load`'s own `Vault::discover` calls [`find_config_file`]
 directly rather than duplicating the walk.
 
+==[The three layers]
+
+Configuration is a stack of three kinds of file, outermost first:
+
+- (vault) `VAULT_CONFIG_FILE` vault boundary -- a vault is the:the
+
+directory holding it -- and the vault-only settings.
+
+- (folder) `FOLDER_CONFIG_FILE` to its folder and below, stacked:applies
+
+from the vault root down to the document.
+
+- (document) the document's own declarations (`::format`, `::fields`, `::macros`, ...), applied
+
+by [`config_for`].
+
+The nearer layer wins, key by key; see [`Config::from_layers`] for the
+merge. The nearest [`VAULT_CONFIG_FILE`] ends the walk, so an outer vault
+never leaks into an inner one. A declaration that only the vault config may
+write (`DeclKind::is_vault_only`: `::workspace`) has no effect in a folder or a document
+layer; `tomet check` reports it.
+
+These two names are the only ones. Every user of them, in code and in
+tests, refers to the constants here rather than spelling them.
+
 ==[Functions]
 
 ===[fn find_config_file]
 
-Searches `start` and its parent directories for `default.config.tmt` or `tomet.config.tmt`.
-Returns `(Config, config_file_path, config_directory_path)`.
+The vault governing `start` and its stacked config: searches `start` and its
+parent directories for the nearest [`VAULT_CONFIG_FILE`].
+
+Returns `(Config, vault_config_path, vault_directory_path)`. The `Config` is
+the vault config with every [`FOLDER_CONFIG_FILE`] between the vault root and
+`start` laid over it; the document's own declarations are not part of it (that
+is [`config_for`]'s).
 
 ===[fn load_config_from_file]
+
+Reads one config file on its own, with no layer under or over it.
 
 ===[fn config_for]
 
 The config that governs `path`, for a tool about to act on `src`.
 
-The nearest `default.config.tmt`/`tomet.config.tmt` up the tree wins,
-because that file's position is what says where the vault begins.
-With no vault to find, the document's own `::config` is used, and
-failing that the defaults.
+The vault config, then each folder config down to `path`, then the
+document's own declarations on top, each layer winning over the ones before
+it. With no vault to find there are no file layers: the document's own
+declarations are used, and failing that the defaults.
+
+==[Constants]
+
+===[const VAULT_CONFIG_FILE]
+
+The vault config: the file whose directory is the vault.
+
+===[const FOLDER_CONFIG_FILE]
+
+A folder config: stacked over the vault config for its folder and below.

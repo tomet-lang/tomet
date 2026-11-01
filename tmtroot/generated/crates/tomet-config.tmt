@@ -1,6 +1,6 @@
 ::kind(api)
 
-::meta{crate: tomet-config, dependencies: list(tomet-ast, tomet-declaration, tomet-parser, tomet-semantics, tomet-spec-derive, tomet-tree), dependents: list(tomet, tomet-benches, tomet-cli, tomet-edit, tomet-field-utils, tomet-formatter, tomet-indexer, tomet-links, tomet-load, tomet-load-config, tomet-printer, tomet-spec, tomet-style, tomet-tests, tomet-vault, tomet-workspace)}
+::meta{crate: tomet-config, dependencies: list(tomet-ast, tomet-declaration, tomet-parser, tomet-semantics, tomet-spec-derive, tomet-tree), dependents: list(tomet, tomet-benches, tomet-cli, tomet-convert-standalone, tomet-edit, tomet-field-utils, tomet-formatter, tomet-indexer, tomet-links, tomet-load, tomet-load-config, tomet-printer, tomet-spec, tomet-style, tomet-tests, tomet-vault, tomet-workspace)}
 
 =[tomet-config]
 
@@ -43,7 +43,7 @@ Each submodule defines a dedicated strongly-typed configuration struct for a spe
 - ("`format`") Heading, link, element, callout, list, and table formatting rules ([`FormatConfig`], [`GroupOrder`]).
 - ("`meta`") Document metadata formatting and schema rules ([`MetaConfig`], [`FieldConfig`]).
 - ("`workspace`") Vault file indexing exclusions and unswept rules ([`WorkspaceConfig`]).
-- ("`registry`") Blueprints and vocabularies declarations ([`RegistryConfig`]).
+- ("`registry`") Blueprints, vocabularies and dictionaries declarations ([`RegistryConfig`]).
 
 ===[Module format]
 
@@ -75,13 +75,13 @@ Document metadata formatting and schema rules.
 
 ===[Module registry]
 
-Blueprint and vocabulary file registry declarations ([`RegistryConfig`]).
+Blueprint, vocabulary and dictionary file registry declarations ([`RegistryConfig`]).
 
 ====[Structs]
 
 =====[struct RegistryConfig]
 
-Blueprint and vocabulary file registry declarations.
+Blueprint, vocabulary and dictionary file registry declarations.
 
 ===[Module workspace]
 
@@ -92,6 +92,31 @@ Workspace-level configuration ([`WorkspaceConfig`]).
 =====[struct WorkspaceConfig]
 
 Workspace-level configuration for vault indexing and file discovery.
+
+==[Module layer]
+
+One config file's contribution to a stacked [`Config`](crate::Config).
+
+A vault's configuration is a stack of files -- the vault config, then each folder config on the
+way down to a document, then the document's own declarations -- and the nearer layer wins, key
+by key. Each concern is a declaration of its own (`::format`, `::fields`, `::workspace`,
+`::blueprints`, `::vocabularies`, `::dictionaries`, `::macros`, `::vars`), and a layer keeps what each one said.
+Merging happens on those values, before they become a [`Config`](crate::Config): a typed group
+cannot tell a key that was never written from one written with its default, so two typed groups
+cannot be merged without guessing.
+
+===[Structs]
+
+====[struct ConfigLayer]
+
+The settings, name tables, macros and variables one file declares, ready to be stacked.
+
+===[Functions]
+
+====[fn registry_entries]
+
+The `(name, path)` pairs a document registers in its `::blueprints`, `::vocabularies` or
+`::dictionaries` (`kind`), in the order written. An entry that is not a reference to a file is left out.
 
 ==[Module schema]
 

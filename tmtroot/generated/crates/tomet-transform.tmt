@@ -51,12 +51,17 @@ Directive promotion and Value DSL normalization transformations.
 
 ====[fn promote_prop_to_directive]
 
-Promotes a property `prop_key` from an element matching `source_filter` into a new top-level
+Promotes a property `prop_key` from a declaration matching `source_filter` into a new top-level
 declaration `::target_directive_name(val)` (or `::target_directive_name{...}`), inserting it at `target_index`
 (or automatically after any `::version` directive, or at position 0).
 
 If the property is absent, empty, or null, it is simply removed without creating a directive.
 Returns `true` if a directive was created and inserted.
+
+====[fn promote_meta_id_to_id]
+
+Promotes `::meta`'s `id:` field to a top-level `::id(...)` element, after the `::version` and
+`::kind` that lead the document.
 
 ====[fn promote_meta_type_to_kind]
 
@@ -117,6 +122,17 @@ What an [`Unresolved`] is about.
 ====[fn resolve_expressions]
 
 Replaces every `${...}` in `doc` with what it stands for.
+
+====[fn resolve_expressions_where]
+
+[`resolve_expressions`] for the `${...}` that `selected` picks, by the span of the
+[`Interpolation`](tomet_ast::Interpolation) in `doc` as it is passed in. The others are left
+as the interpolations they are, not as text, and are not reported.
+
+`selected` must compare spans with [`Span::exact_eq`]: `==` on a `Span` is always true.
+
+This is what makes a file hold its own values for only some of its expressions: the ones
+that depend on where it sits, and none of the ones it can still evaluate for itself.
 
 ==[Module links]
 

@@ -7,16 +7,16 @@
 Applies `tomet_config::PrinterConfig`'s style rules (meta format,
 link-key spacing (`target`, `@link`/`<embed>`'s one shared key), per-field
 `::meta` formatting) to a single
-`tomet_ast::Value` or `Element`, returning `.tmt`-syntax text.
+`tomet_ast::Value`, `Element` or `Declaration`, returning `.tmt`-syntax text.
 Deliberately scoped to single nodes -- no `Document`, no tree
 position, no recursion into sibling/child elements of other kinds --
 so both `tomet-printer` (rebuilds a whole `Document`) and
 `tomet-formatter` (patches specific spans of existing `.tmt` text)
 can depend on this without a circular dependency (`tomet-printer`
-already depends on `tomet-formatter`). `render_meta_element`
-specifically covers only `::meta` elements' actual shape per the
+already depends on `tomet-formatter`). `render_meta_declaration`
+specifically covers only `::meta` declarations' actual shape per the
 grammar (`args` an optional format map, `value` always
-`ElementValue::from_map(Value::Map(...))`) -- not the general
+`Group::from_map(Value::Map(...))`) -- not the general
 element-rendering logic for every other sigil/kind, which stays in
 `tomet-printer` since it recurses into inline/child content and
 is genuinely part of rebuilding a whole document from its AST.
@@ -60,13 +60,13 @@ one. See [`BlockRenderer`].
 Same as [`render_args_with_config`], but with the block renderer
 supplied explicitly. See [`BlockRenderer`].
 
-===[fn render_meta_element]
+===[fn render_meta_declaration]
 
-Renders an `::meta(...){...}` element per `config`'s meta format
+Renders a `::meta(...){...}` declaration per `config`'s meta format
 settings (multi-line, one field per line with per-field formatting
 rules, if `config.meta.always_newline`; else a single `::meta{k: v, ...}`
 line). Scoped to `::meta`'s actual shape -- `value` must be
-`ElementValue::from_map(Value::Map(...))`, which is all the grammar ever
+`Group::from_map(Value::Map(...))`, which is all the grammar ever
 produces for `::meta`; anything else renders as a bare `::meta` (with
 args, if any).
 

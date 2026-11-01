@@ -1,6 +1,6 @@
 ::kind(api)
 
-::meta{crate: tomet-vault, dependencies: list(tomet-ast, tomet-config, tomet-declaration, tomet-expr, tomet-parser, tomet-search, tomet-semantics, tomet-transform, tomet-tree, tomet-type, tomet-validator), dependents: list(tomet, tomet-edit, tomet-load)}
+::meta{crate: tomet-vault, dependencies: list(tomet-ast, tomet-config, tomet-declaration, tomet-expr, tomet-parser, tomet-search, tomet-semantics, tomet-transform, tomet-tree, tomet-type, tomet-validator), dependents: list(tomet, tomet-convert-standalone, tomet-edit, tomet-load)}
 
 =[tomet-vault]
 
@@ -8,7 +8,9 @@ A vault's config and vocabularies, and what can be done with them
 without touching the disk.
 
 A [`Vault`] is the state a document is read against: the config that
-governs it and the vocabularies that config declares. Given that state,
+governs it, the vocabularies that config declares, and the dictionaries
+of terms it registers (`@term` is checked against them in
+[`Vault::diagnostics`] and given the term's text in [`Vault::prepare`]). Given that state,
 parsing a source and binding its names ([`Vault::parse`],
 [`Vault::bindings`]) and rewriting a document into the shape a converter
 should see ([`Vault::prepare`]) are plain computation.
@@ -20,6 +22,16 @@ A caller that already has the pieces in memory -- a wasm host, or a
 binding handed vocabulary text -- builds one directly with
 [`Vault::from_sources`] and gets the same verdicts, because both go
 through the same rules (`LoadedVocabularies::add` in `tomet-semantics`).
+
+==[A document that reads alone]
+
+A document that declares `::profile(standalone)` is read as if the vault held nothing: the
+macros and variables, the `type:` of a metadata field, the vocabularies, the dictionaries and
+the other files an expression could reach are all taken away, so that what it means is what its
+own bytes say. [`Vault::bindings`], [`Vault::prepare`], [`Vault::evaluate`] and the `@term`
+check of [`Vault::diagnostics`] read this way. What a vault only checks and does not change the
+meaning of (a blueprint, the form a metadata field must have) still applies.
+[`Vault::prepare_selected`] does not: it is what makes a document keep that promise.
 
 ==[wasm]
 

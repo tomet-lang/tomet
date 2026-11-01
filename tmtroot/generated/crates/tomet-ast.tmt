@@ -1,19 +1,32 @@
 ::kind(api)
 
-::meta{crate: tomet-ast, dependencies: list(tomet-cst), dependents: list(cotomet-eval, cotomet-syntax, serde_cotomet, tomet, tomet-address, tomet-cli, tomet-config, tomet-declaration, tomet-deps, tomet-edit, tomet-expr, tomet-extract, tomet-formatter, tomet-html, tomet-indexer, tomet-lexer, tomet-links, tomet-load, tomet-lsp, tomet-markdown, tomet-pandoc, tomet-parser, tomet-printer, tomet-search, tomet-semantics, tomet-spec, tomet-stats, tomet-style, tomet-tests, tomet-transform, tomet-tree, tomet-type, tomet-typst, tomet-validator, tomet-validator-blueprint, tomet-validator-core, tomet-validator-rule, tomet-vault, tomet-workspace)}
+::meta{crate: tomet-ast, dependencies: list(tomet-cst), dependents: list(cotomet-eval, cotomet-syntax, serde_cotomet, tomet, tomet-address, tomet-cli, tomet-config, tomet-convert-standalone, tomet-declaration, tomet-deps, tomet-edit, tomet-expr, tomet-extract, tomet-formatter, tomet-html, tomet-indexer, tomet-lexer, tomet-links, tomet-load, tomet-lsp, tomet-markdown, tomet-pandoc, tomet-parser, tomet-printer, tomet-search, tomet-semantics, tomet-spec, tomet-stats, tomet-style, tomet-tests, tomet-transform, tomet-tree, tomet-type, tomet-typst, tomet-validator, tomet-validator-blueprint, tomet-validator-core, tomet-validator-profile, tomet-validator-rule, tomet-vault, tomet-workspace)}
 
 =[tomet-ast]
 
 ==[tomet-ast]
 
 Shared AST and `Value` data models for the Tomet toolchain (`Document`, `Block`,
-`Inline`, `Element`, `Value`, `Span`).
+`Inline`, `Element`, `Declaration`, `Interpolation`, `Hole`, `ListItem`, `Value`, `Span`).
 
 ==[Design Policy]
 
 - ("Pure Data Models & Structural Accessors Only") `tomet-ast` is the foundational dependency-free crate referenced across the workspace.
 It contains only struct/enum definitions and pure inherent methods for construction
 (`new`, `with_*`) and structural inspection (`as_str()`, `get()`, `is_null()`, `Span::union()`).
+- ("A Node's Role Is Its Type") A `${...}` is an [`Interpolation`] (an expression and a span), not an [`Element`]:
+it has no name, no groups and no connects, so it is a variant of [`Block`],
+[`Inline`] and [`Value`] and no walker over elements ever meets one. Reach every
+interpolation of a document through `tomet_tree::for_each_interpolation`.
+A `::name(...)` is a [`Declaration`]: always a [`Block`], about the document and attached to
+nothing, so it has no placement and takes no connect.
+A `:name(...)` is a [`Connect`]: metadata about its owner, with no id, no connects of its own
+and no placement. A `?matcher(...)` is a [`Hole`] (a matcher, optional, in place of a name).
+A list item is a [`ListItem`] and a nameless `(marker)[content]` entry of a `{...}` group is a
+[`Bare`]: neither has a name, so neither is an [`Element`], whose name is mandatory.
+`ListItem::named_element` gives the element a `-@name(...)` item is, as a copy.
+What nodes share is [`Data`] (`(args)` and the `{...}` [`Group`]), so what
+reads them is written once; `[content]` and `#(id)` stay on the roles that take them.
 - ("Clear Crate Boundaries") Semantics: Classification of element meanings (links, `::meta`, `::config`) lives in `tomet-semantics`.
 Traversal & Manipulation: Generic tree traversal algorithms live in `tomet-tree`.
 Formatting & Printing: Serialization to `.tmt` text lives in `tomet-style` and `tomet-printer`.
@@ -82,16 +95,14 @@ what its own items may be) needs to live on.
 
 ===[struct ListItem]
 
-One item of a [`List`].
+One item of a [`List`]: a plain `- content`, or `-@name(...) content`
+(the combine notation), which is the item @em[and] an element of that name.
 
-Composes an ordinary [`Element`] rather than restating its fields: a
-list item written `- content` is `Element { sigil: Sigil::Bare, .. }`,
-and one written `-@name(...) content` (the combine notation) is
-`Element { sigil: Sigil::Named(name), .. }` -- the exact same `Element`
-a standalone `@name(...)` would parse to, with no naming constraint and
-no second grammar. Every existing consumer that already treats a list
-item as "just an `Element`" (the validator, the formatter, every
-converter) keeps working unchanged against `&item.element`.
+It takes the groups an element does -- `(args)` is the item's marker,
+`{value}` its attributes, `#(id)` and `:connect`s -- and its `content` is
+always there (possibly empty). It has no placement: an item is always a
+block of its own list. `name` is `None` for a plain item and the element's
+name for the combine notation.
 
 `sublist` is the one genuinely new thing: an indented list directly
 below this item. Typed as `Option<List>`, not `Option<Vec<Block>>`,
@@ -150,7 +161,80 @@ the content is a value, not a structural identifier, so it is as
 free as any other string value (e.g. `@line(天音かなた)` elsewhere in
 this codebase already allows non-ASCII value text).
 
+===[struct Declaration]
+
+A `::name(args){data}[content]#(id)` declaration about the document itself,
+not content in it.
+
+It takes the groups an element does and is introduced by `::` instead of
+`@`. The sigil says @em[where] it belongs -- in the document's preamble, the
+run of `::` blocks at the top -- so the preamble can be found without
+loading any vocabulary. Which names may be written this way is the
+`Region` a vocabulary declares for them, and whether one takes `[content]`
+is that vocabulary's call too, so the parser does not decide it.
+
+It is always a [`Block`]: a `::` has to open its line and stand alone on it,
+and so has no [`Placement`]. And it is attached to nothing, so unlike an
+[`Element`] it takes no `:connect`.
+
+===[struct Bare]
+
+A nameless entry of a `{...}` group, `(marker)[content]`: the container
+already supplies what it is (the `(1)[...]` entries of `@links{ ... }`),
+so it has no name. It takes the groups an element does and no connect.
+
+===[struct Hole]
+
+A `?matcher(name, args){options}[content]` hole in a pattern.
+
+It takes the groups an element does, read by the same code. Two
+differences: its head is a @em[matcher], not an element name, and it is
+optional (`?()` and `?(n)[...]` have none); and it takes no `:connect`. It
+only exists in what `parse_pattern` reads: `parse_document` leaves `?` as
+text, so ordinary prose such as `本当に?(はい)` is never a hole.
+
+A hole sits where an element sits, so it is a variant of [`Block`],
+[`Inline`], [`Entry`] and [`Value`], in the same tree a document is: a
+pattern is written in, and printed as, ordinary tomet. The type of every
+document allows one; `parse_document` never builds one.
+
+The matcher is not an element name: `?meta()` is not the `meta` element.
+What a matcher means, and what a hole matches, is the host's (tandr's), not
+tomet's. See `tmtroot/spec/syntax/hole.tmt`.
+
+===[struct Connect]
+
+A `:name(...)` connect stacked after an element, a section or a list
+(`@x(...):as(y):rule(...)`): metadata about its owner, not content of the
+document. It takes `(args)`, `[content]` and `{value}` like an element does,
+and nothing else: no `#(id)` (an id belongs to the owner, written before the
+first connect), no connects of its own, and no placement.
+
+===[struct Data]
+
+The data a node carries: its `(args)` and its `{value}` group, each
+optional and at most one of each.
+
+Every node that takes either holds them as a `Data`, so what reads them
+(the walkers, the printer, `merge_values`) is written once for all of
+them. `[content]` and `#(id)` are not in here on purpose: they differ in
+kind (child blocks, an address) and not every node takes them.
+
 ===[struct Element]
+
+An `@name(args)[content]{value}` element.
+
+The one element sigil is `@`; it says "an element starts here" and nothing
+else. Whether the element stands as a block or belongs to a paragraph is
+[`Placement`], which the parser derives from position, and origin is
+carried by [`Name`]'s namespace. Two earlier axes were tried and carried no
+information: `<T>` vs `@name` (official vs user-defined, but both
+classified through the same arm) and `#name` vs `@name` (shape, which
+`tomet-semantics`' `required_shape` already knew). `#(id)` is not a second
+sigil either: it is [`Element::id`], a slot in the element's own groups.
+
+A node that has no name of its own, a [`Bare`] entry or a plain list item,
+is not an element at all.
 
 `(args)` / `[content]` / `{value}`, each optional and at most one of each,
 in any order in the source.
@@ -159,10 +243,28 @@ in any order in the source.
 groups but strictly before any connect -- see [`Id`].
 
 `connects` is unrelated to those three: it is the `:name(...)` family
-stacked after them (`@x(...):as(y):rule(...)`), zero or more, each its
-own full `Element` (with its own `args`/`content`/`value`, but never
-its own `connects` -- a connect does not itself take further connects
-in this parser). Order-preserving, empty when nothing follows.
+stacked after them (`@x(...):as(y):rule(...)`), zero or more, each a
+[`Connect`]. Order-preserving, empty when nothing follows.
+
+===[struct Group]
+
+The entries of a `{...}` group, in source order.
+
+`{...}` is always data: it parses uniformly into [`Entry`] items in
+source order, whatever the element is called. "Is this a data map or a
+list of children?" is no longer a parse-time branch -- it is a view
+computed downstream in `tomet-semantics`, which is what lets the parser
+build the tree without consulting any element vocabulary.
+
+===[struct Interpolation]
+
+A `${...}` (or `$name(...)`) interpolation: an expression to be evaluated
+where it stands.
+
+It is not an [`Element`]: it has no name, no `(args)` / `[content]` and no
+`#(id)`, and it never takes a `:connect`. It holds an expression and the
+span of the whole `$`-form, and nothing else. It sits in three places, as
+[`Block::Interp`], [`Inline::Interp`] and [`Value::Interp`].
 
 ===[struct InterpExpr]
 
@@ -178,25 +280,6 @@ equivalent (no headings, prose, or links).
 ===[enum Block]
 
 ===[enum Inline]
-
-===[enum Sigil]
-
-Which sigil introduced an element, and its name.
-
-There is one element sigil in a document, `@`, and a second, `?`, in a
-pattern (see [`Sigil::Question`]). A sigil says "an element starts here" and
-nothing else: whether the element stands as a block or belongs to a
-paragraph is [`Placement`], which the parser derives from position, and
-origin is carried by [`Name`]'s namespace.
-
-Two earlier axes were tried here and both carried no information. `<T>`
-vs `@name` was meant to separate official from user-defined elements,
-but both classified through the same arm. `#name` vs `@name` was meant
-to encode shape, but the parser never consulted it (position already
-decided placement) and `tomet-semantics`' `required_shape` already knew
-each builtin's shape, so the sigil only restated it. `#` is not a
-second sigil today either: `#(id)` is [`Element::id`], a slot in the
-element's own groups, not a different way to introduce an element.
 
 ===[enum Placement]
 
@@ -225,16 +308,6 @@ pair or a nested element.
 `Pair`'s shape is exactly [`Value::Map`]'s entry type, which is what
 lets the data view be rebuilt from a group without copying any other
 structure.
-
-===[enum ElementValue]
-
-The contents of an element's value group.
-
-`{...}` is always data: it parses uniformly into [`Entry`] items in
-source order, whatever the element is called. "Is this a data map or a
-list of children?" is no longer a parse-time branch -- it is a view
-computed downstream in `tomet-semantics`, which is what lets the parser
-build the tree without consulting any element vocabulary.
 
 ===[enum InterpExprKind]
 

@@ -1,6 +1,6 @@
 ::kind(api)
 
-::meta{crate: tomet, dependencies: list(tomet-ast, tomet-config, tomet-declaration, tomet-deps, tomet-edit, tomet-formatter, tomet-html, tomet-links, tomet-load, tomet-markdown, tomet-merge, tomet-pandoc, tomet-parser, tomet-printer, tomet-semantics, tomet-stats, tomet-transform, tomet-typst, tomet-validator, tomet-vault), dependents: list(tomet-java, tomet-js, tomet-python)}
+::meta{crate: tomet, dependencies: list(tomet-ast, tomet-config, tomet-declaration, tomet-deps, tomet-edit, tomet-formatter, tomet-highlight, tomet-html, tomet-links, tomet-load, tomet-markdown, tomet-merge, tomet-pandoc, tomet-parser, tomet-printer, tomet-semantics, tomet-stats, tomet-transform, tomet-typst, tomet-validator, tomet-vault), dependents: list(tomet-java, tomet-js, tomet-python)}
 
 =[tomet]
 
@@ -17,7 +17,7 @@ not: the CST, the lexer, the resolver, the workspace and the TUI. Routing
 them through here would turn this crate into a mirror of the workspace.
 The language bindings (`bindings/python`, `java`, `js`) do use it, which
 is what keeps this surface honest -- what a binding still takes directly
-(`js`: `tomet-transform`, `tomet-lexer`) is what is missing here.
+(`js`: `tomet-transform`) is what is missing here.
 
 ==[Reading a document]
 
@@ -56,6 +56,7 @@ compiles nothing it does not use. Each feature adds one module:
 [ `edit`     ][ `edit`       ][ `tomet-edit`      ]
 [ `merge`    ][ `merge`      ][ `tomet-merge`     ]
 [ `parser`   ][ `parser`     ][ `tomet-parser`    ]
+[ `highlight` ][ `highlight`   ][ `tomet-highlight` ]
 [ `html`     ][ `html`       ][ `tomet-html`      ]
 [ `links`    ][ `links`      ][ `tomet-links`     ]
 [ `markdown` ][ `markdown`   ][ `tomet-markdown`  ]

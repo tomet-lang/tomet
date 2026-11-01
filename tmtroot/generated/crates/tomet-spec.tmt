@@ -86,9 +86,13 @@ Wraps inline nodes into a paragraph block.
 
 Builds a block-level `@raw(lang: "text")` code block element.
 
+====[fn plain_item]
+
+Builds a plain list item holding `content` as one paragraph.
+
 ====[fn list]
 
-Builds an unordered list from an iterator of list item elements.
+Builds an unordered list from an iterator of list items.
 
 ====[fn inlines]
 

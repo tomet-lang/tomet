@@ -44,10 +44,15 @@ A matched AST element occurrence with its span and tag name.
 
 Checks if a single element matches `query`.
 
+====[fn matches_declaration_query]
+
+Checks if a single declaration matches `query`.
+
 ====[fn count_structural_matches]
 
-Counts matching elements in `doc` for `query`.
+Counts matching elements and declarations in `doc` for `query`.
 
 ====[fn find_structural_matches]
 
-Finds all matching element occurrences in `doc` for `query`.
+Finds all matching element and declaration occurrences in `doc` for
+`query`, in document order.

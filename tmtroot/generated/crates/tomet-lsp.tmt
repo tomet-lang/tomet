@@ -93,9 +93,9 @@ A `.ctmt` is formatted by whitespace alone, whatever the config says, as
 ====[fn resolve_effective_config]
 
 Resolves the merged configuration for a document by combining:
-1. Workspace config discovered from ancestor directories (`default.config.tmt` / `tomet.config.tmt`)
-2. Explicit `::config(import: ...)` / `::config(file: ...)` imported configs
-3. Document's local `::config` definitions (highest precedence)
+1. The vault config and the folder configs down to the document, already stacked
+(see `tomet_load_config`), for the macros and variables they declare
+2. The document's own `::macros` and `::vars` (highest precedence)
 
 ==[Module hover]
 

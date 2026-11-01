@@ -1,0 +1,53 @@
+::kind(api)
+
+::meta{crate: tomet-validator-profile, dependencies: list(tomet-ast, tomet-declaration, tomet-expr, tomet-parser, tomet-semantics, tomet-tree, tomet-validator-core), dependents: list(tomet-convert-standalone, tomet-validator)}
+
+=[tomet-validator-profile]
+
+==[tomet-validator-profile]
+
+Checks that a document keeps the promise of its `::profile(...)`.
+
+==[Architecture & Responsibilities]
+
+- (Standalone) A document that promises `standalone` means what its own bytes say. [`standalone_findings`]
+finds everything it takes from outside, by trying to resolve each thing in a world with
+nothing outside the file: an expression is held to the names the file defines
+([`tomet_expr::reaches_outside`]), an element name to no vocabulary at all, and an `@term` to
+no dictionary but the file itself. Nothing is evaluated and nothing is read from disk, so the
+check needs no vault.
+- (Findings, "then diagnostics") A [`Finding`] says what is outside and where, which is what a converter that makes a file
+standalone works from. [`validate_profile`] is the same list as [`Diagnostic`]s, for
+`tomet check`, and is empty unless the document declares the profile.
+
+==[Not here]
+
+- `oneline`: it needs the lines of the source, which a parsed [`Document`] does not carry.
+- A vocabulary the document holds itself. No reader for one exists yet, so any element that is
+
+not built in counts as taken from outside.
+
+==[Structs]
+
+===[struct Finding]
+
+One thing a document takes from outside, and where it is written.
+
+==[Enums]
+
+===[enum Dirt]
+
+What a document takes from outside itself.
+
+==[Functions]
+
+===[fn standalone_findings]
+
+Everything `doc` takes from outside itself, in the order it is written, whether or not it
+promises `standalone`.
+
+===[fn validate_profile]
+
+What `doc` breaks of the profiles it declares. Empty when it declares none that this checks.
+
+Only `standalone` is checked so far; `oneline` is not, see the module doc.

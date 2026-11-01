@@ -1,6 +1,6 @@
 ::kind(api)
 
-::meta{crate: tomet-declaration, dependencies: list(cotomet-syntax, tomet-ast, tomet-parser, tomet-tree, tomet-type), dependents: list(cotomet-eval, tomet, tomet-cli, tomet-config, tomet-expr, tomet-indexer, tomet-load, tomet-lsp, tomet-pandoc, tomet-semantics, tomet-validator, tomet-validator-core, tomet-vault, tomet-workspace)}
+::meta{crate: tomet-declaration, dependencies: list(cotomet-syntax, tomet-ast, tomet-parser, tomet-tree, tomet-type), dependents: list(cotomet-eval, tomet, tomet-cli, tomet-config, tomet-convert-standalone, tomet-expr, tomet-indexer, tomet-load, tomet-lsp, tomet-pandoc, tomet-semantics, tomet-validator, tomet-validator-core, tomet-validator-profile, tomet-vault, tomet-workspace)}
 
 =[tomet-declaration]
 
@@ -26,7 +26,7 @@ host back.
 [`tomet_tree`] to walk a document's top level, and on [`tomet_type`] for the types a
 `::vars` entry names. It does not know a body element, a vocabulary or a vault.
 - ("Two hosts", "one input") A `.tmt` document gives its declarations as [`Declaration`]s through
-[`Declaration::from_element`]; a `.ctmt` file's header gives the same three things, a
+[`Declaration::from_ast`]; a `.ctmt` file's header gives the same three things, a
 name, `(args)` and `{data}`. The readers see only that.
 
 ==[Not here]

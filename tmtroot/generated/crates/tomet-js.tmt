@@ -1,6 +1,6 @@
 ::kind(api)
 
-::meta{crate: tomet-js, dependencies: list(tomet, tomet-cst, tomet-lexer, tomet-links, tomet-transform), dependents: list()}
+::meta{crate: tomet-js, dependencies: list(tomet, tomet-cst, tomet-links, tomet-transform), dependents: list()}
 
 =[tomet-js]
 
@@ -10,9 +10,15 @@
 
 ====[struct HighlightSpan]
 
+A range of the source to color. Offsets are bytes of the source.
+
 ===[Functions]
 
 ====[fn compute_highlight_spans]
+
+The ranges of `src` that have a tag, in order and without overlap. The
+definition of what is what lives in `tomet-highlight`; this is its shape
+for JavaScript.
 
 ==[Structs]
 
