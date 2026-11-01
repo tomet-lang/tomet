@@ -1,0 +1,18 @@
+// `` at the start of a line makes the whole line raw: one backtick is an
+// inline raw, two a line, three a block. What follows is text, not syntax.
+
+`` @name *not em* ${not.interp} // not a comment
+
+// One space after the backticks is the separator; a second one is text.
+``  indented once
+
+// Consecutive lines are one block; a blank line ends it.
+`` first
+`` second
+``
+``third
+
+// It breaks a paragraph, like a block does.
+text
+`` raw
+more text

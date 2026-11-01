@@ -224,6 +224,10 @@
           "named": true
         },
         {
+          "type": "line_raw",
+          "named": true
+        },
+        {
           "type": "list",
           "named": true
         },
@@ -981,6 +985,11 @@
         }
       ]
     }
+  },
+  {
+    "type": "line_raw",
+    "named": true,
+    "fields": {}
   },
   {
     "type": "list",

@@ -40,6 +40,10 @@
         },
         {
           "type": "SYMBOL",
+          "name": "line_raw"
+        },
+        {
+          "type": "SYMBOL",
           "name": "list"
         },
         {
@@ -67,6 +71,37 @@
           }
         }
       ]
+    },
+    "line_raw": {
+      "type": "PREC_RIGHT",
+      "value": 0,
+      "content": {
+        "type": "REPEAT1",
+        "content": {
+          "type": "SEQ",
+          "members": [
+            {
+              "type": "SYMBOL",
+              "name": "_line_raw_line"
+            },
+            {
+              "type": "SYMBOL",
+              "name": "_newline"
+            }
+          ]
+        }
+      }
+    },
+    "_line_raw_line": {
+      "type": "TOKEN",
+      "content": {
+        "type": "PREC",
+        "value": 2,
+        "content": {
+          "type": "PATTERN",
+          "value": "``([^`\\n][^\\n]*)?"
+        }
+      }
     },
     "semi_break": {
       "type": "STRING",
@@ -385,8 +420,15 @@
         {
           "type": "ALIAS",
           "content": {
-            "type": "STRING",
-            "value": "```"
+            "type": "TOKEN",
+            "content": {
+              "type": "PREC",
+              "value": 3,
+              "content": {
+                "type": "STRING",
+                "value": "```"
+              }
+            }
           },
           "named": true,
           "value": "fence_marker"
@@ -440,8 +482,15 @@
         {
           "type": "ALIAS",
           "content": {
-            "type": "STRING",
-            "value": "```"
+            "type": "TOKEN",
+            "content": {
+              "type": "PREC",
+              "value": 3,
+              "content": {
+                "type": "STRING",
+                "value": "```"
+              }
+            }
           },
           "named": true,
           "value": "fence_marker"

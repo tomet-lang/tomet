@@ -70,6 +70,7 @@ module.exports = grammar({
 				$.titled_thematic_break,
 				$.thematic_break,
 				$.fenced_code_block,
+				$.line_raw,
 				$.list,
 				$.document_element,
 				$.semi_break,
@@ -77,6 +78,13 @@ module.exports = grammar({
 				$.line_comment,
 				prec(1, $.block_comment),
 			),
+
+		// Two backticks at the start of a line make the whole line raw; the lines
+		// under it that start the same way are more of the same block. A third
+		// backtick is a fence, so the token excludes it. In the middle of a line
+		// two backticks are an inline `code_span`. Like `;`, only at the top level.
+		line_raw: ($) => prec.right(repeat1(seq($._line_raw_line, $._newline))),
+		_line_raw_line: (_$) => token(prec(2, /``([^`\n][^\n]*)?/)),
 
 		// A `;` at the start of a line breaks the block, as a blank line does
 		// (`tomet-parser`'s `cst.rs`, `SEMI`). It is only a break where a block
@@ -178,11 +186,11 @@ module.exports = grammar({
 		// a real closing fence.
 		fenced_code_block: ($) =>
 			seq(
-				alias("```", $.fence_marker),
+				alias(token(prec(3, "```")), $.fence_marker),
 				optional(field("lang", alias(/[^\n]+/, $.text))),
 				$._newline,
 				optional(field("content", alias(/(?:[^`]|`[^`]|``[^`])+/, $.text))),
-				alias("```", $.fence_marker),
+				alias(token(prec(3, "```")), $.fence_marker),
 			),
 
 		// ---- comments -------------------------------------------------------

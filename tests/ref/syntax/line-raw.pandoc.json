@@ -1,0 +1,79 @@
+{
+  "pandoc-api-version": [
+    1,
+    23,
+    1
+  ],
+  "meta": {},
+  "blocks": [
+    {
+      "t": "CodeBlock",
+      "c": [
+        [
+          "",
+          [],
+          []
+        ],
+        "@name *not em* ${not.interp} // not a comment"
+      ]
+    },
+    {
+      "t": "CodeBlock",
+      "c": [
+        [
+          "",
+          [],
+          []
+        ],
+        " indented once"
+      ]
+    },
+    {
+      "t": "CodeBlock",
+      "c": [
+        [
+          "",
+          [],
+          []
+        ],
+        "first\nsecond\n\nthird"
+      ]
+    },
+    {
+      "t": "Para",
+      "c": [
+        {
+          "t": "Str",
+          "c": "text"
+        }
+      ]
+    },
+    {
+      "t": "CodeBlock",
+      "c": [
+        [
+          "",
+          [],
+          []
+        ],
+        "raw"
+      ]
+    },
+    {
+      "t": "Para",
+      "c": [
+        {
+          "t": "Str",
+          "c": "more"
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Str",
+          "c": "text"
+        }
+      ]
+    }
+  ]
+}

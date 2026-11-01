@@ -237,3 +237,64 @@ fn backtick_span_still_closes_normally_on_the_same_line() {
         other => panic!("expected a paragraph, got {other:?}"),
     }
 }
+
+fn line_raw_text(src: &str) -> String {
+    let doc = parse_document(src).unwrap();
+    let [Block::Element(el)] = doc.blocks.as_slice() else {
+        panic!("expected one raw element, got {:?}", doc.blocks);
+    };
+    assert_eq!(el.name, Name::bare("raw"));
+    assert_eq!(el.placement, Placement::Block);
+    assert_eq!(el.data.args, None);
+    let Some([Block::Paragraph(p)]) = el.content.as_deref() else { panic!() };
+    let [Inline::Raw(raw)] = p.content.as_slice() else { panic!() };
+    raw.value.clone()
+}
+
+#[test]
+fn two_backticks_at_the_start_of_a_line_make_the_whole_line_raw() {
+    assert_eq!(line_raw_text("`` a *b* @c(d) ${e}\n"), "a *b* @c(d) ${e}");
+    // One space after the backticks is the separator; a second is text.
+    assert_eq!(line_raw_text("``  indented\n"), " indented");
+    assert_eq!(line_raw_text("``no space\n"), "no space");
+    // It wins over an inline raw that stands at the start of the line.
+    assert_eq!(line_raw_text("``a`b``\n"), "a`b``");
+}
+
+#[test]
+fn consecutive_line_raw_lines_are_one_raw_block() {
+    assert_eq!(line_raw_text("`` one\n`` two\n``\n``three\n"), "one\ntwo\n\nthree");
+    // A blank line ends it.
+    let doc = parse_document("`` one\n\n`` two\n").unwrap();
+    assert_eq!(doc.blocks.len(), 2);
+}
+
+#[test]
+fn a_line_raw_breaks_the_paragraph_before_it_and_not_a_fence_after_it() {
+    let doc = parse_document("text\n`` raw\n```\nfence\n```\n").unwrap();
+    assert!(matches!(doc.blocks[0], Block::Paragraph(_)));
+    assert_eq!(doc.blocks.len(), 3, "{:?}", doc.blocks);
+}
+
+#[test]
+fn two_backticks_inside_a_line_are_still_an_inline_raw() {
+    let doc = parse_document("a ``b`c`` d\n").unwrap();
+    let [Block::Paragraph(p)] = doc.blocks.as_slice() else { panic!() };
+    assert!(p.content.iter().any(|i| matches!(i, Inline::Element(el) if el.name == Name::bare("raw"))));
+    // And in a `[content]`, where it is the first thing after the bracket.
+    let doc = parse_document("@x[ ``b`c`` ]\n").unwrap();
+    let Block::Element(el) = &doc.blocks[0] else { panic!() };
+    assert!(matches!(el.content.as_deref(), Some([Block::Paragraph(_)])));
+}
+
+#[test]
+fn a_line_raw_in_a_pipe_run_loses_the_markers() {
+    let doc = parse_document("@quote\n| `` one\n| `` two\n").unwrap();
+    let Block::Element(q) = &doc.blocks[0] else { panic!() };
+    let Some([Block::Element(raw)]) = q.content.as_deref() else {
+        panic!("{:?}", q.content)
+    };
+    let Some([Block::Paragraph(p)]) = raw.content.as_deref() else { panic!() };
+    let [Inline::Raw(t)] = p.content.as_slice() else { panic!() };
+    assert_eq!(t.value, "one\ntwo");
+}

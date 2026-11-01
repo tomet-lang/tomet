@@ -134,7 +134,15 @@ fn a_code_span_is_a_node_and_its_inside_is_not_parsed() {
 
 #[test]
 fn a_code_span_closes_on_a_fence_of_the_same_length() {
-    assert_eq!(texts("``a`b`` c\n", K::CODE_SPAN), ["``a`b``"]);
+    assert_eq!(texts("x ``a`b`` c\n", K::CODE_SPAN), ["``a`b``"]);
+}
+
+#[test]
+fn two_backticks_at_the_start_of_a_line_are_a_line_raw_not_a_code_span() {
+    assert_eq!(texts("``a`b`` c\n", K::CODE_SPAN), Vec::<String>::new());
+    assert_eq!(texts("``a`b`` c\n", K::CODE_BLOCK), ["``a`b`` c\n"]);
+    // Consecutive lines are one node.
+    assert_eq!(texts("`` a\n`` b\nc\n", K::CODE_BLOCK), ["`` a\n`` b\n"]);
 }
 
 #[test]

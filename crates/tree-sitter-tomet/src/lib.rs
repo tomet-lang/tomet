@@ -245,6 +245,20 @@ mod tests {
     }
 
     #[test]
+    fn two_backticks_at_the_start_of_a_line_make_a_line_raw() {
+        let tree = parse("a\n`` b *c*\n`` d\n\ne `f` h\n");
+        let root = tree.root_node();
+        assert!(!root.has_error());
+        let kinds: Vec<_> = (0..root.named_child_count() as u32)
+            .map(|i| root.named_child(i).unwrap().kind())
+            .collect();
+        assert_eq!(kinds, ["paragraph", "line_raw", "paragraph"]);
+        // Three backticks are a fence.
+        let tree = parse("```\nx\n```\n");
+        assert_eq!(tree.root_node().named_child(0).unwrap().kind(), "fenced_code_block");
+    }
+
+    #[test]
     fn parses_a_fenced_code_block() {
         let tree = parse("```rust\nfn main() {}\n```\n");
         let root = tree.root_node();

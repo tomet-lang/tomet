@@ -28,6 +28,9 @@
 //! a shallower section -- a block nested inside `[content]` (and its own
 //! `#(id)`) is represented, not flattened into inline text.
 //!
+//! A `CODE_BLOCK` is a fence of three backticks or more, or -- two backticks at the
+//! start of a line -- a line raw: the lines that open that way, with no closing line.
+//!
 //! Running text carries `EMPHASIS`, `STRONG`, `STRIKEOUT`, `CODE_SPAN` and
 //! `AUTOLINK` nodes where the AST has an `em`, `strong`, `strikeout`,
 //! `raw` or `link` element. What opens a span, and where an address ends, is
@@ -337,8 +340,13 @@ impl<'a> CstParser<'a> {
     /// opener's `|` is part of the line's left edge, as the markers of the
     /// lines after it are: an element written after it stands as a block.
     fn at_line_start(&self) -> bool {
+        self.line_start_at(self.pos)
+    }
+
+    /// [`CstParser::at_line_start`] for token `i`.
+    fn line_start_at(&self, i: usize) -> bool {
         let in_run = !self.pipe_cols.is_empty();
-        let mut i = self.pos;
+        let mut i = i;
         while i > 0
             && (self.kind_at(i - 1) == Some(K::WHITESPACE)
                 || (in_run && self.kind_at(i - 1) == Some(K::PIPE)))
@@ -682,8 +690,14 @@ impl<'a> CstParser<'a> {
         }
     }
 
+    /// A fence (three backticks or more), or, at the start of a line, a line raw
+    /// (exactly two). In the middle of a line ``` ``x`` ``` is inline raw.
     fn is_code_block_start_at(&self, i: usize) -> bool {
-        self.run_len(i, K::BACKTICK) >= 3
+        match self.run_len(i, K::BACKTICK) {
+            0 | 1 => false,
+            2 => self.line_start_at(i),
+            _ => true,
+        }
     }
 
     /// Does a block other than a paragraph start at `i` (the first token of a line)?
@@ -1124,6 +1138,11 @@ impl<'a> CstParser<'a> {
     fn parse_code_block(&mut self) {
         self.builder.start_node(K::CODE_BLOCK.into());
         let count = self.run_len(self.pos, K::BACKTICK);
+        if count == 2 {
+            self.parse_line_raw();
+            self.builder.finish_node();
+            return;
+        }
         for _ in 0..count {
             self.bump();
         }
@@ -1149,6 +1168,28 @@ impl<'a> CstParser<'a> {
             self.bump_line();
         }
         self.builder.finish_node();
+    }
+
+    /// A line raw: the rest of the line after two backticks is the text, and the
+    /// lines under it that open with two backticks of their own are more of the
+    /// same block. A blank line, or any other line, ends it.
+    fn parse_line_raw(&mut self) {
+        loop {
+            self.bump();
+            self.bump();
+            self.bump_line();
+            if self.is_eof() || self.at_run_end() {
+                break;
+            }
+            let next = self.skip_ws_from(self.pos);
+            if self.run_len(next, K::BACKTICK) != 2 {
+                break;
+            }
+            // The indentation and a run's markers before it.
+            while self.pos < next {
+                self.bump();
+            }
+        }
     }
 
     /// Reads the rest of the line, its `NEWLINE` included.

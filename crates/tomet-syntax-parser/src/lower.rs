@@ -378,6 +378,9 @@ fn lower_thematic_break(src: &str, node: &SyntaxNode) -> Result<Block> {
 fn lower_code_block(src: &str, node: &SyntaxNode) -> Result<Block> {
     let (start, text) = text_of(src, node);
     let fence_len = text.chars().take_while(|&c| c == '`').count();
+    if fence_len == 2 {
+        return lower_line_raw(node, start, text);
+    }
     let (opening, rest) = match text.find('\n') {
         Some(n) => (&text[fence_len..n], &text[n + 1..]),
         None => (&text[fence_len..], ""),
@@ -414,6 +417,51 @@ fn lower_code_block(src: &str, node: &SyntaxNode) -> Result<Block> {
     if !lang.is_empty() {
         element.data.args = Some(Value::Map(vec![("lang".to_string(), Value::String(lang))]));
     }
+    Ok(Block::Element(element))
+}
+
+/// A line raw: each line of the node is two backticks and the text after them,
+/// less the one space that may follow the backticks. The lines are one `raw`
+/// element, joined with a newline; the markers of a `|` run at the start of every
+/// line but the first are not part of them.
+fn lower_line_raw(node: &SyntaxNode, start: usize, text: &str) -> Result<Block> {
+    let depth = pipe_depth(node);
+    let mut code = String::new();
+    let mut content_start = None;
+    let mut content_end = start;
+    let mut at = start;
+    for (n, line) in text.split_inclusive('\n').enumerate() {
+        let mut rest = line;
+        // The opener of a run is before the node; the later lines carry its markers.
+        for _ in 0..if n == 0 { 0 } else { depth } {
+            rest = rest.trim_start_matches([' ', '\t']);
+            rest = rest
+                .strip_prefix('|')
+                .ok_or_else(|| unsupported("a line raw without the run's marker"))?;
+        }
+        rest = rest.trim_start_matches([' ', '\t']);
+        rest = rest
+            .strip_prefix("``")
+            .ok_or_else(|| unsupported("a line raw line without its backticks"))?;
+        rest = rest.strip_prefix(' ').unwrap_or(rest);
+        let body = rest.trim_end_matches(['\n', '\r']);
+        let body_at = at + (line.len() - rest.len());
+        content_start.get_or_insert(body_at);
+        content_end = body_at + body.len();
+        if n > 0 {
+            code.push('\n');
+        }
+        code.push_str(body);
+        at += line.len();
+    }
+    let content_span = Span::new(content_start.unwrap_or(start), content_end);
+    let element = element_new(Name::bare("raw"))
+        .with_placement(Placement::Block)
+        .with_span(Span::new(start, start + text.len()))
+        .with_content(vec![Block::Paragraph(Paragraph::new(
+            vec![Inline::Raw(RawText::new(code, content_span))],
+            content_span,
+        ))]);
     Ok(Block::Element(element))
 }
 

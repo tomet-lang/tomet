@@ -26,6 +26,9 @@
 
 (thematic_break) @punctuation.special
 
+; Two backticks at the start of a line: the whole line is raw.
+(line_raw) @markup.raw.block @text.literal
+
 ; A `;` at the start of a line breaks the block.
 (semi_break) @punctuation.special
 

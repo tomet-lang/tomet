@@ -88,6 +88,9 @@ parser; the list literal is gone) or (a call such as `list(...)`) `ARGS`.
 a shallower section -- a block nested inside `[content]` (and its own
 `#(id)`) is represented, not flattened into inline text.
 
+A `CODE_BLOCK` is a fence of three backticks or more, or -- two backticks at the
+start of a line -- a line raw: the lines that open that way, with no closing line.
+
 Running text carries `EMPHASIS`, `STRONG`, `STRIKEOUT`, `CODE_SPAN` and
 `AUTOLINK` nodes where the AST has an `em`, `strong`, `strikeout`,
 `raw` or `link` element. What opens a span, and where an address ends, is
