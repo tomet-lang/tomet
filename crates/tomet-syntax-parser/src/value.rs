@@ -5,7 +5,6 @@
 
 use std::collections::HashMap;
 
-use crate::dialect::Dialect;
 use crate::error::{Error, Result};
 use tomet_ast::Value;
 use tomet_cst::{SyntaxKind as K, SyntaxNode};
@@ -20,10 +19,7 @@ pub(crate) use cotomet_syntax::{
 /// document -- no headings, prose, or top-level elements).
 pub fn parse_value(src: &str) -> Result<Value> {
     let root = crate::cst::parse_cst_value(src);
-    crate::lower::in_dialect(Dialect::Document, || {
-        cotomet_syntax::parse_value_with(src, &mut Embedded::new(src, &root))
-    })
-    .map_err(Into::into)
+    cotomet_syntax::parse_value_with(src, &mut Embedded::new(src, &root)).map_err(Into::into)
 }
 
 pub(crate) fn err(pos: usize, message: impl Into<String>) -> Error {
@@ -130,7 +126,7 @@ fn opens_with_element_sigil(node: &SyntaxNode) -> bool {
             .children()
             .find(|n| n.kind() == K::SIGIL)
             .and_then(|n| n.first_token())
-            .is_some_and(|t| matches!(t.kind(), K::AT | K::QUESTION))
+            .is_some_and(|t| t.kind() == K::AT)
 }
 
 fn hooked(e: Error) -> cotomet_syntax::Error {

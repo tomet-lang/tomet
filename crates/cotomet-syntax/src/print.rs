@@ -46,15 +46,16 @@ fn write_value(value: &Value, out: &mut String, top_level: bool) {
             out.push_str(&format!("${{{}}}", interp.expr));
         }
         Value::Hole(hole) => {
-            out.push('?');
+            out.push_str("<?");
             if let Some(matcher) = &hole.matcher {
                 out.push_str(&matcher.to_string());
             }
-            out.push('(');
             if let Some(args) = &hole.data.args {
+                out.push('(');
                 write_args(args, out);
+                out.push(')');
             }
-            out.push(')');
+            out.push('>');
         }
         Value::Element(el) => {
             out.push_str(&format!("@{}", el.name));

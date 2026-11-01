@@ -6,7 +6,6 @@
 //! ([`parse_value_group`]) and `#(id)` ([`parse_hash_id`]). They read the text of
 //! a group; the shape of what a group embeds is the CST's (see [`Embedded`]).
 
-use crate::dialect::Dialect;
 use crate::error::Result;
 use crate::inline::at_line_start;
 use crate::value::{
@@ -18,9 +17,10 @@ use tomet_cst::{SyntaxKind as K, SyntaxNode};
 use tomet_lexer::Cursor;
 use tomet_tree::ElementExt;
 
-/// Whether `cur` starts an element: `@name`, or in a pattern `?matcher(`.
+/// Whether `cur` starts an element: `@name`.
 ///
-/// A hole (`?`) is only an element in [`Dialect::Pattern`]; see [`is_hole_tail`].
+/// A hole is no `@` element: it is a box, `<?...>`, which the CST finds (see
+/// [`crate::cst`]) and the readers of a group ask it for by offset.
 ///
 /// `block_context` is whether the cursor sits where a block may begin --
 /// the document's top level, or a line start inside another element's
@@ -38,21 +38,12 @@ use tomet_tree::ElementExt;
 /// The old `#name` spelling had the end-of-line allowance bound to the
 /// sigil rather than to the position. There is one element sigil now, so
 /// the allowance belongs to the position.
-pub(crate) fn is_element_start(dialect: Dialect, cur: &Cursor, block_context: bool) -> bool {
+pub(crate) fn is_element_start(cur: &Cursor, block_context: bool) -> bool {
     let mut look = *cur;
     match look.bump() {
         Some('@') => name_and_tail_start(look, block_context),
-        Some('?') => dialect == Dialect::Pattern && is_hole_tail(look),
         _ => false,
     }
-}
-
-/// What has to follow a `?` for it to be a hole and not a question mark: an
-/// optional matcher name, then `(` with nothing between. Parens are always
-/// written, so `?name` alone, or `?name {...}`, is text, and so is `really? (yes)`.
-fn is_hole_tail(mut look: Cursor) -> bool {
-    let _ = eat_name(&mut look);
-    look.peek() == Some('(')
 }
 
 /// Whether a declaration about the document, `::name`, starts at `cur`.
@@ -274,11 +265,7 @@ fn parse_id_scalar(cur: &mut Cursor) -> Result<String> {
 /// slot instead (`@tags(1, 2, 3)`, already a `Seq` there) -- there is no
 /// live spelling anywhere in the corpus that needs `{...}` itself to hold
 /// one.
-pub(crate) fn parse_value_group(
-    dialect: Dialect,
-    embedded: &mut Embedded,
-    cur: &mut Cursor,
-) -> Result<Group> {
+pub(crate) fn parse_value_group(embedded: &mut Embedded, cur: &mut Cursor) -> Result<Group> {
     let group_start = cur.pos();
     if !cur.eat_str("{") {
         return Err(err(cur.pos(), "expected '{'"));
@@ -310,7 +297,7 @@ pub(crate) fn parse_value_group(
             // `{value}` groups are a flat list of entries, not prose, so
             // there is no paragraph here for a `;` to break or a line to
             // fold into: an element that is the whole of its line is a block.
-            _ if is_element_start(dialect, cur, at_line_start(cur))
+            _ if is_element_start(cur, at_line_start(cur))
                 || embedded
                     .node_at(cur.pos())
                     .is_some_and(|n| crate::lower::slot_of(n).is_some()) =>

@@ -229,31 +229,40 @@ fn cst_sections_match_the_ast_across_the_corpus() {
     }
 }
 
-/// A pattern printed by the printer reads back as the same pattern.
+/// A hole printed by the printer reads back as the same hole, as a box.
 ///
-/// The corpus above is read with `parse_document`, where `?` is text, so it
-/// cannot cover holes; these go through `parse_pattern`.
+/// The corpus above holds no `<?...>` yet, so these are written here.
 #[test]
-fn a_pattern_survives_print_and_parse() {
+fn a_hole_survives_print_and_parse() {
     for src in [
-        "adr-?int(n)-?(slug).md",
-        "?()",
-        "?(n)",
-        "?(id)[adr-?int(n)-?(slug)]",
-        "?int(n, \"x\"){min: 1}",
-        "?alt(doc, list([adr-?int(n)], [rfc-?int(n)]))",
-        "@link(url: ?(u))[?(text)]",
-        "?tandr.heading(h)",
+        "adr-<?int(n)>-<?(slug)>.md",
+        "<?()>",
+        "<?(n)>",
+        "<?>",
+        "<?int>",
+        "<?(id)>[adr-<?int(n)>-<?(slug)>]",
+        "<?int(n, \"x\"){min: 1}>",
+        "<?alt(doc, list([adr-<?int(n)>], [rfc-<?int(n)>]))>",
+        "@link(url: <?(u)>)[<?(text)>]",
+        "<?tandr.heading(h)>",
+        "@meta{ type: <?(kind)> }",
+        "--out <PATH> and Vec<T>",
     ] {
-        let before = tomet_parser::parse_pattern(src)
+        let before = tomet_parser::parse_document(src)
             .unwrap_or_else(|e| panic!("`{src}` failed to parse: {e}"));
         let printed = tomet_printer::document_to_tm(&before);
-        let after = tomet_parser::parse_pattern(&printed).unwrap_or_else(|e| {
+        let after = tomet_parser::parse_document(&printed).unwrap_or_else(|e| {
             panic!("`{src}` printed as `{printed}`, which fails to parse: {e}")
         });
         assert_eq!(
             before, after,
             "`{src}` printed as `{printed}` and read back differently"
         );
+        if src.contains("<?") {
+            assert!(
+                printed.contains("<?"),
+                "`{src}` printed as `{printed}`, which has lost its hole"
+            );
+        }
     }
 }

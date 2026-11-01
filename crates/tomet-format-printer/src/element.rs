@@ -234,18 +234,29 @@ pub fn render_bare(bare: &Bare, config: &PrinterConfig) -> String {
 }
 
 /// Render a [`Hole`] AST node into Tomet syntax:
-/// `?matcher(args)[content]{value}#(id)`.
+/// `<?matcher(args){value}>[content]#(id)`.
+///
+/// The head, the matcher and the `(args)` and `{value}` groups, is inside the box and
+/// the `[content]` follows its `>`, however `args` and `content` are ordered for an element.
 pub fn render_hole(hole: &Hole, config: &PrinterConfig) -> String {
-    let mut out = String::from("?");
+    let mut out = String::from("<?");
     if let Some(matcher) = &hole.matcher {
         out.push_str(&matcher.to_string());
     }
-    out.push_str(&render_groups(
-        "",
-        &hole.data,
-        hole.content.as_deref(),
-        config,
-    ));
+    if let Some(args) = &hole.data.args {
+        out.push('(');
+        out.push_str(&render_args(args, config));
+        out.push(')');
+    }
+    if let Some(value) = &hole.data.value {
+        out.push_str(&render_element_value(value, config));
+    }
+    out.push('>');
+    if let Some(content) = hole.content.as_deref() {
+        out.push('[');
+        out.push_str(&render_content_blocks(content, config));
+        out.push(']');
+    }
     out.push_str(&render_id(hole.id.as_ref()));
     out
 }

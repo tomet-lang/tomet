@@ -91,7 +91,7 @@ export interface Bare {
   span: Span;
 }
 
-/** A `?matcher(...)` hole; only `parse_pattern` produces one. */
+/** A `<?matcher(...)>` hole. */
 export interface Hole {
   matcher: Name | null;
   placement: Placement;

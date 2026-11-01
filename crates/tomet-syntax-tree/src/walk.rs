@@ -895,8 +895,7 @@ pub fn for_each_declaration(doc: &Document, mut f: impl FnMut(&Declaration)) {
 }
 
 /// Visits every [`Hole`] in `doc`, in document order, wherever it sits: as a
-/// block, in running text, as an entry of a `{...}` group or as a value. A
-/// document has none; a pattern read by `parse_pattern` has them.
+/// block, in running text, as an entry of a `{...}` group or as a value.
 pub fn for_each_hole(doc: &Document, mut f: impl FnMut(&Hole)) {
     for_each_node(doc, |node| match node {
         Node::Block(Block::Hole(hole))

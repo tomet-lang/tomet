@@ -221,26 +221,41 @@ pub fn render_value_inner_with_blocks(
             config,
             render_blocks,
         ),
-        Value::Hole(hole) => render_embedded(
-            hole_head(hole),
-            &hole.data,
-            hole.content.as_deref(),
-            config,
-            render_blocks,
-        ),
+        Value::Hole(hole) => render_embedded_hole(hole, config, render_blocks),
         Value::Blocks(blocks) => format!("[{}]", render_blocks(blocks, config)),
     }
 }
 
-/// `?` and its matcher, if it names one.
-fn hole_head(hole: &tomet_ast::Hole) -> String {
-    match &hole.matcher {
-        Some(matcher) => format!("?{matcher}"),
-        None => "?".to_string(),
+/// A hole sitting in a value slot: `<?matcher(args){value}>[content]`. The head is
+/// inside the box and the content follows it; no `id` is printed, as for an element.
+fn render_embedded_hole(
+    hole: &tomet_ast::Hole,
+    config: &PrinterConfig,
+    render_blocks: &mut BlockRenderer,
+) -> String {
+    let mut s = String::from("<?");
+    if let Some(matcher) = &hole.matcher {
+        s.push_str(&matcher.to_string());
     }
+    if let Some(args) = &hole.data.args {
+        s.push_str(&format!(
+            "({})",
+            render_args_with_blocks(args, config, render_blocks)
+        ));
+    }
+    if let Some(group) = &hole.data.value {
+        s.push_str(&render_embedded_value(group, config, render_blocks));
+    }
+    s.push('>');
+    if let Some(content) = hole.content.as_deref() {
+        s.push('[');
+        s.push_str(&render_blocks(content, config));
+        s.push(']');
+    }
+    s
 }
 
-/// An element or a hole sitting in a value slot: its `head`, then
+/// An element (or a bare entry) sitting in a value slot: its `head`, then
 /// `(args)[content]{value}`. Neither `id` nor connects are printed; the
 /// parser never puts one in a value slot.
 fn render_embedded(
@@ -262,37 +277,48 @@ fn render_embedded(
         s.push_str(&render_blocks(content, config));
         s.push(']');
     }
-    if let Some(Group(entries)) = &data.value {
-        s.push('{');
-        for (i, entry) in entries.iter().enumerate() {
-            if i > 0 {
-                s.push_str(", ");
-            }
-            match entry {
-                Entry::Pair(k, v) => s.push_str(&format!(
-                    "{}: {}",
-                    cotomet_syntax::key_text(k),
-                    render_nested_with_blocks(v, config, render_blocks)
-                )),
-                Entry::Element(nested) => {
-                    let nested = Value::Element(Box::new(nested.clone()));
-                    s.push_str(&render_nested_with_blocks(&nested, config, render_blocks));
-                }
-                Entry::Hole(nested) => {
-                    let nested = Value::Hole(Box::new(nested.clone()));
-                    s.push_str(&render_nested_with_blocks(&nested, config, render_blocks));
-                }
-                Entry::Bare(bare) => s.push_str(&render_embedded(
-                    String::new(),
-                    &bare.data,
-                    bare.content.as_deref(),
-                    config,
-                    render_blocks,
-                )),
-            }
-        }
-        s.push('}');
+    if let Some(group) = &data.value {
+        s.push_str(&render_embedded_value(group, config, render_blocks));
     }
+    s
+}
+
+/// A `{...}` group of an embedded node, its entries in source order.
+fn render_embedded_value(
+    group: &Group,
+    config: &PrinterConfig,
+    render_blocks: &mut BlockRenderer,
+) -> String {
+    let Group(entries) = group;
+    let mut s = String::from('{');
+    for (i, entry) in entries.iter().enumerate() {
+        if i > 0 {
+            s.push_str(", ");
+        }
+        match entry {
+            Entry::Pair(k, v) => s.push_str(&format!(
+                "{}: {}",
+                cotomet_syntax::key_text(k),
+                render_nested_with_blocks(v, config, render_blocks)
+            )),
+            Entry::Element(nested) => {
+                let nested = Value::Element(Box::new(nested.clone()));
+                s.push_str(&render_nested_with_blocks(&nested, config, render_blocks));
+            }
+            Entry::Hole(nested) => {
+                let nested = Value::Hole(Box::new(nested.clone()));
+                s.push_str(&render_nested_with_blocks(&nested, config, render_blocks));
+            }
+            Entry::Bare(bare) => s.push_str(&render_embedded(
+                String::new(),
+                &bare.data,
+                bare.content.as_deref(),
+                config,
+                render_blocks,
+            )),
+        }
+    }
+    s.push('}');
     s
 }
 

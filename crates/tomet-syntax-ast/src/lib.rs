@@ -17,7 +17,12 @@
 //!   | A `::name(...)` is a [`Declaration`]: always a [`Block`], about the document and attached to
 //!   | nothing, so it has no placement and takes no connect.
 //!   | A `:name(...)` is a [`Connect`]: metadata about its owner, with no id, no connects of its own
-//!   | and no placement. A `?matcher(...)` is a [`Hole`] (a matcher, optional, in place of a name).
+//!   | and no placement. A `<?matcher(...)>` is a [`Hole`] (a matcher, optional, in place of a name).
+//!   | `<...>` is one family in the *syntax* (the CST has one `SLOT` node, whatever the mark inside); the
+//!   | AST has no node for the family. It names nodes by role, never by spelling, and has a node only
+//!   | for what tomet interprets or what carries structure to walk: a hole is a [`Hole`], a name tag
+//!   | (`<PATH>`) is text. Merging nodes of different structure into one type with a field to tell
+//!   | them apart is what split `Element` before; a new kind of seat is judged by that rule.
 //!   | A list item is a [`ListItem`] and a nameless `(marker)[content]` entry of a `{...}` group is a
 //!   | [`Bare`]: neither has a name, so neither is an [`Element`], whose name is mandatory.
 //!   | `ListItem::named_element` gives the element a `-@name(...)` item is, as a copy.
@@ -156,7 +161,7 @@ pub enum Value {
     /// `${...}` / `$name(...)` sitting where a value goes -- evaluated later,
     /// so `tomet-semantics` never looks inside it as data. See [`Interpolation`].
     Interp(Interpolation),
-    /// A `?matcher(...)` hole sitting where a value goes, in a pattern. See [`Hole`].
+    /// A `<?matcher(...)>` hole sitting where a value goes. See [`Hole`].
     Hole(Box<Hole>),
     /// A real, `@`-sigiled element sitting where a value goes --
     /// `::meta(icon: @doc.icon("triangle"))`. Unlike [`Value::Call`], this
@@ -389,7 +394,7 @@ pub enum Block {
     List(List),
     /// A `::name(...)` declaration about the document itself. See [`Declaration`].
     Declaration(Declaration),
-    /// A `?matcher(...)` hole standing as a block, in a pattern. See [`Hole`].
+    /// A `<?matcher(...)>` hole standing as a block. See [`Hole`].
     Hole(Hole),
     /// A `${...}` that stands alone on its line, in block context. It is a
     /// block of its own, and not a one-item paragraph, because what it
@@ -539,7 +544,7 @@ pub enum Inline {
     Element(Element),
     /// `${...}` / `$name(...)` inside running text. See [`Interpolation`].
     Interp(Interpolation),
-    /// A `?matcher(...)` hole inside running text, in a pattern. See [`Hole`].
+    /// A `<?matcher(...)>` hole inside running text. See [`Hole`].
     Hole(Hole),
     /// A source line break that is semantically whitespace. Unlike the old
     /// behavior of folding it into a literal `' '` (or nothing, between two
@@ -844,22 +849,22 @@ pub struct Bare {
     pub span: Span,
 }
 
-/// A `?matcher(name, args){options}[content]` hole in a pattern.
+/// A `<?matcher(name, args){options}>[content]` hole: the description of a value that is
+/// not there yet, in a pattern.
 ///
-/// It takes the groups an element does, read by the same code. Two
-/// differences: its head is a *matcher*, not an element name, and it is
-/// optional (`?()` and `?(n)[...]` have none); and it takes no `:connect`. It
-/// only exists in what `parse_pattern` reads: `parse_document` leaves `?` as
-/// text, so ordinary prose such as `本当に?(はい)` is never a hole.
+/// It is a box, `<...>`, whose head (the `?` mark, the matcher and the `(args)` and `{options}`
+/// groups) is inside and whose `[content]` and `#(id)` follow the `>`. Its groups are read by the
+/// same code as an element's. Differences: its head is a *matcher*, not an element name, and it is
+/// optional (`<?>` and `<?(n)>` have none); and it takes no `:connect`. A box that does not close
+/// or does not fit is text, so ordinary prose such as `本当に?(はい)` or `a < b` is never a hole.
 ///
-/// A hole sits where an element sits, so it is a variant of [`Block`],
-/// [`Inline`], [`Entry`] and [`Value`], in the same tree a document is: a
-/// pattern is written in, and printed as, ordinary tomet. The type of every
-/// document allows one; `parse_document` never builds one.
+/// A hole sits where an element sits, so it is a variant of [`Block`], [`Inline`], [`Entry`]
+/// and [`Value`], in the same tree a document is: a pattern is written in, and printed as,
+/// ordinary tomet, and `parse_document` reads one like any other construct.
 ///
-/// The matcher is not an element name: `?meta()` is not the `meta` element.
-/// What a matcher means, and what a hole matches, is the host's (tandr's), not
-/// tomet's. See `tmtroot/spec/syntax/hole.tmt`.
+/// The matcher is not an element name: `<?meta>` is not the `meta` element. What a matcher
+/// means, and what a hole matches, is the host's (tandr's), not tomet's. See
+/// `tmtroot/spec/syntax/hole.tmt`.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Hole {
     pub matcher: Option<Name>,
@@ -958,7 +963,7 @@ pub enum Entry {
     Element(Element),
     /// A nameless entry, `(marker)[content]`. See [`Bare`].
     Bare(Bare),
-    /// A `?matcher(...)` hole standing as an entry, in a pattern. See [`Hole`].
+    /// A `<?matcher(...)>` hole standing as an entry. See [`Hole`].
     Hole(Hole),
 }
 

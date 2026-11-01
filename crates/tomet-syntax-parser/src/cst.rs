@@ -62,13 +62,9 @@ use SyntaxKind as K;
 ///
 /// Guaranteed Invariant: `parse_cst(src).text().to_string() == src`.
 pub fn parse_cst(src: &str) -> SyntaxNode {
-    parse_cst_in(src, false)
-}
-
-/// [`parse_cst`] for a pattern: `?matcher(...)` is a hole, an element of its own
-/// kind, where in a document `?` is text.
-pub fn parse_cst_pattern(src: &str) -> SyntaxNode {
-    parse_cst_in(src, true)
+    let mut parser = CstParser::new(src, tokenize(src));
+    parser.parse_root();
+    SyntaxNode::new_root(parser.builder.finish())
 }
 
 /// [`parse_cst`] for a source that is one value, as [`crate::parse_value`] reads
@@ -80,14 +76,6 @@ pub(crate) fn parse_cst_value(src: &str) -> SyntaxNode {
     // No closer: `ROOT` is never a token, so the entries run to the end.
     parser.parse_entries(K::ROOT);
     parser.builder.finish_node();
-    SyntaxNode::new_root(parser.builder.finish())
-}
-
-fn parse_cst_in(src: &str, pattern: bool) -> SyntaxNode {
-    let raw_tokens = tokenize(src);
-    let mut parser = CstParser::new(src, raw_tokens);
-    parser.pattern = pattern;
-    parser.parse_root();
     SyntaxNode::new_root(parser.builder.finish())
 }
 
@@ -144,8 +132,6 @@ struct CstParser<'a> {
     /// gets them as `PIPE` tokens, because [`CstParser::bump`] emits what the
     /// tokenizer read.
     markers: HashSet<usize>,
-    /// Whether `?matcher(...)` is a hole (a pattern) or prose (a document).
-    pattern: bool,
 }
 
 /// The tokens of the text, kept as two stacks around the cursor.
@@ -219,7 +205,6 @@ impl<'a> CstParser<'a> {
             pipe_cols: Vec::new(),
             run_ends: Vec::new(),
             markers: HashSet::new(),
-            pattern: false,
         }
     }
 
@@ -637,11 +622,6 @@ impl<'a> CstParser<'a> {
     fn sigil_len_at(&self, i: usize) -> Option<usize> {
         match self.kind_at(i) {
             Some(K::AT) if self.name_at(i + 1) => Some(2),
-            // A hole: `?`, a matcher name if there is one, and a `(` against it.
-            Some(K::QUESTION) if self.pattern => {
-                let n = 1 + usize::from(self.name_at(i + 1));
-                (self.kind_at(i + n) == Some(K::L_PAREN)).then_some(n)
-            }
             Some(K::COLON) if self.kind_at(i + 1) == Some(K::COLON) && self.name_at(i + 2) => {
                 Some(3)
             }
@@ -862,7 +842,7 @@ impl<'a> CstParser<'a> {
             K::BACKTICK if self.is_code_block_start_at(self.pos) => self.parse_code_block(),
             // An `@` element that is the whole of its line is a block, unless
             // the next line folds into it; then the line is running text.
-            K::AT | K::QUESTION | K::LT if self.is_block_element_at(self.pos) => {
+            K::AT | K::LT if self.is_block_element_at(self.pos) => {
                 if self.element_line_folds(self.pos) {
                     self.parse_folded_element_paragraph()
                 } else {
@@ -1000,7 +980,6 @@ impl<'a> CstParser<'a> {
     fn reads_to_line_end(&self, at: usize) -> bool {
         let slice = &self.src[at..self.balanced_line_end(at)];
         let mut scratch = CstParser::new(slice, tokenize(slice));
-        scratch.pattern = self.pattern;
         scratch.builder.start_node(K::ROOT.into());
         scratch.parse_groups(false);
         scratch.bump_while(K::WHITESPACE);
@@ -1009,15 +988,8 @@ impl<'a> CstParser<'a> {
             return false;
         }
         let root = SyntaxNode::new_root(scratch.builder.finish());
-        let dialect = if self.pattern {
-            crate::dialect::Dialect::Pattern
-        } else {
-            crate::dialect::Dialect::Document
-        };
-        crate::lower::in_dialect(dialect, || {
-            crate::lower::lower_group_list(slice, root.children())
-        })
-        .is_ok_and(|read| read.content.is_none() && crate::lower::claims_something(&read))
+        crate::lower::lower_group_list(slice, root.children())
+            .is_ok_and(|read| read.content.is_none() && crate::lower::claims_something(&read))
     }
 
     /// The end of the line at `at`, or of the last line a group opened on it runs
@@ -1064,12 +1036,8 @@ impl<'a> CstParser<'a> {
             self.parse_slot();
             return;
         }
-        let hole = self.current_kind() == Some(K::QUESTION);
         self.parse_sigil();
-        let outer = self.allow_connect;
-        self.allow_connect = outer && !hole;
         self.parse_groups(true);
-        self.allow_connect = outer;
     }
 
     /// A box, at the `<` the cursor stands on ([`CstParser::slot_at`] said it is one):
@@ -1613,7 +1581,6 @@ impl<'a> CstParser<'a> {
         }
         let is_element = match self.current_kind() {
             Some(K::AT) => self.name_at(p + 1) && self.groups_follow(p + 2),
-            Some(K::QUESTION) => self.sigil_len_at(p).is_some(),
             Some(K::DOLLAR) => {
                 self.kind_at(p + 1) == Some(K::L_BRACE)
                     || (self.kind_at(p + 1) == Some(K::IDENT)
@@ -1626,13 +1593,8 @@ impl<'a> CstParser<'a> {
         }
         self.builder.start_node(K::INLINE_ELEMENT.into());
         let dollar = self.current_kind() == Some(K::DOLLAR);
-        let hole = self.current_kind() == Some(K::QUESTION);
         self.parse_sigil();
-        if hole {
-            let outer = std::mem::replace(&mut self.allow_connect, false);
-            self.parse_groups(true);
-            self.allow_connect = outer;
-        } else if dollar {
+        if dollar {
             match self.current_kind() {
                 Some(K::L_BRACE) => self.parse_interp_expr(),
                 Some(K::L_PAREN) => self.parse_args_group(),

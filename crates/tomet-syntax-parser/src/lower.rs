@@ -17,7 +17,6 @@
 //! `${...}` expressions and a group's values, which hand back to the CST
 //! whatever they embed (see [`crate::value::Embedded`]).
 
-use crate::dialect::Dialect;
 use crate::element::{
     Groups, is_document_element_start, opens_group, parse_hash_id, parse_paren_value,
     parse_value_group,
@@ -33,25 +32,6 @@ use tomet_ast::{
 use tomet_cst::{SyntaxElement, SyntaxKind as K, SyntaxNode};
 use tomet_lexer::Cursor;
 use tomet_tree::{ElementExt, element_new, list, list_item};
-
-thread_local! {
-    /// The dialect being lowered: a pattern has holes, a document has not. It is the
-    /// state of one call to [`lower_document`] or [`lower_pattern`], read by the
-    /// value grammar the groups are handed to.
-    static DIALECT_IN_USE: std::cell::Cell<Dialect> = const { std::cell::Cell::new(Dialect::Document) };
-}
-
-fn dialect() -> Dialect {
-    DIALECT_IN_USE.with(|d| d.get())
-}
-
-/// Runs `f` with `in_dialect` as the dialect being lowered.
-pub(crate) fn in_dialect<T>(in_dialect: Dialect, f: impl FnOnce() -> T) -> T {
-    let before = DIALECT_IN_USE.with(|d| d.replace(in_dialect));
-    let out = f();
-    DIALECT_IN_USE.with(|d| d.set(before));
-    out
-}
 
 /// The white space the grammar skips: not Unicode's, so a `　` (U+3000) that opens
 /// a paragraph is part of its text.
@@ -70,20 +50,8 @@ fn unsupported(what: impl std::fmt::Display) -> Error {
 
 /// Reads the CST of `src` as an AST [`Document`].
 pub(crate) fn lower_document(src: &str, root: &SyntaxNode) -> Result<Document> {
-    lower_in(Dialect::Document, src, root)
-}
-
-/// Reads the CST of a pattern (from `parse_cst_pattern`) as an AST [`Document`],
-/// holes included.
-pub(crate) fn lower_pattern(src: &str, root: &SyntaxNode) -> Result<Document> {
-    lower_in(Dialect::Pattern, src, root)
-}
-
-fn lower_in(in_dialect: Dialect, src: &str, root: &SyntaxNode) -> Result<Document> {
-    let before = DIALECT_IN_USE.with(|d| d.replace(in_dialect));
-    let blocks = lower_blocks(src, root).map_err(|e| e.located_in(src));
-    DIALECT_IN_USE.with(|d| d.set(before));
-    Ok(Document::new(blocks?, Span::new(0, src.len())))
+    let blocks = lower_blocks(src, root).map_err(|e| e.located_in(src))?;
+    Ok(Document::new(blocks, Span::new(0, src.len())))
 }
 
 /// The blocks that are children of `node`: the document, and (later) a section
@@ -254,7 +222,6 @@ fn lower_inline_element(src: &str, node: &SyntaxNode) -> Result<Inline> {
         .map(|t| t.kind());
     match sigil {
         Some(K::AT) => lower_element(src, node).map(Inline::Element),
-        Some(K::QUESTION) => lower_hole(src, node).map(Inline::Hole),
         Some(K::DOLLAR) => {
             let (start, end) = range_of(node);
             let mut cur = cursor_at(src, start);
@@ -509,11 +476,6 @@ fn lower_block_element(src: &str, node: &SyntaxNode) -> Result<Block> {
     if sigil == Some(K::COLON) {
         return lower_declaration(src, node).map(Block::Declaration);
     }
-    if sigil == Some(K::QUESTION) {
-        let mut hole = lower_hole(src, node)?;
-        hole.placement = Placement::Block;
-        return Ok(Block::Hole(hole));
-    }
     let element = lower_element(src, node)?.with_placement(Placement::Block);
     Ok(Block::Element(element))
 }
@@ -615,7 +577,7 @@ pub(crate) fn lower_group_list(
             }
             K::VALUE_DATA | K::MAP_LITERAL => {
                 let mut embedded = Embedded::new(src, &child);
-                read.data.value = Some(parse_value_group(dialect(), &mut embedded, &mut cur)?);
+                read.data.value = Some(parse_value_group(&mut embedded, &mut cur)?);
                 expect_end(&cur, end, "a value group")?;
             }
             K::CONTENT => read.content = Some(lower_content(src, &child)?),
@@ -645,24 +607,12 @@ pub(crate) fn lower_embedded(src: &str, node: &SyntaxNode) -> Result<(Value, usi
             let end = hole.span.end;
             Ok((Value::Hole(Box::new(hole)), end))
         }
-        _ if first_sigil(node) == Some(K::QUESTION) => {
-            let hole = lower_hole(src, node)?;
-            let end = hole.span.end;
-            Ok((Value::Hole(Box::new(hole)), end))
-        }
         _ => {
             let element = lower_element(src, node)?;
             let end = element.span.end;
             Ok((Value::Element(Box::new(element)), end))
         }
     }
-}
-
-fn first_sigil(node: &SyntaxNode) -> Option<K> {
-    node.children()
-        .find(|n| n.kind() == K::SIGIL)
-        .and_then(|n| n.first_token())
-        .map(|t| t.kind())
 }
 
 /// The AST parser's reading of a group has to end where the CST's group does;
@@ -1109,8 +1059,7 @@ fn merge_connect(src: &str, node: &SyntaxNode, read: &mut Groups) -> Result<()> 
                 read.data.args = merge_values(read.data.args.as_ref(), Some(&args));
             }
             K::VALUE_DATA => {
-                let value =
-                    parse_value_group(dialect(), &mut Embedded::new(src, &child), &mut cur)?;
+                let value = parse_value_group(&mut Embedded::new(src, &child), &mut cur)?;
                 expect_end(&cur, end, "a value group")?;
                 let merged = match &read.data.value {
                     Some(existing) if !existing.has_children() && !value.has_children() => {
@@ -1322,35 +1271,6 @@ fn lower_slot(src: &str, slot: &SyntaxNode) -> Result<tomet_ast::Hole> {
         None => None,
     };
     let read = lower_groups(src, slot)?;
-    Ok(tomet_ast::Hole {
-        matcher,
-        placement: Placement::Inline,
-        data: read.data,
-        content: read.content,
-        id: read.id,
-        span: Span::new(start, end),
-    })
-}
-
-/// `?matcher(args){value}[content]#(id)`, in a pattern.
-fn lower_hole(src: &str, node: &SyntaxNode) -> Result<tomet_ast::Hole> {
-    let sigil = node
-        .children()
-        .find(|n| n.kind() == K::SIGIL)
-        .ok_or_else(|| unsupported("a hole without a sigil"))?;
-    let (start, sigil_end) = range_of(&sigil);
-    let matcher = if sigil_end > start + 1 {
-        Some(name_at(src, start + 1)?)
-    } else {
-        None
-    };
-    let read = lower_groups(src, node)?;
-    let end = node
-        .children()
-        .map(|n| range_of(&n).1)
-        .max()
-        .unwrap_or(sigil_end);
-    reject_second_group(src, end)?;
     Ok(tomet_ast::Hole {
         matcher,
         placement: Placement::Inline,
