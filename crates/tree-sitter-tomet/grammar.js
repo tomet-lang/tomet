@@ -72,10 +72,19 @@ module.exports = grammar({
 				$.fenced_code_block,
 				$.list,
 				$.document_element,
+				$.semi_break,
 				$.paragraph,
 				$.line_comment,
 				prec(1, $.block_comment),
 			),
+
+		// A `;` at the start of a line breaks the block, as a blank line does
+		// (`tomet-parser`'s `cst.rs`, `SEMI`). It is only a break where a block
+		// can begin, so a paragraph's lines may not start with a `;` punctuation
+		// (`_first_line_item`) and the `;` in `text` is carved out below. In the
+		// middle of a line it is plain `punctuation`. Known simplification: only
+		// at the top level, not inside `[content]` or a `|` run.
+		semi_break: (_$) => ";",
 
 		_newline: (_$) => /\r?\n/,
 		_blank_gap: ($) => repeat1($._newline),
@@ -282,7 +291,9 @@ module.exports = grammar({
 		// line merely *looking* like a new block (the real parser's lazy
 		// continuation rule) -- see the module doc in `src/lib.rs`.
 		paragraph: ($) =>
-			prec.right(repeat1(seq(repeat1($._line_item), $._newline))),
+			prec.right(
+				repeat1(seq($._first_line_item, repeat($._line_item), $._newline)),
+			),
 
 		// ---- inline content ---------------------------------------------
 		_line_item: ($) =>
@@ -296,6 +307,19 @@ module.exports = grammar({
 				$.element,
 				$.interpolation,
 				$.punctuation,
+			),
+		// What may open a line of a paragraph: anything but a `;`, which breaks the block.
+		_first_line_item: ($) =>
+			choice(
+				$.text,
+				$.code_span,
+				$.block_comment,
+				$.emphasis,
+				$.strong,
+				$.strikeout,
+				$.element,
+				$.interpolation,
+				alias($._punctuation_not_semi, $.punctuation),
 			),
 		_bracket_item: ($) => choice($._line_item, $._newline),
 
@@ -338,9 +362,10 @@ module.exports = grammar({
 		// a bare `:{`/`:(` right after certain groups) was ever reachable.
 		// A bare `:` with nothing to attach to falls back to `punctuation`,
 		// same as the other excluded characters.
-		text: (_$) => /[^\n`*_=~@$#:()\[{\]/|-]+/,
+		text: (_$) => /[^\n`*_=~@$#:()\[{\]/|;-]+/,
 
-		punctuation: (_$) => choice(/[()\[{/<>|~]/, "-", "$", "#", ":", "="),
+		punctuation: ($) => choice($._punctuation_not_semi, ";"),
+		_punctuation_not_semi: (_$) => choice(/[()\[{/<>|~]/, "-", "$", "#", ":", "="),
 		code_span: (_$) => /`[^`\n]*`/,
 
 		emphasis: ($) =>

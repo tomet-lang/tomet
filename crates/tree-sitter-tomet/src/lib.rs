@@ -227,6 +227,24 @@ mod tests {
     }
 
     #[test]
+    fn a_semicolon_at_the_start_of_a_line_breaks_the_block() {
+        let tree = parse("a\n;b\nc\n");
+        let root = tree.root_node();
+        assert!(!root.has_error());
+        let kinds: Vec<_> = (0..root.named_child_count() as u32)
+            .map(|i| root.named_child(i).unwrap().kind())
+            .collect();
+        assert_eq!(kinds, ["paragraph", "semi_break", "paragraph"]);
+        // In the middle of a line, and escaped, it is text.
+        for src in ["a;b\n", "a\n\\;b\n"] {
+            let tree = parse(src);
+            let root = tree.root_node();
+            assert!(!root.has_error(), "{src:?}");
+            assert_eq!(root.named_child_count(), 1, "{src:?}");
+        }
+    }
+
+    #[test]
     fn parses_a_fenced_code_block() {
         let tree = parse("```rust\nfn main() {}\n```\n");
         let root = tree.root_node();

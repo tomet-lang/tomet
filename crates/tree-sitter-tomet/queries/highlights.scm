@@ -26,6 +26,9 @@
 
 (thematic_break) @punctuation.special
 
+; A `;` at the start of a line breaks the block.
+(semi_break) @punctuation.special
+
 ; Same reasoning as the heading brackets above: `titled_thematic_break`'s
 ; `[`/`]` have no node of their own, so without an explicit capture they'd
 ; just inherit the whole node's `@title` below.

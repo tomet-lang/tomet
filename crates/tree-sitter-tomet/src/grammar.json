@@ -48,6 +48,10 @@
         },
         {
           "type": "SYMBOL",
+          "name": "semi_break"
+        },
+        {
+          "type": "SYMBOL",
           "name": "paragraph"
         },
         {
@@ -63,6 +67,10 @@
           }
         }
       ]
+    },
+    "semi_break": {
+      "type": "STRING",
+      "value": ";"
     },
     "_newline": {
       "type": "PATTERN",
@@ -762,7 +770,11 @@
           "type": "SEQ",
           "members": [
             {
-              "type": "REPEAT1",
+              "type": "SYMBOL",
+              "name": "_first_line_item"
+            },
+            {
+              "type": "REPEAT",
               "content": {
                 "type": "SYMBOL",
                 "name": "_line_item"
@@ -817,6 +829,52 @@
         }
       ]
     },
+    "_first_line_item": {
+      "type": "CHOICE",
+      "members": [
+        {
+          "type": "SYMBOL",
+          "name": "text"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "code_span"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "block_comment"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "emphasis"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "strong"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "strikeout"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "element"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "interpolation"
+        },
+        {
+          "type": "ALIAS",
+          "content": {
+            "type": "SYMBOL",
+            "name": "_punctuation_not_semi"
+          },
+          "named": true,
+          "value": "punctuation"
+        }
+      ]
+    },
     "_bracket_item": {
       "type": "CHOICE",
       "members": [
@@ -832,9 +890,22 @@
     },
     "text": {
       "type": "PATTERN",
-      "value": "[^\\n`*_=~@$#:()\\[{\\]/|-]+"
+      "value": "[^\\n`*_=~@$#:()\\[{\\]/|;-]+"
     },
     "punctuation": {
+      "type": "CHOICE",
+      "members": [
+        {
+          "type": "SYMBOL",
+          "name": "_punctuation_not_semi"
+        },
+        {
+          "type": "STRING",
+          "value": ";"
+        }
+      ]
+    },
+    "_punctuation_not_semi": {
       "type": "CHOICE",
       "members": [
         {

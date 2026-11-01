@@ -236,6 +236,10 @@
           "named": true
         },
         {
+          "type": "semi_break",
+          "named": true
+        },
+        {
           "type": "thematic_break",
           "named": true
         },
@@ -1377,6 +1381,11 @@
     }
   },
   {
+    "type": "semi_break",
+    "named": true,
+    "fields": {}
+  },
+  {
     "type": "strikeout",
     "named": true,
     "fields": {},
@@ -1737,6 +1746,10 @@
   },
   {
     "type": "::",
+    "named": false
+  },
+  {
+    "type": ";",
     "named": false
   },
   {
