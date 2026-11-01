@@ -129,6 +129,13 @@ pub const KNOWN_TS_ERRORS: &[(&str, &[&str])] = &[
     // directly. `tomet-parser`'s `list.rs::eat_list_marker` recognizes
     // it; `grammar.js` has not been taught the combine form yet.
     ("syntax/combine.tmt", &[ANY_ERROR]),
+    // A box where a value goes (`url: <?(u)>`, `type: <?(kind)>`): `grammar.js` has
+    // `hole` only in running text and its content, and leaves a value to the
+    // external `scalar` token, which takes `<?(u)` and strands the `>` and the
+    // `]` after it. The real parser reads them (`syntax/slot-value.tmt` is in
+    // the corpus for that); highlighting a hole in a value is not worth a second
+    // scanner state. A name tag there is text, so it is not the cause.
+    ("syntax/slot-value.tmt", &[ANY_ERROR]),
     // A fenced code block nested inside `[content]` -- the replacement
     // for the retired `+++` raw-body fence (see `raw.rs` and
     // `document.rs::parse_block_seq`, which `[content]` shares with the

@@ -1,0 +1,9 @@
+// A box where a value goes: a hole is a value, a name tag is its own text.
+
+@link(url: <?(u)>)[<?(text)>]
+
+@meta{ type: <?(kind)> }
+
+@opt(<name>)
+
+@opt(key: <name>)

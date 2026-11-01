@@ -37,8 +37,13 @@ use tomet_cst::{NodeOrToken, SyntaxKind as K, SyntaxNode, SyntaxToken, WalkEvent
 pub enum Tag {
     /// The `=` run of a heading, `=[ Title ]` or `== Title`.
     Heading,
-    /// An element's name with its sigil: `@name`, `::name`, `<tag>`, `$`.
+    /// An element's name with its sigil: `@name`, `::name`, `$`.
     TagName,
+    /// The head of a hole, `<?int` and the `>` that closes it. The groups inside keep their own
+    /// tags, so the whole box reads as one range: `<?int(n)>`.
+    Hole,
+    /// A name tag, `<PATH>`: a label for the reader that tomet gives no meaning.
+    Label,
     /// A list item's `-` (and the `.` of an ordered one).
     List,
     /// A string in a value: `"text"`.
@@ -77,6 +82,8 @@ impl Tag {
         match self {
             Tag::Heading => "heading",
             Tag::TagName => "tagName",
+            Tag::Hole => "hole",
+            Tag::Label => "label",
             Tag::List => "list",
             Tag::String => "string",
             Tag::Number => "number",
@@ -184,6 +191,13 @@ fn own_tag(token: &SyntaxToken, src: &str, fences: &HashSet<usize>) -> Option<Ta
             return fences.contains(&at).then_some(Tag::ProcessingInstruction);
         }
         K::SIGIL => return Some(Tag::TagName),
+        // The tokens of a box's own head; its groups are nodes of their own.
+        K::SLOT => {
+            let marked = parent
+                .children_with_tokens()
+                .any(|e| e.kind() == K::QUESTION);
+            return Some(if marked { Tag::Hole } else { Tag::Label });
+        }
         _ => {}
     }
 
@@ -370,6 +384,54 @@ mod tests {
         assert!(has("@note[ text ]\n", "@note", "tagName"));
         assert!(has("::config(a: 1)\n", "::config", "tagName"));
         assert!(has("a @link(ref: x)[y] b\n", "@link", "tagName"));
+    }
+
+    #[test]
+    fn a_hole_is_its_box_and_a_tag_is_a_label() {
+        // The head of a hole is one range with the `>`; the groups in between keep their own tags.
+        assert_eq!(
+            tagged("a <?int(n, \"x\")> b\n"),
+            [
+                ("<?int", "hole"),
+                ("(", "punctuation"),
+                (",", "punctuation"),
+                ("\"x\"", "string"),
+                (")", "punctuation"),
+                (">", "hole"),
+            ]
+        );
+        assert!(has("<?>\n", "<?>", "hole"));
+        // The content is outside the box, so its brackets are group punctuation.
+        assert_eq!(
+            tagged("<?(id)>[a]\n"),
+            [
+                ("<?", "hole"),
+                ("(", "punctuation"),
+                (")", "punctuation"),
+                (">", "hole"),
+                ("[", "punctuation"),
+                ("]", "punctuation"),
+            ]
+        );
+        assert_eq!(
+            tagged("--out <PATH> and <ファイル>\n"),
+            [("<PATH>", "label"), ("<ファイル>", "label")]
+        );
+    }
+
+    #[test]
+    fn text_that_is_no_box_has_no_tag() {
+        for src in [
+            "a < b\n",
+            "x<=1\n",
+            "<->\n",
+            "<!doctype html>\n",
+            "</x>\n",
+            "<x/>\n",
+            "<?int and\n",
+        ] {
+            assert!(highlight(src).is_empty(), "`{src}` is plain text");
+        }
     }
 
     #[test]

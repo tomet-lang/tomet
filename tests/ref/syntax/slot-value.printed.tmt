@@ -1,0 +1,7 @@
+@link(url: <?(u)>)[<?(text)>]
+
+@meta{ type: <?(kind)> }
+
+@opt(<name>)
+
+@opt(key: <name>)

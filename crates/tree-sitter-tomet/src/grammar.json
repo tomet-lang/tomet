@@ -870,6 +870,14 @@
         },
         {
           "type": "SYMBOL",
+          "name": "label"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "hole"
+        },
+        {
+          "type": "SYMBOL",
           "name": "interpolation"
         },
         {
@@ -911,6 +919,14 @@
         },
         {
           "type": "SYMBOL",
+          "name": "label"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "hole"
+        },
+        {
+          "type": "SYMBOL",
           "name": "interpolation"
         },
         {
@@ -939,7 +955,7 @@
     },
     "text": {
       "type": "PATTERN",
-      "value": "[^\\n`*_=~@$#:()\\[{\\]/|;-]+"
+      "value": "[^\\n`*_=~<@$#:()\\[{\\]/|;-]+"
     },
     "punctuation": {
       "type": "CHOICE",
@@ -1118,6 +1134,14 @@
         },
         {
           "type": "SYMBOL",
+          "name": "label"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "hole"
+        },
+        {
+          "type": "SYMBOL",
           "name": "interpolation"
         },
         {
@@ -1157,6 +1181,14 @@
         {
           "type": "SYMBOL",
           "name": "element"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "label"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "hole"
         },
         {
           "type": "SYMBOL",
@@ -1203,6 +1235,14 @@
         {
           "type": "SYMBOL",
           "name": "element"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "label"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "hole"
         },
         {
           "type": "SYMBOL",
@@ -1803,6 +1843,104 @@
     "element": {
       "type": "SYMBOL",
       "name": "inline_element"
+    },
+    "label": {
+      "type": "TOKEN",
+      "content": {
+        "type": "PREC",
+        "value": 2,
+        "content": {
+          "type": "PATTERN",
+          "value": "<\\p{L}[\\p{L}\\p{N}_.\\-]*>"
+        }
+      }
+    },
+    "hole": {
+      "type": "PREC_RIGHT",
+      "value": 3,
+      "content": {
+        "type": "SEQ",
+        "members": [
+          {
+            "type": "SYMBOL",
+            "name": "hole_open"
+          },
+          {
+            "type": "CHOICE",
+            "members": [
+              {
+                "type": "SYMBOL",
+                "name": "args_group"
+              },
+              {
+                "type": "BLANK"
+              }
+            ]
+          },
+          {
+            "type": "CHOICE",
+            "members": [
+              {
+                "type": "SYMBOL",
+                "name": "value_group"
+              },
+              {
+                "type": "BLANK"
+              }
+            ]
+          },
+          {
+            "type": "SYMBOL",
+            "name": "hole_close"
+          },
+          {
+            "type": "CHOICE",
+            "members": [
+              {
+                "type": "SYMBOL",
+                "name": "content_group"
+              },
+              {
+                "type": "BLANK"
+              }
+            ]
+          },
+          {
+            "type": "CHOICE",
+            "members": [
+              {
+                "type": "SYMBOL",
+                "name": "id_group"
+              },
+              {
+                "type": "BLANK"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "hole_open": {
+      "type": "TOKEN",
+      "content": {
+        "type": "PREC",
+        "value": 2,
+        "content": {
+          "type": "PATTERN",
+          "value": "<\\?([A-Za-z_][A-Za-z0-9_.\\-]*)?"
+        }
+      }
+    },
+    "hole_close": {
+      "type": "TOKEN",
+      "content": {
+        "type": "PREC",
+        "value": 1,
+        "content": {
+          "type": "STRING",
+          "value": ">"
+        }
+      }
     },
     "document_element": {
       "type": "PREC_RIGHT",

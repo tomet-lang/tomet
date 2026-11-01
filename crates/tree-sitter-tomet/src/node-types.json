@@ -176,7 +176,15 @@
           "named": true
         },
         {
+          "type": "hole",
+          "named": true
+        },
+        {
           "type": "interpolation",
+          "named": true
+        },
+        {
+          "type": "label",
           "named": true
         },
         {
@@ -336,7 +344,15 @@
           "named": true
         },
         {
+          "type": "hole",
+          "named": true
+        },
+        {
           "type": "interpolation",
+          "named": true
+        },
+        {
+          "type": "label",
           "named": true
         },
         {
@@ -385,6 +401,41 @@
       "types": [
         {
           "type": "fence_marker",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "hole",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "args_group",
+          "named": true
+        },
+        {
+          "type": "content_group",
+          "named": true
+        },
+        {
+          "type": "hole_close",
+          "named": true
+        },
+        {
+          "type": "hole_open",
+          "named": true
+        },
+        {
+          "type": "id_group",
+          "named": true
+        },
+        {
+          "type": "value_group",
           "named": true
         }
       ]
@@ -1101,7 +1152,15 @@
           "named": true
         },
         {
+          "type": "hole",
+          "named": true
+        },
+        {
           "type": "interpolation",
+          "named": true
+        },
+        {
+          "type": "label",
           "named": true
         },
         {
@@ -1198,7 +1257,15 @@
           "named": true
         },
         {
+          "type": "hole",
+          "named": true
+        },
+        {
           "type": "interpolation",
+          "named": true
+        },
+        {
+          "type": "label",
           "named": true
         },
         {
@@ -1245,7 +1312,15 @@
           "named": true
         },
         {
+          "type": "hole",
+          "named": true
+        },
+        {
           "type": "interpolation",
+          "named": true
+        },
+        {
+          "type": "label",
           "named": true
         },
         {
@@ -1332,7 +1407,15 @@
             "named": true
           },
           {
+            "type": "hole",
+            "named": true
+          },
+          {
             "type": "interpolation",
+            "named": true
+          },
+          {
+            "type": "label",
             "named": true
           },
           {
@@ -1419,7 +1502,15 @@
           "named": true
         },
         {
+          "type": "hole",
+          "named": true
+        },
+        {
           "type": "interpolation",
+          "named": true
+        },
+        {
+          "type": "label",
           "named": true
         },
         {
@@ -1463,7 +1554,15 @@
           "named": true
         },
         {
+          "type": "hole",
+          "named": true
+        },
+        {
           "type": "interpolation",
+          "named": true
+        },
+        {
+          "type": "label",
           "named": true
         },
         {
@@ -1521,7 +1620,15 @@
             "named": true
           },
           {
+            "type": "hole",
+            "named": true
+          },
+          {
             "type": "interpolation",
+            "named": true
+          },
+          {
+            "type": "label",
             "named": true
           },
           {
@@ -1629,7 +1736,15 @@
           "named": true
         },
         {
+          "type": "hole",
+          "named": true
+        },
+        {
           "type": "interpolation",
+          "named": true
+        },
+        {
+          "type": "label",
           "named": true
         },
         {
@@ -1822,11 +1937,23 @@
     "named": true
   },
   {
+    "type": "hole_close",
+    "named": true
+  },
+  {
+    "type": "hole_open",
+    "named": true
+  },
+  {
     "type": "identifier",
     "named": true
   },
   {
     "type": "interp_addr",
+    "named": true
+  },
+  {
+    "type": "label",
     "named": true
   },
   {

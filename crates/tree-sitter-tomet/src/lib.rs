@@ -18,8 +18,8 @@
 //! -| **No lazy paragraph continuation.** A paragraph ends at a blank
 //!  | line or EOF only, not at the next line merely *looking* like a new
 //!  | block. `tomet-parser`'s own lazy-continuation check also ends a
-//!  | paragraph early when the next line is an element trigger (`<T>`/
-//!  | `@name`, see `document.rs`'s `Stop::Paragraph`) -- e.g. `::meta{...}`
+//!  | paragraph early when the next line is an element trigger (`@name`,
+//!  | see `document.rs`'s `Stop::Paragraph`) -- e.g. `::meta{...}`
 //!  | immediately followed by `::settings{...}` with no blank line between
 //!  | them becomes two separate top-level elements in the real parser.
 //!  | This grammar doesn't simulate that either, so it still merges such
@@ -57,15 +57,14 @@
 //!  | not as a real `content_group`) has no fallback token and produces a
 //!  | small `ERROR` -- unlike `(`/`[`/`{`/`-`, which all fall back to a
 //!  | `punctuation` node when nothing opens with them.
-//! -| **`<T>`/`@name` written with no group at all** (e.g. `<T>` used as
-//!  | a literal placeholder in prose, as `tests/fixtures/readme.tmt` itself
-//!  | does when explaining the grammar) still parses as an `element`
-//!  | here, where the real parser requires an immediately-following
-//!  | group to even recognize it as one (see
-//!  | `document.rs::is_type_element_start`/`is_at_element_start`) and
-//!  | otherwise treats it as plain text. Considered an acceptable v1
-//!  | trade-off: it doesn't error, and highlighting `<T>`-shaped text as
-//!  | an element is a reasonable default regardless.
+//! -| **A `<...>` box is approximated.** A name tag (`<PATH>`) is one `label`
+//!  | token and a hole (`<?int(n)>[...]`) is a `hole` node with `hole_open`,
+//!  | the groups, `hole_close` and the content. The real parser needs the
+//!  | head to be tight (`<?int (n)>` is text there), but `extras` lets
+//!  | white space into it here. A box in a value position (`url: <?(u)>`)
+//!  | is left to `scalar`, so it is not a `hole` there. A shape that is no
+//!  | box (`a < b`, `x<=1`, `<->`, `</x>`, `<x/>`) is `text` and
+//!  | `punctuation`, never an `ERROR`.
 //! -| **Unterminated `/* ... */` doesn't produce an `ERROR`.** The real
 //!  | parser (`document.rs::skip_block_comment`) hard-errors on a missing
 //!  | `*/` -- silently swallowing the rest of the document is a much
@@ -1123,6 +1122,87 @@ mod tests {
             assert!(
                 captured.contains(&("tag".to_string(), want.to_string())),
                 "{want:?} in {captured:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_name_tag_and_a_hole_are_boxes() {
+        let tree = parse("--out <PATH> と <ファイル> and Vec<T>\n");
+        assert!(!tree.root_node().has_error());
+        assert_eq!(nodes_of_kind(&tree, "label").len(), 3);
+
+        let tree = parse("adr-<?int(n)>-<?(slug)>.md and <?(id)>[sub <?>] end\n");
+        assert!(!tree.root_node().has_error());
+        assert_eq!(nodes_of_kind(&tree, "hole").len(), 4);
+        // The content is outside the box and holds a box of its own.
+        let outer = nodes_of_kind(&tree, "hole")
+            .into_iter()
+            .find(|h| {
+                h.child((h.child_count() - 1) as u32)
+                    .is_some_and(|c| c.kind() == "content_group")
+            })
+            .expect("the hole with a content group");
+        assert_eq!(nodes_of_kind(&tree, "content_group").len(), 1);
+        let inside = nodes_of_kind(&tree, "hole")
+            .iter()
+            .filter(|h| h.start_byte() >= outer.start_byte() && h.end_byte() <= outer.end_byte())
+            .count();
+        assert_eq!(inside, 2, "the hole and the one in its content");
+    }
+
+    #[test]
+    fn text_that_is_no_box_is_neither_a_label_nor_a_hole() {
+        for src in [
+            "a < b\n",
+            "x<=1\n",
+            "<->\n",
+            "<>\n",
+            "<3>\n",
+            "<a b>\n",
+            "<!doctype html>\n",
+            "</x>\n",
+            "<x/>\n",
+            "a<b と c>d\n",
+        ] {
+            let tree = parse(src);
+            assert!(!tree.root_node().has_error(), "`{src}` has an error");
+            assert!(
+                nodes_of_kind(&tree, "label").is_empty(),
+                "`{src}` has a label"
+            );
+            assert!(
+                nodes_of_kind(&tree, "hole").is_empty(),
+                "`{src}` has a hole"
+            );
+        }
+    }
+
+    #[test]
+    fn highlights_colour_a_box() {
+        use tree_sitter::StreamingIterator;
+        let src = "see <PATH> and <?int(n)>[x]\n";
+        let tree = parse(src);
+        let query = tree_sitter::Query::new(&LANGUAGE.into(), HIGHLIGHTS_QUERY).unwrap();
+        let mut cursor = tree_sitter::QueryCursor::new();
+        let mut matches = cursor.matches(&query, tree.root_node(), src.as_bytes());
+        let mut captured: Vec<(String, String)> = Vec::new();
+        while let Some(m) = matches.next() {
+            for c in m.captures {
+                captured.push((
+                    query.capture_names()[c.index as usize].to_string(),
+                    src[c.node.byte_range()].to_string(),
+                ));
+            }
+        }
+        for (capture, text) in [
+            ("string.special", "<PATH>"),
+            ("keyword", "<?int"),
+            ("keyword", ">"),
+        ] {
+            assert!(
+                captured.contains(&(capture.to_string(), text.to_string())),
+                "{capture} on {text:?} in {captured:?}"
             );
         }
     }

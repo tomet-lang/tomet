@@ -1,0 +1,473 @@
+{
+  "pandoc-api-version": [
+    1,
+    23,
+    1
+  ],
+  "meta": {},
+  "blocks": [
+    {
+      "t": "Para",
+      "c": [
+        {
+          "t": "Str",
+          "c": "Pass"
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Str",
+          "c": "--out"
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Str",
+          "c": "<PATH>"
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Str",
+          "c": "to"
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Str",
+          "c": "write"
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Str",
+          "c": "the"
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Str",
+          "c": "file,"
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Str",
+          "c": "or"
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Str",
+          "c": "open"
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Str",
+          "c": "<ファイル>"
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Str",
+          "c": "and"
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Str",
+          "c": "Vec<T>"
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Str",
+          "c": "instead."
+        }
+      ]
+    },
+    {
+      "t": "Para",
+      "c": [
+        {
+          "t": "Str",
+          "c": "Text"
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Str",
+          "c": "that"
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Str",
+          "c": "looks"
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Str",
+          "c": "like"
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Str",
+          "c": "a"
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Str",
+          "c": "box"
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Str",
+          "c": "and"
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Str",
+          "c": "is"
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Str",
+          "c": "not"
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Str",
+          "c": "one:"
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Str",
+          "c": "a"
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Str",
+          "c": "<"
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Str",
+          "c": "b,"
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Str",
+          "c": "x<=1,"
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Str",
+          "c": "<->,"
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Str",
+          "c": "<!doctype"
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Str",
+          "c": "html>,"
+        },
+        {
+          "t": "SoftBreak"
+        },
+        {
+          "t": "Str",
+          "c": "</x>,"
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Str",
+          "c": "<x/>,"
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Str",
+          "c": "and"
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Str",
+          "c": "a<b"
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Str",
+          "c": "と"
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Str",
+          "c": "c>d"
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Str",
+          "c": "stay"
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Str",
+          "c": "as"
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Str",
+          "c": "written."
+        }
+      ]
+    },
+    {
+      "t": "Para",
+      "c": [
+        {
+          "t": "Str",
+          "c": "A"
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Str",
+          "c": "hole"
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Str",
+          "c": "in"
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Str",
+          "c": "running"
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Str",
+          "c": "text:"
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Str",
+          "c": "adr-"
+        },
+        {
+          "t": "Str",
+          "c": "-"
+        },
+        {
+          "t": "Str",
+          "c": ".md"
+        }
+      ]
+    },
+    {
+      "t": "Para",
+      "c": [
+        {
+          "t": "Str",
+          "c": "A"
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Str",
+          "c": "hole"
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Str",
+          "c": "takes"
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Str",
+          "c": "args"
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Str",
+          "c": "and"
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Str",
+          "c": "options"
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Str",
+          "c": "in"
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Str",
+          "c": "its"
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Str",
+          "c": "head,"
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Str",
+          "c": ","
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Str",
+          "c": "and"
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Str",
+          "c": "a"
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Str",
+          "c": "matcher"
+        },
+        {
+          "t": "SoftBreak"
+        },
+        {
+          "t": "Str",
+          "c": "may"
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Str",
+          "c": "be"
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Str",
+          "c": "namespaced,"
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Str",
+          "c": "."
+        }
+      ]
+    },
+    {
+      "t": "Div",
+      "c": [
+        [
+          "",
+          [
+            "tomet-card"
+          ],
+          []
+        ],
+        []
+      ]
+    }
+  ]
+}

@@ -313,6 +313,8 @@ module.exports = grammar({
 				$.strong,
 				$.strikeout,
 				$.element,
+				$.label,
+				$.hole,
 				$.interpolation,
 				$.punctuation,
 			),
@@ -326,6 +328,8 @@ module.exports = grammar({
 				$.strong,
 				$.strikeout,
 				$.element,
+				$.label,
+				$.hole,
 				$.interpolation,
 				alias($._punctuation_not_semi, $.punctuation),
 			),
@@ -370,7 +374,9 @@ module.exports = grammar({
 		// a bare `:{`/`:(` right after certain groups) was ever reachable.
 		// A bare `:` with nothing to attach to falls back to `punctuation`,
 		// same as the other excluded characters.
-		text: (_$) => /[^\n`*_=~@$#:()\[{\]/|;-]+/,
+		// `<` is excluded for the same longest-match reason: a box (`label`, `hole`) opens with it
+		// and must win over a `text` run that would swallow `<PATH>` whole.
+		text: (_$) => /[^\n`*_=~<@$#:()\[{\]/|;-]+/,
 
 		punctuation: ($) => choice($._punctuation_not_semi, ";"),
 		_punctuation_not_semi: (_$) => choice(/[()\[{/<>|~]/, "-", "$", "#", ":", "="),
@@ -395,6 +401,8 @@ module.exports = grammar({
 				$.block_comment,
 				$.strikeout,
 				$.element,
+				$.label,
+				$.hole,
 				$.interpolation,
 				$._newline,
 				$.punctuation,
@@ -406,6 +414,8 @@ module.exports = grammar({
 				$.block_comment,
 				$.strikeout,
 				$.element,
+				$.label,
+				$.hole,
 				$.interpolation,
 				$._newline,
 				$.punctuation,
@@ -418,6 +428,8 @@ module.exports = grammar({
 				$.emphasis,
 				$.strong,
 				$.element,
+				$.label,
+				$.hole,
 				$.interpolation,
 				$._newline,
 				$.punctuation,
@@ -559,6 +571,30 @@ module.exports = grammar({
 		// for `tomet-parser`, not for syntax highlighting -- so this
 		// grammar has one element rule.
 		element: ($) => $.inline_element,
+		// ---- `<...>` boxes ----------------------------------------------------
+		//
+		// A name tag, `<PATH>`: a label for the reader that tomet gives no meaning, so the
+		// real parser lowers it to text. One token, a letter first and no white space, which is
+		// what keeps `a < b`, `x<=1`, `<->`, `</x>` and `<x/>` out of it.
+		label: (_$) => token(prec(2, /<\p{L}[\p{L}\p{N}_.\-]*>/)),
+		// A hole, `<?matcher(args){data}>[content]#(id)`: the head is inside the box, the
+		// content follows its `>`. Simplification: the real parser needs the head to be tight, and
+		// here white space (an `extras`) is allowed inside it; and a box in a value position
+		// (`url: <?(u)>`) is left to `scalar`, so it is not a `hole` there.
+		hole: ($) =>
+			prec.right(
+				3,
+				seq(
+					$.hole_open,
+					optional($.args_group),
+					optional($.value_group),
+					$.hole_close,
+					optional($.content_group),
+					optional($.id_group),
+				),
+			),
+		hole_open: (_$) => token(prec(2, /<\?([A-Za-z_][A-Za-z0-9_.\-]*)?/)),
+		hole_close: (_$) => token(prec(1, ">")),
 		// ---- `::name` declarations ------------------------------------------
 		//
 		// A declaration about the document, not content in it. It is only

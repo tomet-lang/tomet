@@ -132,6 +132,13 @@
 (id_group "(" @punctuation.special)
 (id_group ")" @punctuation.special)
 
+; `<...>` boxes. A name tag (`<PATH>`) is a label for the reader that tomet gives no
+; meaning. A hole (`<?int(n)>[...]`) is drawn by its head and its closing `>`, so the
+; whole box reads as one range; the groups inside keep the colours of any group.
+(label) @string.special
+(hole_open) @keyword.operator @keyword
+(hole_close) @keyword.operator @keyword
+
 ; Bare colons on inline elements and sections (:(), :{}) use distinct keyword color
 (inline_element ":" @keyword.control)
 (document_element ":" @keyword.control)
