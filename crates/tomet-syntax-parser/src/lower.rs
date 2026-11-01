@@ -48,8 +48,24 @@ fn unsupported(what: impl std::fmt::Display) -> Error {
 
 /// Reads the CST of `src` as an AST [`Document`].
 pub(crate) fn lower_document(src: &str, root: &SyntaxNode) -> Result<Document> {
+    reject_too_deep(root).map_err(|e| e.located_in(src))?;
     let blocks = lower_blocks(src, root).map_err(|e| e.located_in(src))?;
     Ok(Document::new(blocks, Span::new(0, src.len())))
+}
+
+/// The error for a tree that holds a `TOO_DEEP` node: the parser stopped reading structure there, so
+/// nothing below it is meaningful. One walk of the tree, once.
+pub(crate) fn reject_too_deep(root: &SyntaxNode) -> Result<()> {
+    match root.descendants().find(|n| n.kind() == K::TOO_DEEP) {
+        Some(node) => Err(err(
+            range_of(&node).0,
+            format!(
+                "this is nested more than {} levels deep",
+                crate::cst::MAX_DEPTH
+            ),
+        )),
+        None => Ok(()),
+    }
 }
 
 /// The blocks that are children of `node`: the document, and (later) a section

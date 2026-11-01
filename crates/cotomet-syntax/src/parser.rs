@@ -14,6 +14,16 @@ use tomet_lexer::Cursor;
 
 /// A hook allowing callers (such as `tomet-syntax-parser`) to parse custom
 /// embedded values (e.g. `@element` or `$interp`) at value positions.
+/// How deep values may nest (a call in a call, a map in a map), and, as `tomet-parser` takes it from
+/// here, how deep a document may (a `[content]` in an element in a `[content]`, a list under a list).
+/// A deeper one is an error and not a stack overflow.
+///
+/// Measured, not chosen: a debug build on a 2 MB stack (a test thread, a language server's worker)
+/// reads, formats, converts and checks a document nested about 100 deep and aborts a little past
+/// it; the limit is two thirds of that. A document does not nest a tenth as deep. A release build,
+/// or a larger stack, has room to spare.
+pub const MAX_DEPTH: usize = 64;
+
 pub trait ValueHook {
     fn try_parse_value(&mut self, cur: &mut Cursor) -> Option<Result<Value>>;
 }
@@ -346,6 +356,7 @@ fn parse_call_args<H: ValueHook>(
     cur: &mut Cursor,
     hook: &mut H,
     raw_args: bool,
+    depth: usize,
 ) -> Result<Vec<Value>> {
     let mut args = Vec::new();
     loop {
@@ -353,7 +364,7 @@ fn parse_call_args<H: ValueHook>(
         if cur.peek() == Some(')') {
             break;
         }
-        args.push(parse_entry_value_impl(cur, hook, raw_args)?);
+        args.push(parse_entry_value_impl(cur, hook, raw_args, depth + 1)?);
         skip_ws_newlines_and_comments(cur);
         match cur.peek() {
             Some(',') => {
@@ -381,6 +392,14 @@ fn parse_call_args<H: ValueHook>(
 pub const LITERAL_CONSTRUCTORS: &[&str] = &["list", "string", "int", "float"];
 
 pub fn try_parse_call_with<H: ValueHook>(cur: &mut Cursor, hook: &mut H) -> Option<Result<Value>> {
+    try_parse_call_impl(cur, hook, 0)
+}
+
+fn try_parse_call_impl<H: ValueHook>(
+    cur: &mut Cursor,
+    hook: &mut H,
+    depth: usize,
+) -> Option<Result<Value>> {
     let mut look = *cur;
     let call_start = cur.pos();
     let name = eat_name_segment(&mut look)?.to_string();
@@ -391,7 +410,7 @@ pub fn try_parse_call_with<H: ValueHook>(cur: &mut Cursor, hook: &mut H) -> Opti
     cur.bump();
     // `string(a)` is the text `a`, so its bare arguments are not typed.
     let raw_args = name == "string";
-    let args = match parse_call_args(cur, hook, raw_args) {
+    let args = match parse_call_args(cur, hook, raw_args, depth) {
         Ok(args) => args,
         Err(e) => return Some(Err(e)),
     };
@@ -620,6 +639,14 @@ pub fn parse_one_entry_with<H: ValueHook>(
     cur: &mut Cursor,
     hook: &mut H,
 ) -> Result<(String, Value)> {
+    parse_one_entry_impl(cur, hook, 0)
+}
+
+fn parse_one_entry_impl<H: ValueHook>(
+    cur: &mut Cursor,
+    hook: &mut H,
+    depth: usize,
+) -> Result<(String, Value)> {
     let checkpoint = cur.pos();
     if is_interp_key(cur) {
         return Err(err(checkpoint, "an expression cannot be a key"));
@@ -632,12 +659,12 @@ pub fn parse_one_entry_with<H: ValueHook>(
             }
             cur.bump();
             skip_inline_ws(cur);
-            let value = parse_entry_value_with(cur, hook)?;
+            let value = parse_entry_value_impl(cur, hook, false, depth)?;
             return Ok((key, value));
         }
     }
     cur.set_pos(checkpoint);
-    let value = parse_entry_value_with(cur, hook)?;
+    let value = parse_entry_value_impl(cur, hook, false, depth)?;
     Ok((POSITIONAL_ENTRY_KEY.to_string(), value))
 }
 
@@ -677,7 +704,7 @@ pub fn duplicate_key_error(pos: usize, key: &str) -> Error {
 /// a duplicate too. A map that held the same key twice would mean different
 /// things to a reader that keeps the first, the last, or both.
 pub fn parse_map_body_with<H: ValueHook>(cur: &mut Cursor, hook: &mut H) -> Result<Value> {
-    parse_map_body_impl(cur, hook, false)
+    parse_map_body_impl(cur, hook, false, 0)
 }
 
 /// A declaration about a file, written `::name(args){data}` at its top: what
@@ -759,7 +786,7 @@ pub fn parse_file_with<H: ValueHook>(src: &str, hook: &mut H) -> Result<File> {
         }
         header.push(parse_declaration(&mut cur).map_err(|e| e.located_in(src))?);
     }
-    let body = parse_map_body_impl(&mut cur, hook, true).map_err(|e| e.located_in(src))?;
+    let body = parse_map_body_impl(&mut cur, hook, true, 0).map_err(|e| e.located_in(src))?;
     skip_ws_newlines_and_comments(&mut cur);
     if !cur.is_eof() {
         return Err(err(cur.pos(), "unexpected trailing content").located_in(src));
@@ -796,7 +823,7 @@ fn parse_declaration(cur: &mut Cursor) -> Result<Declaration> {
             }
             Some('{') if data.is_none() => {
                 cur.bump();
-                let map = parse_map_body_impl(cur, &mut DeclHook, false)?;
+                let map = parse_map_body_impl(cur, &mut DeclHook, false, 0)?;
                 skip_ws_newlines_and_comments(cur);
                 if !cur.eat_str("}") {
                     return Err(err(cur.pos(), "expected '}'"));
@@ -826,6 +853,7 @@ fn parse_map_body_impl<H: ValueHook>(
     cur: &mut Cursor,
     hook: &mut H,
     keyed_only: bool,
+    depth: usize,
 ) -> Result<Value> {
     let mut entries: Vec<(String, Value)> = Vec::new();
     let mut seen: Option<HashSet<String>> = None;
@@ -841,7 +869,7 @@ fn parse_map_body_impl<H: ValueHook>(
                 "a declaration `::name` goes at the top of the file, before the entries",
             ));
         }
-        let (key, value) = parse_one_entry_with(cur, hook)?;
+        let (key, value) = parse_one_entry_impl(cur, hook, depth)?;
         if keyed_only && key == POSITIONAL_ENTRY_KEY {
             return Err(err(
                 entry_start,
@@ -884,7 +912,7 @@ pub fn parse_entry_value(cur: &mut Cursor) -> Result<Value> {
 }
 
 pub fn parse_entry_value_with<H: ValueHook>(cur: &mut Cursor, hook: &mut H) -> Result<Value> {
-    parse_entry_value_impl(cur, hook, false)
+    parse_entry_value_impl(cur, hook, false, 0)
 }
 
 /// [`parse_entry_value_with`], optionally taking a bare scalar as its written
@@ -894,7 +922,14 @@ fn parse_entry_value_impl<H: ValueHook>(
     cur: &mut Cursor,
     hook: &mut H,
     raw_scalars: bool,
+    depth: usize,
 ) -> Result<Value> {
+    if depth > MAX_DEPTH {
+        return Err(err(
+            cur.pos(),
+            format!("this is nested more than {MAX_DEPTH} levels deep"),
+        ));
+    }
     skip_ws_newlines_and_comments(cur);
     if let Some(result) = hook.try_parse_value(cur) {
         return result;
@@ -905,7 +940,7 @@ fn parse_entry_value_impl<H: ValueHook>(
             "an expression `${...}` is not read: this reader reads data only; write it in quotes to keep the text, or use `cotomet::eval` / a hook",
         ));
     }
-    if let Some(result) = try_parse_call_with(cur, hook) {
+    if let Some(result) = try_parse_call_impl(cur, hook, depth) {
         return result;
     }
     match cur.peek() {
@@ -916,7 +951,7 @@ fn parse_entry_value_impl<H: ValueHook>(
         Some('"') => Ok(Value::String(parse_quoted(cur)?)),
         Some('{') => {
             cur.bump();
-            let v = parse_map_body_with(cur, hook)?;
+            let v = parse_map_body_impl(cur, hook, false, depth + 1)?;
             skip_ws_newlines_and_comments(cur);
             if !cur.eat_str("}") {
                 return Err(err(cur.pos(), "expected '}'"));

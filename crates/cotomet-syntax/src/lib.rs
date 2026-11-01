@@ -143,7 +143,7 @@ pub mod print;
 
 pub use error::{Error, Result};
 pub use parser::{
-    Declaration, File, LITERAL_CONSTRUCTORS, NoHook, POSITIONAL_ENTRY_KEY, ValueHook,
+    Declaration, File, LITERAL_CONSTRUCTORS, MAX_DEPTH, NoHook, POSITIONAL_ENTRY_KEY, ValueHook,
     duplicate_key_error, eat_ident, eat_name, eat_name_segment, eat_scalar_raw, err, is_ident_char,
     is_inline_ws, is_interp_ident_char, is_interp_ident_start, is_interp_start, is_name_char,
     is_name_start, is_name_start_at, is_scheme_uri_colon, parse_entry_value,

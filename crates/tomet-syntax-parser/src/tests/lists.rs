@@ -325,6 +325,29 @@ fn full_form_list_item_supports_a_named_connect() {
 }
 
 #[test]
+fn a_trailing_connect_may_hold_a_pipe_run_on_the_same_line() {
+    // `:note| text` is `[content]` spelled without brackets: the connect `note` holds `text`, whether
+    // the item's own text is bracket-less (`- item`) or the connect follows a group.
+    for src in ["- item :note| the note text\n", "- item :rule(allow: x)| the note text\n"] {
+        let doc = parse_document(src).unwrap();
+        let Block::List(list) = &doc.blocks[0] else {
+            panic!("expected list for {src:?}")
+        };
+        let item = &list.items[0];
+        assert_eq!(item.connects.len(), 1, "{src:?}");
+        assert!(item.connects[0].content.is_some(), "{src:?}");
+        let text: String = first_para(&item.content)
+            .iter()
+            .map(|inline| match inline {
+                Inline::Text(t) => t.value.as_str(),
+                other => panic!("expected text, got {other:?}"),
+            })
+            .collect();
+        assert_eq!(text, "item", "{src:?}");
+    }
+}
+
+#[test]
 fn mixed_list_markers_split_into_separate_lists() {
     let doc = parse_document("- one\n-. two\n").unwrap();
     assert_eq!(doc.blocks.len(), 2);

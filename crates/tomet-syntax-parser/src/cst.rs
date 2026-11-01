@@ -49,12 +49,17 @@
 //! line is a `PIPE` token among the content's own, but the grammar reads it as
 //! white space, so the blocks of a run are the blocks the bracketed form has.
 
-use std::collections::HashSet;
+use std::cell::RefCell;
+use std::collections::{HashMap, HashSet};
+use std::rc::Rc;
 
 use tomet_cst::{GreenNodeBuilder, SyntaxKind, SyntaxNode};
 use tomet_lexer::{Cursor, tokenize};
 
-use crate::inline::{DELIMITERS, autolink_end, autolink_scheme_at, delimited_probe, is_boundary};
+use crate::inline::{
+    DELIMITERS, DelimiterIndex, autolink_end, autolink_scheme_at, delimited_probe, is_boundary,
+};
+use crate::tail::TailScan;
 
 use SyntaxKind as K;
 
@@ -79,8 +84,12 @@ pub(crate) fn parse_cst_value(src: &str) -> SyntaxNode {
     SyntaxNode::new_root(parser.builder.finish())
 }
 
-/// How many lines the groups a bracket-less body ends in may span.
-const MAX_TRAILING_GROUP_LINES: usize = 64;
+/// How deep constructs may nest: a `[content]` in an element in a `[content]`, a group in a group, an
+/// emphasis in an emphasis, a list under a list, a section under a section. Past it the parser stops
+/// reading structure and keeps the text flat in a `TOO_DEEP` node, so no recursion here, or in what
+/// reads the tree, goes deeper than this (a deeper document used to abort the process with a stack
+/// overflow). It is the figure `cotomet-syntax` limits values to (see `cotomet_syntax::MAX_DEPTH`).
+pub const MAX_DEPTH: usize = cotomet_syntax::MAX_DEPTH;
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum InlineStop {
@@ -98,6 +107,17 @@ enum InlineStop {
     /// Up to, not including, the byte at this offset: where the groups a sugar
     /// body ends in begin.
     Offset(usize),
+}
+
+/// What the grammar says of the chain of groups a body's line ends in, from one place.
+#[derive(Clone, Copy)]
+enum TailVerdict {
+    /// They are the owner's, from this offset on: the first of the groups that are valid.
+    From(usize),
+    /// They read to the end of the line and none of them, counted from the end, is valid.
+    Invalid,
+    /// They do not read to the end of the line: it was prose that looked like a group.
+    NotGroups,
 }
 
 struct CstParser<'a> {
@@ -132,6 +152,15 @@ struct CstParser<'a> {
     /// gets them as `PIPE` tokens, because [`CstParser::bump`] emits what the
     /// tokenizer read.
     markers: HashSet<usize>,
+    /// How many constructs of the kinds [`MAX_DEPTH`] counts the parser is inside of.
+    depth: usize,
+    /// Where delimiters could close, and where paragraphs end: see [`DelimiterIndex`].
+    delimiters: DelimiterIndex,
+    /// Where `src` stands in the text being read: 0, but for a trial parse of a slice of it.
+    base: usize,
+    /// What the grammar said of the groups that begin at each offset of the text being read (see
+    /// [`CstParser::tail_verdict`]). Shared with the trial parsers, whose slices it is asked about.
+    tail_verdicts: Rc<RefCell<HashMap<usize, TailVerdict>>>,
 }
 
 /// The tokens of the text, kept as two stacks around the cursor.
@@ -205,6 +234,10 @@ impl<'a> CstParser<'a> {
             pipe_cols: Vec::new(),
             run_ends: Vec::new(),
             markers: HashSet::new(),
+            depth: 0,
+            delimiters: DelimiterIndex::new(src),
+            base: 0,
+            tail_verdicts: Rc::default(),
         }
     }
 
@@ -520,25 +553,9 @@ impl<'a> CstParser<'a> {
         (self.kind_at(j) == Some(K::GT)).then_some((true, j))
     }
 
-    /// Index just past the box at `i` and the `[content]` a marked one owns after its `>`,
-    /// with no gap.
-    fn slot_end(&self, i: usize) -> usize {
-        let Some((marked, close)) = self.slot_at(i) else {
-            return i + 1;
-        };
-        let j = close + 1;
-        if marked && self.kind_at(j) == Some(K::L_BRACKET) {
-            return self.group_end(j).unwrap_or(self.tokens.len());
-        }
-        j
-    }
-
     /// Index just past everything an element starting at `i` (its sigil is
     /// `@name`) owns, using only bracket matching.
     fn element_end(&self, mut i: usize) -> usize {
-        if self.kind_at(i) == Some(K::LT) {
-            return self.slot_end(i);
-        }
         i += self.sigil_len_at(i).unwrap_or(2); // `@name`, or `::name`
         let mut seen = [false; 3]; // args, content, value: each at most once
         let mut seen_id = false;
@@ -630,49 +647,27 @@ impl<'a> CstParser<'a> {
                 .is_some_and(cotomet_syntax::is_name_start)
     }
 
-    /// Is the `@` or `::` at `i` a block element: an element that owns the
-    /// rest of its line?
+    /// Is the `::` at `i` a declaration that owns the rest of its line? (An `@` element or a box
+    /// is told from a paragraph after it is read: see [`CstParser::parse_element_line`].)
     fn is_block_element_at(&self, i: usize) -> bool {
-        // A name tag is text and never a block; a marked box is one like `@name(...)`.
-        let box_here = matches!(self.slot_at(i), Some((true, _)));
-        if self.sigil_len_at(i).is_none() && !box_here {
+        if self.sigil_len_at(i) != Some(3) {
             return false;
         }
-        let end = self.element_end(i);
-        let mut j = end;
-        while matches!(self.kind_at(j), Some(K::WHITESPACE | K::COMMENT)) {
-            j += 1;
-        }
-        // A bare `@name` is an element only as a block; a grouped one is a
-        // block only when nothing but a comment follows it on its line.
-        self.kind_at(j).is_none_or(|k| k == K::NEWLINE)
-    }
-
-    /// The `@` at `i` is the whole of its line (see [`Self::is_block_element_at`]):
-    /// does the line after it fold into it, as running text goes on across
-    /// lines? Not if that line is blank, ends the `[content]` or `|` run being
-    /// read, or starts a block (`;`, a list marker, a section, ...).
-    fn element_line_folds(&self, i: usize) -> bool {
         let mut j = self.element_end(i);
         while matches!(self.kind_at(j), Some(K::WHITESPACE | K::COMMENT)) {
             j += 1;
         }
-        if self.kind_at(j) != Some(K::NEWLINE) {
+        self.kind_at(j).is_none_or(|k| k == K::NEWLINE)
+    }
+
+    /// After a line that holds nothing but an element, at its `NEWLINE`: does the next line fold
+    /// into it, as running text goes on across lines? Not if that line is blank, ends the `[content]`
+    /// or `|` run being read, or starts a block (`;`, a list marker, a section, ...).
+    fn next_line_folds(&self, newline: usize) -> bool {
+        if self.kind_at(newline) != Some(K::NEWLINE) {
             return false;
         }
-        // A `|` opening the next line is the element's own content run: the
-        // line that matters is the one after the run.
-        let opener = self.skip_ws_from(j + 1);
-        if self.kind_at(opener) == Some(K::PIPE) {
-            match self.group_end(opener) {
-                Some(end) => j = end,
-                None => return false,
-            }
-            if self.kind_at(j) != Some(K::NEWLINE) {
-                return false;
-            }
-        }
-        let k = self.skip_ws_from(j + 1);
+        let k = self.skip_ws_from(newline + 1);
         let past_run = self
             .run_ends
             .last()
@@ -683,6 +678,14 @@ impl<'a> CstParser<'a> {
             || self.kind_at(k) == Some(K::COMMENT)
             || matches!(self.kind_at(k), None | Some(K::NEWLINE))
             || self.block_starts_at(k))
+    }
+
+    /// Index of the first token from `i` that is not white space or a comment.
+    fn past_blanks(&self, mut i: usize) -> usize {
+        while matches!(self.kind_at(i), Some(K::WHITESPACE | K::COMMENT)) {
+            i += 1;
+        }
+        i
     }
 
     /// `=`-run at `pos` that opens a section: its level.
@@ -830,15 +833,7 @@ impl<'a> CstParser<'a> {
             }
             K::MINUS if self.is_list_start_at(self.pos) => self.parse_list(),
             K::BACKTICK if self.is_code_block_start_at(self.pos) => self.parse_code_block(),
-            // An `@` element that is the whole of its line is a block, unless
-            // the next line folds into it; then the line is running text.
-            K::AT | K::LT if self.is_block_element_at(self.pos) => {
-                if self.element_line_folds(self.pos) {
-                    self.parse_folded_element_paragraph()
-                } else {
-                    self.parse_block_element()
-                }
-            }
+            K::AT | K::LT => self.parse_element_line(),
             K::COLON if self.is_block_element_at(self.pos) => self.parse_block_element(),
             // A declaration that does not stand alone: still read as one, with the text after it
             // marked as the mistake.
@@ -895,7 +890,13 @@ impl<'a> CstParser<'a> {
             self.parse_inline(InlineStop::Line);
         }
         self.builder.finish_node();
-        self.parse_body(level);
+        if self.too_deep() {
+            self.parse_too_deep_line();
+        } else {
+            self.depth += 1;
+            self.parse_body(level);
+            self.depth -= 1;
+        }
         self.builder.finish_node();
     }
 
@@ -903,17 +904,16 @@ impl<'a> CstParser<'a> {
     /// groups it ends in -- `#(id)`, `{value}`, `:connect` -- which are the owner's,
     /// not the text's.
     ///
-    /// Where they begin is the leftmost candidate from which the groups read
-    /// to the end of the line ([`CstParser::reads_to_line_end`]) and which the
-    /// text before it reaches without an element of its own in the way: a
-    /// `{value}` that an `@element` at the end of the text would take is
-    /// the element's.
+    /// Where they begin is the leftmost place from which the groups read to the end
+    /// of the line ([`CstParser::trailing_groups_start`]) and which the text before it
+    /// reaches without an element of its own in the way: a `{value}` that an
+    /// `@element` at the end of the text would take is the element's.
     fn parse_sugar_tail(&mut self) {
         let from = self.start_of(self.pos);
-        let mut candidates = self.trailing_candidates(from).into_iter();
+        let mut line = TailScan::new(self.src, from);
         let mut resume = from;
         loop {
-            let Some(at) = candidates.find(|&at| at >= resume && self.reads_to_line_end(at)) else {
+            let Some(at) = self.trailing_groups_start(&mut line, resume) else {
                 self.parse_inline(InlineStop::Line);
                 return;
             };
@@ -933,89 +933,83 @@ impl<'a> CstParser<'a> {
         }
     }
 
-    /// The offsets on the line starting at `from` where a body's trailing groups
-    /// may begin: every `:`, and every `{` and `#(` that is not part of a
-    /// connect (`:{...}`, `:name(...)`) that starts earlier. A `(` alone is
-    /// not one -- a parenthetical remark is prose -- and only reaches here
-    /// through a `:`.
-    fn trailing_candidates(&self, from: usize) -> Vec<usize> {
-        let bytes = self.src.as_bytes();
-        let preceded_by_colon = |pos: usize| {
-            let mut i = pos;
-            while i > 0 && matches!(bytes[i - 1], b' ' | b'\t') {
-                i -= 1;
+    /// Where the groups that end the line begin, if the line at or after `resume` has any.
+    ///
+    /// The first candidate whose characters make a chain of groups to the end of the line
+    /// ([`TailScan`]) is read with the grammar, once, and the answer settles the rest of the line:
+    /// every later candidate is inside that chain, and a candidate inside a group cannot read to
+    /// the end of the line on its own.
+    fn trailing_groups_start(&self, line: &mut TailScan, resume: usize) -> Option<usize> {
+        let mut scan = resume;
+        while let Some(at) = line.next_candidate(scan) {
+            match self.tail_verdict(line, at) {
+                TailVerdict::From(start) => return Some(start),
+                TailVerdict::Invalid => return None,
+                TailVerdict::NotGroups => scan = at + 1,
             }
-            i > 0 && bytes[i - 1] == b':'
-        };
-        // Names are ASCII, so a byte compare is UTF-8-safe.
-        let preceded_by_name_char = |pos: usize| {
-            pos > 0
-                && matches!(bytes[pos - 1], b'a'..=b'z' | b'A'..=b'Z' | b'0'..=b'9' | b'_' | b'-')
-        };
-        let mut found = Vec::new();
-        let mut i = from;
-        while i < bytes.len() && !matches!(bytes[i], b'\n' | b'\r') {
-            let hash_paren = bytes[i] == b'#' && bytes.get(i + 1) == Some(&b'(');
-            if bytes[i] == b':' {
-                found.push(i);
-            } else if (hash_paren || bytes[i] == b'{')
-                && !preceded_by_colon(i)
-                && !preceded_by_name_char(i)
-            {
-                found.push(i);
-            }
-            i += if hash_paren { 2 } else { 1 };
         }
-        found
+        None
     }
 
-    /// Whether the groups that begin at `at` -- read as an element's are --
-    /// are valid, claim something, and end the line.
+    /// What the grammar says of the chain of groups that begins at `at`, kept: a trial parse of a
+    /// line asks the same of the lines inside it, and the real parse asks it again; without the
+    /// answers kept, every level of nesting doubled the work.
+    fn tail_verdict(&self, line: &mut TailScan, at: usize) -> TailVerdict {
+        let key = self.base + at;
+        if let Some(&known) = self.tail_verdicts.borrow().get(&key) {
+            return known;
+        }
+        let verdict = self.judge_tail(line, at);
+        self.tail_verdicts.borrow_mut().insert(key, verdict);
+        verdict
+    }
+
+    /// The groups from `at` to the end of the line, read on their own and lowered: what the AST
+    /// says of them is what counts, so a `{x}` (a value group holds `key: value`) or a `#(a: 1)` is
+    /// text, as it always was, and so is a trailing `[content]` or `|` run: the owner has no slot
+    /// for one.
     ///
-    /// "Valid" is what the AST says of them: the groups are read on their own
-    /// and lowered, so a `{x}` (a value group holds `key: value`) or a `#(a: 1)`
-    /// is text, as it always was. A trailing `[content]` or `|` run is not
-    /// the owner's: it has no slot for one.
-    fn reads_to_line_end(&self, at: usize) -> bool {
-        let slice = &self.src[at..self.balanced_line_end(at)];
+    /// The tail is the longest run of the groups, counted from the end, that is valid and claims
+    /// something: more groups only add ways to be invalid, so the first group of it is found by
+    /// halving, however many groups the line ends in.
+    fn judge_tail(&self, line: &mut TailScan, at: usize) -> TailVerdict {
+        let Some(end) = line.chain(at) else {
+            return TailVerdict::NotGroups;
+        };
+        let slice = &self.src[at..end];
         let mut scratch = CstParser::new(slice, tokenize(slice));
+        scratch.base = self.base + at;
+        scratch.depth = self.depth;
+        scratch.tail_verdicts = Rc::clone(&self.tail_verdicts);
         scratch.builder.start_node(K::ROOT.into());
         scratch.parse_groups(false, false);
         scratch.bump_while(K::WHITESPACE);
         scratch.builder.finish_node();
         if !scratch.is_eof() {
-            return false;
+            return TailVerdict::NotGroups;
         }
         let root = SyntaxNode::new_root(scratch.builder.finish());
-        crate::lower::lower_group_list(slice, root.children())
-            .is_ok_and(|read| read.content.is_none() && crate::lower::claims_something(&read))
-    }
-
-    /// The end of the line at `at`, or of the last line a group opened on it runs
-    /// over: a group may span lines, so the line ends where its brackets have
-    /// closed. A blank line ends the search, and so do [`MAX_TRAILING_GROUP_LINES`]
-    /// lines: a trailing group does not span a blank line, and an unclosed bracket
-    /// in a line of prose must not make every such line read to the end of the file.
-    fn balanced_line_end(&self, at: usize) -> usize {
-        let mut depth = 0i32;
-        let mut lines = 0usize;
-        let mut line_start = at;
-        for (i, c) in self.src[at..].char_indices() {
-            match c {
-                '(' | '[' | '{' => depth += 1,
-                ')' | ']' | '}' => depth -= 1,
-                '\n' => {
-                    lines += 1;
-                    let blank = self.src[line_start..at + i].trim().is_empty() && line_start > at;
-                    if depth <= 0 || blank || lines >= MAX_TRAILING_GROUP_LINES {
-                        return at + i;
-                    }
-                    line_start = at + i + 1;
-                }
-                _ => {}
+        let groups: Vec<SyntaxNode> = root.children().collect();
+        let read = |first: usize| {
+            crate::lower::lower_group_list(slice, groups[first..].iter().cloned())
+                .ok()
+                .filter(|read| read.content.is_none())
+        };
+        let (mut low, mut high) = (0, groups.len());
+        while low < high {
+            let mid = low + (high - low) / 2;
+            if read(mid).is_some() {
+                high = mid;
+            } else {
+                low = mid + 1;
             }
         }
-        self.src.len()
+        match groups.get(low) {
+            Some(first) if read(low).is_some_and(|read| crate::lower::claims_something(&read)) => {
+                TailVerdict::From(at + usize::from(first.text_range().start()))
+            }
+            _ => TailVerdict::Invalid,
+        }
     }
 
     fn parse_thematic_break(&mut self) {
@@ -1091,6 +1085,39 @@ impl<'a> CstParser<'a> {
         }
     }
 
+    /// Whether one more level of nesting is past [`MAX_DEPTH`].
+    fn too_deep(&self) -> bool {
+        self.depth >= MAX_DEPTH
+    }
+
+    /// The rest of the current line, flat, in a `TOO_DEEP` node.
+    fn parse_too_deep_line(&mut self) {
+        self.builder.start_node(K::TOO_DEEP.into());
+        while !matches!(self.current_kind(), None | Some(K::NEWLINE)) {
+            self.bump();
+        }
+        self.builder.finish_node();
+    }
+
+    /// From just after an opening bracket to just after its closer, flat, in a `TOO_DEEP` node. Strings
+    /// are one token, so a bracket in one does not count.
+    fn parse_too_deep_group(&mut self, open: SyntaxKind, close: SyntaxKind) {
+        self.builder.start_node(K::TOO_DEEP.into());
+        let mut depth = 1usize;
+        while let Some(k) = self.current_kind() {
+            if k == open {
+                depth += 1;
+            } else if k == close {
+                depth -= 1;
+            }
+            self.bump();
+            if depth == 0 {
+                break;
+            }
+        }
+        self.builder.finish_node();
+    }
+
     fn parse_block_element(&mut self) {
         self.builder.start_node(K::BLOCK_ELEMENT.into());
         self.parse_block_head();
@@ -1100,20 +1127,57 @@ impl<'a> CstParser<'a> {
         self.builder.finish_node();
     }
 
-    /// A paragraph that opens with an element that is the whole of its line, and
-    /// goes on with the lines that fold into it. The element is read as a block
-    /// element is -- it may take its groups from the next line -- but it is an
-    /// inline element of the paragraph.
-    fn parse_folded_element_paragraph(&mut self) {
-        self.builder.start_node(K::PARAGRAPH.into());
-        self.builder.start_node(K::INLINE_ELEMENT.into());
+    /// A line that opens with an `@` element or a box. It is read first and told what it is
+    /// after: an element that is the whole of its line is a block, unless the next line folds
+    /// into it (then the line is running text); an element with more after it is the start of a
+    /// paragraph. Reading it first is what keeps the cost proportional to the text: deciding
+    /// before, by scanning to the element's end, scans everything inside it again at every level
+    /// of nesting.
+    fn parse_element_line(&mut self) {
+        let p = self.pos;
+        let element = match self.current_kind() {
+            // A bare `@name` is an element only alone on its line; with a group it is one anywhere.
+            Some(K::AT) => {
+                self.name_at(p + 1)
+                    && (self.groups_follow(p + 2)
+                        || self
+                            .kind_at(self.past_blanks(p + 2))
+                            .is_none_or(|k| k == K::NEWLINE))
+            }
+            Some(K::LT) => matches!(self.slot_at(p), Some((true, _))),
+            _ => false,
+        };
+        if !element {
+            self.parse_paragraph();
+            return;
+        }
+        let start = self.builder.checkpoint();
         self.parse_block_head();
-        while matches!(self.current_kind(), Some(K::WHITESPACE | K::COMMENT)) {
-            self.bump();
+        let after = self.past_blanks(self.pos);
+        let whole_line = self.kind_at(after).is_none_or(|k| k == K::NEWLINE);
+        if whole_line && !self.next_line_folds(after) {
+            self.builder.start_node_at(start, K::BLOCK_ELEMENT.into());
+            self.bump_blanks();
+            self.builder.finish_node();
+            return;
+        }
+        // The element is the first inline of a paragraph. When it is the whole of its line, the
+        // blanks after it are the element's, as they are for a block.
+        self.builder.start_node_at(start, K::PARAGRAPH.into());
+        self.builder.start_node_at(start, K::INLINE_ELEMENT.into());
+        if whole_line {
+            self.bump_blanks();
         }
         self.builder.finish_node();
         self.parse_inline(InlineStop::Paragraph);
         self.builder.finish_node();
+    }
+
+    /// Bumps the white space and comments at the cursor.
+    fn bump_blanks(&mut self) {
+        while matches!(self.current_kind(), Some(K::WHITESPACE | K::COMMENT)) {
+            self.bump();
+        }
     }
 
     /// A list: items of one kind (`-` or `-.`) that stand in the same column or
@@ -1154,7 +1218,13 @@ impl<'a> CstParser<'a> {
             if let Some((_, deeper, deeper_ordered)) = self.list_marker_ahead()
                 && deeper > col
             {
-                self.parse_list_level(deeper_ordered, deeper);
+                if self.too_deep() {
+                    self.parse_too_deep_line();
+                } else {
+                    self.depth += 1;
+                    self.parse_list_level(deeper_ordered, deeper);
+                    self.depth -= 1;
+                }
             }
             self.builder.finish_node();
         }
@@ -1441,8 +1511,15 @@ impl<'a> CstParser<'a> {
         let mut cur = Cursor::new(self.src);
         cur.set_pos(start);
         for (delim, name) in DELIMITERS {
-            if !delimited_probe(&cur, delim) {
+            if !delimited_probe(&cur, delim, &self.delimiters) {
                 continue;
+            }
+            // Past the limit the delimiter is not read; the tree marks it.
+            if self.too_deep() {
+                self.builder.start_node(K::TOO_DEEP.into());
+                self.bump_delimiter(delim);
+                self.builder.finish_node();
+                return true;
             }
             let kind = match name {
                 "strong" => K::STRONG,
@@ -1451,7 +1528,9 @@ impl<'a> CstParser<'a> {
             };
             self.builder.start_node(kind.into());
             self.bump_delimiter(delim);
+            self.depth += 1;
             self.parse_inline(InlineStop::Delim(delim));
+            self.depth -= 1;
             if self.closes_at(self.start_of(self.pos), delim) {
                 self.bump_delimiter(delim);
             }
@@ -1749,7 +1828,7 @@ impl<'a> CstParser<'a> {
     /// A `|` run, read as the `[content]` of whatever owns it: the `|` that
     /// opens it, then blocks until the run ends. The `|` that begins each
     /// later line is the run's margin, not content; the grammar does not see
-    /// it (see [`CstParser::markers`]) and the tree keeps it as a `PIPE`.
+    /// it (see [`CstParser::markers`]) and the tree keeps it as a `MARGIN`.
     fn parse_pipe_content(&mut self) {
         let (end, markers) = self.scan_pipe_run(self.pos);
         let column = self.column_at(self.start_of(self.pos));
@@ -1764,7 +1843,13 @@ impl<'a> CstParser<'a> {
         let outer_connect = std::mem::replace(&mut self.allow_connect, true);
         let outer_bracket = std::mem::replace(&mut self.in_bracket, false);
         self.bump_while(K::WHITESPACE);
-        self.parse_body(0);
+        if self.too_deep() {
+            self.parse_too_deep_line();
+        } else {
+            self.depth += 1;
+            self.parse_body(0);
+            self.depth -= 1;
+        }
         self.in_bracket = outer_bracket;
         self.allow_connect = outer_connect;
         self.run_ends.pop();
@@ -1852,11 +1937,18 @@ impl<'a> CstParser<'a> {
     fn parse_content_group(&mut self) {
         self.builder.start_node(K::CONTENT.into());
         self.bump(); // '['
+        if self.too_deep() {
+            self.parse_too_deep_group(K::L_BRACKET, K::R_BRACKET);
+            self.builder.finish_node();
+            return;
+        }
+        self.depth += 1;
         let outer_connect = std::mem::replace(&mut self.allow_connect, true);
         let outer_bracket = std::mem::replace(&mut self.in_bracket, true);
         self.parse_body(0);
         self.in_bracket = outer_bracket;
         self.allow_connect = outer_connect;
+        self.depth -= 1;
         if self.current_kind() == Some(K::R_BRACKET) {
             self.bump();
         }
@@ -1864,6 +1956,21 @@ impl<'a> CstParser<'a> {
     }
 
     fn parse_entries(&mut self, close: SyntaxKind) {
+        if self.too_deep() {
+            let open = if close == K::R_PAREN {
+                K::L_PAREN
+            } else {
+                K::L_BRACE
+            };
+            self.parse_too_deep_group(open, close);
+            return;
+        }
+        self.depth += 1;
+        self.parse_entries_inside(close);
+        self.depth -= 1;
+    }
+
+    fn parse_entries_inside(&mut self, close: SyntaxKind) {
         while let Some(k) = self.current_kind() {
             if k == close {
                 self.bump();

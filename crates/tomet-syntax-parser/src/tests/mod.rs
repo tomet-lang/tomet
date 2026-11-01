@@ -2,6 +2,7 @@
 
 mod comments;
 mod connects;
+mod cost;
 mod cst;
 mod document_declarations;
 mod elements;
@@ -11,6 +12,7 @@ mod holes;
 mod id;
 mod inline;
 mod interpolation;
+mod limits;
 mod lists;
 mod paragraphs;
 mod sections;

@@ -19,6 +19,7 @@ pub(crate) use cotomet_syntax::{
 /// document -- no headings, prose, or top-level elements).
 pub fn parse_value(src: &str) -> Result<Value> {
     let root = crate::cst::parse_cst_value(src);
+    crate::lower::reject_too_deep(&root).map_err(|e| e.located_in(src))?;
     cotomet_syntax::parse_value_with(src, &mut Embedded::new(src, &root)).map_err(Into::into)
 }
 

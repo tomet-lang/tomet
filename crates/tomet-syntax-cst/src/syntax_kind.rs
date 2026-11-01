@@ -120,6 +120,10 @@ pub enum SyntaxKind {
     /// kind it looks like), and the rest of the line after a `::` declaration (a declaration
     /// stands alone).
     ERROR,
+    /// A construct nested deeper than the parser reads (`MAX_DEPTH` in `tomet-parser`): its text, flat,
+    /// with no structure inside, so that nothing which walks the tree recurses further than the limit.
+    /// Lowering refuses a document that has one.
+    TOO_DEEP,
 
     // Must be the last variant
     #[doc(hidden)]

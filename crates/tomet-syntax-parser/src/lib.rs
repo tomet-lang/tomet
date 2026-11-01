@@ -8,8 +8,13 @@
 //! - (Deterministic Static Parser Boundary)
 //!   -| `tomet-parser` is strictly a pure, side-effect-free, deterministic static parser.
 //!    | It performs zero I/O, external file resolution, or dynamic code execution.
-//!    | Given identical input text, it produces identical AST output with guaranteed
-//!    | linear/predictable time complexity.
+//!    | Given identical input text, it produces identical AST output, in time proportional to the
+//!    | input: no construct is decided by trying it and reading the rest of the line again (the
+//!    | `tail` module below is why), and none nests deeper than [`cst::MAX_DEPTH`].
+//! - (Nesting Limit)
+//!   -| Past [`cst::MAX_DEPTH`] levels the CST keeps the text flat in a `TOO_DEEP` node, still
+//!    | lossless, and lowering refuses it with an error. A deeper document used to abort the
+//!    | process with a stack overflow, so no recursion here, or in what reads the tree, goes deeper.
 //! - (Boxes)
 //!   -| `<...>` is one family in the syntax: a name tag `<name>` and a hole `<?matcher(args)>`.
 //!    | `parse_document` reads both with no mode. A hole becomes a [`tomet_ast::Hole`]; a name tag
@@ -30,6 +35,8 @@
 //!   hole starts inside a group is the CST's to say.
 //! - (value) The Tomet data grammar (maps, sequences, scalars, comments), from `cotomet-syntax`,
 //!   with a hook that finds what a value embeds -- an element, `[content]`, a `|` run -- in the CST.
+//! - (tail) Where a bracket-less body's trailing groups (`- text {value}`, `= text #(id)`) can be,
+//!   from the characters alone; the CST asks the grammar once about what that finds.
 //! - (inline) What the CST and lowering share about running text: `Text`/`SoftBreak` items, the
 //!   probes for formatting delimiters (`*em*`, `**strong**`, `==mark==`) and autolinks.
 //! - (interp) `${...}` interpolation expressions (identifiers, member chains, calls, literals).
@@ -41,6 +48,7 @@ mod error;
 mod inline;
 mod interp;
 mod lower;
+mod tail;
 mod value;
 
 pub use cst::parse_cst;
