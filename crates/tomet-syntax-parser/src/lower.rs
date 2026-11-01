@@ -68,8 +68,10 @@ fn lower_blocks(src: &str, node: &SyntaxNode) -> Result<Vec<Block>> {
             }
             // The brackets of a `[content]` group are not content.
             SyntaxElement::Token(t) if node.kind() == K::CONTENT && is_bracket(t.kind()) => {}
-            // The `|` that opens a run, and the one that begins each of its lines.
+            // The `|` that opens a run.
             SyntaxElement::Token(t) if node.kind() == K::CONTENT && t.kind() == K::PIPE => {}
+            // The `|` that begins each later line of a run.
+            SyntaxElement::Token(t) if t.kind() == K::MARGIN => {}
             SyntaxElement::Token(t) => return Err(unsupported(format!("token {:?}", t.kind()))),
             SyntaxElement::Node(n) => blocks.extend(lower_block(src, &n)?),
         }

@@ -26,6 +26,27 @@ fn tokens_of(src: &str, kind: K) -> usize {
         .count()
 }
 
+// --- a `|` run's margin ----------------------------------------------------
+
+#[test]
+fn a_runs_opener_is_a_pipe_and_the_bar_of_each_later_line_is_a_margin() {
+    let src = "@callout\n| a\n| b\n| c\n";
+    assert_eq!(tokens_of(src, K::PIPE), 1, "the opener");
+    assert_eq!(tokens_of(src, K::MARGIN), 2, "the later lines");
+    // Nested runs: every bar of the source is one or the other, none is lost or counted twice.
+    let nested = "@a\n| x\n| @b\n| | y\n| | z\n";
+    assert_eq!(
+        tokens_of(nested, K::PIPE) + tokens_of(nested, K::MARGIN),
+        nested.matches('|').count()
+    );
+    assert!(
+        tokens_of(nested, K::MARGIN) >= 3,
+        "the margins of the later lines"
+    );
+    // A bar in running text is a bar.
+    assert_eq!(tokens_of("a | b\n", K::MARGIN), 0);
+}
+
 // --- list markers ---------------------------------------------------------
 
 #[test]
@@ -243,13 +264,15 @@ fn a_pipe_opens_the_content_of_an_element() {
 }
 
 #[test]
-fn the_markers_stay_in_the_tree_as_pipe_tokens() {
+fn the_markers_stay_in_the_tree_as_margin_tokens() {
     let root = crate::parse_cst("@quote\n| alpha\n| beta\n");
-    let pipes = root
-        .descendants_with_tokens()
-        .filter(|e| e.kind() == K::PIPE)
-        .count();
-    assert_eq!(pipes, 2, "the opener and one marker");
+    let count = |kind| {
+        root.descendants_with_tokens()
+            .filter(|e| e.kind() == kind)
+            .count()
+    };
+    assert_eq!(count(K::PIPE), 1, "the opener");
+    assert_eq!(count(K::MARGIN), 1, "the marker of the second line");
     assert_eq!(
         texts("@quote\n| alpha\n| beta\n", K::PARAGRAPH),
         ["alpha\n| beta"]

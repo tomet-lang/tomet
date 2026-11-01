@@ -240,6 +240,13 @@ impl<'a> CstParser<'a> {
 
     fn bump(&mut self) {
         if let Some((kind, text)) = self.tokens.get(self.pos) {
+            // The tree tells a run's margin from a bar: the grammar reads it as white space
+            // (see [`CstParser::kind_at`]), and the tree keeps it as what it is.
+            let kind = if kind == K::PIPE && self.markers.contains(&self.start_of(self.pos)) {
+                K::MARGIN
+            } else {
+                kind
+            };
             self.builder.token(kind.into(), text);
             self.tokens.advance();
             self.pos += 1;

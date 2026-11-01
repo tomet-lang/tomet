@@ -32,6 +32,9 @@ pub enum SyntaxKind {
     DOLLAR,      // `$`
     PERCENT,     // `%`
     PIPE,        // `|`
+    /// The `|` that begins a later line of a `|` run: layout that folds away with the line break
+    /// before it, not content. The `|` that opens the run stays a `PIPE`.
+    MARGIN,
     BACKTICK,    // `
     DOT,         // `.`
     EXCLAMATION, // `!`

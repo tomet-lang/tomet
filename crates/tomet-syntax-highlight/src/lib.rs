@@ -135,7 +135,7 @@ pub fn highlight(src: &str) -> Vec<HighlightSpan> {
         };
         let range = token.text_range();
         let (from, to) = (usize::from(range.start()), usize::from(range.end()));
-        let Some(tag) = tag_of(&token, src, &fences) else {
+        let Some(tag) = tag_of(&token, &fences) else {
             continue;
         };
         match spans.last_mut() {
@@ -171,15 +171,15 @@ fn collect_fences(block: &SyntaxNode, fences: &mut HashSet<usize>) {
 /// What a token is, if it is anything. White space takes only the tag of the
 /// span it stands inside, so a `*two words*` is one range and a space between
 /// two keys is not.
-fn tag_of(token: &SyntaxToken, src: &str, fences: &HashSet<usize>) -> Option<Tag> {
+fn tag_of(token: &SyntaxToken, fences: &HashSet<usize>) -> Option<Tag> {
     let kind = token.kind();
     if matches!(kind, K::WHITESPACE | K::NEWLINE) {
         return inline_span(token);
     }
-    own_tag(token, src, fences).or_else(|| inline_span(token))
+    own_tag(token, fences).or_else(|| inline_span(token))
 }
 
-fn own_tag(token: &SyntaxToken, src: &str, fences: &HashSet<usize>) -> Option<Tag> {
+fn own_tag(token: &SyntaxToken, fences: &HashSet<usize>) -> Option<Tag> {
     let kind = token.kind();
     let parent = token.parent()?;
     let parent_kind = parent.kind();
@@ -212,7 +212,8 @@ fn own_tag(token: &SyntaxToken, src: &str, fences: &HashSet<usize>) -> Option<Ta
         K::MINUS | K::DOT if parent_kind == K::LIST_ITEM => {
             is_list_marker(token).then_some(Tag::List)
         }
-        K::PIPE => is_pipe_margin(token, src).then_some(Tag::Punctuation),
+        K::MARGIN => Some(Tag::Punctuation),
+        K::PIPE => is_pipe_opener(token).then_some(Tag::Punctuation),
         K::L_PAREN
         | K::R_PAREN
         | K::L_BRACE
@@ -264,23 +265,12 @@ fn is_list_marker(token: &SyntaxToken) -> bool {
     }
 }
 
-/// A `|` that is the margin of a run -- the one that opens it, or the one that
-/// begins a later line -- and not a bar in the text.
-fn is_pipe_margin(token: &SyntaxToken, src: &str) -> bool {
-    let Some(parent) = token.parent() else {
-        return false;
-    };
-    if parent.kind() == K::CONTENT && parent.first_token().as_ref() == Some(token) {
-        return true;
-    }
-    let at = usize::from(token.text_range().start());
-    let line_start = src[..at].rfind('\n').map_or(0, |i| i + 1);
-    src[line_start..at]
-        .chars()
-        .all(|c| c == '|' || c.is_whitespace())
-        && token
-            .parent_ancestors()
-            .any(|n| n.kind() == K::CONTENT && n.first_token().is_some_and(|f| f.kind() == K::PIPE))
+/// The `|` that opens a run, and not a bar in the text. (The ones that begin a run's later lines are
+/// `MARGIN` tokens in the tree.)
+fn is_pipe_opener(token: &SyntaxToken) -> bool {
+    token
+        .parent()
+        .is_some_and(|p| p.kind() == K::CONTENT && p.first_token().as_ref() == Some(token))
 }
 
 /// The key of a `key: value` entry: what stands before its colon.
