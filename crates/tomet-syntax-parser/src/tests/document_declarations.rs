@@ -133,3 +133,19 @@ fn a_trailing_comment_may_follow_a_declaration() {
     let doc = parse_document("::kind(config) // the kind\n").unwrap();
     assert!(matches!(doc.blocks[0], Block::Declaration(_)));
 }
+
+#[test]
+fn a_declaration_with_text_after_it_on_its_line_is_an_error() {
+    let err = parse_document("::meta{a: 1} text\n").expect_err("a declaration stands alone");
+    assert!(err.message.contains("stands alone"), "{}", err.message);
+    // Where the text after the declaration begins.
+    assert_eq!(err.offset, 13);
+}
+
+#[test]
+fn a_double_colon_that_opens_no_declaration_is_not_an_error_either_way() {
+    // No group after the name: it is prose, not a declaration with something after it.
+    assert!(parse_document("::memo is how a path starts\n").is_ok());
+    // Inside a `|` run a line may begin with one.
+    assert!(parse_document("@quote\n| ::meta{a: 1} text\n").is_ok());
+}

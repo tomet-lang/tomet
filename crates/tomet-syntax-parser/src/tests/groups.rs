@@ -143,6 +143,36 @@ fn a_second_group_written_against_the_first_is_an_error() {
 }
 
 #[test]
+fn every_kind_of_group_written_twice_against_itself_is_an_error() {
+    // The offset is where the second group begins; the message names the kind.
+    for (src, kind, at) in [
+        ("@T(a:1)(b:2)\n", "a second `(args)` group", 7),
+        ("@T[a][b]\n", "a second `[content]` group", 5),
+        ("@T{a:1}{b:2}\n", "a second `{value}` group", 7),
+        ("::meta{a:1}{b:2}\n", "a second `{value}` group", 11),
+        ("a @T(a:1)(b:2) b\n", "a second `(args)` group", 9),
+        ("@T#(a)#(b)\n", "a second `#(...)`", 6),
+    ] {
+        let err = parse_document(src).expect_err(src);
+        assert!(err.message.contains(kind), "`{src}`: {}", err.message);
+        assert_eq!(err.offset, at, "`{src}`: {}", err.message);
+    }
+}
+
+#[test]
+fn a_second_group_apart_from_the_first_is_not_an_error() {
+    // Apart by a space it is prose; on the next line it is prose too. Only against the first it is a mistake.
+    for src in [
+        "@T(a:1) (b:2)\n",
+        "@T(a:1)\n(b:2)\n",
+        "- (a)(b)\n",
+        "=[ t ](a)(b)\n",
+    ] {
+        assert!(parse_document(src).is_ok(), "`{src}` should parse");
+    }
+}
+
+#[test]
 fn a_parenthesis_after_an_element_is_prose() {
     // The narrowing that keeps ordinary sentences working: a group has
     // to be written *against* the element to count as a second one.

@@ -17,10 +17,7 @@
 //! `${...}` expressions and a group's values, which hand back to the CST
 //! whatever they embed (see [`crate::value::Embedded`]).
 
-use crate::element::{
-    Groups, is_document_element_start, opens_group, parse_hash_id, parse_paren_value,
-    parse_value_group,
-};
+use crate::element::{Groups, parse_hash_id, parse_paren_value, parse_value_group};
 use crate::error::{Error, Result};
 use crate::inline::{DELIMITERS, extend_merging, push_text, split_softbreaks, trim_edges};
 use crate::interp::{is_interp_start, parse_interpolation};
@@ -88,6 +85,11 @@ fn lower_block(src: &str, node: &SyntaxNode) -> Result<Option<Block>> {
         K::LIST => lower_list(src, node).map(|l| Some(Block::List(l))),
         K::THEMATIC_BREAK => lower_thematic_break(src, node).map(Some),
         K::CODE_BLOCK => lower_code_block(src, node).map(Some),
+        // The text after a declaration on its line.
+        K::ERROR => Err(err(
+            range_of(node).0,
+            "a `::` declaration stands alone on its line",
+        )),
         other => Err(unsupported(format!("node {other:?}"))),
     }
 }
@@ -116,10 +118,6 @@ fn lower_paragraph(src: &str, node: &SyntaxNode) -> Result<Option<Block>> {
         {
             end = close;
         }
-    }
-    // A `::` that opens a block is a declaration, which stands alone on its line.
-    if pipe_depth(node) == 0 && is_document_element_start(&cursor_at(src, start)) {
-        return Err(declaration_not_alone(src, start));
     }
     let mut content = lower_inlines(src, node, start, end)?;
     if content.is_empty() {
@@ -502,7 +500,6 @@ fn lower_declaration(src: &str, node: &SyntaxNode) -> Result<Declaration> {
         .map(|n| range_of(&n).1)
         .max()
         .unwrap_or(start);
-    reject_second_group(src, end)?;
     Ok(Declaration {
         name,
         data: read.data,
@@ -530,7 +527,6 @@ fn lower_element(src: &str, node: &SyntaxNode) -> Result<Element> {
         .map(|n| range_of(&n).1)
         .max()
         .unwrap_or(sigil_start);
-    reject_second_group(src, end)?;
     Ok(Element {
         name,
         placement: Placement::Inline,
@@ -589,6 +585,7 @@ pub(crate) fn lower_group_list(
             }
             K::CONNECT if is_merge_connect(&child) => merge_connect(src, &child, &mut read)?,
             K::CONNECT => read.connects.push(lower_connect(src, &child)?),
+            K::ERROR => return Err(second_group(&child)),
             other => return Err(unsupported(format!("{other:?} in an element's groups"))),
         }
     }
@@ -1163,55 +1160,26 @@ fn lower_code_block_in_run(
     Ok(Block::Element(element))
 }
 
-/// The error for a `::` declaration that has text before or after it on its line.
-/// It is read on its own, to say where the declaration ends.
-fn declaration_not_alone(src: &str, start: usize) -> Error {
-    let rest = &src[start..];
-    let root = crate::cst::parse_cst(rest);
-    let declaration = root
-        .children()
-        .find(|n| n.kind() == K::BLOCK_ELEMENT)
-        .ok_or_else(|| unsupported("a declaration that does not read"))
-        .and_then(|n| lower_declaration(rest, &n));
-    match declaration {
-        Ok(d) => {
-            let mut cur = cursor_at(src, start + d.span.end);
-            skip_inline_ws(&mut cur);
-            err(cur.pos(), "a `::` declaration stands alone on its line")
-        }
-        Err(mut e) => {
-            e.offset += start;
-            e
-        }
+/// The error for a group of a kind the owner already has, written against the last one (the
+/// CST keeps it in an `ERROR` node). `:` in front of it merges into the one that is there.
+fn second_group(node: &SyntaxNode) -> Error {
+    let (start, _) = range_of(node);
+    let first = node.first_token().map(|t| t.kind());
+    if first == Some(K::HASH) {
+        return err(start, "a second `#(...)`: an element takes at most one id");
     }
-}
-
-/// A group written against the end of an element, when the element has one of
-/// that kind already, is an error: the CST left it as text, and the AST parser
-/// refuses it. `:` in front of it merges into the one that is there.
-fn reject_second_group(src: &str, end: usize) -> Result<()> {
-    let cur = cursor_at(src, end);
-    if !opens_group(&cur) {
-        return Ok(());
-    }
-    if cur.peek() == Some('#') {
-        return Err(err(
-            end,
-            "a second `#(...)`: an element takes at most one id",
-        ));
-    }
-    let group = match cur.peek() {
-        Some('(') => "(args)",
-        Some('[') | Some('|') => "[content]",
+    let group = match first {
+        Some(K::L_PAREN) => "(args)",
+        Some(K::L_BRACKET) | Some(K::PIPE) => "[content]",
         _ => "{value}",
     };
-    Err(err(
-        end,
+    err(
+        start,
         format!(
             "a second `{group}` group: an element takes one of each. \
              Write `:` in front of it to merge into the one already there"
         ),
-    ))
+    )
 }
 
 /// A `[content]` group that never closes.

@@ -47,6 +47,28 @@ fn a_runs_opener_is_a_pipe_and_the_bar_of_each_later_line_is_a_margin() {
     assert_eq!(tokens_of("a | b\n", K::MARGIN), 0);
 }
 
+// --- mistakes the tree keeps ----------------------------------------------
+
+#[test]
+fn a_group_written_twice_against_itself_is_an_error_node_read_as_the_group_it_looks_like() {
+    let src = "@T(a)(b)\n";
+    assert_eq!(texts(src, K::ERROR), ["(b)"]);
+    assert_eq!(
+        kinds(src, K::ARGS),
+        2,
+        "the second is read as arguments too"
+    );
+    // Apart from the first, it is no mistake.
+    assert_eq!(kinds("@T(a) (b)\n", K::ERROR), 0);
+}
+
+#[test]
+fn the_text_after_a_declaration_on_its_line_is_an_error_node() {
+    let src = "::meta{a: 1} text\n";
+    assert_eq!(texts(src, K::BLOCK_ELEMENT), ["::meta{a: 1} "]);
+    assert_eq!(texts(src, K::ERROR), ["text\n"]);
+}
+
 // --- list markers ---------------------------------------------------------
 
 #[test]

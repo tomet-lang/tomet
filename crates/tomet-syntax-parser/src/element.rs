@@ -46,19 +46,6 @@ pub(crate) fn is_element_start(cur: &Cursor, block_context: bool) -> bool {
     }
 }
 
-/// Whether a declaration about the document, `::name`, starts at `cur`.
-///
-/// Only a block can be one -- the `::` has to open a line -- so there is no
-/// `block_context` to pass: every call site is a block dispatch. Nowhere else
-/// asks, so in running text, in a `{...}` entry list, `std::vec` and a `::`
-/// in the middle of a line stay what they were: text.
-///
-/// What follows the `::` is read exactly as what follows an `@`.
-pub(crate) fn is_document_element_start(cur: &Cursor) -> bool {
-    let mut look = *cur;
-    look.eat_str("::") && name_and_tail_start(look, true)
-}
-
 /// The part of [`is_element_start`] after the sigil: the name, and what has to
 /// follow it for the sigil to start an element rather than prose.
 fn name_and_tail_start(mut look: Cursor, block_context: bool) -> bool {

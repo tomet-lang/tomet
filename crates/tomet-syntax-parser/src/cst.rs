@@ -840,6 +840,15 @@ impl<'a> CstParser<'a> {
                 }
             }
             K::COLON if self.is_block_element_at(self.pos) => self.parse_block_element(),
+            // A declaration that does not stand alone: still read as one, with the text after it
+            // marked as the mistake.
+            K::COLON
+                if self.pipe_cols.is_empty()
+                    && self.sigil_len_at(self.pos) == Some(3)
+                    && self.groups_follow(self.pos + 3) =>
+            {
+                self.parse_declaration_with_stray_text()
+            }
             _ => self.parse_paragraph(),
         }
     }
@@ -861,7 +870,7 @@ impl<'a> CstParser<'a> {
                 .is_some_and(|b| *b == b' ' || *b == b'\t')
             && !matches!(self.current_kind(), None | Some(K::NEWLINE | K::COMMENT));
         if full_form {
-            self.parse_groups(true);
+            self.parse_groups(true, false);
             // Decorative trailing `=`, which may itself be followed by groups.
             loop {
                 let j = self.skip_ws_from(self.pos);
@@ -870,7 +879,7 @@ impl<'a> CstParser<'a> {
                 }
                 self.bump_while(K::WHITESPACE);
                 self.bump_while(K::EQUAL);
-                self.parse_groups(false);
+                self.parse_groups(false, false);
             }
         }
         if sugar {
@@ -879,7 +888,7 @@ impl<'a> CstParser<'a> {
             let k = self.skip_ws_from(self.pos);
             if self.kind_at(k) == Some(K::COLON) && self.connect_follows(k) {
                 self.bump_while(K::WHITESPACE);
-                self.parse_groups(false);
+                self.parse_groups(false, false);
                 self.parse_inline(InlineStop::Line);
             }
         } else {
@@ -917,7 +926,7 @@ impl<'a> CstParser<'a> {
                 continue;
             }
             let outer = std::mem::replace(&mut self.allow_connect, true);
-            self.parse_groups(false);
+            self.parse_groups(false, false);
             self.allow_connect = outer;
             self.parse_inline(InlineStop::Line);
             return;
@@ -971,7 +980,7 @@ impl<'a> CstParser<'a> {
         let slice = &self.src[at..self.balanced_line_end(at)];
         let mut scratch = CstParser::new(slice, tokenize(slice));
         scratch.builder.start_node(K::ROOT.into());
-        scratch.parse_groups(false);
+        scratch.parse_groups(false, false);
         scratch.bump_while(K::WHITESPACE);
         scratch.builder.finish_node();
         if !scratch.is_eof() {
@@ -1027,7 +1036,7 @@ impl<'a> CstParser<'a> {
             return;
         }
         self.parse_sigil();
-        self.parse_groups(true);
+        self.parse_groups(true, true);
     }
 
     /// A box, at the `<` the cursor stands on ([`CstParser::slot_at`] said it is one):
@@ -1069,6 +1078,17 @@ impl<'a> CstParser<'a> {
             self.parse_content_group();
         }
         self.builder.finish_node();
+    }
+
+    /// A `::name(...)` that opens a block and has more on its line: the declaration, read as it
+    /// would be alone, and the rest of the line in an `ERROR` node (a declaration stands alone).
+    fn parse_declaration_with_stray_text(&mut self) {
+        self.parse_block_element();
+        if !matches!(self.current_kind(), None | Some(K::NEWLINE)) {
+            self.builder.start_node(K::ERROR.into());
+            self.parse_inline(InlineStop::Line);
+            self.builder.finish_node();
+        }
     }
 
     fn parse_block_element(&mut self) {
@@ -1155,7 +1175,7 @@ impl<'a> CstParser<'a> {
         // its closing bracket, nothing else there to claim it -- attaches
         // to the item itself, the same as any other sigil's groups do.
         let sugar = self.list_item_is_sugar();
-        self.parse_groups(false);
+        self.parse_groups(false, false);
         if sugar {
             // `- text` and `- (marker) text`: the text, and the groups it ends in.
             let outer = std::mem::replace(&mut self.allow_connect, false);
@@ -1186,7 +1206,7 @@ impl<'a> CstParser<'a> {
         let k = self.skip_ws_from(self.pos);
         if self.allow_connect && self.kind_at(k) == Some(K::COLON) && self.connect_follows(k) {
             self.bump_while(K::WHITESPACE);
-            self.parse_groups(false);
+            self.parse_groups(false, false);
             self.parse_inline(InlineStop::Line);
         }
     }
@@ -1579,7 +1599,7 @@ impl<'a> CstParser<'a> {
             }
         } else {
             // Like a block element's, an inline element's groups may begin on the next line.
-            self.parse_groups(true);
+            self.parse_groups(true, true);
         }
         self.builder.finish_node();
         true
@@ -1621,7 +1641,10 @@ impl<'a> CstParser<'a> {
     /// run. A block element (`cross_newline`) may open it on the line after
     /// its own, `@quote(A)` and then `| text`; any other construct opens it
     /// on its own line or not at all.
-    fn parse_groups(&mut self, cross_newline: bool) {
+    ///
+    /// With `strict`, a second group of a kind already taken, written against the last one, is
+    /// an `ERROR` node (see the arm below).
+    fn parse_groups(&mut self, cross_newline: bool, strict: bool) {
         let (mut args, mut value, mut content, mut id) = (false, false, false, false);
         loop {
             let mut j = self.skip_ws_from(self.pos);
@@ -1682,7 +1705,31 @@ impl<'a> CstParser<'a> {
                 }
                 Some(K::COLON) if self.allow_connect && self.connect_follows(j) => {
                     self.bump_while(K::WHITESPACE);
-                    self.parse_connect();
+                    self.parse_connect(strict);
+                }
+                // A group of a kind the owner has already, written against the last one. Apart
+                // from it (a space, a line) it is prose; against it, it is an error, kept in the
+                // tree as one and read as the group it looks like. Only an element and a
+                // declaration take one of each.
+                Some(k @ (K::L_PAREN | K::L_BRACKET | K::L_BRACE | K::PIPE | K::HASH))
+                    if strict
+                        && j == self.pos
+                        && match k {
+                            K::L_PAREN => args,
+                            K::L_BRACE => value,
+                            K::L_BRACKET | K::PIPE => content,
+                            _ => id && self.id_follows(j),
+                        } =>
+                {
+                    self.builder.start_node(K::ERROR.into());
+                    match k {
+                        K::L_PAREN => self.parse_args_group(),
+                        K::L_BRACE => self.parse_value_group(),
+                        K::L_BRACKET => self.parse_content_group(),
+                        K::PIPE => self.parse_pipe_content(),
+                        _ => self.parse_id_group(),
+                    }
+                    self.builder.finish_node();
                 }
                 _ => break,
             }
@@ -1750,7 +1797,7 @@ impl<'a> CstParser<'a> {
         Self::is_opener(self.kind_at(e))
     }
 
-    fn parse_connect(&mut self) {
+    fn parse_connect(&mut self, strict: bool) {
         self.builder.start_node(K::CONNECT.into());
         self.bump(); // ':'
         if self.current_kind() == Some(K::IDENT) {
@@ -1760,7 +1807,7 @@ impl<'a> CstParser<'a> {
         // `[content]` in any order, each once -- but not a sibling `:connect`,
         // which stays for the loop this was called from.
         let outer = std::mem::replace(&mut self.allow_connect, false);
-        self.parse_groups(false);
+        self.parse_groups(false, strict);
         self.allow_connect = outer;
         self.builder.finish_node();
     }
