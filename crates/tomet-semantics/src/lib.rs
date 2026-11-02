@@ -93,3 +93,4 @@ pub use vocabulary::{
     Bindings, ContentAllow, ElementDecl, LoadedVocabularies, ParamDecl, RESERVED_NAMESPACES,
     Region, Vocabulary, builtin_doc_vocabularies,
 };
+pub use tomet_semantics_core::admits::{Mismatch, admits};

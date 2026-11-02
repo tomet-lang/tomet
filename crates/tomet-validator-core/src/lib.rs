@@ -14,6 +14,7 @@ use tomet_span::Span;
 use tomet_cst::{SyntaxNode, TextRange};
 use tomet_semantics::DeclKind;
 use tomet_semantics::{Bindings, Shape};
+use tomet_semantics_core::admits::admits;
 use tomet_tree::{Node, Place, Visit};
 
 /// Something written in the document that a region or sigil rule applies to:
@@ -467,7 +468,7 @@ fn check_arguments_of(
         if matches!(value, Value::Interp(_)) {
             continue;
         }
-        if let Err(mismatch) = ty.admits(value) {
+        if let Err(mismatch) = admits(ty, value) {
             errors.push(Diagnostic::InvalidArgument {
                 element: name.to_string(),
                 argument: key.clone(),

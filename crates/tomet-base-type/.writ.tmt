@@ -1,0 +1,18 @@
+::kind(writ)
+
+==[ type-purity ]
+
+@rule(type-purity){
+  guard: { twrit: pure }
+
+  pure: {
+    crates: [ "crates/tomet-base-type" ]
+    forbid: [ "std::fs", "std::net", "std::process", "std::env" ]
+    allow-external: []
+  }
+}
+
+`tomet-type` is a pure, side-effect-free base-layer crate representing the type
+vocabulary. It performs no I/O and holds zero external dependencies.
+Layering rules in the root `.writ.tmt` govern that Layer 1 crates depend on no
+other workspace crates.

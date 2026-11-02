@@ -122,12 +122,42 @@ pub fn var_scope(
 
 /// A text passed on the command line, as the value of the declared type.
 fn read_text(name: &str, ty: Type, text: &str) -> Result<Value, VarError> {
-    ty.read_text(text).map_err(|err| VarError::BadValue {
+    let bad = |why: String| VarError::BadValue {
         name: name.to_string(),
         ty,
         text: text.to_string(),
-        why: err.to_string(),
-    })
+        why,
+    };
+    match ty {
+        Type::String | Type::Nanoid => Ok(Value::String(text.to_string())),
+        Type::Int => text
+            .trim()
+            .parse::<i64>()
+            .map(Value::Int)
+            .map_err(|_| bad(format!("`{text}` is not an integer"))),
+        Type::Uint => match text.trim().parse::<i64>() {
+            Ok(n) if n >= 0 => Ok(Value::Int(n)),
+            _ => Err(bad(format!("`{text}` is not a non-negative integer"))),
+        },
+        Type::Float => match text.trim().parse::<f64>() {
+            Ok(n) if n.is_finite() => Ok(Value::Float(n)),
+            _ => Err(bad(format!("`{text}` is not a number"))),
+        },
+        Type::Bool => match text.trim() {
+            "true" => Ok(Value::Bool(true)),
+            "false" => Ok(Value::Bool(false)),
+            _ => Err(bad(format!("`{text}` is not `true` or `false`"))),
+        },
+        Type::Datetime | Type::Version | Type::Uuid => {
+            let trimmed = text.trim();
+            if ty.holds_text(trimmed) == Some(true) {
+                Ok(Value::String(trimmed.to_string()))
+            } else {
+                Err(bad(format!("`{text}` is not {}", ty.describe())))
+            }
+        }
+        Type::List => Err(bad("a list has no single-text form".to_string())),
+    }
 }
 
 /// A value as the declared type reads it.

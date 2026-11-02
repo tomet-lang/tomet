@@ -14,6 +14,7 @@ tomet-ast = { workspace = true }
 tomet-span = { workspace = true }
 tomet-tree = { workspace = true }
 tomet-type = { workspace = true }
+tomet-semantics-core = { workspace = true }
 
 #= Crates.io
 serde_json = { workspace = true }

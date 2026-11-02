@@ -4,6 +4,7 @@
 //! macros, and variable definitions.
 
 use tomet_ast::Value;
+use tomet_semantics_core::admits::admits;
 use tomet_type::Type;
 
 use crate::declaration::Declaration;
@@ -240,7 +241,7 @@ fn check_declared_version(
     if matches!(&written, Value::Interp(_)) {
         return;
     }
-    if let Err(mismatch) = Type::Version.admits(&written) {
+    if let Err(mismatch) = admits(Type::Version, &written) {
         problems.push((
             idx,
             Problem::InvalidDefinition {
@@ -339,8 +340,7 @@ fn check_vars(
 
 fn var_problem(decl: &VarDecl) -> Option<String> {
     let default = decl.default.as_ref()?;
-    decl.ty
-        .admits(default)
+    admits(decl.ty, default)
         .err()
         .map(|err| format!("`default` is not a value of `type: {}`: {err}", decl.ty))
 }

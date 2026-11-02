@@ -6,6 +6,7 @@
 //! declaration (it goes in `default:`).
 
 use tomet_ast::{Block, Inline, Value};
+use tomet_semantics_core::parse_type_spec;
 use tomet_type::Type;
 
 use crate::declaration::Declaration;
@@ -46,7 +47,7 @@ impl VarDecl {
         };
         for (key, field) in fields {
             match key.as_str() {
-                "type" => decl.ty = Type::parse(field).map_err(|e| e.to_string())?,
+                "type" => decl.ty = parse_type_spec(field).map_err(|e| e.to_string())?,
                 "default" => decl.default = Some(field.clone()),
                 "about" => match plain_text(field) {
                     Some(about) => decl.about = Some(about),

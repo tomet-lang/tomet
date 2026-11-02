@@ -1,0 +1,12 @@
+[package]
+name = "tomet-semantics-core"
+version.workspace = true
+edition.workspace = true
+description = "Shared core semantic model and type admission for Tomet and cotomet."
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+cotomet-syntax = { workspace = true }
+tomet-ast = { workspace = true }
+tomet-type = { workspace = true }

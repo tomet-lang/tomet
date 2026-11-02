@@ -30,6 +30,8 @@ use tomet_ast::{Document, Name, Value};
 use tomet_tree::ValueExt;
 use tomet_type::{Type, TypeError};
 
+use tomet_semantics_core::{admits, parse_type_spec};
+
 use tomet_declaration::DeclKind;
 
 use crate::kind::{ElementKind, Shape, UnknownName, builtin_kinds, classify_declaration_lenient};
@@ -317,7 +319,7 @@ impl Vocabulary {
                     Some(Ok(ty)) => param
                         .default
                         .as_ref()
-                        .and_then(|default| ty.admits(default).err())
+                        .and_then(|default| admits(*ty, default).err())
                         .map(|mismatch| format!("`default` is not of `type: {ty}`: {mismatch}")),
                     None => None,
                 };
@@ -697,7 +699,7 @@ fn params_from_value(args: &Value) -> Vec<ParamDecl> {
         .iter()
         .map(|(name, spec)| ParamDecl {
             name: name.clone(),
-            ty: spec.get("type").map(Type::parse),
+            ty: spec.get("type").map(parse_type_spec),
             required: spec
                 .get("required")
                 .and_then(|v| v.as_bool())

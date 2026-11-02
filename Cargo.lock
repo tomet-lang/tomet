@@ -1906,6 +1906,7 @@ dependencies = [
  "cotomet-syntax",
  "tomet-ast",
  "tomet-parser",
+ "tomet-semantics-core",
  "tomet-span",
  "tomet-tree",
  "tomet-type",
@@ -2237,8 +2238,18 @@ dependencies = [
  "tomet-ast",
  "tomet-declaration",
  "tomet-parser",
+ "tomet-semantics-core",
  "tomet-span",
  "tomet-tree",
+ "tomet-type",
+]
+
+[[package]]
+name = "tomet-semantics-core"
+version = "0.5.0"
+dependencies = [
+ "cotomet-syntax",
+ "tomet-ast",
  "tomet-type",
 ]
 
@@ -2360,9 +2371,6 @@ dependencies = [
 [[package]]
 name = "tomet-type"
 version = "0.5.0"
-dependencies = [
- "tomet-ast",
-]
 
 [[package]]
 name = "tomet-typst"
@@ -2417,6 +2425,7 @@ dependencies = [
  "tomet-declaration",
  "tomet-position",
  "tomet-semantics",
+ "tomet-semantics-core",
  "tomet-span",
  "tomet-tree",
  "tomet-type",

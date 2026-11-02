@@ -12,6 +12,7 @@ tomet-ast = { workspace = true }
 tomet-span = { workspace = true }
 tomet-tree = { workspace = true }
 tomet-type = { workspace = true }
+tomet-semantics-core = { workspace = true }
 
 [dev-dependencies]
 tomet-parser = { workspace = true }

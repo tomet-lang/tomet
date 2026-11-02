@@ -23,6 +23,7 @@ members = [
   #= Base -- positions in source text; depends on nothing in the workspace
   "crates/tomet-base-span",
   "crates/tomet-base-position",
+  "crates/tomet-base-type",
 
   #= Syntax -- grammar/parsing
   "crates/tomet-syntax-cst",
@@ -37,7 +38,7 @@ members = [
   "crates/tomet-semantics",
   "crates/tomet-semantics-expr",
   "crates/tomet-semantics-address",
-  "crates/tomet-semantics-type",
+  "crates/tomet-semantics-core",
   "crates/tomet-semantics-declaration",
   "crates/tomet-semantics-eval",
 
@@ -134,7 +135,8 @@ tomet-tree = { path = "crates/tomet-syntax-tree", version = "0.5.0" }
 #--- Semantics ---
 tomet-address = { path = "crates/tomet-semantics-address", version = "0.5.0" }
 tomet-expr = { path = "crates/tomet-semantics-expr", version = "0.5.0" }
-tomet-type = { path = "crates/tomet-semantics-type", version = "0.5.0" }
+tomet-type = { path = "crates/tomet-base-type", version = "0.5.0" }
+tomet-semantics-core = { path = "crates/tomet-semantics-core", version = "0.5.0" }
 tomet-declaration = { path = "crates/tomet-semantics-declaration", version = "0.5.0" }
 tomet-semantics = { path = "crates/tomet-semantics", version = "0.5.0" }
 cotomet-eval = { path = "crates/tomet-semantics-eval", version = "0.5.0" }
