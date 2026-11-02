@@ -11,7 +11,7 @@ use tomet_cst::{SyntaxKind as K, SyntaxNode};
 use tomet_lexer::Cursor;
 
 pub(crate) use cotomet_syntax::{
-    POSITIONAL_ENTRY_KEY, eat_name, eat_scalar_raw, skip_inline_ws, skip_line_comment,
+    POSITIONAL_ENTRY_KEY, eat_scalar_raw, skip_inline_ws, skip_line_comment,
     skip_ws_newlines_and_comments,
 };
 

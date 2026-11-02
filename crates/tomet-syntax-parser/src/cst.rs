@@ -98,6 +98,8 @@ pub const MAX_DEPTH: usize = cotomet_syntax::MAX_DEPTH;
 enum InlineStop {
     /// Up to and including the newline.
     Line,
+    /// Up to, not including, the newline: the text of a line without the line break.
+    LineText,
     /// Up to and including the newline that ends the paragraph -- or,
     /// when [`CstParser::in_bracket`], the enclosing group's own closing
     /// `]`, depth-counted so a literal `[`/`]` typed as plain prose
@@ -306,20 +308,30 @@ impl<'a, 't> CstParser<'a, 't> {
     }
 
     /// Assembles a single `COMMENT` token in the green tree spanning all constituent tokens
-    /// of the comment, advancing parser position past them.
+    /// of the comment, advancing parser position past them. Unclosed block comments are
+    /// wrapped in an `ERROR` node.
     fn bump_comment(&mut self) {
         let count = self.comment_len_at(self.pos);
         if count == 0 {
             self.bump();
             return;
         }
+        let is_unclosed_block = self.is_block_comment_open_at(self.pos)
+            && self.block_closers.partition_point(|&c| c <= self.pos + 2) >= self.block_closers.len();
+
         let start = self.start_of(self.pos);
         let end = if self.pos + count >= self.tokens.len() {
             self.src.len()
         } else {
             self.start_of(self.pos + count)
         };
-        self.builder.token(K::COMMENT.into(), &self.src[start..end]);
+        if is_unclosed_block {
+            self.builder.start_node(K::ERROR.into());
+            self.builder.token(K::COMMENT.into(), &self.src[start..end]);
+            self.builder.finish_node();
+        } else {
+            self.builder.token(K::COMMENT.into(), &self.src[start..end]);
+        }
         self.pos += count;
     }
 
@@ -455,6 +467,18 @@ impl<'a, 't> CstParser<'a, 't> {
         let end = self.start_of(self.pos + count);
         self.builder.token(K::IDENT.into(), &self.src[start..end]);
         self.pos += count;
+    }
+
+    fn parse_name_node(&mut self) {
+        let count = self.name_tokens_at(self.pos);
+        if count == 0 {
+            return;
+        }
+        self.builder.start_node(K::NAME.into());
+        for _ in 0..count {
+            self.bump();
+        }
+        self.builder.finish_node();
     }
 
     fn bump_string_literal(&mut self) {
@@ -655,8 +679,9 @@ impl<'a, 't> CstParser<'a, 't> {
 
     /// The run opened by the `|` at token `opener`: the index of the `NEWLINE`
     /// after its last line (the number of tokens, if it runs to the end of the
-    /// text), and the index of the marker on each line after the first.
-    fn scan_pipe_run(&self, opener: usize) -> (usize, Vec<usize>) {
+    /// text), the index of the marker on each line after the first, and whether
+    /// the line after the run carries a misaligned marker.
+    fn scan_pipe_run(&self, opener: usize) -> (usize, Vec<usize>, bool) {
         let mut cols = self.pipe_cols.clone();
         cols.push(self.column_at(self.start_of(opener)));
         let mut markers = Vec::new();
@@ -666,10 +691,26 @@ impl<'a, 't> CstParser<'a, 't> {
                 i += 1;
             }
             if self.raw_kind_at(i).is_none() {
-                return (self.tokens.len(), markers);
+                return (self.tokens.len(), markers, false);
             }
             match self.continuation(i, &cols) {
-                (Continuation::End, _) | (_, None) => return (i, markers),
+                (Continuation::End, _) | (_, None) => {
+                    let mut j = self.skip_raw_ws(i + 1);
+                    let mut is_misaligned = false;
+                    if !matches!(self.raw_kind_at(j), None | Some(K::NEWLINE)) {
+                        for &col in &cols {
+                            if self.raw_kind_at(j) != Some(K::PIPE) {
+                                break;
+                            }
+                            if self.column_at(self.start_of(j)) != col {
+                                is_misaligned = true;
+                                break;
+                            }
+                            j = self.skip_raw_ws(j + 1);
+                        }
+                    }
+                    return (i, markers, is_misaligned);
+                }
                 (_, Some(marker)) => {
                     markers.push(marker);
                     i = marker + 1;
@@ -1220,14 +1261,28 @@ impl<'a, 't> CstParser<'a, 't> {
     /// reaches without an element of its own in the way: a `{value}` that an
     /// `@element` at the end of the text would take is the element's.
     fn parse_sugar_tail(&mut self) {
+        self.bump_while(K::WHITESPACE);
         let from = self.start_of(self.pos);
         let mut line = TailScan::new(self.src, from);
         let mut resume = from;
+        let mut in_body = false;
         loop {
             let Some(at) = self.trailing_groups_start(&mut line, resume) else {
+                if !in_body && !matches!(self.current_kind(), None | Some(K::NEWLINE)) {
+                    self.builder.start_node(K::BODY.into());
+                    in_body = true;
+                }
+                if in_body {
+                    self.parse_inline(InlineStop::LineText);
+                    self.builder.finish_node();
+                }
                 self.parse_inline(InlineStop::Line);
                 return;
             };
+            if at > self.start_of(self.pos) && !in_body {
+                self.builder.start_node(K::BODY.into());
+                in_body = true;
+            }
             if at > self.start_of(self.pos) {
                 self.parse_inline(InlineStop::Offset(at));
             }
@@ -1235,6 +1290,9 @@ impl<'a, 't> CstParser<'a, 't> {
                 // An element in the text took the groups; look for one after it.
                 resume = self.start_of(self.pos);
                 continue;
+            }
+            if in_body {
+                self.builder.finish_node();
             }
             let outer = std::mem::replace(&mut self.allow_connect, true);
             self.parse_groups(false, false);
@@ -1328,12 +1386,60 @@ impl<'a, 't> CstParser<'a, 't> {
 
     fn parse_thematic_break(&mut self) {
         self.builder.start_node(K::THEMATIC_BREAK.into());
+        self.builder.start_node(K::FENCE.into());
         self.bump_while(K::MINUS);
+        self.builder.finish_node();
         self.bump_while(K::WHITESPACE);
         if self.current_kind() == Some(K::L_BRACKET) {
             self.parse_content_group();
+            let has_minus = {
+                let j = self.skip_ws_from(self.pos);
+                self.kind_at(j) == Some(K::MINUS)
+            };
+            let dash_count = if has_minus {
+                let j = self.skip_ws_from(self.pos);
+                self.run_len(j, K::MINUS)
+            } else {
+                0
+            };
+            if dash_count < 3 {
+                if !has_minus {
+                    let j = self.skip_ws_from(self.pos);
+                    let non_ws = !matches!(self.kind_at(j), None | Some(K::NEWLINE));
+                    if !non_ws {
+                        self.builder.start_node(K::ERROR.into());
+                        self.builder.finish_node();
+                        self.bump_while(K::WHITESPACE);
+                    } else {
+                        self.bump_while(K::WHITESPACE);
+                        self.builder.start_node(K::ERROR.into());
+                        self.builder.finish_node();
+                    }
+                } else {
+                    self.bump_while(K::WHITESPACE);
+                    self.builder.start_node(K::FENCE.into());
+                    self.bump_while(K::MINUS);
+                    self.builder.finish_node();
+                    self.builder.start_node(K::ERROR.into());
+                    self.builder.finish_node();
+                }
+            } else {
+                self.bump_while(K::WHITESPACE);
+                self.builder.start_node(K::FENCE.into());
+                self.bump_while(K::MINUS);
+                self.builder.finish_node();
+            }
+            self.bump_while(K::WHITESPACE);
+            if !matches!(self.current_kind(), None | Some(K::NEWLINE)) {
+                self.builder.start_node(K::ERROR.into());
+                self.parse_inline(InlineStop::Line);
+                self.builder.finish_node();
+            } else if self.current_kind() == Some(K::NEWLINE) {
+                self.bump();
+            }
+        } else {
+            self.parse_inline(InlineStop::Line);
         }
-        self.parse_inline(InlineStop::Line);
         self.builder.finish_node();
     }
 
@@ -1364,19 +1470,11 @@ impl<'a, 't> CstParser<'a, 't> {
         };
         let n = self.slot_name_tokens_at(self.pos, first_pred);
         if n > 0 {
-            let start = self.start_of(self.pos);
-            let end = self.start_of(self.pos + n);
-            let kind = if n == 1
-                && matches!(
-                    self.raw_kind_at(self.pos),
-                    Some(K::TRUE_KW | K::FALSE_KW | K::NULL_KW)
-                ) {
-                self.raw_kind_at(self.pos).unwrap()
-            } else {
-                K::IDENT
-            };
-            self.builder.token(kind.into(), &self.src[start..end]);
-            self.pos += n;
+            self.builder.start_node(K::NAME.into());
+            for _ in 0..n {
+                self.bump();
+            }
+            self.builder.finish_node();
         }
         if marked {
             let (mut args, mut value) = (false, false);
@@ -1602,6 +1700,11 @@ impl<'a, 't> CstParser<'a, 't> {
                 self.try_parse_inline_element();
             }
             self.allow_connect = false;
+            if !matches!(self.current_kind(), None | Some(K::NEWLINE)) {
+                self.builder.start_node(K::BODY.into());
+                self.parse_inline(InlineStop::LineText);
+                self.builder.finish_node();
+            }
             self.parse_inline(InlineStop::Line);
             self.allow_connect = outer;
         }
@@ -1655,13 +1758,24 @@ impl<'a, 't> CstParser<'a, 't> {
             self.builder.finish_node();
             return;
         }
+        self.builder.start_node(K::FENCE.into());
         for _ in 0..count {
             self.bump();
         }
+        self.builder.finish_node();
         let prev_raw = self.in_raw_block;
         self.in_raw_block = true;
         // The rest of the opening line is the info string.
-        self.bump_line();
+        if !matches!(self.current_kind(), None | Some(K::NEWLINE)) {
+            self.builder.start_node(K::INFO_STRING.into());
+            while !matches!(self.current_kind(), None | Some(K::NEWLINE)) {
+                self.bump();
+            }
+            self.builder.finish_node();
+        }
+        if self.current_kind() == Some(K::NEWLINE) {
+            self.bump();
+        }
         while !self.is_eof() && !self.at_run_end() {
             // In a `|` run the line's own marker has been read already.
             let i = if self.pipe_cols.is_empty() {
@@ -1673,13 +1787,23 @@ impl<'a, 't> CstParser<'a, 't> {
             if run >= count {
                 let j = self.skip_ws_from(i + run);
                 if matches!(self.kind_at(j), None | Some(K::NEWLINE)) {
+                    while self.pos < i {
+                        self.bump();
+                    }
+                    self.builder.start_node(K::FENCE.into());
+                    while self.pos < i + run {
+                        self.bump();
+                    }
+                    self.builder.finish_node();
                     while self.pos < j {
                         self.bump();
                     }
                     break;
                 }
             }
+            self.builder.start_node(K::CODE_LINE.into());
             self.bump_line();
+            self.builder.finish_node();
         }
         self.in_raw_block = prev_raw;
         self.builder.finish_node();
@@ -1691,20 +1815,29 @@ impl<'a, 't> CstParser<'a, 't> {
     fn parse_line_raw(&mut self) {
         let prev_raw = self.in_raw_block;
         self.in_raw_block = true;
+        let mut first = true;
         loop {
+            self.builder.start_node(K::CODE_LINE.into());
+            if !first {
+                // The indentation and a run's markers before it.
+                let next = self.skip_ws_from(self.pos);
+                while self.pos < next {
+                    self.bump();
+                }
+            }
+            first = false;
+            self.builder.start_node(K::FENCE.into());
             self.bump();
             self.bump();
+            self.builder.finish_node();
             self.bump_line();
+            self.builder.finish_node();
             if self.is_eof() || self.at_run_end() {
                 break;
             }
             let next = self.skip_ws_from(self.pos);
             if self.run_len(next, K::BACKTICK) != 2 {
                 break;
-            }
-            // The indentation and a run's markers before it.
-            while self.pos < next {
-                self.bump();
             }
         }
         self.in_raw_block = prev_raw;
@@ -1745,6 +1878,9 @@ impl<'a, 't> CstParser<'a, 't> {
                     self.bump();
                     break;
                 }
+                InlineStop::LineText if k == K::NEWLINE => {
+                    break;
+                }
                 InlineStop::Paragraph => {
                     if self.in_bracket {
                         match k {
@@ -1782,7 +1918,8 @@ impl<'a, 't> CstParser<'a, 't> {
             if !(self.try_parse_code_span()
                 || self.try_parse_autolink(stop)
                 || self.try_parse_inline_element()
-                || self.try_parse_delimited())
+                || self.try_parse_delimited()
+                || self.try_parse_escaped_semi())
             {
                 if self.current_kind() == Some(K::QUOTE) {
                     self.bump_as(K::TEXT_CHUNK);
@@ -1791,6 +1928,39 @@ impl<'a, 't> CstParser<'a, 't> {
                 }
             }
         }
+    }
+
+    fn is_at_escaped_semi(&self) -> bool {
+        if self.current_kind() != Some(K::TEXT_CHUNK) {
+            return false;
+        }
+        if self.tokens.get(self.pos).map(|(_, t)| *t) != Some("\\") {
+            return false;
+        }
+        if self.kind_at(self.pos + 1) != Some(K::SEMI) {
+            return false;
+        }
+        let mut p = self.pos;
+        while p > 0 {
+            p -= 1;
+            match self.kind_at(p) {
+                Some(K::WHITESPACE | K::MARGIN) => continue,
+                Some(K::NEWLINE) => break,
+                _ => return false,
+            }
+        }
+        true
+    }
+
+    fn try_parse_escaped_semi(&mut self) -> bool {
+        if !self.is_at_escaped_semi() {
+            return false;
+        }
+        self.builder.start_node(K::ESCAPE.into());
+        self.bump();
+        self.bump();
+        self.builder.finish_node();
+        true
     }
 
     /// After the `NEWLINE` at `i`: is the next line empty (or the text over)?
@@ -2003,12 +2173,12 @@ impl<'a, 't> CstParser<'a, 't> {
             Some(K::COLON) if self.is_double_colon_sigil_at(self.pos) => {
                 self.bump();
                 self.bump();
-                self.bump_name();
+                self.parse_name_node();
             }
             Some(_) => {
                 self.bump();
                 if self.name_at(self.pos) {
-                    self.bump_name();
+                    self.parse_name_node();
                 }
             }
             None => {}
@@ -2140,7 +2310,7 @@ impl<'a, 't> CstParser<'a, 't> {
     /// later line is the run's margin, not content; the grammar does not see
     /// it (see [`CstParser::markers`]) and the tree keeps it as a `MARGIN`.
     fn parse_pipe_content(&mut self) {
-        let (end, markers) = self.scan_pipe_run(self.pos);
+        let (end, markers, is_misaligned) = self.scan_pipe_run(self.pos);
         let column = self.column_at(self.start_of(self.pos));
         let marker_starts: Vec<usize> = markers.iter().map(|&m| self.start_of(m)).collect();
         let end_byte = self.start_of(end);
@@ -2164,6 +2334,10 @@ impl<'a, 't> CstParser<'a, 't> {
         self.allow_connect = outer_connect;
         self.run_ends.pop();
         self.pipe_cols.pop();
+        if is_misaligned {
+            self.builder.start_node(K::ERROR.into());
+            self.builder.finish_node();
+        }
         self.builder.finish_node();
     }
 
@@ -2196,7 +2370,7 @@ impl<'a, 't> CstParser<'a, 't> {
         self.builder.start_node(K::CONNECT.into());
         self.bump(); // ':'
         if self.name_at(self.pos) {
-            self.bump_name();
+            self.parse_name_node();
         }
         // The groups of a connect are an element's: `(args)`, `{value}` and
         // `[content]` in any order, each once -- but not a sibling `:connect`,
@@ -2265,6 +2439,9 @@ impl<'a, 't> CstParser<'a, 't> {
         self.depth -= 1;
         if self.current_kind() == Some(K::R_BRACKET) {
             self.bump();
+        } else {
+            self.builder.start_node(K::ERROR.into());
+            self.builder.finish_node();
         }
         self.builder.finish_node();
     }
@@ -2716,7 +2893,7 @@ mod tests {
             K::CONNECT,
         )
         .unwrap();
-        assert_eq!(child_kinds(&el), [K::ARGS, K::ID_GROUP]);
+        assert_eq!(child_kinds(&el), [K::NAME, K::ARGS, K::ID_GROUP]);
     }
 
     #[test]
@@ -2747,7 +2924,8 @@ mod tests {
             .filter_map(|e| e.into_token())
             .map(|t| t.kind())
             .collect();
-        assert_eq!(tokens, [K::COLON, K::COLON, K::IDENT]);
+        assert_eq!(tokens, [K::COLON, K::COLON]);
+        assert_eq!(child_kinds(&sigil), [K::NAME]);
     }
 
     #[test]

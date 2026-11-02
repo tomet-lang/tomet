@@ -186,11 +186,35 @@ fn own_tag(token: &SyntaxToken, fences: &HashSet<usize>) -> Option<Tag> {
 
     match parent_kind {
         K::CODE_SPAN => return None,
+        K::FENCE => {
+            if kind == K::BACKTICK {
+                return Some(Tag::ProcessingInstruction);
+            }
+            if kind == K::MINUS {
+                return Some(Tag::ContentSeparator);
+            }
+            return None;
+        }
         K::CODE_BLOCK => {
             let at = usize::from(token.text_range().start());
             return fences.contains(&at).then_some(Tag::ProcessingInstruction);
         }
         K::SIGIL => return Some(Tag::TagName),
+        K::NAME => {
+            if let Some(p) = parent.parent() {
+                match p.kind() {
+                    K::SIGIL => return Some(Tag::TagName),
+                    K::SLOT => {
+                        let marked = p
+                            .children_with_tokens()
+                            .any(|e| e.kind() == K::QUESTION);
+                        return Some(if marked { Tag::Hole } else { Tag::Label });
+                    }
+                    _ => {}
+                }
+            }
+            return None;
+        }
         // The tokens of a box's own head; its groups are nodes of their own.
         K::SLOT => {
             let marked = parent

@@ -66,6 +66,11 @@ define_ast_node!(CstListItem, LIST_ITEM);
 // (backtick fences), whereas the semantic element sigil is `@raw`.
 define_ast_node!(CstCodeBlock, CODE_BLOCK);
 define_ast_node!(CstSigil, SIGIL);
+define_ast_node!(CstName, NAME);
+define_ast_node!(CstFence, FENCE);
+define_ast_node!(CstInfoString, INFO_STRING);
+define_ast_node!(CstCodeLine, CODE_LINE);
+define_ast_node!(CstSlot, SLOT);
 define_ast_node!(CstArgs, ARGS);
 define_ast_node!(CstContent, CONTENT);
 define_ast_node!(CstValueData, VALUE_DATA);
@@ -76,8 +81,11 @@ define_ast_node!(CstInlineElement, INLINE_ELEMENT);
 define_ast_node!(CstConnect, CONNECT);
 define_ast_node!(CstIdGroup, ID_GROUP);
 define_ast_node!(CstInterpExpr, INTERP_EXPR);
+define_ast_node!(CstEscape, ESCAPE);
+define_ast_node!(CstBody, BODY);
 define_ast_node!(CstMapEntry, MAP_ENTRY);
 define_ast_node!(CstSeqItem, SEQ_ITEM);
+define_ast_node!(CstError, ERROR);
 
 impl CstRoot {
     /// The top-level sections. Deeper ones are reached through [`CstSection::sections`].
@@ -164,6 +172,10 @@ impl CstSectionHeading {
     pub fn id(&self) -> Option<CstIdGroup> {
         self.syntax().children().find_map(CstIdGroup::cast)
     }
+
+    pub fn body(&self) -> Option<CstBody> {
+        self.syntax().children().find_map(CstBody::cast)
+    }
 }
 
 impl CstInlineElement {
@@ -199,6 +211,10 @@ impl CstBlockElement {
 }
 
 impl CstConnect {
+    pub fn name(&self) -> Option<CstName> {
+        self.syntax().children().find_map(CstName::cast)
+    }
+
     pub fn args(&self) -> Option<CstArgs> {
         self.syntax().children().find_map(CstArgs::cast)
     }
@@ -231,6 +247,10 @@ impl CstListItem {
 
     pub fn id(&self) -> Option<CstIdGroup> {
         self.syntax().children().find_map(CstIdGroup::cast)
+    }
+
+    pub fn body(&self) -> Option<CstBody> {
+        self.syntax().children().find_map(CstBody::cast)
     }
 }
 
@@ -271,5 +291,111 @@ impl CstMapEntry {
             }
             None => String::new(),
         }
+    }
+}
+
+impl CstName {
+    /// Returns the namespace (if any) and the name.
+    pub fn parts(&self) -> (Option<String>, String) {
+        let mut segments: Vec<String> = Vec::new();
+        let mut current = String::new();
+        for token in self
+            .syntax()
+            .children_with_tokens()
+            .filter_map(|e| e.into_token())
+        {
+            if token.kind() == SyntaxKind::DOT {
+                if current.chars().next().is_some_and(|c| c.is_ascii_alphabetic() || c == '_') {
+                    segments.push(std::mem::take(&mut current));
+                } else {
+                    current.clear();
+                    break;
+                }
+            } else {
+                current.push_str(token.text());
+            }
+        }
+        if current.chars().next().is_some_and(|c| c.is_ascii_alphabetic() || c == '_') {
+            segments.push(current);
+        }
+        let name = segments.pop().unwrap_or_default();
+        let namespace = if segments.is_empty() {
+            None
+        } else {
+            Some(segments.join("."))
+        };
+        (namespace, name)
+    }
+}
+
+impl CstSigil {
+    pub fn name(&self) -> Option<CstName> {
+        self.syntax().children().find_map(CstName::cast)
+    }
+}
+
+impl CstSlot {
+    pub fn name(&self) -> Option<CstName> {
+        self.syntax().children().find_map(CstName::cast)
+    }
+}
+
+impl CstFence {
+    /// The number of delimiter characters in the fence.
+    pub fn count(&self) -> usize {
+        usize::from(self.syntax().text().len())
+    }
+}
+
+impl CstInfoString {
+    /// The language tag (first word) in the info string, if any.
+    pub fn lang(&self) -> Option<String> {
+        self.text().split_whitespace().next().map(|s| s.to_string())
+    }
+}
+
+impl CstCodeLine {
+    /// The mark (e.g. `` `` `` in a line raw), if present.
+    pub fn fence(&self) -> Option<CstFence> {
+        self.syntax().children().find_map(CstFence::cast)
+    }
+}
+
+impl CstCodeBlock {
+    pub fn opening_fence(&self) -> Option<CstFence> {
+        self.syntax().children().find_map(CstFence::cast)
+    }
+
+    pub fn info_string(&self) -> Option<CstInfoString> {
+        self.syntax().children().find_map(CstInfoString::cast)
+    }
+
+    pub fn lines(&self) -> impl Iterator<Item = CstCodeLine> {
+        self.syntax().children().filter_map(CstCodeLine::cast)
+    }
+
+    pub fn closing_fence(&self) -> Option<CstFence> {
+        self.syntax().children().filter_map(CstFence::cast).nth(1)
+    }
+
+    /// Whether this block is a line-raw construct (`` `` `` at start of each line).
+    pub fn is_line_raw(&self) -> bool {
+        self.syntax()
+            .first_child()
+            .is_some_and(|c| c.kind() == SyntaxKind::CODE_LINE)
+    }
+}
+
+impl CstThematicBreak {
+    pub fn opening_fence(&self) -> Option<CstFence> {
+        self.syntax().children().find_map(CstFence::cast)
+    }
+
+    pub fn content(&self) -> Option<CstContent> {
+        self.syntax().children().find_map(CstContent::cast)
+    }
+
+    pub fn closing_fence(&self) -> Option<CstFence> {
+        self.syntax().children().filter_map(CstFence::cast).nth(1)
     }
 }

@@ -230,65 +230,6 @@ pub(crate) fn push_soft_break(items: &mut Vec<Inline>, span: Span) {
     items.push(Inline::SoftBreak(SoftBreak { span }));
 }
 
-/// Splits one flushed run of source text into `Text`/[`Inline::SoftBreak`]
-/// items.
-///
-/// A source line break used to be folded away here, right into a literal
-/// `' '` in the text (or nothing, between two East-Asian-wide characters) --
-/// see [`Inline::SoftBreak`]'s doc comment for why that destroyed information
-/// this needs to keep. What a break swallows is unchanged: the newline, the
-/// whitespace after it, and -- inside a `|` run -- the next line's own `|` margin
-/// and the whitespace after that, so `x| a\n| b` still swallows exactly what
-/// `x[ a\n  b ]` does. `margins` are the offsets of the `MARGIN` tokens the tree
-/// holds, in order: a `|` that is not one of them is text. Only the
-/// output differs: the swallowed gap becomes a `SoftBreak` node spanning it,
-/// not a character. Deciding what that node renders as (a space, nothing,
-/// a real newline) is left to whoever consumes the tree.
-pub(crate) fn split_softbreaks(items: &mut Vec<Inline>, raw: &str, base: usize, margins: &[usize]) {
-    let mut text_start = 0usize;
-    let mut chars = raw.char_indices().peekable();
-    while let Some((i, c)) = chars.next() {
-        if c != '\n' && c != '\r' {
-            continue;
-        }
-        if i > text_start {
-            let span = Span::new(base + text_start, base + i);
-            push_text(items, raw[text_start..i].to_string(), span);
-        }
-        let mut gap_end = i + c.len_utf8();
-        while let Some(&(j, wc)) = chars.peek() {
-            if matches!(wc, ' ' | '\t' | '\n' | '\r') {
-                gap_end = j + wc.len_utf8();
-                chars.next();
-            } else {
-                break;
-            }
-        }
-        // The margins of a `|` run that begin the next line, each with the blanks after it.
-        while let Some(&(j, '|')) = chars.peek() {
-            if margins.binary_search(&(base + j)).is_err() {
-                break;
-            }
-            gap_end = j + '|'.len_utf8();
-            chars.next();
-            while let Some(&(k, wc)) = chars.peek() {
-                if matches!(wc, ' ' | '\t') {
-                    gap_end = k + wc.len_utf8();
-                    chars.next();
-                } else {
-                    break;
-                }
-            }
-        }
-        let span = Span::new(base + i, base + gap_end);
-        push_soft_break(items, span);
-        text_start = gap_end;
-    }
-    if text_start < raw.len() {
-        let span = Span::new(base + text_start, base + raw.len());
-        push_text(items, raw[text_start..].to_string(), span);
-    }
-}
 
 /// The length of the scheme (`https://`, `http://`, `mailto:`) an autolink
 /// starts with at `cur`, if one starts there and not in the middle of a word.

@@ -80,6 +80,17 @@ pub enum SyntaxKind {
     CODE_BLOCK,
     CALLOUT,
     SIGIL,
+    /// `@a.b-c`, `::name`, `:name`, `<?name>`: an identifier or dot-separated
+    /// name assembled from name tokens.
+    NAME,
+    /// A run of fence characters (`BACKTICK` for code blocks, `MINUS` for thematic breaks).
+    FENCE,
+    /// The info string on the opening line of a fenced code block (e.g. ` rust`).
+    INFO_STRING,
+    /// A line of the body of a fenced code block or line raw.
+    CODE_LINE,
+    /// The running text of a bracket-less sugar body (in a list item or section heading).
+    BODY,
     ARGS,
     CONTENT,
     /// `#(foobar)` -- a single id slot, read after `ARGS`/`CONTENT`/
@@ -107,6 +118,8 @@ pub enum SyntaxKind {
     /// A bare `https://`, `http://` or `mailto:` address in running text,
     /// without the punctuation that closes the sentence around it.
     AUTOLINK,
+    /// A `\;` that opens a line: an escape that produces a literal `;` as text.
+    ESCAPE,
     /// `<name>`, `<?matcher(args){data}>` and the `[content]` a marked one takes
     /// after its `>`: a seat for a value that is not there yet. The head is
     /// inside the angle brackets; one family in the syntax whatever its mark.
@@ -118,11 +131,11 @@ pub enum SyntaxKind {
     /// `EMPHASIS` or a `CODE_SPAN`, and stands bare among the text. That is why the two are not
     /// wrapped alike.
     SLOT,
-    /// A mistake the tree keeps instead of refusing: the tree never fails, lowering turns the node
-    /// into an error with the same message and offset. Two are made today: a group of a kind the
-    /// element already has, written against the last one (the node holds the group, read as the
-    /// kind it looks like), and the rest of the line after a `::` declaration (a declaration
-    /// stands alone).
+    /// A mistake of shape the tree keeps instead of refusing: the tree never fails, lowering turns
+    /// the node into an error with the same message and offset. These include: a second group of a
+    /// kind an element already has, the rest of the line after a `::` declaration, an unclosed `/*`
+    /// block comment, an unterminated `[` content bracket, a titled thematic break with fewer than 3
+    /// dashes or with trailing content, and a misaligned `|` marker.
     ERROR,
     /// A construct nested deeper than the parser reads (`MAX_DEPTH` in `tomet-parser`): its text, flat,
     /// with no structure inside, so that nothing which walks the tree recurses further than the limit.
