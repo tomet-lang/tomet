@@ -414,14 +414,20 @@ fn try_parse_call_impl<H: ValueHook>(
         Ok(args) => args,
         Err(e) => return Some(Err(e)),
     };
-    let resolved = match name.as_str() {
+    let resolved = resolve_call(&name, args);
+    Some(resolved.map_err(|message| err(call_start, message)))
+}
+
+/// Resolves a call expression: literal constructors (`list`, `string`, `int`, `float`)
+/// are evaluated, while any other callee becomes a [`Value::Call`].
+pub fn resolve_call(name: &str, args: Vec<Value>) -> std::result::Result<Value, String> {
+    match name {
         "list" => Ok(Value::Seq(args)),
         "string" => construct_string(args),
         "int" => construct_int(args),
         "float" => construct_float(args),
-        _ => return Some(Ok(Value::Call(name, args))),
-    };
-    Some(resolved.map_err(|message| err(call_start, message)))
+        _ => Ok(Value::Call(name.to_string(), args)),
+    }
 }
 
 /// The one argument of a constructor that takes at most one, `None` for no

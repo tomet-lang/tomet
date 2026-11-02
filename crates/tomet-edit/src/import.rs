@@ -838,8 +838,12 @@ fn import_list_item(doc: &mut EditDoc, node: &SyntaxNode) -> NodeKind {
                 children.push(ChildItem::Trivia(token.text().to_string()));
             }
             NodeOrToken::Node(child_node) => {
-                let child_id = import_block_node(doc, &child_node);
-                children.push(ChildItem::Node(child_id));
+                if child_node.kind() == K::BODY {
+                    children.push(ChildItem::Trivia(child_node.text().to_string()));
+                } else {
+                    let child_id = import_block_node(doc, &child_node);
+                    children.push(ChildItem::Node(child_id));
+                }
             }
         }
     }

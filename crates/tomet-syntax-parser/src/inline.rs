@@ -164,15 +164,6 @@ pub(crate) fn delimited_probe(cur: &Cursor, delim: &str, index: &DelimiterIndex)
     index.has_closer(d, open.pos())
 }
 
-/// Whether only whitespace precedes `cur` on its line.
-pub(crate) fn at_line_start(cur: &Cursor) -> bool {
-    let src = cur.src();
-    let before = &src[..cur.pos()];
-    match before.rfind('\n') {
-        Some(nl) => before[nl + 1..].trim().is_empty(),
-        None => before.trim().is_empty(),
-    }
-}
 
 /// Pushes a `Text`, merging into the previous item if it is also a `Text`.
 ///

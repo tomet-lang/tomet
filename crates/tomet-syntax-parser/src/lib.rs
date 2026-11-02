@@ -53,12 +53,13 @@ mod value;
 
 pub use cst::parse_cst;
 pub use error::{Error, Result};
+pub use lower::lower_document;
 pub use value::{CotometValueHook, parse_value};
 
 /// Parse an entire source string as a markup [`tomet_ast::Document`]: the CST of
 /// the text ([`parse_cst`]), read as the AST it stands for.
 pub fn parse_document(src: &str) -> Result<tomet_ast::Document> {
-    lower::lower_document(src, &parse_cst(src))
+    lower::lower_document(&parse_cst(src)).map_err(|e| e.located_in(src))
 }
 
 /// Parse a `$func(args)` or `${expr}` interpolation directly from a string slice.

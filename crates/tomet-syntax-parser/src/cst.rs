@@ -1363,7 +1363,7 @@ impl<'a, 't> CstParser<'a, 't> {
         let root = SyntaxNode::new_root(scratch.builder.finish());
         let groups: Vec<SyntaxNode> = root.children().collect();
         let read = |first: usize| {
-            crate::lower::lower_group_list(slice, groups[first..].iter().cloned())
+            crate::lower::lower_group_list(groups[first..].iter().cloned())
                 .ok()
                 .filter(|read| read.content.is_none())
         };

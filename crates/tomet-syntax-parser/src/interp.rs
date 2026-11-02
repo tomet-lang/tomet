@@ -1,11 +1,64 @@
-//! Parsing for `${...}` interpolation expressions.
-
 use crate::error::Result;
-use crate::value::{err, parse_quoted};
+use cotomet_syntax::parse_quoted;
 use tomet_ast::{BinaryOp, InterpExpr, InterpExprKind, Interpolation, Literal};
+use tomet_cst::SyntaxNode;
 use tomet_lexer::Cursor;
+use tomet_span::Span;
 
 pub use cotomet_syntax::{is_interp_ident_char, is_interp_ident_start};
+
+fn err(pos: usize, message: impl Into<String>) -> crate::error::Error {
+    crate::error::Error {
+        message: message.into(),
+        line: 0,
+        column: 0,
+        offset: pos,
+    }
+}
+
+/// Lowers an `INLINE_ELEMENT` CST node representing an interpolation into an AST [`Interpolation`].
+pub(crate) fn lower_interpolation(node: &SyntaxNode) -> Result<Interpolation> {
+    let text = node.text().to_string();
+    let base = usize::from(node.text_range().start());
+    let mut cur = Cursor::new(&text);
+    let mut interp = parse_interpolation(&mut cur).map_err(|e| err(base + e.offset, e.message))?;
+    skip_expr_ws(&mut cur);
+    if !cur.is_eof() {
+        return Err(err(base + cur.pos(), "unexpected content in interpolation"));
+    }
+    offset_interpolation(&mut interp, base);
+    Ok(interp)
+}
+
+fn offset_interpolation(interp: &mut Interpolation, base: usize) {
+    interp.span = Span::new(base + interp.span.start, base + interp.span.end);
+    offset_expr(&mut interp.expr, base);
+}
+
+fn offset_expr(expr: &mut InterpExpr, base: usize) {
+    expr.span = Span::new(base + expr.span.start, base + expr.span.end);
+    match &mut expr.kind {
+        InterpExprKind::Identifier(_)
+        | InterpExprKind::Id(_)
+        | InterpExprKind::Literal(_)
+        | InterpExprKind::Addr { .. } => {}
+        InterpExprKind::Member { object, .. } => offset_expr(object, base),
+        InterpExprKind::DocId { doc, .. } => offset_expr(doc, base),
+        InterpExprKind::Group(inner) => offset_expr(inner, base),
+        InterpExprKind::Call { callee, args } => {
+            offset_expr(callee, base);
+            for arg in args {
+                offset_expr(arg, base);
+            }
+        }
+        InterpExprKind::Binary { lhs, rhs, .. } => {
+            offset_expr(lhs, base);
+            offset_expr(rhs, base);
+        }
+        InterpExprKind::Lambda { body, .. } => offset_expr(body, base),
+        InterpExprKind::NamedArg { value, .. } => offset_expr(value, base),
+    }
+}
 
 /// `${ Expr }` or `$func(args)` or `$macro.func(args)`.
 pub(crate) fn parse_interpolation(cur: &mut Cursor) -> Result<Interpolation> {

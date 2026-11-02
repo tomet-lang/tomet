@@ -17,11 +17,10 @@
 //! `${...}` expressions and a group's values, which hand back to the CST
 //! whatever they embed (see [`crate::value::Embedded`]).
 
-use crate::element::{Groups, parse_hash_id, parse_paren_value, parse_value_group};
+use crate::element::Groups;
 use crate::error::{Error, Result};
 use crate::inline::{DELIMITERS, extend_merging, push_soft_break, push_text, trim_edges};
-use crate::interp::parse_interpolation;
-use crate::value::{Embedded, err};
+use crate::value::err;
 use tomet_ast::{
     Block, Connect, Data, Declaration, Document, Element, Inline, List, Name, Paragraph, Placement,
     RawText, Section, Value,
@@ -31,7 +30,6 @@ use tomet_cst::{
     SyntaxToken,
 };
 use tomet_span::Span;
-use tomet_lexer::Cursor;
 use tomet_tree::{ElementExt, element_new, list, list_item};
 
 /// The error for a tree lowering cannot read: a node the CST should not have put
@@ -45,11 +43,14 @@ fn unsupported(what: impl std::fmt::Display) -> Error {
     }
 }
 
-/// Reads the CST of `src` as an AST [`Document`].
-pub(crate) fn lower_document(src: &str, root: &SyntaxNode) -> Result<Document> {
-    reject_too_deep(root).map_err(|e| e.located_in(src))?;
-    let blocks = lower_blocks(src, root).map_err(|e| e.located_in(src))?;
-    Ok(Document::new(blocks, Span::new(0, src.len())))
+/// Reads the CST root as an AST [`Document`].
+pub fn lower_document(root: &SyntaxNode) -> Result<Document> {
+    reject_too_deep(root)?;
+    let blocks = lower_blocks(root)?;
+    Ok(Document::new(
+        blocks,
+        Span::new(0, usize::from(root.text_range().len())),
+    ))
 }
 
 /// The error for a tree that holds a `TOO_DEEP` node: the parser stopped reading structure there, so
@@ -69,7 +70,7 @@ pub(crate) fn reject_too_deep(root: &SyntaxNode) -> Result<()> {
 
 /// The blocks that are children of `node`: the document, and (later) a section
 /// or a `[content]` group.
-fn lower_blocks(src: &str, node: &SyntaxNode) -> Result<Vec<Block>> {
+fn lower_blocks(node: &SyntaxNode) -> Result<Vec<Block>> {
     let mut blocks = Vec::new();
     for child in node.children_with_tokens() {
         match child {
@@ -83,20 +84,20 @@ fn lower_blocks(src: &str, node: &SyntaxNode) -> Result<Vec<Block>> {
             SyntaxElement::Token(t) if t.kind() == K::MARGIN => {}
             SyntaxElement::Token(t) => return Err(unsupported(format!("token {:?}", t.kind()))),
             SyntaxElement::Node(n) if n.kind() == K::ERROR => return Err(lower_error(&n)),
-            SyntaxElement::Node(n) => blocks.extend(lower_block(src, &n)?),
+            SyntaxElement::Node(n) => blocks.extend(lower_block(&n)?),
         }
     }
     Ok(blocks)
 }
 
 /// One block node. `None` is a block that leaves nothing in the AST (an empty paragraph).
-fn lower_block(src: &str, node: &SyntaxNode) -> Result<Option<Block>> {
+fn lower_block(node: &SyntaxNode) -> Result<Option<Block>> {
     match node.kind() {
-        K::PARAGRAPH => lower_paragraph(src, node),
-        K::BLOCK_ELEMENT => lower_block_element(src, node).map(Some),
-        K::SECTION => lower_section(src, node).map(Some),
-        K::LIST => lower_list(src, node).map(|l| Some(Block::List(l))),
-        K::THEMATIC_BREAK => lower_thematic_break(src, node).map(Some),
+        K::PARAGRAPH => lower_paragraph(node),
+        K::BLOCK_ELEMENT => lower_block_element(node).map(Some),
+        K::SECTION => lower_section(node).map(Some),
+        K::LIST => lower_list(node).map(|l| Some(Block::List(l))),
+        K::THEMATIC_BREAK => lower_thematic_break(node).map(Some),
         K::CODE_BLOCK => lower_code_block(node).map(Some),
         // The text after a declaration on its line, or an error node.
         K::ERROR => Err(lower_error(node)),
@@ -154,11 +155,11 @@ fn paragraph_bounds(node: &SyntaxNode) -> Option<(usize, usize)> {
 }
 
 /// A paragraph: running text, with the elements, spans and interpolations in it.
-fn lower_paragraph(src: &str, node: &SyntaxNode) -> Result<Option<Block>> {
+fn lower_paragraph(node: &SyntaxNode) -> Result<Option<Block>> {
     let Some((start, end)) = paragraph_bounds(node) else {
         return Ok(None);
     };
-    let mut content = lower_inlines(src, node, start, end)?;
+    let mut content = lower_inlines(node, start, end)?;
     if content.is_empty() {
         return Ok(None);
     }
@@ -179,7 +180,7 @@ fn lower_paragraph(src: &str, node: &SyntaxNode) -> Result<Option<Block>> {
 /// The running text in `parent` between byte offsets `from` and `to`:
 /// tokens become `Text` and `SoftBreak`, comments are skipped, `\;` becomes `;`,
 /// and the ends are trimmed.
-fn lower_inlines(src: &str, parent: &SyntaxNode, from: usize, to: usize) -> Result<Vec<Inline>> {
+fn lower_inlines(parent: &SyntaxNode, from: usize, to: usize) -> Result<Vec<Inline>> {
     let mut items = Vec::new();
     let mut pending_text = String::new();
     let mut pending_start = None;
@@ -291,7 +292,7 @@ fn lower_inlines(src: &str, parent: &SyntaxNode, from: usize, to: usize) -> Resu
                 flush_softbreak(&mut items, &mut in_softbreak, softbreak_start, softbreak_end);
                 flush_text(&mut items, &mut pending_text, &mut pending_start, &mut pending_end);
                 is_first_text = false;
-                items.push(lower_inline(src, &n)?);
+                items.push(lower_inline(&n)?);
             }
         }
     }
@@ -304,10 +305,10 @@ fn lower_inlines(src: &str, parent: &SyntaxNode, from: usize, to: usize) -> Resu
 }
 
 /// One inline node of running text.
-fn lower_inline(src: &str, node: &SyntaxNode) -> Result<Inline> {
+fn lower_inline(node: &SyntaxNode) -> Result<Inline> {
     match node.kind() {
-        K::INLINE_ELEMENT => lower_inline_element(src, node),
-        K::EMPHASIS | K::STRONG | K::STRIKEOUT => lower_delimited(src, node).map(Inline::Element),
+        K::INLINE_ELEMENT => lower_inline_element(node),
+        K::EMPHASIS | K::STRONG | K::STRIKEOUT => lower_delimited(node).map(Inline::Element),
         K::CODE_SPAN => lower_code_span(node).map(Inline::Element),
         K::AUTOLINK => Ok(Inline::Element(lower_autolink(node))),
         K::ERROR => Err(lower_error(node)),
@@ -316,9 +317,9 @@ fn lower_inline(src: &str, node: &SyntaxNode) -> Result<Inline> {
 }
 
 /// `@name(...)[...]` in running text, or a `${...}` interpolation.
-fn lower_inline_element(src: &str, node: &SyntaxNode) -> Result<Inline> {
+fn lower_inline_element(node: &SyntaxNode) -> Result<Inline> {
     if let Some(slot) = slot_of(node) {
-        return lower_slot(src, &slot).map(Inline::Hole);
+        return lower_slot(&slot).map(Inline::Hole);
     }
     let sigil = node
         .children()
@@ -326,12 +327,9 @@ fn lower_inline_element(src: &str, node: &SyntaxNode) -> Result<Inline> {
         .and_then(|n| n.first_token())
         .map(|t| t.kind());
     match sigil {
-        Some(K::AT) => lower_element(src, node).map(Inline::Element),
+        Some(K::AT) => lower_element(node).map(Inline::Element),
         Some(K::DOLLAR) => {
-            let (start, end) = range_of(node);
-            let mut cur = cursor_at(src, start);
-            let interp = parse_interpolation(&mut cur)?;
-            expect_end(&cur, end, "an interpolation")?;
+            let interp = crate::interp::lower_interpolation(node)?;
             Ok(Inline::Interp(interp))
         }
         _ => Err(unsupported("an inline element with this sigil")),
@@ -340,14 +338,14 @@ fn lower_inline_element(src: &str, node: &SyntaxNode) -> Result<Inline> {
 
 /// `*em*`, `**strong**`, `~~strikeout~~` and the `_` spellings: an element whose
 /// content is one paragraph, the text between the delimiters.
-fn lower_delimited(src: &str, node: &SyntaxNode) -> Result<Element> {
+fn lower_delimited(node: &SyntaxNode) -> Result<Element> {
     let (start, end) = range_of(node);
     let text = node.text().to_string();
     let (delimiter, name) = DELIMITERS
         .iter()
         .find(|(d, _)| text.starts_with(d) && text.ends_with(d) && text.len() >= 2 * d.len())
         .ok_or_else(|| unsupported("a delimited span that does not read"))?;
-    let inner = lower_inlines(src, node, start + delimiter.len(), end - delimiter.len())?;
+    let inner = lower_inlines(node, start + delimiter.len(), end - delimiter.len())?;
     let span = Span::new(start, end);
     Ok(element_new(Name::bare(*name))
         .with_span(span)
@@ -404,7 +402,7 @@ fn lower_autolink(node: &SyntaxNode) -> Element {
 
 /// `---`: a run of dashes on a line of its own; or `---[ title ]---`, whose
 /// title is the content of the `hr` element.
-fn lower_thematic_break(src: &str, node: &SyntaxNode) -> Result<Block> {
+fn lower_thematic_break(node: &SyntaxNode) -> Result<Block> {
     if node.children_with_tokens().any(|e| e.kind() == K::COMMENT) {
         return Err(unsupported("a comment after a thematic break"));
     }
@@ -421,7 +419,7 @@ fn lower_thematic_break(src: &str, node: &SyntaxNode) -> Result<Block> {
         }
         let title = match content.children().find(|n| n.kind() == K::PARAGRAPH) {
             Some(paragraph) if content.children().count() == 1 => {
-                lower_inlines(src, &paragraph, open + 1, close - 1)?
+                lower_inlines(&paragraph, open + 1, close - 1)?
             }
             None => Vec::new(),
             Some(_) => return Err(unsupported("a title of several blocks")),
@@ -587,12 +585,6 @@ fn is_bracket(kind: K) -> bool {
     matches!(kind, K::L_BRACKET | K::R_BRACKET)
 }
 
-fn cursor_at(src: &str, at: usize) -> Cursor<'_> {
-    let mut cur = Cursor::new(src);
-    cur.set_pos(at);
-    cur
-}
-
 /// Where `node` starts and ends, white space and all.
 fn range_of(node: &SyntaxNode) -> (usize, usize) {
     let range = node.text_range();
@@ -612,9 +604,9 @@ fn name_of(node: &SyntaxNode) -> Result<Name> {
 
 /// A block element: `@name` and the groups that follow it, or `::name` and
 /// its groups, a declaration about the document.
-fn lower_block_element(src: &str, node: &SyntaxNode) -> Result<Block> {
+fn lower_block_element(node: &SyntaxNode) -> Result<Block> {
     if let Some(slot) = slot_of(node) {
-        let mut hole = lower_slot(src, &slot)?;
+        let mut hole = lower_slot(&slot)?;
         hole.placement = Placement::Block;
         return Ok(Block::Hole(hole));
     }
@@ -624,21 +616,21 @@ fn lower_block_element(src: &str, node: &SyntaxNode) -> Result<Block> {
         .and_then(|n| n.first_token())
         .map(|t| t.kind());
     if sigil == Some(K::COLON) {
-        return lower_declaration(src, node).map(Block::Declaration);
+        return lower_declaration(node).map(Block::Declaration);
     }
-    let element = lower_element(src, node)?.with_placement(Placement::Block);
+    let element = lower_element(node)?.with_placement(Placement::Block);
     Ok(Block::Element(element))
 }
 
 /// `::name(args){value}[content]#(id)`.
-fn lower_declaration(src: &str, node: &SyntaxNode) -> Result<Declaration> {
+fn lower_declaration(node: &SyntaxNode) -> Result<Declaration> {
     let sigil = node
         .children()
         .find(|n| n.kind() == K::SIGIL)
         .ok_or_else(|| unsupported("a declaration without a sigil"))?;
     let (start, _) = range_of(&sigil);
     let name = name_of(&sigil)?;
-    let read = lower_groups(src, node)?;
+    let read = lower_groups(node)?;
     if !read.connects.is_empty() {
         return Err(err(
             start,
@@ -659,7 +651,7 @@ fn lower_declaration(src: &str, node: &SyntaxNode) -> Result<Declaration> {
     })
 }
 
-fn lower_element(src: &str, node: &SyntaxNode) -> Result<Element> {
+pub(crate) fn lower_element(node: &SyntaxNode) -> Result<Element> {
     let sigil = node
         .children()
         .find(|n| n.kind() == K::SIGIL)
@@ -669,7 +661,7 @@ fn lower_element(src: &str, node: &SyntaxNode) -> Result<Element> {
         return Err(unsupported("a sigil that is not `@`"));
     }
     let name = name_of(&sigil)?;
-    let read = lower_groups(src, node)?;
+    let read = lower_groups(node)?;
     // The element ends with its last group; the white space and comments the
     // node also holds are not part of it.
     let end = node
@@ -689,21 +681,17 @@ fn lower_element(src: &str, node: &SyntaxNode) -> Result<Element> {
 }
 
 /// The groups of `node`: `(args)`, `{value}`, `[content]`, `#(id)` and the
-/// `:connect`s, whatever order they were written in. `(args)` and `{value}`
-/// are read by the AST parser's own value grammar, at the group's offset.
-fn lower_groups(src: &str, node: &SyntaxNode) -> Result<Groups> {
-    lower_group_list(src, node.children())
+/// `:connect`s, whatever order they were written in.
+fn lower_groups(node: &SyntaxNode) -> Result<Groups> {
+    lower_group_list(node.children())
 }
 
 /// The groups in `nodes`, read as [`lower_groups`] reads an element's.
 pub(crate) fn lower_group_list(
-    src: &str,
     nodes: impl IntoIterator<Item = SyntaxNode>,
 ) -> Result<Groups> {
     let mut read = Groups::default();
     for child in nodes {
-        let (start, end) = range_of(&child);
-        let mut cur = cursor_at(src, start);
         match child.kind() {
             K::SIGIL | K::SECTION_HEADING | K::NAME | K::BODY => {}
             // What a list item holds besides groups: its sublist and the inline
@@ -717,24 +705,17 @@ pub(crate) fn lower_group_list(
             | K::CODE_SPAN
             | K::AUTOLINK => {}
             K::ARGS => {
-                read.data.args = Some(parse_paren_value(
-                    &mut Embedded::new(src, &child),
-                    &mut cur,
-                )?);
-                expect_end(&cur, end, "an args group")?;
+                read.data.args = Some(crate::element::lower_paren_value(&child)?);
             }
             K::VALUE_DATA | K::MAP_LITERAL => {
-                let mut embedded = Embedded::new(src, &child);
-                read.data.value = Some(parse_value_group(&mut embedded, &mut cur)?);
-                expect_end(&cur, end, "a value group")?;
+                read.data.value = Some(crate::element::lower_value_group(&child)?);
             }
-            K::CONTENT => read.content = Some(lower_content(src, &child)?),
+            K::CONTENT => read.content = Some(lower_content(&child)?),
             K::ID_GROUP => {
-                read.id = Some(parse_hash_id(&mut cur)?);
-                expect_end(&cur, end, "an id")?;
+                read.id = Some(crate::element::lower_hash_id(&child)?);
             }
-            K::CONNECT if is_merge_connect(&child) => merge_connect(src, &child, &mut read)?,
-            K::CONNECT => read.connects.push(lower_connect(src, &child)?),
+            K::CONNECT if is_merge_connect(&child) => merge_connect(&child, &mut read)?,
+            K::CONNECT => read.connects.push(lower_connect(&child)?),
             K::ERROR => return Err(lower_error(&child)),
             other => return Err(unsupported(format!("{other:?} in an element's groups"))),
         }
@@ -744,51 +725,39 @@ pub(crate) fn lower_group_list(
 
 /// What a value embeds at `node`, and where it ends: an element or a hole
 /// (`@name...`, `?matcher(...)`), or `[content]` / a `|` run as blocks.
-pub(crate) fn lower_embedded(src: &str, node: &SyntaxNode) -> Result<(Value, usize)> {
+pub(crate) fn lower_embedded(node: &SyntaxNode) -> Result<(Value, usize)> {
     match node.kind() {
         K::CONTENT => {
             let (_, end) = range_of(node);
-            Ok((Value::Blocks(lower_content(src, node)?), end))
+            Ok((Value::Blocks(lower_content(node)?), end))
         }
         _ if slot_of(node).is_some() => {
             let slot = slot_of(node).expect("checked");
-            let hole = lower_slot(src, &slot)?;
+            let hole = lower_slot(&slot)?;
             let end = hole.span.end;
             Ok((Value::Hole(Box::new(hole)), end))
         }
         _ => {
-            let element = lower_element(src, node)?;
+            let element = lower_element(node)?;
             let end = element.span.end;
             Ok((Value::Element(Box::new(element)), end))
         }
     }
 }
 
-/// The AST parser's reading of a group has to end where the CST's group does;
-/// if it does not, the two parsers disagree about the group and lowering says so.
-fn expect_end(cur: &Cursor, end: usize, what: &str) -> Result<()> {
-    if cur.pos() == end {
-        Ok(())
-    } else {
-        Err(unsupported(format!(
-            "{what} that the two parsers end differently"
-        )))
-    }
-}
-
 /// `[content]`: the blocks between the brackets, or the blocks of a `|` run.
-fn lower_content(src: &str, node: &SyntaxNode) -> Result<Vec<Block>> {
+pub(crate) fn lower_content(node: &SyntaxNode) -> Result<Vec<Block>> {
     if let Some(err_node) = node
         .children()
         .find(|c| c.kind() == K::ERROR && c.children_with_tokens().count() == 0)
     {
         return Err(lower_error(&err_node));
     }
-    lower_blocks(src, node)
+    lower_blocks(node)
 }
 
 /// `:name(args){value}[content]`.
-fn lower_connect(src: &str, node: &SyntaxNode) -> Result<Connect> {
+fn lower_connect(node: &SyntaxNode) -> Result<Connect> {
     let (start, _) = range_of(node);
     let name = name_of(node).map_err(|_| unsupported("a connect without a name"))?;
     if node.children().any(|n| n.kind() == K::ID_GROUP) {
@@ -797,7 +766,7 @@ fn lower_connect(src: &str, node: &SyntaxNode) -> Result<Connect> {
             "a `:connect` takes no `#(id)`: write the id of its owner before the first `:connect`",
         ));
     }
-    let read = lower_groups(src, node)?;
+    let read = lower_groups(node)?;
     let end = node
         .children()
         .map(|n| range_of(&n).1)
@@ -816,7 +785,7 @@ fn lower_connect(src: &str, node: &SyntaxNode) -> Result<Connect> {
 /// Only the headings with no title, with a title of plain text, or with a
 /// `[title]` of one plain paragraph are lowered; a title with an element in it
 /// is not yet.
-fn lower_section(src: &str, node: &SyntaxNode) -> Result<Block> {
+fn lower_section(node: &SyntaxNode) -> Result<Block> {
     let heading = node
         .children()
         .find(|n| n.kind() == K::SECTION_HEADING)
@@ -826,7 +795,7 @@ fn lower_section(src: &str, node: &SyntaxNode) -> Result<Block> {
         .children_with_tokens()
         .take_while(|e| e.kind() == K::EQUAL)
         .count();
-    let read = lower_groups(src, &heading)?;
+    let read = lower_groups(&heading)?;
 
     let title = if let Some(content) = read.content.clone() {
         let at = heading
@@ -835,14 +804,14 @@ fn lower_section(src: &str, node: &SyntaxNode) -> Result<Block> {
             .map_or(end, |n| range_of(&n).1);
         title_from_content(at, content)?
     } else {
-        sugar_title(src, &heading, level)?
+        sugar_title(&heading, level)?
     };
     let mut section = Section::new(level, title, Span::new(start, end));
     section.data = read.data;
     section.id = read.id;
     section.connects = read.connects;
     for child in node.children().filter(|n| n.kind() != K::SECTION_HEADING) {
-        section.blocks.extend(lower_block(src, &child)?);
+        section.blocks.extend(lower_block(&child)?);
     }
     Ok(Block::Section(section))
 }
@@ -884,23 +853,23 @@ fn title_from_content(at: usize, mut blocks: Vec<Block>) -> Result<Vec<Inline>> 
 }
 
 /// `== text`: the heading's text, up to the groups it ends in.
-fn sugar_title(src: &str, heading: &SyntaxNode, _level: usize) -> Result<Vec<Inline>> {
+fn sugar_title(heading: &SyntaxNode, _level: usize) -> Result<Vec<Inline>> {
     let body = heading.children().find(|n| n.kind() == K::BODY);
     let Some(body) = body else {
         return Ok(Vec::new());
     };
     let (from, to) = range_of(&body);
-    let mut title = lower_inlines(src, &body, from, to)?;
+    let mut title = lower_inlines(&body, from, to)?;
     trim_trailing_equals(&mut title);
     Ok(title)
 }
 
 /// A list: its items, each with the sublist that follows it.
-fn lower_list(src: &str, node: &SyntaxNode) -> Result<List> {
+fn lower_list(node: &SyntaxNode) -> Result<List> {
     let items = node
         .children()
         .filter(|n| n.kind() == K::LIST_ITEM)
-        .map(|item| lower_list_item(src, &item))
+        .map(|item| lower_list_item(&item))
         .collect::<Result<Vec<_>>>()?;
     let ordered = node
         .first_child()
@@ -987,7 +956,6 @@ fn list_item_line_end(node: &SyntaxNode) -> usize {
 
 /// Appends trailing body text of a full-form or combine item to its content.
 fn append_trailing_body(
-    src: &str,
     body: &SyntaxNode,
     content: &mut Vec<Block>,
     line_end: usize,
@@ -1003,7 +971,7 @@ fn append_trailing_body(
         return Ok(());
     };
     let content_start = usize::from(first_content.text_range().start());
-    let rest = lower_inlines(src, body, content_start, body_end)?;
+    let rest = lower_inlines(body, content_start, body_end)?;
     if rest.is_empty() {
         return Ok(());
     }
@@ -1030,9 +998,9 @@ fn append_trailing_body(
 /// `-@name(...)[...] text`, and the full form, where a group opens on the marker
 /// (`- [ content ] text`). The groups before the text are the marker's and the
 /// full form's; those after it are the ones a sugar body ends in.
-fn lower_list_item(src: &str, node: &SyntaxNode) -> Result<tomet_ast::ListItem> {
+fn lower_list_item(node: &SyntaxNode) -> Result<tomet_ast::ListItem> {
     let sublist = match node.children().find(|n| n.kind() == K::LIST) {
-        Some(sub) => Some(lower_list(src, &sub)?),
+        Some(sub) => Some(lower_list(&sub)?),
         None => None,
     };
     let span = list_item_span(node, sublist.as_ref().map(|s| s.span.end));
@@ -1053,10 +1021,10 @@ fn lower_list_item(src: &str, node: &SyntaxNode) -> Result<tomet_ast::ListItem> 
         if node.children().any(|n| is_group(&n)) {
             return Err(unsupported("a combine item with other groups"));
         }
-        let el = lower_element(src, &element)?;
+        let el = lower_element(&element)?;
         let mut content = el.content.unwrap_or_default();
         if let Some(body) = &body {
-            append_trailing_body(src, body, &mut content, line_end)?;
+            append_trailing_body(body, &mut content, line_end)?;
         }
         tomet_ast::ListItem {
             name: Some(el.name),
@@ -1068,7 +1036,7 @@ fn lower_list_item(src: &str, node: &SyntaxNode) -> Result<tomet_ast::ListItem> 
             span,
         }
     } else {
-        let read = lower_groups(src, node)?;
+        let read = lower_groups(node)?;
         let full_form = node
             .children()
             .take_while(|n| n.kind() != K::BODY)
@@ -1077,12 +1045,12 @@ fn lower_list_item(src: &str, node: &SyntaxNode) -> Result<tomet_ast::ListItem> 
         let content = if full_form {
             let mut blocks = read.content.unwrap_or_default();
             if let Some(body) = &body {
-                append_trailing_body(src, body, &mut blocks, line_end)?;
+                append_trailing_body(body, &mut blocks, line_end)?;
             }
             blocks
         } else if let Some(body) = &body {
             let (from, to) = range_of(body);
-            let inlines = lower_inlines(src, body, from, to)?;
+            let inlines = lower_inlines(body, from, to)?;
             if inlines.is_empty() {
                 Vec::new()
             } else {
@@ -1135,19 +1103,15 @@ fn is_merge_connect(node: &SyntaxNode) -> bool {
 }
 
 /// Merges the groups of a nameless `:` connect into `read`, as the AST parser does.
-fn merge_connect(src: &str, node: &SyntaxNode, read: &mut Groups) -> Result<()> {
+fn merge_connect(node: &SyntaxNode, read: &mut Groups) -> Result<()> {
     for child in node.children() {
-        let (start, end) = range_of(&child);
-        let mut cur = cursor_at(src, start);
         match child.kind() {
             K::ARGS => {
-                let args = parse_paren_value(&mut Embedded::new(src, &child), &mut cur)?;
-                expect_end(&cur, end, "an args group")?;
+                let args = crate::element::lower_paren_value(&child)?;
                 read.data.args = merge_values(read.data.args.as_ref(), Some(&args));
             }
-            K::VALUE_DATA => {
-                let value = parse_value_group(&mut Embedded::new(src, &child), &mut cur)?;
-                expect_end(&cur, end, "a value group")?;
+            K::VALUE_DATA | K::MAP_LITERAL => {
+                let value = crate::element::lower_value_group(&child)?;
                 let merged = match &read.data.value {
                     Some(existing) if !existing.has_children() && !value.has_children() => {
                         merge_values(Some(&existing.as_data()), Some(&value.as_data()))
@@ -1287,7 +1251,7 @@ fn second_group(node: &SyntaxNode) -> Error {
     )
 }
 
-fn lower_error(node: &SyntaxNode) -> Error {
+pub(crate) fn lower_error(node: &SyntaxNode) -> Error {
     let start = usize::from(node.text_range().start());
 
     let first = node.first_token().map(|t| t.kind());
@@ -1389,7 +1353,7 @@ pub(crate) fn slot_of(node: &SyntaxNode) -> Option<SyntaxNode> {
 }
 
 /// `<?matcher(args){value}>[content]`: a hole, from the `SLOT` node of a marked box.
-fn lower_slot(src: &str, slot: &SyntaxNode) -> Result<tomet_ast::Hole> {
+pub(crate) fn lower_slot(slot: &SyntaxNode) -> Result<tomet_ast::Hole> {
     let (start, end) = range_of(slot);
     let matcher = slot
         .children()
@@ -1399,7 +1363,7 @@ fn lower_slot(src: &str, slot: &SyntaxNode) -> Result<tomet_ast::Hole> {
             let (namespace, name) = c.parts();
             Name { namespace, name }
         });
-    let read = lower_groups(src, slot)?;
+    let read = lower_groups(slot)?;
     Ok(tomet_ast::Hole {
         matcher,
         placement: Placement::Inline,
