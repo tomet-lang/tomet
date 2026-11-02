@@ -7,14 +7,13 @@ license.workspace = true
 repository.workspace = true
 
 [dependencies]
-cotomet-syntax = { workspace = true }
 tomet-address = { workspace = true }
-tomet-declaration = { workspace = true }
 tomet-ast = { workspace = true }
+tomet-declaration = { workspace = true }
+tomet-semantics-core = { workspace = true }
 tomet-span = { workspace = true }
 tomet-tree = { workspace = true }
 tomet-type = { workspace = true }
-tomet-semantics-core = { workspace = true }
 
 #= Crates.io
 serde_json = { workspace = true }

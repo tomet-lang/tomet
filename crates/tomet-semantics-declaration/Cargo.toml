@@ -7,7 +7,6 @@ license.workspace = true
 repository.workspace = true
 
 [dependencies]
-cotomet-syntax = { workspace = true }
 tomet-ast = { workspace = true }
 tomet-span = { workspace = true }
 tomet-tree = { workspace = true }

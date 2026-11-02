@@ -34,15 +34,4 @@ impl fmt::Display for Error {
 
 impl std::error::Error for Error {}
 
-impl From<cotomet_syntax::Error> for Error {
-    fn from(e: cotomet_syntax::Error) -> Self {
-        Error {
-            message: e.message,
-            line: e.line,
-            column: e.column,
-            offset: e.offset,
-        }
-    }
-}
-
 pub type Result<T> = std::result::Result<T, Error>;

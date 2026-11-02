@@ -33,8 +33,7 @@
 //! - (lower) The CST read as an AST: `parse_document` is `parse_cst` and then this. It builds the typed tree and refuses what a document may not say.
 //! - (element) The readers of a group's values: `(args)`, `{value}`, `#(id)`. Where an element or a
 //!   hole starts inside a group is the CST's to say.
-//! - (value) The Tomet data grammar (maps, sequences, scalars, comments), from `cotomet-syntax`,
-//!   with a hook that finds what a value embeds -- an element, `[content]`, a `|` run -- in the CST.
+//! - (value) The Tomet data grammar (maps, sequences, scalars, comments), folded from the CST.
 //! - (tail) Where a bracket-less body's trailing groups (`- text {value}`, `= text #(id)`) can be,
 //!   from the characters alone; the CST asks the grammar once about what that finds.
 //! - (inline) What the CST and lowering share about running text: `Text`/`SoftBreak` items, the
@@ -54,7 +53,7 @@ mod value;
 pub use cst::parse_cst;
 pub use error::{Error, Result};
 pub use lower::lower_document;
-pub use value::{CotometValueHook, parse_value};
+pub use value::{parse_file, parse_value};
 
 /// Parse an entire source string as a markup [`tomet_ast::Document`]: the CST of
 /// the text ([`parse_cst`]), read as the AST it stands for.
@@ -66,6 +65,11 @@ pub fn parse_document(src: &str) -> Result<tomet_ast::Document> {
 pub fn parse_interpolation_str(source: &str) -> Result<tomet_ast::Interpolation> {
     let mut cur = tomet_lexer::Cursor::new(source);
     interp::parse_interpolation(&mut cur).map_err(|e| e.located_in(source))
+}
+
+/// Parse an interpolation starting at `cur`.
+pub fn parse_interpolation(cur: &mut tomet_lexer::Cursor) -> Result<tomet_ast::Interpolation> {
+    interp::parse_interpolation(cur)
 }
 
 #[cfg(test)]

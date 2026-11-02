@@ -1,7 +1,7 @@
 //! =[ serde_cotomet ]
 //!
 //! Serde support for cotomet: read a cotomet document into a Rust type and write a
-//! Rust type out as one. The language itself is `cotomet-syntax`; depend on
+//! Rust type out as one. The language itself is `cotomet`; depend on
 //! `cotomet` instead unless you are a crate below it.
 //!
 //! =[ Key Functions ]
@@ -25,16 +25,18 @@
 
 pub mod de;
 pub mod error;
+pub mod print;
 pub mod ser;
 
-pub use cotomet_syntax::{Value, print_value};
 pub use de::from_value;
 pub use error::{Error, Result, Segment};
+pub use print::print_value;
 pub use ser::to_value;
+pub use tomet_ast::Value;
 
 /// Parse a cotomet data document into `T` via Serde.
 pub fn from_str<T: for<'de> serde::Deserialize<'de>>(src: &str) -> Result<T> {
-    de::from_value(cotomet_syntax::parse_value(src)?)
+    de::from_value(tomet_parser::parse_value(src)?)
 }
 
 /// Render `T` into cotomet data text via Serde.

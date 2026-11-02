@@ -1,5 +1,5 @@
 //! The cotomet corpus (`fixtures/cotomet/*.ctmt`), read by the two independent
-//! implementations of the language: `cotomet-syntax` (the source of truth) and
+//! implementations of the language: `cotomet` (the source of truth) and
 //! `tree-sitter-cotomet` (a hand-maintained approximation for editor
 //! highlighting). Same arrangement as `corpus.rs` has for `.tmt`.
 //!
@@ -65,7 +65,7 @@ fn every_fixture_is_named_for_what_the_parser_says_of_it() {
     let mut wrong = Vec::new();
     for path in fixtures() {
         let src = std::fs::read_to_string(&path).unwrap();
-        let parsed = cotomet_syntax::parse_file(&src);
+        let parsed = cotomet::parse_file(&src);
         match (name(&path).starts_with("ok-"), parsed) {
             (true, Err(e)) => wrong.push(format!("{}: should parse: {e}", name(&path))),
             (false, Ok(_)) => wrong.push(format!("{}: should be rejected", name(&path))),
@@ -86,7 +86,7 @@ fn the_grammar_reads_every_cotomet_file_without_an_error() {
     }
     assert!(
         errors.is_empty(),
-        "tree-sitter-cotomet errors on what cotomet-syntax accepts: {errors:?}"
+        "tree-sitter-cotomet errors on what cotomet accepts: {errors:?}"
     );
 }
 

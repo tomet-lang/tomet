@@ -5,11 +5,17 @@
 //! They fold CST nodes into AST values and groups without re-reading source text.
 
 use crate::error::{Error, Result};
-use cotomet_syntax::POSITIONAL_ENTRY_KEY;
 use tomet_ast::{Bare, Block, Connect, Data, Entry, Group, Id, Placement, Value};
 use tomet_cst::{SyntaxElement, SyntaxKind as K, SyntaxNode, SyntaxToken};
 use tomet_span::Span;
 use tomet_tree::ElementExt;
+
+/// Sentinel key for a positional (unkeyed) entry inside a map body or args.
+pub const POSITIONAL_ENTRY_KEY: &str = "";
+
+pub(crate) fn duplicate_key_error(pos: usize, key: &str) -> Error {
+    err(pos, format!("duplicate key `{key}`"))
+}
 
 fn err(pos: usize, message: impl Into<String>) -> Error {
     Error {
@@ -187,7 +193,7 @@ pub(crate) fn lower_value_group(node: &SyntaxNode) -> Result<Group> {
                     ));
                 }
                 if entries.iter().any(|e| matches!(e, Entry::Pair(k, _) if *k == key)) {
-                    return Err(cotomet_syntax::duplicate_key_error(offset, &key).into());
+                    return Err(duplicate_key_error(offset, &key));
                 }
                 entries.push(Entry::Pair(key, value));
                 i += 1;
@@ -347,6 +353,19 @@ pub(crate) fn lower_value(root: &SyntaxNode) -> Result<Value> {
     Ok(Value::Map(entries))
 }
 
+/// Lowers a root value node from `parse_cst_value` into a map [`Value`], requiring keyed entries only.
+pub(crate) fn lower_file_body(root: &SyntaxNode) -> Result<Value> {
+    let has_entries = root
+        .children()
+        .any(|c| matches!(c.kind(), K::MAP_ENTRY | K::SEQ_ITEM | K::ERROR));
+    if !has_entries {
+        return Ok(Value::Map(Vec::new()));
+    }
+
+    let entries = lower_map_entries(root, true, true)?;
+    Ok(Value::Map(entries))
+}
+
 /// Lowers child `MAP_ENTRY` and `SEQ_ITEM` nodes into `(key, value)` pairs.
 pub(crate) fn lower_map_entries(
     node: &SyntaxNode,
@@ -372,23 +391,23 @@ pub(crate) fn lower_map_entries(
             K::MAP_ENTRY => {
                 let (key, value, offset) = lower_map_entry(child)?;
                 if keyed_only && key == POSITIONAL_ENTRY_KEY {
-                    return Err(err(offset, "unexpected positional entry"));
+                    return Err(err(offset, "expected 'key: value' entry, found bare value"));
                 }
                 if key != POSITIONAL_ENTRY_KEY && entries.iter().any(|(k, _)| k == &key) {
-                    return Err(cotomet_syntax::duplicate_key_error(offset, &key).into());
+                    return Err(duplicate_key_error(offset, &key));
                 }
                 entries.push((key, value));
             }
             K::SEQ_ITEM => {
                 let offset = usize::from(child.text_range().start());
-                if keyed_only {
-                    return Err(err(offset, "unexpected positional entry"));
-                }
                 let val = lower_single_value_from_children(
                     child.children_with_tokens(),
                     false,
                     offset,
                 )?;
+                if keyed_only {
+                    return Err(err(offset, "expected 'key: value' entry, found bare value"));
+                }
                 entries.push((POSITIONAL_ENTRY_KEY.to_string(), val));
             }
             _ => {}
@@ -472,6 +491,10 @@ pub(crate) fn lower_map_entry(node: &SyntaxNode) -> Result<(String, Value, usize
         return Ok((POSITIONAL_ENTRY_KEY.to_string(), Value::String(trimmed.to_string()), start));
     }
 
+    if key_tokens.iter().any(|t| t.kind() == K::DOLLAR) {
+        return Err(err(start, "an expression cannot be a key"));
+    }
+
     let key = if key_tokens.is_empty() {
         String::new()
     } else if key_tokens[0].kind() == K::STRING_LITERAL {
@@ -537,7 +560,7 @@ fn lower_single_value_from_children(
                 let raw_args = name == "string";
                 let args = lower_call_args(args_node, raw_args)?;
                 let start = usize::from(name_token.text_range().start());
-                let call_val = cotomet_syntax::resolve_call(name, args).map_err(|m| err(start, m))?;
+                let call_val = resolve_call(name, args).map_err(|m| err(start, m))?;
                 if non_trivia_indices.len() > 2 {
                     let next_elem = &elements[non_trivia_indices[2]];
                     let pos = usize::from(next_elem.text_range().start());
@@ -564,6 +587,12 @@ fn lower_single_value_from_children(
             let pos = usize::from(next_elem.text_range().start());
             if matches!(next_elem.kind(), K::R_BRACE | K::R_BRACKET) {
                 return Err(err(pos, "expected ')'"));
+            }
+            let is_expr = first.kind() == K::INTERP_EXPR
+                || (first.kind() == K::INLINE_ELEMENT
+                    && first.as_node().is_some_and(opens_with_dollar));
+            if is_expr && next_elem.kind() == K::COLON {
+                return Err(err(usize::from(first.text_range().start()), "an expression cannot be a key"));
             }
             return Err(err(pos, "expected ',' or a newline between entries"));
         }
@@ -649,7 +678,7 @@ fn lower_single_value_from_children(
     if raw_scalars {
         Ok(Value::String(trimmed.to_string()))
     } else {
-        cotomet_syntax::scalar_from_text(trimmed).map_err(|m| err(start, m))
+        scalar_from_text(trimmed).map_err(|m| err(start, m))
     }
 }
 
@@ -771,4 +800,151 @@ fn is_block_placed_in_group(node: &SyntaxNode) -> bool {
         }
     }
     ends_line
+}
+
+/// What a bare scalar's text is, by the JSON number grammar.
+enum NumberShape {
+    Int,
+    Float,
+}
+
+fn classify_number(s: &str) -> Option<NumberShape> {
+    let b = s.as_bytes();
+    let digits = |mut i: usize| {
+        let start = i;
+        while b.get(i).is_some_and(u8::is_ascii_digit) {
+            i += 1;
+        }
+        (i > start).then_some(i)
+    };
+    let mut i = usize::from(b.first() == Some(&b'-'));
+    match b.get(i)? {
+        b'0' => i += 1,
+        b'1'..=b'9' => i = digits(i)?,
+        _ => return None,
+    }
+    let mut float = false;
+    if b.get(i) == Some(&b'.') {
+        i = digits(i + 1)?;
+        float = true;
+    }
+    if matches!(b.get(i), Some(b'e' | b'E')) {
+        i += 1;
+        if matches!(b.get(i), Some(b'+' | b'-')) {
+            i += 1;
+        }
+        i = digits(i)?;
+        float = true;
+    }
+    (i == b.len()).then_some(if float {
+        NumberShape::Float
+    } else {
+        NumberShape::Int
+    })
+}
+
+pub fn scalar_from_text(s: &str) -> std::result::Result<Value, String> {
+    match s {
+        "null" => return Ok(Value::Null),
+        "true" => return Ok(Value::Bool(true)),
+        "false" => return Ok(Value::Bool(false)),
+        _ => {}
+    }
+    match classify_number(s) {
+        Some(NumberShape::Int) => Ok(match s.parse::<i64>() {
+            Ok(i) if i.to_string() == s => Value::Int(i),
+            _ => Value::Number(s.to_string()),
+        }),
+        Some(NumberShape::Float) => Ok(match s.parse::<f64>() {
+            Ok(f) if f.is_finite() && Value::float_text(f) == s => Value::Float(f),
+            _ => Value::Number(s.to_string()),
+        }),
+        None => Ok(Value::String(s.to_string())),
+    }
+}
+
+pub fn resolve_call(name: &str, args: Vec<Value>) -> std::result::Result<Value, String> {
+    match name {
+        "list" => Ok(Value::Seq(args)),
+        "string" => construct_string(args),
+        "int" => construct_int(args),
+        "float" => construct_float(args),
+        _ => Ok(Value::Call(name.to_string(), args)),
+    }
+}
+
+fn at_most_one(name: &str, args: Vec<Value>) -> std::result::Result<Option<Value>, String> {
+    let mut args = args.into_iter();
+    let arg = args.next();
+    if args.next().is_some() {
+        return Err(format!("{name}() takes at most one argument"));
+    }
+    Ok(arg)
+}
+
+fn construct_string(args: Vec<Value>) -> std::result::Result<Value, String> {
+    Ok(Value::String(match at_most_one("string", args)? {
+        None => String::new(),
+        Some(Value::String(s)) => s,
+        Some(Value::Int(i)) => i.to_string(),
+        Some(Value::Bool(b)) => b.to_string(),
+        Some(Value::Null) => "null".to_string(),
+        Some(Value::Number(text)) => text,
+        Some(Value::Float(f)) if f.is_finite() => Value::float_text(f),
+        Some(Value::Float(f)) if f.is_nan() => "nan".to_string(),
+        Some(Value::Float(f)) => (if f > 0.0 { "inf" } else { "-inf" }).to_string(),
+        Some(other) => return Err(format!("string() takes a scalar, got {other:?}")),
+    }))
+}
+
+fn construct_int(args: Vec<Value>) -> std::result::Result<Value, String> {
+    match at_most_one("int", args)? {
+        None => Ok(Value::Int(0)),
+        Some(Value::Int(i)) => Ok(Value::Int(i)),
+        Some(Value::Float(f)) => {
+            if f.is_finite() && f >= i64::MIN as f64 && f < i64::MAX as f64 {
+                Ok(Value::Int(f.trunc() as i64))
+            } else {
+                Err(format!("float `{f}` is out of range for a 64-bit integer"))
+            }
+        }
+        Some(Value::Number(text)) => match text.parse::<f64>() {
+            Ok(f) if f.is_finite() && f >= i64::MIN as f64 && f < i64::MAX as f64 => {
+                Ok(Value::Int(f.trunc() as i64))
+            }
+            _ => Err(format!(
+                "number `{text}` is out of range for a 64-bit integer"
+            )),
+        },
+        Some(Value::String(s)) => s
+            .trim()
+            .parse::<i64>()
+            .map(Value::Int)
+            .map_err(|_| format!("int() cannot convert `{}` to an integer", s.trim())),
+        Some(other) => Err(format!("int() takes a number or a string, got {other:?}")),
+    }
+}
+
+fn construct_float(args: Vec<Value>) -> std::result::Result<Value, String> {
+    match at_most_one("float", args)? {
+        None => Ok(Value::Float(0.0)),
+        Some(Value::Int(i)) => Ok(Value::Float(i as f64)),
+        Some(Value::Float(f)) => Ok(Value::Float(f)),
+        Some(Value::Number(text)) => match text.parse::<f64>() {
+            Ok(f) if f.is_finite() => Ok(Value::Float(f)),
+            _ => Err(format!("float `{text}` is out of range")),
+        },
+        Some(Value::String(s)) => {
+            let text = s.trim();
+            let spells_non_finite = text
+                .trim_start_matches(['+', '-'])
+                .starts_with(|c: char| c.is_ascii_alphabetic());
+            match text.parse::<f64>() {
+                Ok(f) if f.is_finite() || spells_non_finite => Ok(Value::Float(f)),
+                Ok(_) => Err(format!("float `{text}` is out of range")),
+                Err(_) => Err(format!("float() cannot convert `{text}` to a float")),
+            }
+        }
+        Some(other) => Err(format!("float() takes a number or a string, got {other:?}")),
+    }
 }

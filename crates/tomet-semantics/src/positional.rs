@@ -156,7 +156,7 @@ fn scalar_to_plain(v: &Value) -> String {
         Value::Null => String::new(),
         Value::Bool(b) => b.to_string(),
         Value::Int(i) => i.to_string(),
-        Value::Float(f) => cotomet_syntax::float_text(*f),
+        Value::Float(f) => Value::float_text(*f),
         Value::Number(text) => text.clone(),
         Value::String(s) => s.clone(),
         Value::Seq(_)
@@ -175,7 +175,7 @@ fn scalar_to_plain(v: &Value) -> String {
 ///   element's first slot is `"target"` (see
 ///   [`recover_target_scheme_entry`]), then fill any still-unfilled slots
 ///   from bare positional entries the parser tagged with
-///   [`cotomet_syntax::POSITIONAL_ENTRY_KEY`] (`@link(tm:foo, depends_on)`'s `depends_on`,
+///   [`tomet_semantics_core::POSITIONAL_ENTRY_KEY`] (`@link(tm:foo, depends_on)`'s `depends_on`,
 ///   or a custom element's `(a, b)`).
 /// - `Value::Seq`: an explicit `[...]`-bracketed positional list
 ///   (`@task([a, b])`) -- independent of the parser's bare-comma-list
@@ -234,13 +234,13 @@ fn normalized_args_in(name: Option<&Name>, data: &Data, bindings: &Bindings) -> 
         other => other.clone(),
     };
     let slots: Vec<&str> = keys.iter().map(String::as_str).collect();
-    Some(cotomet_syntax::bind_positional(&args, &slots))
+    Some(tomet_semantics_core::bind_positional(&args, &slots))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use cotomet_syntax::POSITIONAL_ENTRY_KEY;
+    use tomet_semantics_core::POSITIONAL_ENTRY_KEY;
     use tomet_ast::Name;
     use tomet_tree::{ValueExt, element_new};
 

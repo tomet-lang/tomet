@@ -8,4 +8,4 @@ pub mod positional;
 
 pub use admits::{Mismatch, admits};
 pub use parse::parse_type_spec;
-pub use positional::bind_positional;
+pub use positional::{POSITIONAL_ENTRY_KEY, bind_positional};

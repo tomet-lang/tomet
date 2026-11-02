@@ -71,7 +71,7 @@ pub fn profile_names(declaration: &Declaration) -> Vec<String> {
         Some(Value::Map(entries)) => entries
             .iter()
             .map(|(key, value)| {
-                if key == cotomet_syntax::POSITIONAL_ENTRY_KEY {
+                if key == tomet_semantics_core::POSITIONAL_ENTRY_KEY {
                     scalar_text_or_debug(value)
                 } else {
                     key.clone()

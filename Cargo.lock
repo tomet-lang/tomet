@@ -275,30 +275,22 @@ name = "cotomet"
 version = "0.5.0"
 dependencies = [
  "cotomet-eval",
- "cotomet-syntax",
  "serde_cotomet",
-]
-
-[[package]]
-name = "cotomet-eval"
-version = "0.5.0"
-dependencies = [
- "cotomet-syntax",
- "time",
  "tomet-ast",
- "tomet-declaration",
- "tomet-expr",
  "tomet-parser",
  "tomet-position",
  "tomet-span",
 ]
 
 [[package]]
-name = "cotomet-syntax"
+name = "cotomet-eval"
 version = "0.5.0"
 dependencies = [
+ "time",
  "tomet-ast",
- "tomet-lexer",
+ "tomet-declaration",
+ "tomet-expr",
+ "tomet-parser",
  "tomet-position",
  "tomet-span",
 ]
@@ -1511,9 +1503,9 @@ dependencies = [
 name = "serde_cotomet"
 version = "0.5.0"
 dependencies = [
- "cotomet-syntax",
  "serde",
  "tomet-ast",
+ "tomet-parser",
 ]
 
 [[package]]
@@ -1903,7 +1895,6 @@ dependencies = [
 name = "tomet-declaration"
 version = "0.5.0"
 dependencies = [
- "cotomet-syntax",
  "tomet-ast",
  "tomet-parser",
  "tomet-semantics-core",
@@ -1928,13 +1919,13 @@ dependencies = [
 name = "tomet-edit"
 version = "0.5.0"
 dependencies = [
- "cotomet-syntax",
  "getrandom 0.2.17",
  "tomet-address",
  "tomet-ast",
  "tomet-config",
  "tomet-cst",
  "tomet-parser",
+ "tomet-style",
  "tomet-tree",
  "tomet-validator",
  "tomet-vault",
@@ -1980,7 +1971,6 @@ dependencies = [
 name = "tomet-formatter"
 version = "0.5.0"
 dependencies = [
- "cotomet-syntax",
  "tomet-ast",
  "tomet-config",
  "tomet-parser",
@@ -2000,7 +1990,6 @@ dependencies = [
 name = "tomet-html"
 version = "0.5.0"
 dependencies = [
- "cotomet-syntax",
  "tomet-ast",
  "tomet-expr",
  "tomet-parser",
@@ -2133,7 +2122,6 @@ dependencies = [
 name = "tomet-markdown"
 version = "0.5.0"
 dependencies = [
- "cotomet-syntax",
  "nanoid",
  "pulldown-cmark",
  "serde_yaml",
@@ -2175,7 +2163,6 @@ dependencies = [
 name = "tomet-parser"
 version = "0.5.0"
 dependencies = [
- "cotomet-syntax",
  "tomet-ast",
  "tomet-cst",
  "tomet-lexer",
@@ -2194,7 +2181,6 @@ version = "0.5.0"
 name = "tomet-printer"
 version = "0.5.0"
 dependencies = [
- "cotomet-syntax",
  "tomet-ast",
  "tomet-config",
  "tomet-field-utils",
@@ -2232,7 +2218,6 @@ dependencies = [
 name = "tomet-semantics"
 version = "0.5.0"
 dependencies = [
- "cotomet-syntax",
  "serde_json",
  "tomet-address",
  "tomet-ast",
@@ -2248,7 +2233,6 @@ dependencies = [
 name = "tomet-semantics-core"
 version = "0.5.0"
 dependencies = [
- "cotomet-syntax",
  "tomet-ast",
  "tomet-type",
 ]
@@ -2301,7 +2285,6 @@ dependencies = [
 name = "tomet-style"
 version = "0.5.0"
 dependencies = [
- "cotomet-syntax",
  "tomet-ast",
  "tomet-config",
  "tomet-field-utils",
@@ -2319,7 +2302,7 @@ source = "git+https://github.com/tomet-lang/tomet-corpus.git#c1d45569eacc3530a66
 name = "tomet-tests"
 version = "0.5.0"
 dependencies = [
- "cotomet-syntax",
+ "cotomet",
  "serde_json",
  "tomet-ast",
  "tomet-config",

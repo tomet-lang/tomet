@@ -12,13 +12,11 @@
 /// starts in text the parser does not accept; so is any result that would
 /// read back as a different value.
 pub fn format_data_source(src: &str) -> String {
-    let mut hook = tomet_parser::CotometValueHook;
-    let Ok(before) = cotomet_syntax::parse_file_with(src, &mut hook) else {
+    let Ok(before) = tomet_parser::parse_file(src) else {
         return src.to_string();
     };
     let formatted = scan(src);
-    let mut hook = tomet_parser::CotometValueHook;
-    match cotomet_syntax::parse_file_with(&formatted, &mut hook) {
+    match tomet_parser::parse_file(&formatted) {
         Ok(after) if after == before => formatted,
         _ => src.to_string(),
     }
@@ -156,8 +154,8 @@ mod tests {
             "\"k  \": \"v \r\n w\"\r\n",
             "",
         ] {
-            let before = cotomet_syntax::parse_file(src).unwrap();
-            let after = cotomet_syntax::parse_file(&format_data_source(src)).unwrap();
+            let before = tomet_parser::parse_file(src).unwrap();
+            let after = tomet_parser::parse_file(&format_data_source(src)).unwrap();
             assert_eq!(before, after, "{src:?}");
         }
     }
@@ -170,8 +168,8 @@ mod tests {
             "::kind(catalog, 2)\n\n::meta{ id: x }\n\n\"a\": 1\n"
         );
         // the value is the same, header included
-        let before = cotomet_syntax::parse_file(src).unwrap();
-        let after = cotomet_syntax::parse_file(&format_data_source(src)).unwrap();
+        let before = tomet_parser::parse_file(src).unwrap();
+        let after = tomet_parser::parse_file(&format_data_source(src)).unwrap();
         assert_eq!(before, after);
     }
 
@@ -200,10 +198,8 @@ mod tests {
             format_data_source(src),
             "::macros{ vocab: \"x\" }\n\nkey: ${macro.vocab}\n"
         );
-        let mut hook = tomet_parser::CotometValueHook;
-        let before = cotomet_syntax::parse_file_with(src, &mut hook).unwrap();
-        let mut hook = tomet_parser::CotometValueHook;
-        let after = cotomet_syntax::parse_file_with(&format_data_source(src), &mut hook).unwrap();
+        let before = tomet_parser::parse_file(src).unwrap();
+        let after = tomet_parser::parse_file(&format_data_source(src)).unwrap();
         assert_eq!(before, after);
     }
 }

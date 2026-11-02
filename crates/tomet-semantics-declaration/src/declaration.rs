@@ -55,7 +55,7 @@ impl Declaration {
     pub fn bound_args(&self) -> Option<Value> {
         let args = self.args.as_ref()?;
         let keys = self.kind().map_or(&[][..], DeclKind::positional_keys);
-        Some(cotomet_syntax::bind_positional(args, keys))
+        Some(tomet_semantics_core::bind_positional(args, keys))
     }
 }
 
@@ -85,12 +85,6 @@ pub fn declarations(doc: &Document) -> Vec<Found> {
         }
     });
     found
-}
-
-impl From<&cotomet_syntax::Declaration> for Declaration {
-    fn from(d: &cotomet_syntax::Declaration) -> Self {
-        Declaration::new(d.name.clone(), d.args.clone(), d.data.clone())
-    }
 }
 
 #[cfg(test)]

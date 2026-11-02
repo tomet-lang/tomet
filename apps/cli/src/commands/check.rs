@@ -290,8 +290,7 @@ fn format_diagnostics(
 /// `::vars` or `::macros` entry), those duplicates are dropped in favor of the
 /// declaration check's diagnostic so each problem is reported once.
 fn check_ctmt(file: &Path, src: &str, json: bool) -> CheckFileResult {
-    let mut hook = tomet_parser::CotometValueHook;
-    let parsed = match cotomet::syntax::parse_file_with(src, &mut hook) {
+    let parsed = match cotomet::parse_file_with_expressions(src) {
         Ok(parsed) => parsed,
         Err(err) => return parse_failure(file, src, &err.into(), json),
     };
@@ -301,7 +300,10 @@ fn check_ctmt(file: &Path, src: &str, json: bool) -> CheckFileResult {
     let declared: Vec<_> = parsed
         .header
         .iter()
-        .map(|d| tomet_validator::Declared::new(tomet_declaration::Declaration::from(d), d.span))
+        .filter_map(|d| {
+            tomet_declaration::Declaration::from_ast(d)
+                .map(|decl| tomet_validator::Declared::new(decl, d.span))
+        })
         .collect();
     let mut diagnostics = Vec::new();
     tomet_validator::check_ctmt_declarations(&declared, &mut diagnostics);

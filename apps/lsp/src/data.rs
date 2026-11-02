@@ -34,9 +34,8 @@ pub fn request_is_for_data(params: &serde_json::Value) -> bool {
 /// Returns parse errors, declaration errors, and expression evaluation errors,
 /// underlined at their locations in the source text.
 pub fn data_diagnostics_for(text: &str) -> Vec<Diagnostic> {
-    let mut hook = tomet_parser::CotometValueHook;
     let positions = TextPositions::new(text);
-    let parsed = match cotomet::syntax::parse_file_with(text, &mut hook) {
+    let parsed = match cotomet::parse_file_with_expressions(text) {
         Ok(parsed) => parsed,
         Err(err) => {
             return vec![Diagnostic {
@@ -57,7 +56,10 @@ pub fn data_diagnostics_for(text: &str) -> Vec<Diagnostic> {
     let declared: Vec<_> = parsed
         .header
         .iter()
-        .map(|d| tomet_validator::Declared::new(tomet_declaration::Declaration::from(d), d.span))
+        .filter_map(|d| {
+            tomet_declaration::Declaration::from_ast(d)
+                .map(|decl| tomet_validator::Declared::new(decl, d.span))
+        })
         .collect();
     let mut decl_diagnostics = Vec::new();
     tomet_validator::check_ctmt_declarations(&declared, &mut decl_diagnostics);

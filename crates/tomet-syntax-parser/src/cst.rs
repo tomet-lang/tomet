@@ -91,8 +91,12 @@ pub(crate) fn parse_cst_value(src: &str) -> SyntaxNode {
 /// emphasis in an emphasis, a list under a list, a section under a section. Past it the parser stops
 /// reading structure and keeps the text flat in a `TOO_DEEP` node, so no recursion here, or in what
 /// reads the tree, goes deeper than this (a deeper document used to abort the process with a stack
-/// overflow). It is the figure `cotomet-syntax` limits values to (see `cotomet_syntax::MAX_DEPTH`).
-pub const MAX_DEPTH: usize = cotomet_syntax::MAX_DEPTH;
+/// overflow).
+pub const MAX_DEPTH: usize = 64;
+
+fn is_name_start(c: char) -> bool {
+    c.is_ascii_alphabetic() || c == '_'
+}
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum InlineStop {
@@ -392,7 +396,7 @@ impl<'a, 't> CstParser<'a, 't> {
         };
         let first_text = self.text_at(from);
         let valid_start = match first_kind {
-            K::IDENT => first_text.chars().next().is_some_and(cotomet_syntax::is_name_start),
+            K::IDENT => first_text.chars().next().is_some_and(is_name_start),
             K::UNDERSCORE => true,
             K::TRUE_KW | K::FALSE_KW | K::NULL_KW => {
                 let next = from + 1;
@@ -491,10 +495,13 @@ impl<'a, 't> CstParser<'a, 't> {
         let quote = bytes[start];
         let mut cur = start + 1;
         let mut escaped = false;
+        let mut line_end = None;
+        let mut found_closing_quote = false;
+
         while cur < bytes.len() {
             let b = bytes[cur];
-            if b == b'\n' {
-                break;
+            if b == b'\n' && line_end.is_none() {
+                line_end = Some(cur);
             }
             cur += 1;
             if escaped {
@@ -502,10 +509,17 @@ impl<'a, 't> CstParser<'a, 't> {
             } else if b == b'\\' {
                 escaped = true;
             } else if b == quote {
+                found_closing_quote = true;
                 break;
             }
         }
-        let end = cur;
+
+        let end = if found_closing_quote {
+            cur
+        } else {
+            line_end.unwrap_or(cur)
+        };
+
         let tok_end = self.token_at_offset(end);
         let count = tok_end.saturating_sub(self.pos).max(1);
         self.builder.token(K::STRING_LITERAL.into(), &self.src[start..end]);
@@ -525,9 +539,6 @@ impl<'a, 't> CstParser<'a, 't> {
                 let mut escaped = false;
                 while cur < bytes.len() {
                     let b = bytes[cur];
-                    if b == b'\n' {
-                        break;
-                    }
                     cur += 1;
                     if escaped {
                         escaped = false;
@@ -877,7 +888,7 @@ impl<'a, 't> CstParser<'a, 't> {
             j += n;
             return (self.kind_at(j) == Some(K::GT)).then_some((false, j));
         }
-        let n = self.slot_name_tokens_at(j, cotomet_syntax::is_name_start);
+        let n = self.slot_name_tokens_at(j, is_name_start);
         if n > 0 {
             j += n;
         }
@@ -1464,7 +1475,7 @@ impl<'a, 't> CstParser<'a, 't> {
             self.bump(); // '?'
         }
         let first_pred: fn(char) -> bool = if marked {
-            cotomet_syntax::is_name_start
+            is_name_start
         } else {
             char::is_alphabetic
         };
@@ -2486,6 +2497,27 @@ impl<'a, 't> CstParser<'a, 't> {
             }
             self.bump_while(K::WHITESPACE);
             self.bump(); // ':'
+
+            let mut probe = self.pos;
+            while probe < self.tokens.len() && self.tokens[probe].0 == K::WHITESPACE {
+                probe += 1;
+            }
+            if probe < self.tokens.len() && self.tokens[probe].0 == K::NEWLINE {
+                let mut next_line_probe = probe + 1;
+                let mut has_indent = false;
+                if next_line_probe < self.tokens.len() && self.tokens[next_line_probe].0 == K::WHITESPACE {
+                    has_indent = true;
+                    next_line_probe += 1;
+                }
+                if has_indent && next_line_probe < self.tokens.len() {
+                    let k = self.tokens[next_line_probe].0;
+                    if k != close && k != K::NEWLINE && self.map_key_at(next_line_probe).is_none() {
+                        self.bump_while(K::WHITESPACE);
+                        self.bump(); // newline
+                        self.bump_while(K::WHITESPACE); // indentation
+                    }
+                }
+            }
         } else {
             self.builder.start_node(K::SEQ_ITEM.into());
         }

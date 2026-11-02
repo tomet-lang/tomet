@@ -4,8 +4,6 @@
 
 use tomet_ast::Value;
 
-use crate::parser::{is_ident_char, scalar_from_text};
-
 pub fn print_value(value: &Value) -> String {
     let mut out = String::new();
     write_value(value, &mut out, true);
@@ -65,12 +63,6 @@ fn write_value(value: &Value, out: &mut String, top_level: bool) {
                 out.push(')');
             }
         }
-        // Best-effort only: `print_value` has no document-level block
-        // renderer to call (it's a generic cotomet-data printer, used by
-        // `cotomet`'s own tests/convenience function, not by
-        // `tomet-format-printer`, which has its own real block renderer
-        // and never calls through here). Plain text keeps this
-        // exhaustive without pretending to round-trip nested structure.
         Value::Blocks(blocks) => {
             out.push('[');
             for (i, block) in blocks.iter().enumerate() {
@@ -160,10 +152,6 @@ fn is_iso8601(s: &str) -> bool {
     false
 }
 
-/// Writes a float so it reads back as the same float, never as an int:
-/// `1.0` stays `1.0` and `1e21` stays `1e21`. A non-finite float has no bare
-/// spelling, so it is written with the `float(...)` constructor
-/// (`float(nan)`, `float(inf)`, `float(-inf)`).
 pub fn write_float(f: f64, out: &mut String) {
     if f.is_nan() {
         out.push_str("float(nan)");
@@ -174,11 +162,47 @@ pub fn write_float(f: f64, out: &mut String) {
     }
 }
 
-/// [`write_float`] as an owned string, for callers that build with `format!`.
 pub fn float_text(f: f64) -> String {
     let mut out = String::new();
     write_float(f, &mut out);
     out
+}
+
+pub fn is_ident_char(c: char) -> bool {
+    c.is_alphanumeric() || c == '_' || c == '-' || c == '.'
+}
+
+fn classify_number(s: &str) -> bool {
+    let b = s.as_bytes();
+    let digits = |mut i: usize| {
+        let start = i;
+        while b.get(i).is_some_and(u8::is_ascii_digit) {
+            i += 1;
+        }
+        (i > start).then_some(i)
+    };
+    let mut i = usize::from(b.first() == Some(&b'-'));
+    match b.get(i) {
+        Some(b'0') => i += 1,
+        Some(b'1'..=b'9') => {
+            let Some(next_i) = digits(i) else { return false };
+            i = next_i;
+        }
+        _ => return false,
+    }
+    if b.get(i) == Some(&b'.') {
+        let Some(next_i) = digits(i + 1) else { return false };
+        i = next_i;
+    }
+    if matches!(b.get(i), Some(b'e' | b'E')) {
+        i += 1;
+        if matches!(b.get(i), Some(b'+' | b'-')) {
+            i += 1;
+        }
+        let Some(next_i) = digits(i) else { return false };
+        i = next_i;
+    }
+    i == b.len()
 }
 
 pub fn write_scalar_string(s: &str, out: &mut String) {
@@ -200,11 +224,10 @@ pub fn write_scalar_string(s: &str, out: &mut String) {
         Some('&' | '*' | '!' | '%' | '@' | '`' | '|' | '>' | '?' | '-' | '~')
     );
 
-    // Quoted unless the bare text reads back as this same string: a keyword,
-    // a number, and an out-of-range number (which would not read back at all)
-    // all need quotes.
+    let is_bare_keyword_or_number = matches!(s, "null" | "true" | "false") || classify_number(s);
+
     let needs_quotes = s.is_empty()
-        || !matches!(scalar_from_text(s), Ok(Value::String(_)))
+        || is_bare_keyword_or_number
         || s.trim() != s
         || starts_with_special
         || s.contains([
@@ -218,13 +241,6 @@ pub fn write_scalar_string(s: &str, out: &mut String) {
     }
 }
 
-/// Writes a map key: bare when it is a non-empty run of [`is_ident_char`],
-/// quoted (`"tmtroot/a/b.tmt"`) otherwise, so the output reads back as the
-/// same key. Every printer that emits `key: value` goes through here.
-///
-/// An empty key is [`crate::POSITIONAL_ENTRY_KEY`] and has no keyed spelling; callers
-/// print such an entry as a bare value. It is quoted here only so a stray one
-/// fails to parse instead of reading back as something else.
 pub fn write_key(key: &str, out: &mut String) {
     if !key.is_empty() && key.chars().all(is_ident_char) {
         out.push_str(key);
@@ -233,22 +249,18 @@ pub fn write_key(key: &str, out: &mut String) {
     }
 }
 
-/// [`write_key`] as an owned string, for callers that build with `format!`.
 pub fn key_text(key: &str) -> String {
     let mut out = String::new();
     write_key(key, &mut out);
     out
 }
 
-/// `s` as a `"..."` string whatever it holds, where [`key_text`] quotes only what
-/// has to be. For a place that uses `.` as a separator: a bare key may hold one.
 pub fn quoted_text(s: &str) -> String {
     let mut out = String::new();
     write_quoted(s, &mut out);
     out
 }
 
-/// Writes `s` as a `"..."` string, with the escapes `parse_quoted` reads.
 fn write_quoted(s: &str, out: &mut String) {
     out.push('"');
     for c in s.chars() {

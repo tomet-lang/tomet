@@ -186,7 +186,7 @@ pub(crate) fn value_to_plain(v: &Value) -> String {
         Value::Null => String::new(),
         Value::Bool(b) => b.to_string(),
         Value::Int(i) => i.to_string(),
-        Value::Float(f) => cotomet_syntax::float_text(*f),
+        Value::Float(f) => Value::float_text(*f),
         Value::Number(text) => text.clone(),
         Value::String(s) => s.clone(),
         Value::Seq(items) => items

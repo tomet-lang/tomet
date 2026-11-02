@@ -1,5 +1,5 @@
 // cotomet grammar for tree-sitter -- editor syntax highlighting only.
-// An approximation of `crates/cotomet-syntax/src/parser.rs`, not a match for it;
+// An approximation of cotomet syntax, not a match for it;
 // see `src/lib.rs` for what it simplifies and `tests/src/cotomet.rs` (in the
 // `tomet-tests` package) for how drift from the parser is caught.
 //

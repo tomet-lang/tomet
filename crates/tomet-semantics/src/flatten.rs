@@ -63,7 +63,7 @@ impl FlatData {
 /// part of an attribute name, and spliced in it would add attributes of its own.
 /// The empty key is the positional marker and is not judged here.
 pub fn is_attribute_key(key: &str) -> bool {
-    key.chars().all(cotomet_syntax::is_ident_char)
+    key.chars().all(|c| c.is_alphanumeric() || c == '_' || c == '-' || c == '.')
 }
 
 /// Flattens `el`'s `(args)` and `{value}` for an attribute map.
@@ -135,7 +135,7 @@ pub fn scalar_string(v: &Value) -> Option<String> {
         Value::Null => Some(String::new()),
         Value::Bool(b) => Some(b.to_string()),
         Value::Int(i) => Some(i.to_string()),
-        Value::Float(f) => Some(cotomet_syntax::float_text(*f)),
+        Value::Float(f) => Some(Value::float_text(*f)),
         Value::Number(text) => Some(text.clone()),
         Value::String(s) => Some(s.clone()),
         Value::Seq(items) => {

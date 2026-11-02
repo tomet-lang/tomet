@@ -79,7 +79,7 @@ pub enum Value {
     /// ordered sequence is enough for what this exists to express.
     ///
     /// The parser resolves exactly the literal constructors
-    /// (`cotomet_syntax::LITERAL_CONSTRUCTORS`: `list`, `string`, `int`, `float`) to
+    /// (`list`, `string`, `int`, `float`) to
     /// the plain value they stand for, so `list(card)` is a [`Value::Seq`]
     /// and never a `Call`. Every other callee -- `enum`, a typo -- is kept
     /// here as an uninterpreted `String`, the same way the parser never
@@ -1233,4 +1233,13 @@ pub enum Literal {
     String(String),
     Bool(bool),
     Null,
+}
+
+/// A standalone cotomet data file (`.ctmt`): its declarations at the top, then its map entries.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct File {
+    /// The `::name` declarations at the top, in order.
+    pub header: Vec<Declaration>,
+    /// The entries: a [`Value::Map`] of `key: value`.
+    pub body: Value,
 }

@@ -7,8 +7,8 @@ repository.workspace = true
 description = "Serde support for cotomet: read and write Rust types as cotomet data"
 
 [dependencies]
-cotomet-syntax = { workspace = true }
 tomet-ast = { workspace = true }
+tomet-parser = { workspace = true }
 
 #= Crates.io
 serde = { workspace = true }

@@ -34,7 +34,7 @@
 use std::collections::HashMap;
 use std::fmt;
 
-pub use cotomet_syntax::File;
+pub use tomet_ast::File;
 use tomet_ast::Value;
 use tomet_declaration::{DeclKind, Declaration, Host, Problem, check_declarations};
 use tomet_expr::{DocRef, EvalContext, Generate, NoResolver, Phase};
@@ -83,15 +83,14 @@ impl Generate for PureGenerate {
 /// Returns the parsed [`File`] with expressions replaced by their evaluated data values,
 /// or every encountered error with line and column.
 pub fn eval_str(src: &str, vars: &[(String, Value)]) -> Result<File, Vec<Error>> {
-    let file =
-        cotomet_syntax::parse_file_with(src, &mut tomet_parser::CotometValueHook).map_err(|e| {
-            vec![Error {
-                message: e.message,
-                line: e.line,
-                column: e.column,
-                span: Span::new(e.offset, e.offset),
-            }]
-        })?;
+    let file = tomet_parser::parse_file(src).map_err(|e| {
+        vec![Error {
+            message: e.message,
+            line: e.line,
+            column: e.column,
+            span: Span::new(e.offset, e.offset),
+        }]
+    })?;
     eval_file(file, src, vars)
 }
 
@@ -104,7 +103,9 @@ pub fn eval_file(file: File, src: &str, vars: &[(String, Value)]) -> Result<File
     let mut var_decls = Vec::new();
 
     for decl in &file.header {
-        let d = Declaration::from(decl);
+        let Some(d) = Declaration::from_ast(decl) else {
+            continue;
+        };
         if matches!(d.kind(), Some(DeclKind::Macros | DeclKind::Vars)) {
             // An entry the shared check refuses would otherwise vanish, and a later
             // `${macro.x}` or `${var.x}` would complain of something unrelated.

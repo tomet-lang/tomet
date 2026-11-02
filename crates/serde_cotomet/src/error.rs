@@ -4,7 +4,7 @@ use std::fmt;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Error {
     /// The text is not cotomet; it carries the line and column.
-    Syntax(cotomet_syntax::Error),
+    Syntax(tomet_parser::Error),
     /// The text parsed, but the data does not fit the Rust type (or the other
     /// way round when writing).
     Data {
@@ -65,9 +65,9 @@ impl fmt::Display for Error {
 /// anywhere else: `"a.tmt".source`, not `a.tmt.source`.
 fn segment_text(key: &str) -> String {
     if key.contains('.') {
-        cotomet_syntax::quoted_text(key)
+        crate::print::quoted_text(key)
     } else {
-        cotomet_syntax::key_text(key)
+        crate::print::key_text(key)
     }
 }
 
@@ -80,8 +80,8 @@ impl std::error::Error for Error {
     }
 }
 
-impl From<cotomet_syntax::Error> for Error {
-    fn from(e: cotomet_syntax::Error) -> Self {
+impl From<tomet_parser::Error> for Error {
+    fn from(e: tomet_parser::Error) -> Self {
         Error::Syntax(e)
     }
 }

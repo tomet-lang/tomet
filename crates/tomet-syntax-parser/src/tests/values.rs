@@ -301,11 +301,11 @@ fn a_number_reading_would_change_keeps_its_text_in_an_argument() {
 }
 
 #[test]
-fn cotomet_value_hook_accepts_interpolation_with_span() {
+fn parse_value_accepts_interpolation_with_span() {
     let src = "key: ${macro.vocab(\"writ\", \"1.0.0\")}\n";
-    let file = cotomet_syntax::parse_file_with(src, &mut CotometValueHook).unwrap();
-    let Value::Map(entries) = file.body else {
-        panic!("expected a map, got {:?}", file.body);
+    let file = parse_value(src).unwrap();
+    let Value::Map(entries) = file else {
+        panic!("expected a map, got {:?}", file);
     };
     assert_eq!(entries.len(), 1);
     assert_eq!(entries[0].0, "key");
@@ -316,8 +316,8 @@ fn cotomet_value_hook_accepts_interpolation_with_span() {
     assert_eq!(interp.span.end, 36);
 
     let src2 = "key: $f(1, 2)\n";
-    let file2 = cotomet_syntax::parse_file_with(src2, &mut CotometValueHook).unwrap();
-    let Value::Map(entries2) = file2.body else {
+    let file2 = parse_value(src2).unwrap();
+    let Value::Map(entries2) = file2 else {
         panic!("expected a map");
     };
     let Value::Interp(interp2) = &entries2[0].1 else {
@@ -325,35 +325,6 @@ fn cotomet_value_hook_accepts_interpolation_with_span() {
     };
     assert_eq!(interp2.span.start, 5);
     assert_eq!(interp2.span.end, 13);
-}
-
-#[test]
-fn cotomet_value_hook_declines_elements_brackets_and_pipe() {
-    // 1. Bracket list literal is rejected by cotomet grammar
-    let bracket_res = cotomet_syntax::parse_file_with("tags: [a, b]\n", &mut CotometValueHook);
-    assert!(bracket_res.is_err());
-    let err = bracket_res.unwrap_err();
-    assert!(
-        err.message.contains("list literal was removed"),
-        "{}",
-        err.message
-    );
-
-    // 2. Pipe prose across lines is rejected by cotomet grammar
-    let pipe_res = cotomet_syntax::parse_file_with(
-        "about: |\n  line one\n  line two\n",
-        &mut CotometValueHook,
-    );
-    assert!(pipe_res.is_err());
-
-    // 3. Elements (@name) are declined by the hook; in cotomet they are not parsed as elements
-    let file =
-        cotomet_syntax::parse_file_with("icon: @doc.icon(\"triangle\")\n", &mut CotometValueHook)
-            .unwrap();
-    let Value::Map(entries) = file.body else {
-        panic!("expected a map");
-    };
-    assert!(!matches!(entries[0].1, Value::Element(_)));
 }
 
 #[test]

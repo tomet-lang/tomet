@@ -1,11 +1,43 @@
 use crate::error::Result;
-use cotomet_syntax::parse_quoted;
 use tomet_ast::{BinaryOp, InterpExpr, InterpExprKind, Interpolation, Literal};
 use tomet_cst::SyntaxNode;
 use tomet_lexer::Cursor;
 use tomet_span::Span;
 
-pub use cotomet_syntax::{is_interp_ident_char, is_interp_ident_start};
+/// First character of an interpolation expression identifier.
+pub fn is_interp_ident_start(c: char) -> bool {
+    c.is_alphabetic() || c == '_'
+}
+
+/// Subsequent characters of an interpolation expression identifier.
+pub fn is_interp_ident_char(c: char) -> bool {
+    c.is_alphanumeric() || c == '_' || c == '-'
+}
+
+/// Reads a `"..."` string, with `\"`, `\\`, `\n`, `\t` escapes.
+pub fn parse_quoted(cur: &mut Cursor) -> Result<String> {
+    let start = cur.pos();
+    if !cur.eat_str("\"") {
+        return Err(err(start, "expected '\"'"));
+    }
+    let mut out = String::new();
+    loop {
+        match cur.bump() {
+            None => return Err(err(start, "unterminated string")),
+            Some('"') => break,
+            Some('\\') => match cur.bump() {
+                Some('"') => out.push('"'),
+                Some('\\') => out.push('\\'),
+                Some('n') => out.push('\n'),
+                Some('t') => out.push('\t'),
+                Some(other) => out.push(other),
+                None => return Err(err(start, "unterminated string")),
+            },
+            Some(c) => out.push(c),
+        }
+    }
+    Ok(out)
+}
 
 fn err(pos: usize, message: impl Into<String>) -> crate::error::Error {
     crate::error::Error {

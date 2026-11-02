@@ -61,7 +61,7 @@ tomet-expr = { workspace = true }
 tomet-config = { workspace = true }
 tomet-cst = { workspace = true }
 tomet-edit = { workspace = true }
-cotomet-syntax = { workspace = true }
+cotomet = { workspace = true }
 tomet-formatter = { workspace = true }
 tomet-html = { workspace = true }
 tomet-load-config = { workspace = true }

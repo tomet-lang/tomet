@@ -13,7 +13,6 @@ tomet-span = { workspace = true }
 tomet-lexer = { workspace = true }
 tomet-position = { workspace = true }
 tomet-tree = { workspace = true }
-cotomet-syntax = { workspace = true }
 
 #= Crates.io
 unicode-width = { workspace = true }

@@ -65,12 +65,121 @@ pub fn quote_scalar_string(s: &str) -> String {
     out
 }
 
+/// Characters legal inside a bare map key.
+pub fn is_ident_char(c: char) -> bool {
+    c.is_alphanumeric() || c == '_' || c == '-' || c == '.'
+}
+
+/// Writes `s` as a `"..."` string, with `\"`, `\\`, `\n`, `\r`, `\t` escapes.
+pub fn write_quoted(s: &str, out: &mut String) {
+    out.push('"');
+    for c in s.chars() {
+        match c {
+            '"' => out.push_str("\\\""),
+            '\\' => out.push_str("\\\\"),
+            '\n' => out.push_str("\\n"),
+            '\r' => out.push_str("\\r"),
+            '\t' => out.push_str("\\t"),
+            _ => out.push(c),
+        }
+    }
+    out.push('"');
+}
+
+/// `s` as a `"..."` string whatever it holds.
+pub fn quoted_text(s: &str) -> String {
+    let mut out = String::new();
+    write_quoted(s, &mut out);
+    out
+}
+
+/// Writes a map key: bare when it is a non-empty run of [`is_ident_char`],
+/// quoted (`"tmtroot/a/b.tmt"`) otherwise.
+pub fn write_key(key: &str, out: &mut String) {
+    if !key.is_empty() && key.chars().all(is_ident_char) {
+        out.push_str(key);
+    } else {
+        write_quoted(key, out);
+    }
+}
+
+/// [`write_key`] as an owned string.
+pub fn key_text(key: &str) -> String {
+    let mut out = String::new();
+    write_key(key, &mut out);
+    out
+}
+
+
+fn classify_number(s: &str) -> bool {
+    let b = s.as_bytes();
+    let digits = |mut i: usize| {
+        let start = i;
+        while b.get(i).is_some_and(u8::is_ascii_digit) {
+            i += 1;
+        }
+        (i > start).then_some(i)
+    };
+    let mut i = usize::from(b.first() == Some(&b'-'));
+    match b.get(i) {
+        Some(b'0') => i += 1,
+        Some(b'1'..=b'9') => {
+            let Some(next_i) = digits(i) else { return false };
+            i = next_i;
+        }
+        _ => return false,
+    }
+    if b.get(i) == Some(&b'.') {
+        let Some(next_i) = digits(i + 1) else { return false };
+        i = next_i;
+    }
+    if matches!(b.get(i), Some(b'e' | b'E')) {
+        i += 1;
+        if matches!(b.get(i), Some(b'+' | b'-')) {
+            i += 1;
+        }
+        let Some(next_i) = digits(i) else { return false };
+        i = next_i;
+    }
+    i == b.len()
+}
+
 /// Appends a safely quoted/escaped string scalar to `out`.
-///
-/// This is `cotomet`'s own, not a copy: what needs quotes is decided by what the
-/// parser reads back as something other than the same string, so the two
-/// cannot drift apart.
-pub use cotomet_syntax::write_scalar_string;
+pub fn write_scalar_string(s: &str, out: &mut String) {
+    if is_iso8601(s) {
+        out.push_str(s);
+        return;
+    }
+
+    if (s.starts_with("${") && s.ends_with('}'))
+        || (s.starts_with('$') && s.contains('(') && s.ends_with(')'))
+    {
+        out.push_str(s);
+        return;
+    }
+
+    let first_char = s.chars().next();
+    let starts_with_special = matches!(
+        first_char,
+        Some('&' | '*' | '!' | '%' | '@' | '`' | '|' | '>' | '?' | '-' | '~')
+    );
+
+    let is_bare_keyword_or_number = matches!(s, "null" | "true" | "false") || classify_number(s);
+
+    let needs_quotes = s.is_empty()
+        || is_bare_keyword_or_number
+        || s.trim() != s
+        || starts_with_special
+        || s.contains([
+            '"', '\'', ':', ',', '(', ')', '[', ']', '{', '}', '\n', '\r', '\t', ' ',
+        ]);
+
+    if needs_quotes {
+        write_quoted(s, out);
+    } else {
+        out.push_str(s);
+    }
+}
 
 /// Renders a `Vec<Block>` slot (an element's `[content]`, or a `key:
 /// [...]` value) back into `.tmt` source text.
@@ -141,7 +250,7 @@ pub fn render_value_inner_with_blocks(
         Value::Null => String::new(),
         Value::Bool(b) => b.to_string(),
         Value::Int(i) => i.to_string(),
-        Value::Float(f) => cotomet_syntax::float_text(*f),
+        Value::Float(f) => Value::float_text(*f),
         // As written: formatting must not turn `1.10` into `1.1`.
         Value::Number(text) => text.clone(),
         Value::String(s) => quote_scalar_string(s),
@@ -177,7 +286,7 @@ pub fn render_value_inner_with_blocks(
                         if k.is_empty() || (idx == 0 && (k == "variant" || k == "lang")) {
                             parts.push(val_str);
                         } else {
-                            parts.push(format!("{}: {val_str}", cotomet_syntax::key_text(k)));
+                            parts.push(format!("{}: {val_str}", key_text(k)));
                         }
                     }
                     parts.join(", ")
@@ -192,7 +301,7 @@ pub fn render_value_inner_with_blocks(
                     if k.is_empty() || (idx == 0 && (k == "variant" || k == "lang")) {
                         parts.push(val_str);
                     } else {
-                        parts.push(format!("{}: {val_str}", cotomet_syntax::key_text(k)));
+                        parts.push(format!("{}: {val_str}", key_text(k)));
                     }
                 }
                 parts.join(", ")
@@ -298,7 +407,7 @@ fn render_embedded_value(
         match entry {
             Entry::Pair(k, v) => s.push_str(&format!(
                 "{}: {}",
-                cotomet_syntax::key_text(k),
+                key_text(k),
                 render_nested_with_blocks(v, config, render_blocks)
             )),
             Entry::Element(nested) => {
@@ -404,7 +513,7 @@ pub fn render_meta_declaration(declaration: &Declaration, config: &PrinterConfig
             let field_cfg = config.meta.fields.get(k);
             let val_str = render_meta_field_value(v, field_cfg, config);
             out.push_str("  ");
-            cotomet_syntax::write_key(k, &mut out);
+            write_key(k, &mut out);
             if val_str.starts_with('\n') || val_str.is_empty() {
                 out.push(':');
             } else {
