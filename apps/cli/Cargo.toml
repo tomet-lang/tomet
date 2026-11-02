@@ -25,7 +25,7 @@ tomet-load = { workspace = true }
 tomet-load-config = { workspace = true }
 tomet-markdown = { workspace = true }
 tomet-pandoc = { workspace = true }
-tomet-parser = { workspace = true }
+tomet-ast-parser = { workspace = true }
 tomet-printer = { workspace = true }
 tomet-declaration = { workspace = true }
 tomet-semantics = { workspace = true }

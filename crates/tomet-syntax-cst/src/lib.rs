@@ -53,6 +53,10 @@ pub use rowan::{
     GreenNode, GreenNodeBuilder, GreenToken, NodeOrToken, TextRange, TextSize, WalkEvent,
 };
 
+/// How deep constructs may nest: past this depth, parsing halts recursion and
+/// emits a `TOO_DEEP` node.
+pub const MAX_DEPTH: usize = 64;
+
 /// Replaces the byte slice defined by `range` in `source` with `replacement`.
 pub fn replace_range(source: &str, range: TextRange, replacement: &str) -> String {
     let start = usize::from(range.start());

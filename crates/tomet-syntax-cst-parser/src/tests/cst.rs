@@ -89,12 +89,6 @@ fn every_marker_the_ast_parser_reads_as_a_list_is_a_list() {
         let root = crate::parse_cst(src);
         let top: Vec<K> = root.children().map(|n| n.kind()).collect();
         assert_eq!(top, [K::LIST], "{src:?}");
-        // `parse_document` agrees.
-        let doc = crate::parse_document(src).unwrap();
-        assert!(
-            matches!(doc.blocks.as_slice(), [tomet_ast::Block::List(_)]),
-            "{src:?}: {doc:?}"
-        );
     }
 }
 
@@ -222,52 +216,6 @@ fn a_url_does_not_start_inside_a_word() {
     assert_eq!(kinds("xhttps://a.b\n", K::AUTOLINK), 0);
 }
 
-// --- parity ---------------------------------------------------------------
-
-/// Whatever `parse_document` turns into these elements, the CST has a node for.
-#[test]
-fn the_cst_and_the_ast_agree_on_inline_structure() {
-    use tomet_ast::{Block, Inline};
-    fn names(inlines: &[Inline], out: &mut Vec<String>) {
-        for i in inlines {
-            if let Inline::Element(e) = i {
-                out.push(e.name.name.clone());
-                for b in e.content.iter().flatten() {
-                    if let Block::Paragraph(p) = b {
-                        names(&p.content, out);
-                    }
-                }
-            }
-        }
-    }
-    for src in [
-        "a *em* b **strong** c ~~gone~~ `code` https://a.b/c\n",
-        "**a *b* c**\n",
-        "`*not em*` and _em_\n",
-        "x _two words_ y\n",
-    ] {
-        let doc = crate::parse_document(src).unwrap();
-        let mut ast = Vec::new();
-        for b in &doc.blocks {
-            if let Block::Paragraph(p) = b {
-                names(&p.content, &mut ast);
-            }
-        }
-        ast.sort();
-        let mut cst: Vec<String> = Vec::new();
-        for (kind, name) in [
-            (K::EMPHASIS, "em"),
-            (K::STRONG, "strong"),
-            (K::STRIKEOUT, "strikeout"),
-            (K::CODE_SPAN, "raw"),
-            (K::AUTOLINK, "link"),
-        ] {
-            cst.extend(std::iter::repeat_n(name.to_string(), kinds(src, kind)));
-        }
-        cst.sort();
-        assert_eq!(cst, ast, "{src:?}");
-    }
-}
 
 // --- `|` runs ---------------------------------------------------------------
 
@@ -381,7 +329,6 @@ fn a_bracket_in_a_value_is_content_and_a_code_span_cannot_close_it() {
     // `[ ... ]` in a value is read as blocks (`Value::Blocks`).
     // Read as a list it closed at the `]` inside the code span.
     let src = "a @conflict(a: [ use `]` here ], b: [ x ]) b\n";
-    assert!(crate::parse_document(src).is_ok());
     assert_eq!(texts(src, K::CONTENT), ["[ use `]` here ]", "[ x ]"]);
     assert_eq!(texts(src, K::CODE_SPAN), ["`]`"]);
     assert_eq!(kinds(src, K::INLINE_ELEMENT), 1);

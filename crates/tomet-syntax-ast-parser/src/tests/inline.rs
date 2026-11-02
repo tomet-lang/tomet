@@ -160,3 +160,50 @@ fn delimiters_and_names_read_as_before() {
     assert_eq!(el.connects.len(), 1);
     assert_eq!(el.connects[0].name, Name::bare("a-b"));
 }
+
+#[test]
+fn the_cst_and_the_ast_agree_on_inline_structure() {
+    use tomet_cst::SyntaxKind as K;
+    fn names(inlines: &[Inline], out: &mut Vec<String>) {
+        for i in inlines {
+            if let Inline::Element(e) = i {
+                out.push(e.name.name.clone());
+                for b in e.content.iter().flatten() {
+                    if let Block::Paragraph(p) = b {
+                        names(&p.content, out);
+                    }
+                }
+            }
+        }
+    }
+    for src in [
+        "a *em* b **strong** c ~~gone~~ `code` https://a.b/c\n",
+        "**a *b* c**\n",
+        "`*not em*` and _em_\n",
+        "x _two words_ y\n",
+    ] {
+        let doc = parse_document(src).unwrap();
+        let mut ast = Vec::new();
+        for b in &doc.blocks {
+            if let Block::Paragraph(p) = b {
+                names(&p.content, &mut ast);
+            }
+        }
+        ast.sort();
+        let mut cst: Vec<String> = Vec::new();
+        let root = tomet_cst_parser::parse_cst(src);
+        for (kind, name) in [
+            (K::EMPHASIS, "em"),
+            (K::STRONG, "strong"),
+            (K::STRIKEOUT, "strikeout"),
+            (K::CODE_SPAN, "raw"),
+            (K::AUTOLINK, "link"),
+        ] {
+            let count = root.descendants().filter(|n| n.kind() == kind).count();
+            cst.extend(std::iter::repeat_n(name.to_string(), count));
+        }
+        cst.sort();
+        assert_eq!(cst, ast, "{src:?}");
+    }
+}
+

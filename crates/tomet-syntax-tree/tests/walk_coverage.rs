@@ -32,7 +32,7 @@ text <?(h2)>[@s_hole_inline_content()]
 ";
 
 fn doc() -> Document {
-    tomet_parser::parse_document(SRC).expect("the walk document parses")
+    tomet_ast_parser::parse_document(SRC).expect("the walk document parses")
 }
 
 fn sentinel(el: &tomet_ast::Element) -> Option<String> {

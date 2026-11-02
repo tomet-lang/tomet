@@ -6,7 +6,7 @@ use crate::position::TextPositions;
 
 /// Provides document symbols for outline navigation in the editor.
 pub fn document_symbols_for(text: &str) -> Vec<DocumentSymbol> {
-    let Ok(doc) = tomet_parser::parse_document(text) else {
+    let Ok(doc) = tomet_ast_parser::parse_document(text) else {
         return Vec::new();
     };
 

@@ -348,7 +348,7 @@ mod tests {
     use super::*;
 
     fn parse_doc(src: &str) -> Document {
-        tomet_parser::parse_document(src).unwrap()
+        tomet_ast_parser::parse_document(src).unwrap()
     }
 
     #[test]

@@ -83,7 +83,7 @@ impl Generate for PureGenerate {
 /// Returns the parsed [`File`] with expressions replaced by their evaluated data values,
 /// or every encountered error with line and column.
 pub fn eval_str(src: &str, vars: &[(String, Value)]) -> Result<File, Vec<Error>> {
-    let file = tomet_parser::parse_file(src).map_err(|e| {
+    let file = tomet_ast_parser::parse_file(src).map_err(|e| {
         vec![Error {
             message: e.message,
             line: e.line,

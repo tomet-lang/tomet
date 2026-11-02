@@ -59,7 +59,7 @@ pub(crate) fn run(file: &Path, out: Option<&Path>, freeze_fields: bool) -> Resul
 
     let text = tomet_printer::document_to_tm_with_config(&converted.document, &vault.config);
     // A conversion never hands back text that is not Tomet.
-    if let Err(e) = tomet_parser::parse_document(&text) {
+    if let Err(e) = tomet_ast_parser::parse_document(&text) {
         return Err(anyhow!(
             "generated .tmt has parse error: {}",
             format_parse_error(file, &text, &e)

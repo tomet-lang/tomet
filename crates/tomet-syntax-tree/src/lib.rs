@@ -105,7 +105,7 @@ mod tests {
     use tomet_span::Span;
 
     fn parse(src: &str) -> tomet_ast::Document {
-        tomet_parser::parse_document(src).expect("valid Tomet source")
+        tomet_ast_parser::parse_document(src).expect("valid Tomet source")
     }
 
     #[test]

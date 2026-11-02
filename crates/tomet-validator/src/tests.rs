@@ -1,7 +1,7 @@
 use super::*;
 
 fn parse(source: &str) -> Document {
-    tomet_parser::parse_document(source).expect("valid Tomet source")
+    tomet_ast_parser::parse_document(source).expect("valid Tomet source")
 }
 
 #[test]
@@ -59,7 +59,7 @@ fn a_repeated_standard_declaration_says_where_the_first_is() {
 /// two rules.
 #[test]
 fn a_vocabularys_singleton_is_enforced_too() {
-    let vocab = tomet_parser::parse_document(
+    let vocab = tomet_ast_parser::parse_document(
         "::kind(vocabulary)\n::vocabulary(deck)\n\n::elements{ spread: { singleton: true } }\n",
     )
     .expect("vocabulary parses");
@@ -147,7 +147,7 @@ fn a_typoed_connect_name_is_reported() {
 /// requires this check to live in the validator rather than earlier.
 #[test]
 fn allow_list_resolves_a_namespaced_custom_element_via_bindings() {
-    let vocab = tomet_parser::parse_document(
+    let vocab = tomet_ast_parser::parse_document(
         "::kind(vocabulary)\n::vocabulary(ns)\n\n::elements{ mycard: {} }\n",
     )
     .expect("vocabulary parses");
@@ -716,7 +716,7 @@ fn the_dissolved_config_and_settings_are_unknown_declarations() {
 /// closed, so the namespace has to actually be in scope now, and
 /// saying so here is what keeps these tests about duplicate ids.
 fn with_deck() -> Bindings {
-    let vocab = tomet_parser::parse_document(
+    let vocab = tomet_ast_parser::parse_document(
         "::kind(vocabulary)\n::vocabulary(deck)\n\n::elements{ task: {}, ref: {} }\n",
     )
     .expect("vocabulary parses");
@@ -794,7 +794,7 @@ fn duplicate_id_with_integer_values_is_reported() {
 #[test]
 fn test_validate_cst_exact_range() {
     let src = "=[ one ]#(duplicate)\n\n=[ two ]#(duplicate)\n";
-    let cst = tomet_parser::parse_cst(src);
+    let cst = tomet_cst_parser::parse_cst(src);
     let errors = validate_cst(&cst);
     assert_eq!(errors.len(), 1);
 
@@ -809,11 +809,11 @@ fn validate_cst_counts_only_the_id_group_not_any_attribute_named_id() {
     // A literal `id:` key -- nested in a map, or `@link`'s own -- is
     // ordinary data now, never this slot, so none of these count.
     let src = "@a{id: x}\n@b{meta: {id: x}}\n@link[t](id: x)\n";
-    let cst = tomet_parser::parse_cst(src);
+    let cst = tomet_cst_parser::parse_cst(src);
     assert!(validate_cst(&cst).is_empty());
 
     let src = "@a#(x)\ntext @b#(x)\n";
-    let cst = tomet_parser::parse_cst(src);
+    let cst = tomet_cst_parser::parse_cst(src);
     assert_eq!(validate_cst(&cst).len(), 1);
 }
 
@@ -833,7 +833,7 @@ fn validate_cst_catches_a_duplicate_id_nested_inside_content() {
     // duplicate-id diagnostic (`apps/lsp` never calls the AST-based
     // `validate_document`).
     let src = "@a#(x)\n@outer[\n=[ Heading ]#(x)\n]\n";
-    let cst = tomet_parser::parse_cst(src);
+    let cst = tomet_cst_parser::parse_cst(src);
     assert_eq!(validate_cst(&cst).len(), 1);
 }
 

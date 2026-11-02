@@ -1,0 +1,34 @@
+::kind(writ)
+
+=[ Writ: tomet-syntax-ast-parser ]
+
+Rules this crate must obey.
+
+Scope is this directory. Rules that bind more than this crate live in a
+`.writ.tmt` further up; read every `.writ.tmt` from here to the workspace
+root, the way `.gitignore` is read.
+
+Only the author edits this file. An agent that finds a rule in its way
+proposes an edit here and stops. It does not work around the rule, and it
+does not relax the rule to fit the change it wanted to make.
+
+==[ parser-purity ]
+
+@rule(parser-purity){
+  guard: { twrit: pure }
+
+  pure: {
+    crates: [ "crates/tomet-syntax-ast-parser" ]
+    forbid: [ "std::fs", "std::net", "std::process", "std::env" ]
+    allow-external: [
+      "rowan", "countme", "hashbrown", "rustc-hash", "text-size",
+      "serde", "serde_core", "serde_derive",
+      "proc-macro2", "quote", "syn", "unicode-ident", "unicode-width",
+      "ahash", "cfg-if", "once_cell", "zerocopy", "zerocopy-derive"
+    ]
+  }
+}
+
+The reference AST parser is pure, deterministic and side-effect-free. It performs no
+I/O, resolves no external file, and executes nothing. The same input text
+produces the same AST, in predictable time.

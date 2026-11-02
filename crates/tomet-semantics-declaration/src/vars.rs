@@ -111,7 +111,7 @@ pub fn read_var_decls(declaration: &Declaration) -> Vec<(String, Result<VarDecl,
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tomet_parser::parse_document;
+    use tomet_ast_parser::parse_document;
 
     fn decls(src: &str) -> Vec<(String, Result<VarDecl, String>)> {
         let doc = parse_document(src).unwrap();

@@ -6,7 +6,7 @@ use crate::position::TextPositions;
 pub fn diagnostics_for(text: &str) -> Vec<Diagnostic> {
     let positions = TextPositions::new(text);
     let mut diags = Vec::new();
-    let cst = tomet_parser::parse_cst(text);
+    let cst = tomet_cst_parser::parse_cst(text);
 
     // 1. CST-based lint validation (exact token wave lines!)
     let cst_errors = tomet_validator::validate_cst(&cst);
@@ -21,7 +21,7 @@ pub fn diagnostics_for(text: &str) -> Vec<Diagnostic> {
     }
 
     // 2. High-level parser errors if document structure is invalid
-    if let Err(err) = tomet_parser::parse_document(text) {
+    if let Err(err) = tomet_ast_parser::parse_document(text) {
         diags.push(Diagnostic {
             range: error_range(&err, &positions),
             severity: Some(DiagnosticSeverity::ERROR),
@@ -34,6 +34,6 @@ pub fn diagnostics_for(text: &str) -> Vec<Diagnostic> {
     diags
 }
 
-fn error_range(err: &tomet_parser::Error, positions: &TextPositions<'_>) -> Range {
+fn error_range(err: &tomet_ast_parser::Error, positions: &TextPositions<'_>) -> Range {
     positions.offset_to_line_end(err.offset)
 }

@@ -31,7 +31,7 @@ mod tests {
     use tomet_ast::Value;
 
     fn parse_doc(src: &str) -> tomet_ast::Document {
-        tomet_parser::parse_document(src).expect("valid source")
+        tomet_ast_parser::parse_document(src).expect("valid source")
     }
 
     #[test]

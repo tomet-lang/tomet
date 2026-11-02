@@ -17,4 +17,4 @@ serde = { workspace = true }
 
 [dev-dependencies]
 serde_json = { workspace = true }
-tomet-parser = { workspace = true }
+tomet-ast-parser = { workspace = true }

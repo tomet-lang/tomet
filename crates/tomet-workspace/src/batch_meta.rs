@@ -5,7 +5,7 @@ use std::fs;
 use std::path::PathBuf;
 
 use tomet_indexer::extract_metadata;
-use tomet_parser::parse_document;
+use tomet_ast_parser::parse_document;
 use tomet_printer::document_to_tm;
 use tomet_transform::set_meta_in_doc;
 

@@ -55,10 +55,10 @@ fn formatting_does_not_change_the_parsed_document() {
         let key = rel.to_string_lossy().replace('\\', "/");
         let known = KNOWN_FORMAT_CHANGES_DOCUMENT.contains(&key.as_str());
 
-        let before = tomet_parser::parse_document(&src)
+        let before = tomet_ast_parser::parse_document(&src)
             .unwrap_or_else(|e| panic!("{key} failed to parse: {e}"));
         let formatted = tomet_formatter::format_source(&src);
-        let after = tomet_parser::parse_document(&formatted)
+        let after = tomet_ast_parser::parse_document(&formatted)
             .unwrap_or_else(|e| panic!("{key} failed to parse after formatting: {e}"));
 
         match (before == after, known) {
@@ -91,10 +91,10 @@ fn printed_source_parses() {
     // same meaning. What the printer actually emits is pinned by
     // `snapshot.rs`'s `printed_source_matches_reference` instead.
     for (rel, src) in parseable_corpus() {
-        let doc = tomet_parser::parse_document(&src)
+        let doc = tomet_ast_parser::parse_document(&src)
             .unwrap_or_else(|e| panic!("{} failed to parse: {e}", rel.display()));
         let printed = tomet_printer::document_to_tm(&doc);
-        tomet_parser::parse_document(&printed).unwrap_or_else(|e| {
+        tomet_ast_parser::parse_document(&printed).unwrap_or_else(|e| {
             panic!(
                 "{} failed to reparse after printing: {e}\n--- printed ---\n{printed}",
                 rel.display()
@@ -148,8 +148,8 @@ fn parses_the_repo_spec_examples() {
     // Kept as its own named test (moved from `tomet-syntax-parser`) so a
     // failure points at the two hand-picked documents that exercise the
     // widest slice of the grammar, rather than at the whole corpus.
-    tomet_parser::parse_document(&read_fixture(Path::new("readme.tmt"))).unwrap();
-    tomet_parser::parse_document(&read_fixture(Path::new("examples/image.meta.tmt"))).unwrap();
+    tomet_ast_parser::parse_document(&read_fixture(Path::new("readme.tmt"))).unwrap();
+    tomet_ast_parser::parse_document(&read_fixture(Path::new("examples/image.meta.tmt"))).unwrap();
 }
 
 // ---------------------------------------------------------------------
@@ -163,7 +163,7 @@ fn cst_is_lossless_across_the_corpus() {
     // what an editor relies on.
     for rel in corpus() {
         let src = read_fixture(&rel);
-        let cst = tomet_parser::parse_cst(&src);
+        let cst = tomet_cst_parser::parse_cst(&src);
         assert_eq!(
             cst.text().to_string(),
             src,
@@ -205,11 +205,11 @@ fn cst_sections_match_the_ast_across_the_corpus() {
     // form is added to one and not the other, the levels they report for
     // the same source disagree.
     for (rel, src) in parseable_corpus() {
-        let doc = tomet_parser::parse_document(&src).expect("parseable corpus parses");
+        let doc = tomet_ast_parser::parse_document(&src).expect("parseable corpus parses");
         let mut expected = Vec::new();
         ast_section_levels(&doc.blocks, &mut expected);
 
-        let cst = tomet_parser::parse_cst(&src);
+        let cst = tomet_cst_parser::parse_cst(&src);
         let actual: Vec<usize> = cst
             .descendants()
             .filter(|n| n.kind() == tomet_cst::SyntaxKind::SECTION_HEADING)
@@ -248,10 +248,10 @@ fn a_hole_survives_print_and_parse() {
         "@meta{ type: <?(kind)> }",
         "--out <PATH> and Vec<T>",
     ] {
-        let before = tomet_parser::parse_document(src)
+        let before = tomet_ast_parser::parse_document(src)
             .unwrap_or_else(|e| panic!("`{src}` failed to parse: {e}"));
         let printed = tomet_printer::document_to_tm(&before);
-        let after = tomet_parser::parse_document(&printed).unwrap_or_else(|e| {
+        let after = tomet_ast_parser::parse_document(&printed).unwrap_or_else(|e| {
             panic!("`{src}` printed as `{printed}`, which fails to parse: {e}")
         });
         assert_eq!(

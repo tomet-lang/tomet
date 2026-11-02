@@ -7,7 +7,7 @@ use tomet_span::Span;
 
 /// Computes folding ranges for the given document text.
 pub fn folding_ranges_for(text: &str) -> Vec<FoldingRange> {
-    let Ok(doc) = tomet_parser::parse_document(text) else {
+    let Ok(doc) = tomet_ast_parser::parse_document(text) else {
         return Vec::new();
     };
 

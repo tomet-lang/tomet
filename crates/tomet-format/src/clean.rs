@@ -2,7 +2,7 @@
 //! blocks, and any `(content:raw)` element).
 
 use tomet_ast::{Block, Document, Element, Value};
-use tomet_parser::parse_document;
+use tomet_ast_parser::parse_document;
 use tomet_tree::{Node, Place, Visit, walk};
 
 /// Normalizes whitespace (LF line endings, no trailing whitespace, collapsed excess

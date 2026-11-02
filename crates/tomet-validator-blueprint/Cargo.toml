@@ -15,4 +15,4 @@ tomet-validator-core = { workspace = true }
 tomet-validator-rule = { workspace = true }
 
 [dev-dependencies]
-tomet-parser = { workspace = true }
+tomet-ast-parser = { workspace = true }

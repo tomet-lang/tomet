@@ -55,7 +55,7 @@ fn run_in(
         heading_level: 0,
         notes: Default::default(),
     };
-    let mut doc = tomet_parser::parse_document(src).expect("source parses");
+    let mut doc = tomet_ast_parser::parse_document(src).expect("source parses");
     let unresolved = resolve_expressions(&mut doc, &cx);
     (doc, unresolved)
 }
@@ -264,7 +264,7 @@ fn macro_table_cases() {
     };
     let test_run = |expr: &str| {
         let src = format!("Test {}.\n", expr);
-        let mut doc = tomet_parser::parse_document(&src).unwrap();
+        let mut doc = tomet_ast_parser::parse_document(&src).unwrap();
         let unresolved = resolve_expressions(&mut doc, &cx);
         (text_of(&doc), unresolved)
     };
@@ -441,7 +441,7 @@ fn creation_only_names_are_refused_when_rendering() {
 
 #[test]
 fn with_no_vault_a_reference_to_another_document_fails_and_stays() {
-    let mut doc = tomet_parser::parse_document("see ${tmt(\"x.tmt\")#a.id}\n").unwrap();
+    let mut doc = tomet_ast_parser::parse_document("see ${tmt(\"x.tmt\")#a.id}\n").unwrap();
     let macros = HashMap::new();
     let vars = EvalValue::Null;
     let cx = EvalContext {
@@ -592,7 +592,7 @@ fn only_the_selected_expressions_are_resolved() {
         heading_level: 0,
         notes: Default::default(),
     };
-    let mut doc = tomet_parser::parse_document(src).expect("source parses");
+    let mut doc = tomet_ast_parser::parse_document(src).expect("source parses");
     // Pick every expression that mentions `path`, by the span it is written at.
     let mut picked = Vec::new();
     tomet_tree::for_each_interpolation(&doc, |interp| {

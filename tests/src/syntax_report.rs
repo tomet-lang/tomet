@@ -27,7 +27,7 @@ use tomet_ast::{
     Bare, Block, Connect, Data, Document, Element, Entry, Group, Hole, Inline, InterpExpr,
     Interpolation, List, ListItem, Placement, Value,
 };
-use tomet_parser::parse_document;
+use tomet_ast_parser::parse_document;
 
 /// One documented construct: a heading it files under, a one-line note in
 /// Japanese, and the source to run through the parser.

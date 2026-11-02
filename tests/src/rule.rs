@@ -12,7 +12,7 @@ use tomet_validator::{Diagnostic, validate_document};
 
 fn parse_fixture(name: &str) -> tomet_ast::Document {
     let src = read_fixture(Path::new("rule").join(name).as_path());
-    tomet_parser::parse_document(&src).expect("fixture parses")
+    tomet_ast_parser::parse_document(&src).expect("fixture parses")
 }
 
 #[test]

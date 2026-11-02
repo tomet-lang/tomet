@@ -120,7 +120,7 @@ fn value_contains_str(v: &Value, sub: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tomet_parser::parse_document;
+    use tomet_ast_parser::parse_document;
 
     #[test]
     fn matches_query_by_tag() {

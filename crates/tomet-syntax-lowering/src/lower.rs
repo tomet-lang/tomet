@@ -61,7 +61,7 @@ pub(crate) fn reject_too_deep(root: &SyntaxNode) -> Result<()> {
             range_of(&node).0,
             format!(
                 "this is nested more than {} levels deep",
-                crate::cst::MAX_DEPTH
+                tomet_cst::MAX_DEPTH
             ),
         )),
         None => Ok(()),
@@ -1083,18 +1083,6 @@ fn sublist_start(node: &SyntaxNode) -> Option<usize> {
         .map(|sub| range_of(&sub).0)
 }
 
-/// Whether the groups in `read` hold anything: a `:name` with nothing of its own
-/// is not a connect, only a word with a colon in front of it.
-pub(crate) fn claims_something(read: &Groups) -> bool {
-    read.data.args.is_some()
-        || read.content.is_some()
-        || read.data.value.is_some()
-        || read.id.is_some()
-        || read
-            .connects
-            .iter()
-            .any(|c| c.data.args.is_some() || c.content.is_some() || c.data.value.is_some())
-}
 
 /// `:(args)` or `:{value}`: no name, so it is not a connect of its own but more
 /// of the owner's args or value.

@@ -30,8 +30,8 @@ impl MemoryResolver {
     }
 
     /// Adds the document read from `source` at `path`.
-    pub fn with_source(mut self, path: &str, source: &str) -> Result<Self, tomet_parser::Error> {
-        let doc = tomet_parser::parse_document(source)?;
+    pub fn with_source(mut self, path: &str, source: &str) -> Result<Self, tomet_ast_parser::Error> {
+        let doc = tomet_ast_parser::parse_document(source)?;
         self.docs.insert(path.to_string(), Arc::new(doc));
         Ok(self)
     }

@@ -36,7 +36,7 @@ pub fn load_vocabularies(root: &Path, declared: &[String]) -> LoadedVocabularies
 }
 
 fn add_source(loaded: &mut LoadedVocabularies, label: &str, src: &str) {
-    match tomet_parser::parse_document(src) {
+    match tomet_ast_parser::parse_document(src) {
         Ok(doc) => loaded.add(label, &doc),
         Err(e) => loaded
             .errors
@@ -63,7 +63,7 @@ mod tests {
         assert!(loaded.errors.is_empty(), "{:?}", loaded.errors);
         assert!(loaded.by_namespace.contains_key("doc.index"));
 
-        let doc = tomet_parser::parse_document("::kind(doc.index)\n\n#[ An index ]\n")
+        let doc = tomet_ast_parser::parse_document("::kind(doc.index)\n\n#[ An index ]\n")
             .expect("document parses");
         let bindings = loaded.bindings_for(&doc);
         assert!(bindings.kind.is_some());
@@ -78,7 +78,7 @@ mod tests {
         assert!(loaded.errors.is_empty(), "{:?}", loaded.errors);
         assert!(loaded.by_namespace.contains_key("doc"));
 
-        let doc = tomet_parser::parse_document("a @doc.icon(\"star\", pkg:\"lucide\") b\n")
+        let doc = tomet_ast_parser::parse_document("a @doc.icon(\"star\", pkg:\"lucide\") b\n")
             .expect("document parses");
         let bindings = loaded.bindings_for(&doc);
         assert_eq!(

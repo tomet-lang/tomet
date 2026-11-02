@@ -631,7 +631,7 @@ fn the_cst_keeps_a_brace_inside_an_interpolation_within_it() {
         ("${addr(tmt:a.tmt#x)} tail #(x)\n", "{addr(tmt:a.tmt#x)}"),
         ("${f(\"{\")} tail\n", "{f(\"{\")}"),
     ] {
-        let root = crate::parse_cst(src);
+        let root = tomet_cst_parser::parse_cst(src);
         let interps: Vec<String> = root
             .descendants()
             .filter(|n| n.kind() == SyntaxKind::INTERP_EXPR)

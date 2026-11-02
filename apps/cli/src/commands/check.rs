@@ -49,7 +49,7 @@ pub(crate) fn check(path: &Path, data: bool, quiet: bool, json: bool) -> anyhow:
             ));
         }
         let src = read(path)?;
-        return match tomet_parser::parse_value(&src) {
+        return match tomet_ast_parser::parse_value(&src) {
             Ok(_) => {
                 if !quiet {
                     println!("OK");
@@ -101,7 +101,7 @@ pub(crate) fn check(path: &Path, data: bool, quiet: bool, json: bool) -> anyhow:
                 return check_ctmt(file, &src, json);
             }
 
-            let doc = match tomet_parser::parse_document(&src) {
+            let doc = match tomet_ast_parser::parse_document(&src) {
                 Ok(doc) => doc,
                 Err(err) => return parse_failure(file, &src, &err, json),
             };
@@ -343,7 +343,7 @@ fn check_ctmt(file: &Path, src: &str, json: bool) -> CheckFileResult {
 
 /// One file that did not parse, as the sweep reports it: JSON when asked for,
 /// else the source line with a caret.
-fn parse_failure(file: &Path, src: &str, err: &tomet_parser::Error, json: bool) -> CheckFileResult {
+fn parse_failure(file: &Path, src: &str, err: &tomet_ast_parser::Error, json: bool) -> CheckFileResult {
     let (json_entry, text) = if json {
         (
             Some(serde_json::json!({
@@ -363,7 +363,7 @@ fn parse_failure(file: &Path, src: &str, err: &tomet_parser::Error, json: bool) 
     CheckFileResult::ParseError { json_entry, text }
 }
 
-fn report_parse_error(file: &Path, src: &str, err: &tomet_parser::Error, json: bool) {
+fn report_parse_error(file: &Path, src: &str, err: &tomet_ast_parser::Error, json: bool) {
     if json {
         let value = serde_json::json!({
             "file": file.display().to_string(),
@@ -533,7 +533,7 @@ mod tests {
         let vault = tomet_load::Vault::discover(&root);
         let unresolved = |name: &str| {
             let path = root.join(name);
-            let doc = tomet_parser::parse_document(&fs::read_to_string(&path).unwrap()).unwrap();
+            let doc = tomet_ast_parser::parse_document(&fs::read_to_string(&path).unwrap()).unwrap();
             vault.findings(&path, &doc).unresolved
         };
 

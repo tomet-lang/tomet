@@ -45,7 +45,7 @@ fn conflict_named_block_arguments_preserve_content_across_all_converters() {
   ]
 )
 "#;
-    let doc = tomet_parser::parse_document(src).expect("document should parse cleanly");
+    let doc = tomet_ast_parser::parse_document(src).expect("document should parse cleanly");
     let outputs = convert_all(&doc);
 
     for (format, text) in outputs {
@@ -72,7 +72,7 @@ fn conflict_positional_block_arguments_preserve_content_across_all_converters() 
   [PositionalBetaContent]
 )
 "#;
-    let doc = tomet_parser::parse_document(src).expect("document should parse cleanly");
+    let doc = tomet_ast_parser::parse_document(src).expect("document should parse cleanly");
     let outputs = convert_all(&doc);
 
     for (format, text) in outputs {

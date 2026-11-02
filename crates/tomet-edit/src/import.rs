@@ -10,7 +10,7 @@ use crate::node::{
 
 /// Parses `src` into a CST and imports it into an [`EditDoc`].
 pub fn import_source(src: &str) -> EditDoc {
-    let root = tomet_parser::parse_cst(src);
+    let root = tomet_cst_parser::parse_cst(src);
     import_cst(&root)
 }
 
@@ -573,7 +573,7 @@ fn import_edit_value(elems: &[SyntaxElement]) -> EditValue {
 /// Parses a raw value string into an [`EditValue`].
 pub fn parse_edit_value_str(raw: &str) -> EditValue {
     let wrapped = format!("::v{{ k: {raw} }}");
-    let cst = tomet_parser::parse_cst(&wrapped);
+    let cst = tomet_cst_parser::parse_cst(&wrapped);
     if let Some(entry_node) = cst.descendants().find(|n| n.kind() == K::MAP_ENTRY) {
         let (_, entry, _) = import_attr_entry(&entry_node);
         if entry.value.raw == raw {
@@ -603,7 +603,7 @@ pub fn parse_inline_items(src: &str) -> Vec<InlineItem> {
     };
 
     // Find inline element byte ranges from the CST of `body`
-    let cst = tomet_parser::parse_cst(body);
+    let cst = tomet_cst_parser::parse_cst(body);
     let mut inline_elements: Vec<(usize, usize, SyntaxNode)> = Vec::new();
     for child in cst.children() {
         for sub in child.children() {

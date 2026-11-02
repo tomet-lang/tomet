@@ -844,7 +844,7 @@ fn code_attr(el: &Element) -> Attr {
 mod tests {
     use super::*;
     use crate::ast::TableParts;
-    use tomet_parser::parse_document;
+    use tomet_ast_parser::parse_document;
     use tomet_semantics::EXACT_DATA_KEY;
 
     fn convert(src: &str) -> Vec<Block> {

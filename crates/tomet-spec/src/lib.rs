@@ -63,7 +63,7 @@ mod tests {
             &PrinterConfig::default(),
         );
 
-        let parsed = tomet_parser::parse_document(&rendered).expect("valid .tmt output");
+        let parsed = tomet_ast_parser::parse_document(&rendered).expect("valid .tmt output");
         assert!(!parsed.blocks.is_empty());
         assert!(rendered.contains("==[catasto]") || rendered.contains("==[ catasto ]"));
         assert!(rendered.contains("`catasto.strict` (bool, default: `true`)"));

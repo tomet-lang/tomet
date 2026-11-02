@@ -127,7 +127,7 @@ mod tests {
 ";
 
     fn meta_of(src: &str) -> EvalValue {
-        let doc = tomet_parser::parse_document(src).unwrap();
+        let doc = tomet_ast_parser::parse_document(src).unwrap();
         typed_meta(&config(SETTINGS), &doc, &DocRef("a.tmt".into()))
     }
 
@@ -233,7 +233,7 @@ mod tests {
             .unwrap()
             .with_source("b.tmt", "::meta{ title: B }\n")
             .unwrap();
-        let rewritten = Arc::new(tomet_parser::parse_document("::meta{ title: mine }\n").unwrap());
+        let rewritten = Arc::new(tomet_ast_parser::parse_document("::meta{ title: mine }\n").unwrap());
         let overlay = Overlay {
             path: DocRef("a.tmt".into()),
             snapshot: rewritten.clone(),

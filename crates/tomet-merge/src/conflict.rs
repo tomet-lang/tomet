@@ -2,7 +2,7 @@
 //!
 //! =[ Where a marker is found ]
 //!
-//! In the CST, [`tomet_parser::parse_cst`], and nowhere else: a marker is an
+//! In the CST, [`tomet_cst_parser::parse_cst`], and nowhere else: a marker is an
 //! `@conflict` element wherever the tree puts one -- a paragraph, a list item,
 //! a heading, an element's content, a `{ }` value -- so a marker the merge
 //! wrote cannot be written in a place this does not look. Text that is code
@@ -125,7 +125,7 @@ pub(crate) fn scan(src: &str) -> Result<Vec<Found>, ConflictError> {
     if !src.contains(crate::markers::CONFLICT_MARKER) {
         return Ok(Vec::new());
     }
-    let root = tomet_parser::parse_cst(src);
+    let root = tomet_cst_parser::parse_cst(src);
     let mut found = Vec::new();
     let mut walk = root.preorder();
     while let Some(event) = walk.next() {

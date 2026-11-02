@@ -18,7 +18,7 @@ pub fn load_dictionaries(root: &Path, declared: &[String]) -> LoadedDictionaries
 
     for declared in declared {
         match std::fs::read_to_string(root.join(declared)) {
-            Ok(src) => match tomet_parser::parse_document(&src) {
+            Ok(src) => match tomet_ast_parser::parse_document(&src) {
                 Ok(doc) => loaded.add(declared, &doc),
                 Err(e) => loaded
                     .errors

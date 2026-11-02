@@ -59,7 +59,7 @@ impl Vault {
                 tomet_workspace::blueprint::find_blueprint(&self.root, &kind, &self.config)
             })
             .and_then(|path| std::fs::read_to_string(path).ok())
-            .and_then(|src| tomet_parser::parse_document(&src).ok());
+            .and_then(|src| tomet_ast_parser::parse_document(&src).ok());
         let mut diagnostics = self.diagnostics(doc, blueprint.as_slice());
 
         // What only the vault config may set has no effect anywhere else. This
@@ -129,7 +129,7 @@ impl Vault {
             for (name, path) in tomet_config::registry_entries(doc, found.kind) {
                 let Some(registered) = std::fs::read_to_string(self.root.join(&path))
                     .ok()
-                    .and_then(|src| tomet_parser::parse_document(&src).ok())
+                    .and_then(|src| tomet_ast_parser::parse_document(&src).ok())
                 else {
                     continue;
                 };

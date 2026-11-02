@@ -11,7 +11,7 @@ tomet-ast = { workspace = true }
 tomet-span = { workspace = true }
 tomet-expr = { workspace = true }
 tomet-config = { workspace = true }
-tomet-parser = { workspace = true }
+tomet-ast-parser = { workspace = true }
 tomet-search = { workspace = true }
 tomet-declaration = { workspace = true }
 tomet-semantics = { workspace = true }

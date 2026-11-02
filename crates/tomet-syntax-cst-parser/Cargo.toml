@@ -1,0 +1,17 @@
+[package]
+name = "tomet-cst-parser"
+version.workspace = true
+edition.workspace = true
+description = "The lossless, resilient Concrete Syntax Tree parser for Tomet."
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+tomet-cst = { workspace = true }
+tomet-span = { workspace = true }
+tomet-lexer = { workspace = true }
+tomet-position = { workspace = true }
+tomet-tree = { workspace = true }
+
+#= Crates.io
+unicode-width = { workspace = true }

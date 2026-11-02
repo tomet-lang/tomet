@@ -3,7 +3,6 @@
 mod comments;
 mod connects;
 mod cost;
-mod cst;
 mod document_declarations;
 mod elements;
 mod fences;
@@ -22,6 +21,7 @@ mod urls;
 mod values;
 
 use super::*;
+pub(crate) use tomet_cst_parser::parse_cst;
 use tomet_ast::{
     Block, Declaration, Element, Group, Inline, InterpExpr, InterpExprKind, Literal, Name,
     Paragraph, Placement, SoftBreak, Value,

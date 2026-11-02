@@ -800,21 +800,21 @@ mod tests {
 
     #[test]
     fn direct_only_stops_at_the_first_level() {
-        let doc = tomet_parser::parse_document("@outer[ @mid[ @inner[ text ] ] ]\n").unwrap();
+        let doc = tomet_ast_parser::parse_document("@outer[ @mid[ @inner[ text ] ] ]\n").unwrap();
         let outer = element_of(&doc);
         assert_eq!(names(outer, true), vec!["mid"]);
     }
 
     #[test]
     fn every_descendant_walks_every_depth() {
-        let doc = tomet_parser::parse_document("@outer[ @mid[ @inner[ text ] ] ]\n").unwrap();
+        let doc = tomet_ast_parser::parse_document("@outer[ @mid[ @inner[ text ] ] ]\n").unwrap();
         let outer = element_of(&doc);
         assert_eq!(names(outer, false), vec!["mid", "inner"]);
     }
 
     #[test]
     fn descendant_walk_never_visits_the_element_itself() {
-        let doc = tomet_parser::parse_document("@outer[ @mid[ text ] ]\n").unwrap();
+        let doc = tomet_ast_parser::parse_document("@outer[ @mid[ text ] ]\n").unwrap();
         let outer = element_of(&doc);
         assert!(!names(outer, false).contains(&"outer".to_string()));
     }
@@ -830,7 +830,7 @@ mod tests {
                    @x(a: ${arg}, b: list(${nested})){ k: ${val} }[ ${content} ]:as(${connect})\n\
                    \n\
                    - item ${item}\n";
-        let doc = tomet_parser::parse_document(src).unwrap();
+        let doc = tomet_ast_parser::parse_document(src).unwrap();
         let mut found = Vec::new();
         for_each_interpolation(&doc, |i| found.push(i.expr.to_string()));
         found.sort();

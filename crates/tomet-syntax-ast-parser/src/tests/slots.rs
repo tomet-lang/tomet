@@ -7,7 +7,7 @@ use tomet_cst::SyntaxKind as K;
 /// The text of every box of `src`, in document order (an outer one first). Also
 /// checks the tree is lossless, which every case here depends on.
 fn boxes(src: &str) -> Vec<String> {
-    let root = crate::parse_cst(src);
+    let root = tomet_cst_parser::parse_cst(src);
     assert_eq!(root.text().to_string(), src, "lossless: {src:?}");
     root.descendants()
         .filter(|n| n.kind() == K::SLOT)

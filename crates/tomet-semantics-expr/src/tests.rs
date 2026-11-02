@@ -38,7 +38,7 @@ fn map(entries: Vec<(&str, EvalValue)>) -> EvalValue {
 }
 
 fn parse(src: &str) -> tomet_ast::InterpExpr {
-    tomet_parser::parse_interpolation_str(&format!("${{{src}}}"))
+    tomet_ast_parser::parse_interpolation_str(&format!("${{{src}}}"))
         .unwrap_or_else(|e| panic!("`{src}` does not parse: {e}"))
         .expr
 }
@@ -1454,7 +1454,7 @@ fn includes_nested_too_deep_stop() {
 /// so the id is set on the tree. The list is addressed by the rules the
 /// element and the section already follow, which is what these pin down.
 fn list_vault() -> MemoryResolver {
-    let mut doc = tomet_parser::parse_document("Lead.\n\n- one #(i1)\n- two\n- three\n").unwrap();
+    let mut doc = tomet_ast_parser::parse_document("Lead.\n\n- one #(i1)\n- two\n- three\n").unwrap();
     let mut named = 0;
     for block in &mut doc.blocks {
         if let tomet_ast::Block::List(list) = block {

@@ -14,4 +14,4 @@ tomet-type = { workspace = true }
 tomet-semantics-core = { workspace = true }
 
 [dev-dependencies]
-tomet-parser = { workspace = true }
+tomet-ast-parser = { workspace = true }

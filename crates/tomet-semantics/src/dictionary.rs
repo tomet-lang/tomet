@@ -313,7 +313,7 @@ mod tests {
     fn loaded(sources: &[(&str, &str)]) -> LoadedDictionaries {
         let mut loaded = LoadedDictionaries::default();
         for (label, src) in sources {
-            loaded.add(label, &tomet_parser::parse_document(src).expect("parses"));
+            loaded.add(label, &tomet_ast_parser::parse_document(src).expect("parses"));
         }
         loaded
     }

@@ -204,7 +204,7 @@ mod tests {
 
     #[test]
     fn test_empty_document() {
-        let doc = tomet_parser::parse_document("").unwrap();
+        let doc = tomet_ast_parser::parse_document("").unwrap();
         let stats = measure(&doc);
         assert_eq!(stats.files, 1);
         assert_eq!(stats.characters, 0);
@@ -226,7 +226,7 @@ This is a paragraph with @link(readme.md)[custom text].
 - Bare item 2
 @custom_tag[Hello world]
 "#;
-        let doc = tomet_parser::parse_document(input).unwrap();
+        let doc = tomet_ast_parser::parse_document(input).unwrap();
         let stats = measure(&doc);
 
         assert_eq!(stats.files, 1);
@@ -245,8 +245,8 @@ This is a paragraph with @link(readme.md)[custom text].
 
     #[test]
     fn test_merge() {
-        let doc1 = tomet_parser::parse_document("=[ H1 ]\nHello").unwrap();
-        let doc2 = tomet_parser::parse_document("==[ H2 ]\nWorld").unwrap();
+        let doc1 = tomet_ast_parser::parse_document("=[ H1 ]\nHello").unwrap();
+        let doc2 = tomet_ast_parser::parse_document("==[ H2 ]\nWorld").unwrap();
 
         let mut s1 = measure(&doc1);
         let s2 = measure(&doc2);

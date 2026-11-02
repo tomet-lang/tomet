@@ -79,8 +79,8 @@ fn test_blueprint_end_to_end_lifecycle() {
     assert!(doc_content.contains("2026-09-01"));
 
     // 4. Validate generated document against blueprint
-    let blueprint_ast = tomet_parser::parse_document(blueprint_src).unwrap();
-    let doc_ast = tomet_parser::parse_document(&doc_content).unwrap();
+    let blueprint_ast = tomet_ast_parser::parse_document(blueprint_src).unwrap();
+    let doc_ast = tomet_ast_parser::parse_document(&doc_content).unwrap();
 
     let errors = validate_against_blueprint(&doc_ast, &blueprint_ast);
     assert!(
@@ -93,7 +93,7 @@ fn test_blueprint_end_to_end_lifecycle() {
         .replace("=[ Review ]", "=[ Freeform Notes ]")
         .replace("#(review)", "#(notes)")
         .replace("Review", "Freeform Notes");
-    let corrupted_ast = tomet_parser::parse_document(&corrupted_src).unwrap();
+    let corrupted_ast = tomet_ast_parser::parse_document(&corrupted_src).unwrap();
     let errors_on_corrupt = validate_against_blueprint(&corrupted_ast, &blueprint_ast);
     assert_eq!(errors_on_corrupt.len(), 1);
     assert!(

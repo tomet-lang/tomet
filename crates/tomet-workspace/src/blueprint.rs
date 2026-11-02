@@ -92,7 +92,7 @@ pub fn find_blueprint(root: &Path, name: &str, config: &PrinterConfig) -> Option
 /// `::blueprint(X)`.
 fn blueprint_name(path: &Path) -> Option<String> {
     let src = fs::read_to_string(path).ok()?;
-    let doc = tomet_parser::parse_document(&src).ok()?;
+    let doc = tomet_ast_parser::parse_document(&src).ok()?;
     tomet_declaration::document_blueprint(&doc)
 }
 
@@ -162,7 +162,7 @@ fn instantiate_blueprint_file_with(
     let src = fs::read_to_string(blueprint_path)
         .with_context(|| format!("failed to read blueprint at {}", blueprint_path.display()))?;
 
-    let mut doc = tomet_parser::parse_document(&src)
+    let mut doc = tomet_ast_parser::parse_document(&src)
         .map_err(|e| anyhow::anyhow!("failed to parse blueprint: {e}"))?;
 
     let self_doc = DocRef(target.to_string_lossy().replace('\\', "/"));

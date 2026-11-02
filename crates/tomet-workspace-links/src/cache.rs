@@ -20,7 +20,7 @@ pub enum LinkCacheError {
     },
     Parse {
         path: String,
-        source: tomet_parser::Error,
+        source: tomet_ast_parser::Error,
     },
     Sqlite(rusqlite::Error),
 }
@@ -219,7 +219,7 @@ impl LinkCache {
             path: path_str.clone(),
             source: e,
         })?;
-        let doc = tomet_parser::parse_document(&src).map_err(|e| LinkCacheError::Parse {
+        let doc = tomet_ast_parser::parse_document(&src).map_err(|e| LinkCacheError::Parse {
             path: path_str.clone(),
             source: e,
         })?;

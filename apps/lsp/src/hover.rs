@@ -28,7 +28,7 @@ pub type Evaluate<'a> =
 /// what reaches for another file fails and says so. A document that has a
 /// vault is better served by [`hover_in`], with the vault's evaluation.
 pub fn hover_for(text: &str, pos: Position, uri: Option<&Uri>) -> Option<Hover> {
-    let doc = tomet_parser::parse_document(text).ok()?;
+    let doc = tomet_ast_parser::parse_document(text).ok()?;
     let config = resolve_effective_config(&doc, uri);
     hover_in(text, pos, &|doc, expr| {
         evaluate_for_hover(doc, expr, &config)
@@ -37,7 +37,7 @@ pub fn hover_for(text: &str, pos: Position, uri: Option<&Uri>) -> Option<Hover> 
 
 /// [`hover_for`], with `evaluate` deciding what an expression comes to.
 pub fn hover_in(text: &str, pos: Position, evaluate: Evaluate<'_>) -> Option<Hover> {
-    let doc = tomet_parser::parse_document(text).ok()?;
+    let doc = tomet_ast_parser::parse_document(text).ok()?;
     let positions = TextPositions::new(text);
     let offset = positions.offset(pos);
 
@@ -421,7 +421,7 @@ fn find_interp_in_value(val: &Value) -> Option<tomet_ast::InterpExpr> {
         Value::String(s) => {
             let trimmed = s.trim();
             if trimmed.starts_with('$')
-                && let Ok(parsed) = tomet_parser::parse_document(trimmed)
+                && let Ok(parsed) = tomet_ast_parser::parse_document(trimmed)
             {
                 let mut found = None;
                 for_each_interpolation(&parsed, |interp| {

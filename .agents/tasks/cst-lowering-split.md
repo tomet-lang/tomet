@@ -1,0 +1,64 @@
+# CST Parser and Lowering Split
+
+- [x] Step 1: Create `crates/tomet-syntax-cst-parser` (`tomet-cst-parser`)
+  - [x] `Cargo.toml` without `tomet-ast` dependency
+  - [x] `.writ.tmt`
+  - [x] `src/inline.rs` (CST delimiter scanning only, no `tomet_ast` references)
+  - [x] `src/tail.rs`
+  - [x] `src/cst.rs` (with `pub fn parse_cst_value`, pure CST tail validation)
+  - [x] `src/lib.rs` (exports `parse_cst`, `parse_cst_value`, `MAX_DEPTH`)
+  - [x] `src/tests/` (CST shape, lossless, limits, cost)
+- [x] Step 2: Create `crates/tomet-syntax-lowering` (`tomet-lowering`)
+  - [x] `Cargo.toml` with `tomet-cst-parser`, `tomet-ast`, etc.
+  - [x] `.writ.tmt`
+  - [x] `src/error.rs`
+  - [x] `src/inline.rs` (`trim_edges`, `push_text`, `extend_merging`, `push_soft_break`)
+  - [x] `src/interp.rs`
+  - [x] `src/element.rs`
+  - [x] `src/lower.rs`
+  - [x] `src/value.rs`
+  - [x] `src/lib.rs` (exports `lower_document`, `parse_document`, `parse_value`, `parse_file`, `parse_interpolation`, `parse_interpolation_str`, `Error`, `Result`)
+  - [x] `src/tests/` (all lowering and document integration tests)
+- [x] Step 3: Update root `Cargo.toml`
+  - [x] Update `members` list
+  - [x] Update `[workspace.dependencies]`
+- [x] Step 4: Remove `crates/tomet-syntax-parser`
+- [x] Step 5: Update all downstream call sites across the workspace
+  - [x] CST-only crates (`tomet-syntax-highlight`)
+  - [x] Crates using both CST and Lowering (`tomet-edit`, `tomet-merge`, `apps/lsp`, `tests`, `benches`)
+  - [x] Lowering/AST crates (`apps/cli`, `crates/tomet`, `crates/cotomet`, `crates/serde_cotomet`, `crates/tomet-config`, `crates/tomet-convert-*`, `crates/tomet-deps`, `crates/tomet-extract`, `crates/tomet-format*`, `crates/tomet-load*`, `crates/tomet-search`, `crates/tomet-semantics*`, `crates/tomet-spec`, `crates/tomet-stats`, `crates/tomet-syntax-tree`, `crates/tomet-transform`, `crates/tomet-validator*`, `crates/tomet-vault`, `crates/tomet-workspace*`)
+- [x] Step 6: Update `.writ.tmt` files
+- [x] Step 7: Verification
+  - [x] `cargo check --workspace --all-targets` (passed)
+  - [x] `cargo test -p tomet-cst-parser -p tomet-lowering` (all 280+ tests passed)
+  - [x] `cargo test -p tomet-tests` (passed)
+  - [x] `cargo test --workspace` (passed)
+  - [x] `twrit check` (passed)
+  - [x] `just docs-check` (passed)
+
+## Final Architectural Refinement: Complete CST / Lowering Decoupling & Reference AST Parser
+
+- [x] Step 8: Decouple `crates/tomet-syntax-lowering`
+  - [x] Remove `tomet-cst-parser` dependency from `crates/tomet-syntax-lowering/Cargo.toml`
+  - [x] Define `MAX_DEPTH` in `tomet-cst` and use it in `reject_too_deep`
+  - [x] Define `DELIMITERS` locally in `tomet-lowering/src/inline.rs`
+  - [x] In `src/value.rs`: `lower_value(&SyntaxNode)` and `lower_file(&SyntaxNode, src: &str)`
+  - [x] In `src/lib.rs`: export only `lower_document`, `lower_value`, `lower_file`, `Error`, `Result`
+- [x] Step 9: Create `crates/tomet-syntax-ast-parser` (`tomet-ast-parser`)
+  - [x] `Cargo.toml`
+  - [x] `.writ.tmt`
+  - [x] `src/lib.rs` (`parse_document`, `parse_value`, `parse_file`, `parse_interpolation`, `parse_interpolation_str`)
+  - [x] `src/tests/` (moved from `tomet-syntax-lowering`)
+- [x] Step 10: Update Root `Cargo.toml` & `.writ.tmt`
+  - [x] Add `"crates/tomet-syntax-ast-parser"` to `members`
+  - [x] Add `tomet-ast-parser` to `[workspace.dependencies]`
+  - [x] Check `.writ.tmt`
+- [x] Step 11: Update Downstream Call Sites
+  - [x] `crates/tomet`: update dependencies and re-export from `tomet-ast-parser`
+  - [x] `crates/cotomet`: switch to `tomet-ast-parser`
+  - [x] Downstream crates calling `parse_document`, `parse_value`, `parse_file`, `parse_interpolation_str`
+- [x] Step 12: Verification
+  - [x] `cargo check --workspace --all-targets` (passed cleanly)
+  - [x] `cargo test --workspace` (passed, all doctests & tests passed)
+  - [x] `twrit check` (passed, 6 writs 0 rules)
+  - [x] `just docs` / `just docs-check` / `just test` (all passed)

@@ -4,8 +4,8 @@
 //! whole path (reading, lowering, dropping) fits there in a debug build.
 
 use super::*;
-use crate::cst::MAX_DEPTH;
 use tomet_cst::SyntaxKind as K;
+use tomet_cst_parser::{MAX_DEPTH, parse_cst};
 
 /// Every kind of nesting the parser recurses on, as `(name, how deep to push it, opens n levels deep)`.
 /// A list, a section and a pipe run take input quadratic in their depth (each level is indented, or
@@ -73,7 +73,7 @@ fn nesting_past_the_limit_is_an_error_and_not_a_crash() {
         for n in [MAX_DEPTH + 2, big] {
             let src = shape(n);
             let (cst_has_it, err) = on_small_stack(move || {
-                let root = crate::parse_cst(&src);
+                let root = parse_cst(&src);
                 let has = root.descendants().any(|d| d.kind() == K::TOO_DEEP);
                 (has, parse_document(&src).err())
             });
@@ -95,7 +95,7 @@ fn nesting_past_the_limit_is_an_error_and_not_a_crash() {
 fn the_tree_stays_lossless_past_the_limit() {
     for (name, _, shape) in shapes() {
         let src = shape(MAX_DEPTH + 40);
-        let same = on_small_stack(move || crate::parse_cst(&src).text().to_string() == src);
+        let same = on_small_stack(move || parse_cst(&src).text().to_string() == src);
         assert!(same, "{name}: the tree must hold every character");
     }
 }

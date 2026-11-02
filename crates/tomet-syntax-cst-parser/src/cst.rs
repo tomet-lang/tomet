@@ -77,7 +77,7 @@ pub fn parse_cst(src: &str) -> SyntaxNode {
 /// [`parse_cst`] for a source that is one value, as [`crate::parse_value`] reads
 /// it: the entries of its map (or its one value) under a `ROOT`, with the
 /// elements, `[content]` and `|` runs they embed as nodes.
-pub(crate) fn parse_cst_value(src: &str) -> SyntaxNode {
+pub fn parse_cst_value(src: &str) -> SyntaxNode {
     let tokens = tokenize(src);
     let mut parser = CstParser::new(src, &tokens);
     parser.builder.start_node(K::ROOT.into());
@@ -92,7 +92,7 @@ pub(crate) fn parse_cst_value(src: &str) -> SyntaxNode {
 /// reading structure and keeps the text flat in a `TOO_DEEP` node, so no recursion here, or in what
 /// reads the tree, goes deeper than this (a deeper document used to abort the process with a stack
 /// overflow).
-pub const MAX_DEPTH: usize = 64;
+pub const MAX_DEPTH: usize = tomet_cst::MAX_DEPTH;
 
 fn is_name_start(c: char) -> bool {
     c.is_ascii_alphabetic() || c == '_'
@@ -1373,27 +1373,315 @@ impl<'a, 't> CstParser<'a, 't> {
         }
         let root = SyntaxNode::new_root(scratch.builder.finish());
         let groups: Vec<SyntaxNode> = root.children().collect();
-        let read = |first: usize| {
-            crate::lower::lower_group_list(groups[first..].iter().cloned())
-                .ok()
-                .filter(|read| read.content.is_none())
+        let read = |first: usize| -> bool {
+            let slice = &groups[first..];
+            !slice.is_empty() && is_valid_tail_group_list(slice)
         };
         let (mut low, mut high) = (0, groups.len());
         while low < high {
             let mid = low + (high - low) / 2;
-            if read(mid).is_some() {
+            if read(mid) {
                 high = mid;
             } else {
                 low = mid + 1;
             }
         }
         match groups.get(low) {
-            Some(first) if read(low).is_some_and(|read| crate::lower::claims_something(&read)) => {
+            Some(first) if read(low) && tail_claims_something(&groups[low..]) => {
                 TailVerdict::From(at + usize::from(first.text_range().start()))
             }
             _ => TailVerdict::Invalid,
         }
     }
+}
+
+fn validate_args_group(node: &SyntaxNode) -> bool {
+    let closed = node.children_with_tokens().any(|e| e.kind() == K::R_PAREN)
+        || node.text().to_string().trim_end().ends_with(')');
+    let entry_children: Vec<SyntaxNode> = node
+        .children()
+        .filter(|c| matches!(c.kind(), K::MAP_ENTRY | K::SEQ_ITEM | K::ERROR))
+        .collect();
+
+    if entry_children.is_empty() {
+        return closed;
+    }
+    if !closed {
+        return false;
+    }
+
+    let mut keys = Vec::new();
+    for (i, child) in entry_children.iter().enumerate() {
+        if child.kind() == K::ERROR {
+            return false;
+        }
+        if child.kind() == K::MAP_ENTRY {
+            let has_colon = child.children_with_tokens().any(|e| e.kind() == K::COLON);
+            if has_colon {
+                let key_str: String = child
+                    .children_with_tokens()
+                    .take_while(|e| e.kind() != K::COLON)
+                    .filter(|e| !e.kind().is_trivia())
+                    .map(|e| e.to_string())
+                    .collect();
+                if keys.contains(&key_str) {
+                    return false;
+                }
+                keys.push(key_str);
+            }
+        }
+        if i + 1 < entry_children.len() {
+            let next_child = &entry_children[i + 1];
+            let mut has_sep = false;
+            let mut cur = child.last_token().and_then(|t| t.next_token());
+            let next_start = next_child
+                .first_token()
+                .map(|t| usize::from(t.text_range().start()))
+                .unwrap_or(0);
+            while let Some(t) = cur {
+                if usize::from(t.text_range().start()) >= next_start {
+                    break;
+                }
+                if t.kind() == K::COMMA || t.kind() == K::NEWLINE {
+                    has_sep = true;
+                    break;
+                }
+                cur = t.next_token();
+            }
+            if !has_sep {
+                return false;
+            }
+        }
+    }
+    true
+}
+
+fn validate_value_group(node: &SyntaxNode) -> bool {
+    let closed = node.children_with_tokens().any(|e| e.kind() == K::R_BRACE);
+    if !closed {
+        return false;
+    }
+    let mut keys = Vec::new();
+    let entry_children: Vec<SyntaxNode> = node
+        .children()
+        .filter(|c| matches!(c.kind(), K::MAP_ENTRY | K::SEQ_ITEM | K::ERROR))
+        .collect();
+
+    for (i, child) in entry_children.iter().enumerate() {
+        match child.kind() {
+            K::ERROR => return false,
+            K::MAP_ENTRY => {
+                let has_colon = child.children_with_tokens().any(|e| e.kind() == K::COLON);
+                if !has_colon {
+                    return false;
+                }
+                let key_str: String = child
+                    .children_with_tokens()
+                    .take_while(|e| e.kind() != K::COLON)
+                    .filter(|e| !e.kind().is_trivia())
+                    .map(|e| e.to_string())
+                    .collect();
+                if keys.contains(&key_str) {
+                    return false;
+                }
+                keys.push(key_str);
+            }
+            K::SEQ_ITEM => {
+                let first_non_trivia = child
+                    .children_with_tokens()
+                    .find(|e| !e.kind().is_trivia());
+                match first_non_trivia {
+                    Some(tomet_cst::SyntaxElement::Node(n))
+                        if matches!(
+                            n.kind(),
+                            K::ARGS | K::INLINE_ELEMENT | K::BLOCK_ELEMENT
+                        ) => {}
+                    _ => return false,
+                }
+            }
+            _ => return false,
+        }
+        if i + 1 < entry_children.len() {
+            let next_child = &entry_children[i + 1];
+            let mut has_sep = false;
+            let mut cur = child.last_token().and_then(|t| t.next_token());
+            let next_start = next_child
+                .first_token()
+                .map(|t| usize::from(t.text_range().start()))
+                .unwrap_or(0);
+            while let Some(t) = cur {
+                if usize::from(t.text_range().start()) >= next_start {
+                    break;
+                }
+                if t.kind() == K::COMMA || t.kind() == K::NEWLINE {
+                    has_sep = true;
+                    break;
+                }
+                cur = t.next_token();
+            }
+            if !has_sep {
+                return false;
+            }
+        }
+    }
+    true
+}
+
+fn validate_id_group(node: &SyntaxNode) -> bool {
+    let closed = node.children_with_tokens().any(|e| e.kind() == K::R_PAREN);
+    if !closed {
+        return false;
+    }
+    let mut tokens_inside = Vec::new();
+    let mut seen_lparen = false;
+    for elem in node.children_with_tokens() {
+        if elem.kind() == K::L_PAREN {
+            seen_lparen = true;
+            continue;
+        }
+        if elem.kind() == K::R_PAREN {
+            break;
+        }
+        if seen_lparen {
+            match elem {
+                tomet_cst::SyntaxElement::Token(t) => {
+                    if !t.kind().is_trivia() && t.kind() != K::COMMENT {
+                        tokens_inside.push(t);
+                    }
+                }
+                tomet_cst::SyntaxElement::Node(n) => {
+                    if n.kind() == K::CONTENT {
+                        return false;
+                    }
+                    for t in n.descendants_with_tokens().filter_map(|e| e.into_token()) {
+                        if !t.kind().is_trivia() && t.kind() != K::COMMENT {
+                            tokens_inside.push(t);
+                        }
+                    }
+                }
+            }
+        }
+    }
+    if tokens_inside.len() != 1 {
+        return false;
+    }
+    let tok = &tokens_inside[0];
+    tok.kind() == K::NAME || tok.kind() == K::IDENT || tok.text().chars().all(|c| c.is_alphanumeric() || c == '_' || c == '-')
+}
+
+fn validate_connect(node: &SyntaxNode) -> bool {
+    if node.children().any(|n| n.kind() == K::ID_GROUP || n.kind() == K::ERROR) {
+        return false;
+    }
+    let has_name = node.children().any(|n| n.kind() == K::NAME)
+        || node.children().any(|n| n.kind() == K::SIGIL);
+    if !has_name {
+        let mut group_count = 0;
+        for child in node.children() {
+            match child.kind() {
+                K::ARGS => {
+                    if !validate_args_group(&child) {
+                        return false;
+                    }
+                    group_count += 1;
+                }
+                K::VALUE_DATA | K::MAP_LITERAL => {
+                    if !validate_value_group(&child) {
+                        return false;
+                    }
+                    group_count += 1;
+                }
+                _ => return false,
+            }
+        }
+        group_count > 0
+    } else {
+        for child in node.children() {
+            match child.kind() {
+                K::NAME | K::SIGIL => {}
+                K::ARGS => {
+                    if !validate_args_group(&child) {
+                        return false;
+                    }
+                }
+                K::VALUE_DATA | K::MAP_LITERAL => {
+                    if !validate_value_group(&child) {
+                        return false;
+                    }
+                }
+                K::CONTENT => {}
+                K::CONNECT => {
+                    if !validate_connect(&child) {
+                        return false;
+                    }
+                }
+                _ => return false,
+            }
+        }
+        true
+    }
+}
+
+fn is_valid_tail_group_list(groups: &[SyntaxNode]) -> bool {
+    if groups.is_empty() {
+        return false;
+    }
+    let mut seen_args = false;
+    let mut seen_value = false;
+    let mut seen_id = false;
+
+    for child in groups {
+        match child.kind() {
+            K::SIGIL | K::SECTION_HEADING | K::NAME | K::BODY => {}
+            K::LIST
+            | K::INLINE_ELEMENT
+            | K::SLOT
+            | K::EMPHASIS
+            | K::STRONG
+            | K::STRIKEOUT
+            | K::CODE_SPAN
+            | K::AUTOLINK => {}
+            K::CONTENT => return false,
+            K::ERROR => return false,
+            K::ARGS => {
+                if seen_args || !validate_args_group(child) {
+                    return false;
+                }
+                seen_args = true;
+            }
+            K::VALUE_DATA | K::MAP_LITERAL => {
+                if seen_value || !validate_value_group(child) {
+                    return false;
+                }
+                seen_value = true;
+            }
+            K::ID_GROUP => {
+                if seen_id || !validate_id_group(child) {
+                    return false;
+                }
+                seen_id = true;
+            }
+            K::CONNECT => {
+                if !validate_connect(child) {
+                    return false;
+                }
+            }
+            _ => return false,
+        }
+    }
+    true
+}
+
+fn tail_claims_something(groups: &[SyntaxNode]) -> bool {
+    groups.iter().any(|g| {
+        matches!(
+            g.kind(),
+            K::ARGS | K::VALUE_DATA | K::MAP_LITERAL | K::ID_GROUP | K::CONNECT
+        )
+    })
+}
+
+impl<'a, 't> CstParser<'a, 't> {
 
     fn parse_thematic_break(&mut self) {
         self.builder.start_node(K::THEMATIC_BREAK.into());

@@ -352,7 +352,7 @@ mod tests {
     use tomet_ast::Document;
 
     fn parse(src: &str) -> Document {
-        tomet_parser::parse_document(src).expect("parses")
+        tomet_ast_parser::parse_document(src).expect("parses")
     }
 
     fn problems_of(src: &str) -> Vec<Problem> {

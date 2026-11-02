@@ -14,7 +14,7 @@ fn a_backtick_span_survives_export_unescaped() {
     // the run from further markup), so it reaches the writer looking
     // like prose. Escaping it turned every `` `spec/` `` in the docs
     // into a literal ``\`spec/\``.
-    let doc = tomet_parser::parse_document("地の文に `code` と `spec/` があります。\n").unwrap();
+    let doc = tomet_ast_parser::parse_document("地の文に `code` と `spec/` があります。\n").unwrap();
     assert_eq!(
         to_markdown(&doc).trim(),
         "地の文に `code` と `spec/` があります。"
@@ -23,7 +23,7 @@ fn a_backtick_span_survives_export_unescaped() {
 
 #[test]
 fn ruby_exports_as_raw_html() {
-    let doc = tomet_parser::parse_document("a @ruby[漢字](rt:\"かんじ\") b\n").unwrap();
+    let doc = tomet_ast_parser::parse_document("a @ruby[漢字](rt:\"かんじ\") b\n").unwrap();
     assert_eq!(
         to_markdown(&doc).trim(),
         "a <ruby>漢字<rt>かんじ</rt></ruby> b"
@@ -34,14 +34,14 @@ fn ruby_exports_as_raw_html() {
 fn an_unpaired_backtick_is_still_escaped() {
     // No closing backtick on the line -- not a span, so it stays an
     // escaped literal, exactly as before.
-    let doc = tomet_parser::parse_document("値段は 100` です\n").unwrap();
+    let doc = tomet_ast_parser::parse_document("値段は 100` です\n").unwrap();
     assert_eq!(to_markdown(&doc).trim(), "値段は 100\\` です");
 }
 
 #[test]
 fn a_backtick_span_is_not_escaped_inside_a_table_cell() {
     let doc =
-        tomet_parser::parse_document("@table()[\n[ Dir ][ Lang ]\n[ `spec/` ][ 日本語 ]\n]{}\n")
+        tomet_ast_parser::parse_document("@table()[\n[ Dir ][ Lang ]\n[ `spec/` ][ 日本語 ]\n]{}\n")
             .unwrap();
     assert!(
         to_markdown(&doc).contains("| `spec/` |"),
@@ -64,7 +64,7 @@ fn directives_have_no_markdown_output() {
         "::use(deck)\n",
         "::meta{type: note}\n",
     ] {
-        let doc = tomet_parser::parse_document(src).unwrap();
+        let doc = tomet_ast_parser::parse_document(src).unwrap();
         assert_eq!(to_markdown(&doc).trim(), "", "for {src:?}");
     }
 }
@@ -562,7 +562,7 @@ fn an_unprepared_interpolation_renders_as_its_own_source() {
     // still folded a wrapped line into a space before this crate ever
     // saw it.
     let doc =
-        tomet_parser::parse_document("Issue: $gh(42)\nFooter: ${copyright}\nMath: ${add(10, 5)}\n")
+        tomet_ast_parser::parse_document("Issue: $gh(42)\nFooter: ${copyright}\nMath: ${add(10, 5)}\n")
             .unwrap();
     assert_eq!(
         to_markdown(&doc),
@@ -573,7 +573,7 @@ fn an_unprepared_interpolation_renders_as_its_own_source() {
 #[test]
 fn inline_footnote_exports_to_markdown() {
     let doc =
-        tomet_parser::parse_document("This has a footnote @ftn[a short note] in text.\n").unwrap();
+        tomet_ast_parser::parse_document("This has a footnote @ftn[a short note] in text.\n").unwrap();
     let md = to_markdown(&doc);
     assert!(
         md.contains("This has a footnote [^1] in text."),
@@ -590,7 +590,7 @@ Prose B @ftn(shared).
 
 @ftn(shared)[Shared footnote explanation.]
 ";
-    let doc = tomet_parser::parse_document(src).unwrap();
+    let doc = tomet_ast_parser::parse_document(src).unwrap();
     let md = to_markdown(&doc);
     assert!(md.contains("Prose A [^1]."), "got: {md}");
     assert!(md.contains("Prose B [^1]."), "got: {md}");
@@ -605,7 +605,7 @@ Prose B @ftn(shared).
 #[test]
 fn tag_elements_export_to_markdown() {
     let src = "@tag(rust, tomet) and @tag(spec)\n";
-    let doc = tomet_parser::parse_document(src).unwrap();
+    let doc = tomet_ast_parser::parse_document(src).unwrap();
     let md = to_markdown(&doc);
     assert_eq!(md.trim(), "#rust #tomet and #spec");
 }
@@ -617,7 +617,7 @@ fn task_elements_export_to_markdown() {
 -@task(todo)[ Todo task ]
 -@task(\" \")[ Unchecked task ]
 ";
-    let doc = tomet_parser::parse_document(src).unwrap();
+    let doc = tomet_ast_parser::parse_document(src).unwrap();
     let md = to_markdown(&doc);
     assert_eq!(
         md.trim(),
@@ -628,14 +628,14 @@ fn task_elements_export_to_markdown() {
 #[test]
 fn standalone_task_element_exports_to_markdown() {
     let src = "@task(done)[ Single task ]\n";
-    let doc = tomet_parser::parse_document(src).unwrap();
+    let doc = tomet_ast_parser::parse_document(src).unwrap();
     let md = to_markdown(&doc);
     assert_eq!(md.trim(), "[x] Single task");
 }
 
 #[test]
 fn a_key_that_is_not_an_attribute_name_adds_no_attribute() {
-    let doc = tomet_parser::parse_document("@x(\"a onclick=alert(1)\": 1, plain: 2)\n").unwrap();
+    let doc = tomet_ast_parser::parse_document("@x(\"a onclick=alert(1)\": 1, plain: 2)\n").unwrap();
     let md = to_markdown(&doc);
     assert!(md.contains(" data-plain=\"2\""), "{md}");
     assert!(!md.contains("onclick="), "{md}");

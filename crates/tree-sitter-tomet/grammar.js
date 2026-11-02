@@ -990,7 +990,7 @@ module.exports = grammar({
 		// contains a colon (e.g. a URL with no `key:` prefix at all) won't
 		// parse as one token.
 		//
-		// KNOWN DRIFT from `tomet_parser` (see this crate's own module
+		// KNOWN DRIFT from `tomet_ast_parser` (see this crate's own module
 		// doc, and `docs/design/decisions/2026-08-22-link-reference-uri-schemes.md`
 		// section 5's "Group B"): the real parser's `value.rs` now
 		// special-cases `identifier://...` to read as one bare scalar

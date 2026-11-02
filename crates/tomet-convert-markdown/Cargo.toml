@@ -21,4 +21,4 @@ serde_yaml = { workspace = true }
 
 [dev-dependencies]
 tomet-html = { workspace = true }
-tomet-parser = { workspace = true }
+tomet-ast-parser = { workspace = true }

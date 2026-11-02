@@ -36,7 +36,7 @@ impl Resolver for DiskResolver<'_> {
         }
         let path = self.vault.root.join(&doc.0);
         let src = std::fs::read_to_string(&path).map_err(|e| e.to_string())?;
-        let parsed = tomet_parser::parse_document(&src).map_err(|e| e.to_string())?;
+        let parsed = tomet_ast_parser::parse_document(&src).map_err(|e| e.to_string())?;
         Ok(self.vault.cache_document(&doc.0, parsed))
     }
 
@@ -220,7 +220,7 @@ mod tests {
             heading_level: 0,
             notes: Default::default(),
         };
-        let interp = tomet_parser::parse_interpolation_str(
+        let interp = tomet_ast_parser::parse_interpolation_str(
             "${vault.docs.filter(d => d.meta.tags.contains(\"rust\")).map(d => d.path)}",
         )
         .unwrap();

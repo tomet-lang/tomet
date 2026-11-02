@@ -3,7 +3,7 @@
 use std::fs;
 use std::path::Path;
 
-use tomet_parser::parse_document;
+use tomet_ast_parser::parse_document;
 use tomet_printer::document_to_tm;
 use tomet_search::{StructuralQuery, count_structural_matches};
 use tomet_transform::{StructuralAction, apply_structural_action};

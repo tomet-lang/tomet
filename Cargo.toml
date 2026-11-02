@@ -30,7 +30,9 @@ members = [
   "crates/tomet-syntax-ast",
   "crates/tomet-syntax-tree",
   "crates/tomet-syntax-lexer",
-  "crates/tomet-syntax-parser",
+  "crates/tomet-syntax-cst-parser",
+  "crates/tomet-syntax-lowering",
+  "crates/tomet-syntax-ast-parser",
   "crates/tomet-syntax-highlight",
 
   #= Semantics -- classification/eval/resolve
@@ -128,7 +130,9 @@ tomet-cst = { path = "crates/tomet-syntax-cst", version = "0.5.0" }
 tomet-span = { path = "crates/tomet-base-span", version = "0.5.0" }
 tomet-lexer = { path = "crates/tomet-syntax-lexer", version = "0.5.0" }
 tomet-position = { path = "crates/tomet-base-position", version = "0.5.0" }
-tomet-parser = { path = "crates/tomet-syntax-parser", version = "0.5.0" }
+tomet-cst-parser = { path = "crates/tomet-syntax-cst-parser", version = "0.5.0" }
+tomet-lowering = { path = "crates/tomet-syntax-lowering", version = "0.5.0" }
+tomet-ast-parser = { path = "crates/tomet-syntax-ast-parser", version = "0.5.0" }
 tomet-highlight = { path = "crates/tomet-syntax-highlight", version = "0.5.0" }
 tomet-tree = { path = "crates/tomet-syntax-tree", version = "0.5.0" }
 #--- Semantics ---

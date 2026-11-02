@@ -61,7 +61,7 @@ mod tests {
     use tomet_span::Span;
 
     fn parse_connect(src: &str) -> Connect {
-        let doc = tomet_parser::parse_document(src).expect("valid Tomet source");
+        let doc = tomet_ast_parser::parse_document(src).expect("valid Tomet source");
         let el = match &doc.blocks[0] {
             tomet_ast::Block::Element(el) => el,
             other => panic!("expected an element, got {other:?}"),

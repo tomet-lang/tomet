@@ -17,7 +17,7 @@
 //! `|` has started deciding something, and this test says so.
 
 use tomet_ast::Block;
-use tomet_parser::parse_document;
+use tomet_ast_parser::parse_document;
 
 /// A construct written both ways. The two sources must parse to the same
 /// document -- `Span`'s `PartialEq` is unconditionally true, so this
@@ -247,8 +247,8 @@ fn shape(node: &tomet_cst::SyntaxNode) -> String {
 #[test]
 fn the_cst_has_one_shape_for_both_spellings() {
     for (label, marked, bracketed) in SAME {
-        let from_marked = tomet_parser::parse_cst(marked);
-        let from_brackets = tomet_parser::parse_cst(bracketed);
+        let from_marked = tomet_cst_parser::parse_cst(marked);
+        let from_brackets = tomet_cst_parser::parse_cst(bracketed);
         assert_eq!(
             from_marked.text().to_string(),
             *marked,

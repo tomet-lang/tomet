@@ -27,7 +27,7 @@ fn vault() -> Vault {
 }
 
 fn convert(source: &str, options: Options) -> Converted {
-    let doc = tomet_parser::parse_document(source).expect("parses");
+    let doc = tomet_ast_parser::parse_document(source).expect("parses");
     let resolver = MemoryResolver::new()
         .with_source(PATH, source)
         .unwrap()
@@ -194,7 +194,7 @@ fn a_file_that_is_already_standalone_is_not_changed() {
     assert_eq!(
         printed(&converted),
         printed(&Converted {
-            document: tomet_parser::parse_document(source).unwrap(),
+            document: tomet_ast_parser::parse_document(source).unwrap(),
             changes: vec![],
             remaining: vec![],
         })
@@ -231,7 +231,7 @@ See ${macro.gh(7)} about ${var.topic} in ${self.path}.
 ";
     let inside = {
         let vault = vault();
-        let mut doc = tomet_parser::parse_document(source).unwrap();
+        let mut doc = tomet_ast_parser::parse_document(source).unwrap();
         let resolver = MemoryResolver::new()
             .with_source(PATH, source)
             .unwrap()
@@ -249,7 +249,7 @@ See ${macro.gh(7)} about ${var.topic} in ${self.path}.
     // An empty vault, no other file, and the file at a different place.
     let outside = {
         let vault = Vault::from_sources(PrinterConfig::default(), ".", &[]);
-        let mut doc = tomet_parser::parse_document(&taken_out).expect("the printed file parses");
+        let mut doc = tomet_ast_parser::parse_document(&taken_out).expect("the printed file parses");
         let resolver = MemoryResolver::new();
         let prepared = vault.prepare(&mut doc, Path::new("elsewhere/renamed.tmt"), &resolver);
         assert!(prepared.unresolved.is_empty(), "{:?}", prepared.unresolved);

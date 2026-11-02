@@ -28,7 +28,7 @@ use std::path::{Path, PathBuf};
 use ignore::WalkBuilder;
 use tomet_ast::Value;
 use tomet_config::PrinterConfig;
-use tomet_parser::parse_document;
+use tomet_ast_parser::parse_document;
 use tomet_semantics::{classify_declaration_lenient, classify_std_lenient};
 
 pub mod workspace_scan;

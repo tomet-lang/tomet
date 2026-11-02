@@ -2,7 +2,7 @@ use tomet_deps::{
     Change, Dependency, DependencyGraph, DependencyKind, DocumentNode, compute_affected_paths,
     extract_document_node, fnv1a_hash,
 };
-use tomet_parser::parse_document;
+use tomet_ast_parser::parse_document;
 
 fn make_node(
     path: &str,

@@ -410,7 +410,7 @@ mod pipe_value_tests {
     #[test]
     fn the_marker_a_merge_writes_for_a_pipe_run_value_can_be_read_back() {
         let text = conflicted();
-        assert!(tomet_parser::parse_document(&text).is_ok(), "{text}");
+        assert!(tomet_ast_parser::parse_document(&text).is_ok(), "{text}");
         let found = find_conflicts(&text).unwrap();
         assert_eq!(found.len(), 1);
         assert_eq!(found[0].kind, ConflictKind::Value);
@@ -433,7 +433,7 @@ mod pipe_value_tests {
             let out = resolve_all(&text, side.clone()).unwrap();
             assert!(!has_conflicts(&out), "{side:?}: {out}");
             assert!(
-                tomet_parser::parse_document(&out).is_ok(),
+                tomet_ast_parser::parse_document(&out).is_ok(),
                 "{side:?}: {out}"
             );
             assert!(out.contains("about: ["), "{side:?}: {out}");

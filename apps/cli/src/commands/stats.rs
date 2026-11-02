@@ -8,7 +8,7 @@ use tomet_stats::{LinkKind, Stats, measure};
 
 enum StatsFileResult {
     Unreadable,
-    ParseError(tomet_parser::Error),
+    ParseError(tomet_ast_parser::Error),
     Measured {
         warnings: usize,
         has_errors: bool,
@@ -38,7 +38,7 @@ impl Failure {
         }
     }
 
-    fn parse(file: &Path, err: &tomet_parser::Error) -> Self {
+    fn parse(file: &Path, err: &tomet_ast_parser::Error) -> Self {
         Failure {
             file: file.to_path_buf(),
             position: Some((err.line, err.column)),
@@ -130,7 +130,7 @@ fn collect_report(path: &Path) -> anyhow::Result<(Report, usize)> {
             let Ok(src) = std::fs::read_to_string(file) else {
                 return StatsFileResult::Unreadable;
             };
-            let doc = match tomet_parser::parse_document(&src) {
+            let doc = match tomet_ast_parser::parse_document(&src) {
                 Ok(doc) => doc,
                 Err(err) => return StatsFileResult::ParseError(err),
             };
@@ -475,7 +475,7 @@ mod tests {
     use std::fs;
 
     fn measure_src(src: &str) -> Stats {
-        measure(&tomet_parser::parse_document(src).expect("test source parses"))
+        measure(&tomet_ast_parser::parse_document(src).expect("test source parses"))
     }
 
     #[test]
@@ -654,7 +654,7 @@ mod tests {
     fn report_of(docs: &[(&str, &str)]) -> Report {
         let mut by_kind: BTreeMap<Option<String>, Stats> = BTreeMap::new();
         for (name, src) in docs {
-            let doc = tomet_parser::parse_document(src).expect("test source parses");
+            let doc = tomet_ast_parser::parse_document(src).expect("test source parses");
             assert_eq!(
                 tomet_declaration::document_kind(&doc).is_some(),
                 !name.is_empty()
@@ -777,7 +777,7 @@ mod tests {
             .push(Failure::unreadable(Path::new("b.tmt")));
         report.failures.push(Failure::parse(
             Path::new("c.tmt"),
-            &tomet_parser::Error {
+            &tomet_ast_parser::Error {
                 message: "expected ']'".into(),
                 line: 3,
                 column: 7,

@@ -36,7 +36,7 @@ pub(crate) enum Target {
 /// document. One into another document needs the vault
 /// ([`Workspace::definition`](crate::Workspace::definition)).
 pub fn definition_for(text: &str, pos: Position, uri: &Uri) -> Option<GotoDefinitionResponse> {
-    let doc = tomet_parser::parse_document(text).ok()?;
+    let doc = tomet_ast_parser::parse_document(text).ok()?;
     let positions = TextPositions::new(text);
     let Some(Reference::Id(target_id)) = reference_at(&doc, positions.offset(pos)) else {
         return None;

@@ -246,7 +246,7 @@ mod tests {
     use super::*;
 
     fn parse(src: &str) -> Document {
-        tomet_parser::parse_document(src).expect("parses")
+        tomet_ast_parser::parse_document(src).expect("parses")
     }
 
     #[test]

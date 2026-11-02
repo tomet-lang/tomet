@@ -52,9 +52,9 @@ is the hand-maintained grammar approximation and is only worth having while
 it stays independent of the parser.
 
 @dir(crates/serde_cotomet) is listed by name in layer 2. cotomet is the data language dual to tomet.
-`serde_cotomet` reads and writes Rust types through serde, and depends on `tomet-ast` and `tomet-parser`. It shares no prefix with the tomet syntax group.
+`serde_cotomet` reads and writes Rust types through serde, and depends on `tomet-ast` and `tomet-ast-parser`. It shares no prefix with the tomet syntax group.
 
-@dir(crates/cotomet) is the public facade over `serde_cotomet`, `tomet-ast`, and `tomet-parser`. It sits in layer 3.
+@dir(crates/cotomet) is the public facade over `serde_cotomet`, `tomet-ast`, and `tomet-ast-parser`. It sits in layer 3.
 
 @dir(crates/tomet-extract) and @dir(crates/tomet-search) are listed by name in layer 5. They are pure in-memory extraction and query
 engines rather than internal syntax or semantics producers, and their names carry no prefix shared with the producer groups.
@@ -77,7 +77,7 @@ editing runtimes, and it shares no prefix with the producer groups.
 A pattern ending in `*` matches by prefix; every other pattern is exact.
 Patterns are directory paths relative to the workspace root, because the
 directory is the half of a crate's identity that is arranged by layer --
-@dir(crates/tomet-syntax-parser) publishes `tomet-parser`.
+@dir(crates/tomet-syntax-cst-parser) publishes `tomet-cst-parser`.
 
 Dev-dependencies are exempt. A crate may reach upward in `[dev-dependencies]`
 to get a parser for its own tests -- `tomet-syntax-tree` and
@@ -90,7 +90,7 @@ reading `crates/tomet-syntax-*` and nothing else; the moment an edge runs
 upward, it means reading the applications too.
 
 The layer is derived from the directory name, not the package name. The two
-disagree -- @dir(crates/tomet-syntax-parser) publishes `tomet-parser` -- and the
+disagree -- @dir(crates/tomet-syntax-cst-parser) publishes `tomet-cst-parser` -- and the
 directory is the half that is arranged by layer, which is why the workspace
 member list in `Cargo.toml` is already grouped this way in comments.
 

@@ -22,4 +22,5 @@ serde = { workspace = true }
 [dev-dependencies]
 tomet-declaration = { workspace = true }
 tomet-position = { workspace = true }
-tomet-parser = { workspace = true }
+tomet-cst-parser = { workspace = true }
+tomet-ast-parser = { workspace = true }

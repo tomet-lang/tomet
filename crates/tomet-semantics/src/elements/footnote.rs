@@ -181,7 +181,7 @@ fn value_to_id(val: &tomet_ast::Value) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tomet_parser::parse_document;
+    use tomet_ast_parser::parse_document;
 
     #[test]
     fn test_inline_footnote_numbering() {

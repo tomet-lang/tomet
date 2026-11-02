@@ -744,7 +744,7 @@ fn assert_json_round_trip(v: &Value) {
 mod tests {
     use super::*;
     use crate::to_pandoc;
-    use tomet_parser::parse_document;
+    use tomet_ast_parser::parse_document;
     use tomet_printer::document_to_tm;
 
     /// Tomet source -> Pandoc -> Tomet source.

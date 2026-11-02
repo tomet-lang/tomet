@@ -372,7 +372,7 @@ fn declare_standalone(document: &mut Document) {
     }
     names.push(Profile::Standalone.name());
     // Read from text so the arguments have the shape the parser gives them, whatever it is.
-    let written = tomet_parser::parse_document(&format!("::profile({})\n", names.join(", ")))
+    let written = tomet_ast_parser::parse_document(&format!("::profile({})\n", names.join(", ")))
         .expect("`::profile(...)` of known names parses");
     let Some(Block::Declaration(declaration)) = written.blocks.into_iter().next() else {
         unreachable!("a line that starts with `::` is a declaration")

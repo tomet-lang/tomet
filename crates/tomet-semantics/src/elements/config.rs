@@ -142,7 +142,7 @@ fn clean_path_value(v: &Value) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tomet_parser::parse_document;
+    use tomet_ast_parser::parse_document;
 
     #[test]
     fn parses_the_export_declaration_args() {

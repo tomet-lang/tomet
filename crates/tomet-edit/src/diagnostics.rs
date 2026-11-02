@@ -6,7 +6,7 @@
 //! `validate_document` to report duplicate IDs or validation warnings.
 
 use tomet_ast::Document;
-use tomet_parser::{Error as ParseError, parse_document};
+use tomet_ast_parser::{Error as ParseError, parse_document};
 use tomet_validator::{Diagnostic, validate_document};
 use tomet_vault::Vault;
 

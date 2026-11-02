@@ -718,7 +718,7 @@ mod tests {
     use super::*;
 
     fn vocab(src: &str) -> Vocabulary {
-        let doc = tomet_parser::parse_document(src).expect("vocabulary parses");
+        let doc = tomet_ast_parser::parse_document(src).expect("vocabulary parses");
         Vocabulary::from_document(&doc).expect("has a ::vocabulary header")
     }
 
@@ -892,7 +892,7 @@ mod tests {
     /// made, where any `::kind` at all counted as a blueprint.
     #[test]
     fn a_document_without_the_header_is_not_a_vocabulary() {
-        let doc = tomet_parser::parse_document("::kind(note)\n\n::elements{ x: {} }\n").unwrap();
+        let doc = tomet_ast_parser::parse_document("::kind(note)\n\n::elements{ x: {} }\n").unwrap();
         assert!(Vocabulary::from_document(&doc).is_none());
     }
 
@@ -952,7 +952,7 @@ mod tests {
 
     #[test]
     fn the_problem_is_reported_once_where_the_vocabulary_is_read() {
-        let doc = tomet_parser::parse_document(DECK).unwrap();
+        let doc = tomet_ast_parser::parse_document(DECK).unwrap();
         let mut loaded = LoadedVocabularies::default();
         loaded.add("deck.vocabulary.tmt", &doc);
         assert_eq!(loaded.errors.len(), 3, "{:?}", loaded.errors);
@@ -1019,7 +1019,7 @@ mod tests {
     /// all along.
     #[test]
     fn a_caller_that_cannot_read_files_can_pass_the_vocabularies_in() {
-        let doc = tomet_parser::parse_document("::kind(writ)\n\n@layers{ 1: list(\"a\") }\n")
+        let doc = tomet_ast_parser::parse_document("::kind(writ)\n\n@layers{ 1: list(\"a\") }\n")
             .expect("document parses");
 
         // Nothing in scope: `std` only, so the kind's element is unknown.
@@ -1043,7 +1043,7 @@ mod tests {
     #[test]
     fn use_brings_a_namespace_into_scope_by_name() {
         let deck = vocab("::vocabulary(deck)\n\n::elements{ ref: {} }\n");
-        let doc = tomet_parser::parse_document("::kind(writ)\n::use(deck)\n\n@deck.ref(id:1)\n")
+        let doc = tomet_ast_parser::parse_document("::kind(writ)\n::use(deck)\n\n@deck.ref(id:1)\n")
             .expect("document parses");
 
         let bound = Bindings::for_document(&doc, [vocab(WRIT), deck]);
@@ -1066,7 +1066,7 @@ mod tests {
             "::kind(writ, 1)\n::use(deck, 3)\n\n@deck.ref(id:1)\n",
             "::kind(writ)\n::use(deck)\n\n@deck.ref(id:1)\n",
         ] {
-            let doc = tomet_parser::parse_document(src).expect("document parses");
+            let doc = tomet_ast_parser::parse_document(src).expect("document parses");
             let bound = Bindings::for_document(&doc, [vocab(WRIT), deck.clone()]);
             assert!(bound.classify(&name("layers")).is_ok(), "{src}");
             assert!(bound.classify(&name("deck.ref")).is_ok(), "{src}");
@@ -1079,7 +1079,7 @@ mod tests {
     fn an_available_vocabulary_is_not_in_scope_unless_the_document_asks() {
         let deck = vocab("::vocabulary(deck)\n\n::elements{ ref: {} }\n");
         let doc =
-            tomet_parser::parse_document("::kind(writ)\n\n@layers{}\n").expect("document parses");
+            tomet_ast_parser::parse_document("::kind(writ)\n\n@layers{}\n").expect("document parses");
 
         let bound = Bindings::for_document(&doc, [vocab(WRIT), deck]);
         assert!(bound.classify(&name("layers")).is_ok());
@@ -1118,7 +1118,7 @@ mod tests {
     /// paths meet at the same `Bindings::for_document`.
     #[test]
     fn kind_doc_index_binds_from_the_builtin_vocabulary() {
-        let doc = tomet_parser::parse_document("::kind(doc.index)\n\n#[ An index ]\n")
+        let doc = tomet_ast_parser::parse_document("::kind(doc.index)\n\n#[ An index ]\n")
             .expect("document parses");
         let bound = Bindings::for_document(&doc, builtin_doc_vocabularies());
         assert!(bound.kind.is_some());
@@ -1149,7 +1149,7 @@ mod tests {
     #[test]
     fn doc_icon_resolves_with_no_use_or_vocabulary_declaration() {
         let doc =
-            tomet_parser::parse_document("::kind(writ)\n\n@layers{}\n").expect("document parses");
+            tomet_ast_parser::parse_document("::kind(writ)\n\n@layers{}\n").expect("document parses");
         let bound = Bindings::for_document(&doc, builtin_doc_vocabularies());
         assert_eq!(
             bound.classify(&name("doc.icon")),
@@ -1164,7 +1164,7 @@ mod tests {
     #[test]
     fn doc_rejects_a_name_it_does_not_declare() {
         let doc =
-            tomet_parser::parse_document("::kind(writ)\n\n@layers{}\n").expect("document parses");
+            tomet_ast_parser::parse_document("::kind(writ)\n\n@layers{}\n").expect("document parses");
         let bound = Bindings::for_document(&doc, builtin_doc_vocabularies());
         assert!(bound.classify(&name("doc.glyph")).is_err());
     }
@@ -1176,7 +1176,7 @@ mod tests {
     #[test]
     fn doc_icon_declares_name_and_pkg() {
         let doc =
-            tomet_parser::parse_document("::kind(writ)\n\n@layers{}\n").expect("document parses");
+            tomet_ast_parser::parse_document("::kind(writ)\n\n@layers{}\n").expect("document parses");
         let bound = Bindings::for_document(&doc, builtin_doc_vocabularies());
         let decl = bound
             .declaration(&name("doc.icon"))
@@ -1187,7 +1187,7 @@ mod tests {
     }
 
     fn parsed(src: &str) -> Document {
-        tomet_parser::parse_document(src).expect("document parses")
+        tomet_ast_parser::parse_document(src).expect("document parses")
     }
 
     fn vocab_src(ns: &str) -> String {

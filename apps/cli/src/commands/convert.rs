@@ -381,7 +381,7 @@ fn from_markdown(src: &str, path: &Path) -> Result<String> {
     let mut doc = tomet_markdown::from_markdown_with_options(src, &import);
     tomet_printer::ensure_document_id_with_config(&mut doc, &config);
     let tmt = tomet_printer::document_to_tm_with_config(&doc, &config);
-    if let Err(e) = tomet_parser::parse_document(&tmt) {
+    if let Err(e) = tomet_ast_parser::parse_document(&tmt) {
         return Err(anyhow!(
             "generated .tmt has parse error: {}",
             format_parse_error(path, &tmt, &e)
@@ -533,7 +533,7 @@ mod tests {
 
         let tmt = text_of(convert_file(&src, &from_md(), &stdout()).unwrap());
         assert!(tmt.contains("=[Hello Convert]"), "{tmt}");
-        assert!(tomet_parser::parse_document(&tmt).is_ok(), "{tmt}");
+        assert!(tomet_ast_parser::parse_document(&tmt).is_ok(), "{tmt}");
     }
 
     #[test]

@@ -8,4 +8,4 @@ repository.workspace = true
 
 [dependencies]
 tomet-cst = { workspace = true }
-tomet-parser = { workspace = true }
+tomet-cst-parser = { workspace = true }

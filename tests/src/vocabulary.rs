@@ -24,7 +24,7 @@
 //! moment one was reintroduced.
 
 use tomet_ast::{Data, Document, Name, Value};
-use tomet_parser::parse_document;
+use tomet_ast_parser::parse_document;
 use tomet_tree::{for_each_element_mut, for_each_top_level_declaration_mut};
 
 /// Which kind of identifier a case renames.

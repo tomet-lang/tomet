@@ -330,7 +330,7 @@ fn parse_value_accepts_interpolation_with_span() {
 #[test]
 fn string_in_value_group_holding_special_characters_is_one_string() {
     let src1 = r#"@e(key: "* _ ` #( #(id) // \"escaped\"")"#;
-    let root1 = crate::parse_cst(src1);
+    let root1 = tomet_cst_parser::parse_cst(src1);
     let str_tokens1: Vec<_> = root1
         .descendants_with_tokens()
         .filter_map(|e| e.into_token())
@@ -340,7 +340,7 @@ fn string_in_value_group_holding_special_characters_is_one_string() {
     assert_eq!(str_tokens1, vec![r#""* _ ` #( #(id) // \"escaped\"""#]);
 
     let src2 = "@e(key: \"unterminated holding * and _\nother: 1)\n";
-    let root2 = crate::parse_cst(src2);
+    let root2 = tomet_cst_parser::parse_cst(src2);
     let str_tokens2: Vec<_> = root2
         .descendants_with_tokens()
         .filter_map(|e| e.into_token())

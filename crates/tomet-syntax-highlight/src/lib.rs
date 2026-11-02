@@ -6,7 +6,7 @@
 //!
 //! =[ Where the answer comes from ]
 //!
-//! From the CST, [`tomet_parser::parse_cst`], and from nothing else. A token
+//! From the CST, [`tomet_cst_parser::parse_cst`], and from nothing else. A token
 //! is a heading mark, a key or a string because of the node it stands in, not
 //! because of how it looks: `"x"` is a string inside `@note("x")` and text in
 //! a sentence; `true` is an atom in an argument and a word in a paragraph.
@@ -115,7 +115,7 @@ pub struct HighlightSpan {
 
 /// The ranges of `src` that have a [`Tag`], in order and without overlap.
 pub fn highlight(src: &str) -> Vec<HighlightSpan> {
-    let root = tomet_parser::parse_cst(src);
+    let root = tomet_cst_parser::parse_cst(src);
     let mut spans: Vec<HighlightSpan> = Vec::new();
     let mut fences: HashSet<usize> = HashSet::new();
 

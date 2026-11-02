@@ -118,7 +118,7 @@ mod tests {
     }
 
     fn rebased(to: &str) -> Vec<String> {
-        let blocks = tomet_parser::parse_document(GUIDE).unwrap().blocks;
+        let blocks = tomet_ast_parser::parse_document(GUIDE).unwrap().blocks;
         targets(&rebase_relative_links(blocks, "docs/guide.tmt", to))
     }
 
@@ -161,7 +161,7 @@ mod tests {
 
     #[test]
     fn a_file_mention_names_a_path_and_is_left_alone() {
-        let blocks = tomet_parser::parse_document("@file(./src/lib.rs)\n")
+        let blocks = tomet_ast_parser::parse_document("@file(./src/lib.rs)\n")
             .unwrap()
             .blocks;
         let moved = rebase_relative_links(blocks.clone(), "docs/guide.tmt", "here.tmt");
@@ -170,7 +170,7 @@ mod tests {
 
     #[test]
     fn a_target_that_climbs_out_of_the_vault_is_left_as_it_was() {
-        let blocks = tomet_parser::parse_document("@link(../../x.md)\n")
+        let blocks = tomet_ast_parser::parse_document("@link(../../x.md)\n")
             .unwrap()
             .blocks;
         let moved = rebase_relative_links(blocks.clone(), "docs/guide.tmt", "here.tmt");

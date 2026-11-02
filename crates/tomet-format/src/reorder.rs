@@ -2,7 +2,7 @@
 
 use tomet_ast::{Block, Connect, Data, Declaration, Element, Entry, Group, Inline, List};
 use tomet_config::{GroupOrder, PrinterConfig};
-use tomet_parser::parse_document;
+use tomet_ast_parser::parse_document;
 
 /// Byte offset of the `close` matching the `open` at `open_pos` in
 /// `src` (which must be `open`), tracking nested `open`/`close` depth

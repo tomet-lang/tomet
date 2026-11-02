@@ -93,7 +93,7 @@ fn offset_expr(expr: &mut InterpExpr, base: usize) {
 }
 
 /// `${ Expr }` or `$func(args)` or `$macro.func(args)`.
-pub(crate) fn parse_interpolation(cur: &mut Cursor) -> Result<Interpolation> {
+pub fn parse_interpolation(cur: &mut Cursor) -> Result<Interpolation> {
     let start_pos = cur.pos();
     cur.eat_str("$");
     if cur.peek() == Some('{') {

@@ -87,13 +87,13 @@ pub use tomet_validator as validator;
 pub use tomet_load::{DiskResolver, LoadError, Prepared, Unresolved, Vault, load_document};
 /// Parses a data-only document into a [`ast::Value`]. Not a way to read a
 /// document; use [`Vault`] for that.
-pub use tomet_parser::parse_value;
+pub use tomet_ast_parser::parse_value;
 
 /// Bare document parser (opt-in feature `parser`).
 #[cfg(feature = "parser")]
-pub use tomet_parser as parser;
+pub use tomet_ast_parser as parser;
 #[cfg(feature = "parser")]
-pub use tomet_parser::parse_document;
+pub use tomet_ast_parser::parse_document;
 
 /// Lossless editable document tree model (opt-in feature `edit`).
 #[cfg(feature = "edit")]
@@ -143,6 +143,7 @@ pub fn measure_document(path: &std::path::Path) -> Result<tomet_stats::Stats, Lo
 
 #[cfg(test)]
 mod tests {
+    #[allow(unused_imports)]
     use super::*;
 
     #[test]

@@ -267,7 +267,7 @@ pub enum LoadError {
     },
     Parse {
         path: PathBuf,
-        source: tomet_parser::Error,
+        source: tomet_ast_parser::Error,
     },
 }
 
@@ -516,7 +516,7 @@ mod tests {
         )
         .unwrap();
         let vault = Vault::discover(&root);
-        let doc = tomet_parser::parse_document(&fs::read_to_string(&path).unwrap()).unwrap();
+        let doc = tomet_ast_parser::parse_document(&fs::read_to_string(&path).unwrap()).unwrap();
         let mismatches: Vec<(String, String)> = vault
             .findings(&path, &doc)
             .diagnostics
@@ -552,7 +552,7 @@ mod tests {
         );
         let vault = Vault::discover(&root);
         let findings_of = |path: &std::path::Path| {
-            let doc = tomet_parser::parse_document(&fs::read_to_string(path).unwrap()).unwrap();
+            let doc = tomet_ast_parser::parse_document(&fs::read_to_string(path).unwrap()).unwrap();
             vault.findings(path, &doc)
         };
         let reported = |findings: &Findings| {
@@ -706,7 +706,7 @@ mod tests {
         let host = root.join("host.tmt");
         let (doc, _) = vault.document(&host).unwrap();
         let eval = |src: &str| {
-            let expr = tomet_parser::parse_interpolation_str(&format!("${{{src}}}"))
+            let expr = tomet_ast_parser::parse_interpolation_str(&format!("${{{src}}}"))
                 .unwrap()
                 .expr;
             vault.evaluate(&doc, &host, &expr)

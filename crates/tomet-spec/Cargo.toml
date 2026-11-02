@@ -19,4 +19,4 @@ tomet-tree = { workspace = true }
 clap = { workspace = true }
 
 [dev-dependencies]
-tomet-parser = { workspace = true }
+tomet-ast-parser = { workspace = true }

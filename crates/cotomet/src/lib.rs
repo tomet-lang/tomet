@@ -18,7 +18,7 @@ pub use serde_cotomet::{
     to_value,
 };
 pub use tomet_ast::{Declaration, File, Value};
-pub use tomet_parser::{Error, Result, parse_value};
+pub use tomet_ast_parser::{Error, Result, parse_value};
 
 #[cfg(feature = "eval")]
 pub use cotomet_eval as eval;
@@ -28,7 +28,7 @@ pub use cotomet_eval as eval;
 ///
 /// Unquoted `${...}` expressions are rejected (this reader reads data only).
 pub fn parse_file(src: &str) -> Result<File> {
-    let file = tomet_parser::parse_file(src)?;
+    let file = tomet_ast_parser::parse_file(src)?;
     if let Some(span) = find_interp(&file.body) {
         let at = LineIndex::new(src).line_col(span.start);
         return Err(Error {
@@ -44,7 +44,7 @@ pub fn parse_file(src: &str) -> Result<File> {
 /// Parse a standalone cotomet file (`.ctmt`) allowing unquoted `${...}` expressions
 /// (e.g. for expression evaluation or formatting).
 pub fn parse_file_with_expressions(src: &str) -> Result<File> {
-    tomet_parser::parse_file(src)
+    tomet_ast_parser::parse_file(src)
 }
 
 fn find_interp(v: &Value) -> Option<Span> {
@@ -60,7 +60,7 @@ fn find_interp(v: &Value) -> Option<Span> {
 pub mod syntax {
     pub use crate::{parse_file, parse_file_with_expressions};
     pub use tomet_ast::{Declaration, File, Value};
-    pub use tomet_parser::{Error, Result, parse_value};
+    pub use tomet_ast_parser::{Error, Result, parse_value};
 
     pub fn parse_file_with<H>(_src: &str, _hook: &mut H) -> Result<File> {
         crate::parse_file_with_expressions(_src)

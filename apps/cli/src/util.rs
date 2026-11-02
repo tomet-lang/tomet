@@ -1,7 +1,7 @@
 use std::fs;
 use std::path::Path;
 
-pub(crate) fn format_parse_error(path: &Path, src: &str, err: &tomet_parser::Error) -> String {
+pub(crate) fn format_parse_error(path: &Path, src: &str, err: &tomet_ast_parser::Error) -> String {
     let line_num = err.line;
     let col_num = err.column;
 
@@ -85,7 +85,7 @@ mod tests {
 
     #[test]
     fn formats_parse_error_with_source_context() {
-        let err = tomet_parser::Error {
+        let err = tomet_ast_parser::Error {
             message: "expected ']'".into(),
             line: 1,
             column: 11,

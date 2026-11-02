@@ -185,7 +185,7 @@ mod tests {
     use crate::Config;
 
     fn layer(src: &str) -> ConfigLayer {
-        ConfigLayer::from_doc(&tomet_parser::parse_document(src).expect("parse"))
+        ConfigLayer::from_doc(&tomet_ast_parser::parse_document(src).expect("parse"))
     }
 
     #[test]

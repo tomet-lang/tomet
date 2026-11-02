@@ -1,5 +1,5 @@
 use super::*;
-use tomet_parser::parse_document;
+use tomet_ast_parser::parse_document;
 
 fn typst(src: &str) -> String {
     to_typst(&parse_document(src).unwrap())

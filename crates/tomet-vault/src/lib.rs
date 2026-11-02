@@ -120,7 +120,7 @@ pub fn validate_sources(
     let (doc, _) = vault.parse(source).map_err(|e| e.to_string())?;
     let blueprints: Vec<Document> = blueprints
         .iter()
-        .filter_map(|src| tomet_parser::parse_document(src).ok())
+        .filter_map(|src| tomet_ast_parser::parse_document(src).ok())
         .collect();
     Ok(vault.diagnostics(&doc, &blueprints))
 }
@@ -270,7 +270,7 @@ impl Vault {
     ) -> Self {
         let mut loaded = LoadedVocabularies::default();
         for (label, src) in vocabularies {
-            match tomet_parser::parse_document(src) {
+            match tomet_ast_parser::parse_document(src) {
                 Ok(doc) => loaded.add(label, &doc),
                 Err(e) => loaded
                     .errors
@@ -360,8 +360,8 @@ impl Vault {
     }
 
     /// Parses `src` and binds its names against this vault.
-    pub fn parse(&self, src: &str) -> Result<(Document, Bindings), tomet_parser::Error> {
-        let doc = tomet_parser::parse_document(src)?;
+    pub fn parse(&self, src: &str) -> Result<(Document, Bindings), tomet_ast_parser::Error> {
+        let doc = tomet_ast_parser::parse_document(src)?;
         let bindings = self.bindings(&doc);
         Ok((doc, bindings))
     }
@@ -709,7 +709,7 @@ mod tests {
         let mut dictionaries = tomet_semantics::LoadedDictionaries::default();
         dictionaries.add(
             "tomet.tmt",
-            &tomet_parser::parse_document(
+            &tomet_ast_parser::parse_document(
                 "::dictionary(tomet){ \"vault.config.tmt\": @term[ The file that marks a vault. ]#(vault-config) }\n",
             )
             .expect("parses"),
@@ -992,7 +992,7 @@ mod tests {
     #[test]
     fn a_standalone_document_is_still_held_to_a_blueprint() {
         let vault = vault_with_a_macro();
-        let blueprint = tomet_parser::parse_document(BLUEPRINT).unwrap();
+        let blueprint = tomet_ast_parser::parse_document(BLUEPRINT).unwrap();
         let src = format!("{PROMISE}::kind(note)\n\n=[ Other ]\n");
         let doc = vault.parse(&src).unwrap().0;
         let found = vault.diagnostics(&doc, &[blueprint]);

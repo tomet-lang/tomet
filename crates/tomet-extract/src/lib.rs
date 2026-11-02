@@ -26,7 +26,7 @@ pub use comment::{ExtractOptions, extract_comments};
 pub use lang::Language;
 use tomet_ast::{Document, Element};
 use tomet_span::Span;
-use tomet_parser::Error as ParseError;
+use tomet_ast_parser::Error as ParseError;
 
 /// The kind of comment in source code.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -155,7 +155,7 @@ pub fn parse_comments(
     let mut errors = Vec::new();
 
     for block in blocks {
-        match tomet_parser::parse_document(&block.text) {
+        match tomet_ast_parser::parse_document(&block.text) {
             Ok(doc) => {
                 parsed.push(ParsedComment {
                     doc,

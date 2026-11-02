@@ -19,4 +19,4 @@ tomet-type = { workspace = true }
 serde_json = { workspace = true }
 
 [dev-dependencies]
-tomet-parser = { workspace = true }
+tomet-ast-parser = { workspace = true }

@@ -86,7 +86,7 @@ mod tests {
 
 @link(target:tmt:foo/bar#some-id)
 "#;
-        let doc = tomet_parser::parse_document(src).unwrap();
+        let doc = tomet_ast_parser::parse_document(src).unwrap();
         let links = collect_links(&doc);
 
         assert_eq!(links.len(), 4, "links: {links:?}");
@@ -120,7 +120,7 @@ mod tests {
         // same way, but `Url` stays excluded from this crate regardless --
         // see this module's doc comment.
         let src = "@link(/etc/hosts)[Hosts]\n\n@link(https://example.com)[External2]\n";
-        let doc = tomet_parser::parse_document(src).unwrap();
+        let doc = tomet_ast_parser::parse_document(src).unwrap();
         let links = collect_links(&doc);
 
         assert_eq!(links.len(), 1, "links: {links:?}");

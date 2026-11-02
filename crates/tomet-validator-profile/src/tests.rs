@@ -2,7 +2,7 @@ use super::*;
 use tomet_expr::Reach;
 
 fn findings(source: &str) -> Vec<Dirt> {
-    let doc = tomet_parser::parse_document(source).expect("parses");
+    let doc = tomet_ast_parser::parse_document(source).expect("parses");
     standalone_findings(&doc)
         .into_iter()
         .map(|finding| finding.dirt)
@@ -10,7 +10,7 @@ fn findings(source: &str) -> Vec<Dirt> {
 }
 
 fn messages(source: &str) -> Vec<String> {
-    let doc = tomet_parser::parse_document(source).expect("parses");
+    let doc = tomet_ast_parser::parse_document(source).expect("parses");
     validate_profile(&doc)
         .into_iter()
         .map(|diagnostic| diagnostic.to_string())

@@ -294,12 +294,12 @@ mod tests {
     use super::*;
 
     fn parse(src: &str) -> Document {
-        tomet_parser::parse_document(src).unwrap()
+        tomet_ast_parser::parse_document(src).unwrap()
     }
 
     #[test]
     fn a_plain_kind_document_is_not_a_blueprint() {
-        let doc = tomet_parser::parse_document(
+        let doc = tomet_ast_parser::parse_document(
             "::kind(daily-note)\n::id(doc-1)\n\n=[ Plan ] {id: plan}\n",
         )
         .unwrap();
@@ -311,7 +311,7 @@ mod tests {
 
     #[test]
     fn a_blueprint_still_extracts_its_schema() {
-        let doc = tomet_parser::parse_document(
+        let doc = tomet_ast_parser::parse_document(
             "::kind(blueprint)\n::blueprint(daily-note)\n\n=[ Plan ] {id: plan}\n",
         )
         .unwrap();

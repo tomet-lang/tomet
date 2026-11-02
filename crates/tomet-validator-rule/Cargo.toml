@@ -14,4 +14,4 @@ tomet-tree = { workspace = true }
 tomet-validator-core = { workspace = true }
 
 [dev-dependencies]
-tomet-parser = { workspace = true }
+tomet-ast-parser = { workspace = true }

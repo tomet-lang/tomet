@@ -4,7 +4,7 @@ use std::fmt;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Error {
     /// The text is not cotomet; it carries the line and column.
-    Syntax(tomet_parser::Error),
+    Syntax(tomet_ast_parser::Error),
     /// The text parsed, but the data does not fit the Rust type (or the other
     /// way round when writing).
     Data {
@@ -80,8 +80,8 @@ impl std::error::Error for Error {
     }
 }
 
-impl From<tomet_parser::Error> for Error {
-    fn from(e: tomet_parser::Error) -> Self {
+impl From<tomet_ast_parser::Error> for Error {
+    fn from(e: tomet_ast_parser::Error) -> Self {
         Error::Syntax(e)
     }
 }

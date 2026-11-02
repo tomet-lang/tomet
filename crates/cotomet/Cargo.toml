@@ -10,7 +10,7 @@ description = "The crate to depend on when using cotomet, the data language dual
 cotomet-eval = { workspace = true, optional = true }
 serde_cotomet = { workspace = true }
 tomet-ast = { workspace = true }
-tomet-parser = { workspace = true }
+tomet-ast-parser = { workspace = true }
 tomet-position = { workspace = true }
 tomet-span = { workspace = true }
 

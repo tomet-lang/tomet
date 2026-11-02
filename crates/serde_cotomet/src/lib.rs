@@ -36,7 +36,7 @@ pub use tomet_ast::Value;
 
 /// Parse a cotomet data document into `T` via Serde.
 pub fn from_str<T: for<'de> serde::Deserialize<'de>>(src: &str) -> Result<T> {
-    de::from_value(tomet_parser::parse_value(src)?)
+    de::from_value(tomet_ast_parser::parse_value(src)?)
 }
 
 /// Render `T` into cotomet data text via Serde.

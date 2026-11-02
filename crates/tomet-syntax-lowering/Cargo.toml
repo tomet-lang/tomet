@@ -1,21 +1,18 @@
 [package]
-name = "tomet-parser"
+name = "tomet-lowering"
 version.workspace = true
 edition.workspace = true
-description = "The recursive-descent parser (&str -> Document/Value) and authoritative grammar for Tomet."
+description = "Lowering the Tomet Concrete Syntax Tree (CST) into typed AST representations (Document, Value, File)."
 license.workspace = true
 repository.workspace = true
 
 [dependencies]
-tomet-ast = { workspace = true }
 tomet-cst = { workspace = true }
+tomet-ast = { workspace = true }
 tomet-span = { workspace = true }
-tomet-lexer = { workspace = true }
 tomet-position = { workspace = true }
 tomet-tree = { workspace = true }
+tomet-lexer = { workspace = true }
 
 #= Crates.io
 unicode-width = { workspace = true }
-
-[dev-dependencies]
-tomet-semantics = { workspace = true }

@@ -172,7 +172,7 @@ mod tests {
     }
 
     fn instantiate(src: &str, vars: EvalValue) -> (Document, Instantiated) {
-        let mut doc = tomet_parser::parse_document(src).unwrap();
+        let mut doc = tomet_ast_parser::parse_document(src).unwrap();
         let macros = HashMap::new();
         let cx = EvalContext {
             phase: Phase::Create,
@@ -219,7 +219,7 @@ mod tests {
     fn extracts_blueprint_info() {
         let src =
             "::blueprint(daily-note){\n  description: \"Daily note\"\n}\n\n=[ Plan ]#(plan)\n";
-        let doc = tomet_parser::parse_document(src).unwrap();
+        let doc = tomet_ast_parser::parse_document(src).unwrap();
         let info = extract_blueprint_info(&doc).unwrap();
         assert_eq!(info.target_kind, "daily-note");
         assert_eq!(info.description.as_deref(), Some("Daily note"));

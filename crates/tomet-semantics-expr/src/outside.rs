@@ -225,7 +225,7 @@ mod tests {
     use crate::FUNCTIONS;
 
     fn parse(source: &str) -> InterpExpr {
-        tomet_parser::parse_interpolation_str(&format!("${{{source}}}"))
+        tomet_ast_parser::parse_interpolation_str(&format!("${{{source}}}"))
             .unwrap()
             .expr
     }
@@ -334,7 +334,7 @@ mod tests {
 
     #[test]
     fn the_names_a_document_defines_are_read_from_the_document() {
-        let doc = tomet_parser::parse_document(
+        let doc = tomet_ast_parser::parse_document(
             "::macros{ gh: \"https://x/${1}\" }\n::vars{ topic: { type: string } }\n",
         )
         .unwrap();
