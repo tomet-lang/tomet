@@ -141,7 +141,7 @@ pub fn transform_link_targets_with_macros(doc: &mut Document, macro_set: &MacroS
     transform_elements(
         doc,
         |el| {
-            let kind = classify_std_lenient(el);
+            let kind = classify_std_lenient(el.as_view());
             matches!(kind, ElementKind::Link | ElementKind::Embed)
         },
         |el| {

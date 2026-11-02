@@ -305,7 +305,7 @@ mod tests {
                 match inline {
                     Inline::Text(t) => out.push(t.value.clone()),
                     Inline::Element(el) => {
-                        if let Some((_, target)) = tomet_semantics::link_target_of(el) {
+                        if let Some((_, target)) = tomet_semantics::link_target_of(el.as_view()) {
                             out.push(format!("link:{target}"));
                         }
                     }

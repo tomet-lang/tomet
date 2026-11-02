@@ -762,7 +762,7 @@ fn merge_block_into(content: &mut Vec<Inline>, block: Block) {
         // its title text directly in, same as a paragraph -- not wrapped
         // as a nested `Inline::Element`, which is what the generic
         // `Block::Element` arm would do.
-        Block::Element(el) if classify_std_lenient(&el) == ElementKind::Heading => extend_spaced(
+        Block::Element(el) if classify_std_lenient(el.as_view()) == ElementKind::Heading => extend_spaced(
             content,
             blocks_to_flat_inlines(el.content.unwrap_or_default()),
         ),

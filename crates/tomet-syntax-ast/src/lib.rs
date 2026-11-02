@@ -1,7 +1,8 @@
 //! =[ tomet-ast ]
 //!
 //! Shared AST and `Value` data models for the Tomet toolchain (`Document`, `Block`,
-//! `Inline`, `Element`, `Declaration`, `Interpolation`, `Hole`, `ListItem`, `Value`, `Span`).
+//! `Inline`, `Element`, `ElementView`, `BodyView`, `Declaration`, `Interpolation`,
+//! `Hole`, `ListItem`, `Value`, `Span`).
 //!
 //! =[ Design Policy ]
 //!
@@ -26,9 +27,10 @@
 //!   | them apart is what split `Element` before; a new kind of seat is judged by that rule.
 //!   | A list item is a [`ListItem`] and a nameless `(marker)[content]` entry of a `{...}` group is a
 //!   | [`Bare`]: neither has a name, so neither is an [`Element`], whose name is mandatory.
-//!   | `ListItem::named_element` gives the element a `-@name(...)` item is, as a copy.
-//!   | What nodes share is [`Data`] (`(args)` and the `{...}` [`Group`]), so what
-//!   | reads them is written once; `[content]` and `#(id)` stay on the roles that take them.
+//!   | [`ListItem::as_element_view`] gives a zero-copy [`ElementView`] of the element a `-@name(...)`
+//!   | item is.
+//!   | What nodes share is [`Data`] (`(args)` and the `{...}` [`Group`]), and their body groups can
+//!   | be inspected uniformly via [`BodyView`]; `[content]` and `#(id)` stay on the roles that take them.
 //! - (Clear Crate Boundaries)
 //!   | Semantics: Classification of element meanings (links, `::meta`, `::config`) lives in `tomet-semantics`.
 //!   | Traversal & Manipulation: Generic tree traversal algorithms live in `tomet-tree`.
@@ -440,24 +442,28 @@ pub struct ListItem {
 }
 
 impl ListItem {
-    /// The element an item written in the combine notation (`-@name(...)
-    /// content`) is: the exact element a standalone `@name(...) content`
-    /// would parse to, standing as a block. `None` for a plain `- content`,
-    /// which has no name and so is not an element.
-    ///
-    /// It is a copy: an item is not stored as an element, so the checks and
-    /// renderers that are written for elements are handed this one.
-    pub fn named_element(&self) -> Option<Element> {
-        let name = self.name.clone()?;
-        Some(Element {
+    /// A zero-copy borrowed view of the element an item written in combine notation
+    /// (`-@name(...) content`) is. Returns `None` for a plain list item without a name.
+    pub fn as_element_view(&self) -> Option<ElementView<'_>> {
+        let name = self.name.as_ref()?;
+        Some(ElementView {
             name,
             placement: Placement::Block,
-            data: self.data.clone(),
-            content: Some(self.content.clone()),
-            id: self.id.clone(),
-            connects: self.connects.clone(),
+            data: &self.data,
+            content: Some(&self.content),
+            id: self.id.as_ref(),
+            connects: &self.connects,
             span: self.span,
         })
+    }
+
+    /// A zero-copy borrowed view of this item's body groups.
+    pub fn as_body_view(&self) -> BodyView<'_> {
+        BodyView {
+            data: &self.data,
+            content: Some(&self.content),
+            id: self.id.as_ref(),
+        }
     }
 }
 
@@ -773,6 +779,17 @@ pub struct Declaration {
     pub span: Span,
 }
 
+impl Declaration {
+    /// A zero-copy borrowed view of this declaration's body groups.
+    pub fn as_body_view(&self) -> BodyView<'_> {
+        BodyView {
+            data: &self.data,
+            content: self.content.as_deref(),
+            id: self.id.as_ref(),
+        }
+    }
+}
+
 /// A nameless entry of a `{...}` group, `(marker)[content]`: the container
 /// already supplies what it is (the `(1)[...]` entries of `@links{ ... }`),
 /// so it has no name. It takes the groups an element does and no connect.
@@ -782,6 +799,17 @@ pub struct Bare {
     pub content: Option<Vec<Block>>,
     pub id: Option<Id>,
     pub span: Span,
+}
+
+impl Bare {
+    /// A zero-copy borrowed view of this bare entry's body groups.
+    pub fn as_body_view(&self) -> BodyView<'_> {
+        BodyView {
+            data: &self.data,
+            content: self.content.as_deref(),
+            id: self.id.as_ref(),
+        }
+    }
 }
 
 /// A `<?matcher(name, args){options}>[content]` hole: the description of a value that is
@@ -809,6 +837,17 @@ pub struct Hole {
     pub span: Span,
 }
 
+impl Hole {
+    /// A zero-copy borrowed view of this hole's body groups.
+    pub fn as_body_view(&self) -> BodyView<'_> {
+        BodyView {
+            data: &self.data,
+            content: self.content.as_deref(),
+            id: None,
+        }
+    }
+}
+
 /// A `:name(...)` connect stacked after an element, a section or a list
 /// (`@x(...):as(y):rule(...)`): metadata about its owner, not content of the
 /// document. It takes `(args)`, `[content]` and `{value}` like an element does,
@@ -820,6 +859,17 @@ pub struct Connect {
     pub data: Data,
     pub content: Option<Vec<Block>>,
     pub span: Span,
+}
+
+impl Connect {
+    /// A zero-copy borrowed view of this connect's body groups.
+    pub fn as_body_view(&self) -> BodyView<'_> {
+        BodyView {
+            data: &self.data,
+            content: self.content.as_deref(),
+            id: None,
+        }
+    }
 }
 
 /// The data a node carries: its `(args)` and its `{value}` group, each
@@ -882,6 +932,110 @@ pub struct Element {
     pub id: Option<Id>,
     pub connects: Vec<Connect>,
     pub span: Span,
+}
+
+impl Element {
+    /// A zero-copy borrowed view of this element's fields.
+    pub fn as_view(&self) -> ElementView<'_> {
+        ElementView {
+            name: &self.name,
+            placement: self.placement,
+            data: &self.data,
+            content: self.content.as_deref(),
+            id: self.id.as_ref(),
+            connects: &self.connects,
+            span: self.span,
+        }
+    }
+
+    /// A zero-copy borrowed view of this element's body groups.
+    pub fn as_body_view(&self) -> BodyView<'_> {
+        BodyView {
+            data: &self.data,
+            content: self.content.as_deref(),
+            id: self.id.as_ref(),
+        }
+    }
+}
+
+/// A zero-copy borrowed view of an element's fields.
+///
+/// Represents an [`Element`] or any node that stands as an element (such as a
+/// combine list item `-@name(...)` via [`ListItem::as_element_view`]) without
+/// heap allocation or cloning child blocks and data.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct ElementView<'a> {
+    pub name: &'a Name,
+    pub placement: Placement,
+    pub data: &'a Data,
+    pub content: Option<&'a [Block]>,
+    pub id: Option<&'a Id>,
+    pub connects: &'a [Connect],
+    pub span: Span,
+}
+
+impl<'a> ElementView<'a> {
+    /// Positional or keyword arguments `(args)`.
+    pub fn args(&self) -> Option<&'a Value> {
+        self.data.args.as_ref()
+    }
+
+    /// The `{value}` group entries.
+    pub fn value(&self) -> Option<&'a Group> {
+        self.data.value.as_ref()
+    }
+
+    /// The body view (data, content, id) of this element.
+    pub fn body(&self) -> BodyView<'a> {
+        BodyView {
+            data: self.data,
+            content: self.content,
+            id: self.id,
+        }
+    }
+
+    /// Converts this borrowed view into an owned [`Element`] by cloning.
+    pub fn to_element(&self) -> Element {
+        Element {
+            name: self.name.clone(),
+            placement: self.placement,
+            data: self.data.clone(),
+            content: self.content.map(|c| c.to_vec()),
+            id: self.id.cloned(),
+            connects: self.connects.to_vec(),
+            span: self.span,
+        }
+    }
+}
+
+impl<'a> From<&'a Element> for ElementView<'a> {
+    fn from(el: &'a Element) -> Self {
+        el.as_view()
+    }
+}
+
+/// A zero-copy borrowed view of a node's body: its data (`(args)` and `{value}`),
+/// optional child `[content]`, and optional `#(id)`.
+///
+/// Shared by nodes that carry body groups ([`ElementView`], [`Declaration`],
+/// [`Bare`], [`Connect`], [`Hole`]).
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct BodyView<'a> {
+    pub data: &'a Data,
+    pub content: Option<&'a [Block]>,
+    pub id: Option<&'a Id>,
+}
+
+impl<'a> BodyView<'a> {
+    /// Positional or keyword arguments `(args)`.
+    pub fn args(&self) -> Option<&'a Value> {
+        self.data.args.as_ref()
+    }
+
+    /// The `{value}` group entries.
+    pub fn value(&self) -> Option<&'a Group> {
+        self.data.value.as_ref()
+    }
 }
 
 /// One entry inside an element's `{value}` group: either a `key: value`
@@ -1242,4 +1396,137 @@ pub struct File {
     pub header: Vec<Declaration>,
     /// The entries: a [`Value::Map`] of `key: value`.
     pub body: Value,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_element_view_and_list_item_as_element_view() {
+        let name = Name::bare("item");
+        let data = Data {
+            args: Some(Value::Int(42)),
+            value: Some(Group::from_map(Value::Map(vec![(
+                "key".to_string(),
+                Value::String("val".to_string()),
+            )]))),
+        };
+        let content_blocks = vec![Block::Paragraph(Paragraph::new(
+            vec![Inline::Text(Text::new("hello", Span::dummy()))],
+            Span::dummy(),
+        ))];
+        let id = Id("my-id".to_string());
+        let connects = vec![Connect {
+            name: Name::bare("note"),
+            data: Data::default(),
+            content: None,
+            span: Span::dummy(),
+        }];
+
+        let element = Element {
+            name: name.clone(),
+            placement: Placement::Block,
+            data: data.clone(),
+            content: Some(content_blocks.clone()),
+            id: Some(id.clone()),
+            connects: connects.clone(),
+            span: Span::dummy(),
+        };
+
+        let item = ListItem {
+            name: Some(name.clone()),
+            data: data.clone(),
+            content: content_blocks.clone(),
+            id: Some(id.clone()),
+            connects: connects.clone(),
+            sublist: None,
+            span: Span::dummy(),
+        };
+
+        let el_view = element.as_view();
+        let item_view = item.as_element_view().expect("combine item has ElementView");
+
+        assert_eq!(el_view, item_view);
+        assert_eq!(el_view.name, &name);
+        assert_eq!(el_view.placement, Placement::Block);
+        assert_eq!(el_view.args(), Some(&Value::Int(42)));
+        assert!(el_view.value().is_some());
+        assert_eq!(el_view.id, Some(&id));
+        assert_eq!(el_view.connects, &connects);
+
+        // Body view matches
+        let body = el_view.body();
+        assert_eq!(body, item.as_body_view());
+        assert_eq!(body, element.as_body_view());
+        assert_eq!(body.args(), Some(&Value::Int(42)));
+        assert_eq!(body.content, Some(content_blocks.as_slice()));
+        assert_eq!(body.id, Some(&id));
+
+        // Converting back to Element produces exact equivalent
+        assert_eq!(el_view.to_element(), element);
+        assert_eq!(item_view.to_element(), element);
+
+        // Plain list item without a name has no ElementView, but has BodyView
+        let plain_item = ListItem {
+            name: None,
+            data: data.clone(),
+            content: content_blocks.clone(),
+            id: Some(id.clone()),
+            connects: connects.clone(),
+            sublist: None,
+            span: Span::dummy(),
+        };
+        assert!(plain_item.as_element_view().is_none());
+        assert_eq!(plain_item.as_body_view(), body);
+
+        // BodyView on Declaration, Bare, Hole, Connect
+        let decl = Declaration {
+            name: name.clone(),
+            data: data.clone(),
+            content: Some(content_blocks.clone()),
+            id: Some(id.clone()),
+            span: Span::dummy(),
+        };
+        assert_eq!(decl.as_body_view(), body);
+
+        let bare = Bare {
+            data: data.clone(),
+            content: Some(content_blocks.clone()),
+            id: Some(id.clone()),
+            span: Span::dummy(),
+        };
+        assert_eq!(bare.as_body_view(), body);
+
+        let hole = Hole {
+            matcher: Some(name.clone()),
+            placement: Placement::Block,
+            data: data.clone(),
+            content: Some(content_blocks.clone()),
+            span: Span::dummy(),
+        };
+        assert_eq!(
+            hole.as_body_view(),
+            BodyView {
+                data: &data,
+                content: Some(content_blocks.as_slice()),
+                id: None,
+            }
+        );
+
+        let connect = Connect {
+            name,
+            data: data.clone(),
+            content: Some(content_blocks.clone()),
+            span: Span::dummy(),
+        };
+        assert_eq!(
+            connect.as_body_view(),
+            BodyView {
+                data: &data,
+                content: Some(content_blocks.as_slice()),
+                id: None,
+            }
+        );
+    }
 }

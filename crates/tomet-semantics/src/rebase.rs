@@ -26,7 +26,7 @@ pub fn rebase_relative_links(blocks: Vec<Block>, from: &str, to: &str) -> Vec<Bl
     }
     let mut holder = Document::new(blocks, Span::default());
     for_each_element_mut(&mut holder, |element| {
-        let Some((_, target)) = link_target_of(element) else {
+        let Some((_, target)) = link_target_of(element.as_view()) else {
             return;
         };
         if !(target.starts_with("./") || target.starts_with("../")) {
@@ -110,7 +110,7 @@ mod tests {
         let mut doc = Document::new(blocks.to_vec(), Span::default());
         let mut out = Vec::new();
         for_each_element_mut(&mut doc, |el| {
-            if let Some((_, target)) = link_target_of(el) {
+            if let Some((_, target)) = link_target_of(el.as_view()) {
                 out.push(target);
             }
         });

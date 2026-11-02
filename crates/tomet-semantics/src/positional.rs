@@ -1,4 +1,4 @@
-use tomet_ast::{Data, Declaration, Element, Name, Value};
+use tomet_ast::{Data, Declaration, ElementView, Name, Value};
 
 use crate::vocabulary::{Bindings, ElementDecl};
 
@@ -196,14 +196,14 @@ fn scalar_to_plain(v: &Value) -> String {
 /// here. That one took a `SettingsSchema` no caller ever built, so its
 /// second source was dead on arrival; this one exists because the
 /// validator passes real bindings through it.
-pub fn normalized_element_args(el: &Element) -> Option<Value> {
+pub fn normalized_element_args(el: ElementView<'_>) -> Option<Value> {
     normalized_element_args_in(el, &Bindings::default())
 }
 
 /// [`normalized_element_args`], plus the positional slots a vocabulary in
 /// scope declares with `@param(name){ positional: true }`.
-pub fn normalized_element_args_in(el: &Element, bindings: &Bindings) -> Option<Value> {
-    normalized_args_in(Some(&el.name), &el.data, bindings)
+pub fn normalized_element_args_in(el: ElementView<'_>, bindings: &Bindings) -> Option<Value> {
+    normalized_args_in(Some(el.name), el.data, bindings)
 }
 
 /// [`normalized_element_args`] for a declaration: `::kind(config, 2)` is
@@ -249,7 +249,7 @@ mod tests {
         let mut el = element_new(Name::bare("raw"));
         el.data.args = Some(Value::String("rust".to_string()));
         assert_eq!(
-            normalized_element_args(&el),
+            normalized_element_args(el.as_view()),
             Some(Value::Map(vec![(
                 "lang".to_string(),
                 Value::String("rust".to_string())
@@ -272,7 +272,7 @@ mod tests {
             (String::new(), Value::Int(2)),
         ]));
         assert_eq!(
-            normalized_element_args(&el),
+            normalized_element_args(el.as_view()),
             Some(Value::Map(vec![
                 ("a".to_string(), Value::Int(1)),
                 ("b".to_string(), Value::Int(2)),
@@ -290,7 +290,7 @@ mod tests {
                 (String::new(), Value::Int(2)),
             ]));
             assert_eq!(
-                normalized_element_args(&el),
+                normalized_element_args(el.as_view()),
                 Some(Value::Map(vec![
                     (name_key.to_string(), Value::String("deck".to_string())),
                     ("version".to_string(), Value::Int(2)),
@@ -301,7 +301,7 @@ mod tests {
             // the version may be left out
             el.data.args = Some(Value::String("deck".to_string()));
             assert_eq!(
-                normalized_element_args(&el),
+                normalized_element_args(el.as_view()),
                 Some(Value::Map(vec![(
                     name_key.to_string(),
                     Value::String("deck".to_string())
@@ -316,7 +316,7 @@ mod tests {
         let mut el = element_new(Name::bare("embed"));
         el.data.args = Some(Value::String("foo.png".to_string()));
         assert_eq!(
-            normalized_element_args(&el),
+            normalized_element_args(el.as_view()),
             Some(Value::Map(vec![(
                 "target".to_string(),
                 Value::String("foo.png".to_string())
@@ -329,7 +329,7 @@ mod tests {
         let mut el = element_new(Name::bare("link"));
         el.data.args = Some(Value::String("https://example.com".to_string()));
         assert_eq!(
-            normalized_element_args(&el),
+            normalized_element_args(el.as_view()),
             Some(Value::Map(vec![(
                 "target".to_string(),
                 Value::String("https://example.com".to_string())
@@ -350,7 +350,7 @@ mod tests {
             let mut found = None;
             tomet_tree::for_each_element(&doc, |el| {
                 if el.name.name == "term" {
-                    found = normalized_element_args(el);
+                    found = normalized_element_args(el.as_view());
                 }
             });
             let target = found
@@ -375,7 +375,7 @@ mod tests {
             Value::String("foo/bar".to_string()),
         )]));
         assert_eq!(
-            normalized_element_args(&el),
+            normalized_element_args(el.as_view()),
             Some(Value::Map(vec![(
                 "target".to_string(),
                 Value::String("tmt:foo/bar".to_string())
@@ -397,7 +397,7 @@ mod tests {
             ),
         ]));
         assert_eq!(
-            normalized_element_args(&el),
+            normalized_element_args(el.as_view()),
             Some(Value::Map(vec![
                 ("target".to_string(), Value::String("tmt:foo".to_string())),
                 (
@@ -416,7 +416,7 @@ mod tests {
             ("tmt".to_string(), Value::String("bar".to_string())),
         ]));
         assert_eq!(
-            normalized_element_args(&el),
+            normalized_element_args(el.as_view()),
             Some(Value::Map(vec![
                 ("target".to_string(), Value::String("tmt:foo".to_string())),
                 ("tmt".to_string(), Value::String("bar".to_string())),
@@ -432,7 +432,7 @@ mod tests {
             ("id".to_string(), Value::String("bar".to_string())),
         ]));
         assert_eq!(
-            normalized_element_args(&el),
+            normalized_element_args(el.as_view()),
             Some(Value::Map(vec![
                 ("tmt".to_string(), Value::String("foo".to_string())),
                 ("id".to_string(), Value::String("bar".to_string())),
@@ -451,7 +451,7 @@ mod tests {
             Value::String("foo".to_string()),
         )]));
         assert_eq!(
-            normalized_element_args(&el),
+            normalized_element_args(el.as_view()),
             Some(Value::Map(vec![(
                 "tmt".to_string(),
                 Value::String("foo".to_string())
@@ -488,7 +488,7 @@ mod tests {
         ]));
 
         assert_eq!(
-            normalized_element_args(&el),
+            normalized_element_args(el.as_view()),
             Some(Value::Map(vec![
                 (
                     POSITIONAL_ENTRY_KEY.to_string(),
@@ -510,7 +510,7 @@ mod tests {
             Value::String("rust".to_string()),
         )]);
         el.data.args = Some(map_val.clone());
-        assert_eq!(normalized_element_args(&el), Some(map_val));
+        assert_eq!(normalized_element_args(el.as_view()), Some(map_val));
     }
 
     #[test]
@@ -540,7 +540,7 @@ mod tests {
         let mut el = element_new(Name::namespaced("deck", "card"));
         el.data.args = Some(Value::String("https://example.com".to_string()));
         assert_eq!(
-            normalized_element_args(&el),
+            normalized_element_args(el.as_view()),
             Some(Value::String("https://example.com".to_string()))
         );
     }
@@ -557,7 +557,7 @@ mod tests {
         ]));
 
         assert_eq!(
-            normalized_element_args(&el),
+            normalized_element_args(el.as_view()),
             Some(Value::Seq(vec![
                 Value::String("Clean room".to_string()),
                 Value::String("high".to_string()),
@@ -570,7 +570,7 @@ mod tests {
         let mut el = element_new(Name::bare("task"));
         el.data.args = Some(Value::String("x".to_string()));
         assert_eq!(
-            normalized_element_args(&el),
+            normalized_element_args(el.as_view()),
             Some(Value::Map(vec![(
                 "status".to_string(),
                 Value::String("x".to_string()),

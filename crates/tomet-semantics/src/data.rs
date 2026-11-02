@@ -6,8 +6,8 @@
 
 /// An element's value as data: a `{...}` group's `key: value` pairs, or
 /// `None` if the element has no value group at all.
-pub fn element_data(el: &tomet_ast::Element) -> Option<tomet_ast::Value> {
-    data_of(&el.data)
+pub fn element_data(el: tomet_ast::ElementView<'_>) -> Option<tomet_ast::Value> {
+    data_of(el.data)
 }
 
 /// [`element_data`] for a declaration.

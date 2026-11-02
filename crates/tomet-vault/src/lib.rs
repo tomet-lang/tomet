@@ -328,10 +328,11 @@ impl Vault {
         let dictionaries = self.dictionaries_for(doc);
         let mut unresolved = Vec::new();
         tomet_tree::for_each_element(doc, |el| {
-            if tomet_semantics::classify_std_lenient(el) != ElementKind::Term {
+            let view = el.as_view();
+            if tomet_semantics::classify_std_lenient(view) != ElementKind::Term {
                 return;
             }
-            let Some(target) = tomet_semantics::normalized_element_args(el).and_then(|args| {
+            let Some(target) = tomet_semantics::normalized_element_args(view).and_then(|args| {
                 args.get("target")
                     .and_then(|v| v.as_str())
                     .map(String::from)
@@ -420,15 +421,16 @@ impl Vault {
         }
         let own = tomet_declaration::document_dictionary(doc);
         tomet_tree::for_each_element_mut(doc, |el| {
+            let view = el.as_view();
             if el
                 .content
                 .as_ref()
                 .is_some_and(|content| !content.is_empty())
-                || tomet_semantics::classify_std_lenient(el) != ElementKind::Term
+                || tomet_semantics::classify_std_lenient(view) != ElementKind::Term
             {
                 return;
             }
-            let Some(target) = tomet_semantics::normalized_element_args(el).and_then(|args| {
+            let Some(target) = tomet_semantics::normalized_element_args(view).and_then(|args| {
                 args.get("target")
                     .and_then(|v| v.as_str())
                     .map(String::from)
@@ -750,7 +752,7 @@ mod tests {
             let (doc, _) = prepared(&vault, "a.tmt", src);
             let mut found = Vec::new();
             tomet_tree::for_each_element(&doc, |el| {
-                if tomet_semantics::classify_std_lenient(el) == tomet_semantics::ElementKind::Term {
+                if tomet_semantics::classify_std_lenient(el.as_view()) == tomet_semantics::ElementKind::Term {
                     found.push(el.content.as_ref().and_then(|blocks| match blocks.first() {
                         Some(Block::Paragraph(p)) => match p.content.first() {
                             Some(tomet_ast::Inline::Text(t)) => Some(t.value.clone()),
@@ -797,7 +799,7 @@ mod tests {
             vault.prepare(&mut doc, Path::new(host), &resolver);
             let mut found = Vec::new();
             tomet_tree::for_each_element_mut(&mut doc, |el| {
-                if let Some((_, target)) = tomet_semantics::link_target_of(el) {
+                if let Some((_, target)) = tomet_semantics::link_target_of(el.as_view()) {
                     found.push(target);
                 }
             });

@@ -1,0 +1,40 @@
+::kind(api)
+
+::meta{crate: tomet-span, dependencies: list(), dependents: list(cotomet, cotomet-eval, tomet-address, tomet-ast, tomet-ast-parser, tomet-convert-standalone, tomet-cst-parser, tomet-declaration, tomet-expr, tomet-extract, tomet-html, tomet-lexer, tomet-links, tomet-lowering, tomet-lsp, tomet-markdown, tomet-pandoc, tomet-printer, tomet-search, tomet-semantics, tomet-spec, tomet-transform, tomet-tree, tomet-validator, tomet-validator-blueprint, tomet-validator-core, tomet-validator-profile, tomet-validator-rule, tomet-vault)}
+
+=[tomet-span]
+
+==[tomet-span]
+
+Source span representations ([`Span`]) for the Tomet toolchain.
+
+==[Design & Invariants]
+
+- ("Byte Offsets Only") A [`Span`] records byte offsets (`start`, `end`) into source text. Line and column
+numbers are not stored; resolve them on demand using a line index.
+- ("Structural Equality Contract") [`Span`] implements [`PartialEq`] to always return `true` so that AST structural
+equality comparisons ignore source positions. Use [`Span::exact_eq()`] when exact
+byte offsets need to be compared.
+
+==[Structs]
+
+===[struct Span]
+
+A source span: a range of byte offsets into the text it was parsed from.
+
+A span deliberately holds no line or column. Those are a view of the source
+text, not a property of the node, and computing them while parsing made
+every node cost a rescan of everything before it. Resolve them on demand
+with `tomet_position::LineIndex`.
+
+Note: [`PartialEq`] is implemented to always return `true` so that AST
+structural equality checks (e.g. `assert_eq!(doc1, doc2)`) compare node
+content and semantics without failing on source location differences.
+Use [`exact_eq`](Self::exact_eq) or direct field comparison when exact
+byte offsets need to be validated.
+
+`Hash` is deliberately @em[not] derived: a derived impl would hash the real
+`start`/`end` offsets while `PartialEq` above always returns `true`,
+so two "equal" `Span`s could hash differently -- a Hash/Eq contract
+violation that breaks `HashMap`/`HashSet` lookups. Don't re-add it
+without also reconciling it with the custom equality above.

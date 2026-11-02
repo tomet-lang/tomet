@@ -38,7 +38,7 @@ pub(crate) fn render_inlines(inlines: &[Inline], config: &PrinterConfig) -> Stri
             Inline::Element(el) => push_node(
                 &mut s,
                 el.placement == Placement::Block,
-                crate::element::render_element(el, config),
+                crate::element::render_element(el.as_view(), config),
             ),
             Inline::Hole(hole) => push_node(
                 &mut s,

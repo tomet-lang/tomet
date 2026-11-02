@@ -3,7 +3,9 @@
 use std::cell::RefCell;
 use std::collections::HashSet;
 
-use tomet_ast::{Block, Document, Element, Inline, Interpolation, List, Placement, Section, Value};
+use tomet_ast::{
+    Block, Document, ElementView, Inline, Interpolation, List, Placement, Section, Value,
+};
 use tomet_semantics::{
     FootnoteRegistry, TargetScheme, classify_std_lenient, extract_tags, heading_level,
     is_directive, link_target, normalized_element_args, parse_table_rows, path_target,
@@ -59,7 +61,7 @@ fn render_block(cx: &TypstCtx, block: &Block, out: &mut String) {
             }
         }
         Block::Element(el) => {
-            let text = element_to_typst(cx, el, false);
+            let text = element_to_typst(cx, el.as_view(), false);
             if !text.is_empty() {
                 out.push_str(&text);
                 out.push_str("\n\n");
@@ -111,11 +113,11 @@ fn render_list_with_indent(cx: &TypstCtx, list: &List, indent: usize, out: &mut 
             "- ".to_string()
         };
         out.push_str(&marker);
-        if let Some(element) = item.named_element() {
+        if let Some(element) = item.as_element_view() {
             // The combine notation (`-@name(...)`): no Typst markup
             // marker has an equivalent, so this falls back to the same
             // generic element rendering a standalone one would use.
-            out.push_str(&element_to_typst(cx, &element, true));
+            out.push_str(&element_to_typst(cx, element, true));
         } else {
             // `args` (the `(...)` marker `Value`) has no Typst markup
             // equivalent -- dropped on export, same as this crate's
@@ -156,7 +158,7 @@ fn inline_to_typst(cx: &TypstCtx, inlines: &[Inline]) -> String {
                 out.push_str(tomet_ast::softbreak_join(before, after));
             }
             Inline::LineBreak(_) => out.push_str("\\\n"),
-            Inline::Element(el) => out.push_str(&element_to_typst(cx, el, true)),
+            Inline::Element(el) => out.push_str(&element_to_typst(cx, el.as_view(), true)),
             Inline::Interp(interp) => out.push_str(&render_interp(interp)),
             Inline::Hole(hole) => out.push_str(&escape_text(&tomet_printer::hole_to_tm(hole))),
         }
@@ -164,7 +166,7 @@ fn inline_to_typst(cx: &TypstCtx, inlines: &[Inline]) -> String {
     out
 }
 
-fn element_to_typst(cx: &TypstCtx, el: &Element, inline: bool) -> String {
+fn element_to_typst(cx: &TypstCtx, el: ElementView<'_>, inline: bool) -> String {
     let kind = classify_std_lenient(el);
     match kind.as_str() {
         // Directives -- see `tomet_semantics::is_directive`.
@@ -192,8 +194,8 @@ fn element_to_typst(cx: &TypstCtx, el: &Element, inline: bool) -> String {
         "ftn" => {
             if inline || el.placement == Placement::Inline {
                 if let Some((idx, _)) = cx.footnotes.get_ref(&el.span) {
-                    render_footnote_ref_or_def(cx, idx, el.content.as_deref())
-                } else if let Some(content) = &el.content {
+                    render_footnote_ref_or_def(cx, idx, el.content)
+                } else if let Some(content) = el.content {
                     let text = blocks_to_typst(cx, content);
                     format!("#footnote[{text}]")
                 } else {
@@ -250,7 +252,7 @@ fn render_footnote_ref_or_def(
     }
 }
 
-fn render_tag(el: &Element) -> String {
+fn render_tag(el: ElementView<'_>) -> String {
     let tags = extract_tags(el);
     if tags.is_empty() {
         return String::new();
@@ -266,7 +268,7 @@ fn render_tag(el: &Element) -> String {
     boxes.join(" ")
 }
 
-fn render_task(cx: &TypstCtx, el: &Element, _inline: bool) -> String {
+fn render_task(cx: &TypstCtx, el: ElementView<'_>, _inline: bool) -> String {
     let status_str = task_status(el);
     let marker = match status_str.as_deref() {
         Some("x") | Some("X") | Some("done") => "[x]",
@@ -283,7 +285,7 @@ fn render_task(cx: &TypstCtx, el: &Element, _inline: bool) -> String {
     }
 }
 
-fn task_status(el: &Element) -> Option<String> {
+fn task_status(el: ElementView<'_>) -> Option<String> {
     let args = normalized_element_args(el)?;
     match args {
         Value::Map(entries) => {
@@ -302,17 +304,17 @@ fn task_status(el: &Element) -> Option<String> {
     }
 }
 
-fn render_heading(cx: &TypstCtx, el: &Element) -> String {
+fn render_heading(cx: &TypstCtx, el: ElementView<'_>) -> String {
     let level = heading_level(el).unwrap_or(1) as usize;
-    let content = el.content.as_deref().unwrap_or(&[]);
+    let content = el.content.unwrap_or(&[]);
     format!("{} {}", "=".repeat(level), blocks_to_typst(cx, content))
 }
 
 /// A bare `---` break renders as a full-width rule; a titled one
 /// (`---[ Title ]---`) has no single-construct Typst equivalent, so it's
 /// lossy: the title text on its own line followed by the rule.
-fn render_hr(cx: &TypstCtx, el: &Element) -> String {
-    match &el.content {
+fn render_hr(cx: &TypstCtx, el: ElementView<'_>) -> String {
+    match el.content {
         Some(title) if !title.is_empty() => {
             format!("{}\n#line(length: 100%)", blocks_to_typst(cx, title))
         }
@@ -323,7 +325,7 @@ fn render_hr(cx: &TypstCtx, el: &Element) -> String {
 /// Typst has no bare `>` markup shorthand; `#quote` is the built-in
 /// function, and its own `block:` parameter is exactly the distinction
 /// Tomet draws by position.
-fn render_quote(cx: &TypstCtx, el: &Element, inline: bool) -> String {
+fn render_quote(cx: &TypstCtx, el: ElementView<'_>, inline: bool) -> String {
     if inline {
         return format!("#quote[{}]", content_to_typst(cx, el));
     }
@@ -336,7 +338,7 @@ fn render_quote(cx: &TypstCtx, el: &Element, inline: bool) -> String {
 /// Typst has no built-in admonition/callout construct, so this renders a
 /// plain bordered block with a bold `[variant] title` header line -- a
 /// first-pass approximation, not a byte-for-byte callout package match.
-fn render_callout(cx: &TypstCtx, el: &Element) -> String {
+fn render_callout(cx: &TypstCtx, el: ElementView<'_>) -> String {
     let (variant, title) = callout_variant_and_title(el);
     let body = content_to_typst(cx, el);
     let header = match title {
@@ -353,7 +355,7 @@ fn render_callout(cx: &TypstCtx, el: &Element) -> String {
 /// has none). Showing both: picking one side here would make `tomet
 /// check`'s own `Diagnostic::Conflict` warning pointless the moment
 /// someone exports.
-fn render_conflict(cx: &TypstCtx, el: &Element) -> String {
+fn render_conflict(cx: &TypstCtx, el: ElementView<'_>) -> String {
     let (a, b) = conflict_sides(el);
     let a_body = blocks_to_typst(cx, &a);
     let b_body = blocks_to_typst(cx, &b);
@@ -365,7 +367,7 @@ fn render_conflict(cx: &TypstCtx, el: &Element) -> String {
 
 /// Reads `a`/`b` out of `el`'s `(args)` -- block content
 /// (`Value::Blocks`), not a scalar.
-fn conflict_sides(el: &Element) -> (Vec<Block>, Vec<Block>) {
+fn conflict_sides(el: ElementView<'_>) -> (Vec<Block>, Vec<Block>) {
     let args = normalized_element_args(el);
     let map = args.as_ref().and_then(as_map);
     let side = |key: &str| -> Vec<Block> {
@@ -377,11 +379,11 @@ fn conflict_sides(el: &Element) -> (Vec<Block>, Vec<Block>) {
     (side("a"), side("b"))
 }
 
-fn callout_variant_and_title(el: &Element) -> (String, Option<String>) {
+fn callout_variant_and_title(el: ElementView<'_>) -> (String, Option<String>) {
     let mut variant = None;
     let mut title = None;
 
-    if let Some(args) = &el.data.args {
+    if let Some(args) = el.data.args.as_ref() {
         match args {
             Value::String(s) => variant = Some(s.clone()),
             Value::Map(entries) => {
@@ -420,7 +422,7 @@ fn callout_variant_and_title(el: &Element) -> (String, Option<String>) {
 /// or `#raw(...)` for inlines. Reads `lang` via `normalized_element_args`
 /// (not raw `el.args`) so a positional lang arg (`<raw>("rust")[...]`)
 /// resolves the same as a named `lang:rust` one.
-fn render_raw(el: &Element, inline: bool) -> String {
+fn render_raw(el: ElementView<'_>, inline: bool) -> String {
     let args = normalized_element_args(el);
     let lang = args
         .as_ref()
@@ -430,8 +432,7 @@ fn render_raw(el: &Element, inline: bool) -> String {
         .unwrap_or_default();
     let code = el
         .content
-        .as_ref()
-        .map(|a| blocks_to_plain(a))
+        .map(blocks_to_plain)
         .unwrap_or_default();
     if inline {
         if lang.is_empty() && !code.contains('`') {
@@ -460,8 +461,8 @@ fn fence_for(code: &str) -> String {
 /// treated as a header (its cells bolded) unless `header:false` is set,
 /// same default/opt-out convention `tomet-convert-html`'s
 /// `render_table_element` uses for its `<thead>` split.
-fn render_table(cx: &TypstCtx, el: &Element) -> String {
-    let inlines = match &el.content {
+fn render_table(cx: &TypstCtx, el: ElementView<'_>) -> String {
+    let inlines = match el.content {
         Some(content) => content,
         None => return String::new(),
     };
@@ -522,9 +523,9 @@ fn render_table(cx: &TypstCtx, el: &Element) -> String {
 /// the visible target.
 /// `@file(x)`/`@dir(x)` -> Typst raw text, the same shape CommonMark
 /// gets. A path is named, not navigated to, so there is no `#link` here.
-fn render_path(cx: &TypstCtx, el: &Element, inline: bool) -> String {
+fn render_path(cx: &TypstCtx, el: ElementView<'_>, inline: bool) -> String {
     let path = path_target(el, &classify_std_lenient(el)).unwrap_or_default();
-    let content = match &el.content {
+    let content = match el.content {
         Some(content) if !content.is_empty() => Some(blocks_to_typst(cx, content)),
         _ => None,
     };
@@ -537,10 +538,10 @@ fn render_path(cx: &TypstCtx, el: &Element, inline: bool) -> String {
     }
 }
 
-fn render_link(cx: &TypstCtx, el: &Element) -> String {
+fn render_link(cx: &TypstCtx, el: ElementView<'_>) -> String {
     let raw_target = link_target(el, &classify_std_lenient(el)).unwrap_or_default();
     let (scheme, target) = target_scheme(&raw_target);
-    let text = match &el.content {
+    let text = match el.content {
         Some(content) if !content.is_empty() => blocks_to_typst(cx, content),
         _ => String::new(),
     };
@@ -574,13 +575,12 @@ fn render_link(cx: &TypstCtx, el: &Element) -> String {
 /// Strips `target`'s scheme prefix the same way `render_link` does -- see
 /// `tomet-convert-html`'s `render_embed_element` for why `<embed>` needs
 /// this too, not just a raw passthrough.
-fn render_embed(el: &Element) -> String {
+fn render_embed(el: ElementView<'_>) -> String {
     let raw_target = link_target(el, &classify_std_lenient(el)).unwrap_or_default();
     let (_, src) = target_scheme(&raw_target);
     let alt = el
         .content
-        .as_ref()
-        .map(|a| blocks_to_plain(a))
+        .map(blocks_to_plain)
         .unwrap_or_default();
     if alt.is_empty() {
         format!("#image(\"{}\")", escape_typst_string(src))
@@ -608,7 +608,7 @@ fn render_interp(interp: &Interpolation) -> String {
 /// `args`/`kind` metadata can't be preserved in the output itself. In
 /// block position only (never inline, to avoid corrupting running text) a
 /// leading `// tomet:{kind}` line comment records what was dropped.
-fn render_generic(cx: &TypstCtx, el: &Element, kind: &str, inline: bool) -> String {
+fn render_generic(cx: &TypstCtx, el: ElementView<'_>, kind: &str, inline: bool) -> String {
     let content = content_to_typst(cx, el);
     if content.is_empty() {
         return String::new();
@@ -624,7 +624,7 @@ fn render_generic(cx: &TypstCtx, el: &Element, kind: &str, inline: bool) -> Stri
 /// unlike [`render_generic`]'s inline fallback, `rt` can't just be dropped:
 /// it's the reading, meaningful content rather than decoration. Renders as
 /// `base(reading)`, the least-lossy plain-text approximation.
-fn render_ruby(cx: &TypstCtx, el: &Element) -> String {
+fn render_ruby(cx: &TypstCtx, el: ElementView<'_>) -> String {
     let args = normalized_element_args(el);
     let rt = args
         .as_ref()
@@ -640,9 +640,8 @@ fn render_ruby(cx: &TypstCtx, el: &Element) -> String {
     }
 }
 
-fn content_to_typst(cx: &TypstCtx, el: &Element) -> String {
+fn content_to_typst(cx: &TypstCtx, el: ElementView<'_>) -> String {
     el.content
-        .as_ref()
         .map(|a| blocks_to_typst(cx, a))
         .unwrap_or_default()
 }

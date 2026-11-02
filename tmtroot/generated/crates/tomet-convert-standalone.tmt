@@ -1,6 +1,6 @@
 ::kind(api)
 
-::meta{crate: tomet-convert-standalone, dependencies: list(tomet-ast, tomet-config, tomet-declaration, tomet-expr, tomet-markdown, tomet-parser, tomet-printer, tomet-tree, tomet-type, tomet-validator-profile, tomet-vault), dependents: list(tomet-cli)}
+::meta{crate: tomet-convert-standalone, dependencies: list(tomet-ast, tomet-ast-parser, tomet-config, tomet-declaration, tomet-expr, tomet-markdown, tomet-printer, tomet-span, tomet-tree, tomet-type, tomet-validator-profile, tomet-vault), dependents: list(tomet-cli)}
 
 =[tomet-convert-standalone]
 

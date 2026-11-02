@@ -1,6 +1,6 @@
 ::kind(api)
 
-::meta{crate: tomet-highlight, dependencies: list(tomet-cst, tomet-parser), dependents: list(tomet)}
+::meta{crate: tomet-highlight, dependencies: list(tomet-cst, tomet-cst-parser), dependents: list(tomet)}
 
 =[tomet-highlight]
 
@@ -12,7 +12,7 @@ maps tags to its own.
 
 ==[Where the answer comes from]
 
-From the CST, [`tomet_parser::parse_cst`], and from nothing else. A token
+From the CST, [`tomet_cst_parser::parse_cst`], and from nothing else. A token
 is a heading mark, a key or a string because of the node it stands in, not
 because of how it looks: `"x"` is a string inside `@note("x")` and text in
 a sentence; `true` is an atom in an argument and a word in a paragraph.

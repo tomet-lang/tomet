@@ -3,11 +3,11 @@
 use crate::RenderCtx;
 use crate::block::render_inlines;
 use crate::util::{as_map, id_attr, map_get, push_named_attrs, split_attrs};
-use tomet_ast::{Element, Value};
+use tomet_ast::{ElementView, Value};
 use tomet_semantics::normalized_element_args;
 
-pub(crate) fn render_table_element(cx: &RenderCtx, el: &Element, out: &mut String) {
-    let inlines = match &el.content {
+pub(crate) fn render_table_element(cx: &RenderCtx, el: ElementView<'_>, out: &mut String) {
+    let inlines = match el.content {
         Some(content) => content,
         None => {
             out.push_str("<table class=\"tm-element tm-table\"></table>\n");
@@ -33,7 +33,7 @@ pub(crate) fn render_table_element(cx: &RenderCtx, el: &Element, out: &mut Strin
 
     let attrs = el.data.value.as_ref().map(|v| v.as_data());
     let (class, data) = split_attrs(attrs.as_ref());
-    let id = id_attr(el.id.as_ref());
+    let id = id_attr(el.id);
     let class = class.or_else(|| Some("tm-element tm-table".to_string()));
 
     out.push_str("<table");

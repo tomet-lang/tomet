@@ -28,7 +28,7 @@ pub struct StructuralMatch {
 
 /// Checks if a single element matches `query`.
 pub fn matches_query(el: &Element, query: &StructuralQuery) -> bool {
-    matches_parts(classify_std_lenient(el).as_str(), &el.data, query)
+    matches_parts(classify_std_lenient(el.as_view()).as_str(), &el.data, query)
 }
 
 /// Checks if a single declaration matches `query`.
@@ -85,7 +85,7 @@ pub fn find_structural_matches(doc: &Document, query: &StructuralQuery) -> Vec<S
     let mut matches = Vec::new();
     for_each_element(doc, |el| {
         if matches_query(el, query) {
-            let kind = classify_std_lenient(el);
+            let kind = classify_std_lenient(el.as_view());
             matches.push(StructuralMatch {
                 span: el.span,
                 tag: kind.as_str().to_string(),

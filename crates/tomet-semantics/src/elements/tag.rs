@@ -1,16 +1,16 @@
 //! Extracts tags from an element (`@tag(...)`, `@tag[...]`).
 
-use tomet_ast::{Block, Element, Inline, List, Value};
+use tomet_ast::{Block, ElementView, Inline, List, Value};
 
 /// Extracts a list of tag names from a tag element.
 /// Inspects `args` (as string, seq, or map) and `content` (as plain text).
-pub fn extract_tags(el: &Element) -> Vec<String> {
+pub fn extract_tags(el: ElementView<'_>) -> Vec<String> {
     let mut tags = Vec::new();
-    if let Some(args) = &el.data.args {
+    if let Some(args) = el.args() {
         extract_tags_from_value(args, &mut tags);
     }
     if tags.is_empty()
-        && let Some(content) = &el.content
+        && let Some(content) = el.content
     {
         let s = blocks_to_plain(content);
         if !s.trim().is_empty() {
@@ -112,7 +112,7 @@ mod tests {
     fn extracts_tags_from_args_string() {
         let mut el = element_new(Name::bare("tag"));
         el.data.args = Some(Value::String("rust".to_string()));
-        assert_eq!(extract_tags(&el), vec!["rust"]);
+        assert_eq!(extract_tags(el.as_view()), vec!["rust"]);
     }
 
     #[test]
@@ -122,7 +122,7 @@ mod tests {
             Value::String("rust".to_string()),
             Value::String("tomet".to_string()),
         ]));
-        assert_eq!(extract_tags(&el), vec!["rust", "tomet"]);
+        assert_eq!(extract_tags(el.as_view()), vec!["rust", "tomet"]);
     }
 
     #[test]
@@ -132,6 +132,6 @@ mod tests {
             vec![Inline::Text(Text::new("docs", Span::dummy()))],
             Span::dummy(),
         ))]);
-        assert_eq!(extract_tags(&el), vec!["docs"]);
+        assert_eq!(extract_tags(el.as_view()), vec!["docs"]);
     }
 }

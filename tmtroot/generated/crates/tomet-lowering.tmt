@@ -1,0 +1,135 @@
+::kind(api)
+
+::meta{crate: tomet-lowering, dependencies: list(tomet-ast, tomet-cst, tomet-lexer, tomet-position, tomet-span, tomet-tree), dependents: list(tomet-ast-parser)}
+
+=[tomet-lowering]
+
+==[tomet-lowering]
+
+Lowering the Tomet Concrete Syntax Tree (CST) into typed AST representations
+([`tomet_ast::Document`], [`tomet_ast::Value`], [`tomet_ast::File`]).
+
+==[Architecture & Responsibilities]
+
+- ("Deterministic Static Lowering Boundary")
+  - `tomet-lowering` is strictly a pure, side-effect-free, deterministic lowering engine.
+It performs zero I/O, external file resolution, or dynamic code execution.
+Given an identical CST, it produces identical AST output.
+- ("Nesting Limit")
+  - Past [`tomet_cst::MAX_DEPTH`] levels the CST keeps the text flat in a `TOO_DEEP` node,
+and lowering refuses it with an error.
+
+==[Module element]
+
+The values a group holds.
+
+Lowering of group values: `(args)` ([`lower_paren_value`]), `{value}`
+([`lower_value_group`]) and `#(id)` ([`lower_hash_id`]).
+They fold CST nodes into AST values and groups without re-reading source text.
+
+===[Functions]
+
+====[fn scalar_from_text]
+
+====[fn resolve_call]
+
+===[Constants]
+
+====[const POSITIONAL_ENTRY_KEY]
+
+Sentinel key for a positional (unkeyed) entry inside a map body or args.
+
+==[Module error]
+
+===[Structs]
+
+====[struct Error]
+
+===[Type Aliases]
+
+====[type Result]
+
+==[Module inline]
+
+Inline AST sequence operations: trimming at edges and merging adjacent
+`Text` or `SoftBreak` items during lowering.
+
+===[Constants]
+
+====[const DELIMITERS]
+
+The inline delimiters and the element each one makes, longest first so
+`**` is tried before `*`.
+
+==[Module interp]
+
+===[Functions]
+
+====[fn is_interp_ident_start]
+
+First character of an interpolation expression identifier.
+
+====[fn is_interp_ident_char]
+
+Subsequent characters of an interpolation expression identifier.
+
+====[fn parse_quoted]
+
+Reads a `"..."` string, with `\"`, `\\`, `\n`, `\t` escapes.
+
+====[fn parse_interpolation]
+
+`${ Expr }` or `$func(args)` or `$macro.func(args)`.
+
+==[Module lower]
+
+Lowering: the CST read as an AST.
+
+The CST parser is the one reader of the grammar's shape (where a block, an
+element, a group starts and ends); the AST is the owned, typed tree the rest
+of the system works on. Lowering is the fold from the first to the second, so
+that a construct is written once, in the CST parser: `parse_document` is
+`parse_cst` and then [`lower_document`].
+
+Lowering is also where a document is refused. The CST never fails, so what
+the grammar does not allow -- a second `(args)` group, a `[` that never
+closes, a `|` in a column that continues nothing -- is found here, with a
+message and the offset it is at.
+
+What it reads from text rather than from nodes is not shape: how a run of
+source text becomes `Text` and `SoftBreak` items
+([`crate::inline::split_softbreaks`]), and the grammars of the leaves --
+`${...}` expressions and a group's values, which hand back to the CST
+whatever they embed (see [`crate::value::Embedded`]).
+
+===[Functions]
+
+====[fn lower_document]
+
+Reads the CST root as an AST [`Document`].
+
+==[Module value]
+
+Lowering for `Value` and `File`: folds CST nodes into AST [`Value`] or [`File`].
+
+===[Functions]
+
+====[fn lower_value]
+
+Lowers a CST root from `parse_cst_value` into an AST [`Value`].
+
+====[fn lower_file]
+
+Lowers a CST root from `parse_cst_value` into a [`File`].
+
+====[fn shift_spans]
+
+Shifts spans of all interpolations in `value` by `delta`.
+
+====[fn find_interp_in_value]
+
+Finds the byte offset of the first interpolation in `v`, if any.
+
+====[fn find_interp_in_group]
+
+Finds the byte offset of the first interpolation in `g`, if any.

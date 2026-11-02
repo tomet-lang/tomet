@@ -22,12 +22,12 @@ use crate::util::{
     escape_attr, escape_html, id_attr, push_data_attrs, push_value_data_attrs, value_to_plain,
 };
 use crate::{CustomElementCtx, RenderCtx};
-use tomet_ast::{Bare, Block, Data, Element, Entry, Group, Id, Interpolation};
+use tomet_ast::{Bare, BodyView, ElementView, Entry, Group, Interpolation};
 use tomet_semantics::{
     classify_std_lenient, extract_tags, is_directive, normalized_element_args_in,
 };
 
-pub(crate) fn render_element(cx: &RenderCtx, el: &Element, out: &mut String, inline: bool) {
+pub(crate) fn render_element(cx: &RenderCtx, el: ElementView<'_>, out: &mut String, inline: bool) {
     let kind = classify_std_lenient(el);
     match kind.as_str() {
         // Directives -- see `tomet_semantics::is_directive`.
@@ -62,7 +62,7 @@ pub(crate) fn render_element(cx: &RenderCtx, el: &Element, out: &mut String, inl
     }
 }
 
-fn render_task_element(cx: &RenderCtx, el: &Element, out: &mut String, inline: bool) {
+fn render_task_element(cx: &RenderCtx, el: ElementView<'_>, out: &mut String, inline: bool) {
     let status = normalized_element_args_in(el, cx.bindings)
         .as_ref()
         .and_then(crate::util::as_map)
@@ -75,7 +75,7 @@ fn render_task_element(cx: &RenderCtx, el: &Element, out: &mut String, inline: b
         "<{tag} class=\"tm-element tm-task\" data-status=\"{}\"",
         escape_attr(&status)
     ));
-    if let Some(id) = id_attr(el.id.as_ref()) {
+    if let Some(id) = id_attr(el.id) {
         out.push_str(&format!(" id=\"{}\"", escape_attr(&id)));
     }
     push_span_attrs(cx, out, el.span);
@@ -84,7 +84,7 @@ fn render_task_element(cx: &RenderCtx, el: &Element, out: &mut String, inline: b
     out.push_str(&format!(
         "<input type=\"checkbox\" class=\"tm-task-checkbox\" disabled{checked_attr}> "
     ));
-    if let Some(content) = &el.content {
+    if let Some(content) = el.content {
         crate::block::render_content_blocks(cx, content, out);
     }
     out.push_str(&format!("</{tag}>"));
@@ -99,11 +99,11 @@ fn render_task_element(cx: &RenderCtx, el: &Element, out: &mut String, inline: b
 /// nothing is silently dropped. Marked, not resolved: picking one side
 /// and discarding the other here would make `tomet check`'s own
 /// `Diagnostic::Conflict` warning pointless the moment someone exports.
-fn render_conflict_element(cx: &RenderCtx, el: &Element, out: &mut String, inline: bool) {
+fn render_conflict_element(cx: &RenderCtx, el: ElementView<'_>, out: &mut String, inline: bool) {
     let (a, b) = conflict_sides(cx, el);
     let tag = if inline { "span" } else { "div" };
     out.push_str(&format!("<{tag} class=\"tm-element tm-conflict\""));
-    if let Some(id) = id_attr(el.id.as_ref()) {
+    if let Some(id) = id_attr(el.id) {
         out.push_str(&format!(" id=\"{}\"", escape_attr(&id)));
     }
     out.push('>');
@@ -122,7 +122,7 @@ fn render_conflict_element(cx: &RenderCtx, el: &Element, out: &mut String, inlin
 /// Reads `a`/`b` out of `el`'s `(args)` -- block content
 /// (`tomet_ast::Value::Blocks`), not a scalar, so it cannot go through
 /// `push_data_attrs`/the generic flatten path at all.
-fn conflict_sides(cx: &RenderCtx, el: &Element) -> (Vec<tomet_ast::Block>, Vec<tomet_ast::Block>) {
+fn conflict_sides(cx: &RenderCtx, el: ElementView<'_>) -> (Vec<tomet_ast::Block>, Vec<tomet_ast::Block>) {
     let args = normalized_element_args_in(el, cx.bindings);
     let map = args.as_ref().and_then(crate::util::as_map);
     let side = |key: &str| -> Vec<tomet_ast::Block> {
@@ -134,7 +134,7 @@ fn conflict_sides(cx: &RenderCtx, el: &Element) -> (Vec<tomet_ast::Block>, Vec<t
     (side("a"), side("b"))
 }
 
-fn render_tag_element(cx: &RenderCtx, el: &Element, out: &mut String, inline: bool) {
+fn render_tag_element(cx: &RenderCtx, el: ElementView<'_>, out: &mut String, inline: bool) {
     let tags = extract_tags(el);
     if tags.is_empty() {
         return;
@@ -170,14 +170,14 @@ fn render_tag_element(cx: &RenderCtx, el: &Element, out: &mut String, inline: bo
 /// [`render_generic_element`] for anything the hook doesn't claim.
 fn render_custom_or_generic_element(
     cx: &RenderCtx,
-    el: &Element,
+    el: ElementView<'_>,
     kind: &str,
     out: &mut String,
     inline: bool,
 ) {
     if let Some(renderer) = &cx.options.custom_element {
         let bindings = cx.bindings;
-        let ctx = CustomElementCtx::new(kind, el.content.as_deref(), inline, || {
+        let ctx = CustomElementCtx::new(kind, el.content, inline, || {
             normalized_element_args_in(el, bindings)
         });
         if let Some(html) = (renderer.0)(ctx) {
@@ -190,11 +190,11 @@ fn render_custom_or_generic_element(
 
 pub(crate) fn render_content_or_fallback(
     cx: &RenderCtx,
-    el: &Element,
+    el: ElementView<'_>,
     fallback: &str,
     out: &mut String,
 ) {
-    match &el.content {
+    match el.content {
         Some(content) if !content.is_empty() => {
             crate::block::render_content_blocks(cx, content, out)
         }
@@ -204,7 +204,7 @@ pub(crate) fn render_content_or_fallback(
 
 fn render_generic_element(
     cx: &RenderCtx,
-    el: &Element,
+    el: ElementView<'_>,
     kind: &str,
     out: &mut String,
     inline: bool,
@@ -212,9 +212,7 @@ fn render_generic_element(
     render_generic(
         cx,
         kind,
-        el.id.as_ref(),
-        &el.data,
-        el.content.as_deref(),
+        el.body(),
         out,
         inline,
     );
@@ -227,9 +225,7 @@ fn render_bare(cx: &RenderCtx, bare: &Bare, out: &mut String) {
     render_generic(
         cx,
         "bare",
-        bare.id.as_ref(),
-        &bare.data,
-        bare.content.as_deref(),
+        bare.as_body_view(),
         out,
         false,
     );
@@ -240,24 +236,22 @@ fn render_bare(cx: &RenderCtx, bare: &Bare, out: &mut String) {
 fn render_generic(
     cx: &RenderCtx,
     kind: &str,
-    id: Option<&Id>,
-    data: &Data,
-    content: Option<&[Block]>,
+    body: BodyView<'_>,
     out: &mut String,
     inline: bool,
 ) {
     let tag = if inline { "span" } else { "div" };
     out.push_str(&format!("<{tag} class=\"tm-element tm-{kind}\""));
-    if let Some(id) = id_attr(id) {
+    if let Some(id) = id_attr(body.id) {
         out.push_str(&format!(" id=\"{}\"", escape_attr(&id)));
     }
-    push_data_attrs(out, data.args.as_ref(), &[]);
-    push_value_data_attrs(out, data);
+    push_data_attrs(out, body.data.args.as_ref(), &[]);
+    push_value_data_attrs(out, body.data);
     out.push('>');
-    if let Some(content) = content {
+    if let Some(content) = body.content {
         crate::block::render_content_blocks(cx, content, out);
     }
-    if let Some(value) = &data.value {
+    if let Some(value) = &body.data.value {
         render_element_value(cx, value, out);
     }
     out.push_str(&format!("</{tag}>"));
@@ -278,7 +272,7 @@ fn render_element_value(cx: &RenderCtx, value: &Group, out: &mut String) {
                 out.push_str("<div class=\"tm-children\">\n");
                 for entry in entries {
                     match entry {
-                        Entry::Element(child) => render_element(cx, child, out, false),
+                        Entry::Element(child) => render_element(cx, child.as_view(), out, false),
                         Entry::Bare(child) => render_bare(cx, child, out),
                         Entry::Pair(..) | Entry::Hole(_) => {}
                     }

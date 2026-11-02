@@ -1,6 +1,6 @@
 ::kind(api)
 
-::meta{crate: tomet-declaration, dependencies: list(cotomet-syntax, tomet-ast, tomet-parser, tomet-tree, tomet-type), dependents: list(cotomet-eval, tomet, tomet-cli, tomet-config, tomet-convert-standalone, tomet-expr, tomet-indexer, tomet-load, tomet-lsp, tomet-pandoc, tomet-semantics, tomet-validator, tomet-validator-core, tomet-validator-profile, tomet-vault, tomet-workspace)}
+::meta{crate: tomet-declaration, dependencies: list(tomet-ast, tomet-ast-parser, tomet-semantics-core, tomet-span, tomet-tree, tomet-type), dependents: list(cotomet-eval, tomet, tomet-cli, tomet-config, tomet-convert-standalone, tomet-expr, tomet-indexer, tomet-load, tomet-lsp, tomet-pandoc, tomet-semantics, tomet-validator, tomet-validator-core, tomet-validator-profile, tomet-vault, tomet-workspace)}
 
 =[tomet-declaration]
 

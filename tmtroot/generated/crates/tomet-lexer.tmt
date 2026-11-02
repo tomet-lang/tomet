@@ -1,43 +1,42 @@
 ::kind(api)
 
-::meta{crate: tomet-lexer, dependencies: list(tomet-ast, tomet-cst), dependents: list(cotomet-eval, cotomet-syntax, tomet-cli, tomet-extract, tomet-lsp, tomet-parser, tomet-validator, tomet-validator-core)}
+::meta{crate: tomet-lexer, dependencies: list(tomet-cst, tomet-span), dependents: list(tomet-ast-parser, tomet-cst-parser, tomet-lowering)}
 
 =[tomet-lexer]
 
 ==[tomet-lexer]
 
-A minimal byte-position cursor ([`Cursor`]) over `&str` source text.
+Byte-position cursor ([`Cursor`]) and lossless tokenizer ([`tokenize`]) for Tomet.
 
 ==[Overview & Design]
 
-- ("Context-Sensitive Scanning") Tomet's grammar is context-sensitive -- `<`, `@`, `(`, `[`, `{` are only
-structural right after specific triggers (an element sigil/name), and plain
-prose text otherwise. Scanning directly with a lightweight cursor is more efficient
-and flexible than pre-tokenizing into a context-free token stream.
+- ("Context-Free Tokenization") The tokenizer is strictly context-free: a token decision never depends on
+anything past the token itself and at most one character of lookbehind. The
+tokenizer never scans ahead across lines, never searches for closing markers
+like `*/`, and never tracks grammatical nesting state.
+- ("Parser Assembly") The tokenizer emits fine-grained token pieces. Where the grammar requires
+larger semantic tokens -- strings in value contexts (`STRING_LITERAL`),
+compound identifiers (`IDENT`), and comments (`COMMENT` assembled from line
+openers `//` or block openers `/*` to `*/` or newline) -- the parser assembles
+them. In running prose, quotes and individual comment pieces outside comment
+contexts remain plain text. Inside strings and code spans, comment pieces are
+accepted as plain text.
 - ("Zero-Copy & Copyable") [`Cursor`] holds only `&'a str` and byte offset `pos: usize`, making it `Copy`
 and strictly zero-copy.
+- ("Lossless Tokenization") [`tokenize`] splits source text into `(SyntaxKind, &str)` tokens preserving 100%
+of input characters and whitespace for CST construction. Concatenating all tokens
+exactly reproduces the original source.
+- ("Lookbehind Invariants") Word-internal apostrophes (`don't`) are emitted as text rather than quote tokens.
+`//` starts a line comment token (`COMMENT_LINE_OPEN`) only after whitespace or
+at the start of source.
 - ("Core Capabilities") Scanning & Consumption: `bump()`, `eat_char()`, `eat_str()`, `eat_while()`, `eat_whitespace()`.
 Lookahead & Peeking: `peek()`, `peek_at()`, `starts_with()`.
 Span Mapping: `span_from()`, `column()`. Spans are byte offsets; lines and columns are not
-computed while scanning -- [`LineIndex`] resolves them from offsets on demand.
+computed while scanning -- resolve them on demand using `tomet-position`.
 
 ==[Structs]
 
 ===[struct Cursor]
-
-===[struct LineCol]
-
-A 1-based line and a 1-based column, the column counted in `char`s.
-
-===[struct LineIndex]
-
-Resolves byte offsets of one source text to lines and columns, and back.
-
-Spans and errors carry byte offsets only; a line and column is a view of
-the text, built here when something has to show one (a diagnostic, an
-editor position). Building the index is one pass over the text, a lookup is
-a binary search plus a count of the characters in that one line, and
-nothing about it is paid while parsing.
 
 ==[Functions]
 

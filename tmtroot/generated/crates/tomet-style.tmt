@@ -1,6 +1,6 @@
 ::kind(api)
 
-::meta{crate: tomet-style, dependencies: list(cotomet-syntax, tomet-ast, tomet-config, tomet-field-utils, tomet-semantics, tomet-tree, tomet-type), dependents: list(tomet-printer, tomet-transform)}
+::meta{crate: tomet-style, dependencies: list(tomet-ast, tomet-config, tomet-field-utils, tomet-semantics, tomet-tree, tomet-type), dependents: list(tomet-edit, tomet-printer, tomet-transform)}
 
 =[tomet-style]
 
@@ -31,6 +31,31 @@ is genuinely part of rebuilding a whole document from its AST.
 
 Formats a string scalar for Tomet source text, wrapping in `"` and escaping
 inner quotes and special characters only when necessary.
+
+===[fn is_ident_char]
+
+Characters legal inside a bare map key.
+
+===[fn write_quoted]
+
+Writes `s` as a `"..."` string, with `\"`, `\\`, `\n`, `\r`, `\t` escapes.
+
+===[fn quoted_text]
+
+`s` as a `"..."` string whatever it holds.
+
+===[fn write_key]
+
+Writes a map key: bare when it is a non-empty run of [`is_ident_char`],
+quoted (`"tmtroot/a/b.tmt"`) otherwise.
+
+===[fn key_text]
+
+[`write_key`] as an owned string.
+
+===[fn write_scalar_string]
+
+Appends a safely quoted/escaped string scalar to `out`.
 
 ===[fn render_nested]
 

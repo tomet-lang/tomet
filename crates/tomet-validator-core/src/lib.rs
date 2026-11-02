@@ -9,7 +9,7 @@ pub mod id;
 pub use diagnostic::{CstValidationError, Diagnostic, Severity};
 pub use id::{collect_ids, collect_ids_cst};
 
-use tomet_ast::{Block, Document, Inline};
+use tomet_ast::{Block, Document, ElementView, Inline};
 use tomet_span::Span;
 use tomet_cst::{SyntaxNode, TextRange};
 use tomet_semantics::DeclKind;
@@ -21,14 +21,14 @@ use tomet_tree::{Node, Place, Visit};
 /// an element, or a declaration.
 #[derive(Clone, Copy)]
 enum Written<'a> {
-    Element(&'a tomet_ast::Element),
+    Element(ElementView<'a>),
     Declaration(&'a tomet_ast::Declaration),
 }
 
 impl Written<'_> {
     fn name(&self) -> Option<&tomet_ast::Name> {
         match self {
-            Written::Element(el) => Some(&el.name),
+            Written::Element(el) => Some(el.name),
             Written::Declaration(d) => Some(&d.name),
         }
     }
@@ -50,21 +50,21 @@ impl Written<'_> {
 /// notation (`-@name(...)`) too: an item with a name is an element in a list,
 /// and is held to everything an element is. A plain `- content` has no name
 /// and is not passed.
-fn for_each_element_and_item(doc: &Document, mut f: impl FnMut(&tomet_ast::Element)) {
-    tomet_tree::for_each_element(doc, &mut f);
+fn for_each_element_and_item(doc: &Document, mut f: impl FnMut(ElementView<'_>)) {
+    tomet_tree::for_each_element(doc, |el| f(el.as_view()));
     tomet_tree::for_each_list_item(doc, |item| {
-        if let Some(element) = item.named_element() {
-            f(&element);
+        if let Some(view) = item.as_element_view() {
+            f(view);
         }
     });
 }
 
 /// Classifies `el` against `std` and the namespaces in scope.
 pub fn classify_in(
-    el: &tomet_ast::Element,
+    el: ElementView<'_>,
     bindings: &Bindings,
 ) -> Result<tomet_semantics::ElementKind, tomet_semantics::UnknownName> {
-    tomet_semantics::refuse_declaration_as_element(&el.name, bindings.classify(&el.name)?)
+    tomet_semantics::refuse_declaration_as_element(el.name, bindings.classify(el.name)?)
 }
 
 /// What a `:rule(allow: list(...))` calls a plain `- item`, which has no name
@@ -79,9 +79,9 @@ pub fn child_kind_name(
     bindings: &Bindings,
 ) -> Result<String, tomet_semantics::UnknownName> {
     let kind = match child {
-        tomet_tree::Child::Element(el) => classify_in(el, bindings)?,
-        tomet_tree::Child::Item(item) => match item.named_element() {
-            Some(element) => classify_in(&element, bindings)?,
+        tomet_tree::Child::Element(el) => classify_in(el.as_view(), bindings)?,
+        tomet_tree::Child::Item(item) => match item.as_element_view() {
+            Some(view) => classify_in(view, bindings)?,
             None => return Ok(PLAIN_ITEM_KIND_NAME.to_string()),
         },
     };
@@ -269,10 +269,10 @@ pub fn check_singletons_and_regions(
     for block in &doc.blocks {
         match block {
             Block::Element(el) => {
-                let still_preamble = constraints(Written::Element(el))
+                let still_preamble = constraints(Written::Element(el.as_view()))
                     .map(|held| held.region == Region::Preamble)
                     .unwrap_or(false);
-                visit(Written::Element(el), in_preamble);
+                visit(Written::Element(el.as_view()), in_preamble);
                 if !still_preamble {
                     in_preamble = false;
                 }
@@ -290,10 +290,10 @@ pub fn check_singletons_and_regions(
                 for inline in &p.content {
                     match inline {
                         Inline::Element(el) => {
-                            let still_preamble = constraints(Written::Element(el))
+                            let still_preamble = constraints(Written::Element(el.as_view()))
                                 .map(|held| held.region == Region::Preamble)
                                 .unwrap_or(false);
-                            visit(Written::Element(el), in_preamble);
+                            visit(Written::Element(el.as_view()), in_preamble);
                             if !still_preamble {
                                 in_preamble = false;
                             }
@@ -342,7 +342,7 @@ fn visit_all(node: Node<'_>, place: Place, visit: &mut impl FnMut(Written<'_>, b
             Node::Item(item) => visit_child(tomet_tree::Child::Item(item), visit),
             other => {
                 if let Some(el) = other.element() {
-                    visit(Written::Element(el), false);
+                    visit(Written::Element(el.as_view()), false);
                 }
             }
         }
@@ -354,10 +354,10 @@ fn visit_all(node: Node<'_>, place: Place, visit: &mut impl FnMut(Written<'_>, b
 /// is when it has a name, and nothing when it has none.
 fn visit_child(child: tomet_tree::Child<'_>, visit: &mut impl FnMut(Written<'_>, bool)) {
     match child {
-        tomet_tree::Child::Element(el) => visit(Written::Element(el), false),
+        tomet_tree::Child::Element(el) => visit(Written::Element(el.as_view()), false),
         tomet_tree::Child::Item(item) => {
-            if let Some(element) = item.named_element() {
-                visit(Written::Element(&element), false);
+            if let Some(view) = item.as_element_view() {
+                visit(Written::Element(view), false);
             }
         }
     }
@@ -387,8 +387,8 @@ pub fn check_unfinished(doc: &Document, errors: &mut Vec<Diagnostic>) {
     });
 }
 
-fn note_text(el: &tomet_ast::Element) -> String {
-    let Some(blocks) = el.content.as_ref() else {
+fn note_text(el: ElementView<'_>) -> String {
+    let Some(blocks) = el.content else {
         return String::new();
     };
     let mut out = String::new();
@@ -408,7 +408,7 @@ fn note_text(el: &tomet_ast::Element) -> String {
 pub fn check_arguments(doc: &Document, bindings: &Bindings, errors: &mut Vec<Diagnostic>) {
     for_each_element_and_item(doc, |el| {
         check_arguments_of(
-            &el.name,
+            el.name,
             tomet_semantics::normalized_element_args_in(el, bindings),
             el.span,
             bindings,
@@ -613,7 +613,7 @@ pub fn check_ctmt_declarations(declarations: &[Declared], errors: &mut Vec<Diagn
 
 pub fn check_content_shape(doc: &Document, bindings: &Bindings, errors: &mut Vec<Diagnostic>) {
     for_each_element_and_item(doc, |el| {
-        let Some(content) = &el.content else { return };
+        let Some(content) = el.content else { return };
         let Ok(kind) = classify_in(el, bindings) else {
             return;
         };
@@ -621,7 +621,7 @@ pub fn check_content_shape(doc: &Document, bindings: &Bindings, errors: &mut Vec
 
         let allow = match &kind {
             tomet_semantics::ElementKind::Custom(_) => bindings
-                .declaration(&el.name)
+                .declaration(el.name)
                 .and_then(|decl| decl.content_allow.clone()),
             _ => match tomet_semantics::builtin_content_shape(&kind) {
                 Some(tomet_semantics::ContentShape::Inline) => {
@@ -634,7 +634,7 @@ pub fn check_content_shape(doc: &Document, bindings: &Bindings, errors: &mut Vec
         match allow {
             None | Some(tomet_semantics::ContentAllow::Any) => {}
             Some(tomet_semantics::ContentAllow::Inline) => {
-                if !matches!(content.as_slice(), [] | [Block::Paragraph(_)]) {
+                if !matches!(content, [] | [Block::Paragraph(_)]) {
                     errors.push(Diagnostic::ContentNotInline {
                         name,
                         span: el.span,
@@ -672,12 +672,12 @@ pub fn check_content_shape(doc: &Document, bindings: &Bindings, errors: &mut Vec
 fn for_each_direct_content_item<'a>(content: &'a [Block], mut f: impl FnMut(Written<'a>)) {
     for block in content {
         match block {
-            Block::Element(el) => f(Written::Element(el)),
+            Block::Element(el) => f(Written::Element(el.as_view())),
             Block::Declaration(d) => f(Written::Declaration(d)),
             Block::Paragraph(p) => {
                 for inline in &p.content {
                     if let Inline::Element(el) = inline {
-                        f(Written::Element(el));
+                        f(Written::Element(el.as_view()));
                     }
                 }
             }

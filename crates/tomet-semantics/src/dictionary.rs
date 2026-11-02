@@ -215,7 +215,7 @@ impl LoadedDictionaries {
                     self.errors.push(problem("is not an @term"));
                     continue;
                 };
-                if classify_std_lenient(el) != ElementKind::Term {
+                if classify_std_lenient(el.as_view()) != ElementKind::Term {
                     self.errors.push(problem("is not an @term"));
                     continue;
                 }

@@ -393,7 +393,7 @@ pub fn extract_metadata(src: &str) -> BTreeMap<String, String> {
     let mut map = BTreeMap::new();
     if let Ok(doc) = parse_document(src) {
         tomet_tree::for_each_element(&doc, |el| {
-            let kind = classify_std_lenient(el);
+            let kind = classify_std_lenient(el.as_view());
             if kind.as_str() == "meta" {
                 collect_meta(&el.data, &mut map);
             }

@@ -416,17 +416,17 @@ fn combine_notation_has_no_naming_constraint() {
     let Block::List(list) = &combine_doc.blocks[0] else {
         panic!("expected list");
     };
-    let combine_el = list.items[0].named_element().expect("a named item");
+    let combine_el = list.items[0].as_element_view().expect("a named item");
 
     let standalone_doc = parse_document("@task()\n").unwrap();
     let Block::Element(standalone_el) = &standalone_doc.blocks[0] else {
         panic!("expected element");
     };
 
-    assert_eq!(combine_el.name, standalone_el.name);
+    assert_eq!(combine_el.name, &standalone_el.name);
     assert_eq!(
-        classify_std_lenient(&combine_el),
-        classify_std_lenient(standalone_el)
+        classify_std_lenient(combine_el),
+        classify_std_lenient(standalone_el.as_view())
     );
 }
 

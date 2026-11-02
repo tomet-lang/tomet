@@ -99,7 +99,7 @@ pub(crate) fn reference_at(doc: &Document, offset: usize) -> Option<Reference> {
 ///   another), and `tmt("p")`, `ref("n")` (the document itself). Where the
 ///   cursor is on more than one, the narrowest; where it is on none, the first.
 fn reference_in(el: &Element) -> Option<Reference> {
-    if let Some((_, target)) = tomet_semantics::link_target_of(el) {
+    if let Some((_, target)) = tomet_semantics::link_target_of(el.as_view()) {
         let (scheme, rest) = tomet_semantics::target_scheme(&target);
         match scheme {
             TargetScheme::Internal => return Some(Reference::Id(rest.to_string())),

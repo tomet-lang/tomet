@@ -1,6 +1,6 @@
 ::kind(api)
 
-::meta{crate: tomet-validator-profile, dependencies: list(tomet-ast, tomet-declaration, tomet-expr, tomet-parser, tomet-semantics, tomet-tree, tomet-validator-core), dependents: list(tomet-convert-standalone, tomet-validator)}
+::meta{crate: tomet-validator-profile, dependencies: list(tomet-ast, tomet-ast-parser, tomet-declaration, tomet-expr, tomet-semantics, tomet-span, tomet-tree, tomet-validator-core), dependents: list(tomet-convert-standalone, tomet-validator)}
 
 =[tomet-validator-profile]
 

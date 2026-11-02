@@ -244,7 +244,7 @@ fn heading_nested_inside_a_block_quote_splices_its_title_text_in() {
             assert!(
                 !content
                     .iter()
-                    .any(|i| matches!(i, Inline::Element(inner) if classify_std_lenient(inner) == ElementKind::Heading)),
+                    .any(|i| matches!(i, Inline::Element(inner) if classify_std_lenient(inner.as_view()) == ElementKind::Heading)),
                 "heading should have been spliced as text, not nested as an element: {content:?}"
             );
             assert!(

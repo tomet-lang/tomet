@@ -173,7 +173,7 @@ fn file_target(el: &Element) -> Option<String> {
     if !el.name.is_bare_named("file") {
         return None;
     }
-    let args = tomet_semantics::normalized_element_args(el)?;
+    let args = tomet_semantics::normalized_element_args(el.as_view())?;
     args.get("target")
         .and_then(|target| target.as_str())
         .map(str::to_string)

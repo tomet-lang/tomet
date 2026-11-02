@@ -1,4 +1,4 @@
-use tomet_ast::{Element, Name, Placement};
+use tomet_ast::{ElementView, Name, Placement};
 use tomet_declaration::DeclKind;
 
 /// What a parsed `Element` officially means, replacing the ad-hoc
@@ -404,10 +404,10 @@ impl std::error::Error for UnknownName {}
 /// No inference from `args` happens here -- `@(url:...)`-style key-based
 /// guessing was retired; the only way to get `ElementKind::Link` is to
 /// write `@link` explicitly.
-pub fn classify_std(el: &Element) -> Result<ElementKind, UnknownName> {
+pub fn classify_std(el: ElementView<'_>) -> Result<ElementKind, UnknownName> {
     // A name that is a declaration's is refused when written `@name`:
     // see [`refuse_declaration_as_element`].
-    refuse_declaration_as_element(&el.name, classify_std_name(&el.name)?)
+    refuse_declaration_as_element(el.name, classify_std_name(el.name)?)
 }
 
 /// [`classify_std`], falling back to `Custom` for an unknown bare name.
@@ -418,7 +418,7 @@ pub fn classify_std(el: &Element) -> Result<ElementKind, UnknownName> {
 /// For consumers that render whatever they are given and have no way to
 /// report a diagnostic -- an HTML writer mid-document, say. Validation
 /// belongs to [`classify_std`]; this is the lenient read of the same thing.
-pub fn classify_std_lenient(el: &Element) -> ElementKind {
+pub fn classify_std_lenient(el: ElementView<'_>) -> ElementKind {
     classify_std(el).unwrap_or_else(|e| ElementKind::Custom(e.name))
 }
 
@@ -606,7 +606,7 @@ pub fn builtin_region(kind: &ElementKind) -> crate::vocabulary::Region {
 /// exactly as wrong as always.
 ///
 /// Returns `Some((found, expected))` when they disagree.
-pub fn shape_mismatch(el: &Element) -> Option<(Shape, Shape)> {
+pub fn shape_mismatch(el: ElementView<'_>) -> Option<(Shape, Shape)> {
     let found = Shape::from(el.placement);
     let kind = classify_std(el).ok()?;
     let expected = required_shape(&kind)?;
@@ -637,7 +637,7 @@ mod tests {
         // the diagnostic that replaces the old silent `Custom` fallback.
         let el = element_new(Name::bare("caution"));
         assert_eq!(
-            classify_std(&el),
+            classify_std(el.as_view()),
             Err(UnknownName {
                 name: "caution".to_string(),
                 unbound_namespace: None,
@@ -669,7 +669,7 @@ mod tests {
                 classify_declaration(&declaration_new(name)).is_ok(),
                 "::{name}"
             );
-            let err = classify_std(&element_new(Name::bare(name))).unwrap_err();
+            let err = classify_std(element_new(Name::bare(name)).as_view()).unwrap_err();
             assert!(err.declaration, "@{name}");
             assert!(
                 err.to_string().contains(&format!("write `::{name}`")),
@@ -677,19 +677,19 @@ mod tests {
             );
             // and it is not read as the declaration, however leniently
             assert_eq!(
-                classify_std_lenient(&element_new(Name::bare(name))),
+                classify_std_lenient(element_new(Name::bare(name)).as_view()),
                 ElementKind::Custom(name.to_string())
             );
         }
         // content keeps its sigil
-        assert!(classify_std(&element_new(Name::bare("callout"))).is_ok());
+        assert!(classify_std(element_new(Name::bare("callout")).as_view()).is_ok());
     }
 
     #[test]
     fn namespaced_name_is_custom() {
         let el = element_new(Name::namespaced("deck", "caution"));
         assert_eq!(
-            classify_std(&el),
+            classify_std(el.as_view()),
             Ok(ElementKind::Custom("deck.caution".to_string()))
         );
     }
@@ -699,7 +699,7 @@ mod tests {
         // `deck.meta` is the user's element, not Tomet's `#meta`.
         let el = element_new(Name::namespaced("deck", "meta"));
         assert_eq!(
-            classify_std(&el),
+            classify_std(el.as_view()),
             Ok(ElementKind::Custom("deck.meta".to_string()))
         );
     }
@@ -708,7 +708,7 @@ mod tests {
     fn classify_std_lenient_falls_back_for_an_unknown_bare_name() {
         let el = element_new(Name::bare("caution"));
         assert_eq!(
-            classify_std_lenient(&el),
+            classify_std_lenient(el.as_view()),
             ElementKind::Custom("caution".to_string())
         );
     }
@@ -716,7 +716,7 @@ mod tests {
     #[test]
     fn type_sigil_with_builtin_name_is_recognized() {
         let el = element_new(Name::bare("raw"));
-        assert_eq!(classify_std_lenient(&el), ElementKind::Raw);
+        assert_eq!(classify_std_lenient(el.as_view()), ElementKind::Raw);
     }
 
     #[test]
@@ -735,13 +735,13 @@ mod tests {
             "target".to_string(),
             Value::String("https://example.com".to_string()),
         )]));
-        assert_eq!(classify_std_lenient(&el), ElementKind::Link);
+        assert_eq!(classify_std_lenient(el.as_view()), ElementKind::Link);
     }
 
     #[test]
     fn named_at_sigil_with_conflict_name_is_recognized() {
         let el = element_new(Name::bare("conflict"));
-        assert_eq!(classify_std_lenient(&el), ElementKind::Conflict);
+        assert_eq!(classify_std_lenient(el.as_view()), ElementKind::Conflict);
         // Either shape, and no `[content]`/`|content` concept of its own
         // -- `a`/`b` live in `(args)` instead.
         assert_eq!(required_shape(&ElementKind::Conflict), None);
@@ -751,7 +751,7 @@ mod tests {
     #[test]
     fn named_at_sigil_with_task_name_is_recognized() {
         let el = element_new(Name::bare("task"));
-        assert_eq!(classify_std_lenient(&el), ElementKind::Task);
+        assert_eq!(classify_std_lenient(el.as_view()), ElementKind::Task);
         assert_eq!(required_shape(&ElementKind::Task), None);
         assert_eq!(
             builtin_content_shape(&ElementKind::Task),
@@ -766,28 +766,28 @@ mod tests {
             "rt".to_string(),
             Value::String("かんじ".to_string()),
         )]));
-        assert_eq!(classify_std_lenient(&el), ElementKind::Ruby);
+        assert_eq!(classify_std_lenient(el.as_view()), ElementKind::Ruby);
         assert_eq!(required_shape(&ElementKind::Ruby), Some(Shape::Inline));
     }
 
     #[test]
     fn shape_mismatch_reports_a_block_element_put_in_running_text() {
         let el = element_new(Name::bare("hr")).with_placement(Placement::Inline);
-        assert_eq!(shape_mismatch(&el), Some((Shape::Inline, Shape::Block)));
+        assert_eq!(shape_mismatch(el.as_view()), Some((Shape::Inline, Shape::Block)));
     }
 
     #[test]
     fn shape_mismatch_reports_an_inline_element_standing_as_a_block() {
         let el = element_new(Name::bare("em")).with_placement(Placement::Block);
-        assert_eq!(shape_mismatch(&el), Some((Shape::Block, Shape::Inline)));
+        assert_eq!(shape_mismatch(el.as_view()), Some((Shape::Block, Shape::Inline)));
     }
 
     #[test]
     fn a_correctly_placed_element_has_no_mismatch() {
         let hr = element_new(Name::bare("hr")).with_placement(Placement::Block);
         let em = element_new(Name::bare("em")).with_placement(Placement::Inline);
-        assert_eq!(shape_mismatch(&hr), None);
-        assert_eq!(shape_mismatch(&em), None);
+        assert_eq!(shape_mismatch(hr.as_view()), None);
+        assert_eq!(shape_mismatch(em.as_view()), None);
     }
 
     #[test]
@@ -795,7 +795,7 @@ mod tests {
         let name = Name::namespaced("deck", "card");
         let block = element_new(name.clone()).with_placement(Placement::Block);
         let inline = element_new(name).with_placement(Placement::Inline);
-        assert_eq!(shape_mismatch(&block), None);
-        assert_eq!(shape_mismatch(&inline), None);
+        assert_eq!(shape_mismatch(block.as_view()), None);
+        assert_eq!(shape_mismatch(inline.as_view()), None);
     }
 }

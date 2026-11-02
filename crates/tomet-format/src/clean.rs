@@ -1,7 +1,7 @@
 //! Whitespace-hygiene formatting preserving verbatim raw spans (fenced code
 //! blocks, and any `(content:raw)` element).
 
-use tomet_ast::{Block, Document, Element, Value};
+use tomet_ast::{Block, Document, ElementView, Value};
 use tomet_ast_parser::parse_document;
 use tomet_tree::{Node, Place, Visit, walk};
 
@@ -67,11 +67,11 @@ pub fn clean_whitespace(normalized: &str) -> String {
     out
 }
 
-pub(crate) fn is_raw_element(el: &Element) -> bool {
+pub(crate) fn is_raw_element(el: ElementView<'_>) -> bool {
     if el.name.is_bare_named("raw") {
         return true;
     }
-    if let Some(Value::Map(entries)) = &el.data.args
+    if let Some(Value::Map(entries)) = el.data.args.as_ref()
         && entries
             .iter()
             .any(|(k, v)| k == "content" && matches!(v, Value::String(s) if s == "raw"))
@@ -105,15 +105,15 @@ pub(crate) fn collect_raw_spans(doc: &Document, out: &mut Vec<(usize, usize)>) {
         match node {
             // An item in the combine notation is the element it names.
             Node::Item(item) => {
-                if let Some(el) = item.named_element()
-                    && is_raw_element(&el)
+                if let Some(el) = item.as_element_view()
+                    && is_raw_element(el)
                 {
-                    push_spans(el.content.as_deref(), out);
+                    push_spans(el.content, out);
                 }
             }
             other => {
                 if let Some(el) = other.element()
-                    && is_raw_element(el)
+                    && is_raw_element(el.as_view())
                 {
                     push_spans(el.content.as_deref(), out);
                 }

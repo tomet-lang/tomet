@@ -20,7 +20,7 @@ pub enum StructuralAction {
 pub fn apply_structural_action(doc: &mut Document, action: &StructuralAction) -> usize {
     let mut count = 0;
     for_each_element_mut(doc, |el| {
-        let kind = classify_std_lenient(el);
+        let kind = classify_std_lenient(el.as_view());
         count += apply_to(action, kind.as_str(), Some(&mut el.name), &mut el.data);
     });
     for_each_top_level_declaration_mut(doc, |declaration| {

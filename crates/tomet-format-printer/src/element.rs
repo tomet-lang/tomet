@@ -1,8 +1,8 @@
 //! Rendering elements, values, args, and connects.
 
 use tomet_ast::{
-    Bare, Block, Connect, Data, Declaration, Element, Entry, Group, Hole, Interpolation, Placement,
-    Value,
+    Bare, Block, Connect, Data, Declaration, ElementView, Entry, Group, Hole, Interpolation,
+    Placement, Value,
 };
 use tomet_config::{GroupOrder, PrinterConfig};
 use tomet_style::render_nested;
@@ -12,21 +12,21 @@ use crate::inline::render_content_blocks;
 
 /// Render an [`Element`] AST node into Tomet syntax:
 /// `<sigil><name>(args)[content]{value}`.
-pub fn render_element(el: &Element, config: &PrinterConfig) -> String {
+pub fn render_element(el: ElementView<'_>, config: &PrinterConfig) -> String {
     {
         if el.name.is_bare_named("hr") && el.data.args.is_none() && el.data.value.is_none() {
-            if let Some(content) = &el.content {
+            if let Some(content) = el.content {
                 return format!(
                     "---[{}]---{}{}",
                     render_content_blocks(content, config),
-                    render_id(el.id.as_ref()),
-                    render_connects(&el.connects, config)
+                    render_id(el.id),
+                    render_connects(el.connects, config)
                 );
             } else {
                 return format!(
                     "---{}{}",
-                    render_id(el.id.as_ref()),
-                    render_connects(&el.connects, config)
+                    render_id(el.id),
+                    render_connects(el.connects, config)
                 );
             }
         }
@@ -40,7 +40,6 @@ pub fn render_element(el: &Element, config: &PrinterConfig) -> String {
         {
             let from_content = el
                 .content
-                .as_ref()
                 .map(|content| render_content_blocks(content, config));
             let body = from_content.unwrap_or_default();
             let longest = body
@@ -78,7 +77,6 @@ pub fn render_element(el: &Element, config: &PrinterConfig) -> String {
                 .unwrap_or_default();
             let body = el
                 .content
-                .as_ref()
                 .map(|content| render_content_blocks(content, config))
                 .unwrap_or_default();
             let longest = body
@@ -95,8 +93,8 @@ pub fn render_element(el: &Element, config: &PrinterConfig) -> String {
                 out.push('\n');
             }
             out.push_str(&fence);
-            out.push_str(&render_id(el.id.as_ref()));
-            out.push_str(&render_connects(&el.connects, config));
+            out.push_str(&render_id(el.id));
+            out.push_str(&render_connects(el.connects, config));
             return out;
         }
     }
@@ -111,7 +109,7 @@ pub fn render_element(el: &Element, config: &PrinterConfig) -> String {
                 out.push_str(&render_args(args, config));
                 out.push(')');
             }
-            if let Some(content) = &el.content {
+            if let Some(content) = el.content {
                 let inlines_text = render_content_blocks(content, config);
                 out.push_str("[\n");
                 for line in inlines_text.lines() {
@@ -124,8 +122,8 @@ pub fn render_element(el: &Element, config: &PrinterConfig) -> String {
             if let Some(value) = &el.data.value {
                 out.push_str(&render_element_value(value, config));
             }
-            out.push_str(&render_id(el.id.as_ref()));
-            out.push_str(&render_connects(&el.connects, config));
+            out.push_str(&render_id(el.id));
+            out.push_str(&render_connects(el.connects, config));
             return out;
         } else if style == "block" {
             let mut out = String::from("@callout");
@@ -134,7 +132,7 @@ pub fn render_element(el: &Element, config: &PrinterConfig) -> String {
                 out.push_str(&render_args(args, config));
                 out.push(')');
             }
-            if let Some(content) = &el.content {
+            if let Some(content) = el.content {
                 let inlines_text = render_content_blocks(content, config);
                 let lines: Vec<&str> = inlines_text.lines().collect();
                 out.push('\n');
@@ -162,8 +160,8 @@ pub fn render_element(el: &Element, config: &PrinterConfig) -> String {
             if let Some(value) = &el.data.value {
                 out.push_str(&render_element_value(value, config));
             }
-            out.push_str(&render_id(el.id.as_ref()));
-            out.push_str(&render_connects(&el.connects, config));
+            out.push_str(&render_id(el.id));
+            out.push_str(&render_connects(el.connects, config));
             return out;
         } else if style == "box" {
             let mut out = String::from("@callout");
@@ -172,7 +170,7 @@ pub fn render_element(el: &Element, config: &PrinterConfig) -> String {
                 out.push_str(&render_args(args, config));
                 out.push(')');
             }
-            if let Some(content) = &el.content {
+            if let Some(content) = el.content {
                 let inlines_text = render_content_blocks(content, config);
                 let lines: Vec<&str> = inlines_text.lines().collect();
                 out.push('\n');
@@ -203,8 +201,8 @@ pub fn render_element(el: &Element, config: &PrinterConfig) -> String {
             if let Some(value) = &el.data.value {
                 out.push_str(&render_element_value(value, config));
             }
-            out.push_str(&render_id(el.id.as_ref()));
-            out.push_str(&render_connects(&el.connects, config));
+            out.push_str(&render_id(el.id));
+            out.push_str(&render_connects(el.connects, config));
             return out;
         }
     }
@@ -216,12 +214,12 @@ pub fn render_element(el: &Element, config: &PrinterConfig) -> String {
     let name = el.name.name.as_str();
     out.push_str(&render_groups(
         name,
-        &el.data,
-        el.content.as_deref(),
+        el.data,
+        el.content,
         config,
     ));
-    out.push_str(&render_id(el.id.as_ref()));
-    out.push_str(&render_connects(&el.connects, config));
+    out.push_str(&render_id(el.id));
+    out.push_str(&render_connects(el.connects, config));
     out
 }
 
@@ -359,7 +357,7 @@ pub(crate) fn render_group_entries(entries: &[Entry], config: &PrinterConfig) ->
                 tomet_style::key_text(k),
                 render_nested(v, config)
             ),
-            Entry::Element(child) => render_element(child, config),
+            Entry::Element(child) => render_element(child.as_view(), config),
             Entry::Hole(hole) => render_hole(hole, config),
             Entry::Bare(bare) => render_bare(bare, config),
         })

@@ -44,7 +44,8 @@ pub struct DocumentLink {
 pub fn collect_links(doc: &Document) -> Vec<DocumentLink> {
     let mut links = Vec::new();
     for_each_element(doc, |el| {
-        if let Some((kind, target)) = link_target_of(el).or_else(|| path_target_of(el))
+        let view = el.as_view();
+        if let Some((kind, target)) = link_target_of(view).or_else(|| path_target_of(view))
             && let Some((kind, target)) = from_element_kind_and_target(&kind, &target)
         {
             links.push(DocumentLink {

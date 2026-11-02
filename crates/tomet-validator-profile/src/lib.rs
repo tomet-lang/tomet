@@ -22,7 +22,7 @@
 //! - A vocabulary the document holds itself. No reader for one exists yet, so any element that is
 //!   not built in counts as taken from outside.
 
-use tomet_ast::{Document, Element};
+use tomet_ast::{Document, ElementView};
 use tomet_span::Span;
 use tomet_declaration::{Profile, document_profiles};
 use tomet_expr::{OwnNames, Reach, reaches_outside};
@@ -132,7 +132,7 @@ fn term_findings(doc: &Document, findings: &mut Vec<Finding>) {
     if own.is_some() {
         dictionaries.add("", doc);
     }
-    let mut mention = |el: &Element| {
+    let mut mention = |el: ElementView<'_>| {
         if tomet_semantics::classify_std_lenient(el) != ElementKind::Term {
             return;
         }
@@ -154,11 +154,11 @@ fn term_findings(doc: &Document, findings: &mut Vec<Finding>) {
             });
         }
     };
-    tomet_tree::for_each_element(doc, &mut mention);
+    tomet_tree::for_each_element(doc, |el| mention(el.as_view()));
     // A list item written `-@term(...)` is a `ListItem` with a name, not an `Element`.
     tomet_tree::for_each_list_item(doc, |item| {
-        if let Some(el) = item.named_element() {
-            mention(&el);
+        if let Some(el) = item.as_element_view() {
+            mention(el);
         }
     });
 }

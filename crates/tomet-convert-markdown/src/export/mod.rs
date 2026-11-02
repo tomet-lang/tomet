@@ -15,7 +15,9 @@ mod tests;
 
 use escape::{escape_attr, escape_text, fence_for};
 
-use tomet_ast::{Block, Document, Element, Inline, Interpolation, List, Placement, Section, Value};
+use tomet_ast::{
+    Block, Document, ElementView, Inline, Interpolation, List, Placement, Section, Value,
+};
 use tomet_semantics::{
     FootnoteRegistry, TargetScheme, classify_std_lenient, extract_tags, heading_level,
     is_attribute_key, is_directive, link_target, normalized_element_args, path_target,
@@ -63,7 +65,7 @@ fn render_block(cx: &MarkdownCtx, block: &Block, out: &mut String) {
             }
         }
         Block::Element(el) => {
-            let text = element_to_md(cx, el, false);
+            let text = element_to_md(cx, el.as_view(), false);
             if !text.is_empty() {
                 out.push_str(&text);
                 out.push_str("\n\n");
@@ -115,12 +117,12 @@ fn render_list_with_indent(cx: &MarkdownCtx, list: &List, indent: usize, out: &m
             "- ".to_string()
         };
         out.push_str(&marker);
-        if let Some(element) = item.named_element() {
+        if let Some(element) = item.as_element_view() {
             // The combine notation (`-@name(...)`): no CommonMark list
             // item has an equivalent, so this falls back the same way
             // `element_to_md` already does for any other construct with
             // no CommonMark form (see the module doc).
-            out.push_str(&element_to_md(cx, &element, false));
+            out.push_str(&element_to_md(cx, element, false));
         } else {
             // `args` (the `(...)` marker `Value`) has no CommonMark
             // equivalent -- dropped on export, same as this crate's
@@ -171,7 +173,7 @@ fn inline_to_md(cx: &MarkdownCtx, inlines: &[Inline]) -> String {
             // stripped by editors/tools -- the same reason that spelling
             // was rejected for tomet's own source syntax.
             Inline::LineBreak(_) => out.push_str("\\\n"),
-            Inline::Element(el) => out.push_str(&element_to_md(cx, el, true)),
+            Inline::Element(el) => out.push_str(&element_to_md(cx, el.as_view(), true)),
             Inline::Interp(interp) => out.push_str(&render_interp(interp)),
             Inline::Hole(hole) => out.push_str(&escape_text(&tomet_printer::hole_to_tm(hole))),
         }
@@ -179,7 +181,7 @@ fn inline_to_md(cx: &MarkdownCtx, inlines: &[Inline]) -> String {
     out
 }
 
-fn element_to_md(cx: &MarkdownCtx, el: &Element, inline: bool) -> String {
+fn element_to_md(cx: &MarkdownCtx, el: ElementView<'_>, inline: bool) -> String {
     let kind = classify_std_lenient(el);
     match kind.as_str() {
         // Directives configure or annotate the document and have no
@@ -224,8 +226,8 @@ fn element_to_md(cx: &MarkdownCtx, el: &Element, inline: bool) -> String {
     }
 }
 
-fn render_table(cx: &MarkdownCtx, el: &Element) -> String {
-    let inlines = match &el.content {
+fn render_table(cx: &MarkdownCtx, el: ElementView<'_>) -> String {
+    let inlines = match el.content {
         Some(content) => content,
         None => return String::new(),
     };
@@ -294,7 +296,7 @@ fn render_interp(interp: &Interpolation) -> String {
 
 /// `@ruby[漢字](rt:"かんじ")` -- no CommonMark ruby syntax exists, so this
 /// falls back to raw inline `<ruby>`/`<rt>` HTML, same as `mark` above.
-fn render_ruby(cx: &MarkdownCtx, el: &Element) -> String {
+fn render_ruby(cx: &MarkdownCtx, el: ElementView<'_>) -> String {
     let args = normalized_element_args(el);
     let rt = args
         .as_ref()
@@ -308,9 +310,8 @@ fn render_ruby(cx: &MarkdownCtx, el: &Element) -> String {
     format!("<ruby>{}<rt>{rt}</rt></ruby>", content_to_md(cx, el))
 }
 
-fn content_to_md(cx: &MarkdownCtx, el: &Element) -> String {
+fn content_to_md(cx: &MarkdownCtx, el: ElementView<'_>) -> String {
     el.content
-        .as_ref()
         .map(|a| blocks_to_md(cx, a))
         .unwrap_or_default()
 }
@@ -321,14 +322,14 @@ fn content_to_md(cx: &MarkdownCtx, el: &Element) -> String {
 /// `id`/`cssclass` attrs (`el.value`) have no CommonMark form and are
 /// dropped, same as before this was folded into the generic `Element`
 /// dispatch (see the module doc).
-fn render_heading(cx: &MarkdownCtx, el: &Element) -> String {
+fn render_heading(cx: &MarkdownCtx, el: ElementView<'_>) -> String {
     let level = heading_level(el).unwrap_or(1) as usize;
-    let content = el.content.as_deref().unwrap_or(&[]);
+    let content = el.content.unwrap_or(&[]);
     format!("{} {}", "#".repeat(level), blocks_to_md(cx, content))
 }
 
-fn render_hr(cx: &MarkdownCtx, el: &Element) -> String {
-    match &el.content {
+fn render_hr(cx: &MarkdownCtx, el: ElementView<'_>) -> String {
+    match el.content {
         // The blank line is load-bearing. `Title` immediately above `---`
         // is a setext heading in CommonMark, so without it a labelled
         // divider silently exports as an `<h2>` -- the one shape this is
@@ -343,11 +344,10 @@ fn render_hr(cx: &MarkdownCtx, el: &Element) -> String {
 /// `raw`'s `{value}` (`id`/`cssclass` metadata, if present -- see
 /// `tomet-html`'s `render_raw_element`) has no CommonMark
 /// form, same as a heading's attrs, so it's dropped on export.
-fn render_raw(el: &Element, inline: bool) -> String {
+fn render_raw(el: ElementView<'_>, inline: bool) -> String {
     let code = el
         .content
-        .as_ref()
-        .map(|a| blocks_to_plain(a))
+        .map(blocks_to_plain)
         .unwrap_or_default();
     if inline {
         render_inline_raw(&code)
@@ -390,7 +390,7 @@ fn render_inline_raw(code: &str) -> String {
 /// quote is in Markdown, so that is what it becomes; a reader importing
 /// the result back sees text, which is what any Markdown reader would
 /// have seen anyway.
-fn render_quote(cx: &MarkdownCtx, el: &Element, inline: bool) -> String {
+fn render_quote(cx: &MarkdownCtx, el: ElementView<'_>, inline: bool) -> String {
     let text = content_to_md(cx, el);
     if inline {
         return format!("\u{201c}{text}\u{201d}");
@@ -401,11 +401,11 @@ fn render_quote(cx: &MarkdownCtx, el: &Element, inline: bool) -> String {
         .join("\n")
 }
 
-fn render_callout(cx: &MarkdownCtx, el: &Element) -> String {
+fn render_callout(cx: &MarkdownCtx, el: ElementView<'_>) -> String {
     let mut variant = None;
     let mut title = None;
 
-    if let Some(args) = &el.data.args {
+    if let Some(args) = el.data.args.as_ref() {
         match args {
             Value::String(s) => variant = Some(s.clone()),
             Value::Map(entries) => {
@@ -467,9 +467,9 @@ fn render_callout(cx: &MarkdownCtx, el: &Element) -> String {
 /// exported Markdown byte-identical. The import direction cannot recover
 /// it -- a code span in Markdown is a code span, and nothing in it says
 /// whether the author meant a path.
-fn render_path(cx: &MarkdownCtx, el: &Element, inline: bool) -> String {
+fn render_path(cx: &MarkdownCtx, el: ElementView<'_>, inline: bool) -> String {
     let path = path_target(el, &classify_std_lenient(el)).unwrap_or_default();
-    let content = match &el.content {
+    let content = match el.content {
         Some(content) if !content.is_empty() => Some(blocks_to_md(cx, content)),
         _ => None,
     };
@@ -485,10 +485,10 @@ fn render_path(cx: &MarkdownCtx, el: &Element, inline: bool) -> String {
     }
 }
 
-fn render_link(cx: &MarkdownCtx, el: &Element) -> String {
+fn render_link(cx: &MarkdownCtx, el: ElementView<'_>) -> String {
     let raw_target = link_target(el, &classify_std_lenient(el)).unwrap_or_default();
     let (scheme, target) = target_scheme(&raw_target);
-    let text = match &el.content {
+    let text = match el.content {
         Some(content) if !content.is_empty() => blocks_to_md(cx, content),
         _ => String::new(),
     };
@@ -527,13 +527,12 @@ fn render_link(cx: &MarkdownCtx, el: &Element) -> String {
 /// Strips `target`'s scheme prefix the same way `render_link` does -- see
 /// `tomet-html`'s `render_embed_element` for why `<embed>`
 /// needs this too, not just a raw passthrough.
-fn render_embed(el: &Element) -> String {
+fn render_embed(el: ElementView<'_>) -> String {
     let raw_target = link_target(el, &classify_std_lenient(el)).unwrap_or_default();
     let (_, src) = target_scheme(&raw_target);
     let alt = el
         .content
-        .as_ref()
-        .map(|a| blocks_to_plain(a))
+        .map(blocks_to_plain)
         .unwrap_or_default();
     format!("![{alt}]({src})")
 }
@@ -589,7 +588,7 @@ fn inlines_to_plain(inlines: &[Inline]) -> String {
     s
 }
 
-fn render_tag(el: &Element) -> String {
+fn render_tag(el: ElementView<'_>) -> String {
     let tags = extract_tags(el);
     if tags.is_empty() {
         return String::new();
@@ -607,7 +606,7 @@ fn render_tag(el: &Element) -> String {
     formatted.join(" ")
 }
 
-fn render_task(cx: &MarkdownCtx, el: &Element, _inline: bool) -> String {
+fn render_task(cx: &MarkdownCtx, el: ElementView<'_>, _inline: bool) -> String {
     let status_str = task_status(el);
     let marker = match status_str.as_deref() {
         Some("x") | Some("X") | Some("done") => "[x]",
@@ -624,7 +623,7 @@ fn render_task(cx: &MarkdownCtx, el: &Element, _inline: bool) -> String {
     }
 }
 
-fn task_status(el: &Element) -> Option<String> {
+fn task_status(el: ElementView<'_>) -> Option<String> {
     let args = normalized_element_args(el)?;
     match args {
         Value::Map(entries) => {
@@ -664,14 +663,14 @@ fn render_footnotes(cx: &MarkdownCtx, out: &mut String) {
 /// or `@name` element the importer never produces) passes through as raw
 /// HTML -- valid CommonMark, and matches `tomet-html`'s own
 /// generic div/span fallback in spirit.
-fn render_generic(cx: &MarkdownCtx, el: &Element, kind: &str, inline: bool) -> String {
+fn render_generic(cx: &MarkdownCtx, el: ElementView<'_>, kind: &str, inline: bool) -> String {
     let tag = if inline { "span" } else { "div" };
     let mut out = format!("<{tag} data-tm-kind=\"{}\"", escape_attr(kind));
-    if let Some(args) = &el.data.args {
+    if let Some(args) = el.data.args.as_ref() {
         push_data_attrs(&mut out, args);
     }
     out.push('>');
-    if let Some(content) = &el.content {
+    if let Some(content) = el.content {
         out.push_str(&blocks_to_md(cx, content));
     }
     out.push_str(&format!("</{tag}>"));
@@ -685,7 +684,7 @@ fn render_generic(cx: &MarkdownCtx, el: &Element, kind: &str, inline: bool) -> S
 /// collapse to). Showing both, marked, rather than silently picking one:
 /// discarding a side here would make `tomet check`'s own
 /// `Diagnostic::Conflict` warning pointless the moment someone exports.
-fn render_conflict(cx: &MarkdownCtx, el: &Element, inline: bool) -> String {
+fn render_conflict(cx: &MarkdownCtx, el: ElementView<'_>, inline: bool) -> String {
     let (a, b) = conflict_sides(el);
     let tag = if inline { "span" } else { "div" };
     format!(
@@ -699,7 +698,7 @@ fn render_conflict(cx: &MarkdownCtx, el: &Element, inline: bool) -> String {
 /// Reads `a`/`b` out of `el`'s `(args)` -- block content (`Value::Blocks`),
 /// not a scalar, so it cannot go through `push_data_attrs`/the generic
 /// flatten path at all.
-fn conflict_sides(el: &Element) -> (Vec<Block>, Vec<Block>) {
+fn conflict_sides(el: ElementView<'_>) -> (Vec<Block>, Vec<Block>) {
     let args = normalized_element_args(el);
     let map = args.as_ref().and_then(as_map);
     let side = |key: &str| -> Vec<Block> {

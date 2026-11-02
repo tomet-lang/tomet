@@ -1,13 +1,13 @@
 ::kind(api)
 
-::meta{crate: serde_cotomet, dependencies: list(cotomet-syntax, tomet-ast), dependents: list(cotomet)}
+::meta{crate: serde_cotomet, dependencies: list(tomet-ast, tomet-ast-parser), dependents: list(cotomet)}
 
 =[serde_cotomet]
 
 ==[serde_cotomet]
 
 Serde support for cotomet: read a cotomet document into a Rust type and write a
-Rust type out as one. The language itself is `cotomet-syntax`; depend on
+Rust type out as one. The language itself is `cotomet`; depend on
 `cotomet` instead unless you are a crate below it.
 
 ==[Key Functions]
@@ -50,6 +50,30 @@ One step from a map or sequence down to a value inside it.
 ===[Type Aliases]
 
 ====[type Result]
+
+==[Module print]
+
+Renders a `Value` back into cotomet data text:
+a top-level map is written as bare `key: value` lines (no enclosing braces);
+nested maps use `{ ... }`, and a sequence prints as `list(...)`.
+
+===[Functions]
+
+====[fn print_value]
+
+====[fn write_float]
+
+====[fn float_text]
+
+====[fn is_ident_char]
+
+====[fn write_scalar_string]
+
+====[fn write_key]
+
+====[fn key_text]
+
+====[fn quoted_text]
 
 ==[Module ser]
 

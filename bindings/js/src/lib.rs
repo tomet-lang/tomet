@@ -89,7 +89,7 @@ fn prepare_document(mut doc: tomet::ast::Document, opts: &ProcessOptions) -> tom
         let mut prefix_blocks = Vec::new();
         for block in cfg_doc.blocks {
             if let tomet::ast::Block::Element(el) = &block {
-                let kind = tomet::semantics::classify_std_lenient(el);
+                let kind = tomet::semantics::classify_std_lenient(el.as_view());
                 if matches!(
                     kind,
                     tomet::semantics::ElementKind::Declaration(

@@ -4,7 +4,7 @@
 //! `:rule` constraints) from blueprint documents (`::kind(blueprint)`), and validates
 //! target documents for conformance.
 
-use tomet_ast::{Block, Connect, Document, Element, Inline, Section, Value};
+use tomet_ast::{Block, Connect, Document, ElementView, Inline, Section, Value};
 use tomet_span::Span;
 use tomet_semantics::DeclKind;
 use tomet_semantics::{Bindings, ElementKind, classify_declaration_lenient, classify_std_lenient};
@@ -78,9 +78,10 @@ pub fn extract_blueprint_schema(blueprint: &Document) -> Option<BlueprintSchema>
         }
     });
     for_each_top_level_element(blueprint, |el| {
-        if classify_std_lenient(el) == ElementKind::Heading {
+        let view = el.as_view();
+        if classify_std_lenient(view) == ElementKind::Heading {
             let id = el.id.as_ref().map(|id| id.0.clone());
-            let title = extract_element_title(el);
+            let title = extract_element_title(view);
             let rules = extract_connect_rules(&el.connects);
             if id.is_some() || !title.is_empty() {
                 required_sections.push(RequiredSection {
@@ -231,9 +232,9 @@ fn extract_connect_rules(connects: &[Connect]) -> Vec<RuleArgs> {
     rules
 }
 
-fn extract_element_title(el: &Element) -> String {
+fn extract_element_title(el: ElementView<'_>) -> String {
     let mut title = String::new();
-    if let Some(blocks) = &el.content {
+    if let Some(blocks) = el.content {
         for block in blocks {
             if let Block::Paragraph(p) = block {
                 for inline in &p.content {

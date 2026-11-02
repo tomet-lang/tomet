@@ -7,7 +7,7 @@
 //! extraction, adopted by `tomet-html`/`tomet-markdown`/`tomet-links`
 //! instead of each reading `el.args` raw.
 
-use tomet_ast::Element;
+use tomet_ast::ElementView;
 use tomet_tree::ValueExt;
 
 use crate::kind::ElementKind;
@@ -24,7 +24,7 @@ use crate::positional::normalized_element_args;
 /// under `target` (e.g. `target: 42`) returns `None` rather than a
 /// stringified `"42"`, which would be a wrong filesystem-lookup target
 /// even though it's harmless for display purposes.
-pub fn link_target(el: &Element, kind: &ElementKind) -> Option<String> {
+pub fn link_target(el: ElementView<'_>, kind: &ElementKind) -> Option<String> {
     if !matches!(kind, ElementKind::Link | ElementKind::Embed) {
         return None;
     }
@@ -37,14 +37,14 @@ pub fn link_target(el: &Element, kind: &ElementKind) -> Option<String> {
 /// two this is, so a `file:`/`dir:` inside the value would be saying it
 /// twice. That is the difference from [`link_target`], where one element
 /// serves every scheme and the string has to carry which.
-pub fn path_target(el: &Element, kind: &ElementKind) -> Option<String> {
+pub fn path_target(el: ElementView<'_>, kind: &ElementKind) -> Option<String> {
     if !matches!(kind, ElementKind::File | ElementKind::Dir) {
         return None;
     }
     target_arg(el)
 }
 
-fn target_arg(el: &Element) -> Option<String> {
+fn target_arg(el: ElementView<'_>) -> Option<String> {
     let args = normalized_element_args(el)?;
     if let Some(target) = args.get("target").and_then(|v| v.as_str()) {
         return Some(target.to_string());
@@ -65,14 +65,14 @@ fn target_arg(el: &Element) -> Option<String> {
 
 /// Classifies `el` and extracts its link target in one step, for callers
 /// that don't already have `classify_std_lenient(el)`'s result on hand.
-pub fn link_target_of(el: &Element) -> Option<(ElementKind, String)> {
+pub fn link_target_of(el: ElementView<'_>) -> Option<(ElementKind, String)> {
     let kind = crate::classify_std_lenient(el);
     link_target(el, &kind).map(|target| (kind, target))
 }
 
 /// [`path_target`] with the kind it classified to, for a caller sweeping
 /// a document without one in hand.
-pub fn path_target_of(el: &Element) -> Option<(ElementKind, String)> {
+pub fn path_target_of(el: ElementView<'_>) -> Option<(ElementKind, String)> {
     let kind = crate::classify_std_lenient(el);
     path_target(el, &kind).map(|target| (kind, target))
 }
@@ -89,7 +89,7 @@ pub fn target_scheme(target: &str) -> (AddressKind, &str) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tomet_ast::{Name, Value};
+    use tomet_ast::{Element, Name, Value};
     use tomet_tree::element_new;
 
     fn map_el(name: Name, entries: Vec<(&str, Value)>) -> Element {
@@ -110,9 +110,9 @@ mod tests {
     #[test]
     fn named_target_key_on_typed_link_element() {
         let el = map_el(Name::bare("link"), vec![("target", s("x.md"))]);
-        assert_eq!(crate::classify_std_lenient(&el), ElementKind::Link);
+        assert_eq!(crate::classify_std_lenient(el.as_view()), ElementKind::Link);
         assert_eq!(
-            link_target_of(&el),
+            link_target_of(el.as_view()),
             Some((ElementKind::Link, "x.md".to_string()))
         );
     }
@@ -120,9 +120,9 @@ mod tests {
     #[test]
     fn named_at_link_element() {
         let el = map_el(Name::bare("link"), vec![("target", s("x.md"))]);
-        assert_eq!(crate::classify_std_lenient(&el), ElementKind::Link);
+        assert_eq!(crate::classify_std_lenient(el.as_view()), ElementKind::Link);
         assert_eq!(
-            link_target_of(&el),
+            link_target_of(el.as_view()),
             Some((ElementKind::Link, "x.md".to_string()))
         );
     }
@@ -135,9 +135,9 @@ mod tests {
         // `link_target` ever sees it.
         let mut el = element_new(Name::bare("link"));
         el.data.args = Some(s("x.md"));
-        assert_eq!(crate::classify_std_lenient(&el), ElementKind::Link);
+        assert_eq!(crate::classify_std_lenient(el.as_view()), ElementKind::Link);
         assert_eq!(
-            link_target_of(&el),
+            link_target_of(el.as_view()),
             Some((ElementKind::Link, "x.md".to_string()))
         );
     }
@@ -145,9 +145,9 @@ mod tests {
     #[test]
     fn embed_target_named_key() {
         let el = map_el(Name::bare("embed"), vec![("target", s("a.png"))]);
-        assert_eq!(crate::classify_std_lenient(&el), ElementKind::Embed);
+        assert_eq!(crate::classify_std_lenient(el.as_view()), ElementKind::Embed);
         assert_eq!(
-            link_target_of(&el),
+            link_target_of(el.as_view()),
             Some((ElementKind::Embed, "a.png".to_string()))
         );
     }
@@ -160,7 +160,7 @@ mod tests {
         let mut el = element_new(Name::bare("embed"));
         el.data.args = Some(s("a.png"));
         assert_eq!(
-            link_target_of(&el),
+            link_target_of(el.as_view()),
             Some((ElementKind::Embed, "a.png".to_string()))
         );
     }
@@ -235,21 +235,21 @@ mod tests {
     #[test]
     fn non_string_value_under_target_key_is_rejected() {
         let el = map_el(Name::bare("link"), vec![("target", Value::Int(42))]);
-        assert_eq!(link_target_of(&el), None);
+        assert_eq!(link_target_of(el.as_view()), None);
     }
 
     #[test]
     fn non_link_kind_has_no_target() {
         let el = map_el(Name::bare("em"), vec![("key", s("val"))]);
-        assert_eq!(crate::classify_std_lenient(&el), ElementKind::Em);
-        assert_eq!(link_target_of(&el), None);
+        assert_eq!(crate::classify_std_lenient(el.as_view()), ElementKind::Em);
+        assert_eq!(link_target_of(el.as_view()), None);
     }
 }
 
 #[cfg(test)]
 mod path_tests {
     use super::*;
-    use tomet_ast::{Name, Value};
+    use tomet_ast::{Element, Name, Value};
     use tomet_tree::element_new;
 
     fn path_el(name: &str, value: &str) -> Element {
@@ -265,12 +265,12 @@ mod path_tests {
         // makes that visible -- the value comes back whole.
         let el = path_el("file", "docs/README.tmt");
         assert_eq!(
-            path_target(&el, &ElementKind::File),
+            path_target(el.as_view(), &ElementKind::File),
             Some("docs/README.tmt".to_string())
         );
         let el = path_el("dir", "docs/spec");
         assert_eq!(
-            path_target(&el, &ElementKind::Dir),
+            path_target(el.as_view(), &ElementKind::Dir),
             Some("docs/spec".to_string())
         );
     }
@@ -282,8 +282,8 @@ mod path_tests {
         // mentions must not pick up a link -- they render differently and
         // only one produces an `<a>`.
         let file = path_el("file", "x.rs");
-        assert_eq!(link_target(&file, &ElementKind::File), None);
+        assert_eq!(link_target(file.as_view(), &ElementKind::File), None);
         let link = path_el("link", "x.rs");
-        assert_eq!(path_target(&link, &ElementKind::Link), None);
+        assert_eq!(path_target(link.as_view(), &ElementKind::Link), None);
     }
 }

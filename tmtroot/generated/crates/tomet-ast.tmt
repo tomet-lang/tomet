@@ -1,19 +1,21 @@
 ::kind(api)
 
-::meta{crate: tomet-ast, dependencies: list(tomet-cst), dependents: list(cotomet-eval, cotomet-syntax, serde_cotomet, tomet, tomet-address, tomet-cli, tomet-config, tomet-convert-standalone, tomet-declaration, tomet-deps, tomet-edit, tomet-expr, tomet-extract, tomet-formatter, tomet-html, tomet-indexer, tomet-lexer, tomet-links, tomet-load, tomet-lsp, tomet-markdown, tomet-pandoc, tomet-parser, tomet-printer, tomet-search, tomet-semantics, tomet-spec, tomet-stats, tomet-style, tomet-tests, tomet-transform, tomet-tree, tomet-type, tomet-typst, tomet-validator, tomet-validator-blueprint, tomet-validator-core, tomet-validator-profile, tomet-validator-rule, tomet-vault, tomet-workspace)}
+::meta{crate: tomet-ast, dependencies: list(tomet-span), dependents: list(cotomet, cotomet-eval, serde_cotomet, tomet, tomet-address, tomet-ast-parser, tomet-cli, tomet-config, tomet-convert-standalone, tomet-declaration, tomet-deps, tomet-edit, tomet-expr, tomet-extract, tomet-formatter, tomet-html, tomet-indexer, tomet-links, tomet-load, tomet-lowering, tomet-lsp, tomet-markdown, tomet-pandoc, tomet-printer, tomet-search, tomet-semantics, tomet-semantics-core, tomet-spec, tomet-stats, tomet-style, tomet-tests, tomet-transform, tomet-tree, tomet-typst, tomet-validator, tomet-validator-blueprint, tomet-validator-core, tomet-validator-profile, tomet-validator-rule, tomet-vault, tomet-workspace)}
 
 =[tomet-ast]
 
 ==[tomet-ast]
 
 Shared AST and `Value` data models for the Tomet toolchain (`Document`, `Block`,
-`Inline`, `Element`, `Declaration`, `Interpolation`, `Hole`, `ListItem`, `Value`, `Span`).
+`Inline`, `Element`, `ElementView`, `BodyView`, `Declaration`, `Interpolation`,
+`Hole`, `ListItem`, `Value`, `Span`).
 
 ==[Design Policy]
 
-- ("Pure Data Models & Structural Accessors Only") `tomet-ast` is the foundational dependency-free crate referenced across the workspace.
+- ("Pure Data Models & Structural Accessors Only") `tomet-ast` is the foundational AST crate referenced across the workspace,
+depending only on `tomet-span`, `serde`, and `unicode-width`.
 It contains only struct/enum definitions and pure inherent methods for construction
-(`new`, `with_*`) and structural inspection (`as_str()`, `get()`, `is_null()`, `Span::union()`).
+(`new`, `with_*`) and structural inspection (`as_str()`, `get()`, `is_null()`).
 - ("A Node's Role Is Its Type") A `${...}` is an [`Interpolation`] (an expression and a span), not an [`Element`]:
 it has no name, no groups and no connects, so it is a variant of [`Block`],
 [`Inline`] and [`Value`] and no walker over elements ever meets one. Reach every
@@ -21,52 +23,27 @@ interpolation of a document through `tomet_tree::for_each_interpolation`.
 A `::name(...)` is a [`Declaration`]: always a [`Block`], about the document and attached to
 nothing, so it has no placement and takes no connect.
 A `:name(...)` is a [`Connect`]: metadata about its owner, with no id, no connects of its own
-and no placement. A `?matcher(...)` is a [`Hole`] (a matcher, optional, in place of a name).
+and no placement. A `<?matcher(...)>` is a [`Hole`] (a matcher, optional, in place of a name).
+`<...>` is one family in the @em[syntax] (the CST has one `SLOT` node, whatever the mark inside); the
+AST has no node for the family. It names nodes by role, never by spelling, and has a node only
+for what tomet interprets or what carries structure to walk: a hole is a [`Hole`], a name tag
+(`<PATH>`) is text. Merging nodes of different structure into one type with a field to tell
+them apart is what split `Element` before; a new kind of seat is judged by that rule.
 A list item is a [`ListItem`] and a nameless `(marker)[content]` entry of a `{...}` group is a
 [`Bare`]: neither has a name, so neither is an [`Element`], whose name is mandatory.
-`ListItem::named_element` gives the element a `-@name(...)` item is, as a copy.
-What nodes share is [`Data`] (`(args)` and the `{...}` [`Group`]), so what
-reads them is written once; `[content]` and `#(id)` stay on the roles that take them.
+[`ListItem::as_element_view`] gives a zero-copy [`ElementView`] of the element a `-@name(...)`
+item is.
+What nodes share is [`Data`] (`(args)` and the `{...}` [`Group`]), and their body groups can
+be inspected uniformly via [`BodyView`]; `[content]` and `#(id)` stay on the roles that take them.
 - ("Clear Crate Boundaries") Semantics: Classification of element meanings (links, `::meta`, `::config`) lives in `tomet-semantics`.
 Traversal & Manipulation: Generic tree traversal algorithms live in `tomet-tree`.
 Formatting & Printing: Serialization to `.tmt` text lives in `tomet-style` and `tomet-printer`.
 Validation: Field formatting and lint validation live in `tomet-validator`.
-- ("Span Equality Contract") `Span` implements a custom `PartialEq` that always returns `true` so that structural
+- ("Span Equality Contract") [`Span`] implements a custom `PartialEq` that always returns `true` so that structural
 equality comparisons (`assert_eq!(doc1, doc2)`) ignore source positions. Use
 [`Span::exact_eq()`] when exact source position comparisons are required.
 
-==[Module cst_ast]
-
-Typed AST wrappers over Rowan's [`SyntaxNode`].
-
-===[Traits]
-
-====[trait AstNode]
-
-====[trait AstToken]
-
 ==[Structs]
-
-===[struct Span]
-
-A source span: a range of byte offsets into the text it was parsed from.
-
-A span deliberately holds no line or column. Those are a view of the source
-text, not a property of the node, and computing them while parsing made
-every node cost a rescan of everything before it. Resolve them on demand
-with `tomet_lexer::LineIndex`.
-
-Note: [`PartialEq`] is implemented to always return `true` so that AST
-structural equality checks (e.g. `assert_eq!(doc1, doc2)`) compare node
-content and semantics without failing on source location differences.
-Use [`exact_eq`](Self::exact_eq) or direct field comparison when exact
-byte offsets need to be validated.
-
-`Hash` is deliberately @em[not] derived: a derived impl would hash the real
-`start`/`end` offsets while `PartialEq` above always returns `true`,
-so two "equal" `Span`s could hash differently -- a Hash/Eq contract
-violation that breaks `HashMap`/`HashSet` lookups. Don't re-add it
-without also reconciling it with the custom equality above.
 
 ===[struct Document]
 
@@ -185,22 +162,22 @@ so it has no name. It takes the groups an element does and no connect.
 
 ===[struct Hole]
 
-A `?matcher(name, args){options}[content]` hole in a pattern.
+A `<?matcher(name, args){options}>[content]` hole: the description of a value that is
+not there yet, in a pattern.
 
-It takes the groups an element does, read by the same code. Two
-differences: its head is a @em[matcher], not an element name, and it is
-optional (`?()` and `?(n)[...]` have none); and it takes no `:connect`. It
-only exists in what `parse_pattern` reads: `parse_document` leaves `?` as
-text, so ordinary prose such as `本当に?(はい)` is never a hole.
+It is a box, `<...>`, whose head (the `?` mark, the matcher and the `(args)` and `{options}`
+groups) is inside and whose `[content]` follows the `>`. Its groups are read by the
+same code as an element's. Differences: its head is a @em[matcher], not an element name, and it is
+optional (`<?>` and `<?(n)>` have none); and it takes no `:connect`. A box that does not close
+or does not fit is text, so ordinary prose such as `本当に?(はい)` or `a < b` is never a hole.
 
-A hole sits where an element sits, so it is a variant of [`Block`],
-[`Inline`], [`Entry`] and [`Value`], in the same tree a document is: a
-pattern is written in, and printed as, ordinary tomet. The type of every
-document allows one; `parse_document` never builds one.
+A hole sits where an element sits, so it is a variant of [`Block`], [`Inline`], [`Entry`]
+and [`Value`], in the same tree a document is: a pattern is written in, and printed as,
+ordinary tomet, and `parse_document` reads one like any other construct.
 
-The matcher is not an element name: `?meta()` is not the `meta` element.
-What a matcher means, and what a hole matches, is the host's (tandr's), not
-tomet's. See `tmtroot/spec/syntax/hole.tmt`.
+The matcher is not an element name: `<?meta>` is not the `meta` element. What a matcher
+means, and what a hole matches, is the host's (tandr's), not tomet's. See
+`tmtroot/spec/syntax/hole.tmt`.
 
 ===[struct Connect]
 
@@ -246,6 +223,22 @@ groups but strictly before any connect -- see [`Id`].
 stacked after them (`@x(...):as(y):rule(...)`), zero or more, each a
 [`Connect`]. Order-preserving, empty when nothing follows.
 
+===[struct ElementView]
+
+A zero-copy borrowed view of an element's fields.
+
+Represents an [`Element`] or any node that stands as an element (such as a
+combine list item `-@name(...)` via [`ListItem::as_element_view`]) without
+heap allocation or cloning child blocks and data.
+
+===[struct BodyView]
+
+A zero-copy borrowed view of a node's body: its data (`(args)` and `{value}`),
+optional child `[content]`, and optional `#(id)`.
+
+Shared by nodes that carry body groups ([`ElementView`], [`Declaration`],
+[`Bare`], [`Connect`], [`Hole`]).
+
 ===[struct Group]
 
 The entries of a `{...}` group, in source order.
@@ -269,6 +262,10 @@ span of the whole `$`-form, and nothing else. It sits in three places, as
 ===[struct InterpExpr]
 
 One node of a `${...}` interpolation's parsed expression tree.
+
+===[struct File]
+
+A standalone cotomet data file (`.ctmt`): its declarations at the top, then its map entries.
 
 ==[Enums]
 

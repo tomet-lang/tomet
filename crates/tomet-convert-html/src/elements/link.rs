@@ -4,7 +4,7 @@ use super::render_content_or_fallback;
 use crate::RenderCtx;
 use crate::block::render_content_blocks;
 use crate::util::{blocks_to_plain, escape_attr, escape_html, push_data_attrs};
-use tomet_ast::{Element, Value};
+use tomet_ast::{ElementView, Value};
 use tomet_semantics::{
     TargetScheme, classify_std_lenient, link_target, normalized_element_args, path_target,
     target_scheme,
@@ -18,13 +18,12 @@ use tomet_semantics::{
 /// never part of the value string); now that both `@link` and `<embed>`
 /// share one `target` key with the scheme embedded in the string, `<embed>`
 /// needs the same treatment `@link` gets, not just a raw passthrough.
-pub(crate) fn render_embed_element(el: &Element, out: &mut String) {
+pub(crate) fn render_embed_element(el: ElementView<'_>, out: &mut String) {
     let raw_target = link_target(el, &classify_std_lenient(el)).unwrap_or_default();
     let (scheme, src) = target_scheme(&raw_target);
     let alt = el
         .content
-        .as_ref()
-        .map(|a| blocks_to_plain(a))
+        .map(blocks_to_plain)
         .unwrap_or_default();
     if scheme == TargetScheme::Unresolved {
         out.push_str(&format!(
@@ -49,11 +48,11 @@ pub(crate) fn render_embed_element(el: &Element, out: &mut String) {
 /// it was written in backticks -- which is exactly what this renders back
 /// to, so moving a mention onto `@file` changes what a checker can see
 /// and nothing a reader can.
-pub(crate) fn render_path_element(cx: &RenderCtx, el: &Element, out: &mut String, inline: bool) {
+pub(crate) fn render_path_element(cx: &RenderCtx, el: ElementView<'_>, out: &mut String, inline: bool) {
     let kind = classify_std_lenient(el);
     let path = path_target(el, &kind).unwrap_or_default();
     let class = format!("tm-{}", kind.as_str());
-    let content = el.content.as_ref().filter(|c| !c.is_empty()).map(|c| {
+    let content = el.content.filter(|c| !c.is_empty()).map(|c| {
         let mut s = String::new();
         render_content_blocks(cx, c, &mut s);
         s
@@ -89,7 +88,7 @@ pub(crate) fn render_path_element(cx: &RenderCtx, el: &Element, out: &mut String
 /// same-document anchor reference (`id:`) or a real `href` (everything
 /// else: url/file/tm/ref). The scheme prefix itself is stripped before
 /// rendering -- it's addressing metadata, not part of the visible target.
-pub(crate) fn render_link_element(cx: &RenderCtx, el: &Element, out: &mut String, inline: bool) {
+pub(crate) fn render_link_element(cx: &RenderCtx, el: ElementView<'_>, out: &mut String, inline: bool) {
     let normalized_args = normalized_element_args(el);
     let raw_target = link_target(el, &classify_std_lenient(el)).unwrap_or_default();
     let (scheme, target) = target_scheme(&raw_target);

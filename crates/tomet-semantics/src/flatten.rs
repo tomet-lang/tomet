@@ -17,7 +17,7 @@
 //! between a nested lookup and a flat key of that name. Element @em[names]
 //! use `.` as a namespace separator, but map keys deliberately do not.
 
-use tomet_ast::{Element, Value};
+use tomet_ast::{ElementView, Value};
 
 /// The attribute a consumer should read instead of the flat projection
 /// when it is present.
@@ -70,9 +70,9 @@ pub fn is_attribute_key(key: &str) -> bool {
 ///
 /// The element children a `{...}` group may hold are skipped: they belong
 /// in the output's body rather than its attributes.
-pub fn flatten_element_data(el: &Element) -> FlatData {
-    let value = el.data.value.as_ref().map(|v| v.as_data());
-    flatten_data(el.data.args.as_ref(), value.as_ref())
+pub fn flatten_element_data(el: ElementView<'_>) -> FlatData {
+    let value = el.value().map(|v| v.as_data());
+    flatten_data(el.args(), value.as_ref())
 }
 
 /// Flattens the two groups directly.
@@ -243,7 +243,7 @@ pub fn value_to_json(v: &Value) -> serde_json::Value {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tomet_ast::{Group, Name};
+    use tomet_ast::{Element, Group, Name};
     use tomet_tree::element_new;
 
     fn el_with(args: Option<Value>, value: Option<Value>) -> Element {
@@ -274,7 +274,7 @@ mod tests {
             ])),
             None,
         );
-        let data = flatten_element_data(&el);
+        let data = flatten_element_data(el.as_view());
         assert_eq!(
             data.pairs,
             vec![
@@ -296,7 +296,7 @@ mod tests {
             ])),
             None,
         );
-        let data = flatten_element_data(&el);
+        let data = flatten_element_data(el.as_view());
         assert_eq!(data.pairs, vec![("a".to_string(), "1".to_string())]);
         assert_eq!(
             data.exact.as_deref(),
@@ -313,7 +313,7 @@ mod tests {
                 ("meta", map(&[("author", Value::String("alice".into()))])),
             ])),
         );
-        let data = flatten_element_data(&el);
+        let data = flatten_element_data(el.as_view());
         assert_eq!(
             data.pairs,
             vec![
@@ -332,7 +332,7 @@ mod tests {
     #[test]
     fn into_pairs_appends_the_exact_copy() {
         let el = el_with(Some(map(&[("m", map(&[("k", Value::Int(1))]))])), None);
-        let pairs = flatten_element_data(&el).into_pairs();
+        let pairs = flatten_element_data(el.as_view()).into_pairs();
         assert_eq!(pairs.len(), 1);
         assert_eq!(pairs[0].0, EXACT_DATA_KEY);
     }

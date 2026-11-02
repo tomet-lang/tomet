@@ -1,6 +1,6 @@
 ::kind(api)
 
-::meta{crate: tomet-printer, dependencies: list(cotomet-syntax, tomet-ast, tomet-config, tomet-field-utils, tomet-formatter, tomet-markdown, tomet-parser, tomet-semantics, tomet-style, tomet-tree), dependents: list(tomet, tomet-cli, tomet-convert-standalone, tomet-pandoc, tomet-spec, tomet-tests, tomet-workspace)}
+::meta{crate: tomet-printer, dependencies: list(tomet-ast, tomet-ast-parser, tomet-config, tomet-field-utils, tomet-formatter, tomet-markdown, tomet-semantics, tomet-span, tomet-style, tomet-tree), dependents: list(tomet, tomet-cli, tomet-convert-standalone, tomet-html, tomet-markdown, tomet-pandoc, tomet-spec, tomet-tests, tomet-typst, tomet-workspace)}
 
 =[tomet-printer]
 
@@ -40,7 +40,10 @@ with no head.
 ====[fn render_hole]
 
 Render a [`Hole`] AST node into Tomet syntax:
-`?matcher(args)[content]{value}#(id)`.
+`<?matcher(args){value}>[content]`.
+
+The head, the matcher and the `(args)` and `{value}` groups, is inside the box and
+the `[content]` follows its `>`, however `args` and `content` are ordered for an element.
 
 ====[fn render_declaration]
 
@@ -70,5 +73,13 @@ Rendering inline content and block-permitted content runs.
 ===[fn document_to_tm]
 
 Serialize a [`Document`] AST into Tomet (`.tmt`) source string using document-level config or defaults.
+
+===[fn hole_to_tm]
+
+A [`tomet_ast::Hole`] as the box it was written as, `<?matcher(args){value}>[content]`,
+with the document-independent default configuration.
+
+For a reader that has no rendering of a hole and shows it as it was written, the way an
+interpolation nobody evaluated is shown (`tomet-convert-*`).
 
 ===[fn document_to_tm_with_config]

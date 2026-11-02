@@ -1,0 +1,41 @@
+::kind(api)
+
+::meta{crate: tomet-ast-parser, dependencies: list(tomet-ast, tomet-cst, tomet-cst-parser, tomet-lexer, tomet-lowering, tomet-position, tomet-semantics, tomet-span, tomet-tree), dependents: list(cotomet, cotomet-eval, serde_cotomet, tomet, tomet-address, tomet-benches, tomet-cli, tomet-config, tomet-convert-standalone, tomet-declaration, tomet-deps, tomet-edit, tomet-expr, tomet-extract, tomet-formatter, tomet-html, tomet-indexer, tomet-links, tomet-load, tomet-load-config, tomet-lsp, tomet-markdown, tomet-merge, tomet-pandoc, tomet-printer, tomet-search, tomet-semantics, tomet-spec, tomet-stats, tomet-tests, tomet-transform, tomet-tree, tomet-typst, tomet-validator, tomet-validator-blueprint, tomet-validator-profile, tomet-validator-rule, tomet-vault, tomet-workspace)}
+
+=[tomet-ast-parser]
+
+==[tomet-ast-parser]
+
+Reference AST parser for Tomet, combining CST parsing ([`tomet_cst_parser`])
+and AST lowering ([`tomet_lowering`]).
+
+==[Architecture & Responsibilities]
+
+- ("Standard Parsing Facade")
+  - Provides text-to-AST entry points: [`parse_document`], [`parse_value`], [`parse_file`].
+  - Bridges lossless CST parsing and typed AST representations.
+
+==[Functions]
+
+===[fn parse_document]
+
+Parse an entire source string as a markup [`tomet_ast::Document`]: the CST of
+the text ([`tomet_cst_parser::parse_cst`]), read as the AST it stands for.
+
+===[fn parse_value]
+
+Parse an entire source string as one `Value` (a data-only `.tmt`
+document -- no headings, prose, or top-level elements).
+
+===[fn parse_file]
+
+Parse an entire source string as a standalone cotomet data file (`.ctmt`):
+optional `::declaration` header at the top, followed by `key: value` map entries.
+
+===[fn parse_interpolation]
+
+Parse an interpolation starting at `cur`.
+
+===[fn parse_interpolation_str]
+
+Parse a `$func(args)` or `${expr}` interpolation directly from a string slice.

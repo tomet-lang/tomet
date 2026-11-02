@@ -1,7 +1,7 @@
 //! `tomet_ast::Document` -> Pandoc's AST.
 
 use tomet_ast::{
-    Bare, Block as TmBlock, Data, Document, Element, Entry, Group, Id, Inline as TmInline,
+    Bare, Block as TmBlock, BodyView, Document, ElementView, Entry, Group, Id, Inline as TmInline,
     Interpolation, List, Placement, Value,
 };
 use tomet_semantics::{
@@ -95,7 +95,7 @@ fn meta_value(v: &Value) -> MetaValue {
 fn block_to_pandoc(block: &TmBlock) -> Vec<Block> {
     match block {
         TmBlock::Paragraph(p) => content_to_blocks(&p.content),
-        TmBlock::Element(el) => element_to_blocks(el),
+        TmBlock::Element(el) => element_to_blocks(el.as_view()),
         TmBlock::Interp(interp) => vec![Block::Para(vec![interp_inline(interp)])],
         // What a declaration says about the document is `to_pandoc`'s metadata,
         // not a block.
@@ -121,7 +121,7 @@ fn block_to_pandoc(block: &TmBlock) -> Vec<Block> {
 }
 
 /// An element in block position.
-fn element_to_blocks(el: &Element) -> Vec<Block> {
+fn element_to_blocks(el: ElementView<'_>) -> Vec<Block> {
     let kind = classify_std_lenient(el);
     if is_directive(&kind) {
         return Vec::new();
@@ -194,7 +194,7 @@ fn element_to_blocks(el: &Element) -> Vec<Block> {
 }
 
 /// An element in inline position.
-fn element_to_inlines(el: &Element) -> Vec<Inline> {
+fn element_to_inlines(el: ElementView<'_>) -> Vec<Inline> {
     let kind = classify_std_lenient(el);
     if is_directive(&kind) {
         return Vec::new();
@@ -269,7 +269,7 @@ fn element_to_inlines(el: &Element) -> Vec<Inline> {
 /// `a`/`b` out of `@conflict`'s `(args)` -- block content
 /// (`Value::Blocks`), not a scalar, so it cannot go through
 /// `flatten_element_data`/`generic_attr` at all.
-fn conflict_sides(el: &Element) -> (Vec<TmBlock>, Vec<TmBlock>) {
+fn conflict_sides(el: ElementView<'_>) -> (Vec<TmBlock>, Vec<TmBlock>) {
     let Some(Value::Map(entries)) = normalized_element_args(el) else {
         return (Vec::new(), Vec::new());
     };
@@ -299,7 +299,7 @@ fn blocks_to_inlines_lossy(blocks: &[TmBlock]) -> Vec<Inline> {
         }
         match block {
             TmBlock::Paragraph(p) => out.extend(inlines_to_pandoc(&p.content)),
-            TmBlock::Element(el) => out.extend(element_to_inlines(el)),
+            TmBlock::Element(el) => out.extend(element_to_inlines(el.as_view())),
             TmBlock::Interp(interp) => out.push(interp_inline(interp)),
             TmBlock::Declaration(_) => {}
             TmBlock::Hole(hole) => out.push(hole_inline(hole)),
@@ -316,8 +316,8 @@ fn blocks_to_inlines_lossy(blocks: &[TmBlock]) -> Vec<Inline> {
 
 // ---- content -------------------------------------------------------
 
-fn content_of(el: &Element) -> &[TmBlock] {
-    el.content.as_deref().unwrap_or(&[])
+fn content_of(el: ElementView<'_>) -> &[TmBlock] {
+    el.content.unwrap_or(&[])
 }
 
 /// A flat inline run (`Paragraph.content`, still `Vec<Inline>`) as Pandoc
@@ -335,9 +335,9 @@ fn content_to_blocks(inlines: &[TmInline]) -> Vec<Block> {
         match item {
             TmInline::Element(el) if el.placement == Placement::Block => {
                 flush_run(&mut run, &mut blocks);
-                blocks.extend(element_to_blocks(el));
+                blocks.extend(element_to_blocks(el.as_view()));
             }
-            TmInline::Element(el) => run.extend(element_to_inlines(el)),
+            TmInline::Element(el) => run.extend(element_to_inlines(el.as_view())),
             TmInline::Interp(interp) => run.push(interp_inline(interp)),
             TmInline::Text(t) => run.extend(text_to_inlines(&t.value)),
             TmInline::Raw(t) => run.extend(text_to_inlines(&t.value)),
@@ -381,7 +381,7 @@ fn element_content_to_blocks(blocks: &[TmBlock]) -> Vec<Block> {
                     out.push(Block::Para(inlines));
                 }
             }
-            TmBlock::Element(el) => out.extend(element_to_blocks(el)),
+            TmBlock::Element(el) => out.extend(element_to_blocks(el.as_view())),
             TmBlock::Interp(interp) => out.push(Block::Para(vec![interp_inline(interp)])),
             TmBlock::Declaration(_) => {}
             TmBlock::Hole(hole) => out.push(Block::Para(vec![hole_inline(hole)])),
@@ -407,7 +407,7 @@ fn element_content_to_blocks(blocks: &[TmBlock]) -> Vec<Block> {
 /// blocks, or a block-placed element put where a heading/link expects
 /// plain text -- which the validator already reports as a shape mismatch)
 /// flattens every paragraph's inlines together rather than losing it.
-fn content_to_inlines(el: &Element) -> Vec<Inline> {
+fn content_to_inlines(el: ElementView<'_>) -> Vec<Inline> {
     blocks_to_pandoc_inlines(content_of(el))
 }
 
@@ -419,7 +419,7 @@ fn blocks_to_pandoc_inlines(blocks: &[TmBlock]) -> Vec<Inline> {
     for block in blocks {
         match block {
             TmBlock::Paragraph(p) => out.extend(inlines_to_pandoc(&p.content)),
-            TmBlock::Element(el) => out.extend(element_to_inlines(el)),
+            TmBlock::Element(el) => out.extend(element_to_inlines(el.as_view())),
             TmBlock::Interp(interp) => out.push(interp_inline(interp)),
             TmBlock::Declaration(_) => {}
             TmBlock::Hole(hole) => out.push(hole_inline(hole)),
@@ -442,7 +442,7 @@ fn inlines_to_pandoc(inlines: &[TmInline]) -> Vec<Inline> {
             TmInline::Raw(t) => out.extend(text_to_inlines(&t.value)),
             TmInline::SoftBreak(_) => out.push(Inline::SoftBreak),
             TmInline::LineBreak(_) => out.push(Inline::LineBreak),
-            TmInline::Element(el) => out.extend(element_to_inlines(el)),
+            TmInline::Element(el) => out.extend(element_to_inlines(el.as_view())),
             TmInline::Interp(interp) => out.push(interp_inline(interp)),
             TmInline::Hole(hole) => out.push(hole_inline(hole)),
         }
@@ -531,18 +531,18 @@ fn push_word(word: &mut String, out: &mut Vec<Inline>) {
 
 /// An element's own body as blocks: its `[content]`, then any elements
 /// its `{...}` group holds as children.
-fn element_body_blocks(el: &Element) -> Vec<Block> {
-    body_blocks(content_of(el), &el.data)
+fn element_body_blocks(el: ElementView<'_>) -> Vec<Block> {
+    body_blocks(el.body())
 }
 
 /// [`element_body_blocks`] for anything that takes the groups an element
 /// does: a bare entry's body is read the same way.
-fn body_blocks(content: &[TmBlock], data: &Data) -> Vec<Block> {
-    let mut blocks = element_content_to_blocks(content);
-    if let Some(Group(entries)) = data.value.as_ref() {
+fn body_blocks(body: BodyView<'_>) -> Vec<Block> {
+    let mut blocks = element_content_to_blocks(body.content.unwrap_or(&[]));
+    if let Some(Group(entries)) = body.data.value.as_ref() {
         for entry in entries {
             match entry {
-                Entry::Element(child) => blocks.extend(element_to_blocks(child)),
+                Entry::Element(child) => blocks.extend(element_to_blocks(child.as_view())),
                 Entry::Bare(child) => blocks.push(bare_to_block(child)),
                 Entry::Pair(..) | Entry::Hole(_) => {}
             }
@@ -561,13 +561,12 @@ fn bare_to_block(bare: &Bare) -> Block {
         &[],
     );
     attr.2.push((SIGIL_KEY.to_string(), BARE_SIGIL.to_string()));
-    let content = bare.content.as_deref().unwrap_or(&[]);
-    Block::Div(attr, body_blocks(content, &bare.data))
+    Block::Div(attr, body_blocks(bare.as_body_view()))
 }
 
 /// Content flattened to plain text, for slots that cannot hold markup --
 /// a code block's body.
-fn content_to_plain_text(el: &Element) -> String {
+fn content_to_plain_text(el: ElementView<'_>) -> String {
     blocks_plain_text(content_of(el))
 }
 
@@ -577,7 +576,7 @@ fn blocks_plain_text(blocks: &[TmBlock]) -> String {
     for block in blocks {
         match block {
             TmBlock::Paragraph(p) => out.push_str(&plain_text(&p.content)),
-            TmBlock::Element(el) => out.push_str(&blocks_plain_text(content_of(el))),
+            TmBlock::Element(el) => out.push_str(&blocks_plain_text(content_of(el.as_view()))),
             TmBlock::Interp(_) | TmBlock::Declaration(_) => {}
             TmBlock::Hole(hole) => out.push_str(&tomet_printer::hole_to_tm(hole)),
             TmBlock::Section(sec) => out.push_str(&plain_text(&sec.title)),
@@ -603,7 +602,7 @@ fn plain_text(inlines: &[TmInline]) -> String {
                 out.push_str(tomet_ast::softbreak_join(before, after));
             }
             TmInline::LineBreak(_) => out.push('\n'),
-            TmInline::Element(el) => out.push_str(&blocks_plain_text(content_of(el))),
+            TmInline::Element(el) => out.push_str(&blocks_plain_text(content_of(el.as_view()))),
             TmInline::Interp(_) => {}
             TmInline::Hole(hole) => out.push_str(&tomet_printer::hole_to_tm(hole)),
         }
@@ -630,11 +629,11 @@ fn list_to_pandoc(list: &List) -> Block {
         .items
         .iter()
         .map(|item| {
-            let mut blocks = if let Some(element) = item.named_element() {
+            let mut blocks = if let Some(element) = item.as_element_view() {
                 // The combine notation (`-@name(...)`): rendered exactly
                 // like a standalone `@name(...)` would be, through the
                 // same generic element-to-blocks dispatch.
-                element_to_blocks(&element)
+                element_to_blocks(element)
             } else {
                 element_content_to_blocks(&item.content)
             };
@@ -673,7 +672,7 @@ fn list_to_pandoc(list: &List) -> Block {
 /// becomes a real `ColSpec` alignment. The Markdown and Typst writers
 /// both ignore that argument today, because neither target has a good
 /// place to put it.
-fn table_to_pandoc(el: &Element) -> Vec<Block> {
+fn table_to_pandoc(el: ElementView<'_>) -> Vec<Block> {
     let rows = parse_table_rows(content_of(el));
     let col_count = rows.iter().map(|r| r.cells.len()).max().unwrap_or(0);
     if col_count == 0 {
@@ -734,14 +733,14 @@ fn table_to_pandoc(el: &Element) -> Vec<Block> {
 
 /// Reads one of `@table`'s own arguments, after positional
 /// normalization so `@table(center)` and `@table(align: center)` agree.
-fn table_arg(el: &Element, key: &str) -> Option<Value> {
+fn table_arg(el: ElementView<'_>, key: &str) -> Option<Value> {
     let Value::Map(entries) = normalized_element_args(el)? else {
         return None;
     };
     entries.into_iter().find(|(k, _)| k == key).map(|(_, v)| v)
 }
 
-fn table_has_header(el: &Element) -> bool {
+fn table_has_header(el: ElementView<'_>) -> bool {
     match table_arg(el, "header") {
         Some(Value::Bool(b)) => b,
         Some(_) => true,
@@ -749,7 +748,7 @@ fn table_has_header(el: &Element) -> bool {
     }
 }
 
-fn table_alignment(el: &Element) -> Alignment {
+fn table_alignment(el: ElementView<'_>) -> Alignment {
     match table_arg(el, "align").as_ref().and_then(|v| match v {
         Value::String(s) => Some(s.as_str().to_ascii_lowercase()),
         _ => None,
@@ -781,7 +780,7 @@ pub(crate) const BARE_SIGIL: &str = "bare";
 
 /// The `Attr` for an element Pandoc has no equivalent for: its data, plus the
 /// class carrying its name.
-fn generic_attr(el: &Element, kind: &ElementKind) -> Attr {
+fn generic_attr(el: ElementView<'_>, kind: &ElementKind) -> Attr {
     attr_of(el, &[&format!("tomet-{}", kind.as_str())])
 }
 
@@ -791,9 +790,9 @@ fn generic_attr(el: &Element, kind: &ElementKind) -> Attr {
 /// Pandoc's writers look for an anchor. Everything else follows the
 /// shared flattening rule: readable pairs, plus the exact JSON copy
 /// under `EXACT_DATA_KEY` when the projection would lose something.
-fn attr_of(el: &Element, classes: &[&str]) -> Attr {
+fn attr_of(el: ElementView<'_>, classes: &[&str]) -> Attr {
     attr_from(
-        el.id.as_ref(),
+        el.id,
         flatten_element_data(el).into_pairs(),
         classes,
     )
@@ -813,10 +812,10 @@ fn section_attr(sec: &tomet_ast::Section) -> Attr {
 ///
 /// For the builtins whose args the mapping already consumed into a
 /// dedicated field: a heading's level, a link's or image's target.
-fn attr_from_value(el: &Element, classes: &[&str]) -> Attr {
+fn attr_from_value(el: ElementView<'_>, classes: &[&str]) -> Attr {
     let value = el.data.value.as_ref().map(|v| v.as_data());
     attr_from(
-        el.id.as_ref(),
+        el.id,
         flatten_data(None, value.as_ref()).into_pairs(),
         classes,
     )
@@ -829,7 +828,7 @@ fn attr_from(id: Option<&Id>, pairs: Vec<(String, String)>, classes: &[&str]) ->
 
 /// A code block's attr: the language becomes a class, which is how every
 /// Pandoc writer decides how to highlight it.
-fn code_attr(el: &Element) -> Attr {
+fn code_attr(el: ElementView<'_>) -> Attr {
     let mut attr = attr_of(el, &[]);
     if let Some(pos) = attr.2.iter().position(|(k, _)| k == "lang") {
         let (_, lang) = attr.2.remove(pos);

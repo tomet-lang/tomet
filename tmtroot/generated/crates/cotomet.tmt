@@ -1,6 +1,6 @@
 ::kind(api)
 
-::meta{crate: cotomet, dependencies: list(cotomet-eval, cotomet-syntax, serde_cotomet), dependents: list(tomet-cli, tomet-lsp)}
+::meta{crate: cotomet, dependencies: list(cotomet-eval, serde_cotomet, tomet-ast, tomet-ast-parser, tomet-position, tomet-span), dependents: list(tomet-cli, tomet-lsp, tomet-tests)}
 
 =[cotomet]
 
@@ -8,22 +8,33 @@
 
 The data language dual to tomet (`tmt` / `ctmt`): a lightweight, expressive
 syntax for values, maps and sequences. This is the crate to depend on when
-using cotomet from Rust. It holds no logic of its own.
+using cotomet from Rust.
 
-==[Overview]
-
-- `syntax` is the language: parser, printer and the spelling helpers
-
-from `cotomet-syntax`. Read its crate doc for what cotomet accepts. Without
-the `eval` feature, an unquoted expression `${...}` is an error.
-
-- The top level is the serde side (`serde_cotomet`): [`from_str`] and
+- Top-level serde support is provided by `serde_cotomet`: [`from_str`] and
 
 [`to_string`] read and write Rust types as cotomet.
 
+- `parse_file` reads standalone `.ctmt` data files into a [`File`].
 - `eval` evaluates `${macro...}` and `${var...}` expressions in `.ctmt`
 
 files when the optional `eval` feature is enabled.
 
-A crate that sits below this one in the workspace layering (the tomet
-parser, the printers) depends on `cotomet-syntax` directly.
+==[Module syntax]
+
+===[Functions]
+
+====[fn parse_file_with]
+
+==[Functions]
+
+===[fn parse_file]
+
+Parse a standalone cotomet file (`.ctmt`): declarations, then a map of
+`key: value` entries.
+
+Unquoted `${...}` expressions are rejected (this reader reads data only).
+
+===[fn parse_file_with_expressions]
+
+Parse a standalone cotomet file (`.ctmt`) allowing unquoted `${...}` expressions
+(e.g. for expression evaluation or formatting).

@@ -2,7 +2,7 @@
 //! [`crate::classify_std`]) from its `args`, centralizing the `1..=6` clamp
 //! that `tomet-html`/`tomet-markdown`/`tomet-printer` each used to apply separately.
 
-use tomet_ast::Element;
+use tomet_ast::ElementView;
 use tomet_tree::ValueExt;
 
 use crate::kind::ElementKind;
@@ -13,7 +13,7 @@ use crate::positional::normalized_element_args;
 /// `level` argument is missing or not an integer (e.g. hand-authored
 /// `@heading(level: "two")`) -- callers fall back to a default level
 /// themselves, this function never guesses one.
-pub fn heading_level(el: &Element) -> Option<u8> {
+pub fn heading_level(el: ElementView<'_>) -> Option<u8> {
     if crate::classify_std_lenient(el) != ElementKind::Heading {
         return None;
     }
@@ -33,16 +33,16 @@ mod tests {
     fn type_sigil_heading_classifies_and_extracts_level() {
         let mut el = element_new(Name::bare("heading"));
         el.data.args = Some(Value::Int(2));
-        assert_eq!(crate::classify_std_lenient(&el), ElementKind::Heading);
-        assert_eq!(heading_level(&el), Some(2));
+        assert_eq!(crate::classify_std_lenient(el.as_view()), ElementKind::Heading);
+        assert_eq!(heading_level(el.as_view()), Some(2));
     }
 
     #[test]
     fn at_sigil_heading_classifies_and_extracts_level() {
         let mut el = element_new(Name::bare("heading"));
         el.data.args = Some(Value::Int(3));
-        assert_eq!(crate::classify_std_lenient(&el), ElementKind::Heading);
-        assert_eq!(heading_level(&el), Some(3));
+        assert_eq!(crate::classify_std_lenient(el.as_view()), ElementKind::Heading);
+        assert_eq!(heading_level(el.as_view()), Some(3));
     }
 
     #[test]
@@ -64,34 +64,34 @@ mod tests {
         // under the single "level" positional slot before this reads it.
         let mut el = element_new(Name::bare("heading"));
         el.data.args = Some(Value::Int(1));
-        assert_eq!(heading_level(&el), Some(1));
+        assert_eq!(heading_level(el.as_view()), Some(1));
     }
 
     #[test]
     fn clamps_level_above_six_down_to_six() {
         let mut el = element_new(Name::bare("heading"));
         el.data.args = Some(Value::Int(9));
-        assert_eq!(heading_level(&el), Some(6));
+        assert_eq!(heading_level(el.as_view()), Some(6));
     }
 
     #[test]
     fn clamps_level_below_one_up_to_one() {
         let mut el = element_new(Name::bare("heading"));
         el.data.args = Some(Value::Int(0));
-        assert_eq!(heading_level(&el), Some(1));
+        assert_eq!(heading_level(el.as_view()), Some(1));
     }
 
     #[test]
     fn non_heading_element_is_always_none() {
         let mut el = element_new(Name::bare("raw"));
         el.data.args = Some(Value::Int(2));
-        assert_eq!(heading_level(&el), None);
+        assert_eq!(heading_level(el.as_view()), None);
     }
 
     #[test]
     fn heading_with_missing_level_is_none() {
         let el = element_new(Name::bare("heading"));
-        assert_eq!(heading_level(&el), None);
+        assert_eq!(heading_level(el.as_view()), None);
     }
 
     #[test]
@@ -101,6 +101,6 @@ mod tests {
             "level".to_string(),
             Value::String("two".to_string()),
         )]));
-        assert_eq!(heading_level(&el), None);
+        assert_eq!(heading_level(el.as_view()), None);
     }
 }

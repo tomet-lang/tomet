@@ -1,6 +1,8 @@
 //! Element group order formatting according to `GroupOrder` settings.
 
-use tomet_ast::{Block, Connect, Data, Declaration, Element, Entry, Group, Inline, List};
+use tomet_ast::{
+    Block, BodyView, Connect, Declaration, ElementView, Entry, Group, Inline, List,
+};
 use tomet_config::{GroupOrder, PrinterConfig};
 use tomet_ast_parser::parse_document;
 
@@ -116,7 +118,7 @@ fn collect_swaps_in_block(
             }
         }
         Block::Element(el) => {
-            collect_swaps_in_element(el, src, config, swaps, limit);
+            collect_swaps_in_element(el.as_view(), src, config, swaps, limit);
         }
         Block::Declaration(declaration) => {
             collect_swaps_in_declaration(declaration, src, config, swaps, limit);
@@ -154,10 +156,10 @@ fn collect_swaps_in_list(
     limit: usize,
 ) {
     for item in &list.items {
-        match item.named_element() {
-            Some(element) => collect_swaps_in_element(&element, src, config, swaps, limit),
+        match item.as_element_view() {
+            Some(element) => collect_swaps_in_element(element, src, config, swaps, limit),
             None => {
-                collect_swaps_in_held(Some(&item.content), &item.data, src, config, swaps, limit)
+                collect_swaps_in_held(item.as_body_view(), src, config, swaps, limit)
             }
         }
         if swaps.len() >= limit {
@@ -180,12 +182,12 @@ fn collect_swaps_in_inline(
     limit: usize,
 ) {
     if let Inline::Element(el) = inline {
-        collect_swaps_in_element(el, src, config, swaps, limit);
+        collect_swaps_in_element(el.as_view(), src, config, swaps, limit);
     }
 }
 
 fn collect_swaps_in_element(
-    el: &Element,
+    el: ElementView<'_>,
     src: &str,
     config: &PrinterConfig,
     swaps: &mut Vec<SwapTarget>,
@@ -215,11 +217,11 @@ fn collect_swaps_in_element(
     }
 
     // 2. Otherwise recursively check children
-    collect_swaps_in_held(el.content.as_deref(), &el.data, src, config, swaps, limit);
+    collect_swaps_in_held(el.body(), src, config, swaps, limit);
     if swaps.len() >= limit {
         return;
     }
-    for conn in &el.connects {
+    for conn in el.connects {
         collect_swaps_in_connect(conn, src, config, swaps, limit);
         if swaps.len() >= limit {
             return;
@@ -237,8 +239,7 @@ fn collect_swaps_in_connect(
     limit: usize,
 ) {
     collect_swaps_in_held(
-        conn.content.as_deref(),
-        &conn.data,
+        conn.as_body_view(),
         src,
         config,
         swaps,
@@ -256,8 +257,7 @@ fn collect_swaps_in_declaration(
     limit: usize,
 ) {
     collect_swaps_in_held(
-        declaration.content.as_deref(),
-        &declaration.data,
+        declaration.as_body_view(),
         src,
         config,
         swaps,
@@ -266,29 +266,29 @@ fn collect_swaps_in_declaration(
 }
 
 fn collect_swaps_in_held(
-    content: Option<&[Block]>,
-    data: &Data,
+    body: BodyView<'_>,
     src: &str,
     config: &PrinterConfig,
     swaps: &mut Vec<SwapTarget>,
     limit: usize,
 ) {
-    for block in content.into_iter().flatten() {
+    for block in body.content.into_iter().flatten() {
         collect_swaps_in_block(block, src, config, swaps, limit);
         if swaps.len() >= limit {
             return;
         }
     }
-    let Some(Group(entries)) = &data.value else {
+    let Some(Group(entries)) = &body.data.value else {
         return;
     };
     for entry in entries {
         match entry {
-            Entry::Element(child) => collect_swaps_in_element(child, src, config, swaps, limit),
+            Entry::Element(child) => {
+                collect_swaps_in_element(child.as_view(), src, config, swaps, limit)
+            }
             // A bare entry holds what an element does, and is no element.
             Entry::Bare(bare) => collect_swaps_in_held(
-                bare.content.as_deref(),
-                &bare.data,
+                bare.as_body_view(),
                 src,
                 config,
                 swaps,

@@ -3,7 +3,7 @@
 use crate::kind::{ElementKind, classify_std_lenient};
 use crate::positional::normalized_element_args;
 use std::collections::HashMap;
-use tomet_ast::{Document, Element, Placement};
+use tomet_ast::{Document, Element, ElementView, Placement};
 use tomet_span::Span;
 use tomet_tree::{ValueExt, for_each_element};
 
@@ -74,9 +74,10 @@ impl FootnoteRegistry {
         // `@ftn(id)`, is a reference to one and defines nothing.
         let mut defs: HashMap<String, Element> = HashMap::new();
         for_each_element(doc, |el| {
-            if classify_std_lenient(el) == ElementKind::Footnote
+            let view = el.as_view();
+            if classify_std_lenient(view) == ElementKind::Footnote
                 && el.content.is_some()
-                && let Some(id) = get_element_id(el)
+                && let Some(id) = get_element_id(view)
             {
                 defs.insert(id, el.clone());
             }
@@ -87,19 +88,20 @@ impl FootnoteRegistry {
         let mut id_to_index: HashMap<String, usize> = HashMap::new();
 
         for_each_element(doc, |el| {
-            let kind = classify_std_lenient(el);
+            let view = el.as_view();
+            let kind = classify_std_lenient(view);
             match kind {
                 ElementKind::Footnote => {
                     // Block-placed footnote with ID and content is a separated
                     // definition block, not an in-text reference occurrence.
                     let is_block_def = el.placement == Placement::Block
                         && el.content.is_some()
-                        && get_element_id(el).is_some();
+                        && get_element_id(view).is_some();
                     if is_block_def {
                         return;
                     }
 
-                    let id = get_element_id(el);
+                    let id = get_element_id(view);
                     if let Some(id_str) = id {
                         if el.content.is_none() {
                             // `@ftn(id)`: a reference to the definition with that id
@@ -162,7 +164,7 @@ impl FootnoteRegistry {
     }
 }
 
-fn get_element_id(el: &Element) -> Option<String> {
+fn get_element_id(el: ElementView<'_>) -> Option<String> {
     let args = normalized_element_args(el)?;
     if let Some(id) = args.get("id") {
         return value_to_id(id);

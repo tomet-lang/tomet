@@ -1,6 +1,6 @@
 ::kind(api)
 
-::meta{crate: tomet-extract, dependencies: list(tomet-ast, tomet-cst, tomet-lexer, tomet-parser, tomet-tree), dependents: list()}
+::meta{crate: tomet-extract, dependencies: list(tomet-ast, tomet-ast-parser, tomet-cst, tomet-position, tomet-span, tomet-tree), dependents: list()}
 
 =[tomet-extract]
 
@@ -72,7 +72,7 @@ Records where each line of an extracted comment block sits in the source file.
 Everything is a byte offset: a [`Span`] from parsing `text` points into
 `text`, [`map_span`](Self::map_span) turns it into a span of the original
 file, and the caller resolves a line and column from the file with a
-`tomet_lexer::LineIndex` when it has to show one.
+`tomet_position::LineIndex` when it has to show one.
 
 ===[struct ParsedComment]
 

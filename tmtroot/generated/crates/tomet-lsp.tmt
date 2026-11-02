@@ -1,6 +1,6 @@
 ::kind(api)
 
-::meta{crate: tomet-lsp, dependencies: list(cotomet, cotomet-eval, tomet-address, tomet-ast, tomet-cst, tomet-declaration, tomet-expr, tomet-formatter, tomet-lexer, tomet-load, tomet-load-config, tomet-parser, tomet-semantics, tomet-tree, tomet-validator), dependents: list()}
+::meta{crate: tomet-lsp, dependencies: list(cotomet, cotomet-eval, tomet-address, tomet-ast, tomet-ast-parser, tomet-cst, tomet-cst-parser, tomet-declaration, tomet-expr, tomet-formatter, tomet-load, tomet-load-config, tomet-position, tomet-semantics, tomet-span, tomet-tree, tomet-validator), dependents: list()}
 
 =[tomet-lsp]
 

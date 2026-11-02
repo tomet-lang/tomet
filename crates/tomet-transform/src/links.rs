@@ -116,12 +116,13 @@ pub fn resolve_document_links<F>(
     F: Fn(&str, Option<&Path>) -> Option<PathBuf>,
 {
     for_each_element_mut(doc, |el| {
-        let kind = classify_std_lenient(el);
+        let view = el.as_view();
+        let kind = classify_std_lenient(view);
         if kind != ElementKind::Link && kind != ElementKind::Embed {
             return;
         }
 
-        let Some(raw_target) = link_target(el, &kind) else {
+        let Some(raw_target) = link_target(view, &kind) else {
             return;
         };
         let (scheme, rest) = target_scheme(&raw_target);
@@ -268,7 +269,7 @@ mod tests {
 
         let mut targets = Vec::new();
         for_each_element_mut(&mut doc, |el| {
-            if let Some((_, t)) = tomet_semantics::link_target_of(el) {
+            if let Some((_, t)) = tomet_semantics::link_target_of(el.as_view()) {
                 targets.push(t);
             }
         });
@@ -318,7 +319,7 @@ mod tests {
 
         let mut targets = Vec::new();
         for_each_element_mut(&mut doc, |el| {
-            if let Some((_, t)) = tomet_semantics::link_target_of(el) {
+            if let Some((_, t)) = tomet_semantics::link_target_of(el.as_view()) {
                 targets.push(t);
             }
         });

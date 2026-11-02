@@ -48,7 +48,7 @@ pub(crate) fn render_block(block: &Block, config: &PrinterConfig, out: &mut Stri
             if matches!(
                 p.content.first(),
                 Some(Inline::Element(el)) if el.placement == Placement::Inline
-                    && classify_std_lenient(el) == ElementKind::Heading
+                    && classify_std_lenient(el.as_view()) == ElementKind::Heading
             ) =>
         {
             let Some(Inline::Element(first)) = p.content.first() else {
@@ -71,11 +71,11 @@ pub(crate) fn render_block(block: &Block, config: &PrinterConfig, out: &mut Stri
                 out.push('\n');
             }
         }
-        Block::Element(el) if classify_std_lenient(el) == ElementKind::Heading => {
+        Block::Element(el) if classify_std_lenient(el.as_view()) == ElementKind::Heading => {
             render_heading_element(el, config, out)
         }
         Block::Element(el) => {
-            out.push_str(&render_element(el, config));
+            out.push_str(&render_element(el.as_view(), config));
             out.push('\n');
         }
         Block::Declaration(declaration) => {
@@ -138,7 +138,7 @@ pub(crate) fn render_section(sec: &Section, config: &PrinterConfig, out: &mut St
 /// consistent with `tomet-html`/`tomet-markdown`'s
 /// equivalent gating for the same resolved decision.
 pub(crate) fn render_heading_element(el: &Element, config: &PrinterConfig, out: &mut String) {
-    let level = heading_level(el).unwrap_or(1) as usize;
+    let level = heading_level(el.as_view()).unwrap_or(1) as usize;
     let content = el.content.as_deref().unwrap_or(&[]);
     out.push_str(&"#".repeat(level));
     if config.format.heading_space_inside_brackets {
@@ -181,10 +181,10 @@ pub(crate) fn render_list_with_indent(
         // `render_element` a standalone one would use -- no marker, no
         // `( )`-wrapping, just the bare `-`/`-.` prefix directly against
         // `@name`.
-        if let Some(element) = item.named_element() {
+        if let Some(element) = item.as_element_view() {
             out.push_str(&indent_str);
             out.push_str(if ordered { "-." } else { "-" });
-            out.push_str(&render_element(&element, config));
+            out.push_str(&render_element(element, config));
             out.push('\n');
             if let Some(sub) = &item.sublist {
                 render_list_with_indent(sub, indent + 1, config, out);

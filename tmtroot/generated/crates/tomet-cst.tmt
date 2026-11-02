@@ -1,6 +1,6 @@
 ::kind(api)
 
-::meta{crate: tomet-cst, dependencies: list(), dependents: list(tomet-ast, tomet-edit, tomet-extract, tomet-highlight, tomet-js, tomet-lexer, tomet-lsp, tomet-merge, tomet-parser, tomet-tests, tomet-validator, tomet-validator-core)}
+::meta{crate: tomet-cst, dependencies: list(), dependents: list(tomet-ast-parser, tomet-cst-parser, tomet-edit, tomet-extract, tomet-highlight, tomet-js, tomet-lexer, tomet-lowering, tomet-lsp, tomet-merge, tomet-tests, tomet-validator, tomet-validator-core)}
 
 =[tomet-cst]
 
@@ -15,11 +15,15 @@ source characters, whitespace, newlines, and comments.
 Guaranteed Invariant: `syntax_node.text().to_string() == original_source`.
 - ("Core Types & Handles") [`SyntaxNode`], [`SyntaxToken`], [`SyntaxElement`] provide offset navigation.
 [`TextRange`], [`TextSize`] provide byte-offset spans for LSP diagnostics and refactorings.
+- ("Typed View") [`AstNode`], [`AstToken`], and typed CST wrappers ([`CstRoot`], [`CstSection`], etc.)
+provide typed traversal over Rowan syntax nodes.
 
-This crate defines only the vocabulary ([`SyntaxKind`]) and the rowan glue;
-`tomet-parser::parse_cst` builds the tree and documents its shape. The tree
-is structured down to sections (nested by level), elements and their groups,
-and `key: value` entries.
+This crate defines only the vocabulary ([`SyntaxKind`]), the rowan glue,
+and the typed node wrappers; `tomet-parser::parse_cst` builds the tree and
+documents its shape. The tree is structured down to sections (nested by level),
+elements and their groups, and `key: value` entries. A `|` run's later lines
+begin with a `MARGIN` token, a run's opener is a `PIPE`; the mistakes the
+parser can name stay in the tree as `ERROR` nodes.
 
 ==[Module syntax_kind]
 
@@ -28,6 +32,16 @@ Defines the raw token and composite node kinds for Tomet's Concrete Syntax Tree 
 ===[Enums]
 
 ====[enum SyntaxKind]
+
+==[Module typed]
+
+Typed AST wrappers over Rowan's [`SyntaxNode`].
+
+===[Traits]
+
+====[trait AstNode]
+
+====[trait AstToken]
 
 ==[Enums]
 
@@ -54,3 +68,10 @@ Replaces the exact source range occupied by `target` in `source` with `replaceme
 ===[type SyntaxNodeChildren]
 
 ===[type SyntaxElementChildren]
+
+==[Constants]
+
+===[const MAX_DEPTH]
+
+How deep constructs may nest: past this depth, parsing halts recursion and
+emits a `TOO_DEEP` node.

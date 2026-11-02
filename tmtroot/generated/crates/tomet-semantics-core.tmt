@@ -1,0 +1,86 @@
+::kind(api)
+
+::meta{crate: tomet-semantics-core, dependencies: list(tomet-ast, tomet-type), dependents: list(tomet-declaration, tomet-semantics, tomet-validator-core)}
+
+=[tomet-semantics-core]
+
+==[tomet-semantics-core]
+
+Shared core semantic model and type admission for Tomet and cotomet documents.
+
+==[Module admits]
+
+Type admission and conformance checking for AST [`Value`]s.
+
+===[Structs]
+
+====[struct Mismatch]
+
+A value that is not of the type it was held to.
+
+===[Functions]
+
+====[fn admits]
+
+Whether `value`, as a document holds it, is of this type.
+
+A type that is text -- `string`, `version`, `uuid`, `nanoid`, and `datetime`
+-- takes any scalar as the text it was written as, so a bare `2024` is a
+`string` and a bare `1.10` is a `version`: what is written decides, not
+what the reader would have made of it. A number type takes the numbers
+the reader keeps as written too (`1.10` is a `float`, `-0` an `int`).
+
+==[Module parse]
+
+Parsing of type specifications from AST [`Value`]s.
+
+===[Functions]
+
+====[fn parse_type_spec]
+
+Reads a `type:` specification as it is written in an AST [`Value`].
+
+Only a name is read. Any other spelling -- a call such as `list(string)`,
+a list, a map -- is a [`TypeError::NotAName`], because a type with a
+parameter has no spelling yet.
+
+==[Module positional]
+
+Giving positional arguments their names.
+
+The reader leaves a positional argument unnamed (an entry keyed [`POSITIONAL_ENTRY_KEY`]);
+what the first, the second... are called is a signature, and the signature belongs to whoever
+owns the element: a declaration's to `tomet-declaration`, a body element's to `tomet-semantics`.
+The binding itself is the same for all of them, and is here, next to the key it undoes.
+
+===[Functions]
+
+====[fn bind_positional]
+
+Names the positional arguments of `(args)` after `keys`, in order.
+
+The reader keeps a positional argument as it was written: an entry whose key is
+[`POSITIONAL_ENTRY_KEY`] in a map, an item of a sequence, or the lone scalar of `(x)`. A
+signature says what the first, the second... are called; this puts the names on.
+
+- A map: each remaining positional entry takes the next slot in `keys` that is not already
+
+a real key, left to right on both sides. A slot with no positional entry left, and a positional
+entry past the last slot, are both left as they are -- nothing is dropped, and an unassigned
+entry keeps its empty key.
+
+- A sequence (`(list(a, b))`): zipped against the slots by position; items past the last slot
+
+are dropped.
+
+- Any other value: the lone argument, under the first slot.
+
+With no `keys` -- an element that has no positional slots -- `args` comes back unchanged.
+
+This is the mechanism only; the signatures are the callers'.
+
+===[Constants]
+
+====[const POSITIONAL_ENTRY_KEY]
+
+Sentinel key for a positional (unkeyed) entry inside a map body or args.

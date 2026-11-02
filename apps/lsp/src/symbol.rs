@@ -1,5 +1,7 @@
 use lsp_types::{DocumentSymbol, SymbolKind};
-use tomet_ast::{Block, Connect, Declaration, Element, Inline, Interpolation, List, ListItem};
+use tomet_ast::{
+    Block, Connect, Declaration, ElementView, Inline, Interpolation, List, ListItem,
+};
 use tomet_semantics::{ElementKind, classify_std_lenient, heading_level};
 
 use crate::position::TextPositions;
@@ -53,7 +55,7 @@ fn collect_block_symbols(
                 collect_block_symbols(positions, child, symbols);
             }
         }
-        Block::Element(el) => collect_element_symbol(positions, el, symbols),
+        Block::Element(el) => collect_element_symbol(positions, el.as_view(), symbols),
         Block::Paragraph(p) => {
             for inline in &p.content {
                 collect_inline_symbols(positions, inline, symbols);
@@ -88,8 +90,8 @@ fn collect_item_symbol(
     item: &ListItem,
     symbols: &mut Vec<DocumentSymbol>,
 ) {
-    if let Some(element) = item.named_element() {
-        collect_element_symbol(positions, &element, symbols);
+    if let Some(element) = item.as_element_view() {
+        collect_element_symbol(positions, element, symbols);
         return;
     }
     let range = positions.range(&item.span);
@@ -118,14 +120,14 @@ fn collect_item_symbol(
 
 fn collect_element_symbol(
     positions: &TextPositions<'_>,
-    el: &Element,
+    el: ElementView<'_>,
     symbols: &mut Vec<DocumentSymbol>,
 ) {
     let range = positions.range(&el.span);
     let kind = classify_std_lenient(el);
     let symbol = if kind == ElementKind::Heading {
         let level = heading_level(el).unwrap_or(1);
-        let title = extract_blocks_text(el.content.as_deref().unwrap_or(&[]));
+        let title = extract_blocks_text(el.content.unwrap_or(&[]));
         let name = format!("{} {}", "=".repeat(level as usize), title);
         #[allow(deprecated)]
         DocumentSymbol {
@@ -154,12 +156,12 @@ fn collect_element_symbol(
     };
     symbols.push(symbol);
 
-    if let Some(content) = &el.content {
+    if let Some(content) = el.content {
         for block in content {
             collect_block_symbols(positions, block, symbols);
         }
     }
-    for conn in &el.connects {
+    for conn in el.connects {
         collect_connect_symbol(positions, conn, symbols);
     }
 }
@@ -233,7 +235,7 @@ fn collect_inline_symbols(
     symbols: &mut Vec<DocumentSymbol>,
 ) {
     match inline {
-        Inline::Element(el) => collect_element_symbol(positions, el, symbols),
+        Inline::Element(el) => collect_element_symbol(positions, el.as_view(), symbols),
         Inline::Interp(interp) => collect_interp_symbol(positions, interp, symbols),
         _ => {}
     }

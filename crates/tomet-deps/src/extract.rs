@@ -10,7 +10,8 @@ use crate::model::{Dependency, DependencyKind, DocumentNode, fnv1a_hash};
 pub fn extract_raw_dependencies(doc: &Document) -> Vec<(String, DependencyKind)> {
     let mut out = Vec::new();
     for_each_element(doc, |el| {
-        if let Some((kind, target)) = link_target_of(el).or_else(|| path_target_of(el)) {
+        let view = el.as_view();
+        if let Some((kind, target)) = link_target_of(view).or_else(|| path_target_of(view)) {
             match kind {
                 ElementKind::Embed => {
                     out.push((target, DependencyKind::Embed));

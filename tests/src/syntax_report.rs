@@ -24,8 +24,8 @@ use std::fmt::Write as _;
 use std::path::PathBuf;
 
 use tomet_ast::{
-    Bare, Block, Connect, Data, Document, Element, Entry, Group, Hole, Inline, InterpExpr,
-    Interpolation, List, ListItem, Placement, Value,
+    Bare, Block, Connect, Data, Document, ElementView, Entry, Group, Hole, Inline,
+    InterpExpr, Interpolation, List, ListItem, Placement, Value,
 };
 use tomet_ast_parser::parse_document;
 
@@ -671,7 +671,7 @@ fn dump_block(out: &mut String, block: &Block, depth: usize) {
                 dump_inline(out, inline, depth + 1);
             }
         }
-        Block::Element(el) => dump_element(out, el, depth),
+        Block::Element(el) => dump_element(out, el.as_view(), depth),
         Block::Interp(interp) => dump_interp(out, interp, depth),
         Block::Declaration(declaration) => {
             indent(out, depth);
@@ -713,7 +713,7 @@ fn dump_block(out: &mut String, block: &Block, depth: usize) {
                                 indent(out, depth + 2);
                                 let _ = writeln!(out, "{k}: {}", value_str(v));
                             }
-                            Entry::Element(child) => dump_element(out, child, depth + 2),
+                            Entry::Element(child) => dump_element(out, child.as_view(), depth + 2),
                             Entry::Hole(child) => dump_hole(out, child, depth + 2),
                             Entry::Bare(child) => dump_bare(out, child, depth + 2),
                         }
@@ -785,7 +785,7 @@ fn dump_inline(out: &mut String, inline: &Inline, depth: usize) {
             indent(out, depth);
             let _ = writeln!(out, "LineBreak");
         }
-        Inline::Element(el) => dump_element(out, el, depth),
+        Inline::Element(el) => dump_element(out, el.as_view(), depth),
         Inline::Interp(interp) => dump_interp(out, interp, depth),
         Inline::Hole(hole) => dump_hole(out, hole, depth),
     }
@@ -814,16 +814,16 @@ fn dump_interp(out: &mut String, interp: &Interpolation, depth: usize) {
     let _ = writeln!(out, "interp  {}", interp_str(&interp.expr));
 }
 
-fn dump_element(out: &mut String, el: &Element, depth: usize) {
+fn dump_element(out: &mut String, el: ElementView<'_>, depth: usize) {
     indent(out, depth);
     let _ = writeln!(out, "{}", element_head(el));
 
-    dump_groups(out, &el.data, el.content.as_deref(), depth);
-    if let Some(id) = &el.id {
+    dump_groups(out, el.data, el.content, depth);
+    if let Some(id) = el.id {
         indent(out, depth + 1);
         let _ = writeln!(out, "id      {:?}", id.0);
     }
-    for connect in &el.connects {
+    for connect in el.connects {
         indent(out, depth + 1);
         out.push_str("connect\n");
         dump_connect(out, connect, depth + 2);
@@ -833,8 +833,8 @@ fn dump_element(out: &mut String, el: &Element, depth: usize) {
 /// A list item reads as the element it is when it has a name, and as a bare one
 /// when it has not.
 fn dump_item(out: &mut String, item: &ListItem, depth: usize) {
-    if let Some(element) = item.named_element() {
-        dump_element(out, &element, depth);
+    if let Some(element) = item.as_element_view() {
+        dump_element(out, element, depth);
         return;
     }
     indent(out, depth);
@@ -896,7 +896,7 @@ fn dump_groups(out: &mut String, data: &Data, content: Option<&[Block]>, depth: 
                         indent(out, depth + 2);
                         let _ = writeln!(out, "{k}: {}", value_str(v));
                     }
-                    Entry::Element(child) => dump_element(out, child, depth + 2),
+                    Entry::Element(child) => dump_element(out, child.as_view(), depth + 2),
                     Entry::Hole(child) => dump_hole(out, child, depth + 2),
                     Entry::Bare(child) => dump_bare(out, child, depth + 2),
                 }
@@ -910,7 +910,7 @@ fn dump_groups(out: &mut String, data: &Data, content: Option<&[Block]>, depth: 
 ///
 /// Placement is shown because the name does not carry it -- every element is
 /// `@name`, and whether it stands as a block is decided by position.
-fn element_head(el: &Element) -> String {
+fn element_head(el: ElementView<'_>) -> String {
     let placement = match el.placement {
         Placement::Block => "Block ",
         Placement::Inline => "Inline",

@@ -23,7 +23,7 @@
 use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
-use tomet_ast::{Block, Document, Inline};
+use tomet_ast::{Block, Document, ElementView, Inline};
 use tomet_semantics::{ElementKind, TargetScheme, link_target_of, path_target_of, target_scheme};
 
 pub use tomet_address::LinkKind;
@@ -134,7 +134,7 @@ pub fn measure(doc: &Document) -> Stats {
     };
 
     /// The link an element is, if it is one, counted by its kind.
-    fn count_link(stats: &mut Stats, el: &tomet_ast::Element) {
+    fn count_link(stats: &mut Stats, el: ElementView<'_>) {
         if let Some((kind, target)) = link_target_of(el).or_else(|| path_target_of(el))
             && let Some(link_kind) = link_kind_from_semantic(&kind, &target)
             && let Some(i) = LinkKind::ALL.iter().position(|k| *k == link_kind)
@@ -146,19 +146,19 @@ pub fn measure(doc: &Document) -> Stats {
     tomet_tree::for_each_element(doc, |el| {
         stats.named += 1;
         *stats.by_name.entry(el.name.to_string()).or_default() += 1;
-        count_link(&mut stats, el);
+        count_link(&mut stats, el.as_view());
     });
 
     // A list item and a nameless `{...}` entry are not elements, so the walk above
     // never meets them: a named item is counted as the element it is, a plain one
     // as the bare element it was.
-    tomet_tree::for_each_list_item(doc, |item| match (&item.name, item.named_element()) {
-        (Some(name), Some(element)) => {
+    tomet_tree::for_each_list_item(doc, |item| match item.as_element_view() {
+        Some(view) => {
             stats.named += 1;
-            *stats.by_name.entry(name.to_string()).or_default() += 1;
-            count_link(&mut stats, &element);
+            *stats.by_name.entry(view.name.to_string()).or_default() += 1;
+            count_link(&mut stats, view);
         }
-        _ => stats.bare += 1,
+        None => stats.bare += 1,
     });
     tomet_tree::for_each_node(doc, |node| {
         if let tomet_tree::Node::Entry(tomet_ast::Entry::Bare(_)) = node {

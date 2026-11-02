@@ -7,7 +7,7 @@ use crate::util::{
     split_attrs, value_to_plain,
 };
 use crate::{HeadingInfo, RenderCtx};
-use tomet_ast::{Block, Element, Inline, List, Paragraph, Section, Value};
+use tomet_ast::{Block, ElementView, Inline, List, Paragraph, Section, Value};
 use tomet_span::Span;
 use tomet_semantics::{ElementKind, classify_std_lenient, heading_level};
 
@@ -48,8 +48,8 @@ pub(crate) fn render_block(
                 out.push_str("</p>\n");
             }
         }
-        Block::Element(el) if classify_std_lenient(el) == ElementKind::Heading => {
-            render_heading_element(cx, el, out, state)
+        Block::Element(el) if classify_std_lenient(el.as_view()) == ElementKind::Heading => {
+            render_heading_element(cx, el.as_view(), out, state)
         }
         Block::Element(el) => {
             // The catch-all: dispatches into whichever of `render_element`'s
@@ -61,7 +61,7 @@ pub(crate) fn render_block(
             // `>` reach an attribute value, so the first `>` after this
             // point is that tag's own close.
             let start = out.len();
-            render_element(cx, el, out, false);
+            render_element(cx, el.as_view(), out, false);
             if cx.options.emit_source_spans && out.len() > start {
                 splice_span_attrs(out, start, el.span);
             }
@@ -163,15 +163,15 @@ fn splice_span_attrs(out: &mut String, start: usize, span: Span) {
 /// CommonMark/Tomet headings are both block-position-only by grammar.
 fn render_heading_element(
     cx: &RenderCtx,
-    el: &Element,
+    el: ElementView<'_>,
     out: &mut String,
     state: &mut HeadingState,
 ) {
     let level = heading_level(el).unwrap_or(1);
-    let content = el.content.as_deref().unwrap_or(&[]);
+    let content = el.content.unwrap_or(&[]);
     let value_data = el.data.value.as_ref().map(|v| v.as_data());
     let (class, data) = split_attrs(value_data.as_ref());
-    let mut id = id_attr(el.id.as_ref());
+    let mut id = id_attr(el.id);
     let text = crate::util::blocks_to_plain(content);
     if id.is_none() && cx.options.auto_slug_headings {
         let slug = state.slugs.slug_for(&text);
@@ -213,11 +213,11 @@ fn render_list(cx: &RenderCtx, list: &List, out: &mut String) {
         // -- no list-marker span, since there is no marker, and the item's
         // own `{value}`/`id` belong to the element, not to a synthetic
         // `<li class=.. data-..>` the way a plain item's do below.
-        if let Some(element) = item.named_element() {
+        if let Some(element) = item.as_element_view() {
             out.push_str("<li");
             push_span_attrs(cx, out, item.span);
             out.push('>');
-            render_element(cx, &element, out, false);
+            render_element(cx, element, out, false);
             if let Some(sub) = &item.sublist {
                 render_list(cx, sub, out);
             }
@@ -249,7 +249,7 @@ fn render_list(cx: &RenderCtx, list: &List, out: &mut String) {
             out.push('>');
             match marker {
                 Value::Element(el) => {
-                    render_element(cx, el, out, true);
+                    render_element(cx, el.as_view(), out, true);
                 }
                 Value::Interp(interp) => render_interp(interp, out),
                 other => {
@@ -300,7 +300,7 @@ pub(crate) fn render_inlines(cx: &RenderCtx, inlines: &[Inline], out: &mut Strin
                 out.push_str(tomet_ast::softbreak_join(before, after));
             }
             Inline::LineBreak(_) => out.push_str("<br>"),
-            Inline::Element(el) => render_element(cx, el, out, true),
+            Inline::Element(el) => render_element(cx, el.as_view(), out, true),
             Inline::Interp(interp) => render_interp(interp, out),
             Inline::Hole(hole) => out.push_str(&escape_html(&tomet_printer::hole_to_tm(hole))),
         }

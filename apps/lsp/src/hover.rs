@@ -69,7 +69,8 @@ pub fn hover_in(text: &str, pos: Position, evaluate: Evaluate<'_>) -> Option<Hov
         fn visit(&mut self, el: &Element) {
             let span = el.span;
             if span_contains(&span, self.offset) {
-                let kind = classify_std_lenient(el);
+                let view = el.as_view();
+                let kind = classify_std_lenient(view);
                 let hover = if kind == ElementKind::Table {
                     table_hover(self.positions, self.text, self.pos, el)
                 } else if let Some(h) = macro_hover(self.positions, self.doc, self.evaluate, el) {
@@ -78,14 +79,14 @@ pub fn hover_in(text: &str, pos: Position, evaluate: Evaluate<'_>) -> Option<Hov
                     Some(Hover {
                         contents: HoverContents::Markup(MarkupContent {
                             kind: MarkupKind::Markdown,
-                            value: format!("**Heading Level {}**", heading_level(el).unwrap_or(1)),
+                            value: format!("**Heading Level {}**", heading_level(view).unwrap_or(1)),
                         }),
                         range: Some(self.positions.range(&span)),
                     })
                 } else {
                     let mut desc = format!("**Element**: `{}`\n", format!("@{}", el.name));
                     desc.push_str(&format!("- **Classification**: `{}`\n", kind.as_str()));
-                    if let Some(norm_args) = normalized_element_args(el) {
+                    if let Some(norm_args) = normalized_element_args(view) {
                         desc.push_str(&format!("- **Normalized Args**: `{norm_args:?}`\n"));
                     }
                     Some(Hover {
@@ -310,7 +311,7 @@ fn table_hover(
     // `normalized_element_args`, not raw `el.args`: `align: list(...)` is
     // a `Value::Call` until normalized, and `extract_table_aligns_from_args`
     // only recognizes `Value::Seq`.
-    let normalized_args = normalized_element_args(el);
+    let normalized_args = normalized_element_args(el.as_view());
     let aligns = extract_table_aligns_from_args(normalized_args.as_ref());
 
     let mut table_rows: Vec<(usize, Vec<CellInfo>)> = Vec::new();

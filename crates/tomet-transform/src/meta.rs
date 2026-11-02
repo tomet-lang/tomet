@@ -12,7 +12,7 @@ pub fn set_meta_in_doc(doc: &mut Document, target_element: &str, key: &str, new_
     let mut found = false;
 
     for_each_element_mut(doc, |el| {
-        let kind = classify_std_lenient(el);
+        let kind = classify_std_lenient(el.as_view());
         if kind.as_str() == target_element {
             found = true;
             el.data.set_prop(key, Value::String(new_val.to_string()));

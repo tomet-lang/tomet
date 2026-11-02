@@ -24,8 +24,8 @@ character" check.
 - @strong[No lazy paragraph continuation.] A paragraph ends at a blank
 line or EOF only, not at the next line merely @em[looking] like a new
 block. `tomet-parser`'s own lazy-continuation check also ends a
-paragraph early when the next line is an element trigger (`<T>`/
-`@name`, see `document.rs`'s `Stop::Paragraph`) -- e.g. `::meta{...}`
+paragraph early when the next line is an element trigger (`@name`,
+see `document.rs`'s `Stop::Paragraph`) -- e.g. `::meta{...}`
 immediately followed by `::settings{...}` with no blank line between
 them becomes two separate top-level elements in the real parser.
 This grammar doesn't simulate that either, so it still merges such
@@ -63,15 +63,14 @@ entry-separator logic about comments specifically, not just the
 not as a real `content_group`) has no fallback token and produces a
 small `ERROR` -- unlike `(`/`[`/`{`/`-`, which all fall back to a
 `punctuation` node when nothing opens with them.
-- @strong[`<T>`/`@name` written with no group at all] (e.g. `<T>` used as
-a literal placeholder in prose, as `tests/fixtures/readme.tmt` itself
-does when explaining the grammar) still parses as an `element`
-here, where the real parser requires an immediately-following
-group to even recognize it as one (see
-`document.rs::is_type_element_start`/`is_at_element_start`) and
-otherwise treats it as plain text. Considered an acceptable v1
-trade-off: it doesn't error, and highlighting `<T>`-shaped text as
-an element is a reasonable default regardless.
+- @strong[A `<...>` box is approximated.] A name tag (`<PATH>`) is one `label`
+token and a hole (`<?int(n)>[...]`) is a `hole` node with `hole_open`,
+the groups, `hole_close` and the content. The real parser needs the
+head to be tight (`<?int (n)>` is text there), but `extras` lets
+white space into it here. A box in a value position (`url: <?(u)>`)
+is left to `scalar`, so it is not a `hole` there. A shape that is no
+box (`a < b`, `x<=1`, `<->`, `</x>`, `<x/>`) is `text` and
+`punctuation`, never an `ERROR`.
 - @strong[Unterminated `/* ... */` doesn't produce an `ERROR`.] The real
 parser (`document.rs::skip_block_comment`) hard-errors on a missing
 `*/` -- silently swallowing the rest of the document is a much
