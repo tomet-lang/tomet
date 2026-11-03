@@ -10,7 +10,7 @@ pub use decode::{RuleArgs, decode_rule_args};
 use tomet_ast::{Connect, File};
 use tomet_span::Span;
 use tomet_semantics::Bindings;
-use tomet_tree::Child;
+use tomet_tree::Node;
 use tomet_validator_core::{Diagnostic, child_kind_name};
 
 /// Enforces every `:rule(allow:list(...))` connect found anywhere in the
@@ -46,7 +46,7 @@ pub fn check_one_connect(
     connect: &Connect,
     bindings: &Bindings,
     errors: &mut Vec<Diagnostic>,
-    walk_descendants: impl FnOnce(bool, &mut dyn FnMut(Child<'_>)),
+    walk_descendants: impl FnOnce(bool, &mut dyn FnMut(Node<'_>)),
 ) {
     let member = match tomet_semantics::classify_connect_member(&connect.name) {
         Ok(member) => member,
@@ -72,7 +72,7 @@ pub fn check_one_rule(
     connect: &Connect,
     bindings: &Bindings,
     errors: &mut Vec<Diagnostic>,
-    walk_descendants: impl FnOnce(bool, &mut dyn FnMut(Child<'_>)),
+    walk_descendants: impl FnOnce(bool, &mut dyn FnMut(Node<'_>)),
 ) {
     let Some(rule_args) = decode_rule_args(connect) else {
         return;
@@ -87,7 +87,7 @@ pub fn check_descendants_against_rule(
     rule_span: Span,
     bindings: &Bindings,
     errors: &mut Vec<Diagnostic>,
-    walk_descendants: impl FnOnce(bool, &mut dyn FnMut(Child<'_>)),
+    walk_descendants: impl FnOnce(bool, &mut dyn FnMut(Node<'_>)),
 ) {
     let allowed_display: Vec<String> = rule_args.allow.iter().map(|n| n.to_string()).collect();
 
@@ -104,7 +104,7 @@ pub fn check_descendants_against_rule(
                 name: kind_name,
                 allowed: allowed_display.clone(),
                 rule_span,
-                span: descendant.span(),
+                span: descendant.span().unwrap_or_default(),
             });
         }
     });

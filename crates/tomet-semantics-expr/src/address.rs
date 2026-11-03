@@ -8,7 +8,7 @@
 
 use super::context::EvalContext;
 use super::error::EvalError;
-use super::nodes::normalize_path;
+use super::parts::normalize_path;
 use super::value::{DirRef, DocRef, Env, EvalValue};
 
 /// The name under which the document to resolve a leading `#id` against is

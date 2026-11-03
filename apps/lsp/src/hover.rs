@@ -556,7 +556,7 @@ fn render_value(value: &EvalValue) -> String {
         EvalValue::DateTime(dt) => tomet_expr::format_datetime(dt, "YYYY-MM-DD HH:mm:ss"),
         EvalValue::Document(doc) => format!("document {}", doc.0),
         EvalValue::Directory(dir) => format!("directory {}", dir.0),
-        EvalValue::Node { node, .. } => match node.id() {
+        EvalValue::Part { part, .. } => match part.id() {
             Some(id) => format!("element #{id}"),
             None => "element".to_string(),
         },

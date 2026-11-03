@@ -14,7 +14,7 @@ use super::value::EvalValue;
 pub(crate) fn link_fragment(target: &EvalValue) -> Result<EvalValue, EvalError> {
     let address = match target {
         EvalValue::Document(doc) => format!("tmt:{}", doc.0),
-        EvalValue::Node { doc, node } => match node.id() {
+        EvalValue::Part { doc, part } => match part.id() {
             Some(id) => format!("tmt:{}#{id}", doc.0),
             None => {
                 return Err(EvalError::message(

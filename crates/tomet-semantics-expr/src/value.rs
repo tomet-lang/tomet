@@ -9,7 +9,7 @@
 //!
 //! =[ References and fragments ]
 //!
-//! A [`DocRef`], [`DirRef`] and [`EvalValue::Node`] point at something in the
+//! A [`DocRef`], [`DirRef`] and [`EvalValue::Part`] point at something in the
 //! source. Putting one where output goes is a type mismatch, because it does
 //! not say whether the author wants a link or the content. A
 //! [`EvalValue::Fragment`] is a tree built by evaluation (`include`, `link`)
@@ -29,18 +29,15 @@ pub struct DocRef(pub String);
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct DirRef(pub String);
 
-/// A node that can carry a unique id: an element, a section or a list.
+/// A structured part of a document: an element, a section, a list, a connect,
+/// a declaration, or a list item.
 ///
-/// A heading's id attaches to the whole section (heading and everything
-/// under it), not to a lone element, and a list's to the whole list, not to
-/// one of its items -- which is why each is a node of its own.
-///
-/// A list has an `id` in the tree, but no syntax writes one yet (a trailing
-/// `#(id)` belongs to the last item). It is addressed here by the same rules
-/// as the others, so that when a spelling is chosen nothing in the evaluator
-/// has to change.
+/// Unlike whole documents ([`EvalValue::Document`]) or detached block output
+/// ([`EvalValue::Fragment`]), a [`Part`] represents a structured AST vertex
+/// from a document inspectable at runtime via `.name`, `.prop`, `.id`,
+/// `.connects`, `.content`, and `.item(n)`.
 #[derive(Debug, Clone, PartialEq)]
-pub enum Node {
+pub enum Part {
     Element(Box<Element>),
     Section(Box<Section>),
     List(Box<List>),
@@ -49,20 +46,20 @@ pub enum Node {
     Connect(Box<Connect>),
     /// A `::name(...)` declaration, when it was given an id.
     Declaration(Box<Declaration>),
-    /// An item of a list: a node of its own, since it can carry an id.
+    /// An item of a list: a part of its own, since it can carry an id.
     Item(Box<ListItem>),
 }
 
-impl Node {
-    /// The node's unique id, if it has one.
+impl Part {
+    /// The part's unique id, if it has one.
     pub fn id(&self) -> Option<&str> {
         match self {
-            Node::Element(el) => el.id.as_ref().map(|id| id.0.as_str()),
-            Node::Section(sec) => sec.id.as_ref().map(|id| id.0.as_str()),
-            Node::List(list) => list.id.as_ref().map(|id| id.0.as_str()),
-            Node::Connect(_) => None,
-            Node::Declaration(d) => d.id.as_ref().map(|id| id.0.as_str()),
-            Node::Item(item) => item.id.as_ref().map(|id| id.0.as_str()),
+            Part::Element(el) => el.id.as_ref().map(|id| id.0.as_str()),
+            Part::Section(sec) => sec.id.as_ref().map(|id| id.0.as_str()),
+            Part::List(list) => list.id.as_ref().map(|id| id.0.as_str()),
+            Part::Connect(_) => None,
+            Part::Declaration(d) => d.id.as_ref().map(|id| id.0.as_str()),
+            Part::Item(item) => item.id.as_ref().map(|id| id.0.as_str()),
         }
     }
 }
@@ -159,10 +156,11 @@ pub enum EvalValue {
     /// A call literal other than `list(...)`, kept as written
     /// (`enum(a, b)`). `list(...)` becomes a [`EvalValue::Seq`].
     Call(String, Vec<EvalValue>),
-    /// An element, a section or a list, with the document it came from.
-    Node {
+    /// A structured part of a document: an element, a section, a list, a connect,
+    /// a declaration, or a list item, with the document it came from.
+    Part {
         doc: DocRef,
-        node: Box<Node>,
+        part: Box<Part>,
     },
     Document(DocRef),
     Directory(DirRef),
@@ -186,7 +184,7 @@ impl EvalValue {
             EvalValue::Seq(_) => "list",
             EvalValue::Map(_) => "map",
             EvalValue::Call(..) => "call",
-            EvalValue::Node { .. } => "element",
+            EvalValue::Part { .. } => "element",
             EvalValue::Document(_) => "document",
             EvalValue::Directory(_) => "directory",
             EvalValue::Fragment(_) => "fragment",
@@ -224,9 +222,9 @@ impl EvalValue {
                 let args = args.iter().map(|v| Self::from_ast(v, doc)).collect();
                 EvalValue::Call(name.clone(), args)
             }
-            Value::Element(el) => EvalValue::Node {
+            Value::Element(el) => EvalValue::Part {
                 doc: doc.clone(),
-                node: Box::new(Node::Element(el.clone())),
+                part: Box::new(Part::Element(el.clone())),
             },
             Value::Blocks(blocks) => EvalValue::Fragment(blocks.clone()),
             // Not evaluated yet, so it stays what it is: a block that holds it.
@@ -259,13 +257,13 @@ impl EvalValue {
                 name.clone(),
                 args.iter().map(Self::to_ast).collect::<Option<_>>()?,
             ),
-            EvalValue::Node { node, .. } => match &**node {
-                Node::Element(el) => Value::Element(el.clone()),
-                Node::Section(_)
-                | Node::List(_)
-                | Node::Connect(_)
-                | Node::Declaration(_)
-                | Node::Item(_) => {
+            EvalValue::Part { part, .. } => match &**part {
+                Part::Element(el) => Value::Element(el.clone()),
+                Part::Section(_)
+                | Part::List(_)
+                | Part::Connect(_)
+                | Part::Declaration(_)
+                | Part::Item(_) => {
                     return None;
                 }
             },

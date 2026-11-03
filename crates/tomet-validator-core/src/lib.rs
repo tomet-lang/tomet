@@ -17,35 +17,6 @@ use tomet_semantics::{Bindings, Shape};
 use tomet_semantics_core::admits::admits;
 use tomet_tree::{Node, Place, Visit};
 
-/// Something written in the document that a region or sigil rule applies to:
-/// an element, or a declaration.
-#[derive(Clone, Copy)]
-enum Written<'a> {
-    Element(ElementView<'a>),
-    Declaration(&'a tomet_ast::Declaration),
-}
-
-impl Written<'_> {
-    fn name(&self) -> Option<&tomet_ast::Name> {
-        match self {
-            Written::Element(el) => Some(el.name),
-            Written::Declaration(d) => Some(&d.name),
-        }
-    }
-
-    fn span(&self) -> Span {
-        match self {
-            Written::Element(el) => el.span,
-            Written::Declaration(d) => d.span,
-        }
-    }
-
-    /// Whether it was written `::name`.
-    fn is_declaration(&self) -> bool {
-        matches!(self, Written::Declaration(_))
-    }
-}
-
 /// [`tomet_tree::for_each_element`], and the list items written in the combine
 /// notation (`-@name(...)`) too: an item with a name is an element in a list,
 /// and is held to everything an element is. A plain `- content` has no name
@@ -75,17 +46,16 @@ pub const PLAIN_ITEM_KIND_NAME: &str = "bare";
 /// its kind, a list item by the element it is when it has a name, and a plain
 /// list item by [`PLAIN_ITEM_KIND_NAME`].
 pub fn child_kind_name(
-    child: tomet_tree::Child<'_>,
+    node: tomet_tree::Node<'_>,
     bindings: &Bindings,
 ) -> Result<String, tomet_semantics::UnknownName> {
-    let kind = match child {
-        tomet_tree::Child::Element(el) => classify_in(el.as_view(), bindings)?,
-        tomet_tree::Child::Item(item) => match item.as_element_view() {
-            Some(view) => classify_in(view, bindings)?,
-            None => return Ok(PLAIN_ITEM_KIND_NAME.to_string()),
-        },
-    };
-    Ok(kind.as_str().to_string())
+    if let Some(view) = node.element_view() {
+        Ok(classify_in(view, bindings)?.as_str().to_string())
+    } else if matches!(node, tomet_tree::Node::Item(_)) {
+        Ok(PLAIN_ITEM_KIND_NAME.to_string())
+    } else {
+        Ok(PLAIN_ITEM_KIND_NAME.to_string())
+    }
 }
 
 pub fn shape_str(shape: Shape) -> &'static str {
@@ -179,12 +149,17 @@ pub fn check_singletons_and_regions(
         document: bool,
     }
 
-    let constraints = |written: Written<'_>| -> Option<Held> {
-        let name = written.name()?;
-        let document = written.is_declaration();
-        let classified = match written {
-            Written::Element(el) => classify_in(el, bindings),
-            Written::Declaration(d) => tomet_semantics::classify_declaration(d),
+    let constraints = |node: Node<'_>| -> Option<Held> {
+        let (name, document, classified) = match node {
+            Node::Declaration(d) => (
+                &d.name,
+                true,
+                tomet_semantics::classify_declaration(d),
+            ),
+            other => {
+                let view = other.element_view()?;
+                (view.name, false, classify_in(view, bindings))
+            }
         };
         let (singleton, declared) = match classified {
             Ok(kind) => match bindings.declaration(name) {
@@ -208,14 +183,14 @@ pub fn check_singletons_and_regions(
 
     let mut seen: Vec<(String, Span)> = Vec::new();
 
-    let mut visit = |written: Written<'_>| {
-        let span = written.span();
+    let mut visit = |node: Node<'_>| {
+        let span = node.span().unwrap_or_default();
         let Some(Held {
             name,
             singleton,
             declared,
             document,
-        }) = constraints(written)
+        }) = constraints(node)
         else {
             return;
         };
@@ -249,21 +224,19 @@ pub fn check_singletons_and_regions(
     };
 
     for decl in &doc.header {
-        visit(Written::Declaration(decl));
+        visit(Node::Declaration(decl));
     }
 
     for block in &doc.body {
         match block {
-            Block::Element(el) => {
-                visit(Written::Element(el.as_view()));
+            Block::Element(_) => {
+                visit(Node::Block(block));
             }
             Block::Paragraph(p) => {
                 for inline in &p.content {
                     if let Inline::Element(el) = inline {
-                        visit(Written::Element(el.as_view()));
-                        tomet_tree::for_each_descendant(el, false, |child| {
-                            visit_child(child, &mut visit)
-                        });
+                        visit(Node::Inline(inline));
+                        tomet_tree::for_each_descendant(el, false, &mut visit);
                     }
                 }
             }
@@ -280,34 +253,16 @@ pub fn check_singletons_and_regions(
 ///
 /// `(args)`, the value of a `key: value` entry and a `:connect` are left out, as a descendant walk
 /// leaves them out: they describe their owner and are not part of what it holds.
-fn visit_all(node: Node<'_>, place: Place, visit: &mut impl FnMut(Written<'_>)) {
+fn visit_all(node: Node<'_>, place: Place, visit: &mut impl FnMut(Node<'_>)) {
     let _ = tomet_tree::walk_node(node, place, &mut |node, place| {
         if matches!(place, Place::Args | Place::PairValue | Place::Connect) {
             return Visit::<()>::Skip;
         }
-        match node {
-            Node::Item(item) => visit_child(tomet_tree::Child::Item(item), visit),
-            other => {
-                if let Some(el) = other.element() {
-                    visit(Written::Element(el.as_view()));
-                }
-            }
+        if node.element_view().is_some() {
+            visit(node);
         }
         Visit::Descend
     });
-}
-
-/// What a child is held to: an element as itself, a list item as the element it
-/// is when it has a name, and nothing when it has none.
-fn visit_child(child: tomet_tree::Child<'_>, visit: &mut impl FnMut(Written<'_>)) {
-    match child {
-        tomet_tree::Child::Element(el) => visit(Written::Element(el.as_view())),
-        tomet_tree::Child::Item(item) => {
-            if let Some(view) = item.as_element_view() {
-                visit(Written::Element(view));
-            }
-        }
-    }
 }
 
 pub fn check_unfinished(doc: &File, errors: &mut Vec<Diagnostic>) {
@@ -590,12 +545,8 @@ pub fn check_content_shape(doc: &File, bindings: &Bindings, errors: &mut Vec<Dia
             }
             Some(tomet_semantics::ContentAllow::Names(names)) => {
                 let allowed_display: Vec<String> = names.iter().map(|n| n.to_string()).collect();
-                for_each_direct_content_item(content, |descendant| {
-                    let classified = match descendant {
-                        Written::Element(desc) => classify_in(desc, bindings),
-                        Written::Declaration(desc) => tomet_semantics::classify_declaration(desc),
-                    };
-                    let Ok(desc_kind) = classified else {
+                for_each_direct_content_item(content, |desc| {
+                    let Ok(desc_kind) = classify_in(desc, bindings) else {
                         return;
                     };
                     let desc_name = desc_kind.as_str().to_string();
@@ -605,7 +556,7 @@ pub fn check_content_shape(doc: &File, bindings: &Bindings, errors: &mut Vec<Dia
                             element: name.clone(),
                             allowed: allowed_display.clone(),
                             element_span: el.span,
-                            span: descendant.span(),
+                            span: desc.span,
                         });
                     }
                 });
@@ -615,14 +566,14 @@ pub fn check_content_shape(doc: &File, bindings: &Bindings, errors: &mut Vec<Dia
 }
 
 /// What sits directly in `content`: elements.
-fn for_each_direct_content_item<'a>(content: &'a [Block], mut f: impl FnMut(Written<'a>)) {
+fn for_each_direct_content_item<'a>(content: &'a [Block], mut f: impl FnMut(ElementView<'a>)) {
     for block in content {
         match block {
-            Block::Element(el) => f(Written::Element(el.as_view())),
+            Block::Element(el) => f(el.as_view()),
             Block::Paragraph(p) => {
                 for inline in &p.content {
                     if let Inline::Element(el) = inline {
-                        f(Written::Element(el.as_view()));
+                        f(el.as_view());
                     }
                 }
             }

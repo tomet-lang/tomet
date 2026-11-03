@@ -450,7 +450,7 @@ fn item_expression(item: &ListItem) -> Option<(&InterpExpr, Span)> {
 fn misfit(value: &EvalValue) -> String {
     let hint = match value {
         EvalValue::Seq(_) => " -- join it into text with `.join(\", \")`",
-        EvalValue::Document(_) | EvalValue::Node { .. } => {
+        EvalValue::Document(_) | EvalValue::Part { .. } => {
             " -- use `include(...)` for its content, or `.link()` for a link"
         }
         EvalValue::DateTime(_) => " -- write it with `.format(...)`",

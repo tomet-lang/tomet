@@ -1,4 +1,4 @@
-//! Documents, directories and the nodes inside documents.
+//! Documents, directories and the parts inside documents.
 
 use tomet_ast::{Block, Connect, File, Group, Value};
 
@@ -6,7 +6,7 @@ use super::args::Args;
 use super::context::EvalContext;
 use super::error::EvalError;
 use super::methods::index_into;
-use super::value::{DirRef, DocRef, EvalValue, Node};
+use super::value::{DirRef, DocRef, EvalValue, Part};
 
 /// The document behind a reference.
 pub(crate) fn load(doc: &DocRef, cx: &EvalContext) -> Result<std::sync::Arc<File>, EvalError> {
@@ -59,49 +59,51 @@ fn directory_docs(
         })
 }
 
-// ---- finding a node by id ----------------------------------------------------
+// ---- finding a part by id ----------------------------------------------------
 
-/// The node with unique id `id`: an element, a declaration, a section, a list or a list item,
+/// The part with unique id `id`: an element, a declaration, a section, a list or a list item,
 /// wherever it sits in the document, in a `:connect` too.
-pub(crate) fn find_node(doc: &File, id: &str) -> Option<Node> {
+pub(crate) fn find_part(doc: &File, id: &str) -> Option<Part> {
     let found = tomet_tree::walk(doc, &mut |node, _| {
         if node.id().is_some_and(|i| i.0 == id)
-            && let Some(found) = expr_node(node)
+            && let Some(found) = Part::from_tree_node(node)
         {
             return tomet_tree::Visit::Break(found);
         }
         tomet_tree::Visit::Descend
     });
     match found {
-        std::ops::ControlFlow::Break(node) => Some(node),
+        std::ops::ControlFlow::Break(part) => Some(part),
         std::ops::ControlFlow::Continue(()) => None,
     }
 }
 
-/// The expression language's node for a node of the tree, if it has one. A bare entry carries an
-/// id but is not something an expression can name.
-fn expr_node(node: tomet_tree::Node<'_>) -> Option<Node> {
-    if let Some(el) = node.element() {
-        return Some(Node::Element(Box::new(el.clone())));
-    }
-    if let Some(list) = node.list() {
-        return Some(Node::List(Box::new(list.clone())));
-    }
-    match node {
-        tomet_tree::Node::Block(Block::Section(s)) => Some(Node::Section(Box::new(s.clone()))),
-        tomet_tree::Node::Declaration(d) => Some(Node::Declaration(Box::new(d.clone()))),
-        tomet_tree::Node::Item(item) => Some(Node::Item(Box::new(item.clone()))),
-        _ => None,
+impl Part {
+    /// The expression language's part for a node of the tree, if it has one. A bare entry carries an
+    /// id but is not something an expression can name.
+    pub fn from_tree_node(node: tomet_tree::Node<'_>) -> Option<Part> {
+        if let Some(el) = node.element() {
+            return Some(Part::Element(Box::new(el.clone())));
+        }
+        if let Some(list) = node.list() {
+            return Some(Part::List(Box::new(list.clone())));
+        }
+        match node {
+            tomet_tree::Node::Block(Block::Section(s)) => Some(Part::Section(Box::new(s.clone()))),
+            tomet_tree::Node::Declaration(d) => Some(Part::Declaration(Box::new(d.clone()))),
+            tomet_tree::Node::Item(item) => Some(Part::Item(Box::new(item.clone()))),
+            _ => None,
+        }
     }
 }
 
 /// `doc#id`.
-pub(crate) fn node_by_id(doc: &DocRef, id: &str, cx: &EvalContext) -> Result<EvalValue, EvalError> {
+pub(crate) fn part_by_id(doc: &DocRef, id: &str, cx: &EvalContext) -> Result<EvalValue, EvalError> {
     let document = load(doc, cx)?;
-    find_node(&document, id)
-        .map(|node| EvalValue::Node {
+    find_part(&document, id)
+        .map(|part| EvalValue::Part {
             doc: doc.clone(),
-            node: Box::new(node),
+            part: Box::new(part),
         })
         .ok_or_else(|| EvalError::Unresolved(format!("no element with id `{id}` in `{}`", doc.0)))
 }
@@ -123,23 +125,23 @@ pub(crate) fn root_item(
 
 fn block_value(doc: &DocRef, block: &Block) -> EvalValue {
     match block {
-        Block::Element(el) => EvalValue::Node {
+        Block::Element(el) => EvalValue::Part {
             doc: doc.clone(),
-            node: Box::new(Node::Element(Box::new(el.clone()))),
+            part: Box::new(Part::Element(Box::new(el.clone()))),
         },
-        Block::Section(sec) => EvalValue::Node {
+        Block::Section(sec) => EvalValue::Part {
             doc: doc.clone(),
-            node: Box::new(Node::Section(Box::new(sec.clone()))),
+            part: Box::new(Part::Section(Box::new(sec.clone()))),
         },
-        Block::List(list) => EvalValue::Node {
+        Block::List(list) => EvalValue::Part {
             doc: doc.clone(),
-            node: Box::new(Node::List(Box::new(list.clone()))),
+            part: Box::new(Part::List(Box::new(list.clone()))),
         },
         other => EvalValue::Fragment(vec![other.clone()]),
     }
 }
 
-// ---- members of a node -------------------------------------------------------
+// ---- members of a part -------------------------------------------------------
 
 /// An element's `(args)` and `{value}` seen as one map: the value's keys win
 /// on a conflict, since `{value}` is where an element's real data usually
@@ -172,90 +174,90 @@ fn prop(doc: &DocRef, args: &Option<Value>, value: &Option<Group>) -> EvalValue 
     EvalValue::from_ast(&merged, doc)
 }
 
-/// What a node holds, as blocks: an element's or a section's body, and for a
+/// What a part holds, as blocks: an element's or a section's body, and for a
 /// list the list itself, since its items are its body.
-fn child_blocks(node: &Node) -> Vec<Block> {
-    match node {
-        Node::Element(el) => el.content.clone().unwrap_or_default(),
-        Node::Connect(conn) => conn.content.clone().unwrap_or_default(),
-        Node::Declaration(d) => d.content.clone().unwrap_or_default(),
-        Node::Item(item) => item.content.clone(),
-        Node::Section(sec) => sec.blocks.clone(),
-        Node::List(list) => vec![Block::List((**list).clone())],
+fn child_blocks(part: &Part) -> Vec<Block> {
+    match part {
+        Part::Element(el) => el.content.clone().unwrap_or_default(),
+        Part::Connect(conn) => conn.content.clone().unwrap_or_default(),
+        Part::Declaration(d) => d.content.clone().unwrap_or_default(),
+        Part::Item(item) => item.content.clone(),
+        Part::Section(sec) => sec.blocks.clone(),
+        Part::List(list) => vec![Block::List((**list).clone())],
     }
 }
 
-/// The things `.item(n)` counts in a node: the blocks of an element or a
-/// section, and the items of a list. An item is an element, so it is a node
+/// The things `.item(n)` counts in a part: the blocks of an element or a
+/// section, and the items of a list. An item is an element, so it is a part
 /// like any other (its `#(id)` is found by `#id` as well).
-fn children(doc: &DocRef, node: &Node) -> Vec<EvalValue> {
-    match node {
-        Node::Element(_)
-        | Node::Connect(_)
-        | Node::Declaration(_)
-        | Node::Item(_)
-        | Node::Section(_) => child_blocks(node)
+fn children(doc: &DocRef, part: &Part) -> Vec<EvalValue> {
+    match part {
+        Part::Element(_)
+        | Part::Connect(_)
+        | Part::Declaration(_)
+        | Part::Item(_)
+        | Part::Section(_) => child_blocks(part)
             .iter()
             .map(|b| block_value(doc, b))
             .collect(),
-        Node::List(list) => list
+        Part::List(list) => list
             .items
             .iter()
-            .map(|item| EvalValue::Node {
+            .map(|item| EvalValue::Part {
                 doc: doc.clone(),
-                node: Box::new(Node::Item(Box::new(item.clone()))),
+                part: Box::new(Part::Item(Box::new(item.clone()))),
             })
             .collect(),
     }
 }
 
-pub(crate) fn node_member(doc: &DocRef, node: &Node, member: &str) -> Result<EvalValue, EvalError> {
+pub(crate) fn part_member(doc: &DocRef, part: &Part, member: &str) -> Result<EvalValue, EvalError> {
     match member {
-        "prop" => Ok(match node {
-            Node::Element(el) => prop(doc, &el.data.args, &el.data.value),
-            Node::Section(sec) => prop(doc, &sec.data.args, &sec.data.value),
-            Node::Connect(conn) => prop(doc, &conn.data.args, &conn.data.value),
-            Node::Declaration(d) => prop(doc, &d.data.args, &d.data.value),
-            Node::Item(item) => prop(doc, &item.data.args, &item.data.value),
+        "prop" => Ok(match part {
+            Part::Element(el) => prop(doc, &el.data.args, &el.data.value),
+            Part::Section(sec) => prop(doc, &sec.data.args, &sec.data.value),
+            Part::Connect(conn) => prop(doc, &conn.data.args, &conn.data.value),
+            Part::Declaration(d) => prop(doc, &d.data.args, &d.data.value),
+            Part::Item(item) => prop(doc, &item.data.args, &item.data.value),
             // A list has neither arguments nor a value group.
-            Node::List(_) => prop(doc, &None, &None),
+            Part::List(_) => prop(doc, &None, &None),
         }),
-        "id" => Ok(node
+        "id" => Ok(part
             .id()
             .map(|id| EvalValue::String(id.to_string()))
             .unwrap_or(EvalValue::Null)),
-        "name" => Ok(EvalValue::String(match node {
-            Node::Element(el) => el.name.to_string(),
-            Node::Connect(conn) => conn.name.to_string(),
-            Node::Declaration(d) => d.name.to_string(),
-            Node::Item(item) => item
+        "name" => Ok(EvalValue::String(match part {
+            Part::Element(el) => el.name.to_string(),
+            Part::Connect(conn) => conn.name.to_string(),
+            Part::Declaration(d) => d.name.to_string(),
+            Part::Item(item) => item
                 .name
                 .as_ref()
                 .map(ToString::to_string)
                 .unwrap_or_default(),
-            Node::Section(_) => "section".to_string(),
-            Node::List(_) => "list".to_string(),
+            Part::Section(_) => "section".to_string(),
+            Part::List(_) => "list".to_string(),
         })),
         "connects" => {
             // A connect takes no connects of its own.
-            let connects: &[Connect] = match node {
-                Node::Element(el) => &el.connects,
-                Node::Section(sec) => &sec.connects,
-                Node::List(list) => &list.connects,
-                Node::Item(item) => &item.connects,
-                Node::Connect(_) | Node::Declaration(_) => &[],
+            let connects: &[Connect] = match part {
+                Part::Element(el) => &el.connects,
+                Part::Section(sec) => &sec.connects,
+                Part::List(list) => &list.connects,
+                Part::Item(item) => &item.connects,
+                Part::Connect(_) | Part::Declaration(_) => &[],
             };
             Ok(EvalValue::Seq(
                 connects
                     .iter()
-                    .map(|conn| EvalValue::Node {
+                    .map(|conn| EvalValue::Part {
                         doc: doc.clone(),
-                        node: Box::new(Node::Connect(Box::new(conn.clone()))),
+                        part: Box::new(Part::Connect(Box::new(conn.clone()))),
                     })
                     .collect(),
             ))
         }
-        "content" => Ok(EvalValue::Fragment(child_blocks(node))),
+        "content" => Ok(EvalValue::Fragment(child_blocks(part))),
         _ => Err(EvalError::UnknownMember {
             on: "element",
             member: member.to_string(),
@@ -263,19 +265,19 @@ pub(crate) fn node_member(doc: &DocRef, node: &Node, member: &str) -> Result<Eva
     }
 }
 
-/// Calls on a node: `.item(n)` and `.prop(key)`.
-pub(crate) fn node_method(
+/// Calls on a part: `.item(n)` and `.prop(key)`.
+pub(crate) fn part_method(
     doc: &DocRef,
-    node: &Node,
+    part: &Part,
     member: &str,
     args: Args,
 ) -> Result<EvalValue, EvalError> {
     match member {
         "link" => {
             args.exactly(".link", 0)?;
-            super::fragments::link_fragment(&EvalValue::Node {
+            super::fragments::link_fragment(&EvalValue::Part {
                 doc: doc.clone(),
-                node: Box::new(node.clone()),
+                part: Box::new(part.clone()),
             })
         }
         "item" => {
@@ -283,7 +285,7 @@ pub(crate) fn node_method(
                 .exactly(".item", 1)?
                 .try_into()
                 .unwrap_or_else(|_| unreachable!("`exactly` returned one value"));
-            index_into(&children(doc, node), &index)
+            index_into(&children(doc, part), &index)
         }
         "prop" => {
             let key = match args.exactly(".prop", 1)?.pop() {
@@ -297,7 +299,7 @@ pub(crate) fn node_method(
                 }
                 None => unreachable!("`exactly` returned one value"),
             };
-            match node_member(doc, node, "prop")? {
+            match part_member(doc, part, "prop")? {
                 EvalValue::Map(entries) => entries
                     .into_iter()
                     .find(|(k, _)| *k == key)

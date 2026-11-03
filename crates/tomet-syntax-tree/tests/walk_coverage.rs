@@ -169,7 +169,9 @@ fn descendants_are_the_entries_and_the_content_not_the_args_nor_a_pairs_value() 
         if el.name.name == "s_host" {
             for direct in [false, true] {
                 let w = names(|w| {
-                    for_each_descendant(el, direct, |c| w.extend(c.name().map(|n| n.name.clone())))
+                    for_each_descendant(el, direct, |c| {
+                        w.extend(c.element_view().map(|v| v.name.name.clone()))
+                    })
                 });
                 got.push((direct, w));
             }

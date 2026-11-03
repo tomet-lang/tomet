@@ -14,8 +14,8 @@
 
 use std::ops::ControlFlow;
 use tomet_ast::{
-    Block, Connect, Data, Declaration, Element, Entry, File, Group, Hole, Id, Inline,
-    Interpolation, List, ListItem, Section, Value,
+    Block, Connect, Data, Declaration, Element, ElementView, Entry, File, Group, Hole, Id,
+    Inline, Interpolation, List, ListItem, Section, Value,
 };
 use tomet_span::Span;
 
@@ -50,11 +50,18 @@ pub enum Place {
     Sublist,
 }
 
-/// A thing in a file's tree, together with what it is in.
+/// A borrowed cursor over any vertex of a file's AST (Layer 1).
+///
+/// Represents a short-lived, `Copy` borrowed reference over every vertex of an AST
+/// ([`Declaration`], [`Block`], [`Inline`], [`Value`], [`Entry`], [`Connect`], [`ListItem`], [`List`]).
+///
+/// In contrast to Layer 2's owned runtime [`tomet_expr::Part`], which represents structured,
+/// addressable parts of a document at expression evaluation time, [`Node`] is the universal
+/// borrowed traversal cursor for tree walkers and validators.
 ///
 /// An element is not a node of its own: it is the `Block`, `Inline`, `Value` or `Entry` it stands
-/// as (see [`Node::element`]). A list at the top of a file is a `Block`; the list nested in an
-/// item is a [`Node::List`].
+/// as (see [`Node::element`] and [`Node::element_view`]). A list at the top of a file is a `Block`;
+/// the list nested in an item is a [`Node::List`].
 #[derive(Debug, Clone, Copy)]
 pub enum Node<'a> {
     Declaration(&'a Declaration),
@@ -78,6 +85,38 @@ impl<'a> Node<'a> {
             | Node::Entry(Entry::Element(el)) => Some(el),
             Node::Value(Value::Element(el)) => Some(el),
             _ => None,
+        }
+    }
+
+    /// The element view of this node, wherever it stands.
+    pub fn element_view(self) -> Option<ElementView<'a>> {
+        match self {
+            Node::Block(Block::Element(el))
+            | Node::Inline(Inline::Element(el))
+            | Node::Entry(Entry::Element(el)) => Some(el.as_view()),
+            Node::Value(Value::Element(el)) => Some(el.as_view()),
+            Node::Item(item) => item.as_element_view(),
+            _ => None,
+        }
+    }
+
+    /// The span of whichever AST vertex this node wraps.
+    pub fn span(self) -> Option<Span> {
+        match self {
+            Node::Declaration(d) => Some(d.span),
+            Node::Block(b) => Some(b.span()),
+            Node::Inline(i) => Some(i.span()),
+            Node::Connect(c) => Some(c.span),
+            Node::Item(item) => Some(item.span),
+            Node::List(l) => Some(l.span),
+            Node::Entry(Entry::Element(e)) => Some(e.span),
+            Node::Entry(Entry::Hole(h)) => Some(h.span),
+            Node::Entry(Entry::Bare(b)) => Some(b.span),
+            Node::Entry(Entry::Pair(..)) => None,
+            Node::Value(Value::Element(e)) => Some(e.span),
+            Node::Value(Value::Hole(h)) => Some(h.span),
+            Node::Value(Value::Interp(it)) => Some(it.span),
+            Node::Value(_) => None,
         }
     }
 
@@ -438,31 +477,6 @@ pub fn for_each_top_level_element(file: &File, mut f: impl FnMut(&Element)) {
     }
 }
 
-/// Something nested in a node: an element, or a list item. What a `:rule(allow:...)` constrains,
-/// and what the region rules run over.
-#[derive(Debug, Clone, Copy)]
-pub enum Child<'a> {
-    Element(&'a Element),
-    Item(&'a ListItem),
-}
-
-impl<'a> Child<'a> {
-    /// Its name, if it has one: a plain list item has none.
-    pub fn name(&self) -> Option<&'a tomet_ast::Name> {
-        match self {
-            Child::Element(el) => Some(&el.name),
-            Child::Item(item) => item.name.as_ref(),
-        }
-    }
-
-    pub fn span(&self) -> Span {
-        match self {
-            Child::Element(el) => el.span,
-            Child::Item(item) => item.span,
-        }
-    }
-}
-
 /// What a descendant walk shows `f`, given the nodes at its start. It leaves out three positions,
 /// at every depth:
 ///
@@ -480,27 +494,24 @@ impl<'a> Child<'a> {
 fn descendants<'a>(
     start: impl FnOnce(&mut dyn FnMut(Node<'a>, Place)),
     direct_only: bool,
-    mut f: impl FnMut(Child<'a>),
+    mut f: impl FnMut(Node<'a>),
 ) {
     let mut visit = |node: Node<'a>, place: Place| -> Visit<()> {
         if matches!(place, Place::Args | Place::PairValue | Place::Connect) {
             return Visit::Skip;
         }
-        let child = match node {
-            Node::Item(item) => Some(Child::Item(item)),
-            other => other.element().map(Child::Element),
-        };
-        match child {
-            Some(child) => {
-                f(child);
-                if direct_only {
-                    Visit::Skip
-                } else {
-                    Visit::Descend
-                }
+        let is_target = matches!(node, Node::Item(_)) || node.element().is_some();
+        if is_target {
+            f(node);
+            if direct_only {
+                Visit::Skip
+            } else {
+                Visit::Descend
             }
-            None if direct_only && !matches!(node, Node::Block(Block::Paragraph(_))) => Visit::Skip,
-            None => Visit::Descend,
+        } else if direct_only && !matches!(node, Node::Block(Block::Paragraph(_))) {
+            Visit::Skip
+        } else {
+            Visit::Descend
         }
     };
     start(&mut |node, place| {
@@ -512,7 +523,7 @@ fn descendants<'a>(
 /// With `direct_only`, only the first level.
 ///
 /// Neither `el.args` nor `el.connects` is looked at; see [`descendants`] for why.
-pub fn for_each_descendant(el: &Element, direct_only: bool, f: impl FnMut(Child<'_>)) {
+pub fn for_each_descendant(el: &Element, direct_only: bool, f: impl FnMut(Node<'_>)) {
     descendants(
         |g| groups(&el.data, el.content.as_deref(), g),
         direct_only,
@@ -522,7 +533,7 @@ pub fn for_each_descendant(el: &Element, direct_only: bool, f: impl FnMut(Child<
 
 /// [`for_each_descendant`] for a list item: what is nested in its content and in its `{value}`
 /// group, not its `sublist` and not its `(args)` marker.
-pub fn for_each_descendant_of_item(item: &ListItem, direct_only: bool, f: impl FnMut(Child<'_>)) {
+pub fn for_each_descendant_of_item(item: &ListItem, direct_only: bool, f: impl FnMut(Node<'_>)) {
     descendants(
         |g| groups(&item.data, Some(&item.content), g),
         direct_only,
@@ -536,7 +547,7 @@ pub fn for_each_descendant_of_item(item: &ListItem, direct_only: bool, f: impl F
 pub fn for_each_descendant_in_blocks(
     blocks: &[Block],
     direct_only: bool,
-    f: impl FnMut(Child<'_>),
+    f: impl FnMut(Node<'_>),
 ) {
     descendants(
         |g| {
@@ -551,7 +562,7 @@ pub fn for_each_descendant_in_blocks(
 
 /// [`for_each_descendant_in_blocks`] for a list's own items: what a list's own `:rule(allow:...)`
 /// checks against. `direct_only` means just the items themselves, not what is inside each one.
-pub fn for_each_item_descendant(items: &[ListItem], direct_only: bool, f: impl FnMut(Child<'_>)) {
+pub fn for_each_item_descendant(items: &[ListItem], direct_only: bool, f: impl FnMut(Node<'_>)) {
     descendants(
         |g| {
             for item in items {
@@ -770,8 +781,12 @@ mod tests {
 
     fn names(el: &Element, direct_only: bool) -> Vec<String> {
         let mut out = Vec::new();
-        for_each_descendant(el, direct_only, |child| {
-            out.push(child.name().map(|n| n.name.clone()).unwrap_or_default());
+        for_each_descendant(el, direct_only, |node| {
+            out.push(
+                node.element_view()
+                    .map(|v| v.name.name.clone())
+                    .unwrap_or_default(),
+            );
         });
         out
     }

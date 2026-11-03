@@ -15,6 +15,9 @@
 //!   | also holds documents, directories, functions and datetimes, which can
 //!   | be the result of an expression and never data. A fragment (`link`,
 //!   | `include`) is the one non-scalar value that can be placed in output.
+//!   | Structured document parts (inspectable via `.name`, `.prop`, `.id`,
+//!   | `.connects`, `.content`, `.item(n)`) are owned [`Part`]s (Layer 2),
+//!   | converted from Layer 1 [`tomet_tree::Node`] via [`Part::from_tree_node`].
 //! - (Names by position)
 //!   | A name is looked up in the one table its position selects: a call in
 //!   | the builtin functions, a bare name in the lambda parameters and then
@@ -48,9 +51,9 @@ mod fragments;
 mod include;
 mod memory;
 mod methods;
-mod nodes;
 mod ops;
 mod outside;
+mod parts;
 mod value;
 mod vars;
 
@@ -66,7 +69,7 @@ pub use error::EvalError;
 pub use include::MAX_INCLUDE_DEPTH;
 pub use memory::MemoryResolver;
 pub use outside::{OwnNames, Reach, Reaching, reaches_outside};
-pub use value::{Closure, DirRef, DocRef, Env, EvalValue, Namespace, Node};
+pub use value::{Closure, DirRef, DocRef, Env, EvalValue, Namespace, Part};
 pub use vars::{VarError, VarScope, shaped, typed_value, var_scope};
 
 use tomet_ast::{BinaryOp, InterpExpr, InterpExprKind, Literal};
@@ -87,7 +90,7 @@ pub fn evaluate(expr: &InterpExpr, cx: &EvalContext) -> Result<EvalValue, EvalEr
 /// is found through a vault and has no data form of its own.
 fn refers_to_vault(value: &EvalValue) -> bool {
     match value {
-        EvalValue::Document(_) | EvalValue::Directory(_) | EvalValue::Node { .. } => true,
+        EvalValue::Document(_) | EvalValue::Directory(_) | EvalValue::Part { .. } => true,
         EvalValue::Seq(items) => items.iter().any(refers_to_vault),
         EvalValue::Map(entries) => entries.iter().any(|(_, v)| refers_to_vault(v)),
         EvalValue::Call(_, args) => args.iter().any(refers_to_vault),
@@ -170,10 +173,10 @@ fn eval(expr: &InterpExpr, cx: &EvalContext, env: &Env) -> Result<EvalValue, Eva
         InterpExprKind::NamedArg { name, .. } => Err(EvalError::message(format!(
             "`{name}: ...` is only meaningful as an argument of a call"
         ))),
-        InterpExprKind::Id(id) => nodes::node_by_id(&root_doc(cx, env), id, cx),
+        InterpExprKind::Id(id) => parts::part_by_id(&root_doc(cx, env), id, cx),
         InterpExprKind::DocId { doc, id } => {
             let doc = document_of("`#`", eval(doc, cx, env)?)?;
-            nodes::node_by_id(&doc, id, cx)
+            parts::part_by_id(&doc, id, cx)
         }
         InterpExprKind::Addr { text, .. } => address::address_value(text, cx),
     }
@@ -198,9 +201,9 @@ fn name_value(name: &str, cx: &EvalContext, env: &Env) -> Result<EvalValue, Eval
 /// `value.member`, without a call.
 fn member_value(value: EvalValue, member: &str, cx: &EvalContext) -> Result<EvalValue, EvalError> {
     match &value {
-        EvalValue::Document(doc) => nodes::document_member(doc, member, cx),
-        EvalValue::Node { doc, node } => nodes::node_member(doc, node, member),
-        EvalValue::Directory(dir) => nodes::directory_member(dir, member, cx),
+        EvalValue::Document(doc) => parts::document_member(doc, member, cx),
+        EvalValue::Part { doc, part } => parts::part_member(doc, part, member),
+        EvalValue::Directory(dir) => parts::directory_member(dir, member, cx),
         EvalValue::DateTime(value) => datetime::member(value, member),
         EvalValue::Map(entries) => entries
             .iter()
@@ -265,8 +268,8 @@ fn call(
             match receiver {
                 EvalValue::Namespace(Namespace::Macro) => macro_call(member, args, cx),
                 EvalValue::Namespace(Namespace::Generate) => generate_call(member, args, cx),
-                EvalValue::Node { doc, node } => nodes::node_method(&doc, &node, member, args),
-                EvalValue::Document(doc) => nodes::document_method(&doc, member, args, cx),
+                EvalValue::Part { doc, part } => parts::part_method(&doc, &part, member, args),
+                EvalValue::Document(doc) => parts::document_method(&doc, member, args, cx),
                 EvalValue::String(text) if member == "addr" => {
                     args.exactly(".addr", 0)?;
                     address::address_value(&text, cx)
@@ -423,7 +426,7 @@ fn builtin(name: &str, args: Args, cx: &EvalContext) -> Result<EvalValue, EvalEr
     match name {
         "tmt" => match args.exactly(name, 1)?.pop() {
             Some(EvalValue::String(path)) => {
-                Ok(EvalValue::Document(DocRef(nodes::normalize_path(&path))))
+                Ok(EvalValue::Document(DocRef(parts::normalize_path(&path))))
             }
             Some(other) => Err(EvalError::mismatch(
                 "`tmt`",
@@ -565,7 +568,7 @@ fn root_item_call(
         )));
     }
     match args.exactly("item", 1)?.pop() {
-        Some(index) => nodes::root_item(doc, &index, cx),
+        Some(index) => parts::root_item(doc, &index, cx),
         None => unreachable!("`exactly` returned one value"),
     }
 }

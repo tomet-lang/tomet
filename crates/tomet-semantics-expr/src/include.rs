@@ -22,8 +22,8 @@ use tomet_ast::{Block, Element, Inline, Placement};
 use super::args::Args;
 use super::context::{EvalContext, Note};
 use super::error::EvalError;
-use super::nodes::load;
-use super::value::{DocRef, EvalValue, Node};
+use super::parts::load;
+use super::value::{DocRef, EvalValue, Part};
 
 /// How many files may be included inside one another.
 pub const MAX_INCLUDE_DEPTH: usize = 16;
@@ -147,8 +147,8 @@ fn select(
             let loaded = load(doc, cx)?;
             Ok((doc.clone(), loaded.body.clone()))
         }
-        EvalValue::Node { doc, node } => match &**node {
-            Node::Section(section) => {
+        EvalValue::Part { doc, part } => match &**part {
+            Part::Section(section) => {
                 let blocks = if heading == Some(false) {
                     section.blocks.clone()
                 } else {
@@ -156,13 +156,13 @@ fn select(
                 };
                 Ok((doc.clone(), blocks))
             }
-            Node::Element(element) => {
+            Part::Element(element) => {
                 if heading.is_some() {
                     return Err(not_a_section());
                 }
                 Ok((doc.clone(), vec![element_block(element)]))
             }
-            Node::List(list) => {
+            Part::List(list) => {
                 if heading.is_some() {
                     return Err(not_a_section());
                 }
@@ -170,17 +170,17 @@ fn select(
             }
             // Metadata of its owner, or a statement about its document: not
             // content, so nothing to splice in.
-            Node::Connect(_) => Err(EvalError::mismatch(
+            Part::Connect(_) => Err(EvalError::mismatch(
                 "`include`",
                 "a document or an element with an id",
                 "a connect",
             )),
-            Node::Declaration(_) => Err(EvalError::mismatch(
+            Part::Declaration(_) => Err(EvalError::mismatch(
                 "`include`",
                 "a document or an element with an id",
                 "a declaration",
             )),
-            Node::Item(item) => {
+            Part::Item(item) => {
                 if heading.is_some() {
                     return Err(not_a_section());
                 }
