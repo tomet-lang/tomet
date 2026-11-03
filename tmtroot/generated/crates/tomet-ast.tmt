@@ -247,6 +247,11 @@ list of children?" is no longer a parse-time branch -- it is a view
 computed downstream in `tomet-semantics`, which is what lets the parser
 build the tree without consulting any element vocabulary.
 
+`Group` holds a source-order sequence of entries (`Group(pub Vec<Entry>)`)
+and provides map operations exclusively for [`Entry::Pair`] entries.
+Non-pair entries ([`Entry::Element`], [`Entry::Bare`], [`Entry::Hole`]) are
+handled directly by callers through exhaustive pattern matching.
+
 ===[struct Interpolation]
 
 A `${...}` (or `$name(...)`) interpolation: an expression to be evaluated

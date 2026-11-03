@@ -22,8 +22,8 @@ use crate::error::{Error, Result};
 use crate::inline::{DELIMITERS, extend_merging, push_soft_break, push_text, trim_edges};
 use crate::value::err;
 use tomet_ast::{
-    Block, Connect, Data, Declaration, Element, File, Inline, List, Name, Paragraph, Placement,
-    RawText, Section, Value,
+    Block, Connect, Data, Declaration, Element, Entry, File, Inline, List, Name, Paragraph,
+    Placement, RawText, Section, Value,
 };
 use tomet_cst::{
     AstNode, CstCodeBlock, CstName, NodeOrToken, SyntaxElement, SyntaxKind as K, SyntaxNode,
@@ -1134,7 +1134,10 @@ fn merge_connect(node: &SyntaxNode, read: &mut Groups) -> Result<()> {
             K::VALUE_DATA | K::MAP_LITERAL => {
                 let value = crate::element::lower_value_group(&child)?;
                 let merged = match &read.data.value {
-                    Some(existing) if !existing.has_children() && !value.has_children() => {
+                    Some(existing)
+                        if existing.0.iter().all(|e| matches!(e, Entry::Pair(..)))
+                            && value.0.iter().all(|e| matches!(e, Entry::Pair(..))) =>
+                    {
                         merge_values(Some(&existing.as_data()), Some(&value.as_data()))
                             .map(tomet_ast::Group::from_map)
                     }

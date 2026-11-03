@@ -265,18 +265,19 @@ fn render_element_value(cx: &RenderCtx, value: &Group, out: &mut String) {
         // Only the elements. A group's *pairs* are data and left the body
         // for `data-*` beside `(args)`; see `push_value_data_attrs`.
         Group(entries) => {
-            if entries
-                .iter()
-                .any(|e| matches!(e, Entry::Element(_) | Entry::Bare(_)))
-            {
-                out.push_str("<div class=\"tm-children\">\n");
-                for entry in entries {
-                    match entry {
-                        Entry::Element(child) => render_element(cx, child.as_view(), out, false),
-                        Entry::Bare(child) => render_bare(cx, child, out),
-                        Entry::Pair(..) | Entry::Hole(_) => {}
+            let mut inner = String::new();
+            for entry in entries {
+                match entry {
+                    Entry::Element(child) => {
+                        render_element(cx, child.as_view(), &mut inner, false);
                     }
+                    Entry::Bare(child) => render_bare(cx, child, &mut inner),
+                    Entry::Pair(..) | Entry::Hole(_) => {}
                 }
+            }
+            if !inner.is_empty() {
+                out.push_str("<div class=\"tm-children\">\n");
+                out.push_str(&inner);
                 out.push_str("</div>\n");
             }
         }

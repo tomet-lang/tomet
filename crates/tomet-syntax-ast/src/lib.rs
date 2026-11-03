@@ -1047,6 +1047,11 @@ pub enum Entry {
 /// list of children?" is no longer a parse-time branch -- it is a view
 /// computed downstream in `tomet-semantics`, which is what lets the parser
 /// build the tree without consulting any element vocabulary.
+///
+/// `Group` holds a source-order sequence of entries (`Group(pub Vec<Entry>)`)
+/// and provides map operations exclusively for [`Entry::Pair`] entries.
+/// Non-pair entries ([`Entry::Element`], [`Entry::Bare`], [`Entry::Hole`]) are
+/// handled directly by callers through exhaustive pattern matching.
 #[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
 pub struct Group(pub Vec<Entry>);
 
@@ -1066,14 +1071,8 @@ impl Group {
         }
     }
 
-    /// Builds a group from nested elements alone.
-    pub fn from_children(children: Vec<Element>) -> Self {
-        Group(children.into_iter().map(Entry::Element).collect())
-    }
-
     /// The data view: this group's `key: value` pairs, in source order,
-    /// as a [`Value::Map`]. Nested elements are skipped.
-    ///
+    /// as a [`Value::Map`]. Non-pair entries are skipped.
     pub fn as_data(&self) -> Value {
         let Group(entries) = self;
         Value::Map(
@@ -1085,26 +1084,6 @@ impl Group {
                 })
                 .collect(),
         )
-    }
-
-    /// The children view: this group's nested elements, in source order.
-    pub fn as_children(&self) -> Vec<&Element> {
-        let Group(entries) = self;
-        entries
-            .iter()
-            .filter_map(|e| match e {
-                Entry::Element(el) => Some(el),
-                Entry::Pair(..) | Entry::Bare(_) | Entry::Hole(_) => None,
-            })
-            .collect()
-    }
-
-    /// Whether this group holds any nested elements.
-    pub fn has_children(&self) -> bool {
-        let Group(entries) = self;
-        entries
-            .iter()
-            .any(|e| matches!(e, Entry::Element(_) | Entry::Bare(_) | Entry::Hole(_)))
     }
 
     /// This group's `key: value` pairs, in source order.

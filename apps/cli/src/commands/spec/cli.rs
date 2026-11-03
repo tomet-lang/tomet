@@ -136,8 +136,14 @@ mod tests {
                         walk(el.content.as_deref().unwrap_or(&[]), found);
                         if let Some(tomet_ast::Group(entries)) = &el.data.value {
                             for entry in entries {
-                                if let Entry::Element(item) = entry {
-                                    walk(item.content.as_deref().unwrap_or(&[]), found);
+                                match entry {
+                                    Entry::Element(item) => {
+                                        walk(item.content.as_deref().unwrap_or(&[]), found);
+                                    }
+                                    Entry::Bare(bare) => {
+                                        walk(bare.content.as_deref().unwrap_or(&[]), found);
+                                    }
+                                    Entry::Pair(..) | Entry::Hole(_) => {}
                                 }
                             }
                         }
