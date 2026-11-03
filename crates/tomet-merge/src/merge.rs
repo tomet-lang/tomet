@@ -469,26 +469,26 @@ impl<'a> Merger<'a> {
                 Some((new_id, title_clean && children_clean))
             }
             (
-                NodeKind::BlockElement {
+                NodeKind::BlockForm {
                     name: bn,
                     declaration: bd,
                     id_attr: bid_attr,
                     ..
                 },
-                NodeKind::BlockElement {
+                NodeKind::BlockForm {
                     name: ln,
                     declaration: ld,
                     id_attr: lid_attr,
                     ..
                 },
-                NodeKind::BlockElement {
+                NodeKind::BlockForm {
                     name: rn,
                     declaration: rd,
                     id_attr: rid_attr,
                     ..
                 },
             ) if bn == ln && ln == rn && bd == ld && ld == rd && lid_attr == rid_attr => {
-                self.merge_block_element(b_node, l_node, r_node)
+                self.merge_block_form(b_node, l_node, r_node)
             }
             (
                 NodeKind::List { children: bc },
@@ -567,13 +567,13 @@ impl<'a> Merger<'a> {
         }
     }
 
-    fn merge_block_element(
+    fn merge_block_form(
         &mut self,
         b_node: &Node,
         l_node: &Node,
         r_node: &Node,
     ) -> Option<(NodeId, bool)> {
-        let NodeKind::BlockElement {
+        let NodeKind::BlockForm {
             name,
             declaration,
             id_attr,
@@ -640,7 +640,7 @@ impl<'a> Merger<'a> {
         let new_id = self.out.alloc_id();
         let mut new_node = Node::new(
             new_id,
-            NodeKind::BlockElement {
+            NodeKind::BlockForm {
                 name: name.clone(),
                 declaration: *declaration,
                 id_attr: id_attr.clone(),

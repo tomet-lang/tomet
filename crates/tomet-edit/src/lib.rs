@@ -46,8 +46,8 @@ pub use import::{
     import_attr_slot, import_cst, import_source, parse_edit_value_str, parse_inline_items,
 };
 pub use node::{
-    AttrEntry, AttrGroup, AttrSlot, ChildItem, EditValue, EditValueKind, ElementPiece,
-    ElementSlots, InlineItem, Node, NodeId, NodeKind,
+    AttrEntry, AttrGroup, AttrSlot, ChildItem, EditValue, EditValueKind, FormPiece,
+    FormSlots, InlineItem, Node, NodeId, NodeKind,
 };
 pub use op::{EditError, EditOp};
 
@@ -201,8 +201,8 @@ mod tests {
             .root_children()
             .iter()
             .filter_map(|c| c.as_node_id())
-            .find(|id| matches!(doc.get(*id).map(|n| &n.kind), Some(NodeKind::BlockElement { name, .. }) if name == "meta"))
-            .expect("meta element must exist");
+            .find(|id| matches!(doc.get(*id).map(|n| &n.kind), Some(NodeKind::BlockForm { name, .. }) if name == "meta"))
+            .expect("meta form must exist");
 
         doc.set_attribute(
             meta_id,
@@ -307,7 +307,7 @@ mod tests {
         let meta_id = doc.alloc_id();
         let meta_node = Node::new(
             meta_id,
-            NodeKind::BlockElement {
+            NodeKind::BlockForm {
                 name: "meta".to_string(),
                 declaration: true,
                 id_attr: None,
@@ -492,27 +492,27 @@ mod tests {
     }
 
     #[test]
-    fn find_element_by_name_and_meta_helpers() {
+    fn find_block_form_and_meta_helpers() {
         let src = "::meta{ version: 1 }\n\n// comment\n@callout(info)[ Notice ]\n";
         let doc = import_source(src);
 
-        // Find elements by sigil/name
+        // Find forms by sigil/name
         let meta_id = doc
-            .find_element_by_name("meta")
+            .find_block_form("meta")
             .expect("meta should be found");
         let callout_id = doc
-            .find_element_by_name("callout")
+            .find_block_form("callout")
             .expect("callout should be found");
         assert_ne!(meta_id, callout_id);
-        assert_eq!(doc.find_element_by_name("unknown"), None);
+        assert_eq!(doc.find_block_form("unknown"), None);
 
         // meta_node shortcut
         assert_eq!(doc.meta_node(), Some(meta_id));
         assert_eq!(doc.meta_data("version").as_deref(), Some("1"));
         assert_eq!(doc.meta_data("nonexistent"), None);
 
-        // top_level_elements count
-        assert_eq!(doc.top_level_elements().count(), 2);
+        // block_forms count
+        assert_eq!(doc.block_forms().count(), 2);
     }
 
     #[test]
@@ -878,7 +878,7 @@ Second paragraph.
                 ));
                 assert!(matches!(
                     inner_slot.entries[1].value.kind,
-                    EditValueKind::Element { .. }
+                    EditValueKind::Form { .. }
                 ));
             }
             other => panic!("expected nested Map value, got {other:?}"),
@@ -917,7 +917,7 @@ Second paragraph.
         );
         assert!(para_node.inlines.iter().any(|item| matches!(
             item,
-            InlineItem::Element { name, .. } if name == "badge"
+            InlineItem::Form { name, .. } if name == "badge"
         )));
     }
 }

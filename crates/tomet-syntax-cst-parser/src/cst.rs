@@ -2,7 +2,7 @@
 //!
 //! Preserves 100% of source characters including trivia (whitespace, newlines, comments).
 //!
-//! This is the one reader of the grammar's shape -- where a block, an element, a
+//! This is the one reader of the grammar's shape -- where a block, a form, a
 //! group starts and ends. `parse_document` is this tree lowered into the AST
 //! (see `lower.rs`), so a grammar change is made here once. The parser itself
 //! never fails: broken input still gets a tree, and the errors a document is
@@ -12,10 +12,10 @@
 //! ROOT
 //!   SECTION                    `=[ T ]` and everything up to the next section
 //!     SECTION_HEADING          of the same or a shallower level (they nest)
-//!     PARAGRAPH | LIST | BLOCK_ELEMENT | CODE_BLOCK | THEMATIC_BREAK | SECTION ...
+//!     PARAGRAPH | LIST | BLOCK_FORM | CODE_BLOCK | THEMATIC_BREAK | SECTION ...
 //! ```
 //!
-//! An element (`BLOCK_ELEMENT`, `INLINE_ELEMENT`) is a `SIGIL` followed by
+//! A form (`BLOCK_FORM`, `INLINE_FORM`) is a `SIGIL` followed by
 //! its groups -- `ARGS` `( )`, `VALUE_DATA` `{ }`, `CONTENT` `[ ]`, at most
 //! one of each -- then any `CONNECT` (`:name(...)`).
 //! `${ ... }` is an `INTERP_EXPR`. Inside `ARGS`/`VALUE_DATA` an entry is a
@@ -23,7 +23,7 @@
 //! `MAP_LITERAL`, `CONTENT` (a value written `[ ... ]` is blocks, as in the AST
 //! parser; the list literal is gone) or (a call such as `list(...)`) `ARGS`.
 //! `CONTENT` recurses into the same block grammar `ROOT`/`SECTION` use
-//! (`SECTION`, `LIST`, `BLOCK_ELEMENT`, `CODE_BLOCK`, `THEMATIC_BREAK`,
+//! (`SECTION`, `LIST`, `BLOCK_FORM`, `CODE_BLOCK`, `THEMATIC_BREAK`,
 //! `PARAGRAPH`), bounded by the group's own closing `]` instead of EOF or
 //! a shallower section -- a block nested inside `[content]` (and its own
 //! `#(id)`) is represented, not flattened into inline text.
@@ -41,8 +41,8 @@
 //! contexts and compound identifiers) where the grammar requires them.
 //!
 //! A `|` run is `[content]` spelled without brackets, and so it is the same
-//! node: a `CONTENT` that opens with a `PIPE` and has no closing `]`. It is an
-//! element's content (`@quote| text`, or `|` on the line after the element), a
+//! node: a `CONTENT` that opens with a `PIPE` and has no closing `]`. It is a
+//! form's content (`@quote| text`, or `|` on the line after the form), a
 //! list item's (`-| text`), a heading's (`=| text`) or a `key: | prose` value.
 //! It ends at the first line that does not repeat its marker in the same column
 //! -- a blank line, or a `|` somewhere else, ends it too -- and the error for that
@@ -74,9 +74,9 @@ pub fn parse_cst(src: &str) -> SyntaxNode {
     SyntaxNode::new_root(parser.builder.finish())
 }
 
-/// [`parse_cst`] for a source that is one value, as [`crate::parse_value`] reads
+/// [`parse_cst`] for a source that is one value, as [`parse_cst_value`] reads
 /// it: the entries of its map (or its one value) under a `ROOT`, with the
-/// elements, `[content]` and `|` runs they embed as nodes.
+/// forms, `[content]` and `|` runs they embed as nodes.
 pub fn parse_cst_value(src: &str) -> SyntaxNode {
     let tokens = tokenize(src);
     let mut parser = CstParser::new(src, &tokens);
@@ -87,7 +87,7 @@ pub fn parse_cst_value(src: &str) -> SyntaxNode {
     SyntaxNode::new_root(parser.builder.finish())
 }
 
-/// How deep constructs may nest: a `[content]` in an element in a `[content]`, a group in a group, an
+/// How deep constructs may nest: a `[content]` in a form in a `[content]`, a group in a group, an
 /// emphasis in an emphasis, a list under a list, a section under a section. Past it the parser stops
 /// reading structure and keeps the text flat in a `TOO_DEEP` node, so no recursion here, or in what
 /// reads the tree, goes deeper than this (a deeper document used to abort the process with a stack
@@ -134,8 +134,8 @@ struct CstParser<'a, 't> {
     tokens: &'t [(SyntaxKind, &'a str)],
     pos: usize,
     builder: GreenNodeBuilder<'static>,
-    /// Whether an element may claim a `:name(...)` group that follows it.
-    /// A list item's own top-level element may not: the group is the item's.
+    /// Whether a form may claim a `:name(...)` group that follows it.
+    /// A list item's own top-level form may not: the group is the item's.
     allow_connect: bool,
     /// Whether the block grammar currently being parsed (via
     /// [`CstParser::parse_body`]/[`CstParser::parse_inline`]) is bounded
@@ -621,7 +621,7 @@ impl<'a, 't> CstParser<'a, 't> {
 
     /// Is the cursor the first thing on its line? Inside a `|` run the
     /// opener's `|` is part of the line's left edge, as the markers of the
-    /// lines after it are: an element written after it stands as a block.
+    /// lines after it are: a form written after it stands as a block.
     fn at_line_start(&self) -> bool {
         self.line_start_at(self.pos)
     }
@@ -789,8 +789,8 @@ impl<'a, 't> CstParser<'a, 't> {
         None
     }
 
-    /// After an element's name (index `i`): does a group, a `:` connect, or
-    /// a `#(id)` follow, so that it is an element and not plain text?
+    /// After a form's name (index `i`): does a group, a `:` connect, or
+    /// a `#(id)` follow, so that it is a form and not plain text?
     fn groups_follow(&self, i: usize) -> bool {
         let i = self.skip_ws_from(i);
         match self.kind_at(i) {
@@ -909,19 +909,19 @@ impl<'a, 't> CstParser<'a, 't> {
         (self.kind_at(j) == Some(K::GT)).then_some((true, j))
     }
 
-    /// Index just past everything an element starting at `i` (its sigil is
+    /// Index just past everything a form starting at `i` (its sigil is
     /// `@name`) owns, using only bracket matching.
-    fn element_end(&self, mut i: usize) -> usize {
+    fn form_end(&self, mut i: usize) -> usize {
         i += self.sigil_len_at(i).unwrap_or(2); // `@name`, or `::name`
         let mut seen = [false; 3]; // args, content, value: each at most once
         let mut seen_id = false;
         loop {
             let mut j = self.skip_ws_from(i);
-            // A comment after the element does not end it either.
+            // A comment after the form does not end it either.
             while self.kind_at(j) == Some(K::COMMENT) {
                 j = self.skip_ws_from(j + self.comment_len_at(j));
             }
-            // A group may stand on the line after the element's own, with no
+            // A group may stand on the line after the form's own, with no
             // blank line between: `@file(a)` and then `[ text ]`.
             if self.kind_at(j) == Some(K::NEWLINE) {
                 let k = self.skip_ws_from(j + 1);
@@ -998,13 +998,13 @@ impl<'a, 't> CstParser<'a, 't> {
             && self.name_at(i + 2)
     }
 
-    /// Is the `::` at `i` a declaration that owns the rest of its line? (An `@` element or a box
-    /// is told from a paragraph after it is read: see [`CstParser::parse_element_line`].)
-    fn is_block_element_at(&self, i: usize) -> bool {
+    /// Is the `::` at `i` a declaration that owns the rest of its line? (An `@` form or a box
+    /// is told from a paragraph after it is read: see [`CstParser::parse_form_line`].)
+    fn is_block_form_at(&self, i: usize) -> bool {
         if !self.is_double_colon_sigil_at(i) {
             return false;
         }
-        let mut j = self.element_end(i);
+        let mut j = self.form_end(i);
         while let Some(k) = self.kind_at(j) {
             if k == K::WHITESPACE {
                 j += 1;
@@ -1017,7 +1017,7 @@ impl<'a, 't> CstParser<'a, 't> {
         self.kind_at(j).is_none_or(|k| k == K::NEWLINE)
     }
 
-    /// After a line that holds nothing but an element, at its `NEWLINE`: does the next line fold
+    /// After a line that holds nothing but a form, at its `NEWLINE`: does the next line fold
     /// into it, as running text goes on across lines? Not if that line is blank, ends the `[content]`
     /// or `|` run being read, or starts a block (`;`, a list marker, a section, ...).
     fn next_line_folds(&self, newline: usize) -> bool {
@@ -1094,7 +1094,7 @@ impl<'a, 't> CstParser<'a, 't> {
     }
 
     /// Does a list item start at `i`: a `-` (`-.` for an ordered one), then
-    /// white space, an element's `@`, or a group opener -- the forms
+    /// white space, a form's `@`, or a group opener -- the forms
     /// `list::eat_list_marker` reads. A `-` followed by anything else is prose.
     fn is_list_start_at(&self, i: usize) -> bool {
         if self.kind_at(i) != Some(K::MINUS) {
@@ -1131,10 +1131,10 @@ impl<'a, 't> CstParser<'a, 't> {
             Some(K::SEMI) => true,
             // So does a comment on a line of its own.
             Some(K::COMMENT) => true,
-            // An `@` element is not here: a line that starts with one is
+            // An `@` form is not here: a line that starts with one is
             // running text and folds into the paragraph. A `::` declaration
             // is only ever a block.
-            Some(K::COLON) => self.is_block_element_at(i),
+            Some(K::COLON) => self.is_block_form_at(i),
             _ => false,
         }
     }
@@ -1196,8 +1196,8 @@ impl<'a, 't> CstParser<'a, 't> {
             }
             K::MINUS if self.is_list_start_at(self.pos) => self.parse_list(),
             K::BACKTICK if self.is_code_block_start_at(self.pos) => self.parse_code_block(),
-            K::AT | K::LT => self.parse_element_line(),
-            K::COLON if self.is_block_element_at(self.pos) => self.parse_block_element(),
+            K::AT | K::LT => self.parse_form_line(),
+            K::COLON if self.is_block_form_at(self.pos) => self.parse_block_form(),
             // A declaration that does not stand alone: still read as one, with the text after it
             // marked as the mistake.
             K::COLON
@@ -1269,8 +1269,8 @@ impl<'a, 't> CstParser<'a, 't> {
     ///
     /// Where they begin is the leftmost place from which the groups read to the end
     /// of the line ([`CstParser::trailing_groups_start`]) and which the text before it
-    /// reaches without an element of its own in the way: a `{value}` that an
-    /// `@element` at the end of the text would take is the element's.
+    /// reaches without a form of its own in the way: a `{value}` that an
+    /// `@form` at the end of the text would take is the form's.
     fn parse_sugar_tail(&mut self) {
         self.bump_while(K::WHITESPACE);
         let from = self.start_of(self.pos);
@@ -1298,7 +1298,7 @@ impl<'a, 't> CstParser<'a, 't> {
                 self.parse_inline(InlineStop::Offset(at));
             }
             if self.start_of(self.pos) > at {
-                // An element in the text took the groups; look for one after it.
+                // A form in the text took the groups; look for one after it.
                 resume = self.start_of(self.pos);
                 continue;
             }
@@ -1494,7 +1494,7 @@ fn validate_value_group(node: &SyntaxNode) -> bool {
                     Some(tomet_cst::SyntaxElement::Node(n))
                         if matches!(
                             n.kind(),
-                            K::ARGS | K::INLINE_ELEMENT | K::BLOCK_ELEMENT
+                            K::ARGS | K::INLINE_FORM | K::BLOCK_FORM
                         ) => {}
                     _ => return false,
                 }
@@ -1634,7 +1634,7 @@ fn is_valid_tail_group_list(groups: &[SyntaxNode]) -> bool {
         match child.kind() {
             K::SIGIL | K::SECTION_HEADING | K::NAME | K::BODY => {}
             K::LIST
-            | K::INLINE_ELEMENT
+            | K::INLINE_FORM
             | K::SLOT
             | K::EMPHASIS
             | K::STRONG
@@ -1742,7 +1742,7 @@ impl<'a, 't> CstParser<'a, 't> {
         self.builder.finish_node();
     }
 
-    /// The head of an element that stands as a block: its sigil and groups, or a box.
+    /// The head of a form that stands as a block: its sigil and groups, or a box.
     fn parse_block_head(&mut self) {
         if self.current_kind() == Some(K::LT) {
             self.parse_slot();
@@ -1803,7 +1803,7 @@ impl<'a, 't> CstParser<'a, 't> {
     /// A `::name(...)` that opens a block and has more on its line: the declaration, read as it
     /// would be alone, and the rest of the line in an `ERROR` node (a declaration stands alone).
     fn parse_declaration_with_stray_text(&mut self) {
-        self.parse_block_element();
+        self.parse_block_form();
         if !matches!(self.current_kind(), None | Some(K::NEWLINE)) {
             self.builder.start_node(K::ERROR.into());
             self.parse_inline(InlineStop::Line);
@@ -1848,8 +1848,8 @@ impl<'a, 't> CstParser<'a, 't> {
         self.builder.finish_node();
     }
 
-    fn parse_block_element(&mut self) {
-        self.builder.start_node(K::BLOCK_ELEMENT.into());
+    fn parse_block_form(&mut self) {
+        self.builder.start_node(K::BLOCK_FORM.into());
         self.parse_block_head();
         while matches!(self.current_kind(), Some(K::WHITESPACE | K::COMMENT)) {
             self.bump();
@@ -1857,16 +1857,16 @@ impl<'a, 't> CstParser<'a, 't> {
         self.builder.finish_node();
     }
 
-    /// A line that opens with an `@` element or a box. It is read first and told what it is
-    /// after: an element that is the whole of its line is a block, unless the next line folds
-    /// into it (then the line is running text); an element with more after it is the start of a
+    /// A line that opens with an `@` form or a box. It is read first and told what it is
+    /// after: a form that is the whole of its line is a block, unless the next line folds
+    /// into it (then the line is running text); a form with more after it is the start of a
     /// paragraph. Reading it first is what keeps the cost proportional to the text: deciding
-    /// before, by scanning to the element's end, scans everything inside it again at every level
+    /// before, by scanning to the form's end, scans everything inside it again at every level
     /// of nesting.
-    fn parse_element_line(&mut self) {
+    fn parse_form_line(&mut self) {
         let p = self.pos;
-        let element = match self.current_kind() {
-            // A bare `@name` is an element only alone on its line; with a group it is one anywhere.
+        let form = match self.current_kind() {
+            // A bare `@name` is a form only alone on its line; with a group it is one anywhere.
             Some(K::AT) => {
                 let n = self.name_tokens_at(p + 1);
                 n > 0
@@ -1878,7 +1878,7 @@ impl<'a, 't> CstParser<'a, 't> {
             Some(K::LT) => matches!(self.slot_at(p), Some((true, _))),
             _ => false,
         };
-        if !element {
+        if !form {
             self.parse_paragraph();
             return;
         }
@@ -1887,15 +1887,15 @@ impl<'a, 't> CstParser<'a, 't> {
         let after = self.past_blanks(self.pos);
         let whole_line = self.kind_at(after).is_none_or(|k| k == K::NEWLINE);
         if whole_line && !self.next_line_folds(after) {
-            self.builder.start_node_at(start, K::BLOCK_ELEMENT.into());
+            self.builder.start_node_at(start, K::BLOCK_FORM.into());
             self.bump_blanks();
             self.builder.finish_node();
             return;
         }
-        // The element is the first inline of a paragraph. When it is the whole of its line, the
-        // blanks after it are the element's, as they are for a block.
+        // The form is the first inline of a paragraph. When it is the whole of its line, the
+        // blanks after it are the form's, as they are for a block.
         self.builder.start_node_at(start, K::PARAGRAPH.into());
-        self.builder.start_node_at(start, K::INLINE_ELEMENT.into());
+        self.builder.start_node_at(start, K::INLINE_FORM.into());
         if whole_line {
             self.bump_blanks();
         }
@@ -1984,19 +1984,19 @@ impl<'a, 't> CstParser<'a, 't> {
             self.allow_connect = outer;
         } else {
             // The rest of the line -- plain trailing text for a full-form
-            // item -- must not let an inner element (`@link` in
+            // item -- must not let an inner form (`@link` in
             // `- @link(ref:x) :{ id: b }`) steal a colon connect meant for
-            // the item: `connect_joins_the_element` depends on this staying
+            // the item: `connect_joins_the_form` depends on this staying
             // `false` here.
             let outer = self.allow_connect;
             // The combine notation `-@name(...)` is the one exception: that
-            // element is the item, and takes its own connects.
+            // form is the item, and takes its own connects.
             let combine = self.current_kind() == Some(K::AT)
                 && self.pos > 0
                 && self.kind_at(self.pos - 1) != Some(K::WHITESPACE);
             if combine {
                 self.allow_connect = true;
-                self.try_parse_inline_element();
+                self.try_parse_inline_form();
             }
             self.allow_connect = false;
             if !matches!(self.current_kind(), None | Some(K::NEWLINE)) {
@@ -2216,7 +2216,7 @@ impl<'a, 't> CstParser<'a, 't> {
             }
             if !(self.try_parse_code_span()
                 || self.try_parse_autolink(stop)
-                || self.try_parse_inline_element()
+                || self.try_parse_inline_form()
                 || self.try_parse_delimited()
                 || self.try_parse_escaped_semi())
             {
@@ -2414,16 +2414,16 @@ impl<'a, 't> CstParser<'a, 't> {
         true
     }
 
-    /// Parses an element at the cursor if the tokens form one.
-    fn try_parse_inline_element(&mut self) -> bool {
+    /// Parses a form at the cursor if the tokens form one.
+    fn try_parse_inline_form(&mut self) -> bool {
         let p = self.pos;
         if self.current_kind() == Some(K::LT) {
             let Some((marked, _)) = self.slot_at(p) else {
                 return false;
             };
-            // A marked box is an element of the tree; a name tag stays running text.
+            // A marked box is a form of the tree; a name tag stays running text.
             if marked {
-                self.builder.start_node(K::INLINE_ELEMENT.into());
+                self.builder.start_node(K::INLINE_FORM.into());
                 self.parse_slot();
                 self.builder.finish_node();
             } else {
@@ -2431,7 +2431,7 @@ impl<'a, 't> CstParser<'a, 't> {
             }
             return true;
         }
-        let is_element = match self.current_kind() {
+        let is_form = match self.current_kind() {
             Some(K::AT) => {
                 let n = self.name_tokens_at(p + 1);
                 n > 0 && self.groups_follow(p + 1 + n)
@@ -2443,10 +2443,10 @@ impl<'a, 't> CstParser<'a, 't> {
             }
             _ => false,
         };
-        if !is_element {
+        if !is_form {
             return false;
         }
-        self.builder.start_node(K::INLINE_ELEMENT.into());
+        self.builder.start_node(K::INLINE_FORM.into());
         let dollar = self.current_kind() == Some(K::DOLLAR);
         self.parse_sigil();
         if dollar {
@@ -2456,14 +2456,14 @@ impl<'a, 't> CstParser<'a, 't> {
                 _ => {}
             }
         } else {
-            // Like a block element's, an inline element's groups may begin on the next line.
+            // Like a block form's, an inline form's groups may begin on the next line.
             self.parse_groups(true, true);
         }
         self.builder.finish_node();
         true
     }
 
-    // --- elements ---------------------------------------------------------
+    // --- forms -----------------------------------------------------------
 
     fn parse_sigil(&mut self) {
         self.builder.start_node(K::SIGIL.into());
@@ -2485,7 +2485,7 @@ impl<'a, 't> CstParser<'a, 't> {
         self.builder.finish_node();
     }
 
-    /// An element's `(args)`, `{value}` and `[content]` (at most one of each,
+    /// A form's `(args)`, `{value}` and `[content]` (at most one of each,
     /// in any order), then its `#(id)` slot, then its `:name(...)` connects.
     ///
     /// No ordering is enforced between `#(id)` and the other three groups,
@@ -2496,7 +2496,7 @@ impl<'a, 't> CstParser<'a, 't> {
     /// never reaches this loop's own `id` slot at all.
     ///
     /// `|` is `[` without the brackets: the same slot, closed by the end of its
-    /// run. A block element (`cross_newline`) may open it on the line after
+    /// run. A block form (`cross_newline`) may open it on the line after
     /// its own, `@quote(A)` and then `| text`; any other construct opens it
     /// on its own line or not at all.
     ///
@@ -2567,7 +2567,7 @@ impl<'a, 't> CstParser<'a, 't> {
                 }
                 // A group of a kind the owner has already, written against the last one. Apart
                 // from it (a space, a line) it is prose; against it, it is an error, kept in the
-                // tree as one and read as the group it looks like. Only an element and a
+                // tree as one and read as the group it looks like. Only a form and a
                 // declaration take one of each.
                 Some(k @ (K::L_PAREN | K::L_BRACKET | K::L_BRACE | K::PIPE | K::HASH))
                     if strict
@@ -2671,7 +2671,7 @@ impl<'a, 't> CstParser<'a, 't> {
         if self.name_at(self.pos) {
             self.parse_name_node();
         }
-        // The groups of a connect are an element's: `(args)`, `{value}` and
+        // The groups of a connect are a form's: `(args)`, `{value}` and
         // `[content]` in any order, each once -- but not a sibling `:connect`,
         // which stays for the loop this was called from.
         let outer = std::mem::replace(&mut self.allow_connect, false);
@@ -2833,8 +2833,8 @@ impl<'a, 't> CstParser<'a, 't> {
                     self.parse_entries(K::R_BRACE);
                     self.builder.finish_node();
                 }
-                // `[ ... ]` as a value is blocks, the same `[content]` an
-                // element takes; the list literal it once was is gone. Read as
+                // `[ ... ]` as a value is blocks, the same `[content]` a
+                // form takes; the list literal it once was is gone. Read as
                 // a list it closed at the first `]`, even one inside `` `code` ``.
                 K::L_BRACKET => self.parse_content_group(),
                 K::L_PAREN => self.parse_args_group(),
@@ -2842,7 +2842,7 @@ impl<'a, 't> CstParser<'a, 't> {
                 K::HASH if self.id_follows(self.pos) => self.parse_id_group(),
                 K::QUOTE => self.bump_string_literal(),
                 _ => {
-                    if !self.try_parse_inline_element() {
+                    if !self.try_parse_inline_form() {
                         if self.name_at(self.pos) {
                             self.bump_name();
                         } else {
@@ -2962,26 +2962,26 @@ mod tests {
     }
 
     #[test]
-    fn inline_elements_are_structured() {
+    fn inline_forms_are_structured() {
         let src = "See @link[label](ref:x) and @ftn(1) and ${a.b} and $sum(1, 2).\n";
         let root = parse_cst(src);
         let para = find(&root, K::PARAGRAPH).unwrap();
-        let elements: Vec<_> = para
+        let forms: Vec<_> = para
             .children()
-            .filter(|n| n.kind() == K::INLINE_ELEMENT)
+            .filter(|n| n.kind() == K::INLINE_FORM)
             .collect();
-        assert_eq!(elements.len(), 4);
+        assert_eq!(forms.len(), 4);
 
-        assert_eq!(child_kinds(&elements[0]), [K::SIGIL, K::CONTENT, K::ARGS]);
-        assert_eq!(elements[0].text().to_string(), "@link[label](ref:x)");
-        assert_eq!(child_kinds(&elements[1]), [K::SIGIL, K::ARGS]);
-        assert_eq!(elements[1].text().to_string(), "@ftn(1)");
-        assert_eq!(child_kinds(&elements[2]), [K::SIGIL, K::INTERP_EXPR]);
-        assert_eq!(elements[2].text().to_string(), "${a.b}");
-        assert_eq!(child_kinds(&elements[3]), [K::SIGIL, K::ARGS]);
+        assert_eq!(child_kinds(&forms[0]), [K::SIGIL, K::CONTENT, K::ARGS]);
+        assert_eq!(forms[0].text().to_string(), "@link[label](ref:x)");
+        assert_eq!(child_kinds(&forms[1]), [K::SIGIL, K::ARGS]);
+        assert_eq!(forms[1].text().to_string(), "@ftn(1)");
+        assert_eq!(child_kinds(&forms[2]), [K::SIGIL, K::INTERP_EXPR]);
+        assert_eq!(forms[2].text().to_string(), "${a.b}");
+        assert_eq!(child_kinds(&forms[3]), [K::SIGIL, K::ARGS]);
 
         // `ref:x` is a structured entry.
-        let entry = find(&elements[0], K::MAP_ENTRY).unwrap();
+        let entry = find(&forms[0], K::MAP_ENTRY).unwrap();
         assert_eq!(entry.text().to_string(), "ref:x");
     }
 
@@ -2995,17 +2995,17 @@ mod tests {
             "@name\n\n",
         ] {
             let root = parse_cst(src);
-            assert_eq!(count(&root, K::INLINE_ELEMENT), 0, "{src:?}");
+            assert_eq!(count(&root, K::INLINE_FORM), 0, "{src:?}");
         }
     }
 
     #[test]
-    fn inline_elements_nest_in_content() {
+    fn inline_forms_nest_in_content() {
         let root = parse_cst("@note[ see @link[x](ref:y) ]{ k: v }\n");
-        let el = find(&root, K::BLOCK_ELEMENT).unwrap();
+        let el = find(&root, K::BLOCK_FORM).unwrap();
         assert_eq!(child_kinds(&el), [K::SIGIL, K::CONTENT, K::VALUE_DATA]);
         let content = find(&el, K::CONTENT).unwrap();
-        assert_eq!(count(&content, K::INLINE_ELEMENT), 1);
+        assert_eq!(count(&content, K::INLINE_FORM), 1);
     }
 
     #[test]
@@ -3017,7 +3017,7 @@ mod tests {
         // `tomet-semantics-validator::collect_ids_cst` (the LSP's only
         // duplicate-id check) see a duplicate id nested this way.
         let root = parse_cst("@outer[\n=[ Heading ]#(x)\n\nbody\n]\n");
-        let el = find(&root, K::BLOCK_ELEMENT).unwrap();
+        let el = find(&root, K::BLOCK_FORM).unwrap();
         let content = find(&el, K::CONTENT).unwrap();
         let section = find(&content, K::SECTION).unwrap();
         assert_eq!(child_kinds(&section), [K::SECTION_HEADING, K::PARAGRAPH]);
@@ -3053,16 +3053,16 @@ mod tests {
     }
 
     #[test]
-    fn block_element_needs_a_bare_line() {
+    fn block_form_needs_a_bare_line() {
         // Ends its line: a block. Text follows: part of a paragraph.
         assert_eq!(
             child_kinds(&parse_cst("@card(id: a){ p: 1 }\n")),
-            [K::BLOCK_ELEMENT]
+            [K::BLOCK_FORM]
         );
-        assert_eq!(child_kinds(&parse_cst("::meta\n")), [K::BLOCK_ELEMENT]);
+        assert_eq!(child_kinds(&parse_cst("::meta\n")), [K::BLOCK_FORM]);
         let root = parse_cst("@link[a](ref:b) trailing\n");
         assert_eq!(child_kinds(&root), [K::PARAGRAPH]);
-        assert_eq!(count(&root, K::INLINE_ELEMENT), 1);
+        assert_eq!(count(&root, K::INLINE_FORM), 1);
     }
 
     #[test]
@@ -3093,9 +3093,9 @@ mod tests {
     }
 
     #[test]
-    fn connect_joins_the_element() {
+    fn connect_joins_the_form() {
         let root = parse_cst("@link[x](ref:y):rule(allow: list(a))\n");
-        let el = find(&root, K::BLOCK_ELEMENT).unwrap();
+        let el = find(&root, K::BLOCK_FORM).unwrap();
         assert_eq!(
             child_kinds(&el),
             [K::SIGIL, K::CONTENT, K::ARGS, K::CONNECT]
@@ -3104,9 +3104,9 @@ mod tests {
             find(&el, K::CONNECT).unwrap().text().to_string(),
             ":rule(allow: list(a))"
         );
-        // A list item's own trailing group is not claimed by its element.
+        // A list item's own trailing group is not claimed by its form.
         let root = parse_cst("- @link(ref:x) :{ id: b }\n");
-        let el = find(&root, K::INLINE_ELEMENT).unwrap();
+        let el = find(&root, K::INLINE_FORM).unwrap();
         assert_eq!(count(&el, K::CONNECT), 0);
     }
 
@@ -3114,7 +3114,7 @@ mod tests {
     fn full_form_list_item_claims_its_own_trailing_connect() {
         // A full-form item's own groups reach `parse_groups`'s `COLON`
         // arm directly (nothing else sits between the closing `]` and
-        // the `:`), so this now mirrors a plain element's own connect --
+        // the `:`), so this now mirrors a plain form's own connect --
         // `parse_list_item` only disables `allow_connect` for the rest
         // of the line (the sugar/trailing-text scan), not for the item's
         // own groups.
@@ -3132,7 +3132,7 @@ mod tests {
         // The second `(...)` is prose, not more args.
         let root = parse_cst("@link[a](ref:b) (see below)\n");
         assert_eq!(child_kinds(&root), [K::PARAGRAPH]);
-        let el = find(&root, K::INLINE_ELEMENT).unwrap();
+        let el = find(&root, K::INLINE_FORM).unwrap();
         assert_eq!(count(&el, K::ARGS), 1);
     }
 
@@ -3147,7 +3147,7 @@ mod tests {
     fn urls_and_apostrophes_do_not_break_groups() {
         // `//` after `:` is not a comment; `'` inside a word is not a quote.
         let root = parse_cst("@link[it's](url:https://example.com/a)\n=[ S ]\n");
-        assert_eq!(child_kinds(&root), [K::BLOCK_ELEMENT, K::SECTION]);
+        assert_eq!(child_kinds(&root), [K::BLOCK_FORM, K::SECTION]);
     }
 
     #[test]
@@ -3175,7 +3175,7 @@ mod tests {
         let el = b
             .syntax()
             .descendants()
-            .find_map(tomet_cst::CstBlockElement::cast)
+            .find_map(tomet_cst::CstBlockForm::cast)
             .unwrap();
         let entries: Vec<_> = el
             .args()
@@ -3191,7 +3191,7 @@ mod tests {
         let src = "@memo(a: 1)[ x ]#(myid)\n";
         let root = parse_cst(src);
         assert_eq!(root.text().to_string(), src);
-        let el = find(&root, K::BLOCK_ELEMENT).unwrap();
+        let el = find(&root, K::BLOCK_FORM).unwrap();
         assert_eq!(
             child_kinds(&el),
             [K::SIGIL, K::ARGS, K::CONTENT, K::ID_GROUP]
@@ -3202,7 +3202,7 @@ mod tests {
 
     #[test]
     fn id_group_can_come_before_its_groups() {
-        let el = find(&parse_cst("@memo#(myid)(a: 1)\n"), K::BLOCK_ELEMENT).unwrap();
+        let el = find(&parse_cst("@memo#(myid)(a: 1)\n"), K::BLOCK_FORM).unwrap();
         assert_eq!(child_kinds(&el), [K::SIGIL, K::ID_GROUP, K::ARGS]);
     }
 
@@ -3223,19 +3223,19 @@ mod tests {
         // free text -- confirmed here for the lossless tree too.
         let root = parse_cst("::meta{a: 1}\n#[ Title ]\n");
         assert_eq!(count(&root, K::ID_GROUP), 0);
-        assert_eq!(child_kinds(&root), [K::BLOCK_ELEMENT, K::PARAGRAPH]);
+        assert_eq!(child_kinds(&root), [K::BLOCK_FORM, K::PARAGRAPH]);
     }
 
     #[test]
-    fn a_document_declaration_is_a_block_element_with_a_double_colon_sigil() {
+    fn a_document_declaration_is_a_block_form_with_a_double_colon_sigil() {
         let src = "::kind(config)\n::meta{ id: x }\n\n=[ T ]\n";
         let root = parse_cst(src);
         assert_eq!(root.text().to_string(), src);
         assert_eq!(
             child_kinds(&root),
-            [K::BLOCK_ELEMENT, K::BLOCK_ELEMENT, K::SECTION]
+            [K::BLOCK_FORM, K::BLOCK_FORM, K::SECTION]
         );
-        let kind = find(&root, K::BLOCK_ELEMENT).unwrap();
+        let kind = find(&root, K::BLOCK_FORM).unwrap();
         assert_eq!(child_kinds(&kind), [K::SIGIL, K::ARGS]);
         let sigil = find(&kind, K::SIGIL).unwrap();
         assert_eq!(sigil.text().to_string(), "::kind");
@@ -3249,11 +3249,11 @@ mod tests {
     }
 
     #[test]
-    fn a_declaration_takes_groups_and_connects_like_an_at_element() {
+    fn a_declaration_takes_groups_and_connects_like_an_at_form() {
         let src = "::x(a)[ b ]{ c: 1 }#(i):rule(allow:list(k))\n";
         let root = parse_cst(src);
         assert_eq!(root.text().to_string(), src);
-        let el = find(&root, K::BLOCK_ELEMENT).unwrap();
+        let el = find(&root, K::BLOCK_FORM).unwrap();
         assert_eq!(
             child_kinds(&el),
             [
@@ -3271,7 +3271,7 @@ mod tests {
     fn the_next_declaration_is_not_a_connect_of_the_one_before() {
         let root = parse_cst("::kind(config)\n::meta{ id: x }\n");
         assert_eq!(count(&root, K::CONNECT), 0);
-        assert_eq!(count(&root, K::BLOCK_ELEMENT), 2);
+        assert_eq!(count(&root, K::BLOCK_FORM), 2);
     }
 
     #[test]
@@ -3285,8 +3285,8 @@ mod tests {
         ] {
             let root = parse_cst(src);
             assert_eq!(root.text().to_string(), src);
-            assert_eq!(count(&root, K::BLOCK_ELEMENT), 0, "{src:?}");
-            assert_eq!(count(&root, K::INLINE_ELEMENT), 0, "{src:?}");
+            assert_eq!(count(&root, K::BLOCK_FORM), 0, "{src:?}");
+            assert_eq!(count(&root, K::INLINE_FORM), 0, "{src:?}");
         }
     }
 }

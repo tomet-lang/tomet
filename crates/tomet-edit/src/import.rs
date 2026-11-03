@@ -4,7 +4,7 @@ use tomet_cst::{NodeOrToken, SyntaxElement, SyntaxKind as K, SyntaxNode};
 
 use crate::doc::EditDoc;
 use crate::node::{
-    AttrEntry, AttrSlot, ChildItem, EditValue, EditValueKind, ElementPiece, ElementSlots,
+    AttrEntry, AttrSlot, ChildItem, EditValue, EditValueKind, FormPiece, FormSlots,
     InlineItem, Node, NodeId, NodeKind,
 };
 
@@ -35,7 +35,7 @@ pub(crate) fn import_block_node(doc: &mut EditDoc, node: &SyntaxNode) -> NodeId 
     let raw = node.text().to_string();
     let id = doc.alloc_id();
 
-    let mut slots = ElementSlots::default();
+    let mut slots = FormSlots::default();
     let mut inlines = Vec::new();
     let mut heading_prefix = String::new();
     let mut heading_suffix = String::new();
@@ -52,10 +52,10 @@ pub(crate) fn import_block_node(doc: &mut EditDoc, node: &SyntaxNode) -> NodeId 
             inlines = parse_inline_items(&raw);
             NodeKind::Paragraph { text: raw.clone() }
         }
-        K::BLOCK_ELEMENT => {
-            let (el_kind, el_slots) = import_block_element(doc, node);
-            slots = el_slots;
-            el_kind
+        K::BLOCK_FORM => {
+            let (form_kind, form_slots) = import_block_form(doc, node);
+            slots = form_slots;
+            form_kind
         }
         K::LIST => import_list(doc, node),
         K::LIST_ITEM => import_list_item(doc, node),
@@ -179,7 +179,7 @@ fn count_heading_level(raw: &str) -> usize {
     if count == 0 { 1 } else { count }
 }
 
-fn import_block_element(doc: &mut EditDoc, node: &SyntaxNode) -> (NodeKind, ElementSlots) {
+fn import_block_form(doc: &mut EditDoc, node: &SyntaxNode) -> (NodeKind, FormSlots) {
     let mut name = String::new();
     let mut declaration = false;
     let mut id_attr = None;
@@ -192,7 +192,7 @@ fn import_block_element(doc: &mut EditDoc, node: &SyntaxNode) -> (NodeKind, Elem
     for element in node.children_with_tokens() {
         match element {
             NodeOrToken::Token(token) => {
-                pieces.push(ElementPiece::Trivia(token.text().to_string()));
+                pieces.push(FormPiece::Trivia(token.text().to_string()));
             }
             NodeOrToken::Node(child) => match child.kind() {
                 K::SIGIL => {
@@ -202,7 +202,7 @@ fn import_block_element(doc: &mut EditDoc, node: &SyntaxNode) -> (NodeKind, Elem
                         .trim_start_matches(['@', ':', '<'])
                         .trim_end_matches('>')
                         .to_string();
-                    pieces.push(ElementPiece::Sigil(sigil_text));
+                    pieces.push(FormPiece::Sigil(sigil_text));
                 }
                 K::ID_GROUP => {
                     let raw_id = child.text().to_string();
@@ -212,15 +212,15 @@ fn import_block_element(doc: &mut EditDoc, node: &SyntaxNode) -> (NodeKind, Elem
                         .trim()
                         .to_string();
                     id_attr = Some(parsed_id);
-                    pieces.push(ElementPiece::Id { raw: raw_id });
+                    pieces.push(FormPiece::Id { raw: raw_id });
                 }
                 K::ARGS => {
                     args_slot = Some(import_attr_slot(&child));
-                    pieces.push(ElementPiece::Args);
+                    pieces.push(FormPiece::Args);
                 }
                 K::VALUE_DATA => {
                     data_slot = Some(import_attr_slot(&child));
-                    pieces.push(ElementPiece::Data);
+                    pieces.push(FormPiece::Data);
                 }
                 K::CONTENT => {
                     let raw_content = child.text().to_string();
@@ -234,23 +234,23 @@ fn import_block_element(doc: &mut EditDoc, node: &SyntaxNode) -> (NodeKind, Elem
                         String::new()
                     };
                     content_children = Some(import_content_children(doc, &child));
-                    pieces.push(ElementPiece::Content {
+                    pieces.push(FormPiece::Content {
                         open_raw: if opener == K::PIPE { "|" } else { "[" }.to_string(),
                         close_raw,
                         raw: raw_content,
                     });
                 }
                 K::CONNECT => {
-                    pieces.push(ElementPiece::Connect(child.text().to_string()));
+                    pieces.push(FormPiece::Connect(child.text().to_string()));
                 }
                 _ => {
-                    pieces.push(ElementPiece::Trivia(child.text().to_string()));
+                    pieces.push(FormPiece::Trivia(child.text().to_string()));
                 }
             },
         }
     }
 
-    let slots = ElementSlots {
+    let slots = FormSlots {
         pieces,
         id_edited: false,
         args_slot,
@@ -260,7 +260,7 @@ fn import_block_element(doc: &mut EditDoc, node: &SyntaxNode) -> (NodeKind, Elem
     };
 
     (
-        NodeKind::BlockElement {
+        NodeKind::BlockForm {
             name,
             declaration,
             id_attr,
@@ -528,7 +528,7 @@ fn import_edit_value(elems: &[SyntaxElement]) -> EditValue {
                     kind: EditValueKind::Map(import_attr_slot(node)),
                 };
             }
-            K::INLINE_ELEMENT => {
+            K::INLINE_FORM => {
                 let sigil_raw = node
                     .children()
                     .find(|c| c.kind() == K::SIGIL)
@@ -550,7 +550,7 @@ fn import_edit_value(elems: &[SyntaxElement]) -> EditValue {
                 return EditValue {
                     raw,
                     edited: false,
-                    kind: EditValueKind::Element {
+                    kind: EditValueKind::Form {
                         sigil_raw,
                         name,
                         args,
@@ -602,16 +602,16 @@ pub fn parse_inline_items(src: &str) -> Vec<InlineItem> {
         (src, None)
     };
 
-    // Find inline element byte ranges from the CST of `body`
+    // Find inline form byte ranges from the CST of `body`
     let cst = tomet_cst_parser::parse_cst(body);
-    let mut inline_elements: Vec<(usize, usize, SyntaxNode)> = Vec::new();
+    let mut inline_forms: Vec<(usize, usize, SyntaxNode)> = Vec::new();
     for child in cst.children() {
         for sub in child.children() {
-            if sub.kind() == K::INLINE_ELEMENT {
+            if sub.kind() == K::INLINE_FORM {
                 let start = usize::from(sub.text_range().start());
                 let end = usize::from(sub.text_range().end());
                 if end <= body.len() {
-                    inline_elements.push((start, end, sub));
+                    inline_forms.push((start, end, sub));
                 }
             }
         }
@@ -629,17 +629,17 @@ pub fn parse_inline_items(src: &str) -> Vec<InlineItem> {
     };
 
     while pos < body.len() {
-        // 1. Check CST inline element starting at `pos`
-        if let Some((_, end, el_node)) = inline_elements.iter().find(|(s, _, _)| *s == pos) {
+        // 1. Check CST inline form starting at `pos`
+        if let Some((_, end, el_node)) = inline_forms.iter().find(|(s, _, _)| *s == pos) {
             flush_text(&mut items, &mut text_start, pos);
             let el_raw = body[pos..*end].to_string();
             let mut dummy_doc = EditDoc::new();
-            let (kind, slots) = import_block_element(&mut dummy_doc, el_node);
+            let (kind, slots) = import_block_form(&mut dummy_doc, el_node);
             let name = match kind {
-                NodeKind::BlockElement { name, .. } => name,
+                NodeKind::BlockForm { name, .. } => name,
                 _ => String::new(),
             };
-            items.push(InlineItem::Element {
+            items.push(InlineItem::Form {
                 name,
                 raw: el_raw,
                 slots,

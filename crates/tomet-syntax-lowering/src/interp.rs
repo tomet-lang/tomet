@@ -48,7 +48,7 @@ fn err(pos: usize, message: impl Into<String>) -> crate::error::Error {
     }
 }
 
-/// Lowers an `INLINE_ELEMENT` CST node representing an interpolation into an AST [`Interpolation`].
+/// Lowers an `INLINE_FORM` CST node representing an interpolation into an AST [`Interpolation`].
 pub(crate) fn lower_interpolation(node: &SyntaxNode) -> Result<Interpolation> {
     let text = node.text().to_string();
     let base = usize::from(node.text_range().start());

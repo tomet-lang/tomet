@@ -58,7 +58,7 @@ macro_rules! define_ast_node {
 }
 
 define_ast_node!(CstRoot, ROOT);
-define_ast_node!(CstBlockElement, BLOCK_ELEMENT);
+define_ast_node!(CstBlockForm, BLOCK_FORM);
 define_ast_node!(CstParagraph, PARAGRAPH);
 define_ast_node!(CstList, LIST);
 define_ast_node!(CstListItem, LIST_ITEM);
@@ -77,7 +77,7 @@ define_ast_node!(CstValueData, VALUE_DATA);
 define_ast_node!(CstSection, SECTION);
 define_ast_node!(CstSectionHeading, SECTION_HEADING);
 define_ast_node!(CstThematicBreak, THEMATIC_BREAK);
-define_ast_node!(CstInlineElement, INLINE_ELEMENT);
+define_ast_node!(CstInlineForm, INLINE_FORM);
 define_ast_node!(CstConnect, CONNECT);
 define_ast_node!(CstIdGroup, ID_GROUP);
 define_ast_node!(CstInterpExpr, INTERP_EXPR);
@@ -93,8 +93,8 @@ impl CstRoot {
         self.syntax().children().filter_map(CstSection::cast)
     }
 
-    pub fn elements(&self) -> impl Iterator<Item = CstBlockElement> {
-        self.syntax().children().filter_map(CstBlockElement::cast)
+    pub fn forms(&self) -> impl Iterator<Item = CstBlockForm> {
+        self.syntax().children().filter_map(CstBlockForm::cast)
     }
 
     pub fn paragraphs(&self) -> impl Iterator<Item = CstParagraph> {
@@ -110,7 +110,7 @@ impl CstRoot {
     }
 }
 
-impl CstBlockElement {
+impl CstBlockForm {
     pub fn sigil(&self) -> Option<CstSigil> {
         self.syntax().children().find_map(CstSigil::cast)
     }
@@ -125,6 +125,10 @@ impl CstBlockElement {
 
     pub fn value_data(&self) -> Option<CstValueData> {
         self.syntax().children().find_map(CstValueData::cast)
+    }
+
+    pub fn connects(&self) -> impl Iterator<Item = CstConnect> {
+        self.syntax().children().filter_map(CstConnect::cast)
     }
 
     pub fn id(&self) -> Option<CstIdGroup> {
@@ -178,7 +182,7 @@ impl CstSectionHeading {
     }
 }
 
-impl CstInlineElement {
+impl CstInlineForm {
     pub fn sigil(&self) -> Option<CstSigil> {
         self.syntax().children().find_map(CstSigil::cast)
     }
@@ -201,12 +205,6 @@ impl CstInlineElement {
 
     pub fn id(&self) -> Option<CstIdGroup> {
         self.syntax().children().find_map(CstIdGroup::cast)
-    }
-}
-
-impl CstBlockElement {
-    pub fn connects(&self) -> impl Iterator<Item = CstConnect> {
-        self.syntax().children().filter_map(CstConnect::cast)
     }
 }
 

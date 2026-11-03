@@ -1,7 +1,7 @@
 //! Serializes an [`EditDoc`] back into Tomet source text.
 
 use crate::doc::EditDoc;
-use crate::node::{ChildItem, ElementPiece, NodeId, NodeKind};
+use crate::node::{ChildItem, FormPiece, NodeId, NodeKind};
 
 /// Exports an [`EditDoc`] back to a Tomet source string.
 ///
@@ -59,7 +59,7 @@ pub(crate) fn export_node(doc: &EditDoc, id: NodeId, out: &mut String) {
         NodeKind::Paragraph { text } => {
             out.push_str(text);
         }
-        NodeKind::BlockElement {
+        NodeKind::BlockForm {
             name,
             declaration,
             id_attr,
@@ -68,9 +68,9 @@ pub(crate) fn export_node(doc: &EditDoc, id: NodeId, out: &mut String) {
                 let start_len = out.len();
                 for piece in &node.slots.pieces {
                     match piece {
-                        ElementPiece::Sigil(s) => out.push_str(s),
-                        ElementPiece::Trivia(t) => out.push_str(t),
-                        ElementPiece::Id { raw } => {
+                        FormPiece::Sigil(s) => out.push_str(s),
+                        FormPiece::Trivia(t) => out.push_str(t),
+                        FormPiece::Id { raw } => {
                             if node.slots.id_edited {
                                 if let Some(id_str) = id_attr {
                                     out.push_str("#(");
@@ -81,7 +81,7 @@ pub(crate) fn export_node(doc: &EditDoc, id: NodeId, out: &mut String) {
                                 out.push_str(raw);
                             }
                         }
-                        ElementPiece::Args => {
+                        FormPiece::Args => {
                             if let Some(slot) = &node.slots.args_slot {
                                 if !slot.edited && !slot.entries.iter().any(|e| e.is_edited()) {
                                     out.push_str(&slot.raw);
@@ -90,7 +90,7 @@ pub(crate) fn export_node(doc: &EditDoc, id: NodeId, out: &mut String) {
                                 }
                             }
                         }
-                        ElementPiece::Data => {
+                        FormPiece::Data => {
                             if let Some(slot) = &node.slots.data_slot {
                                 if !slot.edited && !slot.entries.iter().any(|e| e.is_edited()) {
                                     out.push_str(&slot.raw);
@@ -99,7 +99,7 @@ pub(crate) fn export_node(doc: &EditDoc, id: NodeId, out: &mut String) {
                                 }
                             }
                         }
-                        ElementPiece::Content {
+                        FormPiece::Content {
                             open_raw,
                             close_raw,
                             raw,
@@ -128,7 +128,7 @@ pub(crate) fn export_node(doc: &EditDoc, id: NodeId, out: &mut String) {
                                 out.push_str(close_raw);
                             }
                         }
-                        ElementPiece::Connect(c) => out.push_str(c),
+                        FormPiece::Connect(c) => out.push_str(c),
                     }
                 }
                 if node.raw.ends_with('\n') && !out[start_len..].ends_with('\n') {

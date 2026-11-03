@@ -132,7 +132,7 @@ pub(crate) fn scan(src: &str) -> Result<Vec<Found>, ConflictError> {
         let WalkEvent::Enter(node) = event else {
             continue;
         };
-        if !matches!(node.kind(), K::BLOCK_ELEMENT | K::INLINE_ELEMENT) {
+        if !matches!(node.kind(), K::BLOCK_FORM | K::INLINE_FORM) {
             continue;
         }
         let Some(sigil) = node.children().find(|c| c.kind() == K::SIGIL) else {
@@ -220,7 +220,7 @@ fn read(
     };
 
     let kind = match (&a, &b) {
-        (Side::Blocks(_), Side::Blocks(_)) if node.kind() == K::BLOCK_ELEMENT => {
+        (Side::Blocks(_), Side::Blocks(_)) if node.kind() == K::BLOCK_FORM => {
             ConflictKind::Block
         }
         (Side::Blocks(_), Side::Blocks(_)) => ConflictKind::Inline,

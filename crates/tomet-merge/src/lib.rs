@@ -14,7 +14,7 @@
 //! A conflict is narrowed as far down the CST/EditDoc hierarchy as the three
 //! versions' structure allows before giving up and embedding a marker:
 //!
-//! 1. **Block sequence (`ChildItem`s)** — [`diff3`] aligns top-level blocks,
+//! 1. **Block sequence (`ChildItem`s)** — `diff3` aligns top-level blocks,
 //!    section children, and element `[content]` blocks. Non-overlapping
 //!    insertions, deletions, and replacements merge cleanly, preserving
 //!    original trivia and comments.
@@ -25,7 +25,7 @@
 //!      `@conflict(a: [ ... ], b: [ ... ])`;
 //!    - three `Section`s of the same level and `#(id)` -> narrow heading
 //!      inlines and section children independently;
-//!    - three `BlockElement`s with the same sigil and `#(id)` -> narrow
+//!    - three `BlockForm`s with the same sigil and `#(id)` -> narrow
 //!      `(args)`, `[content]`, and `{data}` slots independently;
 //!    - three `List`s / `ListItem`s -> narrow list children or item text;
 //!    - two `{data}` / `(args)` maps -> key-by-key three-way merge preserving

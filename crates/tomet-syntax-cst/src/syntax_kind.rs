@@ -64,8 +64,8 @@ pub enum SyntaxKind {
     // --- Composite Nodes (SyntaxNode) ---
     ROOT,
     DOCUMENT,
-    BLOCK_ELEMENT,
-    INLINE_ELEMENT,
+    BLOCK_FORM,
+    INLINE_FORM,
     /// `=`-run heading plus every block up to the next section of the same or
     /// a shallower level. Sections nest by level; the first child is the
     /// [`SyntaxKind::SECTION_HEADING`].
@@ -96,7 +96,7 @@ pub enum SyntaxKind {
     /// `#(foobar)` -- a single id slot, read after `ARGS`/`CONTENT`/
     /// `VALUE_DATA` but before any `CONNECT`.
     ID_GROUP,
-    /// `:name(...)`, `:(...)`, `:{...}` -- a group joined to the preceding element.
+    /// `:name(...)`, `:(...)`, `:{...}` -- a group joined to the preceding form.
     CONNECT,
     VALUE_DATA,
     VALUE_CHILDREN,
@@ -126,14 +126,14 @@ pub enum SyntaxKind {
     /// The AST gives it a node only where tomet interprets it (a hole is a
     /// `Hole`); a plain name tag lowers to text.
     ///
-    /// A marked box is an element of the tree, so it stands in an `INLINE_ELEMENT` or a
-    /// `BLOCK_ELEMENT` like `@name(...)` does; a name tag is a span of running text, like an
+    /// A marked box is a form in the tree, so it stands in an `INLINE_FORM` or a
+    /// `BLOCK_FORM` like `@name(...)` does; a name tag is a span of running text, like an
     /// `EMPHASIS` or a `CODE_SPAN`, and stands bare among the text. That is why the two are not
     /// wrapped alike.
     SLOT,
     /// A mistake of shape the tree keeps instead of refusing: the tree never fails, lowering turns
     /// the node into an error with the same message and offset. These include: a second group of a
-    /// kind an element already has, the rest of the line after a `::` declaration, an unclosed `/*`
+    /// kind a form already has, the rest of the line after a `::` declaration, an unclosed `/*`
     /// block comment, an unterminated `[` content bracket, a titled thematic break with fewer than 3
     /// dashes or with trailing content, and a misaligned `|` marker.
     ERROR,

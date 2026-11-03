@@ -1,5 +1,5 @@
 //! `parse_cst` against the grammar: the CST must not leave structure flat
-//! that `parse_document` turns into an element or a list.
+//! that `parse_document` turns into a form or a list.
 
 use tomet_cst::SyntaxKind as K;
 
@@ -65,7 +65,7 @@ fn a_group_written_twice_against_itself_is_an_error_node_read_as_the_group_it_lo
 #[test]
 fn the_text_after_a_declaration_on_its_line_is_an_error_node() {
     let src = "::meta{a: 1} text\n";
-    assert_eq!(texts(src, K::BLOCK_ELEMENT), ["::meta{a: 1} "]);
+    assert_eq!(texts(src, K::BLOCK_FORM), ["::meta{a: 1} "]);
     assert_eq!(texts(src, K::ERROR), ["text\n"]);
 }
 
@@ -147,7 +147,7 @@ fn delimiters_that_do_not_open_stay_prose() {
 }
 
 #[test]
-fn emphasis_works_inside_an_element_group() {
+fn emphasis_works_inside_a_form_group() {
     assert_eq!(texts("@note[ *x* and **y** ]\n", K::EMPHASIS), ["*x*"]);
     assert_eq!(texts("@note[ *x* and **y** ]\n", K::STRONG), ["**y**"]);
 }
@@ -166,7 +166,7 @@ fn a_code_span_is_a_node_and_its_inside_is_not_parsed() {
     assert_eq!(texts("a `code` b\n", K::CODE_SPAN), ["`code`"]);
     assert_eq!(texts("`*not em*`\n", K::CODE_SPAN), ["`*not em*`"]);
     assert_eq!(kinds("`*not em*`\n", K::EMPHASIS), 0);
-    assert_eq!(kinds("`@x(a)[b]`\n", K::INLINE_ELEMENT), 0);
+    assert_eq!(kinds("`@x(a)[b]`\n", K::INLINE_FORM), 0);
 }
 
 #[test]
@@ -220,15 +220,15 @@ fn a_url_does_not_start_inside_a_word() {
 // --- `|` runs ---------------------------------------------------------------
 
 #[test]
-fn a_pipe_opens_the_content_of_an_element() {
+fn a_pipe_opens_the_content_of_a_form() {
     assert_eq!(texts("@quote| alpha\n", K::CONTENT), ["| alpha"]);
     assert_eq!(
         texts("@quote(A)\n| alpha\n| beta\n", K::CONTENT),
         ["| alpha\n| beta"]
     );
-    // It is the element's: the element owns it.
+    // It is the form's: the form owns it.
     assert_eq!(
-        texts("@quote\n| alpha\n", K::BLOCK_ELEMENT),
+        texts("@quote\n| alpha\n", K::BLOCK_FORM),
         ["@quote\n| alpha"]
     );
 }
@@ -267,7 +267,7 @@ fn a_marker_alone_on_its_line_starts_a_new_paragraph() {
 fn runs_nest_by_column() {
     let src = "@tree\n| @tree\n| | alpha\n| |\n| | beta\n";
     assert_eq!(kinds(src, K::CONTENT), 2);
-    assert_eq!(kinds(src, K::BLOCK_ELEMENT), 2);
+    assert_eq!(kinds(src, K::BLOCK_FORM), 2);
     assert_eq!(kinds(src, K::PARAGRAPH), 2);
 }
 
@@ -331,7 +331,7 @@ fn a_bracket_in_a_value_is_content_and_a_code_span_cannot_close_it() {
     let src = "a @conflict(a: [ use `]` here ], b: [ x ]) b\n";
     assert_eq!(texts(src, K::CONTENT), ["[ use `]` here ]", "[ x ]"]);
     assert_eq!(texts(src, K::CODE_SPAN), ["`]`"]);
-    assert_eq!(kinds(src, K::INLINE_ELEMENT), 1);
+    assert_eq!(kinds(src, K::INLINE_FORM), 1);
 }
 
 #[test]
@@ -346,9 +346,9 @@ fn a_value_content_may_hold_blocks() {
 #[test]
 fn a_quote_in_a_sentence_swallows_nothing() {
     // `'s` after a code span looked like the start of a string and took the
-    // rest of the line, and with it the element at the end.
+    // rest of the line, and with it the form at the end.
     let src = "`a`'s own merge, after @conflict(a: [ L ], b: [ R ])\nnext.\n";
-    assert_eq!(kinds(src, K::INLINE_ELEMENT), 1);
+    assert_eq!(kinds(src, K::INLINE_FORM), 1);
     assert_eq!(tokens_of(src, K::STRING_LITERAL), 0);
     let src = "He said \"see *this* and `that`\" twice.\n";
     assert_eq!(texts(src, K::EMPHASIS), ["*this*"]);
@@ -376,8 +376,8 @@ fn a_semicolon_at_the_start_of_a_line_breaks_the_paragraph() {
 }
 
 #[test]
-fn a_semicolon_stands_blocks_of_elements_side_by_side() {
-    assert_eq!(kinds(";@a()\n;@b()\n", K::BLOCK_ELEMENT), 2);
+fn a_semicolon_stands_blocks_of_forms_side_by_side() {
+    assert_eq!(kinds(";@a()\n;@b()\n", K::BLOCK_FORM), 2);
 }
 
 // --- fences ------------------------------------------------------------------
@@ -438,27 +438,31 @@ fn a_list_ends_where_the_kind_of_marker_changes() {
 // --- groups on the next line ---------------------------------------------------
 
 #[test]
-fn a_group_may_stand_on_the_line_after_its_element() {
-    // `[ text ]` here is the element's content.
+fn a_group_may_stand_on_the_line_after_its_form() {
+    // `[ text ]` here is the form's content.
     let src = "@file(a)\n[ text ]\n";
-    assert_eq!(kinds(src, K::BLOCK_ELEMENT), 1);
+    assert_eq!(kinds(src, K::BLOCK_FORM), 1);
     assert_eq!(
         kinds(src, K::PARAGRAPH),
         1,
         "the paragraph inside the content"
     );
-    assert_eq!(texts(src, K::BLOCK_ELEMENT), ["@file(a)\n[ text ]"]);
-    // A blank line in between ends the element.
+    assert_eq!(texts(src, K::BLOCK_FORM), ["@file(a)\n[ text ]"]);
+    // A blank line in between ends the form.
     let src = "@file(a)\n\n[ text ]\n";
-    assert_eq!(texts(src, K::BLOCK_ELEMENT), ["@file(a)"]);
+    assert_eq!(texts(src, K::BLOCK_FORM), ["@file(a)"]);
+    // Trailing non-group content on the next line cannot join.
+    let src = "@file(a)\ntrailing\n";
+    assert_eq!(kinds(src, K::BLOCK_FORM), 0);
+    assert_eq!(texts(src, K::INLINE_FORM), ["@file(a)"]);
 }
 
 #[test]
 fn a_group_whose_slot_is_taken_is_not_pulled_in_from_the_next_line() {
     // `(b)` would be a second `args` group, so it is text; and as text on the
-    // next line it folds into the element's line.
+    // next line it folds into the form's line.
     let src = "@file(a)\n(b)\n";
-    assert_eq!(kinds(src, K::BLOCK_ELEMENT), 0);
-    assert_eq!(texts(src, K::INLINE_ELEMENT), ["@file(a)"]);
+    assert_eq!(kinds(src, K::BLOCK_FORM), 0);
+    assert_eq!(texts(src, K::INLINE_FORM), ["@file(a)"]);
     assert_eq!(kinds(src, K::PARAGRAPH), 1);
 }

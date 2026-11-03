@@ -160,7 +160,7 @@ Node and child definitions for `tomet-edit`.
 
 ====[struct NodeId]
 
-An opaque, unique identifier for a node in an [`EditDoc`].
+An opaque, unique identifier for a node in an [`crate::EditDoc`].
 
 ====[struct AttrSlot]
 
@@ -175,9 +175,9 @@ A single `key: value` map entry or positional sequence item inside an [`AttrSlot
 
 A structured value inside an [`AttrEntry`], preserving its raw CST slice and nested structure.
 
-====[struct ElementSlots]
+====[struct FormSlots]
 
-Fine-grained slot and child-block representation for a [`NodeKind::BlockElement`].
+Fine-grained slot and child-block representation for a [`NodeKind::BlockForm`].
 
 ====[struct Node]
 
@@ -191,15 +191,15 @@ An entry in a child list: either layout trivia (whitespace/comment) or a child n
 
 ====[enum AttrGroup]
 
-Target attribute slot or group on an element.
+Target attribute slot or group on a form.
 
 ====[enum EditValueKind]
 
 Specific variant of an [`EditValue`].
 
-====[enum ElementPiece]
+====[enum FormPiece]
 
-A piece of an element's CST layout in source order.
+A piece of a form's CST layout in source order.
 
 ====[enum InlineItem]
 

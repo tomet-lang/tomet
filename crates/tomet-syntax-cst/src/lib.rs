@@ -18,7 +18,7 @@
 //! This crate defines only the vocabulary ([`SyntaxKind`]), the rowan glue,
 //! and the typed node wrappers; `tomet-parser::parse_cst` builds the tree and
 //! documents its shape. The tree is structured down to sections (nested by level),
-//! elements and their groups, and `key: value` entries. A `|` run's later lines
+//! forms and their groups, and `key: value` entries. A `|` run's later lines
 //! begin with a `MARGIN` token, a run's opener is a `PIPE`; the mistakes the
 //! parser can name stay in the tree as `ERROR` nodes.
 

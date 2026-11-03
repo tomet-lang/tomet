@@ -23,7 +23,7 @@
 //! - Where two kinds of node meet, the inner one decides: the `code` inside
 //!   `*em*` is code.
 //!
-//! =[ Tags ]
+//! =[ The tags ]
 //!
 //! The names are plain words, so they can be used as they are for a style
 //! name. See [`Tag`] for what each one covers.

@@ -182,7 +182,7 @@ impl EditDoc {
             NodeKind::Section { children, .. }
             | NodeKind::List { children }
             | NodeKind::ListItem { children, .. } => Some(children.as_slice()),
-            NodeKind::BlockElement { .. } => node.slots.content_children.as_deref(),
+            NodeKind::BlockForm { .. } => node.slots.content_children.as_deref(),
             _ => None,
         };
 
@@ -222,7 +222,7 @@ impl EditDoc {
                 NodeKind::Paragraph { text } => Some(text.clone()),
                 NodeKind::CodeBlock { code, .. } => Some(code.clone()),
                 NodeKind::Section { heading_raw, .. } => Some(heading_raw.clone()),
-                NodeKind::BlockElement { .. } => {
+                NodeKind::BlockForm { .. } => {
                     self.content_text(cur_id).or_else(|| Some(node.raw.clone()))
                 }
                 NodeKind::ListItem { text, .. } => Some(text.clone()),
@@ -232,16 +232,16 @@ impl EditDoc {
             match remaining_steps {
                 [Step::Field(f)] if f == "id" => node.id_attr().map(|s| s.to_string()),
                 [Step::Field(f)] if f == "name" => match &node.kind {
-                    NodeKind::BlockElement { name, .. } => Some(name.clone()),
+                    NodeKind::BlockForm { name, .. } => Some(name.clone()),
                     _ => None,
                 },
                 [Step::Field(f)] if f == "content" => match &node.kind {
-                    NodeKind::BlockElement { .. } => self.content_text(cur_id),
+                    NodeKind::BlockForm { .. } => self.content_text(cur_id),
                     NodeKind::Paragraph { text } => Some(text.clone()),
                     _ => None,
                 },
                 [Step::Prop, Step::Field(key)] | [Step::Field(key)] => match &node.kind {
-                    NodeKind::BlockElement { .. } => node
+                    NodeKind::BlockForm { .. } => node
                         .slots
                         .data_slot
                         .as_ref()
@@ -264,7 +264,7 @@ impl EditDoc {
         let path =
             parse_address_path(addr).ok_or_else(|| EditError::AddressNotFound(addr.to_string()))?;
 
-        // Check if addr targets `.content` specifically on a BlockElement
+        // Check if addr targets `.content` specifically on a BlockForm
         if let [.., Step::Field(f)] = path.steps.as_slice()
             && f == "content"
         {
@@ -283,7 +283,7 @@ impl EditDoc {
             let node = self
                 .get_mut(owner_id)
                 .ok_or(EditError::NodeNotFound(owner_id))?;
-            if matches!(node.kind, NodeKind::BlockElement { .. }) {
+            if matches!(node.kind, NodeKind::BlockForm { .. }) {
                 node.slots.ensure_piece_content();
                 node.slots.content_children = Some(vec![ChildItem::Trivia(text)]);
                 node.slots.content_edited = true;
@@ -342,7 +342,7 @@ impl EditDoc {
         let node = self.get(node_id).ok_or(EditError::NodeNotFound(node_id))?;
 
         let group = match &node.kind {
-            NodeKind::BlockElement { .. } => {
+            NodeKind::BlockForm { .. } => {
                 let in_args = node
                     .slots
                     .args_slot

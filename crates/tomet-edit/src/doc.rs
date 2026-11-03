@@ -150,7 +150,7 @@ impl EditDoc {
             .collect()
     }
 
-    /// Returns the exported inner text of an element's `[content]` slot, if present.
+    /// Returns the exported inner text of a form's `[content]` slot, if present.
     pub fn content_text(&self, id: NodeId) -> Option<String> {
         let node = self.get(id)?;
         let children = node.slots.content_children.as_ref()?;
@@ -171,7 +171,7 @@ impl EditDoc {
             NodeKind::Section { children, .. }
             | NodeKind::List { children }
             | NodeKind::ListItem { children, .. } => Some(children.as_slice()),
-            NodeKind::BlockElement { .. } => node.slots.content_children.as_deref(),
+            NodeKind::BlockForm { .. } => node.slots.content_children.as_deref(),
             _ => None,
         };
 
@@ -191,45 +191,45 @@ impl EditDoc {
         false
     }
 
-    /// Returns all top-level node IDs that are [`NodeKind::BlockElement`].
-    pub fn top_level_elements(&self) -> impl Iterator<Item = NodeId> + '_ {
+    /// Returns all top-level node IDs that are [`NodeKind::BlockForm`].
+    pub fn block_forms(&self) -> impl Iterator<Item = NodeId> + '_ {
         self.root_nodes().filter(|id| {
             matches!(
                 self.get(*id).map(|n| &n.kind),
-                Some(NodeKind::BlockElement { .. })
+                Some(NodeKind::BlockForm { .. })
             )
         })
     }
 
-    /// Finds the first top-level [`NodeKind::BlockElement`] with the given name (sigil).
-    pub fn find_element_by_name(&self, name: &str) -> Option<NodeId> {
-        self.top_level_elements().find(|id| {
+    /// Finds the first top-level [`NodeKind::BlockForm`] with the given name (sigil).
+    pub fn find_block_form(&self, name: &str) -> Option<NodeId> {
+        self.block_forms().find(|id| {
             matches!(
                 self.get(*id).map(|n| &n.kind),
-                Some(NodeKind::BlockElement { name: n, .. }) if n == name
+                Some(NodeKind::BlockForm { name: n, .. }) if n == name
             )
         })
     }
 
-    /// Finds all top-level [`NodeKind::BlockElement`]s with the given name (sigil).
-    pub fn find_elements_by_name<'a>(&'a self, name: &'a str) -> impl Iterator<Item = NodeId> + 'a {
-        self.top_level_elements().filter(move |id| {
+    /// Finds all top-level [`NodeKind::BlockForm`]s with the given name (sigil).
+    pub fn find_block_forms<'a>(&'a self, name: &'a str) -> impl Iterator<Item = NodeId> + 'a {
+        self.block_forms().filter(move |id| {
             matches!(
                 self.get(*id).map(|n| &n.kind),
-                Some(NodeKind::BlockElement { name: n, .. }) if n == name
+                Some(NodeKind::BlockForm { name: n, .. }) if n == name
             )
         })
     }
 
-    /// Returns the top-level `::meta` element node ID, if present.
+    /// Returns the top-level `::meta` form node ID, if present.
     pub fn meta_node(&self) -> Option<NodeId> {
-        self.find_element_by_name("meta")
+        self.find_block_form("meta")
     }
 
-    /// Ensures that a top-level `::meta` element exists.
+    /// Ensures that a top-level `::meta` form exists.
     ///
-    /// If an existing `::meta` block element is found, returns its [`NodeId`].
-    /// Otherwise, inserts a new `::meta` block element at index 0 with standard
+    /// If an existing `::meta` block form is found, returns its [`NodeId`].
+    /// Otherwise, inserts a new `::meta` block form at index 0 with standard
     /// spacing trivia and returns the newly allocated [`NodeId`].
     pub fn ensure_meta_node(&mut self) -> NodeId {
         if let Some(id) = self.meta_node() {
@@ -237,7 +237,7 @@ impl EditDoc {
         }
 
         let meta_id = self.alloc_id();
-        let meta_node = Node::block_element(
+        let meta_node = Node::block_form(
             meta_id,
             "meta",
             true,
@@ -307,7 +307,7 @@ impl EditDoc {
                 NodeKind::Section { children, .. }
                 | NodeKind::List { children }
                 | NodeKind::ListItem { children, .. } => Some(children.as_slice()),
-                NodeKind::BlockElement { .. } => node.slots.content_children.as_deref(),
+                NodeKind::BlockForm { .. } => node.slots.content_children.as_deref(),
                 _ => None,
             };
             if let Some(children) = children
@@ -420,7 +420,7 @@ impl EditDoc {
                     NodeKind::Section { children, .. }
                     | NodeKind::List { children }
                     | NodeKind::ListItem { children, .. } => children.len(),
-                    NodeKind::BlockElement { .. } => {
+                    NodeKind::BlockForm { .. } => {
                         p.slots.content_children.as_ref().map_or(0, Vec::len)
                     }
                     _ => return Err(EditError::NotAContainer(pid)),
@@ -516,7 +516,7 @@ impl EditDoc {
                 }
                 None
             }
-            NodeKind::BlockElement { name, .. } if name == "task" => {
+            NodeKind::BlockForm { name, .. } if name == "task" => {
                 inspect_task_slot(node.slots.args_slot.as_ref())
             }
             _ => None,
@@ -526,7 +526,7 @@ impl EditDoc {
     /// Sets the completion state of a task item.
     ///
     /// Modifies Markdown-style `- [ ]`/`- [x]`, Tomet value markers `- ( )`/`- (x)`,
-    /// combine `-@task(...)`, or standalone `@task(...)` elements.
+    /// combine `-@task(...)`, or standalone `@task(...)` forms.
     pub fn set_task_state(&mut self, id: NodeId, checked: bool) -> Result<(), EditError> {
         let node = self.get(id).ok_or(EditError::NodeNotFound(id))?;
         match &node.kind {
@@ -587,7 +587,7 @@ impl EditDoc {
 
                 Err(EditError::NotAnElement(id))
             }
-            NodeKind::BlockElement { name, .. } if name == "task" => {
+            NodeKind::BlockForm { name, .. } if name == "task" => {
                 let node_mut = self.get_mut(id).unwrap();
                 node_mut.slots.ensure_piece_args();
                 let slot = node_mut

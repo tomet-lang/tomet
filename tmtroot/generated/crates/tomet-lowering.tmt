@@ -89,7 +89,7 @@ The CST parser is the one reader of the grammar's shape (where a block, an
 element, a group starts and ends); the AST is the owned, typed tree the rest
 of the system works on. Lowering is the fold from the first to the second, so
 that a construct is written once, in the CST parser: `parse_document` is
-`parse_cst` and then [`lower_document`].
+`parse_cst` and then [`lower_file`].
 
 Lowering is also where a document is refused. The CST never fails, so what
 the grammar does not allow -- a second `(args)` group, a `[` that never
@@ -97,10 +97,9 @@ closes, a `|` in a column that continues nothing -- is found here, with a
 message and the offset it is at.
 
 What it reads from text rather than from nodes is not shape: how a run of
-source text becomes `Text` and `SoftBreak` items
-([`crate::inline::split_softbreaks`]), and the grammars of the leaves --
+source text becomes `Text` and `SoftBreak` items, and the grammars of the leaves --
 `${...}` expressions and a group's values, which hand back to the CST
-whatever they embed (see [`crate::value::Embedded`]).
+whatever they embed.
 
 ===[Functions]
 

@@ -4,7 +4,7 @@
 //! element, a group starts and ends); the AST is the owned, typed tree the rest
 //! of the system works on. Lowering is the fold from the first to the second, so
 //! that a construct is written once, in the CST parser: `parse_document` is
-//! `parse_cst` and then [`lower_document`].
+//! `parse_cst` and then [`lower_file`].
 //!
 //! Lowering is also where a document is refused. The CST never fails, so what
 //! the grammar does not allow -- a second `(args)` group, a `[` that never
@@ -12,10 +12,9 @@
 //! message and the offset it is at.
 //!
 //! What it reads from text rather than from nodes is not shape: how a run of
-//! source text becomes `Text` and `SoftBreak` items
-//! ([`crate::inline::split_softbreaks`]), and the grammars of the leaves --
+//! source text becomes `Text` and `SoftBreak` items, and the grammars of the leaves --
 //! `${...}` expressions and a group's values, which hand back to the CST
-//! whatever they embed (see [`crate::value::Embedded`]).
+//! whatever they embed.
 
 use crate::element::Groups;
 use crate::error::{Error, Result};
@@ -121,7 +120,7 @@ fn lower_blocks(node: &SyntaxNode) -> Result<Vec<Block>> {
 fn lower_block(node: &SyntaxNode) -> Result<Option<Block>> {
     match node.kind() {
         K::PARAGRAPH => lower_paragraph(node),
-        K::BLOCK_ELEMENT => lower_block_element(node).map(Some),
+        K::BLOCK_FORM => lower_block_form(node).map(Some),
         K::SECTION => lower_section(node).map(Some),
         K::LIST => lower_list(node).map(|l| Some(Block::List(l))),
         K::THEMATIC_BREAK => lower_thematic_break(node).map(Some),
@@ -334,7 +333,7 @@ fn lower_inlines(parent: &SyntaxNode, from: usize, to: usize) -> Result<Vec<Inli
 /// One inline node of running text.
 fn lower_inline(node: &SyntaxNode) -> Result<Inline> {
     match node.kind() {
-        K::INLINE_ELEMENT => lower_inline_element(node),
+        K::INLINE_FORM => lower_inline_form(node),
         K::EMPHASIS | K::STRONG | K::STRIKEOUT => lower_delimited(node).map(Inline::Element),
         K::CODE_SPAN => lower_code_span(node).map(Inline::Element),
         K::AUTOLINK => Ok(Inline::Element(lower_autolink(node))),
@@ -344,7 +343,7 @@ fn lower_inline(node: &SyntaxNode) -> Result<Inline> {
 }
 
 /// `@name(...)[...]` in running text, or a `${...}` interpolation.
-fn lower_inline_element(node: &SyntaxNode) -> Result<Inline> {
+fn lower_inline_form(node: &SyntaxNode) -> Result<Inline> {
     if let Some(slot) = slot_of(node) {
         return lower_slot(&slot).map(Inline::Hole);
     }
@@ -359,7 +358,7 @@ fn lower_inline_element(node: &SyntaxNode) -> Result<Inline> {
             let interp = crate::interp::lower_interpolation(node)?;
             Ok(Inline::Interp(interp))
         }
-        _ => Err(unsupported("an inline element with this sigil")),
+        _ => Err(unsupported("an inline form with this sigil")),
     }
 }
 
@@ -631,7 +630,7 @@ fn name_of(node: &SyntaxNode) -> Result<Name> {
 
 /// Whether `node` is a `::name(...)` block declaration.
 pub fn is_declaration(node: &SyntaxNode) -> bool {
-    node.kind() == K::BLOCK_ELEMENT
+    node.kind() == K::BLOCK_FORM
         && node
             .children()
             .find(|n| n.kind() == K::SIGIL)
@@ -639,8 +638,8 @@ pub fn is_declaration(node: &SyntaxNode) -> bool {
             .is_some_and(|t| t.kind() == K::COLON)
 }
 
-/// A block element: `@name` and the groups that follow it.
-fn lower_block_element(node: &SyntaxNode) -> Result<Block> {
+/// A block form: `@name` and the groups that follow it.
+fn lower_block_form(node: &SyntaxNode) -> Result<Block> {
     if let Some(slot) = slot_of(node) {
         let mut hole = lower_slot(&slot)?;
         hole.placement = Placement::Block;
@@ -731,7 +730,7 @@ pub(crate) fn lower_group_list(
             // What a list item holds besides groups: its sublist and the inline
             // nodes of its text, lowered by the item itself.
             K::LIST
-            | K::INLINE_ELEMENT
+            | K::INLINE_FORM
             | K::SLOT
             | K::EMPHASIS
             | K::STRONG
@@ -1047,7 +1046,7 @@ fn lower_list_item(node: &SyntaxNode) -> Result<tomet_ast::ListItem> {
     };
     let combine = node
         .children()
-        .find(|n| n.kind() == K::INLINE_ELEMENT);
+        .find(|n| n.kind() == K::INLINE_FORM);
     let body = node.children().find(|n| n.kind() == K::BODY);
 
     let mut item = if let Some(element) = combine {
@@ -1285,7 +1284,7 @@ pub(crate) fn lower_error(node: &SyntaxNode) -> Error {
     ) && node.parent().is_some_and(|p| {
         matches!(
             p.kind(),
-            K::BLOCK_ELEMENT | K::INLINE_ELEMENT | K::SECTION_HEADING | K::SLOT | K::CONNECT
+            K::BLOCK_FORM | K::INLINE_FORM | K::SECTION_HEADING | K::SLOT | K::CONNECT
         )
     }) {
         return second_group(node);

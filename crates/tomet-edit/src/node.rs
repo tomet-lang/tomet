@@ -2,7 +2,7 @@
 
 use std::fmt;
 
-/// An opaque, unique identifier for a node in an [`EditDoc`].
+/// An opaque, unique identifier for a node in an [`crate::EditDoc`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct NodeId(pub u64);
 
@@ -28,7 +28,7 @@ impl ChildItem {
     }
 }
 
-/// Target attribute slot or group on an element.
+/// Target attribute slot or group on a form.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum AttrGroup {
     /// `{ key: value, ... }` data map (e.g. in `::meta{ ... }`).
@@ -273,7 +273,7 @@ impl EditValue {
             EditValueKind::Map(slot) => {
                 slot.edited || slot.entries.iter().any(AttrEntry::is_edited)
             }
-            EditValueKind::Element { args, data, .. } => {
+            EditValueKind::Form { args, data, .. } => {
                 args.as_ref()
                     .is_some_and(|s| s.edited || s.entries.iter().any(AttrEntry::is_edited))
                     || data
@@ -300,7 +300,7 @@ impl EditValue {
         match &self.kind {
             EditValueKind::Scalar(s) => out.push_str(s),
             EditValueKind::Map(slot) => slot.export_into(out),
-            EditValueKind::Element {
+            EditValueKind::Form {
                 sigil_raw,
                 args,
                 data,
@@ -330,8 +330,8 @@ pub enum EditValueKind {
     Scalar(String),
     /// Nested map literal `{ ... }`.
     Map(AttrSlot),
-    /// Inline element in value position (e.g. `@doc.icon(star)` or `@conflict(a: 1, b: 2)`).
-    Element {
+    /// Inline form in value position (e.g. `@doc.icon(star)` or `@conflict(a: 1, b: 2)`).
+    Form {
         sigil_raw: String,
         name: String,
         args: Option<AttrSlot>,
@@ -340,9 +340,9 @@ pub enum EditValueKind {
     },
 }
 
-/// A piece of an element's CST layout in source order.
+/// A piece of a form's CST layout in source order.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum ElementPiece {
+pub enum FormPiece {
     Sigil(String),
     Trivia(String),
     Id {
@@ -358,11 +358,11 @@ pub enum ElementPiece {
     Connect(String),
 }
 
-/// Fine-grained slot and child-block representation for a [`NodeKind::BlockElement`].
+/// Fine-grained slot and child-block representation for a [`NodeKind::BlockForm`].
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
-pub struct ElementSlots {
-    /// Ordered pieces of the element header/groups from the CST.
-    pub pieces: Vec<ElementPiece>,
+pub struct FormSlots {
+    /// Ordered pieces of the form header/groups from the CST.
+    pub pieces: Vec<FormPiece>,
     /// Whether the `#(id)` slot was edited.
     pub id_edited: bool,
     /// Structured `(args)` group, if present.
@@ -375,47 +375,47 @@ pub struct ElementSlots {
     pub content_edited: bool,
 }
 
-impl ElementSlots {
+impl FormSlots {
     pub fn ensure_piece_id(&mut self) {
         if !self
             .pieces
             .iter()
-            .any(|p| matches!(p, ElementPiece::Id { .. }))
+            .any(|p| matches!(p, FormPiece::Id { .. }))
         {
             let pos = self
                 .pieces
                 .iter()
-                .position(|p| matches!(p, ElementPiece::Sigil(_)))
+                .position(|p| matches!(p, FormPiece::Sigil(_)))
                 .map_or(0, |i| i + 1);
             self.pieces
-                .insert(pos, ElementPiece::Id { raw: String::new() });
+                .insert(pos, FormPiece::Id { raw: String::new() });
         }
     }
 
     pub fn ensure_piece_args(&mut self) {
-        if !self.pieces.iter().any(|p| matches!(p, ElementPiece::Args)) {
+        if !self.pieces.iter().any(|p| matches!(p, FormPiece::Args)) {
             let pos = self
                 .pieces
                 .iter()
-                .rposition(|p| matches!(p, ElementPiece::Id { .. } | ElementPiece::Sigil(_)))
+                .rposition(|p| matches!(p, FormPiece::Id { .. } | FormPiece::Sigil(_)))
                 .map_or(0, |i| i + 1);
-            self.pieces.insert(pos, ElementPiece::Args);
+            self.pieces.insert(pos, FormPiece::Args);
         }
     }
 
     pub fn ensure_piece_data(&mut self) {
-        if !self.pieces.iter().any(|p| matches!(p, ElementPiece::Data)) {
+        if !self.pieces.iter().any(|p| matches!(p, FormPiece::Data)) {
             let pos = self
                 .pieces
                 .iter()
                 .rposition(|p| {
                     matches!(
                         p,
-                        ElementPiece::Args | ElementPiece::Id { .. } | ElementPiece::Sigil(_)
+                        FormPiece::Args | FormPiece::Id { .. } | FormPiece::Sigil(_)
                     )
                 })
                 .map_or(0, |i| i + 1);
-            self.pieces.insert(pos, ElementPiece::Data);
+            self.pieces.insert(pos, FormPiece::Data);
         }
     }
 
@@ -423,7 +423,7 @@ impl ElementSlots {
         if !self
             .pieces
             .iter()
-            .any(|p| matches!(p, ElementPiece::Content { .. }))
+            .any(|p| matches!(p, FormPiece::Content { .. }))
         {
             let pos = self
                 .pieces
@@ -431,16 +431,16 @@ impl ElementSlots {
                 .rposition(|p| {
                     matches!(
                         p,
-                        ElementPiece::Data
-                            | ElementPiece::Args
-                            | ElementPiece::Id { .. }
-                            | ElementPiece::Sigil(_)
+                        FormPiece::Data
+                            | FormPiece::Args
+                            | FormPiece::Id { .. }
+                            | FormPiece::Sigil(_)
                     )
                 })
                 .map_or(self.pieces.len(), |i| i + 1);
             self.pieces.insert(
                 pos,
-                ElementPiece::Content {
+                FormPiece::Content {
                     open_raw: "[".to_string(),
                     close_raw: "]".to_string(),
                     raw: String::new(),
@@ -465,11 +465,11 @@ pub enum InlineItem {
         inner_raw: String,
         raw: String,
     },
-    /// An inline element (`@link(...)`, `${...}`, `$func(...)`, `@conflict(...)`).
-    Element {
+    /// An inline form (`@link(...)`, `${...}`, `$func(...)`, `@conflict(...)`).
+    Form {
         name: String,
         raw: String,
-        slots: ElementSlots,
+        slots: FormSlots,
     },
 }
 
@@ -477,7 +477,7 @@ impl InlineItem {
     pub fn raw_str(&self) -> &str {
         match self {
             Self::Text(s) | Self::Trivia(s) => s,
-            Self::Sugar { raw, .. } | Self::Element { raw, .. } => raw,
+            Self::Sugar { raw, .. } | Self::Form { raw, .. } => raw,
         }
     }
 }
@@ -492,8 +492,8 @@ pub struct Node {
     pub raw: String,
     /// Whether this node has been modified since import.
     pub edited: bool,
-    /// Fine-grained CST slots for [`NodeKind::BlockElement`] (and section heading groups).
-    pub slots: ElementSlots,
+    /// Fine-grained CST slots for [`NodeKind::BlockForm`] (and section heading groups).
+    pub slots: FormSlots,
     /// Structured inline children for [`NodeKind::Paragraph`] and [`NodeKind::Section`] headings.
     pub inlines: Vec<InlineItem>,
     /// Prefix before section heading title (e.g. `"=[ "` in `"=[ Main Heading ]\n"`).
@@ -513,7 +513,7 @@ impl Node {
             kind,
             raw,
             edited: false,
-            slots: ElementSlots::default(),
+            slots: FormSlots::default(),
             inlines,
             heading_prefix: String::new(),
             heading_suffix: String::new(),
@@ -528,24 +528,24 @@ impl Node {
     /// Returns the identity attribute `#(id)` attached to this node, if any.
     pub fn id_attr(&self) -> Option<&str> {
         match &self.kind {
-            NodeKind::BlockElement { id_attr, .. }
+            NodeKind::BlockForm { id_attr, .. }
             | NodeKind::Section { id_attr, .. }
             | NodeKind::ListItem { id_attr, .. } => id_attr.as_deref(),
             _ => None,
         }
     }
 
-    /// Returns the child block/trivia list inside an element's `[content]` group, if any.
+    /// Returns the child block/trivia list inside a form's `[content]` group, if any.
     pub fn content_children(&self) -> Option<&[ChildItem]> {
         self.slots.content_children.as_deref()
     }
 
-    /// Returns the structured `(args)` slot on an element, if any.
+    /// Returns the structured `(args)` slot on a form, if any.
     pub fn args_slot(&self) -> Option<&AttrSlot> {
         self.slots.args_slot.as_ref()
     }
 
-    /// Returns the structured `{data}` slot on an element, if any.
+    /// Returns the structured `{data}` slot on a form, if any.
     pub fn data_slot(&self) -> Option<&AttrSlot> {
         self.slots.data_slot.as_ref()
     }
@@ -569,7 +569,7 @@ impl Node {
             },
             raw: text_str,
             edited: true,
-            slots: ElementSlots::default(),
+            slots: FormSlots::default(),
             inlines,
             heading_prefix: String::new(),
             heading_suffix: String::new(),
@@ -599,7 +599,7 @@ impl Node {
             },
             raw: formatted,
             edited: true,
-            slots: ElementSlots::default(),
+            slots: FormSlots::default(),
             inlines: Vec::new(),
             heading_prefix: String::new(),
             heading_suffix: String::new(),
@@ -634,7 +634,7 @@ impl Node {
             },
             raw: heading_raw,
             edited: true,
-            slots: ElementSlots::default(),
+            slots: FormSlots::default(),
             inlines,
             heading_prefix,
             heading_suffix,
@@ -649,7 +649,7 @@ impl Node {
             kind: NodeKind::ThematicBreak { raw: raw.clone() },
             raw,
             edited: true,
-            slots: ElementSlots::default(),
+            slots: FormSlots::default(),
             inlines: Vec::new(),
             heading_prefix: String::new(),
             heading_suffix: String::new(),
@@ -664,7 +664,7 @@ impl Node {
             kind: NodeKind::List { children },
             raw: String::new(),
             edited: true,
-            slots: ElementSlots::default(),
+            slots: FormSlots::default(),
             inlines: Vec::new(),
             heading_prefix: String::new(),
             heading_suffix: String::new(),
@@ -701,7 +701,7 @@ impl Node {
             },
             raw: formatted,
             edited: true,
-            slots: ElementSlots::default(),
+            slots: FormSlots::default(),
             inlines: Vec::new(),
             heading_prefix: String::new(),
             heading_suffix: String::new(),
@@ -735,15 +735,15 @@ impl Node {
             },
             raw: formatted,
             edited: true,
-            slots: ElementSlots::default(),
+            slots: FormSlots::default(),
             inlines: Vec::new(),
             heading_prefix: String::new(),
             heading_suffix: String::new(),
         }
     }
 
-    /// Constructs a new [`NodeKind::BlockElement`] node.
-    pub fn block_element(
+    /// Constructs a new [`NodeKind::BlockForm`] node.
+    pub fn block_form(
         id: NodeId,
         name: impl Into<String>,
         declaration: bool,
@@ -756,8 +756,8 @@ impl Node {
         let id_opt = id_attr.map(Into::into);
         let content_opt = content.map(Into::into);
         let sigil_prefix = if declaration { "::" } else { "@" };
-        let mut slots = ElementSlots {
-            pieces: vec![ElementPiece::Sigil(format!("{sigil_prefix}{name_str}"))],
+        let mut slots = FormSlots {
+            pieces: vec![FormPiece::Sigil(format!("{sigil_prefix}{name_str}"))],
             id_edited: id_opt.is_some(),
             args_slot: None,
             data_slot: None,
@@ -765,7 +765,7 @@ impl Node {
             content_edited: content_opt.is_some(),
         };
         if let Some(ref id_val) = id_opt {
-            slots.pieces.push(ElementPiece::Id {
+            slots.pieces.push(FormPiece::Id {
                 raw: format!("#({id_val})"),
             });
         }
@@ -775,7 +775,7 @@ impl Node {
                 slot.set_key(k, Some(v.clone()));
             }
             slots.args_slot = Some(slot);
-            slots.pieces.push(ElementPiece::Args);
+            slots.pieces.push(FormPiece::Args);
         }
         if !data.is_empty() {
             let mut slot = AttrSlot::new_empty("{", "}");
@@ -783,11 +783,11 @@ impl Node {
                 slot.set_key(k, Some(v.clone()));
             }
             slots.data_slot = Some(slot);
-            slots.pieces.push(ElementPiece::Data);
+            slots.pieces.push(FormPiece::Data);
         }
         if let Some(ref c) = content_opt {
             slots.content_children = Some(vec![ChildItem::Trivia(c.clone())]);
-            slots.pieces.push(ElementPiece::Content {
+            slots.pieces.push(FormPiece::Content {
                 open_raw: "[".to_string(),
                 close_raw: "]".to_string(),
                 raw: format!("[{c}]"),
@@ -795,7 +795,7 @@ impl Node {
         }
         Self {
             id,
-            kind: NodeKind::BlockElement {
+            kind: NodeKind::BlockForm {
                 name: name_str,
                 declaration,
                 id_attr: id_opt,
@@ -822,12 +822,12 @@ pub enum NodeKind {
     },
     /// A paragraph whose content is maintained both as raw text and structured inline items on [`Node::inlines`].
     Paragraph { text: String },
-    /// A block element (e.g. `@callout`, `@note`, `@table`, `::meta`).
+    /// A block form (e.g. `@callout`, `@note`, `@table`, `::meta`).
     /// Its `(args)`, `{data}`, and `[content]` child slots live in [`Node::slots`].
-    BlockElement {
+    BlockForm {
         name: String,
-        /// Written as a document declaration (`::name`) rather than an
-        /// element (`@name`); export keeps the spelling it was read with.
+        /// Written as a document declaration (`::name`) rather than a
+        /// form (`@name`); export keeps the spelling it was read with.
         declaration: bool,
         id_attr: Option<String>,
     },

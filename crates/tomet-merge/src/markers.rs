@@ -99,7 +99,7 @@ pub(crate) fn build_conflict_block_unit(
     let root_id = parsed_doc
         .root_nodes()
         .next()
-        .expect("@conflict source must parse as a BlockElement node");
+        .expect("@conflict source must parse as a BlockForm node");
     let new_id = target_doc.clone_node_from(&parsed_doc, root_id);
 
     BlockUnit {

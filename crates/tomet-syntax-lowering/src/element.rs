@@ -286,7 +286,7 @@ pub(crate) fn lower_value_group(node: &SyntaxNode) -> Result<Group> {
                         i += 1;
                     }
                     Some(SyntaxElement::Node(n))
-                        if matches!(n.kind(), K::INLINE_ELEMENT | K::BLOCK_ELEMENT) =>
+                        if matches!(n.kind(), K::INLINE_FORM | K::BLOCK_FORM) =>
                     {
                         let n_end = usize::from(n.text_range().end());
                         let mut trailing = child.children_with_tokens().skip_while(|e| usize::from(e.text_range().start()) < n_end);
@@ -576,8 +576,8 @@ fn lower_single_value_from_children(
                 n.kind(),
                 K::CONTENT
                     | K::SLOT
-                    | K::INLINE_ELEMENT
-                    | K::BLOCK_ELEMENT
+                    | K::INLINE_FORM
+                    | K::BLOCK_FORM
                     | K::INTERP_EXPR
                     | K::MAP_LITERAL
             ),
@@ -589,7 +589,7 @@ fn lower_single_value_from_children(
                 return Err(err(pos, "expected ')'"));
             }
             let is_expr = first.kind() == K::INTERP_EXPR
-                || (first.kind() == K::INLINE_ELEMENT
+                || (first.kind() == K::INLINE_FORM
                     && first.as_node().is_some_and(opens_with_dollar));
             if is_expr && next_elem.kind() == K::COLON {
                 return Err(err(usize::from(first.text_range().start()), "an expression cannot be a key"));
@@ -605,7 +605,7 @@ fn lower_single_value_from_children(
                 K::ERROR => return Err(crate::lower::lower_error(n)),
                 K::CONTENT => return Ok(Value::Blocks(crate::lower::lower_content(n)?)),
                 K::SLOT => return Ok(Value::String(n.text().to_string())),
-                K::INLINE_ELEMENT | K::BLOCK_ELEMENT => {
+                K::INLINE_FORM | K::BLOCK_FORM => {
                     return if opens_with_dollar(n) {
                         Ok(Value::Interp(crate::interp::lower_interpolation(n)?))
                     } else if let Some(slot) = crate::lower::slot_of(n) {

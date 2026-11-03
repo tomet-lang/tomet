@@ -27,7 +27,7 @@ Resilient, lossless Concrete Syntax Tree (CST) parser for Tomet.
 
 Preserves 100% of source characters including trivia (whitespace, newlines, comments).
 
-This is the one reader of the grammar's shape -- where a block, an element, a
+This is the one reader of the grammar's shape -- where a block, a form, a
 group starts and ends. `parse_document` is this tree lowered into the AST
 (see `lower.rs`), so a grammar change is made here once. The parser itself
 never fails: broken input still gets a tree, and the errors a document is
@@ -37,10 +37,10 @@ refused with are found when the tree is lowered.
 ROOT
   SECTION                    `=[ T ]` and everything up to the next section
     SECTION_HEADING          of the same or a shallower level (they nest)
-    PARAGRAPH | LIST | BLOCK_ELEMENT | CODE_BLOCK | THEMATIC_BREAK | SECTION ...
+    PARAGRAPH | LIST | BLOCK_FORM | CODE_BLOCK | THEMATIC_BREAK | SECTION ...
 ```
 
-An element (`BLOCK_ELEMENT`, `INLINE_ELEMENT`) is a `SIGIL` followed by
+A form (`BLOCK_FORM`, `INLINE_FORM`) is a `SIGIL` followed by
 its groups -- `ARGS` `( )`, `VALUE_DATA` `{ }`, `CONTENT` `[ ]`, at most
 one of each -- then any `CONNECT` (`:name(...)`).
 `${ ... }` is an `INTERP_EXPR`. Inside `ARGS`/`VALUE_DATA` an entry is a
@@ -48,7 +48,7 @@ one of each -- then any `CONNECT` (`:name(...)`).
 `MAP_LITERAL`, `CONTENT` (a value written `[ ... ]` is blocks, as in the AST
 parser; the list literal is gone) or (a call such as `list(...)`) `ARGS`.
 `CONTENT` recurses into the same block grammar `ROOT`/`SECTION` use
-(`SECTION`, `LIST`, `BLOCK_ELEMENT`, `CODE_BLOCK`, `THEMATIC_BREAK`,
+(`SECTION`, `LIST`, `BLOCK_FORM`, `CODE_BLOCK`, `THEMATIC_BREAK`,
 `PARAGRAPH`), bounded by the group's own closing `]` instead of EOF or
 a shallower section -- a block nested inside `[content]` (and its own
 `#(id)`) is represented, not flattened into inline text.
@@ -66,8 +66,8 @@ tokens; it assembles compound structures (such as string literals in value
 contexts and compound identifiers) where the grammar requires them.
 
 A `|` run is `[content]` spelled without brackets, and so it is the same
-node: a `CONTENT` that opens with a `PIPE` and has no closing `]`. It is an
-element's content (`@quote| text`, or `|` on the line after the element), a
+node: a `CONTENT` that opens with a `PIPE` and has no closing `]`. It is a
+form's content (`@quote| text`, or `|` on the line after the form), a
 list item's (`-| text`), a heading's (`=| text`) or a `key: | prose` value.
 It ends at the first line that does not repeat its marker in the same column
 -- a blank line, or a `|` somewhere else, ends it too -- and the error for that
@@ -85,15 +85,15 @@ Guaranteed Invariant: `parse_cst(src).text().to_string() == src`.
 
 ====[fn parse_cst_value]
 
-[`parse_cst`] for a source that is one value, as [`crate::parse_value`] reads
+[`parse_cst`] for a source that is one value, as [`parse_cst_value`] reads
 it: the entries of its map (or its one value) under a `ROOT`, with the
-elements, `[content]` and `|` runs they embed as nodes.
+forms, `[content]` and `|` runs they embed as nodes.
 
 ===[Constants]
 
 ====[const MAX_DEPTH]
 
-How deep constructs may nest: a `[content]` in an element in a `[content]`, a group in a group, an
+How deep constructs may nest: a `[content]` in a form in a `[content]`, a group in a group, an
 emphasis in an emphasis, a list under a list, a section under a section. Past it the parser stops
 reading structure and keeps the text flat in a `TOO_DEEP` node, so no recursion here, or in what
 reads the tree, goes deeper than this (a deeper document used to abort the process with a stack

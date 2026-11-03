@@ -1,7 +1,7 @@
 use std::fmt;
 
 use crate::doc::EditDoc;
-use crate::node::{AttrGroup, AttrSlot, ChildItem, ElementPiece, Node, NodeId, NodeKind};
+use crate::node::{AttrGroup, AttrSlot, ChildItem, FormPiece, Node, NodeId, NodeKind};
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum EditError {
@@ -92,7 +92,7 @@ impl EditDoc {
                             | NodeKind::ListItem { children, .. } => {
                                 children[pos] = ChildItem::Node(new_id);
                             }
-                            NodeKind::BlockElement { .. } => {
+                            NodeKind::BlockForm { .. } => {
                                 let children = parent
                                     .slots
                                     .content_children
@@ -175,7 +175,7 @@ impl EditDoc {
                 let node = self.get_mut(id).ok_or(EditError::NodeNotFound(id))?;
 
                 match &mut node.kind {
-                    NodeKind::BlockElement {
+                    NodeKind::BlockForm {
                         name,
                         declaration,
                         id_attr,
@@ -184,7 +184,7 @@ impl EditDoc {
                             let prefix = if *declaration { "::" } else { "@" };
                             node.slots
                                 .pieces
-                                .push(ElementPiece::Sigil(format!("{prefix}{name}")));
+                                .push(FormPiece::Sigil(format!("{prefix}{name}")));
                         }
                         match group {
                             AttrGroup::Id => {
@@ -336,7 +336,7 @@ impl EditDoc {
                         children.insert(index, item);
                         Ok(())
                     }
-                    NodeKind::BlockElement { .. } => {
+                    NodeKind::BlockForm { .. } => {
                         parent.slots.ensure_piece_content();
                         let children = parent.slots.content_children.get_or_insert_with(Vec::new);
                         if index > children.len() {
@@ -374,7 +374,7 @@ impl EditDoc {
                         remove_child_at(children, pos);
                         Ok(())
                     }
-                    NodeKind::BlockElement { .. } => {
+                    NodeKind::BlockForm { .. } => {
                         let children = parent
                             .slots
                             .content_children
@@ -396,7 +396,7 @@ impl EditDoc {
                 NodeKind::Section { children, .. }
                 | NodeKind::List { children }
                 | NodeKind::ListItem { children, .. } => Some(children),
-                NodeKind::BlockElement { .. } => node.slots.content_children,
+                NodeKind::BlockForm { .. } => node.slots.content_children,
                 _ => None,
             };
             if let Some(children) = children_opt {
