@@ -32,8 +32,8 @@ use tomet_ast::{
     Block, Data, Element, File, Inline, LineBreak, List, ListItem, Name, Paragraph, Placement,
     RawText, Section, SoftBreak, Text, Value,
 };
-use tomet_span::Span;
 use tomet_semantics::{ElementKind, classify_std_lenient};
+use tomet_span::Span;
 use tomet_tree::{declaration_new, element_new, list, list_item};
 
 mod frontmatter;
@@ -244,6 +244,7 @@ pub fn from_markdown_with_options(src: &str, options: &ImportOptions) -> File {
     doc
 }
 
+#[deny(clippy::wildcard_enum_match_arm)]
 fn structure_sections(blocks: Vec<Block>) -> Vec<Block> {
     let mut doc_blocks = Vec::new();
     let mut stack: Vec<Section> = Vec::new();
@@ -265,11 +266,15 @@ fn structure_sections(blocks: Vec<Block>) -> Vec<Block> {
                 }
                 stack.push(sec);
             }
-            other => {
+            Block::Paragraph(_)
+            | Block::Element(_)
+            | Block::List(_)
+            | Block::Hole(_)
+            | Block::Interp(_) => {
                 if let Some(top) = stack.last_mut() {
-                    top.blocks.push(other);
+                    top.blocks.push(block);
                 } else {
-                    doc_blocks.push(other);
+                    doc_blocks.push(block);
                 }
             }
         }
@@ -463,10 +468,7 @@ fn end_frame(stack: &mut Vec<Frame>, tag_end: TagEnd, options: &ImportOptions) {
 
                 placement: Placement::Block,
 
-                data: Data {
-                    args: args,
-                    value: None,
-                },
+                data: Data { args, value: None },
 
                 content: Some(vec![Block::Paragraph(Paragraph::new(
                     vec![Inline::Raw(RawText::new(text, Span::dummy()))],
@@ -737,7 +739,11 @@ fn push_block(stack: &mut [Frame], block: Block) {
                     *sublist = Some(l);
                 }
             }
-            other => merge_block_into(content, other),
+            Block::Paragraph(_)
+            | Block::Element(_)
+            | Block::Section(_)
+            | Block::Hole(_)
+            | Block::Interp(_) => merge_block_into(content, block),
         },
         _ => {}
     }
@@ -757,6 +763,7 @@ fn blocks_to_flat_inlines(blocks: Vec<Block>) -> Vec<Inline> {
     out
 }
 
+#[deny(clippy::wildcard_enum_match_arm)]
 fn merge_block_into(content: &mut Vec<Inline>, block: Block) {
     match block {
         Block::Paragraph(p) => extend_spaced(content, p.content),
@@ -764,10 +771,12 @@ fn merge_block_into(content: &mut Vec<Inline>, block: Block) {
         // its title text directly in, same as a paragraph -- not wrapped
         // as a nested `Inline::Element`, which is what the generic
         // `Block::Element` arm would do.
-        Block::Element(el) if classify_std_lenient(el.as_view()) == ElementKind::Heading => extend_spaced(
-            content,
-            blocks_to_flat_inlines(el.content.unwrap_or_default()),
-        ),
+        Block::Element(el) if classify_std_lenient(el.as_view()) == ElementKind::Heading => {
+            extend_spaced(
+                content,
+                blocks_to_flat_inlines(el.content.unwrap_or_default()),
+            )
+        }
         // A list merged into flattened blockquote content (blockquotes
         // have no `sublist` concept, unlike `Item`) has each of its
         // items' content joined in the same way -- see the module doc.

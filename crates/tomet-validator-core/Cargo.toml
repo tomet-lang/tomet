@@ -20,3 +20,6 @@ tomet-semantics-core = { workspace = true }
 
 #= Crates.io
 serde = { workspace = true }
+
+[dev-dependencies]
+tomet-ast-parser = { workspace = true }

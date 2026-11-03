@@ -5,6 +5,7 @@ use tomet_semantics::{EXACT_DATA_KEY, flatten_data, is_attribute_key};
 
 /// Flattens inline content to plain text -- used for the `alt` attribute,
 /// which can't itself carry markup.
+#[deny(clippy::wildcard_enum_match_arm)]
 pub(crate) fn inlines_to_plain(inlines: &[Inline]) -> String {
     let mut s = String::new();
     for (idx, inline) in inlines.iter().enumerate() {
@@ -30,6 +31,7 @@ pub(crate) fn inlines_to_plain(inlines: &[Inline]) -> String {
 }
 
 /// [`inlines_to_plain`] over `Element.content`'s `Vec<Block>` shape.
+#[deny(clippy::wildcard_enum_match_arm)]
 pub(crate) fn blocks_to_plain(blocks: &[Block]) -> String {
     let mut s = String::new();
     for block in blocks {

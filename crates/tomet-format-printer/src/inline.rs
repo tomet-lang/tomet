@@ -11,6 +11,7 @@ use tomet_config::PrinterConfig;
 /// line breaks rather than with a sigil, so such an element has to start
 /// and end its own line here or it would come back from the parser as
 /// part of the running text.
+#[deny(clippy::wildcard_enum_match_arm)]
 pub(crate) fn render_inlines(inlines: &[Inline], config: &PrinterConfig) -> String {
     let mut s = String::new();
     for inline in inlines {

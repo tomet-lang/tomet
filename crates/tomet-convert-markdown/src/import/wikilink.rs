@@ -15,6 +15,7 @@ pub(super) fn post_process_document_wikilinks(doc: &mut File) {
     }
 }
 
+#[deny(clippy::wildcard_enum_match_arm)]
 fn post_process_block_wikilinks(block: &mut Block) {
     match block {
         Block::Paragraph(p) => {
@@ -56,6 +57,7 @@ fn post_process_element_wikilinks(el: &mut Element) {
     }
 }
 
+#[deny(clippy::wildcard_enum_match_arm)]
 fn post_process_inlines_wikilinks(inlines: Vec<Inline>) -> Vec<Inline> {
     let mut new_inlines = Vec::new();
     for inline in inlines {

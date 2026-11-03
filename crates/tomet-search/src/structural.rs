@@ -4,8 +4,8 @@
 //! attribute/property key, and value content.
 
 use tomet_ast::{Data, Declaration, Element, File, Value};
-use tomet_span::Span;
 use tomet_semantics::{classify_declaration_lenient, classify_std_lenient};
+use tomet_span::Span;
 use tomet_tree::{DataExt, for_each_declaration, for_each_element};
 
 /// Criteria for matching AST elements.
@@ -106,14 +106,26 @@ pub fn find_structural_matches(doc: &File, query: &StructuralQuery) -> Vec<Struc
     matches
 }
 
+#[deny(clippy::wildcard_enum_match_arm)]
 fn value_contains_str(v: &Value, sub: &str) -> bool {
     match v {
         Value::String(s) => s.contains(sub),
+        Value::Number(s) => s.contains(sub),
+        Value::Call(name, args) => {
+            name.contains(sub) || args.iter().any(|item| value_contains_str(item, sub))
+        }
+        Value::Interp(it) => it.expr.to_string().contains(sub),
         Value::Map(entries) => entries
             .iter()
             .any(|(k, val)| k.contains(sub) || value_contains_str(val, sub)),
         Value::Seq(items) => items.iter().any(|item| value_contains_str(item, sub)),
-        _ => false,
+        Value::Null
+        | Value::Bool(_)
+        | Value::Int(_)
+        | Value::Float(_)
+        | Value::Element(_)
+        | Value::Hole(_)
+        | Value::Blocks(_) => false,
     }
 }
 
@@ -165,5 +177,22 @@ mod tests {
             ..Default::default()
         };
         assert_eq!(count_structural_matches(&doc, &q_nomatch), 0);
+    }
+
+    #[test]
+    fn matches_query_by_value_contains_in_call_and_interp() {
+        let doc = parse_file("::meta{rule: allow:list(\"special-item\"), expr: ${vault.name}}\n")
+            .unwrap();
+        let q_call = StructuralQuery {
+            value_contains: Some("special".to_string()),
+            ..Default::default()
+        };
+        assert_eq!(count_structural_matches(&doc, &q_call), 1);
+
+        let q_interp = StructuralQuery {
+            value_contains: Some("vault".to_string()),
+            ..Default::default()
+        };
+        assert_eq!(count_structural_matches(&doc, &q_interp), 1);
     }
 }

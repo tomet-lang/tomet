@@ -16,6 +16,7 @@ pub(super) fn char_display_width(c: char) -> usize {
     }
 }
 
+#[deny(clippy::wildcard_enum_match_arm)]
 pub(super) fn inlines_display_width(inlines: &[Inline]) -> usize {
     let mut len = 0;
     for inline in inlines {
@@ -48,6 +49,7 @@ pub(super) fn inlines_display_width(inlines: &[Inline]) -> usize {
 }
 
 /// [`inlines_display_width`] over `Element.content`'s `Vec<Block>` shape.
+#[deny(clippy::wildcard_enum_match_arm)]
 pub(super) fn blocks_display_width(blocks: &[Block]) -> usize {
     blocks
         .iter()

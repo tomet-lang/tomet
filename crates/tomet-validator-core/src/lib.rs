@@ -388,7 +388,7 @@ fn check_arguments_of(
     }
 }
 
-/// Runs checks on the standard declarations in `doc`, mapping each [`Problem`]
+/// Runs checks on the standard declarations in `doc`, mapping each [`tomet_declaration::Problem`]
 /// back to a [`Diagnostic`] with the declaration element's span.
 pub fn check_document_declarations(doc: &File, errors: &mut Vec<Diagnostic>) {
     use tomet_declaration::{Host, Problem, check_declarations, declarations};
@@ -454,7 +454,7 @@ impl Declared {
     }
 }
 
-/// Validates declarations from a `.ctmt` file header against [`Host::Ctmt`].
+/// Validates declarations from a `.ctmt` file header against [`tomet_declaration::Host::Ctmt`].
 ///
 /// Reports host restrictions, duplicate singletons, version format errors,
 /// too many arguments, and invalid macro/var definitions. Declarations whose

@@ -15,9 +15,7 @@ mod tests;
 
 use escape::{escape_attr, escape_text, fence_for};
 
-use tomet_ast::{
-    Block, ElementView, File, Inline, Interpolation, List, Placement, Section, Value,
-};
+use tomet_ast::{Block, ElementView, File, Inline, Interpolation, List, Placement, Section, Value};
 use tomet_semantics::{
     FootnoteRegistry, TargetScheme, classify_std_lenient, extract_tags, heading_level,
     is_attribute_key, is_directive, link_target, normalized_element_args, path_target,
@@ -51,6 +49,7 @@ pub fn to_markdown(doc: &File) -> String {
     out
 }
 
+#[deny(clippy::wildcard_enum_match_arm)]
 fn render_block(cx: &MarkdownCtx, block: &Block, out: &mut String) {
     match block {
         Block::Paragraph(p) => {
@@ -149,6 +148,7 @@ fn blocks_to_md(cx: &MarkdownCtx, blocks: &[Block]) -> String {
     out
 }
 
+#[deny(clippy::wildcard_enum_match_arm)]
 fn inline_to_md(cx: &MarkdownCtx, inlines: &[Inline]) -> String {
     let mut out = String::new();
     for inline in inlines {
@@ -309,9 +309,7 @@ fn render_ruby(cx: &MarkdownCtx, el: ElementView<'_>) -> String {
 }
 
 fn content_to_md(cx: &MarkdownCtx, el: ElementView<'_>) -> String {
-    el.content
-        .map(|a| blocks_to_md(cx, a))
-        .unwrap_or_default()
+    el.content.map(|a| blocks_to_md(cx, a)).unwrap_or_default()
 }
 
 /// A bare `---` break exports as-is; a titled one (`---[ Title ]---`) has
@@ -343,10 +341,7 @@ fn render_hr(cx: &MarkdownCtx, el: ElementView<'_>) -> String {
 /// `tomet-html`'s `render_raw_element`) has no CommonMark
 /// form, same as a heading's attrs, so it's dropped on export.
 fn render_raw(el: ElementView<'_>, inline: bool) -> String {
-    let code = el
-        .content
-        .map(blocks_to_plain)
-        .unwrap_or_default();
+    let code = el.content.map(blocks_to_plain).unwrap_or_default();
     if inline {
         render_inline_raw(&code)
     } else {
@@ -528,14 +523,12 @@ fn render_link(cx: &MarkdownCtx, el: ElementView<'_>) -> String {
 fn render_embed(el: ElementView<'_>) -> String {
     let raw_target = link_target(el, &classify_std_lenient(el)).unwrap_or_default();
     let (_, src) = target_scheme(&raw_target);
-    let alt = el
-        .content
-        .map(blocks_to_plain)
-        .unwrap_or_default();
+    let alt = el.content.map(blocks_to_plain).unwrap_or_default();
     format!("![{alt}]({src})")
 }
 
 /// [`inlines_to_plain`] over `Element.content`'s `Vec<Block>` shape.
+#[deny(clippy::wildcard_enum_match_arm)]
 fn blocks_to_plain(blocks: &[Block]) -> String {
     let mut s = String::new();
     for block in blocks {
@@ -562,6 +555,7 @@ fn blocks_to_plain(blocks: &[Block]) -> String {
     s
 }
 
+#[deny(clippy::wildcard_enum_match_arm)]
 fn inlines_to_plain(inlines: &[Inline]) -> String {
     let mut s = String::new();
     for (idx, inline) in inlines.iter().enumerate() {

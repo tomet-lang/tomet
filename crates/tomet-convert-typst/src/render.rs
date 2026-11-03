@@ -3,9 +3,7 @@
 use std::cell::RefCell;
 use std::collections::HashSet;
 
-use tomet_ast::{
-    Block, ElementView, File, Inline, Interpolation, List, Placement, Section, Value,
-};
+use tomet_ast::{Block, ElementView, File, Inline, Interpolation, List, Placement, Section, Value};
 use tomet_semantics::{
     FootnoteRegistry, TargetScheme, classify_std_lenient, extract_tags, heading_level,
     is_directive, link_target, normalized_element_args, parse_table_rows, path_target,
@@ -47,6 +45,7 @@ fn render_leftover_footnotes(cx: &TypstCtx, out: &mut String) {
     }
 }
 
+#[deny(clippy::wildcard_enum_match_arm)]
 fn render_block(cx: &TypstCtx, block: &Block, out: &mut String) {
     match block {
         Block::Paragraph(p) => {
@@ -144,6 +143,7 @@ fn blocks_to_typst(cx: &TypstCtx, blocks: &[Block]) -> String {
     out
 }
 
+#[deny(clippy::wildcard_enum_match_arm)]
 fn inline_to_typst(cx: &TypstCtx, inlines: &[Inline]) -> String {
     let mut out = String::new();
     for (idx, inline) in inlines.iter().enumerate() {
@@ -428,10 +428,7 @@ fn render_raw(el: ElementView<'_>, inline: bool) -> String {
         .and_then(|m| map_get(m, "lang"))
         .map(value_to_plain)
         .unwrap_or_default();
-    let code = el
-        .content
-        .map(blocks_to_plain)
-        .unwrap_or_default();
+    let code = el.content.map(blocks_to_plain).unwrap_or_default();
     if inline {
         if lang.is_empty() && !code.contains('`') {
             format!("`{code}`")
@@ -576,10 +573,7 @@ fn render_link(cx: &TypstCtx, el: ElementView<'_>) -> String {
 fn render_embed(el: ElementView<'_>) -> String {
     let raw_target = link_target(el, &classify_std_lenient(el)).unwrap_or_default();
     let (_, src) = target_scheme(&raw_target);
-    let alt = el
-        .content
-        .map(blocks_to_plain)
-        .unwrap_or_default();
+    let alt = el.content.map(blocks_to_plain).unwrap_or_default();
     if alt.is_empty() {
         format!("#image(\"{}\")", escape_typst_string(src))
     } else {
@@ -646,6 +640,7 @@ fn content_to_typst(cx: &TypstCtx, el: ElementView<'_>) -> String {
 
 /// Flattens inline content to plain text -- used where Typst syntax can't
 /// itself carry markup (a raw code block's contents, an image's `alt`).
+#[deny(clippy::wildcard_enum_match_arm)]
 fn inlines_to_plain(inlines: &[Inline]) -> String {
     let mut s = String::new();
     for (idx, inline) in inlines.iter().enumerate() {
@@ -671,6 +666,7 @@ fn inlines_to_plain(inlines: &[Inline]) -> String {
 }
 
 /// [`inlines_to_plain`] over `Element.content`'s `Vec<Block>` shape.
+#[deny(clippy::wildcard_enum_match_arm)]
 fn blocks_to_plain(blocks: &[Block]) -> String {
     let mut s = String::new();
     for block in blocks {

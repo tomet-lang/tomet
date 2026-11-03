@@ -2,9 +2,7 @@
 
 use tomet_ast::{File, Group, Value};
 use tomet_semantics::{classify_declaration_lenient, classify_std_lenient};
-use tomet_tree::{
-    DataExt, declaration_new, for_each_declaration_mut, for_each_element_mut,
-};
+use tomet_tree::{DataExt, declaration_new, for_each_declaration_mut, for_each_element_mut};
 
 /// Updates or inserts a key-value pair in a target directive/metadata block (e.g. `::meta`).
 /// If the target block is not found, prepends a new directive block at position 0.

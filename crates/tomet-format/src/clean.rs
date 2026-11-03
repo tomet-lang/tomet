@@ -3,7 +3,7 @@
 
 use tomet_ast::{Block, ElementView, File, Value};
 use tomet_ast_parser::parse_file;
-use tomet_tree::{Node, Place, Visit, walk};
+use tomet_tree::{Place, Visit, walk};
 
 /// Normalizes whitespace (LF line endings, no trailing whitespace, collapsed excess
 /// blank lines, exactly one final newline) while losslessly preserving literal whitespace
@@ -102,22 +102,10 @@ pub(crate) fn collect_raw_spans(doc: &File, out: &mut Vec<(usize, usize)>) {
         if matches!(place, Place::Args | Place::PairValue) {
             return Visit::<()>::Skip;
         }
-        match node {
-            // An item in the combine notation is the element it names.
-            Node::Item(item) => {
-                if let Some(el) = item.as_element_view()
-                    && is_raw_element(el)
-                {
-                    push_spans(el.content, out);
-                }
-            }
-            other => {
-                if let Some(el) = other.element()
-                    && is_raw_element(el.as_view())
-                {
-                    push_spans(el.content.as_deref(), out);
-                }
-            }
+        if let Some(el) = node.element_view()
+            && is_raw_element(el)
+        {
+            push_spans(el.content, out);
         }
         Visit::Descend
     });

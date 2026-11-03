@@ -385,7 +385,9 @@ fn raw_inline_uses_backticks() {
 
 #[test]
 fn thematic_break() {
-    let doc = doc_from_blocks(vec![Block::Element(tomet_tree::element_new(Name::bare("hr")))]);
+    let doc = doc_from_blocks(vec![Block::Element(tomet_tree::element_new(Name::bare(
+        "hr",
+    )))]);
     assert_eq!(to_markdown(&doc), "---\n\n");
 }
 

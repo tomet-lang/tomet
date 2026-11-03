@@ -78,10 +78,10 @@ pub trait DataExt {
 
     /// Mutable writable attrs slot on `el.args`.
     ///
-    /// Unlike [`ElementExt::attrs_view`] this does not fall back to the
+    /// Unlike [`DataExt::attrs_view`] this does not fall back to the
     /// value group: a group is a list of [`tomet_ast::Entry`] items, not a
     /// `Value`, so there is no single `&mut Value` to hand out for it. Use
-    /// [`ElementExt::set_prop`] or `Group`'s own pair accessors to
+    /// [`DataExt::set_prop`] or `Group`'s own pair accessors to
     /// write into a group.
     fn attrs_mut(&mut self) -> Option<&mut Value>;
 
@@ -322,6 +322,7 @@ pub fn list(ordered: bool, items: Vec<ListItem>, span: Span) -> List {
 /// reads for, and silently dropping it here would repeat the exact bug
 /// `connects` used to have (a full-form list item's parsed connects were
 /// read and then thrown away at this exact spot).
+#[allow(clippy::too_many_arguments)]
 pub fn list_item(
     name: Option<Name>,
     content: Vec<Block>,

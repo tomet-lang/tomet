@@ -27,7 +27,12 @@ pub(crate) fn render_hr_element(cx: &RenderCtx, el: ElementView<'_>, out: &mut S
 
 /// `em`/`strong`/`mark` all wrap their `content` in a same-named HTML tag --
 /// the element's own name doubles as the HTML tag name for these three.
-pub(crate) fn render_wrapped_inline(cx: &RenderCtx, el: ElementView<'_>, tag: &str, out: &mut String) {
+pub(crate) fn render_wrapped_inline(
+    cx: &RenderCtx,
+    el: ElementView<'_>,
+    tag: &str,
+    out: &mut String,
+) {
     out.push_str(&format!("<{tag}>"));
     if let Some(content) = el.content {
         render_content_blocks(cx, content, out);
@@ -71,10 +76,7 @@ pub(crate) fn render_raw_element(el: ElementView<'_>, out: &mut String, inline: 
         .and_then(|m| map_get(m, "lang"))
         .map(value_to_plain)
         .unwrap_or_default();
-    let code = el
-        .content
-        .map(blocks_to_plain)
-        .unwrap_or_default();
+    let code = el.content.map(blocks_to_plain).unwrap_or_default();
     let attrs = el.data.value.as_ref().map(|v| v.as_data());
     let (class, data) = split_attrs(attrs.as_ref());
     let id = id_attr(el.id);
@@ -109,7 +111,12 @@ pub(crate) fn render_raw_element(el: ElementView<'_>, out: &mut String, inline: 
 /// rule everything else here is placed by. Only single-block quotes
 /// round-trip cleanly; multi-block quotes are already flattened into one
 /// inline run on import.
-pub(crate) fn render_quote_element(cx: &RenderCtx, el: ElementView<'_>, out: &mut String, inline: bool) {
+pub(crate) fn render_quote_element(
+    cx: &RenderCtx,
+    el: ElementView<'_>,
+    out: &mut String,
+    inline: bool,
+) {
     let tag = if inline { "q" } else { "blockquote" };
     out.push_str(&format!("<{tag}>"));
     if let Some(content) = el.content {

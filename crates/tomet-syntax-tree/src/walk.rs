@@ -5,6 +5,9 @@
 //! and, where a position must stay unseen, a [`Visit::Skip`] written at the walker, so what a
 //! walker leaves out is read in its own body and not in a copy of the recursion.
 //!
+//! Traversal must never be reimplemented by handwritten AST recursion across downstream crates.
+//! All structural walks across the workspace route through [`children`] and [`walk`].
+//!
 //! The groups of a node come in one order: `(args)`, `{value}`, `[content]`, then its
 //! `:connect`s. The AST keeps no order of groups, so this is the order of every walker.
 //!
@@ -14,8 +17,8 @@
 
 use std::ops::ControlFlow;
 use tomet_ast::{
-    Block, Connect, Data, Declaration, Element, ElementView, Entry, File, Group, Hole, Id,
-    Inline, Interpolation, List, ListItem, Section, Value,
+    Block, Connect, Data, Declaration, Element, ElementView, Entry, File, Group, Hole, Id, Inline,
+    Interpolation, List, ListItem, Section, Value,
 };
 use tomet_span::Span;
 
@@ -191,6 +194,7 @@ pub enum Visit<B = ()> {
 /// `{value}`, its body and its connects; a node that carries data holds `(args)`, `{value}`
 /// entries and `[content]` blocks; an element or a hole inside a block, a line of text, a value
 /// or an entry holds what the element or hole holds.
+#[deny(clippy::wildcard_enum_match_arm)]
 pub fn children<'a>(node: Node<'a>, f: &mut dyn FnMut(Node<'a>, Place)) {
     match node {
         Node::Declaration(d) => groups(&d.data, d.content.as_deref(), f),
@@ -456,6 +460,7 @@ pub fn for_each_hole(file: &File, mut f: impl FnMut(&Hole)) {
 /// This is the one place that decision lives. A caller that wants "the elements at the top of
 /// this file" should call this instead of walking `file.body` by hand. Declarations are in
 /// `file.header`.
+#[deny(clippy::wildcard_enum_match_arm)]
 pub fn for_each_top_level_element(file: &File, mut f: impl FnMut(&Element)) {
     for block in &file.body {
         match block {
@@ -467,10 +472,7 @@ pub fn for_each_top_level_element(file: &File, mut f: impl FnMut(&Element)) {
                     }
                 }
             }
-            Block::Section(_)
-            | Block::List(_)
-            | Block::Hole(_)
-            | Block::Interp(_) => {}
+            Block::Section(_) | Block::List(_) | Block::Hole(_) | Block::Interp(_) => {}
         }
     }
 }
@@ -520,7 +522,7 @@ fn descendants<'a>(
 /// What is nested in `el`: its `[content]` and the elements that are entries of its `{value}`.
 /// With `direct_only`, only the first level.
 ///
-/// Neither `el.args` nor `el.connects` is looked at; see [`descendants`] for why.
+/// Neither `el.args` nor `el.connects` is looked at; see `descendants` for why.
 pub fn for_each_descendant(el: &Element, direct_only: bool, f: impl FnMut(Node<'_>)) {
     descendants(
         |g| groups(&el.data, el.content.as_deref(), g),
@@ -542,11 +544,7 @@ pub fn for_each_descendant_of_item(item: &ListItem, direct_only: bool, f: impl F
 /// Every descendant reachable from `blocks`, in document order: [`for_each_descendant`]'s own
 /// `content` handling for any block sequence (a [`Section`]'s `blocks` has the same shape), so a
 /// heading's own `:rule(...)` can check what sits *under* the heading.
-pub fn for_each_descendant_in_blocks(
-    blocks: &[Block],
-    direct_only: bool,
-    f: impl FnMut(Node<'_>),
-) {
+pub fn for_each_descendant_in_blocks(blocks: &[Block], direct_only: bool, f: impl FnMut(Node<'_>)) {
     descendants(
         |g| {
             for block in blocks {
@@ -592,6 +590,7 @@ impl<S: Sink> MutWalk<'_, S> {
         self.groups(&mut d.data, d.content.as_deref_mut());
     }
 
+    #[deny(clippy::wildcard_enum_match_arm)]
     fn block(&mut self, block: &mut Block) {
         match block {
             Block::Paragraph(p) => self.inlines(&mut p.content),
@@ -611,12 +610,17 @@ impl<S: Sink> MutWalk<'_, S> {
         }
     }
 
+    #[deny(clippy::wildcard_enum_match_arm)]
     fn inlines(&mut self, items: &mut [Inline]) {
         for inline in items {
             match inline {
                 Inline::Element(el) => self.element(el),
                 Inline::Hole(h) => self.groups(&mut h.data, h.content.as_deref_mut()),
-                _ => {}
+                Inline::Text(_)
+                | Inline::SoftBreak(_)
+                | Inline::LineBreak(_)
+                | Inline::Raw(_)
+                | Inline::Interp(_) => {}
             }
         }
     }
@@ -656,6 +660,7 @@ impl<S: Sink> MutWalk<'_, S> {
         }
     }
 
+    #[deny(clippy::wildcard_enum_match_arm)]
     fn data(&mut self, d: &mut Data) {
         if let Some(args) = &mut d.args {
             self.value(args);
@@ -675,6 +680,7 @@ impl<S: Sink> MutWalk<'_, S> {
         }
     }
 
+    #[deny(clippy::wildcard_enum_match_arm)]
     fn value(&mut self, value: &mut Value) {
         match value {
             Value::Element(el) => self.element(el),

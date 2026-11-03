@@ -37,6 +37,7 @@ pub(crate) fn render_blocks(blocks: &[Block], config: &PrinterConfig, out: &mut 
     }
 }
 
+#[deny(clippy::wildcard_enum_match_arm)]
 pub(crate) fn render_block(block: &Block, config: &PrinterConfig, out: &mut String) {
     match block {
         // A heading element that opens a paragraph (it shares the paragraph

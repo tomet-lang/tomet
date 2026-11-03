@@ -56,6 +56,7 @@ pub fn to_pandoc(doc: &File) -> PandocDoc {
 /// string and comes back from `from_pandoc` as one. That is the one
 /// lossy edge here, and step 8's round-trip snapshot is where it should
 /// stay visible.
+#[deny(clippy::wildcard_enum_match_arm)]
 fn meta_value(v: &Value) -> MetaValue {
     match v {
         Value::Null => MetaValue::MetaString(String::new()),
@@ -92,6 +93,7 @@ fn meta_value(v: &Value) -> MetaValue {
 /// paragraph that turns out to hold only directives -- otherwise every
 /// `::meta` line would leave an empty `Para` behind, the same trap the
 /// Markdown and HTML writers guard against.
+#[deny(clippy::wildcard_enum_match_arm)]
 fn block_to_pandoc(block: &TmBlock) -> Vec<Block> {
     match block {
         TmBlock::Paragraph(p) => content_to_blocks(&p.content),
@@ -274,9 +276,12 @@ fn conflict_sides(el: ElementView<'_>) -> (Vec<TmBlock>, Vec<TmBlock>) {
         entries
             .iter()
             .find(|(k, _)| k == key)
-            .and_then(|(_, v)| match v {
-                Value::Blocks(blocks) => Some(blocks.clone()),
-                _ => None,
+            .and_then(|(_, v)| {
+                if let Value::Blocks(blocks) = v {
+                    Some(blocks.clone())
+                } else {
+                    None
+                }
             })
             .unwrap_or_default()
     };
@@ -288,6 +293,7 @@ fn conflict_sides(el: ElementView<'_>) -> (Vec<TmBlock>, Vec<TmBlock>) {
 /// `Inline` has nothing that can carry real blocks. A paragraph's own
 /// inlines join directly; anything else (a nested element, a section
 /// title) contributes what its own inline form would.
+#[deny(clippy::wildcard_enum_match_arm)]
 fn blocks_to_inlines_lossy(blocks: &[TmBlock]) -> Vec<Inline> {
     let mut out = Vec::new();
     for (i, block) in blocks.iter().enumerate() {
@@ -323,6 +329,7 @@ fn content_of(el: ElementView<'_>) -> &[TmBlock] {
 /// carrying `Placement::Block`, which is read here: a block-placed element
 /// becomes its own Pandoc block, and the true inlines around it are
 /// gathered into `Para`.
+#[deny(clippy::wildcard_enum_match_arm)]
 fn content_to_blocks(inlines: &[TmInline]) -> Vec<Block> {
     let mut blocks = Vec::new();
     let mut run: Vec<Inline> = Vec::new();
@@ -364,6 +371,7 @@ fn flush_run(run: &mut Vec<Inline>, blocks: &mut Vec<Block>) {
 /// [`content_to_blocks`] below still is, for `Paragraph.content`, which
 /// stayed `Vec<Inline>` -- see `tmtroot/docs/spec/feature/
 /// content-shape.tmt`).
+#[deny(clippy::wildcard_enum_match_arm)]
 fn element_content_to_blocks(blocks: &[TmBlock]) -> Vec<Block> {
     let mut out = Vec::new();
     for block in blocks {
@@ -406,6 +414,7 @@ fn content_to_inlines(el: ElementView<'_>) -> Vec<Inline> {
     blocks_to_pandoc_inlines(content_of(el))
 }
 
+#[deny(clippy::wildcard_enum_match_arm)]
 fn blocks_to_pandoc_inlines(blocks: &[TmBlock]) -> Vec<Inline> {
     if let [TmBlock::Paragraph(p)] = blocks {
         return inlines_to_pandoc(&p.content);
@@ -428,6 +437,7 @@ fn blocks_to_pandoc_inlines(blocks: &[TmBlock]) -> Vec<Inline> {
     out
 }
 
+#[deny(clippy::wildcard_enum_match_arm)]
 fn inlines_to_pandoc(inlines: &[TmInline]) -> Vec<Inline> {
     let mut out = Vec::new();
     for item in inlines {
@@ -531,6 +541,7 @@ fn element_body_blocks(el: ElementView<'_>) -> Vec<Block> {
 
 /// [`element_body_blocks`] for anything that takes the groups an element
 /// does: a bare entry's body is read the same way.
+#[deny(clippy::wildcard_enum_match_arm)]
 fn body_blocks(body: BodyView<'_>) -> Vec<Block> {
     let mut blocks = element_content_to_blocks(body.content.unwrap_or(&[]));
     if let Some(Group(entries)) = body.data.value.as_ref() {
@@ -565,6 +576,7 @@ fn content_to_plain_text(el: ElementView<'_>) -> String {
 }
 
 /// [`plain_text`] over `Element.content`'s `Vec<Block>` shape.
+#[deny(clippy::wildcard_enum_match_arm)]
 fn blocks_plain_text(blocks: &[TmBlock]) -> String {
     let mut out = String::new();
     for block in blocks {
@@ -584,6 +596,7 @@ fn blocks_plain_text(blocks: &[TmBlock]) -> String {
     out
 }
 
+#[deny(clippy::wildcard_enum_match_arm)]
 fn plain_text(inlines: &[TmInline]) -> String {
     let mut out = String::new();
     for (idx, item) in inlines.iter().enumerate() {
@@ -735,23 +748,25 @@ fn table_arg(el: ElementView<'_>, key: &str) -> Option<Value> {
 }
 
 fn table_has_header(el: ElementView<'_>) -> bool {
-    match table_arg(el, "header") {
-        Some(Value::Bool(b)) => b,
-        Some(_) => true,
-        None => true,
+    if let Some(Value::Bool(b)) = table_arg(el, "header") {
+        b
+    } else {
+        true
     }
 }
 
 fn table_alignment(el: ElementView<'_>) -> Alignment {
-    match table_arg(el, "align").as_ref().and_then(|v| match v {
-        Value::String(s) => Some(s.as_str().to_ascii_lowercase()),
-        _ => None,
-    }) {
-        Some(a) if a == "left" => Alignment::AlignLeft,
-        Some(a) if a == "center" || a == "centre" => Alignment::AlignCenter,
-        Some(a) if a == "right" => Alignment::AlignRight,
-        _ => Alignment::AlignDefault,
+    if let Some(Value::String(s)) = table_arg(el, "align").as_ref() {
+        let a = s.to_ascii_lowercase();
+        if a == "left" {
+            return Alignment::AlignLeft;
+        } else if a == "center" || a == "centre" {
+            return Alignment::AlignCenter;
+        } else if a == "right" {
+            return Alignment::AlignRight;
+        }
     }
+    Alignment::AlignDefault
 }
 
 // ---- attributes ----------------------------------------------------
@@ -785,11 +800,7 @@ fn generic_attr(el: ElementView<'_>, kind: &ElementKind) -> Attr {
 /// shared flattening rule: readable pairs, plus the exact JSON copy
 /// under `EXACT_DATA_KEY` when the projection would lose something.
 fn attr_of(el: ElementView<'_>, classes: &[&str]) -> Attr {
-    attr_from(
-        el.id,
-        flatten_element_data(el).into_pairs(),
-        classes,
-    )
+    attr_from(el.id, flatten_element_data(el).into_pairs(), classes)
 }
 
 fn section_attr(sec: &tomet_ast::Section) -> Attr {
@@ -956,8 +967,8 @@ mod tests {
 
     #[test]
     fn meta_feeds_the_document_metadata_map() {
-        let doc = parse_file("::meta{title: Hello, draft: true, tags: list(a, b)}\n\n本文\n")
-            .unwrap();
+        let doc =
+            parse_file("::meta{title: Hello, draft: true, tags: list(a, b)}\n\n本文\n").unwrap();
         let pandoc = to_pandoc(&doc);
         assert_eq!(
             pandoc.meta.get("title"),
@@ -976,8 +987,7 @@ mod tests {
 
         // list(...) call literal converts identically to [a, b]
         let doc_call =
-            parse_file("::meta{title: Hello, draft: true, tags: list(a, b)}\n\n本文\n")
-                .unwrap();
+            parse_file("::meta{title: Hello, draft: true, tags: list(a, b)}\n\n本文\n").unwrap();
         let pandoc_call = to_pandoc(&doc_call);
         assert_eq!(
             pandoc_call.meta.get("tags"),

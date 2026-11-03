@@ -8,8 +8,8 @@ use crate::util::{
 };
 use crate::{HeadingInfo, RenderCtx};
 use tomet_ast::{Block, ElementView, Inline, List, Paragraph, Section, Value};
-use tomet_span::Span;
 use tomet_semantics::{ElementKind, classify_std_lenient, heading_level};
+use tomet_span::Span;
 
 /// Dispatches one top-level document block, and -- when
 /// `RenderOptions::emit_source_spans` is set -- tags whatever it emits as
@@ -24,6 +24,7 @@ use tomet_semantics::{ElementKind, classify_std_lenient, heading_level};
 /// rendered output, since none of those currently expose finer-grained
 /// spans (a table's cells, notably, do not -- see `RenderOptions::
 /// emit_source_spans`'s doc comment).
+#[deny(clippy::wildcard_enum_match_arm)]
 pub(crate) fn render_block(
     cx: &RenderCtx,
     block: &Block,
@@ -287,6 +288,7 @@ pub(crate) fn render_content_blocks(cx: &RenderCtx, blocks: &[Block], out: &mut 
     }
 }
 
+#[deny(clippy::wildcard_enum_match_arm)]
 pub(crate) fn render_inlines(cx: &RenderCtx, inlines: &[Inline], out: &mut String) {
     for (idx, inline) in inlines.iter().enumerate() {
         match inline {

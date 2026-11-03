@@ -66,21 +66,26 @@ fn run(src: &str) -> (File, Vec<Unresolved>) {
 
 /// Every text node in the document, in order, joined with `|` between blocks.
 fn text_of(doc: &File) -> String {
+    #[deny(clippy::wildcard_enum_match_arm)]
     fn inlines(out: &mut String, items: &[Inline]) {
         for inline in items {
             match inline {
                 Inline::Text(t) => out.push_str(&t.value),
                 Inline::Raw(t) => out.push_str(&t.value),
                 Inline::Element(el) => {
-                    out.push_str(&format!("<{}>", el.name.to_string()));
+                    out.push_str(&format!("<{}>", el.name));
                     if let Some(content) = &el.content {
                         blocks(out, content);
                     }
                 }
-                _ => {}
+                Inline::SoftBreak(_)
+                | Inline::LineBreak(_)
+                | Inline::Interp(_)
+                | Inline::Hole(_) => {}
             }
         }
     }
+    #[deny(clippy::wildcard_enum_match_arm)]
     fn blocks(out: &mut String, items: &[Block]) {
         for (i, block) in items.iter().enumerate() {
             if i > 0 {
@@ -105,7 +110,7 @@ fn text_of(doc: &File) -> String {
                     out.push(']');
                 }
                 Block::Element(el) => {
-                    out.push_str(&format!("<{}>", el.name.to_string()));
+                    out.push_str(&format!("<{}>", el.name));
                 }
                 Block::Interp(interp) => out.push_str(&format!("${{{}}}", interp.expr)),
                 Block::Hole(_) => {}

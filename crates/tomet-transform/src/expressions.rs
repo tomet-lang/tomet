@@ -35,8 +35,8 @@ use tomet_ast::{
     Block, Connect, Data, Declaration, Element, Entry, File, Group, Id, Inline, InterpExpr, List,
     ListItem, Paragraph, Text, Value,
 };
-use tomet_span::Span;
 use tomet_expr::{EvalContext, EvalValue, Note, evaluate, evaluate_data};
+use tomet_span::Span;
 use tomet_tree::list_item;
 
 /// Something the pass left as it found it, and says so.
@@ -221,6 +221,7 @@ impl Pass<'_> {
 
     // ---- blocks -------------------------------------------------------------
 
+    #[deny(clippy::wildcard_enum_match_arm)]
     fn block(&mut self, block: Block) -> Vec<Block> {
         match block {
             Block::Paragraph(mut p) => {
@@ -267,6 +268,7 @@ impl Pass<'_> {
 
     // ---- inlines ------------------------------------------------------------
 
+    #[deny(clippy::wildcard_enum_match_arm)]
     fn inlines(&mut self, inlines: Vec<Inline>) -> Vec<Inline> {
         inlines
             .into_iter()
@@ -276,7 +278,11 @@ impl Pass<'_> {
                 }
                 Inline::Interp(interp) => self.inline_expression(&interp.expr, interp.span),
                 Inline::Element(el) => vec![Inline::Element(self.element(el))],
-                other => vec![other],
+                other @ (Inline::Text(_)
+                | Inline::Raw(_)
+                | Inline::SoftBreak(_)
+                | Inline::LineBreak(_)
+                | Inline::Hole(_)) => vec![other],
             })
             .collect()
     }
@@ -322,6 +328,7 @@ impl Pass<'_> {
         }
     }
 
+    #[deny(clippy::wildcard_enum_match_arm)]
     fn element_value(&mut self, value: Group) -> Group {
         let Group(entries) = value;
         Group(
@@ -343,6 +350,7 @@ impl Pass<'_> {
 
     /// A `${...}` where data goes: it keeps its value, whatever the type
     /// allows to be kept as data.
+    #[deny(clippy::wildcard_enum_match_arm)]
     fn value(&mut self, value: Value) -> Value {
         match value {
             Value::Interp(interp) if !self.is_selected(interp.span) => Value::Interp(interp),
@@ -363,7 +371,13 @@ impl Pass<'_> {
             Value::Blocks(blocks) => {
                 Value::Blocks(blocks.into_iter().flat_map(|b| self.block(b)).collect())
             }
-            other => other,
+            other @ (Value::Null
+            | Value::Bool(_)
+            | Value::Int(_)
+            | Value::Float(_)
+            | Value::Number(_)
+            | Value::String(_)
+            | Value::Hole(_)) => other,
         }
     }
 

@@ -61,18 +61,23 @@ pub fn render_element(el: ElementView<'_>, config: &PrinterConfig) -> String {
                 .data
                 .args
                 .as_ref()
-                .and_then(|args| match args {
-                    Value::String(s) => Some(s.clone()),
-                    Value::Map(entries) => {
+                .and_then(|args| {
+                    if let Value::String(s) = args {
+                        Some(s.clone())
+                    } else if let Value::Map(entries) = args {
                         entries
                             .iter()
                             .find(|(k, _)| k == "lang")
-                            .and_then(|(_, v)| match v {
-                                Value::String(s) => Some(s.clone()),
-                                _ => None,
+                            .and_then(|(_, v)| {
+                                if let Value::String(s) = v {
+                                    Some(s.clone())
+                                } else {
+                                    None
+                                }
                             })
+                    } else {
+                        None
                     }
-                    _ => None,
                 })
                 .unwrap_or_default();
             let body = el
@@ -212,12 +217,7 @@ pub fn render_element(el: ElementView<'_>, config: &PrinterConfig) -> String {
     // reads it back with.
     let mut out = format!("@{}", el.name);
     let name = el.name.name.as_str();
-    out.push_str(&render_groups(
-        name,
-        el.data,
-        el.content,
-        config,
-    ));
+    out.push_str(&render_groups(name, el.data, el.content, config));
     out.push_str(&render_id(el.id));
     out.push_str(&render_connects(el.connects, config));
     out
@@ -339,6 +339,7 @@ pub(crate) fn render_interp(interp: &Interpolation) -> String {
 /// Order is preserved deliberately: a group may interleave `key: value`
 /// pairs and nested elements, and reordering them would change the
 /// document the formatter promises not to change.
+#[deny(clippy::wildcard_enum_match_arm)]
 pub(crate) fn render_group_entries(entries: &[Entry], config: &PrinterConfig) -> String {
     if entries.is_empty() {
         return String::new();
@@ -352,11 +353,9 @@ pub(crate) fn render_group_entries(entries: &[Entry], config: &PrinterConfig) ->
             // `render_nested`, not `render_value_inner_with_config`: a
             // nested map needs its own braces here or `m: { k: v }`
             // prints as `m: k: v` and reparses as a string.
-            Entry::Pair(k, v) => format!(
-                "{}: {}",
-                tomet_style::key_text(k),
-                render_nested(v, config)
-            ),
+            Entry::Pair(k, v) => {
+                format!("{}: {}", tomet_style::key_text(k), render_nested(v, config))
+            }
             Entry::Element(child) => render_element(child.as_view(), config),
             Entry::Hole(hole) => render_hole(hole, config),
             Entry::Bare(bare) => render_bare(bare, config),

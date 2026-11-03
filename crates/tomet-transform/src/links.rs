@@ -1,10 +1,10 @@
 use std::path::{Path, PathBuf};
 
 use tomet_ast::{Block, Element, File, Inline, Paragraph, Text, Value};
-use tomet_span::Span;
 use tomet_semantics::{
     ElementKind, TargetScheme, classify_std_lenient, link_target, target_scheme,
 };
+use tomet_span::Span;
 use tomet_tree::for_each_element_mut;
 
 /// Destination target format when rewriting `ref:` links and `@embed` assets.
@@ -107,6 +107,7 @@ impl TargetMode {
 ///
 /// - Resolved links have their target rewritten according to `mode`.
 /// - Unresolved links are rewritten to the `unresolved:` scheme (e.g. `unresolved:Note Name`).
+#[deny(clippy::wildcard_enum_match_arm)]
 pub fn resolve_document_links<F>(
     doc: &mut File,
     from_path: Option<&Path>,
@@ -193,9 +194,15 @@ pub fn resolve_document_links<F>(
                     && c.iter().any(|block| match block {
                         Block::Paragraph(p) => p.content.iter().any(|inline| match inline {
                             Inline::Text(t) => !t.value.trim().is_empty(),
-                            _ => true,
+                            Inline::Raw(r) => !r.value.trim().is_empty(),
+                            Inline::Element(_) | Inline::Interp(_) | Inline::Hole(_) => true,
+                            Inline::SoftBreak(_) | Inline::LineBreak(_) => false,
                         }),
-                        _ => true,
+                        Block::Element(_)
+                        | Block::Section(_)
+                        | Block::List(_)
+                        | Block::Interp(_)
+                        | Block::Hole(_) => true,
                     })
             });
             if !has_content {
@@ -209,27 +216,23 @@ pub fn resolve_document_links<F>(
 }
 
 fn update_element_target(el: &mut Element, new_target: String) {
-    match &mut el.data.args {
-        Some(Value::String(s)) => {
-            *s = new_target;
-        }
-        Some(Value::Map(entries)) => {
-            let mut found = false;
-            for (k, v) in entries.iter_mut() {
-                if k == "target" || k == "ref" {
-                    *k = "target".to_string();
-                    *v = Value::String(new_target.clone());
-                    found = true;
-                    break;
-                }
-            }
-            if !found {
-                entries.push(("target".to_string(), Value::String(new_target)));
+    if let Some(Value::String(s)) = &mut el.data.args {
+        *s = new_target;
+    } else if let Some(Value::Map(entries)) = &mut el.data.args {
+        let mut found = false;
+        for (k, v) in entries.iter_mut() {
+            if k == "target" || k == "ref" {
+                *k = "target".to_string();
+                *v = Value::String(new_target.clone());
+                found = true;
+                break;
             }
         }
-        _ => {
-            el.data.args = Some(Value::String(new_target));
+        if !found {
+            entries.push(("target".to_string(), Value::String(new_target)));
         }
+    } else {
+        el.data.args = Some(Value::String(new_target));
     }
 }
 
@@ -373,10 +376,19 @@ mod tests {
                             Block::Paragraph(p) => {
                                 Some(p.content.iter().map(|inline| match inline {
                                     Inline::Text(t) => t.value.as_str(),
-                                    _ => "",
+                                    Inline::Raw(r) => r.value.as_str(),
+                                    Inline::Element(_)
+                                    | Inline::Interp(_)
+                                    | Inline::Hole(_)
+                                    | Inline::SoftBreak(_)
+                                    | Inline::LineBreak(_) => "",
                                 }))
                             }
-                            _ => None,
+                            Block::Element(_)
+                            | Block::Section(_)
+                            | Block::List(_)
+                            | Block::Interp(_)
+                            | Block::Hole(_) => None,
                         })
                         .flatten()
                         .collect::<String>()

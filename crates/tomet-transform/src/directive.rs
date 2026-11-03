@@ -48,7 +48,10 @@ where
     let insert_pos = match target_index {
         Some(idx) => idx.min(doc.header.len()),
         None => {
-            let version_idx = doc.header.iter().position(|d| d.name.is_bare_named("version"));
+            let version_idx = doc
+                .header
+                .iter()
+                .position(|d| d.name.is_bare_named("version"));
             match version_idx {
                 Some(v_idx) => v_idx + 1,
                 None => 0,

@@ -6,13 +6,21 @@
 
 AST node accessors, extension traits, builders, and recursive tree traversal for Tomet.
 
+==[Single Source of Truth for Traversal]
+
+AST tree traversal must never be reimplemented by handwritten recursion in downstream
+crates. All structural walks across the workspace route through [`children`] and [`walk()`]
+(or the specialized `for_each_*` helpers built on them). Reimplementing tree walks locally
+inevitably leads to drift, missed container slots (such as `Section.data`), or silent
+omissions when new AST node kinds are introduced.
+
 Provides:
 
 - (ValueExt) Inspection and accessor methods on [`tomet_ast::Value`].
 - (ElementExt) Builders and name helpers on [`tomet_ast::Element`].
 - (DataExt) Property access on [`tomet_ast::Data`], shared by every node that carries `(args)` and `{value}`.
 - (FileExt) Block-level manipulation helpers on [`tomet_ast::File`].
-- (walk) One definition of what sits inside what ([`children`]), the one recursion over it ([`walk`]), and the walkers built on that.
+- (walk) One definition of what sits inside what ([`children`]), the one recursion over it ([`walk()`]), and the walkers built on that.
 
 ==[Module element]
 
@@ -88,6 +96,9 @@ One definition of what sits inside what in a [`File`], and the walkers built on 
 [`walk`] is the one recursion over that. Every other walker here is [`walk`] with a filter
 and, where a position must stay unseen, a [`Visit::Skip`] written at the walker, so what a
 walker leaves out is read in its own body and not in a copy of the recursion.
+
+Traversal must never be reimplemented by handwritten AST recursion across downstream crates.
+All structural walks across the workspace route through [`children`] and [`walk`].
 
 The groups of a node come in one order: `(args)`, `{value}`, `[content]`, then its
 `:connect`s. The AST keeps no order of groups, so this is the order of every walker.
@@ -205,7 +216,7 @@ this file" should call this instead of walking `file.body` by hand. Declarations
 What is nested in `el`: its `[content]` and the elements that are entries of its `{value}`.
 With `direct_only`, only the first level.
 
-Neither `el.args` nor `el.connects` is looked at; see [`descendants`] for why.
+Neither `el.args` nor `el.connects` is looked at; see `descendants` for why.
 
 ====[fn for_each_descendant_of_item]
 

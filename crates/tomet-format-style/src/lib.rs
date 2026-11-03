@@ -21,6 +21,7 @@ use tomet_ast::{Block, Declaration, Entry, Group, Inline, Value};
 /// `Vec<Block>`) the way the old inline-only loop rendered an `Inline` --
 /// a value-embedded element's content is inline in practice, so this only
 /// descends into a `Paragraph`'s own inlines, not into nested structure.
+#[deny(clippy::wildcard_enum_match_arm)]
 fn render_nested_block(block: &Block, config: &PrinterConfig, out: &mut String) {
     let Block::Paragraph(p) = block else {
         return;
@@ -110,7 +111,6 @@ pub fn key_text(key: &str) -> String {
     out
 }
 
-
 fn classify_number(s: &str) -> bool {
     let b = s.as_bytes();
     let digits = |mut i: usize| {
@@ -124,13 +124,17 @@ fn classify_number(s: &str) -> bool {
     match b.get(i) {
         Some(b'0') => i += 1,
         Some(b'1'..=b'9') => {
-            let Some(next_i) = digits(i) else { return false };
+            let Some(next_i) = digits(i) else {
+                return false;
+            };
             i = next_i;
         }
         _ => return false,
     }
     if b.get(i) == Some(&b'.') {
-        let Some(next_i) = digits(i + 1) else { return false };
+        let Some(next_i) = digits(i + 1) else {
+            return false;
+        };
         i = next_i;
     }
     if matches!(b.get(i), Some(b'e' | b'E')) {
@@ -138,7 +142,9 @@ fn classify_number(s: &str) -> bool {
         if matches!(b.get(i), Some(b'+' | b'-')) {
             i += 1;
         }
-        let Some(next_i) = digits(i) else { return false };
+        let Some(next_i) = digits(i) else {
+            return false;
+        };
         i = next_i;
     }
     i == b.len()
@@ -241,6 +247,7 @@ pub fn render_value_inner_with_config(v: &Value, config: &PrinterConfig) -> Stri
 /// Same as [`render_value_inner_with_config`], but with the block
 /// renderer supplied explicitly instead of defaulting to the restricted
 /// one. See [`BlockRenderer`].
+#[deny(clippy::wildcard_enum_match_arm)]
 pub fn render_value_inner_with_blocks(
     v: &Value,
     config: &PrinterConfig,
@@ -393,6 +400,7 @@ fn render_embedded(
 }
 
 /// A `{...}` group of an embedded node, its entries in source order.
+#[deny(clippy::wildcard_enum_match_arm)]
 fn render_embedded_value(
     group: &Group,
     config: &PrinterConfig,
@@ -490,10 +498,12 @@ fn render_meta_field_value(
             return s;
         }
     }
-    match v {
-        Value::String(s) if is_iso8601(s) => s.clone(),
-        _ => render_value_inner_with_config(v, config),
+    if let Value::String(s) = v
+        && is_iso8601(s)
+    {
+        return s.clone();
     }
+    render_value_inner_with_config(v, config)
 }
 
 /// Renders a `::meta(...){...}` declaration per `config`'s meta format

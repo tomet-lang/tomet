@@ -8,8 +8,8 @@ repository.workspace = true
 
 [dependencies]
 tomet-ast = { workspace = true }
-tomet-config = { workspace = true }
 tomet-ast-parser = { workspace = true }
+tomet-config = { workspace = true }
 tomet-tree = { workspace = true }
 #--- Crates.io ---
 unicode-width = { workspace = true }

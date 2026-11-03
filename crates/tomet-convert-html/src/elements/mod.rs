@@ -122,7 +122,10 @@ fn render_conflict_element(cx: &RenderCtx, el: ElementView<'_>, out: &mut String
 /// Reads `a`/`b` out of `el`'s `(args)` -- block content
 /// (`tomet_ast::Value::Blocks`), not a scalar, so it cannot go through
 /// `push_data_attrs`/the generic flatten path at all.
-fn conflict_sides(cx: &RenderCtx, el: ElementView<'_>) -> (Vec<tomet_ast::Block>, Vec<tomet_ast::Block>) {
+fn conflict_sides(
+    cx: &RenderCtx,
+    el: ElementView<'_>,
+) -> (Vec<tomet_ast::Block>, Vec<tomet_ast::Block>) {
     let args = normalized_element_args_in(el, cx.bindings);
     let map = args.as_ref().and_then(crate::util::as_map);
     let side = |key: &str| -> Vec<tomet_ast::Block> {
@@ -209,37 +212,19 @@ fn render_generic_element(
     out: &mut String,
     inline: bool,
 ) {
-    render_generic(
-        cx,
-        kind,
-        el.body(),
-        out,
-        inline,
-    );
+    render_generic(cx, kind, el.body(), out, inline);
 }
 
 /// What a bare `(marker)[content]` entry of a `{...}` group is drawn as: the
 /// generic element of the kind `bare`, since the group it sits in is what says
 /// what it is.
 fn render_bare(cx: &RenderCtx, bare: &Bare, out: &mut String) {
-    render_generic(
-        cx,
-        "bare",
-        bare.as_body_view(),
-        out,
-        false,
-    );
+    render_generic(cx, "bare", bare.as_body_view(), out, false);
 }
 
 /// The generic `tm-element` box of an element, or of anything that takes
 /// the same groups.
-fn render_generic(
-    cx: &RenderCtx,
-    kind: &str,
-    body: BodyView<'_>,
-    out: &mut String,
-    inline: bool,
-) {
+fn render_generic(cx: &RenderCtx, kind: &str, body: BodyView<'_>, out: &mut String, inline: bool) {
     let tag = if inline { "span" } else { "div" };
     out.push_str(&format!("<{tag} class=\"tm-element tm-{kind}\""));
     if let Some(id) = id_attr(body.id) {
@@ -260,6 +245,7 @@ fn render_generic(
     }
 }
 
+#[deny(clippy::wildcard_enum_match_arm)]
 fn render_element_value(cx: &RenderCtx, value: &Group, out: &mut String) {
     match value {
         // Only the elements. A group's *pairs* are data and left the body

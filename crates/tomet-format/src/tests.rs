@@ -280,6 +280,23 @@ fn test_format_element_group_order_with_value_and_connects() {
 }
 
 #[test]
+fn test_format_element_group_order_in_section_data() {
+    let src = "=[ Title ]{ key: @link(\"https://example.com\")[Example] }\n";
+    let config = PrinterConfig {
+        format: FormatConfig {
+            group_order: Some(GroupOrder::ContentFirst),
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+    let out = format_source_with_config(src, &config);
+    assert_eq!(
+        out,
+        "=[ Title ]{ key: @link[Example](\"https://example.com\") }\n"
+    );
+}
+
+#[test]
 fn test_format_element_group_order_preserves_code_blocks() {
     let src = "```tomet\n@link(\"url\")[text]\n```\n";
     let config = PrinterConfig {

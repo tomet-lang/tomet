@@ -293,10 +293,9 @@ fn several_preamble_elements_are_fine_when_they_are_not_singletons() {
     let doc = parse("::kind(note)\n::use(deck)\n::use(cards)\n\n#[ T ]\n");
     let errors = validate_document(&doc);
     assert!(
-        !errors.iter().any(|e| matches!(
-            e,
-            Diagnostic::DuplicateSingleton { .. }
-        )),
+        !errors
+            .iter()
+            .any(|e| matches!(e, Diagnostic::DuplicateSingleton { .. })),
         "{errors:?}"
     );
 }
@@ -321,8 +320,7 @@ fn a_run_of_double_colon_declarations_at_the_top_is_the_preamble() {
     assert!(
         !errors.iter().any(|e| matches!(
             e,
-            Diagnostic::DuplicateSingleton { .. }
-                | Diagnostic::WrongSigil { .. }
+            Diagnostic::DuplicateSingleton { .. } | Diagnostic::WrongSigil { .. }
         )),
         "{errors:?}"
     );
@@ -366,10 +364,9 @@ fn a_user_declared_preamble_element_is_a_declaration() {
     let doc = parse("::kind(deck)\n::character{ a: 1 }\n\ntext\n");
     let errors = validate_document_with(&doc, &bindings);
     assert!(
-        !errors.iter().any(|e| matches!(
-            e,
-            Diagnostic::WrongSigil { .. }
-        )),
+        !errors
+            .iter()
+            .any(|e| matches!(e, Diagnostic::WrongSigil { .. })),
         "{errors:?}"
     );
 }
@@ -816,6 +813,18 @@ fn duplicate_id_on_an_element_in_a_value_slot_is_reported() {
 }
 
 #[test]
+fn duplicate_id_in_section_data_is_reported() {
+    let doc = parse("=[ H ]{ key: @term[ A ]#(dup) }\n\n=[ Other ]#(dup)\n");
+    let errors = validate_document(&doc);
+    assert!(
+        errors
+            .iter()
+            .any(|e| matches!(e, Diagnostic::DuplicateId { id, .. } if id == "dup")),
+        "{errors:?}"
+    );
+}
+
+#[test]
 fn duplicate_id_with_integer_values_is_reported() {
     let src = "=[ one ]#(42)\n=[ two ]#(42)\n";
     let doc = parse(src);
@@ -1241,8 +1250,7 @@ const TYPED_DECK: &str = r#"::kind(vocabulary)
 "#;
 
 fn typed_deck() -> Bindings {
-    let vocab =
-        tomet_semantics::Vocabulary::from_file(&parse(TYPED_DECK)).expect("a vocabulary");
+    let vocab = tomet_semantics::Vocabulary::from_file(&parse(TYPED_DECK)).expect("a vocabulary");
     Bindings::for_document(&parse("::kind(deck)\n"), [vocab])
 }
 

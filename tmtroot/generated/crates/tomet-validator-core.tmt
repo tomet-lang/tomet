@@ -1,6 +1,6 @@
 ::kind(api)
 
-::meta{crate: tomet-validator-core, dependencies: list(tomet-address, tomet-ast, tomet-cst, tomet-declaration, tomet-position, tomet-semantics, tomet-semantics-core, tomet-span, tomet-tree, tomet-type), dependents: list(tomet-validator, tomet-validator-blueprint, tomet-validator-profile, tomet-validator-rule)}
+::meta{crate: tomet-validator-core, dependencies: list(tomet-address, tomet-ast, tomet-ast-parser, tomet-cst, tomet-declaration, tomet-position, tomet-semantics, tomet-semantics-core, tomet-span, tomet-tree, tomet-type), dependents: list(tomet-validator, tomet-validator-blueprint, tomet-validator-profile, tomet-validator-rule)}
 
 =[tomet-validator-core]
 
@@ -41,7 +41,7 @@ A validation error tied directly to precise byte ranges in the CST.
 ====[fn collect_ids]
 
 Walks every node in `doc` and returns `(id, span)` for each
-[`Element::id`]/[`Section::id`] found, in document order.
+anchor ID found, in document order.
 
 ====[fn collect_ids_cst]
 
@@ -89,12 +89,12 @@ Enforces the `singleton` and `region` axes.
 
 ===[fn check_document_declarations]
 
-Runs checks on the standard declarations in `doc`, mapping each [`Problem`]
+Runs checks on the standard declarations in `doc`, mapping each [`tomet_declaration::Problem`]
 back to a [`Diagnostic`] with the declaration element's span.
 
 ===[fn check_ctmt_declarations]
 
-Validates declarations from a `.ctmt` file header against [`Host::Ctmt`].
+Validates declarations from a `.ctmt` file header against [`tomet_declaration::Host::Ctmt`].
 
 Reports host restrictions, duplicate singletons, version format errors,
 too many arguments, and invalid macro/var definitions. Declarations whose

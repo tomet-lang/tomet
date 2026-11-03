@@ -20,6 +20,8 @@
 //!          | counted as workspace document links.
 //! - (Headings) Count of section headings and maximum heading depth.
 
+#![allow(clippy::doc_overindented_list_items)]
+
 use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};

@@ -8,6 +8,8 @@
 //! - (structural) Structural AST query matching and in-place transformations (rename tag, rename key, replace value).
 //! - (meta) Batch `::meta` key/value updates.
 
+#![allow(clippy::doc_overindented_list_items)]
+
 pub mod blueprint;
 pub mod directive;
 pub mod expressions;

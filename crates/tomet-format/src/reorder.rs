@@ -1,10 +1,8 @@
 //! Element group order formatting according to `GroupOrder` settings.
 
-use tomet_ast::{
-    Block, BodyView, Connect, Declaration, ElementView, Entry, Group, Inline, List,
-};
-use tomet_config::{GroupOrder, PrinterConfig};
 use tomet_ast_parser::parse_file;
+use tomet_config::{GroupOrder, PrinterConfig};
+use tomet_tree::Visit;
 
 /// Byte offset of the `close` matching the `open` at `open_pos` in
 /// `src` (which must be `open`), tracking nested `open`/`close` depth
@@ -90,219 +88,32 @@ struct SwapTarget {
 
 fn collect_swaps(src: &str, config: &PrinterConfig, swaps: &mut Vec<SwapTarget>, limit: usize) {
     let Ok(doc) = parse_file(src) else { return };
-    for decl in &doc.header {
-        collect_swaps_in_declaration(decl, src, config, swaps, limit);
+    let _ = tomet_tree::walk(&doc, &mut |node, _| {
         if swaps.len() >= limit {
-            return;
+            return Visit::Break(());
         }
-    }
-    for block in &doc.body {
-        collect_swaps_in_block(block, src, config, swaps, limit);
-        if swaps.len() >= limit {
-            break;
-        }
-    }
-}
-
-fn collect_swaps_in_block(
-    block: &Block,
-    src: &str,
-    config: &PrinterConfig,
-    swaps: &mut Vec<SwapTarget>,
-    limit: usize,
-) {
-    if swaps.len() >= limit {
-        return;
-    }
-    match block {
-        Block::Paragraph(p) => {
-            for inline in &p.content {
-                collect_swaps_in_inline(inline, src, config, swaps, limit);
-                if swaps.len() >= limit {
-                    return;
+        if let Some(el) = node.element_view() {
+            let elem_name = el.name.name.as_str();
+            if let Some(order) = config.element_group_order(elem_name)
+                && el.data.args.is_some()
+                && el.content.is_some()
+                && !el.span.is_dummy()
+            {
+                let start = el.span.start;
+                let end = el.span.end;
+                if start < end
+                    && end <= src.len()
+                    && let Some(target) = detect_swap_element_groups(src, start, end, order)
+                {
+                    swaps.push(target);
+                    if swaps.len() >= limit {
+                        return Visit::Break(());
+                    }
                 }
             }
         }
-        Block::Element(el) => {
-            collect_swaps_in_element(el.as_view(), src, config, swaps, limit);
-        }
-        Block::Section(sec) => {
-            for inline in &sec.title {
-                collect_swaps_in_inline(inline, src, config, swaps, limit);
-                if swaps.len() >= limit {
-                    return;
-                }
-            }
-            for conn in &sec.connects {
-                collect_swaps_in_connect(conn, src, config, swaps, limit);
-                if swaps.len() >= limit {
-                    return;
-                }
-            }
-            for child in &sec.blocks {
-                collect_swaps_in_block(child, src, config, swaps, limit);
-                if swaps.len() >= limit {
-                    return;
-                }
-            }
-        }
-        Block::List(list) => collect_swaps_in_list(list, src, config, swaps, limit),
-        Block::Interp(_) | Block::Hole(_) => {}
-    }
-}
-
-fn collect_swaps_in_list(
-    list: &List,
-    src: &str,
-    config: &PrinterConfig,
-    swaps: &mut Vec<SwapTarget>,
-    limit: usize,
-) {
-    for item in &list.items {
-        match item.as_element_view() {
-            Some(element) => collect_swaps_in_element(element, src, config, swaps, limit),
-            None => {
-                collect_swaps_in_held(item.as_body_view(), src, config, swaps, limit)
-            }
-        }
-        if swaps.len() >= limit {
-            return;
-        }
-        if let Some(sub) = &item.sublist {
-            collect_swaps_in_list(sub, src, config, swaps, limit);
-            if swaps.len() >= limit {
-                return;
-            }
-        }
-    }
-}
-
-fn collect_swaps_in_inline(
-    inline: &Inline,
-    src: &str,
-    config: &PrinterConfig,
-    swaps: &mut Vec<SwapTarget>,
-    limit: usize,
-) {
-    if let Inline::Element(el) = inline {
-        collect_swaps_in_element(el.as_view(), src, config, swaps, limit);
-    }
-}
-
-fn collect_swaps_in_element(
-    el: ElementView<'_>,
-    src: &str,
-    config: &PrinterConfig,
-    swaps: &mut Vec<SwapTarget>,
-    limit: usize,
-) {
-    if swaps.len() >= limit {
-        return;
-    }
-    // 1. Check if this element itself needs swapping
-    let elem_name = el.name.name.as_str();
-    if let Some(order) = config.element_group_order(elem_name)
-        && el.data.args.is_some()
-        && el.content.is_some()
-        && !el.span.is_dummy()
-    {
-        let start = el.span.start;
-        let end = el.span.end;
-        if start < end
-            && end <= src.len()
-            && let Some(target) = detect_swap_element_groups(src, start, end, order)
-        {
-            swaps.push(target);
-            if swaps.len() >= limit {
-                return;
-            }
-        }
-    }
-
-    // 2. Otherwise recursively check children
-    collect_swaps_in_held(el.body(), src, config, swaps, limit);
-    if swaps.len() >= limit {
-        return;
-    }
-    for conn in el.connects {
-        collect_swaps_in_connect(conn, src, config, swaps, limit);
-        if swaps.len() >= limit {
-            return;
-        }
-    }
-}
-
-/// A connect is written `:name(...)`, not `@name`, so there is no group order
-/// to swap on it; what it holds is searched.
-fn collect_swaps_in_connect(
-    conn: &Connect,
-    src: &str,
-    config: &PrinterConfig,
-    swaps: &mut Vec<SwapTarget>,
-    limit: usize,
-) {
-    collect_swaps_in_held(
-        conn.as_body_view(),
-        src,
-        config,
-        swaps,
-        limit,
-    );
-}
-
-/// Neither does a declaration (`::name`) have a group order to swap; what it
-/// holds is searched.
-fn collect_swaps_in_declaration(
-    declaration: &Declaration,
-    src: &str,
-    config: &PrinterConfig,
-    swaps: &mut Vec<SwapTarget>,
-    limit: usize,
-) {
-    collect_swaps_in_held(
-        declaration.as_body_view(),
-        src,
-        config,
-        swaps,
-        limit,
-    );
-}
-
-fn collect_swaps_in_held(
-    body: BodyView<'_>,
-    src: &str,
-    config: &PrinterConfig,
-    swaps: &mut Vec<SwapTarget>,
-    limit: usize,
-) {
-    for block in body.content.into_iter().flatten() {
-        collect_swaps_in_block(block, src, config, swaps, limit);
-        if swaps.len() >= limit {
-            return;
-        }
-    }
-    let Some(Group(entries)) = &body.data.value else {
-        return;
-    };
-    for entry in entries {
-        match entry {
-            Entry::Element(child) => {
-                collect_swaps_in_element(child.as_view(), src, config, swaps, limit)
-            }
-            // A bare entry holds what an element does, and is no element.
-            Entry::Bare(bare) => collect_swaps_in_held(
-                bare.as_body_view(),
-                src,
-                config,
-                swaps,
-                limit,
-            ),
-            Entry::Pair(..) | Entry::Hole(_) => {}
-        }
-        if swaps.len() >= limit {
-            return;
-        }
-    }
+        Visit::Descend
+    });
 }
 
 fn detect_swap_element_groups(

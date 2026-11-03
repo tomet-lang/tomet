@@ -38,8 +38,8 @@ use tomet_ast::{
     Bare, Block as TmBlock, Data, Declaration, Element, Entry, File, Group, Id, Inline as TmInline,
     LineBreak, List, Name, Paragraph, Placement, RawText, Section, SoftBreak, Text, Value,
 };
-use tomet_span::Span;
 use tomet_semantics::EXACT_DATA_KEY;
+use tomet_span::Span;
 
 use crate::to_pandoc::{BARE_ENTRY, ENTRY_KEY};
 use tomet_tree::{ElementExt, declaration_new, element_new, list, list_item};
@@ -78,6 +78,7 @@ pub fn from_pandoc(doc: &PandocDoc) -> File {
     File::new(header, structure_sections(blocks), Span::dummy())
 }
 
+#[deny(clippy::wildcard_enum_match_arm)]
 fn structure_sections(blocks: Vec<TmBlock>) -> Vec<TmBlock> {
     let mut doc_blocks = Vec::new();
     let mut stack: Vec<Section> = Vec::new();
@@ -99,7 +100,11 @@ fn structure_sections(blocks: Vec<TmBlock>) -> Vec<TmBlock> {
                 }
                 stack.push(sec);
             }
-            other => {
+            other @ (TmBlock::Paragraph(_)
+            | TmBlock::Element(_)
+            | TmBlock::List(_)
+            | TmBlock::Interp(_)
+            | TmBlock::Hole(_)) => {
                 if let Some(top) = stack.last_mut() {
                     top.blocks.push(other);
                 } else {
@@ -529,6 +534,7 @@ fn inlines_to_text(inlines: &[Inline]) -> String {
     inlines_to_text_tm(&inlines_from_pandoc(inlines))
 }
 
+#[deny(clippy::wildcard_enum_match_arm)]
 fn inlines_to_text_tm(inlines: &[TmInline]) -> String {
     let mut out = String::new();
     for (idx, inline) in inlines.iter().enumerate() {
@@ -553,6 +559,7 @@ fn inlines_to_text_tm(inlines: &[TmInline]) -> String {
 }
 
 /// [`inlines_to_text_tm`] over `Element.content`'s `Vec<Block>` shape.
+#[deny(clippy::wildcard_enum_match_arm)]
 fn blocks_to_text_tm(blocks: &[TmBlock]) -> String {
     let mut out = String::new();
     for block in blocks {
@@ -770,18 +777,19 @@ mod tests {
     fn emphasis_survives_a_round_trip() {
         // Structure, not spelling: the printer re-emits an `em` element
         // as `@em[a]` rather than the `*a*` sugar it was written with.
-        let back = from_pandoc(&to_pandoc(
-            &parse_file("*a* と **b** です。\n").unwrap(),
-        ));
+        let back = from_pandoc(&to_pandoc(&parse_file("*a* と **b** です。\n").unwrap()));
         let TmBlock::Paragraph(p) = &back.body[0] else {
             panic!("expected a paragraph");
         };
         let names: Vec<String> = p
             .content
             .iter()
-            .filter_map(|i| match i {
-                TmInline::Element(el) => Some(el.name.to_string()),
-                _ => None,
+            .filter_map(|i| {
+                if let TmInline::Element(el) = i {
+                    Some(el.name.to_string())
+                } else {
+                    None
+                }
             })
             .collect();
         assert_eq!(names, vec!["em".to_string(), "strong".to_string()]);

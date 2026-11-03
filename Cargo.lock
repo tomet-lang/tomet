@@ -2435,6 +2435,7 @@ dependencies = [
  "serde",
  "tomet-address",
  "tomet-ast",
+ "tomet-ast-parser",
  "tomet-cst",
  "tomet-declaration",
  "tomet-position",

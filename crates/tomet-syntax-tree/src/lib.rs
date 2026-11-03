@@ -1,11 +1,19 @@
 //! AST node accessors, extension traits, builders, and recursive tree traversal for Tomet.
 //!
+//! =[ Single Source of Truth for Traversal ]
+//!
+//! AST tree traversal must never be reimplemented by handwritten recursion in downstream
+//! crates. All structural walks across the workspace route through [`children`] and [`walk()`]
+//! (or the specialized `for_each_*` helpers built on them). Reimplementing tree walks locally
+//! inevitably leads to drift, missed container slots (such as `Section.data`), or silent
+//! omissions when new AST node kinds are introduced.
+//!
 //! Provides:
 //! - (ValueExt) Inspection and accessor methods on [`tomet_ast::Value`].
 //! - (ElementExt) Builders and name helpers on [`tomet_ast::Element`].
 //! - (DataExt) Property access on [`tomet_ast::Data`], shared by every node that carries `(args)` and `{value}`.
 //! - (FileExt) Block-level manipulation helpers on [`tomet_ast::File`].
-//! - (walk) One definition of what sits inside what ([`children`]), the one recursion over it ([`walk`]), and the walkers built on that.
+//! - (walk) One definition of what sits inside what ([`children`]), the one recursion over it ([`walk()`]), and the walkers built on that.
 
 pub mod element;
 pub mod file;

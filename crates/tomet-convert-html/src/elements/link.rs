@@ -21,10 +21,7 @@ use tomet_semantics::{
 pub(crate) fn render_embed_element(el: ElementView<'_>, out: &mut String) {
     let raw_target = link_target(el, &classify_std_lenient(el)).unwrap_or_default();
     let (scheme, src) = target_scheme(&raw_target);
-    let alt = el
-        .content
-        .map(blocks_to_plain)
-        .unwrap_or_default();
+    let alt = el.content.map(blocks_to_plain).unwrap_or_default();
     if scheme == TargetScheme::Unresolved {
         out.push_str(&format!(
             "<img class=\"tm-embed tm-embed-unresolved\" src=\"{}\" alt=\"{}\" aria-disabled=\"true\">\n",
@@ -48,7 +45,12 @@ pub(crate) fn render_embed_element(el: ElementView<'_>, out: &mut String) {
 /// it was written in backticks -- which is exactly what this renders back
 /// to, so moving a mention onto `@file` changes what a checker can see
 /// and nothing a reader can.
-pub(crate) fn render_path_element(cx: &RenderCtx, el: ElementView<'_>, out: &mut String, inline: bool) {
+pub(crate) fn render_path_element(
+    cx: &RenderCtx,
+    el: ElementView<'_>,
+    out: &mut String,
+    inline: bool,
+) {
     let kind = classify_std_lenient(el);
     let path = path_target(el, &kind).unwrap_or_default();
     let class = format!("tm-{}", kind.as_str());
@@ -88,7 +90,12 @@ pub(crate) fn render_path_element(cx: &RenderCtx, el: ElementView<'_>, out: &mut
 /// same-document anchor reference (`id:`) or a real `href` (everything
 /// else: url/file/tm/ref). The scheme prefix itself is stripped before
 /// rendering -- it's addressing metadata, not part of the visible target.
-pub(crate) fn render_link_element(cx: &RenderCtx, el: ElementView<'_>, out: &mut String, inline: bool) {
+pub(crate) fn render_link_element(
+    cx: &RenderCtx,
+    el: ElementView<'_>,
+    out: &mut String,
+    inline: bool,
+) {
     let normalized_args = normalized_element_args(el);
     let raw_target = link_target(el, &classify_std_lenient(el)).unwrap_or_default();
     let (scheme, target) = target_scheme(&raw_target);

@@ -1,152 +1,12 @@
-use tomet_ast::{Block, Connect, Data, Element, Entry, File, Group, Inline, List, Value};
+use tomet_ast::File;
+use tomet_cst::{SyntaxKind, SyntaxNode, TextRange};
 use tomet_span::Span;
 
 /// Walks every node in `doc` and returns `(id, span)` for each
-/// [`Element::id`]/[`Section::id`] found, in document order.
+/// anchor ID found, in document order.
 pub fn collect_ids(doc: &File) -> Vec<(String, Span)> {
-    let mut ids = Vec::new();
-    for decl in &doc.header {
-        collect_declaration_ids(decl, &mut ids);
-    }
-    for block in &doc.body {
-        collect_block_ids(block, &mut ids);
-    }
-    ids
+    tomet_address::collect_anchors(doc)
 }
-
-fn collect_declaration_ids(d: &tomet_ast::Declaration, ids: &mut Vec<(String, Span)>) {
-    if let Some(id) = &d.id {
-        ids.push((id.0.clone(), d.span));
-    }
-    collect_data_ids(&d.data, ids);
-    collect_content_ids(d.content.as_deref(), ids);
-}
-
-fn collect_block_ids(block: &Block, ids: &mut Vec<(String, Span)>) {
-    match block {
-        Block::Section(sec) => {
-            if let Some(id) = &sec.id {
-                ids.push((id.0.clone(), sec.span));
-            }
-            for inline in &sec.title {
-                collect_inline_ids(inline, ids);
-            }
-            for conn in &sec.connects {
-                collect_connect_ids(conn, ids);
-            }
-            for child in &sec.blocks {
-                collect_block_ids(child, ids);
-            }
-        }
-        Block::Element(el) => collect_element_ids(el, ids),
-        Block::Paragraph(p) => {
-            for inline in &p.content {
-                collect_inline_ids(inline, ids);
-            }
-        }
-        Block::List(list) => collect_list_ids(list, ids),
-        Block::Interp(_) | Block::Hole(_) => {}
-    }
-}
-
-fn collect_list_ids(list: &List, ids: &mut Vec<(String, Span)>) {
-    if let Some(id) = &list.id {
-        ids.push((id.0.clone(), list.span));
-    }
-    for conn in &list.connects {
-        collect_connect_ids(conn, ids);
-    }
-    for item in &list.items {
-        if let Some(id) = &item.id {
-            ids.push((id.0.clone(), item.span));
-        }
-        collect_data_ids(&item.data, ids);
-        collect_content_ids(Some(&item.content), ids);
-        for conn in &item.connects {
-            collect_connect_ids(conn, ids);
-        }
-        if let Some(sub) = &item.sublist {
-            collect_list_ids(sub, ids);
-        }
-    }
-}
-
-fn collect_element_ids(el: &Element, ids: &mut Vec<(String, Span)>) {
-    if let Some(id) = &el.id {
-        ids.push((id.0.clone(), el.span));
-    }
-    collect_data_ids(&el.data, ids);
-    collect_content_ids(el.content.as_deref(), ids);
-    for conn in &el.connects {
-        collect_connect_ids(conn, ids);
-    }
-}
-
-/// A connect has no id of its own; the elements it holds can.
-fn collect_connect_ids(conn: &Connect, ids: &mut Vec<(String, Span)>) {
-    collect_data_ids(&conn.data, ids);
-    collect_content_ids(conn.content.as_deref(), ids);
-}
-
-fn collect_data_ids(data: &Data, ids: &mut Vec<(String, Span)>) {
-    if let Some(args) = &data.args {
-        collect_value_ids(args, ids);
-    }
-    if let Some(Group(entries)) = &data.value {
-        for entry in entries {
-            match entry {
-                Entry::Pair(_, value) => collect_value_ids(value, ids),
-                Entry::Element(child) => collect_element_ids(child, ids),
-                Entry::Bare(bare) => {
-                    if let Some(id) = &bare.id {
-                        ids.push((id.0.clone(), bare.span));
-                    }
-                    collect_data_ids(&bare.data, ids);
-                    collect_content_ids(bare.content.as_deref(), ids);
-                }
-                Entry::Hole(_) => {}
-            }
-        }
-    }
-}
-
-fn collect_content_ids(content: Option<&[Block]>, ids: &mut Vec<(String, Span)>) {
-    for block in content.into_iter().flatten() {
-        collect_block_ids(block, ids);
-    }
-}
-
-/// The ids of the elements that sit in a value slot (`key: @file(a)#(entry)`), at any depth. They are
-/// anchors like any other (`@link(#entry)` resolves), so they count for uniqueness too.
-fn collect_value_ids(value: &Value, ids: &mut Vec<(String, Span)>) {
-    match value {
-        Value::Element(el) => collect_element_ids(el, ids),
-        Value::Map(entries) => {
-            for (_, value) in entries {
-                collect_value_ids(value, ids);
-            }
-        }
-        Value::Seq(values) | Value::Call(_, values) => {
-            for value in values {
-                collect_value_ids(value, ids);
-            }
-        }
-        Value::Blocks(blocks) => {
-            for block in blocks {
-                collect_block_ids(block, ids);
-            }
-        }
-        _ => {}
-    }
-}
-
-fn collect_inline_ids(inline: &Inline, ids: &mut Vec<(String, Span)>) {
-    if let Inline::Element(el) = inline {
-        collect_element_ids(el, ids);
-    }
-}
-
-use tomet_cst::{SyntaxKind, SyntaxNode, TextRange};
 
 /// Scans `root` for every `#(id)` slot and returns the exact [`TextRange`]
 /// of each id's value, in document order.
@@ -173,4 +33,30 @@ pub fn collect_ids_cst(root: &SyntaxNode) -> Vec<(String, TextRange)> {
             Some((text, value.text_range()))
         })
         .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn parse_doc(src: &str) -> File {
+        tomet_ast_parser::parse_file(src).unwrap()
+    }
+
+    #[test]
+    fn collects_ids_in_section_data() {
+        let doc = parse_doc("=[ Sec ]{ k: @note[x]#(in-sec-data) }\n\nBody text.\n");
+        let ids = collect_ids(&doc);
+        assert_eq!(ids.len(), 1);
+        assert_eq!(ids[0].0, "in-sec-data");
+    }
+
+    #[test]
+    fn detects_duplicate_ids_including_section_data() {
+        let doc = parse_doc("=[ Sec ]{ k: @note[x]#(dup) }\n\n@other#(dup)\n");
+        let ids = collect_ids(&doc);
+        assert_eq!(ids.len(), 2);
+        assert_eq!(ids[0].0, "dup");
+        assert_eq!(ids[1].0, "dup");
+    }
 }
