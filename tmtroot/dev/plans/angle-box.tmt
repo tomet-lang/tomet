@@ -12,7 +12,7 @@ Status: 名札と穴は実装済み（2026-11-01）。仕様は @file(tmtroot/sp
 
 ==[ 型の席 ]
 
-きっかけは、`<list<string>>` と書きたいこと（@file(tmtroot/dev/plans/type-followups.tmt) の「`list(string)` と `<list<string>>`」）だった。
+きっかけは、`<list<string>>` と書きたいこと（以前の型の検討「`list(string)` と `<list<string>>`」）だった。
 
 - 引数は頭の中に書けるので、`<%list(string)>` と書ける。入れ子（`<%list<string>>`）と、`>>` を対で数える問題は要らない。`%` は印の表で空いている。
 - 型を解釈するのは `tomet-type` で、tomet 自身が読む。AST に節点を作るのか、`Value` から `tomet-type` が読むのかは、上の規則で、そのとき決める。型の席はおそらく値の位置にしか現れず、内容を取らない。穴と型を一つの型にまとめない。

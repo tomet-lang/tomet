@@ -1,6 +1,6 @@
 use lsp_types::{Position, Range, Uri};
-use tomet_span::Span;
 use tomet_position::LineIndex;
+use tomet_span::Span;
 
 /// Converts between byte offsets into one document's text and LSP positions
 /// (a 0-based line and a UTF-16 character offset within it).

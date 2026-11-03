@@ -854,9 +854,7 @@ mod tests {
             ],
         );
         let vault = Vault::discover(&root);
-        let (doc, _) = vault
-            .prepared_file(&root.join("host.tmt"))
-            .expect("host");
+        let (doc, _) = vault.prepared_file(&root.join("host.tmt")).expect("host");
         assert_eq!(
             outline(&doc),
             [
@@ -1004,9 +1002,7 @@ mod tests {
             ],
         );
         let vault = Vault::discover(&root);
-        let (doc, _) = vault
-            .prepared_file(&root.join("host.tmt"))
-            .expect("host");
+        let (doc, _) = vault.prepared_file(&root.join("host.tmt")).expect("host");
         assert_eq!(outline(&doc), ["1:Host", "use this", "2:Deep", "and this"]);
         let _ = fs::remove_dir_all(&root);
     }

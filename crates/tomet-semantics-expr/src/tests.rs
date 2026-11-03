@@ -1672,7 +1672,10 @@ fn eval_value_number_preserves_written_representation_and_computes_numerically()
         EvalValue::Number("1.10".into())
     );
     assert_eq!(
-        create("var.rev", vars.clone()).unwrap().scalar_text().as_deref(),
+        create("var.rev", vars.clone())
+            .unwrap()
+            .scalar_text()
+            .as_deref(),
         Some("1.10")
     );
 

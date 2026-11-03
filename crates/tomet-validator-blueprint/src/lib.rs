@@ -5,9 +5,9 @@
 //! target documents for conformance.
 
 use tomet_ast::{Block, Connect, ElementView, File, Inline, Section, Value};
-use tomet_span::Span;
 use tomet_semantics::DeclKind;
 use tomet_semantics::{Bindings, ElementKind, classify_declaration_lenient, classify_std_lenient};
+use tomet_span::Span;
 use tomet_tree::{ValueExt, for_each_top_level_element};
 use tomet_validator_core::Diagnostic;
 use tomet_validator_rule::{RuleArgs, check_descendants_against_rule, decode_rule_args};

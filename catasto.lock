@@ -8,7 +8,8 @@
         "rev": "main",
         "path": "base/.editorconfig"
       },
-      "commit": "4d2293d73bc91a742ba57dad7cb4c652726af836"
+      "commit": "4d311d2d26068f4eb32c6e830d51fac200619bdc",
+      "mode": "executable"
     },
     ".envrc": {
       "sha256": "3c8bdb9d52dd4e7440a504e0f43bb3a1929c06f8f4f2d4d7ef41baab974e39e2",
@@ -17,7 +18,7 @@
         "rev": "main",
         "path": "base/.envrc"
       },
-      "commit": "4d2293d73bc91a742ba57dad7cb4c652726af836"
+      "commit": "4d311d2d26068f4eb32c6e830d51fac200619bdc"
     },
     ".github/workflows/nix-ci.yml": {
       "sha256": "572ebb0f03d139314ee7c638e6e6cf62b585b3bf112dd0e71dfd1905dad562bc",
@@ -26,7 +27,7 @@
         "rev": "main",
         "path": "base/.github/workflows/nix-ci.yml"
       },
-      "commit": "4d2293d73bc91a742ba57dad7cb4c652726af836"
+      "commit": "4d311d2d26068f4eb32c6e830d51fac200619bdc"
     },
     ".github/workflows/pages.yml": {
       "sha256": "9bdb09c4b67311dc28ed01f7398d9988a90d4df79497e8112b949c2c31e20528",
@@ -35,7 +36,7 @@
         "rev": "main",
         "path": "base/.github/workflows/pages.yml"
       },
-      "commit": "4d2293d73bc91a742ba57dad7cb4c652726af836"
+      "commit": "4d311d2d26068f4eb32c6e830d51fac200619bdc"
     },
     "LICENSE-APACHE": {
       "sha256": "a549c19a5c34ad57b10e336bdfad9cb6040c2fc311ed217f01c7a9c4ddee6015",
@@ -44,7 +45,7 @@
         "rev": "main",
         "path": "base/LICENSE-APACHE"
       },
-      "commit": "4d2293d73bc91a742ba57dad7cb4c652726af836"
+      "commit": "4d311d2d26068f4eb32c6e830d51fac200619bdc"
     },
     "LICENSE-MIT": {
       "sha256": "24d88f36f2620d2b18d70bc2136e103b1f9910a63a4614d94404577b2a41f5a0",
@@ -53,7 +54,7 @@
         "rev": "main",
         "path": "base/LICENSE-MIT"
       },
-      "commit": "4d2293d73bc91a742ba57dad7cb4c652726af836"
+      "commit": "4d311d2d26068f4eb32c6e830d51fac200619bdc"
     },
     "editors/vscode/LICENSE-APACHE": {
       "sha256": "a549c19a5c34ad57b10e336bdfad9cb6040c2fc311ed217f01c7a9c4ddee6015",
@@ -62,7 +63,7 @@
         "rev": "main",
         "path": "base/LICENSE-APACHE"
       },
-      "commit": "4d2293d73bc91a742ba57dad7cb4c652726af836"
+      "commit": "4d311d2d26068f4eb32c6e830d51fac200619bdc"
     },
     "editors/vscode/LICENSE-MIT": {
       "sha256": "24d88f36f2620d2b18d70bc2136e103b1f9910a63a4614d94404577b2a41f5a0",
@@ -71,7 +72,7 @@
         "rev": "main",
         "path": "base/LICENSE-MIT"
       },
-      "commit": "4d2293d73bc91a742ba57dad7cb4c652726af836"
+      "commit": "4d311d2d26068f4eb32c6e830d51fac200619bdc"
     },
     "editors/zed/LICENSE-APACHE": {
       "sha256": "a549c19a5c34ad57b10e336bdfad9cb6040c2fc311ed217f01c7a9c4ddee6015",
@@ -80,7 +81,7 @@
         "rev": "main",
         "path": "base/LICENSE-APACHE"
       },
-      "commit": "4d2293d73bc91a742ba57dad7cb4c652726af836"
+      "commit": "4d311d2d26068f4eb32c6e830d51fac200619bdc"
     },
     "editors/zed/LICENSE-MIT": {
       "sha256": "24d88f36f2620d2b18d70bc2136e103b1f9910a63a4614d94404577b2a41f5a0",
@@ -89,16 +90,17 @@
         "rev": "main",
         "path": "base/LICENSE-MIT"
       },
-      "commit": "4d2293d73bc91a742ba57dad7cb4c652726af836"
+      "commit": "4d311d2d26068f4eb32c6e830d51fac200619bdc"
     },
     "nix/formatter.nix": {
-      "sha256": "520fd59fc3243a1220b18ba0ce3b710de7c91a46a7d71be0e8f28d9bac55e093",
+      "sha256": "597e3225795133fb2bf373ab5152fda14810db54fba69ce891a2ba1f26229bb1",
       "source": {
         "git": "https://github.com/tomet-lang/commonfiles.git",
         "rev": "main",
         "path": "base/nix/formatter.nix"
       },
-      "commit": "4d2293d73bc91a742ba57dad7cb4c652726af836"
+      "commit": "4d311d2d26068f4eb32c6e830d51fac200619bdc",
+      "mode": "executable"
     }
   }
 }

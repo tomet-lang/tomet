@@ -185,13 +185,17 @@ fn classify_number(s: &str) -> bool {
     match b.get(i) {
         Some(b'0') => i += 1,
         Some(b'1'..=b'9') => {
-            let Some(next_i) = digits(i) else { return false };
+            let Some(next_i) = digits(i) else {
+                return false;
+            };
             i = next_i;
         }
         _ => return false,
     }
     if b.get(i) == Some(&b'.') {
-        let Some(next_i) = digits(i + 1) else { return false };
+        let Some(next_i) = digits(i + 1) else {
+            return false;
+        };
         i = next_i;
     }
     if matches!(b.get(i), Some(b'e' | b'E')) {
@@ -199,7 +203,9 @@ fn classify_number(s: &str) -> bool {
         if matches!(b.get(i), Some(b'+' | b'-')) {
             i += 1;
         }
-        let Some(next_i) = digits(i) else { return false };
+        let Some(next_i) = digits(i) else {
+            return false;
+        };
         i = next_i;
     }
     i == b.len()

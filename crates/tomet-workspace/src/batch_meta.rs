@@ -4,8 +4,8 @@ use std::collections::BTreeMap;
 use std::fs;
 use std::path::PathBuf;
 
-use tomet_indexer::extract_metadata;
 use tomet_ast_parser::parse_file;
+use tomet_indexer::extract_metadata;
 use tomet_printer::document_to_tm;
 use tomet_transform::set_meta_in_doc;
 

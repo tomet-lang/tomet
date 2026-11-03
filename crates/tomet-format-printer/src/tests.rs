@@ -1,10 +1,8 @@
 use super::*;
-use tomet_ast::{
-    Bare, Block, Data, Entry, File, Group, Inline, Name, Paragraph, Section, Value,
-};
-use tomet_span::Span;
+use tomet_ast::{Bare, Block, Data, Entry, File, Group, Inline, Name, Paragraph, Section, Value};
 use tomet_config::{FieldConfig, FormatConfig, GroupOrder, MetaConfig, load_config_from_str};
 use tomet_field_utils::generate_id_for_field;
+use tomet_span::Span;
 use tomet_style::render_value_inner;
 use tomet_tree::element_new;
 

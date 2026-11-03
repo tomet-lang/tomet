@@ -1,27 +1,26 @@
 [package]
-name = "tomet-workspace"
-version.workspace = true
-edition.workspace = true
-description = "Workspace-level batch refactoring, structural search, metadata editing, and I/O execution for Tomet."
-license.workspace = true
+name                 = "tomet-workspace"
+version.workspace    = true
+edition.workspace    = true
+description          = "Workspace-level batch refactoring, structural search, metadata editing, and I/O execution for Tomet."
+license.workspace    = true
 repository.workspace = true
 
 [dependencies]
-tomet-ast = { workspace = true }
-tomet-ast-parser = { workspace = true }
-tomet-config = { workspace = true }
+tomet-ast         = { workspace = true }
+tomet-ast-parser  = { workspace = true }
+tomet-config      = { workspace = true }
 tomet-declaration = { workspace = true }
-tomet-expr = { workspace = true }
-tomet-formatter = { workspace = true }
-tomet-indexer = { workspace = true }
+tomet-expr        = { workspace = true }
+tomet-formatter   = { workspace = true }
+tomet-indexer     = { workspace = true }
 tomet-load-config = { workspace = true }
-tomet-printer = { workspace = true }
-tomet-search = { workspace = true }
-tomet-semantics = { workspace = true }
-tomet-transform = { workspace = true }
-tomet-tree = { workspace = true }
-
-#= Crates.io
+tomet-printer     = { workspace = true }
+tomet-search      = { workspace = true }
+tomet-semantics   = { workspace = true }
+tomet-transform   = { workspace = true }
+tomet-tree        = { workspace = true }
+#--- Crates.io ---
 anyhow = { workspace = true }
 
 [dev-dependencies]

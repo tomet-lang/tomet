@@ -303,7 +303,11 @@ impl CstName {
             .filter_map(|e| e.into_token())
         {
             if token.kind() == SyntaxKind::DOT {
-                if current.chars().next().is_some_and(|c| c.is_ascii_alphabetic() || c == '_') {
+                if current
+                    .chars()
+                    .next()
+                    .is_some_and(|c| c.is_ascii_alphabetic() || c == '_')
+                {
                     segments.push(std::mem::take(&mut current));
                 } else {
                     current.clear();
@@ -313,7 +317,11 @@ impl CstName {
                 current.push_str(token.text());
             }
         }
-        if current.chars().next().is_some_and(|c| c.is_ascii_alphabetic() || c == '_') {
+        if current
+            .chars()
+            .next()
+            .is_some_and(|c| c.is_ascii_alphabetic() || c == '_')
+        {
             segments.push(current);
         }
         let name = segments.pop().unwrap_or_default();

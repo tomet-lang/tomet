@@ -1,6 +1,6 @@
-import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
-import initWasm, { initSync as initSyncWasm } from './pkg/tomet_js.js';
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import initWasm, { initSync as initSyncWasm } from "./pkg/tomet_js.js";
 
 let initialized = false;
 
@@ -12,7 +12,7 @@ export async function init(moduleOrPath) {
     return;
   }
   try {
-    const wasmUrl = new URL('./pkg/tomet_js_bg.wasm', import.meta.url);
+    const wasmUrl = new URL("./pkg/tomet_js_bg.wasm", import.meta.url);
     const bytes = readFileSync(fileURLToPath(wasmUrl));
     await initWasm({ module_or_path: bytes });
     initialized = true;
@@ -29,11 +29,11 @@ export function initSync(module) {
     initialized = true;
     return;
   }
-  const wasmUrl = new URL('./pkg/tomet_js_bg.wasm', import.meta.url);
+  const wasmUrl = new URL("./pkg/tomet_js_bg.wasm", import.meta.url);
   const bytes = readFileSync(fileURLToPath(wasmUrl));
   initSyncWasm({ module_or_path: bytes });
   initialized = true;
 }
 
-export * from './pkg/tomet_js.js';
+export * from "./pkg/tomet_js.js";
 export default init;

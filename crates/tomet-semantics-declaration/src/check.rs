@@ -539,9 +539,7 @@ mod tests {
     fn declared_versions_held_to_version_type() {
         let good_ver = Declaration::new(
             "version",
-            Some(Value::Map(vec![
-                ("version".into(), Value::Float(1.10)),
-            ])),
+            Some(Value::Map(vec![("version".into(), Value::Float(1.10))])),
             None,
         );
         assert!(check_declarations(&[good_ver], Host::Tmt).is_empty());

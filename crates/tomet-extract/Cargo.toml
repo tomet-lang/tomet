@@ -1,17 +1,17 @@
 [package]
-name = "tomet-extract"
-version.workspace = true
-edition.workspace = true
-description = "Extraction and mapping of Tomet markup embedded inside source code comments."
-license.workspace = true
+name                 = "tomet-extract"
+version.workspace    = true
+edition.workspace    = true
+description          = "Extraction and mapping of Tomet markup embedded inside source code comments."
+license.workspace    = true
 repository.workspace = true
 
 [dependencies]
-tomet-ast = { workspace = true }
-tomet-span = { workspace = true }
-tomet-cst = { workspace = true }
+tomet-ast        = { workspace = true }
+tomet-span       = { workspace = true }
+tomet-cst        = { workspace = true }
 tomet-ast-parser = { workspace = true }
-tomet-tree = { workspace = true }
+tomet-tree       = { workspace = true }
 
 [dev-dependencies]
 tomet-position = { workspace = true }

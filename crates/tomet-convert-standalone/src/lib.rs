@@ -37,9 +37,9 @@
 use std::path::Path;
 
 use tomet_ast::{Data, Entry, File, Group, Name, Value};
-use tomet_span::Span;
 use tomet_declaration::{Profile, document_profiles};
 use tomet_expr::{Reach, Resolver};
+use tomet_span::Span;
 use tomet_validator_profile::{Dirt, Finding, standalone_findings};
 use tomet_vault::Vault;
 
@@ -320,7 +320,8 @@ fn add_entries(document: &mut File, name: &str, entries: Vec<(String, Value)>) {
     let entries = entries
         .into_iter()
         .map(|(key, value)| Entry::Pair(key, value));
-    let existing = document.header
+    let existing = document
+        .header
         .iter_mut()
         .find(|declaration| declaration.name == Name::bare(name));
     match existing {
@@ -357,9 +358,10 @@ fn declare_standalone(document: &mut File) {
     let mut written = tomet_ast_parser::parse_file(&format!("::profile({})\n", names.join(", ")))
         .expect("`::profile(...)` of known names parses");
     let declaration = written.header.pop().expect("header has declaration");
-    let existing = document.header.iter().position(
-        |held| held.name == Name::bare("profile"),
-    );
+    let existing = document
+        .header
+        .iter()
+        .position(|held| held.name == Name::bare("profile"));
     match existing {
         Some(index) => document.header[index] = declaration,
         None => document.header.push(declaration),

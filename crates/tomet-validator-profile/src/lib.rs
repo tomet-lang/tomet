@@ -23,9 +23,9 @@
 //!   not built in counts as taken from outside.
 
 use tomet_ast::{ElementView, File};
-use tomet_span::Span;
 use tomet_declaration::{Profile, document_profiles};
 use tomet_expr::{OwnNames, Reach, reaches_outside};
+use tomet_span::Span;
 use tomet_validator_core::Diagnostic;
 
 /// What a document takes from outside itself.

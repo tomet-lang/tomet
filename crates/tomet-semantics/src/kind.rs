@@ -837,13 +837,19 @@ mod tests {
     #[test]
     fn shape_mismatch_reports_a_block_element_put_in_running_text() {
         let el = element_new(Name::bare("hr")).with_placement(Placement::Inline);
-        assert_eq!(shape_mismatch(el.as_view()), Some((Shape::Inline, Shape::Block)));
+        assert_eq!(
+            shape_mismatch(el.as_view()),
+            Some((Shape::Inline, Shape::Block))
+        );
     }
 
     #[test]
     fn shape_mismatch_reports_an_inline_element_standing_as_a_block() {
         let el = element_new(Name::bare("em")).with_placement(Placement::Block);
-        assert_eq!(shape_mismatch(el.as_view()), Some((Shape::Block, Shape::Inline)));
+        assert_eq!(
+            shape_mismatch(el.as_view()),
+            Some((Shape::Block, Shape::Inline))
+        );
     }
 
     #[test]

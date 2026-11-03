@@ -33,7 +33,10 @@ mod tests {
     fn type_sigil_heading_classifies_and_extracts_level() {
         let mut el = element_new(Name::bare("heading"));
         el.data.args = Some(Value::Int(2));
-        assert_eq!(crate::classify_std_lenient(el.as_view()), ElementKind::Heading);
+        assert_eq!(
+            crate::classify_std_lenient(el.as_view()),
+            ElementKind::Heading
+        );
         assert_eq!(heading_level(el.as_view()), Some(2));
     }
 
@@ -41,7 +44,10 @@ mod tests {
     fn at_sigil_heading_classifies_and_extracts_level() {
         let mut el = element_new(Name::bare("heading"));
         el.data.args = Some(Value::Int(3));
-        assert_eq!(crate::classify_std_lenient(el.as_view()), ElementKind::Heading);
+        assert_eq!(
+            crate::classify_std_lenient(el.as_view()),
+            ElementKind::Heading
+        );
         assert_eq!(heading_level(el.as_view()), Some(3));
     }
 

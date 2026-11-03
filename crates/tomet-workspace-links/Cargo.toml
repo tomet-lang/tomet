@@ -1,9 +1,9 @@
 [package]
-name = "tomet-links"
-version.workspace = true
-edition.workspace = true
-description = "Vault-wide link target resolution for Tomet, and (with the `cache` feature) broken-link detection with a SQLite-backed mtime cache."
-license.workspace = true
+name                 = "tomet-links"
+version.workspace    = true
+edition.workspace    = true
+description          = "Vault-wide link target resolution for Tomet, and (with the `cache` feature) broken-link detection with a SQLite-backed mtime cache."
+license.workspace    = true
 repository.workspace = true
 
 [features]
@@ -14,18 +14,17 @@ default = ["cache"]
 cache = ["dep:directories", "dep:rusqlite"]
 
 [dependencies]
-tomet-address = { workspace = true }
-tomet-ast = { workspace = true }
+tomet-address    = { workspace = true }
+tomet-ast        = { workspace = true }
 tomet-ast-parser = { workspace = true }
-tomet-config = { workspace = true }
-tomet-indexer = { workspace = true }
-tomet-semantics = { workspace = true }
-tomet-span = { workspace = true }
-tomet-tree = { workspace = true }
-
-#= Crates.io
+tomet-config     = { workspace = true }
+tomet-indexer    = { workspace = true }
+tomet-semantics  = { workspace = true }
+tomet-span       = { workspace = true }
+tomet-tree       = { workspace = true }
+#--- Crates.io ---
 directories = { workspace = true, optional = true }
-rusqlite = { workspace = true, optional = true }
+rusqlite    = { workspace = true, optional = true }
 
 [dev-dependencies]
 uuid = { workspace = true }

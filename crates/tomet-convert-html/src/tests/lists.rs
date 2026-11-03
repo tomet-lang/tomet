@@ -16,8 +16,7 @@ fn renders_ordered_list_as_ol() {
 
 #[test]
 fn renders_list_with_value_markers_and_attrs() {
-    let doc =
-        parse_file("- (T) in-progress {tag: dev}\n- (\"?\") question #(task1)\n").unwrap();
+    let doc = parse_file("- (T) in-progress {tag: dev}\n- (\"?\") question #(task1)\n").unwrap();
     let body = render_body(&doc);
     assert_eq!(
         body,
@@ -48,9 +47,8 @@ fn renders_key_value_list_marker_as_multiple_data_attrs() {
 
 #[test]
 fn renders_list_marker_with_embedded_element() {
-    let doc =
-        parse_file("- (@em[Important]) content\n- (@link(https://example.com)[Wiki]) docs\n")
-            .unwrap();
+    let doc = parse_file("- (@em[Important]) content\n- (@link(https://example.com)[Wiki]) docs\n")
+        .unwrap();
     let body = render_body(&doc);
     assert_eq!(
         body,

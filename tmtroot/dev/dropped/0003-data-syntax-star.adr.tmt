@@ -1,0 +1,48 @@
+```(tmt)
+::kind(config)
+::id(config-vault)
+::macros(* copyright: "(C) 2026 Tomet Projects"
+         * generated_by:| @comment[ Generated from ${1}. Edit that, then `tomet export .`. ]
+         *)
+::format(* meta: { always_newline: true }
+         * heading: { space_inside_brackets: true }
+         * table: { adjust_width: auto, max_col_width: 50 }
+         * link: {
+         *   no_space: true
+         *   group_order: "[]()"
+         *}
+         * quote: { always_newline: true }
+         * callout: {
+         *   style: { content: block }
+         *}
+         * list: {
+         *   multiline: {
+         *     style: { content: box }
+         *   }
+         *})
+::fields(* aliases:    { type: list, always_newline: true }
+         * created:    { type: datetime, format: rfc3339, offset: "+09:00" }
+         * modified:   { type: datetime, format: rfc3339, offset: "+09:00" }
+         * topics:     { type: list, list_type: "@link", always_newline: false }
+         * url.wiki:   { type: list, always_newline: true }
+         * url.source: { type: list, always_newline: true }
+         * url.main:   { type: list, always_newline: true }
+         *)
+::blueprints(* writ:    @file(tmtroot/schema/blueprints/writ.blueprint.tmt)
+             * element: @file(tmtroot/schema/blueprints/element.blueprint.tmt)
+             * crate:   @file(tmtroot/schema/blueprints/crate.blueprint.tmt)
+             *)
+::vocabularies(* writ:       @file(tmtroot/schema/vocabularies/writ.vocabulary.tmt)
+               * rust:       @file(tmtroot/schema/vocabularies/rust.vocabulary.tmt)
+               * bookmark:   @file(tmtroot/schema/vocabularies/bookmark.vocabulary.tmt)
+               * node-graph: @file(tmtroot/schema/vocabularies/node-graph.vocabulary.tmt)
+               * scenario:   @file(tmtroot/schema/vocabularies/scenario.vocabulary.tmt)
+               * video:      @file(tmtroot/schema/vocabularies/video.vocabulary.tmt)
+               * idea:       @file(tmtroot/schema/vocabularies/idea.vocabulary.tmt)
+               * roots:      @file(tmtroot/schema/vocabularies/roots.vocabulary.tmt)
+               *)
+::dictionaries(tomet: @file(tmtroot/spec/dictionaries/tomet.tmt))
+::workspace(* ignore:  list( "00-09 System/01 Apps/obsidian" )
+            * unswept: list( "tests/fixtures", "tests/ref", "tests/store" )
+            *)
+```

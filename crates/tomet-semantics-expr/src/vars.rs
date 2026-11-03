@@ -102,9 +102,11 @@ pub fn var_scope(
     for (name, decl) in decls {
         let given = passed.iter().rev().find(|(n, _)| n == name);
         let value = match (given, &decl.default) {
-            (Some((_, Value::String(text))), _) => {
-                Some(typed_value(decl.ty.clone(), &read_text(name, &decl.ty, text)?, doc))
-            }
+            (Some((_, Value::String(text))), _) => Some(typed_value(
+                decl.ty.clone(),
+                &read_text(name, &decl.ty, text)?,
+                doc,
+            )),
             (Some((_, other)), _) => Some(EvalValue::from_ast(other, doc)),
             (None, Some(default)) => Some(typed_value(decl.ty.clone(), default, doc)),
             (None, None) => None,
@@ -215,7 +217,12 @@ pub fn shaped(ty: Type, value: EvalValue) -> EvalValue {
         },
         (Type::List(inner), EvalValue::Seq(items)) => {
             if let Some(inner) = inner {
-                EvalValue::Seq(items.into_iter().map(|item| shaped(*inner.clone(), item)).collect())
+                EvalValue::Seq(
+                    items
+                        .into_iter()
+                        .map(|item| shaped(*inner.clone(), item))
+                        .collect(),
+                )
             } else {
                 EvalValue::Seq(items)
             }

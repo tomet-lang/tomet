@@ -2,34 +2,34 @@
 # Merge or reference this in ~/.config/helix/languages.toml
 
 [[language]]
-name = "tomet"
-scope = "source.tmt"
-injection-regex = "tmt|tomet"
-file-types = ["tmt"]
-roots = ["vault.config.tmt", ".git"]
-comment-token = "//"
+name                 = "tomet"
+scope                = "source.tmt"
+injection-regex      = "tmt|tomet"
+file-types           = ["tmt"]
+roots                = ["vault.config.tmt", ".git"]
+comment-token        = "//"
 block-comment-tokens = { start = "/*", end = "*/" }
-indent = { tab-width = 2, unit = "  " }
-language-servers = ["tomet-lsp"]
+indent               = { tab-width = 2, unit = "  " }
+language-servers     = ["tomet-lsp"]
 
 # A standalone cotomet data file. tomet-lsp serves it diagnostics and formatting.
 [[language]]
-name = "cotomet"
-scope = "source.cotomet"
-file-types = ["ctmt"]
-roots = ["vault.config.tmt", ".git"]
-comment-token = "//"
-indent = { tab-width = 2, unit = "  " }
+name             = "cotomet"
+scope            = "source.cotomet"
+file-types       = ["ctmt"]
+roots            = ["vault.config.tmt", ".git"]
+comment-token    = "//"
+indent           = { tab-width = 2, unit = "  " }
 language-servers = ["tomet-lsp"]
-auto-format = true
+auto-format      = true
 
 [language-server.tomet-lsp]
 command = "tomet-lsp"
 
 [[grammar]]
-name = "tomet"
+name   = "tomet"
 source = { git = "https://github.com/tefww/tomet", rev = "main", subpath = "crates/tree-sitter-tomet" }
 
 [[grammar]]
-name = "cotomet"
+name   = "cotomet"
 source = { git = "https://github.com/tefww/tomet", rev = "main", subpath = "crates/tree-sitter-cotomet" }

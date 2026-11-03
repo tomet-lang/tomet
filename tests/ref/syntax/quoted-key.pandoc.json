@@ -1,9 +1,5 @@
 {
-  "pandoc-api-version": [
-    1,
-    23,
-    1
-  ],
+  "pandoc-api-version": [1, 23, 1],
   "meta": {
     "plain.key": {
       "t": "MetaString",
@@ -28,11 +24,7 @@
       "t": "Header",
       "c": [
         1,
-        [
-          "",
-          [],
-          []
-        ],
+        ["", [], []],
         [
           {
             "t": "Str",
@@ -153,18 +145,10 @@
       "c": [
         [
           "",
+          ["tomet-ns.thing"],
           [
-            "tomet-ns.thing"
-          ],
-          [
-            [
-              "plain",
-              "2"
-            ],
-            [
-              "tomet-data",
-              "{\"args\":{\"a/b.tmt\":1,\"plain\":2}}"
-            ]
+            ["plain", "2"],
+            ["tomet-data", "{\"args\":{\"a/b.tmt\":1,\"plain\":2}}"]
           ]
         ],
         []
@@ -175,15 +159,8 @@
       "c": [
         [
           "",
-          [
-            "tomet-ns.thing"
-          ],
-          [
-            [
-              "tomet-data",
-              "{\"value\":{\"a/b\":{\"c d\":3}}}"
-            ]
-          ]
+          ["tomet-ns.thing"],
+          [["tomet-data", "{\"value\":{\"a/b\":{\"c d\":3}}}"]]
         ],
         []
       ]
@@ -228,14 +205,7 @@
         },
         {
           "t": "Code",
-          "c": [
-            [
-              "",
-              [],
-              []
-            ],
-            ":"
-          ]
+          "c": [["", [], []], ":"]
         },
         {
           "t": "Space"
@@ -304,21 +274,7 @@
     },
     {
       "t": "Div",
-      "c": [
-        [
-          "",
-          [
-            "tomet-ns.thing"
-          ],
-          [
-            [
-              "value",
-              "a/b.tmt"
-            ]
-          ]
-        ],
-        []
-      ]
+      "c": [["", ["tomet-ns.thing"], [["value", "a/b.tmt"]]], []]
     }
   ]
 }

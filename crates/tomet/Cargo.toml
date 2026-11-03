@@ -1,46 +1,46 @@
 [package]
-name = "tomet"
-version.workspace = true
-edition.workspace = true
-description = "The crate to depend on when using Tomet from Rust."
-license.workspace = true
+name                 = "tomet"
+version.workspace    = true
+edition.workspace    = true
+description          = "The crate to depend on when using Tomet from Rust."
+license.workspace    = true
 repository.workspace = true
 
 [features]
-deps = ["dep:tomet-deps"]
-edit = ["dep:tomet-edit"]
-format = ["dep:tomet-formatter"]
+deps      = ["dep:tomet-deps"]
+edit      = ["dep:tomet-edit"]
+format    = ["dep:tomet-formatter"]
 highlight = ["dep:tomet-highlight"]
-html = ["dep:tomet-html"]
-links = ["dep:tomet-links"]
-markdown = ["dep:tomet-markdown"]
-merge = ["dep:tomet-merge"]
-pandoc = ["dep:tomet-pandoc"]
-parser = []
-printer = ["dep:tomet-printer"]
-stats = ["dep:tomet-stats"]
-typst = ["dep:tomet-typst"]
+html      = ["dep:tomet-html"]
+links     = ["dep:tomet-links"]
+markdown  = ["dep:tomet-markdown"]
+merge     = ["dep:tomet-merge"]
+pandoc    = ["dep:tomet-pandoc"]
+parser    = []
+printer   = ["dep:tomet-printer"]
+stats     = ["dep:tomet-stats"]
+typst     = ["dep:tomet-typst"]
 
 [dependencies]
-tomet-ast = { workspace = true }
-tomet-config = { workspace = true }
-tomet-load = { workspace = true }
-tomet-ast-parser = { workspace = true }
+tomet-ast         = { workspace = true }
+tomet-config      = { workspace = true }
+tomet-load        = { workspace = true }
+tomet-ast-parser  = { workspace = true }
 tomet-declaration = { workspace = true }
-tomet-semantics = { workspace = true }
-tomet-transform = { workspace = true }
-tomet-validator = { workspace = true }
-tomet-vault = { workspace = true }
+tomet-semantics   = { workspace = true }
+tomet-transform   = { workspace = true }
+tomet-validator   = { workspace = true }
+tomet-vault       = { workspace = true }
 #--- Optional ---
-tomet-deps = { workspace = true, optional = true }
-tomet-edit = { workspace = true, optional = true }
+tomet-deps      = { workspace = true, optional = true }
+tomet-edit      = { workspace = true, optional = true }
 tomet-formatter = { workspace = true, optional = true }
 tomet-highlight = { workspace = true, optional = true }
-tomet-html = { workspace = true, optional = true }
-tomet-links = { workspace = true, optional = true }
-tomet-markdown = { workspace = true, optional = true }
-tomet-merge = { workspace = true, optional = true }
-tomet-pandoc = { workspace = true, optional = true }
-tomet-printer = { workspace = true, optional = true }
-tomet-stats = { workspace = true, optional = true }
-tomet-typst = { workspace = true, optional = true }
+tomet-html      = { workspace = true, optional = true }
+tomet-links     = { workspace = true, optional = true }
+tomet-markdown  = { workspace = true, optional = true }
+tomet-merge     = { workspace = true, optional = true }
+tomet-pandoc    = { workspace = true, optional = true }
+tomet-printer   = { workspace = true, optional = true }
+tomet-stats     = { workspace = true, optional = true }
+tomet-typst     = { workspace = true, optional = true }

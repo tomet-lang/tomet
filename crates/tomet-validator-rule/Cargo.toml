@@ -1,16 +1,16 @@
 [package]
-name = "tomet-validator-rule"
-version.workspace = true
-edition.workspace = true
-description = "Node-level constraint and :rule connect validation engine for Tomet documents."
-license.workspace = true
+name                 = "tomet-validator-rule"
+version.workspace    = true
+edition.workspace    = true
+description          = "Node-level constraint and :rule connect validation engine for Tomet documents."
+license.workspace    = true
 repository.workspace = true
 
 [dependencies]
-tomet-ast = { workspace = true }
-tomet-span = { workspace = true }
-tomet-semantics = { workspace = true }
-tomet-tree = { workspace = true }
+tomet-ast            = { workspace = true }
+tomet-span           = { workspace = true }
+tomet-semantics      = { workspace = true }
+tomet-tree           = { workspace = true }
 tomet-validator-core = { workspace = true }
 
 [dev-dependencies]

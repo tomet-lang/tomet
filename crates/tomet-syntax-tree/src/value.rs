@@ -160,10 +160,20 @@ mod tests {
         assert_eq!(Value::Bool(true).scalar_string(), Some("true".to_string()));
         assert_eq!(Value::Int(42).scalar_string(), Some("42".to_string()));
         assert_eq!(Value::Float(3.14).scalar_string(), Some("3.14".to_string()));
-        assert_eq!(Value::Number("1.10".into()).scalar_string(), Some("1.10".to_string()));
-        assert_eq!(Value::String("hello".into()).scalar_string(), Some("hello".to_string()));
+        assert_eq!(
+            Value::Number("1.10".into()).scalar_string(),
+            Some("1.10".to_string())
+        );
+        assert_eq!(
+            Value::String("hello".into()).scalar_string(),
+            Some("hello".to_string())
+        );
 
-        let seq = Value::Seq(vec![Value::String("a".into()), Value::Int(1), Value::Bool(false)]);
+        let seq = Value::Seq(vec![
+            Value::String("a".into()),
+            Value::Int(1),
+            Value::Bool(false),
+        ]);
         assert_eq!(seq.scalar_string(), Some("a, 1, false".to_string()));
         assert_eq!(seq.plain_text(), "a, 1, false");
 

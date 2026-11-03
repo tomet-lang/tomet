@@ -2830,19 +2830,10 @@
     }
   ],
   "conflicts": [
-    [
-      "section"
-    ],
-    [
-      "map"
-    ],
-    [
-      "children"
-    ],
-    [
-      "_interp_operand",
-      "interp_lambda"
-    ]
+    ["section"],
+    ["map"],
+    ["children"],
+    ["_interp_operand", "interp_lambda"]
   ],
   "precedences": [],
   "externals": [

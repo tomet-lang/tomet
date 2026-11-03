@@ -101,10 +101,19 @@ fn a_line_of_quotes_parses_in_proportional_time() {
 #[test]
 fn comment_shapes_parse_in_proportional_time() {
     let n = 40_000;
-    within_the_limit("40k a/*x*/ on one line", &format!("{}\n", "a/*x*/ ".repeat(n)));
-    within_the_limit("40k a //x on one line", &format!("{}\n", "a //x ".repeat(n)));
+    within_the_limit(
+        "40k a/*x*/ on one line",
+        &format!("{}\n", "a/*x*/ ".repeat(n)),
+    );
+    within_the_limit(
+        "40k a //x on one line",
+        &format!("{}\n", "a //x ".repeat(n)),
+    );
     within_the_limit("40k lines of a /* open", &"a /* open\n".repeat(n));
-    within_the_limit("40k /* openers on one line", &format!("{}\n", "/*".repeat(n)));
+    within_the_limit(
+        "40k /* openers on one line",
+        &format!("{}\n", "/*".repeat(n)),
+    );
     let mut s5 = String::with_capacity(n * 5);
     for i in 0..n {
         match i % 3 {

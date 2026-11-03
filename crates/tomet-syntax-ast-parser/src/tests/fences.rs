@@ -28,9 +28,8 @@ fn nested_raw_body(doc: &tomet_ast::File) -> &str {
 
 #[test]
 fn a_fenced_raw_body_nested_in_content_preserves_brackets_and_newlines_losslessly() {
-    let doc =
-        parse_file("@memo[\n```\nline one\nline two with * and [brackets] inside\n```\n]\n")
-            .unwrap();
+    let doc = parse_file("@memo[\n```\nline one\nline two with * and [brackets] inside\n```\n]\n")
+        .unwrap();
     assert_eq!(
         nested_raw_body(&doc),
         "line one\nline two with * and [brackets] inside"

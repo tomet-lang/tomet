@@ -1,21 +1,21 @@
 [package]
-name = "tomet-printer"
-version.workspace = true
-edition.workspace = true
-description = "Serializes a Tomet AST document back to .tmt source text."
-license.workspace = true
+name                 = "tomet-printer"
+version.workspace    = true
+edition.workspace    = true
+description          = "Serializes a Tomet AST document back to .tmt source text."
+license.workspace    = true
 repository.workspace = true
 
 [dependencies]
-tomet-ast = { workspace = true }
-tomet-config = { workspace = true }
+tomet-ast         = { workspace = true }
+tomet-config      = { workspace = true }
 tomet-field-utils = { workspace = true }
-tomet-formatter = { workspace = true }
-tomet-semantics = { workspace = true }
-tomet-style = { workspace = true }
-tomet-tree = { workspace = true }
+tomet-formatter   = { workspace = true }
+tomet-semantics   = { workspace = true }
+tomet-style       = { workspace = true }
+tomet-tree        = { workspace = true }
 
 [dev-dependencies]
-tomet-markdown = { workspace = true }
+tomet-markdown   = { workspace = true }
 tomet-ast-parser = { workspace = true }
-tomet-span = { workspace = true }
+tomet-span       = { workspace = true }

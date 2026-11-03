@@ -1,9 +1,5 @@
 {
-  "pandoc-api-version": [
-    1,
-    23,
-    1
-  ],
+  "pandoc-api-version": [1, 23, 1],
   "meta": {},
   "blocks": [
     {
@@ -49,57 +45,15 @@
     },
     {
       "t": "Div",
-      "c": [
-        [
-          "",
-          [
-            "tomet-note"
-          ],
-          [
-            [
-              "value",
-              "a"
-            ]
-          ]
-        ],
-        []
-      ]
+      "c": [["", ["tomet-note"], [["value", "a"]]], []]
     },
     {
       "t": "Div",
-      "c": [
-        [
-          "",
-          [
-            "tomet-note"
-          ],
-          [
-            [
-              "value",
-              "b"
-            ]
-          ]
-        ],
-        []
-      ]
+      "c": [["", ["tomet-note"], [["value", "b"]]], []]
     },
     {
       "t": "Div",
-      "c": [
-        [
-          "",
-          [
-            "tomet-note"
-          ],
-          [
-            [
-              "value",
-              "c"
-            ]
-          ]
-        ],
-        []
-      ]
+      "c": [["", ["tomet-note"], [["value", "c"]]], []]
     },
     {
       "t": "Para",

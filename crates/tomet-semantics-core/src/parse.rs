@@ -65,7 +65,9 @@ mod tests {
         let nested = Value::Seq(vec![Value::Seq(vec![Value::String("bool".to_string())])]);
         assert_eq!(
             parse_type_spec(&nested),
-            Ok(Type::List(Some(Box::new(Type::List(Some(Box::new(Type::Bool)))))))
+            Ok(Type::List(Some(Box::new(Type::List(Some(Box::new(
+                Type::Bool
+            )))))))
         );
     }
 

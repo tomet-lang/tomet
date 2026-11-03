@@ -158,10 +158,7 @@ pub struct ProcessedFile {
     pub is_data_only: bool,
 }
 
-pub fn process_file_internal(
-    mut doc: tomet::ast::File,
-    opts: &ProcessOptions,
-) -> ProcessedFile {
+pub fn process_file_internal(mut doc: tomet::ast::File, opts: &ProcessOptions) -> ProcessedFile {
     doc = prepare_file(doc, opts);
     let render_opts = opts.to_render_options();
     let html = tomet::html::render_body_with(&doc, &render_opts);

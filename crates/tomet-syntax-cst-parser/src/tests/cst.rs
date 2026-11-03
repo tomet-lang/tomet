@@ -219,7 +219,6 @@ fn a_url_does_not_start_inside_a_word() {
     assert_eq!(kinds("xhttps://a.b\n", K::AUTOLINK), 0);
 }
 
-
 // --- `|` runs ---------------------------------------------------------------
 
 #[test]

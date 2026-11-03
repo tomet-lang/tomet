@@ -46,8 +46,8 @@ pub use import::{
     import_attr_slot, import_cst, import_source, parse_edit_value_str, parse_inline_items,
 };
 pub use node::{
-    AttrEntry, AttrGroup, AttrSlot, ChildItem, EditValue, EditValueKind, FormPiece,
-    FormSlots, InlineItem, Node, NodeId, NodeKind,
+    AttrEntry, AttrGroup, AttrSlot, ChildItem, EditValue, EditValueKind, FormPiece, FormSlots,
+    InlineItem, Node, NodeId, NodeKind,
 };
 pub use op::{EditError, EditOp};
 
@@ -497,9 +497,7 @@ mod tests {
         let doc = import_source(src);
 
         // Find forms by sigil/name
-        let meta_id = doc
-            .find_block_form("meta")
-            .expect("meta should be found");
+        let meta_id = doc.find_block_form("meta").expect("meta should be found");
         let callout_id = doc
             .find_block_form("callout")
             .expect("callout should be found");

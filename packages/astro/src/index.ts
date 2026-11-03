@@ -4,18 +4,26 @@
  * Provides `tometLoader` for Astro 5 Content Collections, rendering `.tmt` documents
  * in-process via `@tomet/wasm` with incremental caching designed for up to 50,000+ files.
  */
-import type { AstroIntegration } from 'astro';
-import type { Loader, LoaderContext } from 'astro/loaders';
-import { existsSync, promises as fs } from 'node:fs';
-import { basename, dirname, isAbsolute, join, normalize, relative, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import type { AstroIntegration } from "astro";
+import type { Loader, LoaderContext } from "astro/loaders";
+import { existsSync, promises as fs } from "node:fs";
+import {
+  basename,
+  dirname,
+  isAbsolute,
+  join,
+  normalize,
+  relative,
+  resolve,
+} from "node:path";
+import { fileURLToPath } from "node:url";
 import initWasm, {
   processFile,
   setVaultFiles,
   type ProcessOptions,
   type ProcessedFile,
   type TocItem,
-} from '@tomet/wasm';
+} from "@tomet/wasm";
 
 export type { ProcessOptions, ProcessedFile, TocItem };
 
@@ -35,7 +43,10 @@ export async function ensureWasm(): Promise<void> {
 /**
  * Render a single `.tmt` source string to an HTML body string in-process.
  */
-export async function renderTomet(source: string, options?: ProcessOptions): Promise<string> {
+export async function renderTomet(
+  source: string,
+  options?: ProcessOptions,
+): Promise<string> {
   await ensureWasm();
   const res = processFile(source, options);
   return res.html;
@@ -44,7 +55,10 @@ export async function renderTomet(source: string, options?: ProcessOptions): Pro
 /**
  * Process a single `.tmt` source string to a `ProcessedFile` in-process.
  */
-export async function processTomet(source: string, options?: ProcessOptions): Promise<ProcessedFile> {
+export async function processTomet(
+  source: string,
+  options?: ProcessOptions,
+): Promise<ProcessedFile> {
   await ensureWasm();
   return processFile(source, options);
 }
@@ -124,7 +138,7 @@ export function resolveAssetUrl(
   allFilesSet: Set<string>,
   assetPrefix: string,
 ): string | null {
-  if (!raw || typeof raw !== 'string') return null;
+  if (!raw || typeof raw !== "string") return null;
   const s = raw.trim();
   if (!s) return null;
 
@@ -144,12 +158,14 @@ export function resolveAssetUrl(
     }
   }
 
-  target = target.replace(/^@/, '').trim();
+  target = target.replace(/^@/, "").trim();
   const targetBase = basename(target);
-  const prefix = assetPrefix.replace(/\/$/, '');
+  const prefix = assetPrefix.replace(/\/$/, "");
 
   // 3. Check document's own folder first (e.g. dir/-/+hash.png or dir/+hash.png)
-  const localDash = fileRelDir ? `${fileRelDir}/-/${targetBase}` : `-/${targetBase}`;
+  const localDash = fileRelDir
+    ? `${fileRelDir}/-/${targetBase}`
+    : `-/${targetBase}`;
   if (allFilesSet.has(localDash)) {
     return `${prefix}/${localDash}`;
   }
@@ -161,13 +177,13 @@ export function resolveAssetUrl(
   // 4. Global asset map lookup
   if (assetMap.has(targetBase)) {
     const found = assetMap.get(targetBase)!;
-    return `${prefix}/${found.replace(/^\//, '')}`;
+    return `${prefix}/${found.replace(/^\//, "")}`;
   }
 
   // 5. Relative path check
-  if (target.startsWith('./') || target.startsWith('../')) {
-    const norm = normalize(join(fileRelDir, target)).replace(/\\/g, '/');
-    return `${prefix}/${norm.replace(/^\//, '')}`;
+  if (target.startsWith("./") || target.startsWith("../")) {
+    const norm = normalize(join(fileRelDir, target)).replace(/\\/g, "/");
+    return `${prefix}/${norm.replace(/^\//, "")}`;
   }
 
   return null;
@@ -183,12 +199,14 @@ async function mapConcurrent<T, R>(
 ): Promise<R[]> {
   const results: R[] = new Array(items.length);
   let idx = 0;
-  const workers = new Array(Math.min(limit, items.length)).fill(null).map(async () => {
-    while (idx < items.length) {
-      const current = idx++;
-      results[current] = await fn(items[current]);
-    }
-  });
+  const workers = new Array(Math.min(limit, items.length))
+    .fill(null)
+    .map(async () => {
+      while (idx < items.length) {
+        const current = idx++;
+        results[current] = await fn(items[current]);
+      }
+    });
   await Promise.all(workers);
   return results;
 }
@@ -202,7 +220,10 @@ interface ScannedVault {
  * Fast recursive vault scanner discovering both document files (.tmt/.tm)
  * and all static asset files (.png/.jpg/.svg/...) for link and embed resolution.
  */
-async function scanVault(dir: string, baseDir: string = dir): Promise<ScannedVault> {
+async function scanVault(
+  dir: string,
+  baseDir: string = dir,
+): Promise<ScannedVault> {
   if (!existsSync(dir)) return { allFiles: [], docFiles: [] };
   const entries = await fs.readdir(dir, { withFileTypes: true });
   const allFiles: string[] = [];
@@ -211,7 +232,8 @@ async function scanVault(dir: string, baseDir: string = dir): Promise<ScannedVau
   for (const entry of entries) {
     const name = entry.name;
     // Skip hidden files, system files, and dependencies
-    if (name.startsWith('.') || name === 'node_modules' || name === 'dist') continue;
+    if (name.startsWith(".") || name === "node_modules" || name === "dist")
+      continue;
 
     const fullPath = join(dir, name);
     if (entry.isDirectory()) {
@@ -219,9 +241,9 @@ async function scanVault(dir: string, baseDir: string = dir): Promise<ScannedVau
       allFiles.push(...sub.allFiles);
       docFiles.push(...sub.docFiles);
     } else if (entry.isFile()) {
-      const relPath = relative(baseDir, fullPath).split('\\').join('/');
+      const relPath = relative(baseDir, fullPath).split("\\").join("/");
       allFiles.push(relPath);
-      if (name.endsWith('.tmt') || name.endsWith('.tm')) {
+      if (name.endsWith(".tmt") || name.endsWith(".tm")) {
         docFiles.push({ absPath: fullPath, relPath });
       }
     }
@@ -252,18 +274,27 @@ export function tometLoader(options: TometLoaderOptions): Loader {
     concurrency = 32,
     generateId,
     filter,
-    urlPrefix = '/docs',
-    assetPrefix = '/vault',
-    sourcePathPrefix = 'docs',
+    urlPrefix = "/docs",
+    assetPrefix = "/vault",
+    sourcePathPrefix = "docs",
     configPath,
   } = options;
 
   return {
-    name: '@tomet/astro-loader',
-    load: async ({ config, store, logger, generateDigest, watcher }: LoaderContext) => {
+    name: "@tomet/astro-loader",
+    load: async ({
+      config,
+      store,
+      logger,
+      generateDigest,
+      watcher,
+    }: LoaderContext) => {
       await ensureWasm();
 
-      const rootDir = config.root instanceof URL ? fileURLToPath(config.root) : String(config.root);
+      const rootDir =
+        config.root instanceof URL
+          ? fileURLToPath(config.root)
+          : String(config.root);
       const baseDir = isAbsolute(base) ? base : resolve(rootDir, base);
       if (!existsSync(baseDir)) {
         logger.warn(`Tomet loader base directory not found: ${baseDir}`);
@@ -272,21 +303,29 @@ export function tometLoader(options: TometLoaderOptions): Loader {
 
       // Read optional workspace vault.config.tmt
       const resolvedConfigPath = configPath
-        ? (isAbsolute(configPath) ? configPath : resolve(rootDir, configPath))
-        : join(baseDir, 'vault.config.tmt');
+        ? isAbsolute(configPath)
+          ? configPath
+          : resolve(rootDir, configPath)
+        : join(baseDir, "vault.config.tmt");
       let workspaceConfig = existsSync(resolvedConfigPath)
-        ? await fs.readFile(resolvedConfigPath, 'utf8')
+        ? await fs.readFile(resolvedConfigPath, "utf8")
         : undefined;
-      const configStat = workspaceConfig ? await fs.stat(resolvedConfigPath).catch(() => null) : null;
-      let configKey = configStat ? `${configStat.mtimeMs}` : '';
+      const configStat = workspaceConfig
+        ? await fs.stat(resolvedConfigPath).catch(() => null)
+        : null;
+      let configKey = configStat ? `${configStat.mtimeMs}` : "";
 
       logger.info(`Scanning Tomet documents and assets in ${baseDir}...`);
       const scanned = await scanVault(baseDir);
       const allFiles = scanned.docFiles;
-      const matchedFiles = filter ? allFiles.filter((f) => filter(f.relPath)) : allFiles;
+      const matchedFiles = filter
+        ? allFiles.filter((f) => filter(f.relPath))
+        : allFiles;
 
       // Pre-build link resolution index once in Wasm memory
-      logger.info(`Building link index for ${scanned.allFiles.length} files...`);
+      logger.info(
+        `Building link index for ${scanned.allFiles.length} files...`,
+      );
       setVaultFiles(scanned.allFiles);
 
       const allFilesSet = new Set(scanned.allFiles);
@@ -303,7 +342,7 @@ export function tometLoader(options: TometLoaderOptions): Loader {
       async function processFile(file: { absPath: string; relPath: string }) {
         const id = generateId
           ? generateId(file)
-          : file.relPath.replace(/\.(tmt|tm)$/, '');
+          : file.relPath.replace(/\.(tmt|tm)$/, "");
 
         untouchedIds.delete(id);
 
@@ -316,7 +355,9 @@ export function tometLoader(options: TometLoaderOptions): Loader {
           }
 
           // Generate digest using mtime, size, and workspace config mtime
-          const digest = generateDigest(`${stat.mtimeMs}:${stat.size}:${configKey}:v5`);
+          const digest = generateDigest(
+            `${stat.mtimeMs}:${stat.size}:${configKey}:v5`,
+          );
           const existing = store.get(id);
 
           if (existing && existing.digest === digest) {
@@ -324,7 +365,7 @@ export function tometLoader(options: TometLoaderOptions): Loader {
             return;
           }
 
-          const content = await fs.readFile(file.absPath, 'utf8');
+          const content = await fs.readFile(file.absPath, "utf8");
           const processed: ProcessedFile = processFile(content, {
             advanced,
             numberHeadings: advanced,
@@ -337,33 +378,43 @@ export function tometLoader(options: TometLoaderOptions): Loader {
 
           let metaObj: Record<string, unknown> | null = null;
           if (processed.meta) {
-            if (typeof (processed.meta as any).forEach === 'function') {
+            if (typeof (processed.meta as any).forEach === "function") {
               metaObj = {};
               (processed.meta as any).forEach((v: unknown, k: string) => {
                 if (v !== undefined) (metaObj as any)[k] = v;
               });
-            } else if (typeof processed.meta === 'object') {
+            } else if (typeof processed.meta === "object") {
               metaObj = processed.meta as Record<string, unknown>;
             }
           }
 
-          const fallbackTitle = basename(file.relPath).replace(/\.(tmt|tm)$/, '');
+          const fallbackTitle = basename(file.relPath).replace(
+            /\.(tmt|tm)$/,
+            "",
+          );
           const title = (metaObj?.title as string) ?? fallbackTitle;
-          const section = file.relPath.split('/')[0] ?? '';
+          const section = file.relPath.split("/")[0] ?? "";
 
           const kindMatch = content.match(/^@kind\(([^)]*)\)/m);
-          const kind = (processed as any).kind ?? (kindMatch ? kindMatch[1].trim() : null);
+          const kind =
+            (processed as any).kind ?? (kindMatch ? kindMatch[1].trim() : null);
 
           // Resolve banner and images
-          const fileRelDir = dirname(file.relPath).replace(/\\/g, '/');
+          const fileRelDir = dirname(file.relPath).replace(/\\/g, "/");
 
           let rawBanner = metaObj?.banner;
           if (Array.isArray(rawBanner)) rawBanner = rawBanner[0];
-          const banner = resolveAssetUrl(rawBanner, fileRelDir, assetMap, allFilesSet, assetPrefix);
+          const banner = resolveAssetUrl(
+            rawBanner,
+            fileRelDir,
+            assetMap,
+            allFilesSet,
+            assetPrefix,
+          );
 
-          const rawBannerY = metaObj?.['banner-y'] ?? metaObj?.bannerY;
+          const rawBannerY = metaObj?.["banner-y"] ?? metaObj?.bannerY;
           const bannerY =
-            typeof rawBannerY === 'number'
+            typeof rawBannerY === "number"
               ? rawBannerY
               : rawBannerY
                 ? parseInt(String(rawBannerY), 10)
@@ -372,19 +423,31 @@ export function tometLoader(options: TometLoaderOptions): Loader {
           let rawImages: unknown[] = [];
           if (Array.isArray(metaObj?.images)) {
             rawImages = metaObj.images;
-          } else if (typeof metaObj?.images === 'string') {
+          } else if (typeof metaObj?.images === "string") {
             rawImages = [metaObj.images];
           } else if (metaObj?.image) {
-            rawImages = Array.isArray(metaObj.image) ? metaObj.image : [metaObj.image];
+            rawImages = Array.isArray(metaObj.image)
+              ? metaObj.image
+              : [metaObj.image];
           }
 
           const images = rawImages
-            .map((img) => resolveAssetUrl(img, fileRelDir, assetMap, allFilesSet, assetPrefix))
+            .map((img) =>
+              resolveAssetUrl(
+                img,
+                fileRelDir,
+                assetMap,
+                allFilesSet,
+                assetPrefix,
+              ),
+            )
             .filter((u): u is string => Boolean(u));
 
           let thumbnail: string | null = images[0] ?? banner ?? null;
           if (!thumbnail && processed.html) {
-            const match = processed.html.match(/<img[^>]+src=["']([^"']+)["']/i);
+            const match = processed.html.match(
+              /<img[^>]+src=["']([^"']+)["']/i,
+            );
             if (match) {
               thumbnail = match[1];
             }
@@ -394,9 +457,12 @@ export function tometLoader(options: TometLoaderOptions): Loader {
           if (!description && processed.html) {
             const pMatch = processed.html.match(/<p>([\s\S]*?)<\/p>/i);
             if (pMatch) {
-              const rawSnippet = pMatch[1].replace(/<[^>]+>/g, '').trim();
+              const rawSnippet = pMatch[1].replace(/<[^>]+>/g, "").trim();
               if (rawSnippet) {
-                description = rawSnippet.length > 200 ? `${rawSnippet.slice(0, 197)}...` : rawSnippet;
+                description =
+                  rawSnippet.length > 200
+                    ? `${rawSnippet.slice(0, 197)}...`
+                    : rawSnippet;
               }
             }
           }
@@ -404,15 +470,19 @@ export function tometLoader(options: TometLoaderOptions): Loader {
           let tags: string[] | undefined;
           if (Array.isArray(metaObj?.tags)) {
             tags = metaObj.tags.map(String);
-          } else if (typeof metaObj?.tags === 'string') {
-            tags = metaObj.tags.split(',').map((t) => t.trim()).filter(Boolean);
+          } else if (typeof metaObj?.tags === "string") {
+            tags = metaObj.tags
+              .split(",")
+              .map((t) => t.trim())
+              .filter(Boolean);
           }
 
-          const rawDate = metaObj?.date ?? metaObj?.created ?? metaObj?.publishDate;
+          const rawDate =
+            metaObj?.date ?? metaObj?.created ?? metaObj?.publishDate;
           const date = rawDate ? String(rawDate) : null;
 
           const sourcePath = sourcePathPrefix
-            ? `${sourcePathPrefix.replace(/\/$/, '')}/${file.relPath}`
+            ? `${sourcePathPrefix.replace(/\/$/, "")}/${file.relPath}`
             : file.relPath;
 
           const entryData: TometEntryData = {
@@ -434,12 +504,14 @@ export function tometLoader(options: TometLoaderOptions): Loader {
             thumbnail,
           };
 
-          const relToRoot = relative(rootDir, file.absPath).split('\\').join('/');
+          const relToRoot = relative(rootDir, file.absPath)
+            .split("\\")
+            .join("/");
 
           store.set({
             id,
             data: entryData,
-            body: processed.is_data_only ? content : '',
+            body: processed.is_data_only ? content : "",
             rendered: {
               html: processed.html,
             },
@@ -471,20 +543,26 @@ export function tometLoader(options: TometLoaderOptions): Loader {
 
         const handleUpdate = async (changedPath: string) => {
           if (resolve(changedPath) === resolve(resolvedConfigPath)) {
-            logger.info('Workspace config changed, reloading Tomet files...');
+            logger.info("Workspace config changed, reloading Tomet files...");
             try {
-              workspaceConfig = await fs.readFile(resolvedConfigPath, 'utf8');
-              const newStat = await fs.stat(resolvedConfigPath).catch(() => null);
-              configKey = newStat ? `${newStat.mtimeMs}` : '';
+              workspaceConfig = await fs.readFile(resolvedConfigPath, "utf8");
+              const newStat = await fs
+                .stat(resolvedConfigPath)
+                .catch(() => null);
+              configKey = newStat ? `${newStat.mtimeMs}` : "";
               await mapConcurrent(matchedFiles, concurrency, processFile);
             } catch (err) {
-              logger.error(`Failed to reload config ${resolvedConfigPath}: ${err}`);
+              logger.error(
+                `Failed to reload config ${resolvedConfigPath}: ${err}`,
+              );
             }
             return;
           }
 
           if (changedPath.startsWith(baseDir)) {
-            const relPath = relative(baseDir, changedPath).split('\\').join('/');
+            const relPath = relative(baseDir, changedPath)
+              .split("\\")
+              .join("/");
             // Maintain vault asset and file index
             if (!allFilesSet.has(relPath)) {
               allFilesSet.add(relPath);
@@ -492,8 +570,9 @@ export function tometLoader(options: TometLoaderOptions): Loader {
               assetMap.set(basename(relPath), relPath);
               setVaultFiles(scanned.allFiles);
             }
-            if (changedPath.endsWith('.tmt') && !changedPath.endsWith('.tm')) return;
-            if (changedPath.endsWith('.tmt') || changedPath.endsWith('.tm')) {
+            if (changedPath.endsWith(".tmt") && !changedPath.endsWith(".tm"))
+              return;
+            if (changedPath.endsWith(".tmt") || changedPath.endsWith(".tm")) {
               if (filter && !filter(relPath)) return;
               await processFile({ absPath: changedPath, relPath });
             }
@@ -502,7 +581,9 @@ export function tometLoader(options: TometLoaderOptions): Loader {
 
         const handleUnlink = async (deletedPath: string) => {
           if (deletedPath.startsWith(baseDir)) {
-            const relPath = relative(baseDir, deletedPath).split('\\').join('/');
+            const relPath = relative(baseDir, deletedPath)
+              .split("\\")
+              .join("/");
             if (allFilesSet.has(relPath)) {
               allFilesSet.delete(relPath);
               const idx = scanned.allFiles.indexOf(relPath);
@@ -512,14 +593,14 @@ export function tometLoader(options: TometLoaderOptions): Loader {
             }
             const id = generateId
               ? generateId({ relPath, absPath: deletedPath })
-              : relPath.replace(/\.(tmt|tm)$/, '');
+              : relPath.replace(/\.(tmt|tm)$/, "");
             store.delete(id);
           }
         };
 
-        watcher.on('add', handleUpdate);
-        watcher.on('change', handleUpdate);
-        watcher.on('unlink', handleUnlink);
+        watcher.on("add", handleUpdate);
+        watcher.on("change", handleUpdate);
+        watcher.on("unlink", handleUnlink);
       }
     },
   };
@@ -533,7 +614,7 @@ export interface TometOptions {}
  */
 export default function tomet(_options: TometOptions = {}): AstroIntegration {
   return {
-    name: '@tomet/astro',
+    name: "@tomet/astro",
     hooks: {},
   };
 }

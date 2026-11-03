@@ -1,16 +1,16 @@
 [package]
-name = "tomet-typst"
-version.workspace = true
-edition.workspace = true
-description = "Converts a Tomet AST document to Typst markup source."
-license.workspace = true
+name                 = "tomet-typst"
+version.workspace    = true
+edition.workspace    = true
+description          = "Converts a Tomet AST document to Typst markup source."
+license.workspace    = true
 repository.workspace = true
 
 [dependencies]
-tomet-ast = { workspace = true }
-tomet-printer = { workspace = true }
+tomet-ast       = { workspace = true }
+tomet-printer   = { workspace = true }
 tomet-semantics = { workspace = true }
-tomet-tree = { workspace = true }
+tomet-tree      = { workspace = true }
 
 [dev-dependencies]
 tomet-ast-parser = { workspace = true }

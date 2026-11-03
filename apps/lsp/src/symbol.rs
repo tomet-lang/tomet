@@ -1,7 +1,5 @@
 use lsp_types::{DocumentSymbol, SymbolKind};
-use tomet_ast::{
-    Block, Connect, Declaration, ElementView, Inline, Interpolation, List, ListItem,
-};
+use tomet_ast::{Block, Connect, Declaration, ElementView, Inline, Interpolation, List, ListItem};
 use tomet_semantics::{ElementKind, classify_std_lenient, heading_level};
 
 use crate::position::TextPositions;

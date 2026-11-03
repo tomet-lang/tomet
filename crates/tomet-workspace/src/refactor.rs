@@ -4,11 +4,11 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use tomet_ast::File;
+use tomet_ast_parser::parse_file;
 use tomet_config::PrinterConfig;
 use tomet_formatter::format_source;
 use tomet_indexer::{collect_tm_files_with_config, is_excluded_by_config};
 use tomet_load_config::find_config_file;
-use tomet_ast_parser::parse_file;
 use tomet_printer::document_to_tm_with_config;
 use tomet_transform::{
     MacroSet, promote_meta_id_to_id, promote_meta_type_to_kind, transform_link_targets_with_macros,
@@ -43,11 +43,7 @@ impl Default for RefactorOptions {
 }
 
 /// Applies configured refactoring transformations to a parsed [`File`].
-pub fn refactor_file(
-    doc: &mut File,
-    config: &PrinterConfig,
-    options: &RefactorOptions,
-) -> usize {
+pub fn refactor_file(doc: &mut File, config: &PrinterConfig, options: &RefactorOptions) -> usize {
     let mut total_changes = 0;
 
     if options.url_to_macros {

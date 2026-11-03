@@ -1,14 +1,14 @@
 [package]
-name = "tomet-python"
+name              = "tomet-python"
 version.workspace = true
 edition.workspace = true
 
 [lib]
-name = "tomet"
+name       = "tomet"
 crate-type = ["cdylib", "rlib"]
 
 [features]
-default = []
+default          = []
 extension-module = ["pyo3/extension-module"]
 
 [dependencies]
@@ -21,8 +21,7 @@ tomet-crate = { package = "tomet", path = "../../crates/tomet", features = [
   "format",
   "printer",
 ] }
-
-#= Crates.io
-pyo3 = { workspace = true, features = ["auto-initialize"] }
+#--- Crates.io ---
+pyo3      = { workspace = true, features = ["auto-initialize"] }
 pythonize = { workspace = true }
-serde = { workspace = true }
+serde     = { workspace = true }

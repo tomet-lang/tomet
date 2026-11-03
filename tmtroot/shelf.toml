@@ -1,8 +1,8 @@
 [book]
 title = "tomet docs"
-lang = "en"
-dest = "dist"
+lang  = "en"
+dest  = "dist"
 
 [build]
-base = "/tomet"
+base  = "/tomet"
 kinds = ["*", "!config", "!index", "!blueprint", "!vocabulary"]

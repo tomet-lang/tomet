@@ -7,13 +7,11 @@ const SKIP_DIRS = ["target", ".git", ".agents", "node_modules"];
 
 let failed = false;
 
-for await (
-  const entry of walk(".", {
-    match: [/\.writ\.tmt$/],
-    skip: SKIP_DIRS.map((d) => new RegExp(`(^|/)${d}(/|$)`)),
-    includeDirs: false,
-  })
-) {
+for await (const entry of walk(".", {
+  match: [/\.writ\.tmt$/],
+  skip: SKIP_DIRS.map((d) => new RegExp(`(^|/)${d}(/|$)`)),
+  includeDirs: false,
+})) {
   const content = await Deno.readTextFile(entry.path);
   const lines = content.split(/\r?\n/);
 

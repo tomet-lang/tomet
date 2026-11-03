@@ -1,11 +1,11 @@
 [package]
-name = "tomet-lexer"
-version.workspace = true
-edition.workspace = true
-description = "A minimal byte-position cursor over &str source text for the Tomet lexer."
-license.workspace = true
+name                 = "tomet-lexer"
+version.workspace    = true
+edition.workspace    = true
+description          = "A minimal byte-position cursor over &str source text for the Tomet lexer."
+license.workspace    = true
 repository.workspace = true
 
 [dependencies]
 tomet-span = { workspace = true }
-tomet-cst = { workspace = true }
+tomet-cst  = { workspace = true }

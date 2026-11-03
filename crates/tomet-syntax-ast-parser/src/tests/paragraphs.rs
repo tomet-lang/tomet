@@ -100,7 +100,10 @@ fn an_interpolation_is_a_block_only_when_it_stands_alone_on_its_line() {
 #[test]
 fn a_declaration_after_an_element_line_is_an_error() {
     let err = parse_file("@note{ a: 1 }\n::kind(config)\n").unwrap_err();
-    assert!(err.message.contains("a declaration belongs at the top of the file"));
+    assert!(
+        err.message
+            .contains("a declaration belongs at the top of the file")
+    );
 }
 
 #[test]

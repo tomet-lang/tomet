@@ -1,20 +1,12 @@
 {
-  "pandoc-api-version": [
-    1,
-    23,
-    1
-  ],
+  "pandoc-api-version": [1, 23, 1],
   "meta": {},
   "blocks": [
     {
       "t": "Header",
       "c": [
         1,
-        [
-          "",
-          [],
-          []
-        ],
+        ["", [], []],
         [
           {
             "t": "Str",
@@ -26,18 +18,7 @@
     {
       "t": "Div",
       "c": [
-        [
-          "",
-          [
-            "tomet-card"
-          ],
-          [
-            [
-              "title",
-              "Alpha"
-            ]
-          ]
-        ],
+        ["", ["tomet-card"], [["title", "Alpha"]]],
         [
           {
             "t": "Para",
@@ -62,11 +43,7 @@
       "t": "Header",
       "c": [
         1,
-        [
-          "",
-          [],
-          []
-        ],
+        ["", [], []],
         [
           {
             "t": "Str",

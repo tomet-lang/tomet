@@ -327,7 +327,10 @@ fn full_form_list_item_supports_a_named_connect() {
 fn a_trailing_connect_may_hold_a_pipe_run_on_the_same_line() {
     // `:note| text` is `[content]` spelled without brackets: the connect `note` holds `text`, whether
     // the item's own text is bracket-less (`- item`) or the connect follows a group.
-    for src in ["- item :note| the note text\n", "- item :rule(allow: x)| the note text\n"] {
+    for src in [
+        "- item :note| the note text\n",
+        "- item :rule(allow: x)| the note text\n",
+    ] {
         let doc = parse_file(src).unwrap();
         let Block::List(list) = &doc.body[0] else {
             panic!("expected list for {src:?}")

@@ -2,8 +2,8 @@ use lsp_types::{GotoDefinitionResponse, Location, Position, Uri};
 use tomet_ast::{
     Block, Connect, Declaration, Element, File, Inline, InterpExpr, InterpExprKind, List, Value,
 };
-use tomet_span::Span;
 use tomet_semantics::TargetScheme;
+use tomet_span::Span;
 use tomet_tree::{for_each_element, for_each_interpolation};
 
 use crate::position::{TextPositions, span_contains};

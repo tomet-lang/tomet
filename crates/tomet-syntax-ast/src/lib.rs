@@ -1419,7 +1419,9 @@ mod tests {
         };
 
         let el_view = element.as_view();
-        let item_view = item.as_element_view().expect("combine item has ElementView");
+        let item_view = item
+            .as_element_view()
+            .expect("combine item has ElementView");
 
         assert_eq!(el_view, item_view);
         assert_eq!(el_view.name, &name);

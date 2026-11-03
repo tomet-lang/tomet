@@ -136,12 +136,10 @@ fn lower_block(node: &SyntaxNode) -> Result<Option<Block>> {
 /// - ends before the trailing newline, or before the `]` when enclosed in a content group
 fn paragraph_bounds(node: &SyntaxNode) -> Option<(usize, usize)> {
     let (_, node_end) = range_of(node);
-    let first_content = node
-        .children_with_tokens()
-        .find(|e| match e {
-            SyntaxElement::Token(t) => t.kind() != K::WHITESPACE,
-            SyntaxElement::Node(_) => true,
-        })?;
+    let first_content = node.children_with_tokens().find(|e| match e {
+        SyntaxElement::Token(t) => t.kind() != K::WHITESPACE,
+        SyntaxElement::Node(_) => true,
+    })?;
     let start = usize::from(first_content.text_range().start());
 
     let mut end = if let Some(last) = node.last_token().filter(|t| t.kind() == K::NEWLINE) {
@@ -218,7 +216,11 @@ fn lower_inlines(parent: &SyntaxNode, from: usize, to: usize) -> Result<Vec<Inli
                       pending_end: &mut usize| {
         if let Some(start) = pending_start.take() {
             if !pending_text.is_empty() {
-                push_text(items, std::mem::take(pending_text), Span::new(start, *pending_end));
+                push_text(
+                    items,
+                    std::mem::take(pending_text),
+                    Span::new(start, *pending_end),
+                );
             }
         }
     };
@@ -252,12 +254,27 @@ fn lower_inlines(parent: &SyntaxNode, from: usize, to: usize) -> Result<Vec<Inli
         }
         match child {
             SyntaxElement::Token(t) if t.kind() == K::COMMENT => {
-                flush_text(&mut items, &mut pending_text, &mut pending_start, &mut pending_end);
-                flush_softbreak(&mut items, &mut in_softbreak, softbreak_start, softbreak_end);
+                flush_text(
+                    &mut items,
+                    &mut pending_text,
+                    &mut pending_start,
+                    &mut pending_end,
+                );
+                flush_softbreak(
+                    &mut items,
+                    &mut in_softbreak,
+                    softbreak_start,
+                    softbreak_end,
+                );
                 is_first_text = false;
             }
             SyntaxElement::Token(t) if t.kind() == K::NEWLINE => {
-                flush_text(&mut items, &mut pending_text, &mut pending_start, &mut pending_end);
+                flush_text(
+                    &mut items,
+                    &mut pending_text,
+                    &mut pending_start,
+                    &mut pending_end,
+                );
                 if !in_softbreak {
                     in_softbreak = true;
                     softbreak_start = start;
@@ -265,11 +282,18 @@ fn lower_inlines(parent: &SyntaxNode, from: usize, to: usize) -> Result<Vec<Inli
                 softbreak_end = end;
                 is_first_text = false;
             }
-            SyntaxElement::Token(t) if in_softbreak && matches!(t.kind(), K::WHITESPACE | K::MARGIN) => {
+            SyntaxElement::Token(t)
+                if in_softbreak && matches!(t.kind(), K::WHITESPACE | K::MARGIN) =>
+            {
                 softbreak_end = end;
             }
             SyntaxElement::Token(t) => {
-                flush_softbreak(&mut items, &mut in_softbreak, softbreak_start, softbreak_end);
+                flush_softbreak(
+                    &mut items,
+                    &mut in_softbreak,
+                    softbreak_start,
+                    softbreak_end,
+                );
                 if t.kind() == K::MARGIN {
                     continue;
                 }
@@ -284,7 +308,12 @@ fn lower_inlines(parent: &SyntaxNode, from: usize, to: usize) -> Result<Vec<Inli
                 pending_end = end;
             }
             SyntaxElement::Node(n) if n.kind() == K::SLOT => {
-                flush_softbreak(&mut items, &mut in_softbreak, softbreak_start, softbreak_end);
+                flush_softbreak(
+                    &mut items,
+                    &mut in_softbreak,
+                    softbreak_start,
+                    softbreak_end,
+                );
                 let effective_start = if is_first_text && from < start {
                     from
                 } else {
@@ -297,7 +326,12 @@ fn lower_inlines(parent: &SyntaxNode, from: usize, to: usize) -> Result<Vec<Inli
                 pending_end = end;
             }
             SyntaxElement::Node(n) if n.kind() == K::ESCAPE => {
-                flush_softbreak(&mut items, &mut in_softbreak, softbreak_start, softbreak_end);
+                flush_softbreak(
+                    &mut items,
+                    &mut in_softbreak,
+                    softbreak_start,
+                    softbreak_end,
+                );
                 // A `\...` escape: the leading `\` is omitted, the escaped run is text.
                 // The span starts after `\` (at start + 1) through end.
                 let escaped_start = start + 1;
@@ -319,8 +353,18 @@ fn lower_inlines(parent: &SyntaxNode, from: usize, to: usize) -> Result<Vec<Inli
                 return Err(lower_error(&n));
             }
             SyntaxElement::Node(n) => {
-                flush_softbreak(&mut items, &mut in_softbreak, softbreak_start, softbreak_end);
-                flush_text(&mut items, &mut pending_text, &mut pending_start, &mut pending_end);
+                flush_softbreak(
+                    &mut items,
+                    &mut in_softbreak,
+                    softbreak_start,
+                    softbreak_end,
+                );
+                flush_text(
+                    &mut items,
+                    &mut pending_text,
+                    &mut pending_start,
+                    &mut pending_end,
+                );
                 is_first_text = false;
                 items.push(lower_inline(&n)?);
             }
@@ -329,8 +373,18 @@ fn lower_inlines(parent: &SyntaxNode, from: usize, to: usize) -> Result<Vec<Inli
     if pending_start.is_some() && to > pending_end {
         pending_end = to;
     }
-    flush_text(&mut items, &mut pending_text, &mut pending_start, &mut pending_end);
-    flush_softbreak(&mut items, &mut in_softbreak, softbreak_start, softbreak_end);
+    flush_text(
+        &mut items,
+        &mut pending_text,
+        &mut pending_start,
+        &mut pending_end,
+    );
+    flush_softbreak(
+        &mut items,
+        &mut in_softbreak,
+        softbreak_start,
+        softbreak_end,
+    );
     Ok(trim_edges(items))
 }
 
@@ -424,7 +478,6 @@ fn lower_autolink(node: &SyntaxNode) -> Element {
     element
 }
 
-
 /// `---`: a run of dashes on a line of its own; or `---[ title ]---`, whose
 /// title is the content of the `hr` element.
 fn lower_thematic_break(node: &SyntaxNode) -> Result<Block> {
@@ -486,7 +539,10 @@ fn lower_code_block(node: &SyntaxNode) -> Result<Block> {
         .and_then(|info| info.lang())
         .unwrap_or_default();
 
-    let lines: Vec<SyntaxNode> = node.children().filter(|c| c.kind() == K::CODE_LINE).collect();
+    let lines: Vec<SyntaxNode> = node
+        .children()
+        .filter(|c| c.kind() == K::CODE_LINE)
+        .collect();
     let closing_fence = cst.closing_fence();
 
     let body_start = match lines.first() {
@@ -587,7 +643,11 @@ fn lower_line_raw(node: &SyntaxNode) -> Result<Block> {
         if !past_fence {
             return Err(unsupported("a line raw line without its backticks"));
         }
-        let b_start = body_start.unwrap_or(if skipped_space { fence_end + 1 } else { fence_end });
+        let b_start = body_start.unwrap_or(if skipped_space {
+            fence_end + 1
+        } else {
+            fence_end
+        });
         content_start.get_or_insert(b_start);
         content_end = b_start + body.len();
         if n > 0 {
@@ -719,9 +779,7 @@ fn lower_groups(node: &SyntaxNode) -> Result<Groups> {
 }
 
 /// The groups in `nodes`, read as [`lower_groups`] reads an element's.
-pub(crate) fn lower_group_list(
-    nodes: impl IntoIterator<Item = SyntaxNode>,
-) -> Result<Groups> {
+pub(crate) fn lower_group_list(nodes: impl IntoIterator<Item = SyntaxNode>) -> Result<Groups> {
     let mut read = Groups::default();
     for child in nodes {
         match child.kind() {
@@ -929,12 +987,11 @@ fn list_item_span(node: &SyntaxNode, sublist_span_end: Option<usize>) -> Span {
     let line_end = list_item_line_end(node);
     let end = match sublist_span_end {
         Some(sub_end) => sub_end,
-        None => {
-            node.children_with_tokens()
-                .filter_map(|e| e.into_token())
-                .find(|t| t.kind() == K::NEWLINE && usize::from(t.text_range().start()) == line_end)
-                .map_or(line_end, |t| usize::from(t.text_range().end()))
-        }
+        None => node
+            .children_with_tokens()
+            .filter_map(|e| e.into_token())
+            .find(|t| t.kind() == K::NEWLINE && usize::from(t.text_range().start()) == line_end)
+            .map_or(line_end, |t| usize::from(t.text_range().end())),
     };
     Span::new(start, end)
 }
@@ -965,7 +1022,8 @@ fn list_item_span_start(node: &SyntaxNode) -> usize {
             if prev.kind() == K::WHITESPACE {
                 let ws_start = usize::from(prev.text_range().start());
                 let prev_token = prev.as_token().and_then(|t| t.prev_token());
-                let only_blanks = prev_token.is_none() || prev_token.map(|t| t.kind()) == Some(K::NEWLINE);
+                let only_blanks =
+                    prev_token.is_none() || prev_token.map(|t| t.kind()) == Some(K::NEWLINE);
                 if only_blanks {
                     return ws_start;
                 }
@@ -1000,12 +1058,10 @@ fn append_trailing_body(
     line_end: usize,
 ) -> Result<()> {
     let (body_start, body_end) = range_of(body);
-    let first_content = body
-        .children_with_tokens()
-        .find(|e| match e {
-            SyntaxElement::Token(t) => t.kind() != K::WHITESPACE,
-            SyntaxElement::Node(_) => true,
-        });
+    let first_content = body.children_with_tokens().find(|e| match e {
+        SyntaxElement::Token(t) => t.kind() != K::WHITESPACE,
+        SyntaxElement::Node(_) => true,
+    });
     let Some(first_content) = first_content else {
         return Ok(());
     };
@@ -1051,9 +1107,7 @@ fn lower_list_item(node: &SyntaxNode) -> Result<tomet_ast::ListItem> {
             K::ARGS | K::VALUE_DATA | K::CONTENT | K::ID_GROUP | K::CONNECT
         )
     };
-    let combine = node
-        .children()
-        .find(|n| n.kind() == K::INLINE_FORM);
+    let combine = node.children().find(|n| n.kind() == K::INLINE_FORM);
     let body = node.children().find(|n| n.kind() == K::BODY);
 
     let mut item = if let Some(element) = combine {
@@ -1122,7 +1176,6 @@ fn sublist_start(node: &SyntaxNode) -> Option<usize> {
         .map(|sub| range_of(&sub).0)
 }
 
-
 /// `:(args)` or `:{value}`: no name, so it is not a connect of its own but more
 /// of the owner's args or value.
 fn is_merge_connect(node: &SyntaxNode) -> bool {
@@ -1156,7 +1209,6 @@ fn merge_connect(node: &SyntaxNode, read: &mut Groups) -> Result<()> {
     }
     Ok(())
 }
-
 
 /// How many `|` runs `node` stands inside: each one folds the marker at the start
 /// of a line away with the line break before it.
@@ -1316,7 +1368,10 @@ pub(crate) fn lower_error(node: &SyntaxNode) -> Error {
     }
 
     if let Some(parent) = node.parent().filter(|p| p.kind() == K::CONTENT) {
-        if parent.first_token().is_some_and(|t| t.kind() == K::L_BRACKET) {
+        if parent
+            .first_token()
+            .is_some_and(|t| t.kind() == K::L_BRACKET)
+        {
             let eof = usize::from(node.ancestors().last().unwrap().text_range().end());
             return err(eof, "unterminated, expected ']'");
         }

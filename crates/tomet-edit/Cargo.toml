@@ -1,21 +1,21 @@
 [package]
-name = "tomet-edit"
-version.workspace = true
-edition.workspace = true
-description = "Backend-neutral editable tree model of a Tomet document for collaborative editing."
-license.workspace = true
+name                 = "tomet-edit"
+version.workspace    = true
+edition.workspace    = true
+description          = "Backend-neutral editable tree model of a Tomet document for collaborative editing."
+license.workspace    = true
 repository.workspace = true
 
 [dependencies]
-tomet-address = { workspace = true }
-tomet-ast = { workspace = true }
-tomet-cst = { workspace = true }
+tomet-address    = { workspace = true }
+tomet-ast        = { workspace = true }
+tomet-cst        = { workspace = true }
 tomet-cst-parser = { workspace = true }
 tomet-ast-parser = { workspace = true }
-tomet-style = { workspace = true }
-tomet-tree = { workspace = true }
-tomet-validator = { workspace = true }
-tomet-vault = { workspace = true }
+tomet-style      = { workspace = true }
+tomet-tree       = { workspace = true }
+tomet-validator  = { workspace = true }
+tomet-vault      = { workspace = true }
 
 [target.'cfg(all(target_arch = "wasm32", target_os = "unknown"))'.dependencies]
 getrandom = { version = "0.2", features = ["js"] }

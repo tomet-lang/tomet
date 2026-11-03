@@ -1,9 +1,5 @@
 {
-  "pandoc-api-version": [
-    1,
-    23,
-    1
-  ],
+  "pandoc-api-version": [1, 23, 1],
   "meta": {},
   "blocks": [
     {
@@ -11,35 +7,17 @@
       "c": [
         [
           "",
+          ["tomet-bookmark"],
           [
-            "tomet-bookmark"
-          ],
-          [
-            [
-              "id",
-              "uuid-asld-lask-sdff"
-            ],
-            [
-              "tags",
-              "a, a"
-            ],
-            [
-              "value",
-              "https://example.com"
-            ]
+            ["id", "uuid-asld-lask-sdff"],
+            ["tags", "a, a"],
+            ["value", "https://example.com"]
           ]
         ],
         [
           {
             "t": "CodeBlock",
-            "c": [
-              [
-                "",
-                [],
-                []
-              ],
-              "ブックマークの\nメモ\n改行を保持できる"
-            ]
+            "c": [["", [], []], "ブックマークの\nメモ\n改行を保持できる"]
           }
         ]
       ]
@@ -49,35 +27,17 @@
       "c": [
         [
           "",
+          ["tomet-bookmark"],
           [
-            "tomet-bookmark"
-          ],
-          [
-            [
-              "id",
-              "uuid-asld-lask-sdff"
-            ],
-            [
-              "tags",
-              "a, a"
-            ],
-            [
-              "value",
-              "https://example.com"
-            ]
+            ["id", "uuid-asld-lask-sdff"],
+            ["tags", "a, a"],
+            ["value", "https://example.com"]
           ]
         ],
         [
           {
             "t": "CodeBlock",
-            "c": [
-              [
-                "",
-                [],
-                []
-              ],
-              "メモ"
-            ]
+            "c": [["", [], []], "メモ"]
           }
         ]
       ]
@@ -87,35 +47,17 @@
       "c": [
         [
           "",
+          ["tomet-bookmark"],
           [
-            "tomet-bookmark"
-          ],
-          [
-            [
-              "id",
-              "uuid-asld-lask-sdff"
-            ],
-            [
-              "tags",
-              "a, a"
-            ],
-            [
-              "value",
-              "https://example.com"
-            ]
+            ["id", "uuid-asld-lask-sdff"],
+            ["tags", "a, a"],
+            ["value", "https://example.com"]
           ]
         ],
         [
           {
             "t": "CodeBlock",
-            "c": [
-              [
-                "",
-                [],
-                []
-              ],
-              "メモ"
-            ]
+            "c": [["", [], []], "メモ"]
           }
         ]
       ]
@@ -125,35 +67,17 @@
       "c": [
         [
           "",
+          ["tomet-bookmark"],
           [
-            "tomet-bookmark"
-          ],
-          [
-            [
-              "id",
-              "uuid-asld-lask-sdff"
-            ],
-            [
-              "tags",
-              "a, a"
-            ],
-            [
-              "value",
-              "https://example.com"
-            ]
+            ["id", "uuid-asld-lask-sdff"],
+            ["tags", "a, a"],
+            ["value", "https://example.com"]
           ]
         ],
         [
           {
             "t": "CodeBlock",
-            "c": [
-              [
-                "",
-                [],
-                []
-              ],
-              "メモ"
-            ]
+            "c": [["", [], []], "メモ"]
           }
         ]
       ]
@@ -163,35 +87,17 @@
       "c": [
         [
           "",
+          ["tomet-bookmark"],
           [
-            "tomet-bookmark"
-          ],
-          [
-            [
-              "id",
-              "uuid-asld-lask-sdff"
-            ],
-            [
-              "tags",
-              "a, a"
-            ],
-            [
-              "value",
-              "https://example.com"
-            ]
+            ["id", "uuid-asld-lask-sdff"],
+            ["tags", "a, a"],
+            ["value", "https://example.com"]
           ]
         ],
         [
           {
             "t": "CodeBlock",
-            "c": [
-              [
-                "",
-                [],
-                []
-              ],
-              "メモ"
-            ]
+            "c": [["", [], []], "メモ"]
           }
         ]
       ]
@@ -201,35 +107,17 @@
       "c": [
         [
           "",
+          ["tomet-bookmark"],
           [
-            "tomet-bookmark"
-          ],
-          [
-            [
-              "id",
-              "uuid-asld-lask-sdff"
-            ],
-            [
-              "tags",
-              "a, a"
-            ],
-            [
-              "value",
-              "https://example.com"
-            ]
+            ["id", "uuid-asld-lask-sdff"],
+            ["tags", "a, a"],
+            ["value", "https://example.com"]
           ]
         ],
         [
           {
             "t": "CodeBlock",
-            "c": [
-              [
-                "",
-                [],
-                []
-              ],
-              "メモ"
-            ]
+            "c": [["", [], []], "メモ"]
           }
         ]
       ]

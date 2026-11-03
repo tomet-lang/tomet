@@ -25,9 +25,9 @@
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 
-use tomet_span::Span;
 use tomet_config::PrinterConfig;
 use tomet_indexer::{normalize_join, resolve_document_relative};
+use tomet_span::Span;
 
 use crate::cache::LinkCache;
 use crate::collect::LinkKind;

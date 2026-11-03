@@ -51,7 +51,9 @@ pub fn shift_spans(value: &mut Value, delta: usize) {
 pub fn find_interp_in_value(v: &Value) -> Option<usize> {
     match v {
         Value::Interp(it) => Some(it.span.start),
-        Value::Map(entries) => entries.iter().find_map(|(_, val)| find_interp_in_value(val)),
+        Value::Map(entries) => entries
+            .iter()
+            .find_map(|(_, val)| find_interp_in_value(val)),
         Value::Seq(items) => items.iter().find_map(find_interp_in_value),
         Value::Call(_, args) => args.iter().find_map(find_interp_in_value),
         _ => None,

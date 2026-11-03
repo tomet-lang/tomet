@@ -1,0 +1,82 @@
+```(tmt)
+``::upstreams{
+``  origiri: { git: "https://github.com/kakusika/commonfiles.git", rev: main, root: origiri }
+``  origiri-mobile: { git: "https://github.com/kakusika/commonfiles.git", rev: main, root: origiri-mobile }
+``}
+``
+``=(".envrc")
+``source: { upstream: origiri, path: ".envrc" }
+``
+``==(source)
+``upstream: origiri
+``path: ".gitattributes"
+``
+``=("CLAUDE.md")
+``source: { upstream: origiri, path: "CLAUDE.md" }
+``source: { upstream: origiri, path: ".gitattributes" }
+``
+``=("default.config.tmt")
+``source: { upstream: origiri, path: "default.config.tmt" }
+``source: { upstream: origiri, path: ".gitattributes" }
+``
+``=(".gitattributes")
+``source: { upstream: origiri, path: ".gitattributes" }
+``source: { upstream: origiri, path: ".gitattributes" }
+``source: { upstream: origiri, path: ".gitattributes" }
+``source: { upstream: origiri, path: ".gitattributes" }
+``
+``=(".editorconfig")
+``==(source)
+``upstream: origiri
+``path: ".editorconfig"
+``==(next)
+``key: value
+``=(".gitignore")
+``==(source)
+``* upstream: origiri
+``* path: ".gitignore"
+``==(rule)
+``* (key)
+``** key: value
+``
+``=("nix/formatter.nix")
+``==(source)
+``* (upstream) origiri
+``* (path) "nix/formatter.nix"
+``
+``=("flake.nix")
+``source: { upstream: origiri, path: "flake.nix" }
+``
+``=(nix/base.nix")
+``source: { upstream: origiri-mobile, path: "nix/base.nix" }
+```
+
+==[`:head:`]
+
+```(tmt)
+::upstreams{
+  origiri: { git: "https://github.com/kakusika/commonfiles.git", rev: main, root: origiri }
+  origiri-mobile: { git: "https://github.com/kakusika/commonfiles.git", rev: main, root: origiri-mobile }
+}
+
+:".envrc":
+source: { upstream: origiri, path: ".envrc" }
+
+:source:
+upstream: origiri
+path: ".gitattributes"
+
+:"CLAUDE.md":
+source: { upstream: origiri, path: "CLAUDE.md" }
+source: { upstream: origiri, path: ".gitattributes" }
+
+:"default.config.tmt":
+source: { upstream: origiri, path: "default.config.tmt" }
+source: { upstream: origiri, path: ".gitattributes" }
+
+:".gitattributes":
+source: { upstream: origiri, path: ".gitattributes" }
+source: { upstream: origiri, path: ".gitattributes" }
+source: { upstream: origiri, path: ".gitattributes" }
+source: { upstream: origiri, path: ".gitattributes" }
+```

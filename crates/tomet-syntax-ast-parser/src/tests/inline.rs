@@ -139,10 +139,19 @@ fn element_or_span_inside_quotes_in_prose_is_read_as_element_or_span() {
     let Block::Paragraph(p) = &doc.body[0] else {
         panic!("expected paragraph");
     };
-    let has_el = p.content.iter().any(|i| matches!(i, Inline::Element(e) if e.name == Name::bare("note")));
-    let has_em = p.content.iter().any(|i| matches!(i, Inline::Element(e) if e.name == Name::bare("em")));
+    let has_el = p
+        .content
+        .iter()
+        .any(|i| matches!(i, Inline::Element(e) if e.name == Name::bare("note")));
+    let has_em = p
+        .content
+        .iter()
+        .any(|i| matches!(i, Inline::Element(e) if e.name == Name::bare("em")));
     assert!(has_el, "should parse @note element inside quotes in prose");
-    assert!(has_em, "should parse *bold text* span inside quotes in prose");
+    assert!(
+        has_em,
+        "should parse *bold text* span inside quotes in prose"
+    );
 }
 
 #[test]
@@ -151,12 +160,19 @@ fn delimiters_and_names_read_as_before() {
     let Block::Paragraph(p) = &doc.body[0] else {
         panic!("expected paragraph");
     };
-    let has_strong = p.content.iter().any(|i| matches!(i, Inline::Element(e) if e.name == Name::bare("strong")));
+    let has_strong = p
+        .content
+        .iter()
+        .any(|i| matches!(i, Inline::Element(e) if e.name == Name::bare("strong")));
     assert!(has_strong, "expected __strong__ to be parsed as strong");
-    let el = p.content.iter().find_map(|i| match i {
-        Inline::Element(e) if e.name == Name::bare("my_name") => Some(e),
-        _ => None,
-    }).expect("found @my_name");
+    let el = p
+        .content
+        .iter()
+        .find_map(|i| match i {
+            Inline::Element(e) if e.name == Name::bare("my_name") => Some(e),
+            _ => None,
+        })
+        .expect("found @my_name");
     assert_eq!(el.connects.len(), 1);
     assert_eq!(el.connects[0].name, Name::bare("a-b"));
 }
@@ -245,13 +261,17 @@ fn general_backslash_escapes_lower_to_literal_text() {
     assert_eq!(el.content, wrap(vec![Inline::Text("a [ b ] c".into())]));
 
     // Escaped trailing groups on headings and list items stay part of the text.
-    let doc = parse_file("= Heading \\#(id) \\:connect(x)\n\n- item \\#(id) \\:connect(x)\n").unwrap();
+    let doc =
+        parse_file("= Heading \\#(id) \\:connect(x)\n\n- item \\#(id) \\:connect(x)\n").unwrap();
     let Block::Section(sec) = &doc.body[0] else {
         panic!("expected section");
     };
     assert_eq!(sec.id, None);
     assert!(sec.connects.is_empty());
-    assert_eq!(sec.title, vec![Inline::Text("Heading #(id) :connect(x)".into())]);
+    assert_eq!(
+        sec.title,
+        vec![Inline::Text("Heading #(id) :connect(x)".into())]
+    );
     let Block::List(list) = &sec.blocks[0] else {
         panic!("expected list");
     };
@@ -265,5 +285,3 @@ fn general_backslash_escapes_lower_to_literal_text() {
         ))]
     );
 }
-
-

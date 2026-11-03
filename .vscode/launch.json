@@ -1,31 +1,27 @@
 {
-	"version": "0.2.0",
-	"configurations": [
-		{
-			"name": "Extension Development Host",
-			"type": "extensionHost",
-			"request": "launch",
-			"args": [
-				"--extensionDevelopmentPath=${workspaceFolder}/editors/vscode",
-				"${workspaceFolder}"
-			],
-			"outFiles": [
-				"${workspaceFolder}/editors/vscode/dist/**/*.js"
-			],
-			"preLaunchTask": "build extension and lsp"
-		},
-		{
-			"name": "Extension Development Host (Extension Only)",
-			"type": "extensionHost",
-			"request": "launch",
-			"args": [
-				"--extensionDevelopmentPath=${workspaceFolder}/editors/vscode",
-				"${workspaceFolder}"
-			],
-			"outFiles": [
-				"${workspaceFolder}/editors/vscode/dist/**/*.js"
-			],
-			"preLaunchTask": "npm: compile (editors/vscode)"
-		}
-	]
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Extension Development Host",
+      "type": "extensionHost",
+      "request": "launch",
+      "args": [
+        "--extensionDevelopmentPath=${workspaceFolder}/editors/vscode",
+        "${workspaceFolder}"
+      ],
+      "outFiles": ["${workspaceFolder}/editors/vscode/dist/**/*.js"],
+      "preLaunchTask": "build extension and lsp"
+    },
+    {
+      "name": "Extension Development Host (Extension Only)",
+      "type": "extensionHost",
+      "request": "launch",
+      "args": [
+        "--extensionDevelopmentPath=${workspaceFolder}/editors/vscode",
+        "${workspaceFolder}"
+      ],
+      "outFiles": ["${workspaceFolder}/editors/vscode/dist/**/*.js"],
+      "preLaunchTask": "npm: compile (editors/vscode)"
+    }
+  ]
 }

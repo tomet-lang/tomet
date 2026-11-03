@@ -1,16 +1,16 @@
 [package]
-name = "cotomet-eval"
-version.workspace = true
-edition.workspace = true
-description = "Evaluation for cotomet (.ctmt) data files: macros, variables, and expressions."
-license.workspace = true
+name                 = "cotomet-eval"
+version.workspace    = true
+edition.workspace    = true
+description          = "Evaluation for cotomet (.ctmt) data files: macros, variables, and expressions."
+license.workspace    = true
 repository.workspace = true
 
 [dependencies]
-time = { workspace = true }
-tomet-ast = { workspace = true }
-tomet-span = { workspace = true }
+time              = { workspace = true }
+tomet-ast         = { workspace = true }
+tomet-span        = { workspace = true }
 tomet-declaration = { workspace = true }
-tomet-expr = { workspace = true }
-tomet-position = { workspace = true }
-tomet-ast-parser = { workspace = true }
+tomet-expr        = { workspace = true }
+tomet-position    = { workspace = true }
+tomet-ast-parser  = { workspace = true }

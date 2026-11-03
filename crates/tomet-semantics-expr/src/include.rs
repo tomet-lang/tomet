@@ -93,7 +93,9 @@ impl Options {
         for (name, value) in &args.named {
             match (name.as_str(), value) {
                 ("level", EvalValue::Int(n)) if *n >= 1 => level = Some(*n as usize),
-                ("level", EvalValue::Number(text)) if text.parse::<usize>().map(|n| n >= 1).unwrap_or(false) => {
+                ("level", EvalValue::Number(text))
+                    if text.parse::<usize>().map(|n| n >= 1).unwrap_or(false) =>
+                {
                     level = Some(text.parse::<usize>().unwrap());
                 }
                 ("level", other) => {

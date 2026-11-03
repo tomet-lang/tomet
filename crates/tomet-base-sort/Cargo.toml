@@ -1,9 +1,9 @@
 [package]
-name = "tomet-sort"
-version.workspace = true
-edition.workspace = true
-description = "Pure character and dictionary collation, sort keys, and ordering primitives for Tomet."
-license.workspace = true
+name                 = "tomet-sort"
+version.workspace    = true
+edition.workspace    = true
+description          = "Pure character and dictionary collation, sort keys, and ordering primitives for Tomet."
+license.workspace    = true
 repository.workspace = true
 
 [dependencies]

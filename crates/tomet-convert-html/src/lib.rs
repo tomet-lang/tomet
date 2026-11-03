@@ -225,10 +225,7 @@ pub fn render_body_with(doc: &File, options: &RenderOptions) -> String {
 ///
 /// The HTML is byte-for-byte what [`render_body_with`] produces; the outline
 /// lists every heading the renderer emitted, in document order.
-pub fn render_body_with_outline(
-    doc: &File,
-    options: &RenderOptions,
-) -> (String, Vec<HeadingInfo>) {
+pub fn render_body_with_outline(doc: &File, options: &RenderOptions) -> (String, Vec<HeadingInfo>) {
     let mut out = String::new();
     let mut state = HeadingState::default();
     // Only `doc.*` needs binding here -- a document's own `::vocabulary`

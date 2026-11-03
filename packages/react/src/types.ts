@@ -1,4 +1,4 @@
-import type { ReactNode, ComponentType } from 'react';
+import type { ReactNode, ComponentType } from "react";
 
 /**
  * Span information representing exact source location.
@@ -24,8 +24,8 @@ export type Value =
 export type Sigil =
   | { Type: string }
   | { At: string | null }
-  | 'Bare'
-  | 'Dollar'
+  | "Bare"
+  | "Dollar"
   | string;
 
 export interface TextNode {
@@ -36,16 +36,16 @@ export interface TextNode {
 export type Inline =
   | { Text: TextNode }
   | { Element: Element }
-  | { type: 'Text'; value: string; span?: Span }
-  | { type: 'Element'; data: Element }
-  | { type: 'Code'; content: string; span?: Span };
+  | { type: "Text"; value: string; span?: Span }
+  | { type: "Element"; data: Element }
+  | { type: "Code"; content: string; span?: Span };
 
 export type ElementValue =
   | { Data: Value }
   | { Children: Element[] }
   | { Interp: unknown }
-  | { type: 'Data'; data: Value }
-  | { type: 'Children'; data: Element[] };
+  | { type: "Data"; data: Value }
+  | { type: "Children"; data: Element[] };
 
 export interface Element {
   sigil: Sigil;
@@ -65,10 +65,10 @@ export interface Paragraph {
 export type Block =
   | { Paragraph: Paragraph }
   | { Element: Element }
-  | { type: 'Paragraph'; content: Inline[]; inlines?: Inline[]; span?: Span }
-  | { type: 'Element'; data: Element }
-  | { type: 'Heading'; level: number; content: Inline[]; span?: Span }
-  | { type: 'ThematicBreak'; title?: Inline[] | null; span?: Span };
+  | { type: "Paragraph"; content: Inline[]; inlines?: Inline[]; span?: Span }
+  | { type: "Element"; data: Element }
+  | { type: "Heading"; level: number; content: Inline[]; span?: Span }
+  | { type: "ThematicBreak"; title?: Inline[] | null; span?: Span };
 
 export interface Document {
   blocks: Block[];

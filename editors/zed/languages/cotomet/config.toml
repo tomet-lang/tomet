@@ -1,16 +1,16 @@
-name = "Cotomet"
-grammar = "cotomet"
+name          = "Cotomet"
+grammar       = "cotomet"
 path_suffixes = ["ctmt"]
-line_comment = "//"
+line_comment  = "//"
 
 [[brackets]]
-start = "{"
-end = "}"
-close = true
+start   = "{"
+end     = "}"
+close   = true
 newline = true
 
 [[brackets]]
-start = "("
-end = ")"
-close = true
+start   = "("
+end     = ")"
+close   = true
 newline = true

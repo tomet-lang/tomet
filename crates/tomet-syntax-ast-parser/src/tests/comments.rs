@@ -303,16 +303,23 @@ fn comment_between_quotes_in_prose_is_a_comment() {
     let doc = parse_file("\"hello /*a comment*/ world\"\n").unwrap();
     match &doc.body[0] {
         Block::Paragraph(p) => {
-            let combined: String = p.content.iter().filter_map(|i| match i {
-                Inline::Text(t) => Some(t.value.as_str()),
-                _ => None,
-            }).collect();
+            let combined: String = p
+                .content
+                .iter()
+                .filter_map(|i| match i {
+                    Inline::Text(t) => Some(t.value.as_str()),
+                    _ => None,
+                })
+                .collect();
             assert_eq!(combined, "\"hello  world\"");
         }
         other => panic!("expected paragraph, got {other:?}"),
     }
     let cst = parse_cst("\"hello /*a comment*/ world\"\n");
-    assert!(cst.descendants_with_tokens().any(|e| e.kind() == tomet_cst::SyntaxKind::COMMENT));
+    assert!(
+        cst.descendants_with_tokens()
+            .any(|e| e.kind() == tomet_cst::SyntaxKind::COMMENT)
+    );
 }
 
 #[test]
@@ -321,13 +328,12 @@ fn comment_marker_inside_a_string_in_a_value_group_is_part_of_the_string() {
     match &doc.body[0] {
         Block::Element(el) => {
             let v = el.data.args.as_ref().unwrap();
-            let Value::Map(entries) = v else { panic!("expected map, got {v:?}") };
+            let Value::Map(entries) = v else {
+                panic!("expected map, got {v:?}")
+            };
             let (k, val) = &entries[0];
             assert_eq!(k, "allow");
-            assert_eq!(
-                val,
-                &Value::String("spec/**/*.tmt".into())
-            );
+            assert_eq!(val, &Value::String("spec/**/*.tmt".into()));
         }
         other => panic!("expected element, got {other:?}"),
     }
@@ -342,10 +348,22 @@ fn comment_marker_inside_a_code_span_is_text() {
             match (&p.content[0], &p.content[1], &p.content[2]) {
                 (Inline::Element(e1), Inline::Text(t), Inline::Element(e2)) => {
                     assert_eq!(e1.name, Name::bare("raw"));
-                    assert_eq!(e1.content, wrap(vec![Inline::Raw(tomet_ast::RawText::new("/* not a comment */", Span::new(1, 20)))]));
+                    assert_eq!(
+                        e1.content,
+                        wrap(vec![Inline::Raw(tomet_ast::RawText::new(
+                            "/* not a comment */",
+                            Span::new(1, 20)
+                        ))])
+                    );
                     assert_eq!(t.value.as_str(), " and ");
                     assert_eq!(e2.name, Name::bare("raw"));
-                    assert_eq!(e2.content, wrap(vec![Inline::Raw(tomet_ast::RawText::new("// also not a comment", Span::new(26, 49)))]));
+                    assert_eq!(
+                        e2.content,
+                        wrap(vec![Inline::Raw(tomet_ast::RawText::new(
+                            "// also not a comment",
+                            Span::new(26, 49)
+                        ))])
+                    );
                 }
                 other => panic!("unexpected content {other:?}"),
             }
@@ -359,10 +377,14 @@ fn block_comment_over_several_lines() {
     let doc = parse_file("before /* line 1\nline 2\nline 3 */ after\n").unwrap();
     match &doc.body[0] {
         Block::Paragraph(p) => {
-            let combined: String = p.content.iter().filter_map(|i| match i {
-                Inline::Text(t) => Some(t.value.as_str()),
-                _ => None,
-            }).collect();
+            let combined: String = p
+                .content
+                .iter()
+                .filter_map(|i| match i {
+                    Inline::Text(t) => Some(t.value.as_str()),
+                    _ => None,
+                })
+                .collect();
             assert_eq!(combined, "before  after");
         }
         other => panic!("expected paragraph, got {other:?}"),
@@ -380,5 +402,3 @@ fn unclosed_block_comment_ends_at_the_end_of_the_line() {
     }
     assert_eq!(comments, vec!["/* unclosed"]);
 }
-
-

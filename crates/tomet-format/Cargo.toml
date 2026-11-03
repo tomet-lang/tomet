@@ -1,16 +1,16 @@
 [package]
-name = "tomet-formatter"
-version.workspace = true
-edition.workspace = true
-description = "Whitespace-hygiene and layout formatter for .tmt source text."
-license.workspace = true
+name                 = "tomet-formatter"
+version.workspace    = true
+edition.workspace    = true
+description          = "Whitespace-hygiene and layout formatter for .tmt source text."
+license.workspace    = true
 repository.workspace = true
 
 [dependencies]
-tomet-ast = { workspace = true }
+tomet-ast        = { workspace = true }
 tomet-ast-parser = { workspace = true }
-tomet-config = { workspace = true }
-tomet-tree = { workspace = true }
+tomet-config     = { workspace = true }
+tomet-tree       = { workspace = true }
 #--- Crates.io ---
 unicode-width = { workspace = true }
 

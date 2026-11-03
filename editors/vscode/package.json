@@ -1,128 +1,128 @@
 {
-	"name": "tomet",
-	"displayName": "Tomet",
-	"description": "Syntax highlighting and language server support for Tomet (.tmt) and cotomet (.ctmt) files.",
-	"version": "0.1.0",
-	"publisher": "tomet-lang",
-	"license": "MIT OR Apache-2.0",
-	"repository": {
-		"type": "git",
-		"url": "https://github.com/tomet-lang/tomet.git"
-	},
-	"engines": {
-		"vscode": "^1.85.0"
-	},
-	"categories": [
-		"Programming Languages"
-	],
-	"main": "./dist/extension.js",
-	"contributes": {
-		"languages": [
-			{
-				"id": "tomet",
-				"aliases": [
-					"Tomet",
-					"tomet"
-				],
-				"extensions": [
-					".tm",
-					".tmt"
-				],
-				"configuration": "./language-configuration.json"
-			},
-			{
-				"id": "cotomet",
-				"aliases": [
-					"cotomet",
-					"Cotomet"
-				],
-				"extensions": [
-					".ctmt"
-				],
-				"configuration": "./language-configuration-cotomet.json"
-			}
-		],
-		"grammars": [
-			{
-				"language": "tomet",
-				"scopeName": "source.tomet",
-				"path": "./syntaxes/tomet.tmLanguage.json"
-			},
-			{
-				"language": "cotomet",
-				"scopeName": "source.cotomet",
-				"path": "./syntaxes/cotomet.tmLanguage.json"
-			}
-		],
-		"configurationDefaults": {
-			"[tomet]": {
-				"editor.wordWrap": "on",
-				"editor.formatOnSave": true,
-				"editor.bracketPairColorization.enabled": false
-			},
-			"[cotomet]": {
-				"editor.formatOnSave": true
-			}
-		},
-		"commands": [
-			{
-				"command": "tomet.restartServer",
-				"title": "Tomet: Restart Language Server"
-			},
-			{
-				"command": "tomet.onEnterKey",
-				"title": "Tomet: On Enter Key"
-			}
-		],
-		"keybindings": [
-			{
-				"command": "tomet.onEnterKey",
-				"key": "enter",
-				"when": "editorTextFocus && !editorHasSelection && !editorHasMultipleSelections && !suggestWidgetVisible && editorLangId == 'tomet'"
-			}
-		],
-		"configuration": {
-			"title": "Tomet",
-			"properties": {
-				"tomet.serverPath": {
-					"type": "string",
-					"default": "tomet-lsp",
-					"description": "Path to the tomet-lsp binary. Defaults to looking it up on $PATH (e.g. installed via the nix package)."
-				},
-				"tomet.trace.server": {
-					"type": "string",
-					"enum": [
-						"off",
-						"messages",
-						"verbose"
-					],
-					"default": "off",
-					"description": "Traces the communication between VS Code and the Tomet language server."
-				},
-				"tomet.table.columnColors": {
-					"type": "array",
-					"items": {
-						"type": "string"
-					},
-					"default": [],
-					"description": "Custom colors for table column dashed underlines. If empty, VS Code theme colors (editorBracketHighlight.foreground1..3) are used in a cycle."
-				}
-			}
-		}
-	},
-	"scripts": {
-		"compile": "node esbuild.js",
-		"watch": "node esbuild.js --watch",
-		"typecheck": "tsc --noEmit",
-		"vscode:prepublish": "npm run compile"
-	},
-	"dependencies": {
-		"vscode-languageclient": "^9.0.1"
-	},
-	"devDependencies": {
-		"@types/node": "^20.0.0",
-		"@types/vscode": "^1.85.0",
-		"esbuild": "^0.24.0",
-		"typescript": "^5.5.0"
-	}
+  "name": "tomet",
+  "displayName": "Tomet",
+  "description": "Syntax highlighting and language server support for Tomet (.tmt) and cotomet (.ctmt) files.",
+  "version": "0.1.0",
+  "publisher": "tomet-lang",
+  "license": "MIT OR Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/tomet-lang/tomet.git"
+  },
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "languages": [
+      {
+        "id": "tomet",
+        "aliases": [
+          "Tomet",
+          "tomet"
+        ],
+        "extensions": [
+          ".tm",
+          ".tmt"
+        ],
+        "configuration": "./language-configuration.json"
+      },
+      {
+        "id": "cotomet",
+        "aliases": [
+          "cotomet",
+          "Cotomet"
+        ],
+        "extensions": [
+          ".ctmt"
+        ],
+        "configuration": "./language-configuration-cotomet.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "tomet",
+        "scopeName": "source.tomet",
+        "path": "./syntaxes/tomet.tmLanguage.json"
+      },
+      {
+        "language": "cotomet",
+        "scopeName": "source.cotomet",
+        "path": "./syntaxes/cotomet.tmLanguage.json"
+      }
+    ],
+    "configurationDefaults": {
+      "[tomet]": {
+        "editor.wordWrap": "on",
+        "editor.formatOnSave": true,
+        "editor.bracketPairColorization.enabled": false
+      },
+      "[cotomet]": {
+        "editor.formatOnSave": true
+      }
+    },
+    "commands": [
+      {
+        "command": "tomet.restartServer",
+        "title": "Tomet: Restart Language Server"
+      },
+      {
+        "command": "tomet.onEnterKey",
+        "title": "Tomet: On Enter Key"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "tomet.onEnterKey",
+        "key": "enter",
+        "when": "editorTextFocus && !editorHasSelection && !editorHasMultipleSelections && !suggestWidgetVisible && editorLangId == 'tomet'"
+      }
+    ],
+    "configuration": {
+      "title": "Tomet",
+      "properties": {
+        "tomet.serverPath": {
+          "type": "string",
+          "default": "tomet-lsp",
+          "description": "Path to the tomet-lsp binary. Defaults to looking it up on $PATH (e.g. installed via the nix package)."
+        },
+        "tomet.trace.server": {
+          "type": "string",
+          "enum": [
+            "off",
+            "messages",
+            "verbose"
+          ],
+          "default": "off",
+          "description": "Traces the communication between VS Code and the Tomet language server."
+        },
+        "tomet.table.columnColors": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "description": "Custom colors for table column dashed underlines. If empty, VS Code theme colors (editorBracketHighlight.foreground1..3) are used in a cycle."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "compile": "node esbuild.js",
+    "watch": "node esbuild.js --watch",
+    "typecheck": "tsc --noEmit",
+    "vscode:prepublish": "npm run compile"
+  },
+  "dependencies": {
+    "vscode-languageclient": "^9.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/vscode": "^1.85.0",
+    "esbuild": "^0.24.0",
+    "typescript": "^5.5.0"
+  }
 }

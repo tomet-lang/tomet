@@ -1,0 +1,56 @@
+::kind(dictionary)
+::id(dictionary.tomet)
+::dictionary(tomet)
+|;@term("vault")
+|| @term(#vault-config) のあるディレクトリと、その下の文書の全体。tomet が設定と語彙を読む単位。
+|#(vault)
+|;@term("vault.config.tmt")
+|| @term(#vault) の境目を示す設定ファイル。上の階層の vault 設定は、ここで打ち切られる。詳しくは @file(tmtroot/spec/features/config.tmt)。
+|#(vault-config)
+|;@term(".config.tmt")
+|| フォルダごとの設定。そのフォルダと下の文書に、@term(#vault-config) の上に重ねて効く。
+|#(folder-config)
+|;@term("tomet")
+|| Tomet
+|;@term("cotomet")
+||
+|;@term("sytax")
+||
+|;@term("prose")
+|| 散文。`[]`や`|`の中でかく文字
+|;@term("data")
+|| データ。`{}`や`()`、Cotomet内で書くやつ。
+|;@term("sigil")
+|| 記号
+|;@term("form")
+|| `@`, `$`, `::`などの記号で構造を表すものの総称
+|;@term("division")
+|| File, Folder, Section, Vaultを@term("tome")から見て、まとめた言い方。
+|;@term("tome")
+|| @term("tomet")に対して、Vaultをすべての一つのtometだと考えたときの名前
+|;@term("tomed")
+|| @term("tome")化すること、したもの。
+|;@term("dictionary")
+||
+|;@term("kind")
+||
+|;@term("id")
+||
+|;@term("element")
+||
+|;@term("vocabulary")
+||
+|;@term("blueprint")
+||
+|;@term("schema")
+||
+|;@term("tandr")
+||
+|;@term("twrit")
+||
+|;@term("index")
+||
+|;@term("slot")
+|| `<>`
+|;@term("hole")
+|| ``

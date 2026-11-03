@@ -1,43 +1,18 @@
 {
-  "pandoc-api-version": [
-    1,
-    23,
-    1
-  ],
+  "pandoc-api-version": [1, 23, 1],
   "meta": {},
   "blocks": [
     {
       "t": "CodeBlock",
-      "c": [
-        [
-          "",
-          [],
-          []
-        ],
-        "@name *not em* ${not.interp} // not a comment"
-      ]
+      "c": [["", [], []], "@name *not em* ${not.interp} // not a comment"]
     },
     {
       "t": "CodeBlock",
-      "c": [
-        [
-          "",
-          [],
-          []
-        ],
-        " indented once"
-      ]
+      "c": [["", [], []], " indented once"]
     },
     {
       "t": "CodeBlock",
-      "c": [
-        [
-          "",
-          [],
-          []
-        ],
-        "first\nsecond\n\nthird"
-      ]
+      "c": [["", [], []], "first\nsecond\n\nthird"]
     },
     {
       "t": "Para",
@@ -50,14 +25,7 @@
     },
     {
       "t": "CodeBlock",
-      "c": [
-        [
-          "",
-          [],
-          []
-        ],
-        "raw"
-      ]
+      "c": [["", [], []], "raw"]
     },
     {
       "t": "Para",

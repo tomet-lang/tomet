@@ -1,16 +1,16 @@
 [package]
-name = "tomet-deps"
-version.workspace = true
-edition.workspace = true
-description = "Pure in-memory document dependency tracking, impact analysis, and invalidation for Tomet."
-license.workspace = true
+name                 = "tomet-deps"
+version.workspace    = true
+edition.workspace    = true
+description          = "Pure in-memory document dependency tracking, impact analysis, and invalidation for Tomet."
+license.workspace    = true
 repository.workspace = true
 
 [dependencies]
-tomet-ast = { workspace = true }
-tomet-tree = { workspace = true }
+tomet-ast        = { workspace = true }
+tomet-tree       = { workspace = true }
 tomet-ast-parser = { workspace = true }
-tomet-address = { workspace = true }
-tomet-semantics = { workspace = true }
+tomet-address    = { workspace = true }
+tomet-semantics  = { workspace = true }
 #--- Crates.io ---
 serde = { workspace = true }

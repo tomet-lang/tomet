@@ -64,7 +64,8 @@ impl FlatData {
 /// part of an attribute name, and spliced in it would add attributes of its own.
 /// The empty key is the positional marker and is not judged here.
 pub fn is_attribute_key(key: &str) -> bool {
-    key.chars().all(|c| c.is_alphanumeric() || c == '_' || c == '-' || c == '.')
+    key.chars()
+        .all(|c| c.is_alphanumeric() || c == '_' || c == '-' || c == '.')
 }
 
 /// Flattens `el`'s `(args)` and `{value}` for an attribute map.

@@ -117,8 +117,7 @@ fn custom_element_hook_falling_through_matches_generic_rendering() {
 /// honest rendering of that is what was written.
 #[test]
 fn an_unprepared_interpolation_renders_as_its_own_source() {
-    let doc =
-        parse_file("Issue: $gh(42)\nFooter: ${copyright}\nMath: ${add(10, 5)}\n").unwrap();
+    let doc = parse_file("Issue: $gh(42)\nFooter: ${copyright}\nMath: ${add(10, 5)}\n").unwrap();
     assert_eq!(
         render_body(&doc),
         "<p>Issue: ${gh(42)} Footer: ${copyright} Math: ${add(10, 5)}</p>\n"

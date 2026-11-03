@@ -1,18 +1,17 @@
 [package]
-name = "tomet-lowering"
-version.workspace = true
-edition.workspace = true
-description = "Lowering the Tomet Concrete Syntax Tree (CST) into typed AST representations (File, Value)."
-license.workspace = true
+name                 = "tomet-lowering"
+version.workspace    = true
+edition.workspace    = true
+description          = "Lowering the Tomet Concrete Syntax Tree (CST) into typed AST representations (File, Value)."
+license.workspace    = true
 repository.workspace = true
 
 [dependencies]
-tomet-cst = { workspace = true }
-tomet-ast = { workspace = true }
-tomet-span = { workspace = true }
+tomet-cst      = { workspace = true }
+tomet-ast      = { workspace = true }
+tomet-span     = { workspace = true }
 tomet-position = { workspace = true }
-tomet-tree = { workspace = true }
-tomet-lexer = { workspace = true }
-
-#= Crates.io
+tomet-tree     = { workspace = true }
+tomet-lexer    = { workspace = true }
+#--- Crates.io ---
 unicode-width = { workspace = true }

@@ -1,9 +1,5 @@
 {
-  "pandoc-api-version": [
-    1,
-    23,
-    1
-  ],
+  "pandoc-api-version": [1, 23, 1],
   "meta": {
     "id": {
       "t": "MetaInlines",
@@ -57,11 +53,7 @@
       "t": "Header",
       "c": [
         1,
-        [
-          "",
-          [],
-          []
-        ],
+        ["", [], []],
         [
           {
             "t": "Str",
@@ -193,16 +185,7 @@
     },
     {
       "t": "CodeBlock",
-      "c": [
-        [
-          "",
-          [
-            "tmt"
-          ],
-          []
-        ],
-        "::kind(config)"
-      ]
+      "c": [["", ["tmt"], []], "::kind(config)"]
     },
     {
       "t": "Para",

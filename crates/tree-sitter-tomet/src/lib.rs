@@ -1213,12 +1213,21 @@ mod tests {
             ("\\*not em\\*\n", vec!["\\*", "\\*"]),
             ("\\**not strong\\**\n", vec!["\\**", "\\**"]),
             ("use \\`code\\` and `real`\n", vec!["\\`", "\\`"]),
-            ("text \\// not comment and \\/* not block */\n", vec!["\\//", "\\/"]),
-            ("\\= not section and \\--- not hr and \\- not list\n", vec!["\\=", "\\---", "\\-"]),
+            (
+                "text \\// not comment and \\/* not block */\n",
+                vec!["\\//", "\\/"],
+            ),
+            (
+                "\\= not section and \\--- not hr and \\- not list\n",
+                vec!["\\=", "\\---", "\\-"],
+            ),
             ("\\::decl(x) and \\@elem(x)\n", vec!["\\::", "\\@"]),
             ("\\${interp} and \\<?hole>\n", vec!["\\$", "\\<"]),
             ("@note[a \\[ b \\] c]\n", vec!["\\[", "\\]"]),
-            ("literal \\\\ and \\\\*em* and C:\\Users\\name\n", vec!["\\\\", "\\\\"]),
+            (
+                "literal \\\\ and \\\\*em* and C:\\Users\\name\n",
+                vec!["\\\\", "\\\\"],
+            ),
         ] {
             let tree = parse(src);
             assert!(
@@ -1238,7 +1247,10 @@ mod tests {
         assert!(!tree.root_node().has_error());
         let spans: Vec<&str> = nodes_of_kind(&tree, "code_span")
             .into_iter()
-            .map(|n| n.utf8_text("mid `` empty and `code` span\n".as_bytes()).unwrap())
+            .map(|n| {
+                n.utf8_text("mid `` empty and `code` span\n".as_bytes())
+                    .unwrap()
+            })
             .collect();
         assert_eq!(spans, ["`code`"]);
     }

@@ -38,10 +38,7 @@ pub fn render_element(el: ElementView<'_>, config: &PrinterConfig) -> String {
             && el.id.is_none()
             && el.connects.is_empty()
         {
-            let body = el
-                .content
-                .and_then(raw_content_text)
-                .unwrap_or_default();
+            let body = el.content.and_then(raw_content_text).unwrap_or_default();
             if !body.is_empty() && !body.contains('`') && !body.contains('\n') {
                 return format!("`{body}`");
             }
@@ -71,14 +68,11 @@ pub fn render_element(el: ElementView<'_>, config: &PrinterConfig) -> String {
                     }
                 })
                 .unwrap_or_default();
-            let body = el
-                .content
-                .and_then(raw_content_text)
-                .unwrap_or_else(|| {
-                    el.content
-                        .map(|content| render_content_blocks(content, config))
-                        .unwrap_or_default()
-                });
+            let body = el.content.and_then(raw_content_text).unwrap_or_else(|| {
+                el.content
+                    .map(|content| render_content_blocks(content, config))
+                    .unwrap_or_default()
+            });
             let longest = body
                 .lines()
                 .map(|l| l.trim_end())

@@ -115,11 +115,7 @@ pub(crate) fn root_item(
     cx: &EvalContext,
 ) -> Result<EvalValue, EvalError> {
     let document = load(doc, cx)?;
-    let blocks: Vec<EvalValue> = document
-        .body
-        .iter()
-        .map(|b| block_value(doc, b))
-        .collect();
+    let blocks: Vec<EvalValue> = document.body.iter().map(|b| block_value(doc, b)).collect();
     index_into(&blocks, index)
 }
 

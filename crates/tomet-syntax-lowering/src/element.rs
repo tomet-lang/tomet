@@ -54,7 +54,10 @@ pub(crate) fn lower_paren_value(node: &SyntaxNode) -> Result<Value> {
         if closed {
             return Ok(Value::Map(Vec::new()));
         } else {
-            return Err(err(usize::from(node.text_range().end()), "expected a value"));
+            return Err(err(
+                usize::from(node.text_range().end()),
+                "expected a value",
+            ));
         }
     }
 
@@ -105,7 +108,9 @@ pub(crate) fn lower_hash_id(node: &SyntaxNode) -> Result<Id> {
     }
 
     if tokens_inside.is_empty() {
-        if node.children().any(|c| c.kind() == K::ERROR) && node.text().to_string().trim_end().ends_with(')') {
+        if node.children().any(|c| c.kind() == K::ERROR)
+            && node.text().to_string().trim_end().ends_with(')')
+        {
             let full = node.text().to_string();
             let trimmed = full.trim();
             if let Some(inner) = trimmed.strip_prefix("#(").and_then(|s| s.strip_suffix(')')) {
@@ -116,7 +121,10 @@ pub(crate) fn lower_hash_id(node: &SyntaxNode) -> Result<Id> {
             }
         }
         let pos = if closed {
-            let rparen = node.children_with_tokens().find(|e| e.kind() == K::R_PAREN).unwrap();
+            let rparen = node
+                .children_with_tokens()
+                .find(|e| e.kind() == K::R_PAREN)
+                .unwrap();
             usize::from(rparen.text_range().start())
         } else {
             usize::from(node.text_range().end())
@@ -163,7 +171,10 @@ pub(crate) fn lower_hash_id(node: &SyntaxNode) -> Result<Id> {
     }
     let trimmed = raw.trim();
     if trimmed.is_empty() || trimmed.starts_with("//") {
-        return Err(err(usize::from(node.text_range().start()), "expected an id"));
+        return Err(err(
+            usize::from(node.text_range().start()),
+            "expected an id",
+        ));
     }
     let has_error = node.children().any(|c| c.kind() == K::ERROR);
     if !closed && (!has_error || !node.text().to_string().trim_end().ends_with(')')) {
@@ -192,16 +203,17 @@ pub(crate) fn lower_value_group(node: &SyntaxNode) -> Result<Group> {
                          write a bare value in '(args)' instead",
                     ));
                 }
-                if entries.iter().any(|e| matches!(e, Entry::Pair(k, _) if *k == key)) {
+                if entries
+                    .iter()
+                    .any(|e| matches!(e, Entry::Pair(k, _) if *k == key))
+                {
                     return Err(duplicate_key_error(offset, &key));
                 }
                 entries.push(Entry::Pair(key, value));
                 i += 1;
             }
             K::SEQ_ITEM => {
-                let first_non_trivia = child
-                    .children_with_tokens()
-                    .find(|e| !e.kind().is_trivia());
+                let first_non_trivia = child.children_with_tokens().find(|e| !e.kind().is_trivia());
                 match first_non_trivia {
                     Some(SyntaxElement::Node(n)) if n.kind() == K::ARGS => {
                         let start_pos = usize::from(child.text_range().start());
@@ -210,7 +222,11 @@ pub(crate) fn lower_value_group(node: &SyntaxNode) -> Result<Group> {
                             .filter(|n| {
                                 matches!(
                                     n.kind(),
-                                    K::ARGS | K::VALUE_DATA | K::MAP_LITERAL | K::CONTENT | K::ID_GROUP
+                                    K::ARGS
+                                        | K::VALUE_DATA
+                                        | K::MAP_LITERAL
+                                        | K::CONTENT
+                                        | K::ID_GROUP
                                 )
                             })
                             .collect();
@@ -245,7 +261,11 @@ pub(crate) fn lower_value_group(node: &SyntaxNode) -> Result<Group> {
                                 .filter(|n| {
                                     matches!(
                                         n.kind(),
-                                        K::ARGS | K::VALUE_DATA | K::MAP_LITERAL | K::CONTENT | K::ID_GROUP
+                                        K::ARGS
+                                            | K::VALUE_DATA
+                                            | K::MAP_LITERAL
+                                            | K::CONTENT
+                                            | K::ID_GROUP
                                     )
                                 })
                                 .collect();
@@ -255,7 +275,10 @@ pub(crate) fn lower_value_group(node: &SyntaxNode) -> Result<Group> {
                             if next_groups.iter().any(|g| g.kind() == K::ARGS) {
                                 break;
                             }
-                            if next_groups.iter().any(|g| groups.iter().any(|taken| taken.kind() == g.kind())) {
+                            if next_groups
+                                .iter()
+                                .any(|g| groups.iter().any(|taken| taken.kind() == g.kind()))
+                            {
                                 break;
                             }
                             let has_other = next_child.children_with_tokens().any(|e| {
@@ -289,7 +312,9 @@ pub(crate) fn lower_value_group(node: &SyntaxNode) -> Result<Group> {
                         if matches!(n.kind(), K::INLINE_FORM | K::BLOCK_FORM) =>
                     {
                         let n_end = usize::from(n.text_range().end());
-                        let mut trailing = child.children_with_tokens().skip_while(|e| usize::from(e.text_range().start()) < n_end);
+                        let mut trailing = child
+                            .children_with_tokens()
+                            .skip_while(|e| usize::from(e.text_range().start()) < n_end);
                         if let Some(t) = trailing.find(|e| !e.kind().is_trivia()) {
                             let pos = usize::from(t.text_range().start());
                             return Err(err(pos, "expected a value"));
@@ -400,11 +425,8 @@ pub(crate) fn lower_map_entries(
             }
             K::SEQ_ITEM => {
                 let offset = usize::from(child.text_range().start());
-                let val = lower_single_value_from_children(
-                    child.children_with_tokens(),
-                    false,
-                    offset,
-                )?;
+                let val =
+                    lower_single_value_from_children(child.children_with_tokens(), false, offset)?;
                 if keyed_only {
                     return Err(err(offset, "expected 'key: value' entry, found bare value"));
                 }
@@ -443,9 +465,7 @@ pub(crate) fn lower_map_entries(
 /// Lowers one `MAP_ENTRY` node into `(key, value, offset)`.
 pub(crate) fn lower_map_entry(node: &SyntaxNode) -> Result<(String, Value, usize)> {
     let start = usize::from(node.text_range().start());
-    let colon = node
-        .children_with_tokens()
-        .find(|e| e.kind() == K::COLON);
+    let colon = node.children_with_tokens().find(|e| e.kind() == K::COLON);
     let Some(colon) = colon else {
         let val = lower_single_value_from_children(node.children_with_tokens(), false, start)?;
         return Ok((POSITIONAL_ENTRY_KEY.to_string(), val, start));
@@ -488,7 +508,11 @@ pub(crate) fn lower_map_entry(node: &SyntaxNode) -> Result<(String, Value, usize
     if is_scheme_uri {
         let text = node.text().to_string();
         let trimmed = text.trim();
-        return Ok((POSITIONAL_ENTRY_KEY.to_string(), Value::String(trimmed.to_string()), start));
+        return Ok((
+            POSITIONAL_ENTRY_KEY.to_string(),
+            Value::String(trimmed.to_string()),
+            start,
+        ));
     }
 
     if key_tokens.iter().any(|t| t.kind() == K::DOLLAR) {
@@ -545,7 +569,10 @@ fn lower_single_value_from_children(
 
     let first = &elements[non_trivia_indices[0]];
     if matches!(first.kind(), K::COMMA | K::R_BRACKET | K::R_BRACE) {
-        return Err(err(usize::from(first.text_range().start()), "expected a value"));
+        return Err(err(
+            usize::from(first.text_range().start()),
+            "expected a value",
+        ));
     }
 
     if non_trivia_indices.len() >= 2 {
@@ -592,7 +619,10 @@ fn lower_single_value_from_children(
                 || (first.kind() == K::INLINE_FORM
                     && first.as_node().is_some_and(opens_with_dollar));
             if is_expr && next_elem.kind() == K::COLON {
-                return Err(err(usize::from(first.text_range().start()), "an expression cannot be a key"));
+                return Err(err(
+                    usize::from(first.text_range().start()),
+                    "an expression cannot be a key",
+                ));
             }
             return Err(err(pos, "expected ',' or a newline between entries"));
         }
@@ -688,7 +718,10 @@ fn lower_call_args(args_node: &SyntaxNode, raw_args: bool) -> Result<Vec<Value>>
         .children_with_tokens()
         .any(|e| e.kind() == K::R_PAREN);
     if !closed {
-        return Err(err(usize::from(args_node.text_range().end()), "expected ')'"));
+        return Err(err(
+            usize::from(args_node.text_range().end()),
+            "expected ')'",
+        ));
     }
 
     let items: Vec<SyntaxNode> = args_node
@@ -699,9 +732,11 @@ fn lower_call_args(args_node: &SyntaxNode, raw_args: bool) -> Result<Vec<Value>>
     for i in 0..items.len().saturating_sub(1) {
         let end = items[i].text_range().end();
         let next_start = items[i + 1].text_range().start();
-        let has_comma = args_node
-            .children_with_tokens()
-            .any(|e| e.kind() == K::COMMA && e.text_range().start() >= end && e.text_range().end() <= next_start);
+        let has_comma = args_node.children_with_tokens().any(|e| {
+            e.kind() == K::COMMA
+                && e.text_range().start() >= end
+                && e.text_range().end() <= next_start
+        });
         if !has_comma {
             return Err(err(
                 usize::from(next_start),

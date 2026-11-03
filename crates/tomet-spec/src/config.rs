@@ -29,9 +29,7 @@ pub fn document(
     let mut id = declaration_new("id");
     id.data.args = Some(Value::String(doc_id.to_string()));
 
-    let mut blocks = vec![
-        Block::Section(Section::new(1, vec![text(title)], dummy())),
-    ];
+    let mut blocks = vec![Block::Section(Section::new(1, vec![text(title)], dummy()))];
 
     for intro in intro_paragraphs {
         if !intro.is_empty() {

@@ -1,13 +1,13 @@
 [package]
-name = "tomet-ast"
-version.workspace = true
-edition.workspace = true
-description = "Shared AST and Value data models for the Tomet toolchain."
-license.workspace = true
+name                 = "tomet-ast"
+version.workspace    = true
+edition.workspace    = true
+description          = "Shared AST and Value data models for the Tomet toolchain."
+license.workspace    = true
 repository.workspace = true
 
 [dependencies]
 tomet-span = { workspace = true }
-#= Crates.io
-serde = { workspace = true }
+#--- Crates.io ---
+serde         = { workspace = true }
 unicode-width = { workspace = true }

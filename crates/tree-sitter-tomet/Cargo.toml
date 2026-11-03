@@ -1,11 +1,11 @@
 [package]
-name = "tree-sitter-tomet"
-version.workspace = true
-edition.workspace = true
-description = "Rust binding for the Tomet tree-sitter grammar."
-license.workspace = true
+name                 = "tree-sitter-tomet"
+version.workspace    = true
+edition.workspace    = true
+description          = "Rust binding for the Tomet tree-sitter grammar."
+license.workspace    = true
 repository.workspace = true
-build = "build.rs"
+build                = "build.rs"
 
 [dependencies]
 tree-sitter-language = { workspace = true }

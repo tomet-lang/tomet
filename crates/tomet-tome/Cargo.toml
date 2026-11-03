@@ -1,13 +1,13 @@
 [package]
-name = "tomet-tome"
-version.workspace = true
-edition.workspace = true
-description = "A vault's parsed documents assembled in memory into one tree: Vault, Folder, File, Section."
-license.workspace = true
+name                 = "tomet-tome"
+version.workspace    = true
+edition.workspace    = true
+description          = "A vault's parsed documents assembled in memory into one tree: Vault, Folder, File, Section."
+license.workspace    = true
 repository.workspace = true
 
 [dependencies]
-tomet-ast = { workspace = true }
+tomet-ast  = { workspace = true }
 tomet-sort = { workspace = true }
 tomet-tree = { workspace = true }
 

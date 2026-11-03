@@ -1,19 +1,18 @@
 [package]
-name = "tomet-expr"
-version.workspace = true
-edition.workspace = true
-description = "Expression evaluation for the ${...} expressions of a Tomet document."
-license.workspace = true
+name                 = "tomet-expr"
+version.workspace    = true
+edition.workspace    = true
+description          = "Expression evaluation for the ${...} expressions of a Tomet document."
+license.workspace    = true
 repository.workspace = true
 
 [dependencies]
-tomet-ast = { workspace = true }
-tomet-span = { workspace = true }
-tomet-ast-parser = { workspace = true }
+tomet-ast         = { workspace = true }
+tomet-span        = { workspace = true }
+tomet-ast-parser  = { workspace = true }
 tomet-declaration = { workspace = true }
-tomet-type = { workspace = true }
-tomet-tree = { workspace = true }
-
-#= Crates.io
+tomet-type        = { workspace = true }
+tomet-tree        = { workspace = true }
+#--- Crates.io ---
 time = { workspace = true }
 uuid = { workspace = true }

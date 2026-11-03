@@ -2,8 +2,7 @@ use super::*;
 
 #[test]
 fn bare_url_autolink_strips_trailing_punctuation() {
-    let doc =
-        parse_file("Check https://example.com/foo! and https://example.com/bar.\n").unwrap();
+    let doc = parse_file("Check https://example.com/foo! and https://example.com/bar.\n").unwrap();
     match &doc.body[0] {
         Block::Paragraph(p) => {
             assert_eq!(p.content.len(), 5);
@@ -39,8 +38,8 @@ fn bare_url_autolink_strips_trailing_punctuation() {
 
 #[test]
 fn bare_url_autolink_handles_parentheses() {
-    let doc = parse_file("Visit (https://example.com/foo) or https://example.com/path(bar)\n")
-        .unwrap();
+    let doc =
+        parse_file("Visit (https://example.com/foo) or https://example.com/path(bar)\n").unwrap();
     match &doc.body[0] {
         Block::Paragraph(p) => {
             assert_eq!(p.content[0], Inline::Text("Visit (".into()));

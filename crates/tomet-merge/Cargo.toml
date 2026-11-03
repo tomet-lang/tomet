@@ -1,13 +1,13 @@
 [package]
-name = "tomet-merge"
-version.workspace = true
-edition.workspace = true
-description = "Format-preserving three-way merge and conflict resolution for Tomet documents."
-license.workspace = true
+name                 = "tomet-merge"
+version.workspace    = true
+edition.workspace    = true
+description          = "Format-preserving three-way merge and conflict resolution for Tomet documents."
+license.workspace    = true
 repository.workspace = true
 
 [dependencies]
-tomet-cst = { workspace = true }
-tomet-edit = { workspace = true }
+tomet-cst        = { workspace = true }
+tomet-edit       = { workspace = true }
 tomet-cst-parser = { workspace = true }
 tomet-ast-parser = { workspace = true }

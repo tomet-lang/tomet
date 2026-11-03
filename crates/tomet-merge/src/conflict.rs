@@ -220,9 +220,7 @@ fn read(
     };
 
     let kind = match (&a, &b) {
-        (Side::Blocks(_), Side::Blocks(_)) if node.kind() == K::BLOCK_FORM => {
-            ConflictKind::Block
-        }
+        (Side::Blocks(_), Side::Blocks(_)) if node.kind() == K::BLOCK_FORM => ConflictKind::Block,
         (Side::Blocks(_), Side::Blocks(_)) => ConflictKind::Inline,
         (Side::Value(_), Side::Value(_)) => ConflictKind::Value,
         _ => return Err(bad("one side is `[ ... ]` and the other a plain value")),

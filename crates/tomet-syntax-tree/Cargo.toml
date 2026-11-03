@@ -1,13 +1,13 @@
 [package]
-name = "tomet-tree"
-version.workspace = true
-edition.workspace = true
-description = "AST node accessors, extension traits, builders, and recursive tree traversal for Tomet."
-license.workspace = true
+name                 = "tomet-tree"
+version.workspace    = true
+edition.workspace    = true
+description          = "AST node accessors, extension traits, builders, and recursive tree traversal for Tomet."
+license.workspace    = true
 repository.workspace = true
 
 [dependencies]
-tomet-ast = { workspace = true }
+tomet-ast  = { workspace = true }
 tomet-span = { workspace = true }
 
 [dev-dependencies]

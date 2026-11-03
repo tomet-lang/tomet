@@ -1,19 +1,19 @@
 [package]
-name = "cotomet"
-version.workspace = true
-edition.workspace = true
-license.workspace = true
+name                 = "cotomet"
+version.workspace    = true
+edition.workspace    = true
+license.workspace    = true
 repository.workspace = true
-description = "The crate to depend on when using cotomet, the data language dual to tomet, from Rust."
+description          = "The crate to depend on when using cotomet, the data language dual to tomet, from Rust."
 
 [dependencies]
-cotomet-eval = { workspace = true, optional = true }
-serde_cotomet = { workspace = true }
-tomet-ast = { workspace = true }
+cotomet-eval     = { workspace = true, optional = true }
+serde_cotomet    = { workspace = true }
+tomet-ast        = { workspace = true }
 tomet-ast-parser = { workspace = true }
-tomet-position = { workspace = true }
-tomet-span = { workspace = true }
+tomet-position   = { workspace = true }
+tomet-span       = { workspace = true }
 
 [features]
 default = []
-eval = ["dep:cotomet-eval"]
+eval    = ["dep:cotomet-eval"]

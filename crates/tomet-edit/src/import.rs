@@ -4,8 +4,8 @@ use tomet_cst::{NodeOrToken, SyntaxElement, SyntaxKind as K, SyntaxNode};
 
 use crate::doc::EditDoc;
 use crate::node::{
-    AttrEntry, AttrSlot, ChildItem, EditValue, EditValueKind, FormPiece, FormSlots,
-    InlineItem, Node, NodeId, NodeKind,
+    AttrEntry, AttrSlot, ChildItem, EditValue, EditValueKind, FormPiece, FormSlots, InlineItem,
+    Node, NodeId, NodeKind,
 };
 
 /// Parses `src` into a CST and imports it into an [`EditDoc`].

@@ -10,11 +10,11 @@ pub use diagnostic::{CstValidationError, Diagnostic, Severity};
 pub use id::{collect_ids, collect_ids_cst};
 
 use tomet_ast::{Block, ElementView, File, Inline};
-use tomet_span::Span;
 use tomet_cst::{SyntaxNode, TextRange};
 use tomet_semantics::DeclKind;
 use tomet_semantics::{Bindings, Shape};
 use tomet_semantics_core::admits::admits;
+use tomet_span::Span;
 use tomet_tree::{Node, Place, Visit};
 
 /// [`tomet_tree::for_each_element`], and the list items written in the combine
@@ -130,11 +130,7 @@ pub fn validate_core(doc: &File, bindings: &Bindings, errors: &mut Vec<Diagnosti
 }
 
 /// Enforces the `singleton` and `region` axes.
-pub fn check_singletons_and_regions(
-    doc: &File,
-    bindings: &Bindings,
-    errors: &mut Vec<Diagnostic>,
-) {
+pub fn check_singletons_and_regions(doc: &File, bindings: &Bindings, errors: &mut Vec<Diagnostic>) {
     use tomet_ast::{Block, Inline};
     use tomet_semantics::Region;
 
@@ -148,11 +144,7 @@ pub fn check_singletons_and_regions(
 
     let constraints = |node: Node<'_>| -> Option<Held> {
         let (name, document, classified) = match node {
-            Node::Declaration(d) => (
-                &d.name,
-                true,
-                tomet_semantics::classify_declaration(d),
-            ),
+            Node::Declaration(d) => (&d.name, true, tomet_semantics::classify_declaration(d)),
             other => {
                 let view = other.element_view()?;
                 (view.name, false, classify_in(view, bindings))

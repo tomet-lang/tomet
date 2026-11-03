@@ -1,19 +1,19 @@
 [package]
-name = "tomet-ast-parser"
-version.workspace = true
-edition.workspace = true
-description = "Reference AST parser for Tomet, combining CST parsing and AST lowering."
-license.workspace = true
+name                 = "tomet-ast-parser"
+version.workspace    = true
+edition.workspace    = true
+description          = "Reference AST parser for Tomet, combining CST parsing and AST lowering."
+license.workspace    = true
 repository.workspace = true
 
 [dependencies]
-tomet-ast = { workspace = true }
-tomet-cst = { workspace = true }
+tomet-ast        = { workspace = true }
+tomet-cst        = { workspace = true }
 tomet-cst-parser = { workspace = true }
-tomet-span = { workspace = true }
-tomet-position = { workspace = true }
-tomet-lexer = { workspace = true }
-tomet-lowering = { workspace = true }
+tomet-span       = { workspace = true }
+tomet-position   = { workspace = true }
+tomet-lexer      = { workspace = true }
+tomet-lowering   = { workspace = true }
 
 [dev-dependencies]
 tomet-tree = { workspace = true }

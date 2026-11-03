@@ -219,7 +219,8 @@ fn a_heading_rule_connect_is_not_misclassified_as_an_unknown_element() {
 
 #[test]
 fn a_rule_allowing_item_and_task_accepts_plain_and_task_list_items() {
-    let doc = parse("=[ Todo ]:rule(allow:list(item, task))\n- a plain item\n-@task[ a task item ]\n");
+    let doc =
+        parse("=[ Todo ]:rule(allow:list(item, task))\n- a plain item\n-@task[ a task item ]\n");
     let errors = rule_errors(&doc, &Bindings::default());
     assert_eq!(errors, vec![]);
 }
@@ -251,17 +252,18 @@ fn an_element_named_item_is_rejected_as_unknown() {
     let doc = parse("@item[ an item ]\n");
     let errors = validate_document(&doc);
     assert!(
-        errors.iter().any(|e| matches!(e, Diagnostic::UnknownElement { name, .. } if name == "item")),
+        errors
+            .iter()
+            .any(|e| matches!(e, Diagnostic::UnknownElement { name, .. } if name == "item")),
         "{errors:?}"
     );
 }
 
 #[test]
 fn an_element_named_item_is_rejected_even_in_open_vocabulary() {
-    let vocab = tomet_ast_parser::parse_file(
-        "::kind(vocabulary)\n::vocabulary(sketch){ open: true }\n",
-    )
-    .expect("vocabulary parses");
+    let vocab =
+        tomet_ast_parser::parse_file("::kind(vocabulary)\n::vocabulary(sketch){ open: true }\n")
+            .expect("vocabulary parses");
     let bindings = Bindings {
         kind: Some(tomet_semantics::Vocabulary::from_file(&vocab).expect("valid vocabulary")),
         ..Bindings::default()
@@ -269,11 +271,15 @@ fn an_element_named_item_is_rejected_even_in_open_vocabulary() {
     let doc = parse("::kind(sketch)\n\n@item[ item ]\n@widget[ widget ]\n");
     let errors = validate_document_with(&doc, &bindings);
     assert!(
-        !errors.iter().any(|e| matches!(e, Diagnostic::UnknownElement { name, .. } if name == "widget")),
+        !errors
+            .iter()
+            .any(|e| matches!(e, Diagnostic::UnknownElement { name, .. } if name == "widget")),
         "{errors:?}"
     );
     assert!(
-        errors.iter().any(|e| matches!(e, Diagnostic::UnknownElement { name, .. } if name == "item")),
+        errors
+            .iter()
+            .any(|e| matches!(e, Diagnostic::UnknownElement { name, .. } if name == "item")),
         "{errors:?}"
     );
 }

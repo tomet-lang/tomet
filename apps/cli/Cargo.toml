@@ -1,55 +1,54 @@
 [package]
-name = "tomet-cli"
-version.workspace = true
-edition.workspace = true
-description = "Command-line interface and developer tools for the Tomet toolchain."
-license.workspace = true
+name                 = "tomet-cli"
+version.workspace    = true
+edition.workspace    = true
+description          = "Command-line interface and developer tools for the Tomet toolchain."
+license.workspace    = true
 repository.workspace = true
-publish = false
+publish              = false
 
 [[bin]]
 name = "tomet"
 path = "src/main.rs"
 
 [dependencies]
-cotomet = { workspace = true }
-cotomet-eval = { workspace = true }
-tomet-ast = { workspace = true }
-tomet-ast-parser = { workspace = true }
-tomet-config = { workspace = true }
+cotomet                  = { workspace = true }
+cotomet-eval             = { workspace = true }
+tomet-ast                = { workspace = true }
+tomet-ast-parser         = { workspace = true }
+tomet-config             = { workspace = true }
 tomet-convert-standalone = { workspace = true }
-tomet-declaration = { workspace = true }
-tomet-expr = { workspace = true }
-tomet-formatter = { workspace = true }
-tomet-html = { workspace = true }
-tomet-indexer = { workspace = true }
-tomet-position = { workspace = true }
-tomet-links = { workspace = true, features = ["cache"] }
-tomet-load = { workspace = true }
-tomet-load-config = { workspace = true }
-tomet-markdown = { workspace = true }
-tomet-pandoc = { workspace = true }
-tomet-printer = { workspace = true }
-tomet-semantics = { workspace = true }
-tomet-spec = { workspace = true }
-tomet-stats = { workspace = true }
-tomet-tree = { workspace = true }
-tomet-typst = { workspace = true }
-tomet-validator = { workspace = true }
-tomet-workspace = { workspace = true }
-
-#= Crates.io
-anyhow = { workspace = true }
-clap = { workspace = true }
+tomet-declaration        = { workspace = true }
+tomet-expr               = { workspace = true }
+tomet-formatter          = { workspace = true }
+tomet-html               = { workspace = true }
+tomet-indexer            = { workspace = true }
+tomet-position           = { workspace = true }
+tomet-links              = { workspace = true, features = ["cache"] }
+tomet-load               = { workspace = true }
+tomet-load-config        = { workspace = true }
+tomet-markdown           = { workspace = true }
+tomet-pandoc             = { workspace = true }
+tomet-printer            = { workspace = true }
+tomet-semantics          = { workspace = true }
+tomet-spec               = { workspace = true }
+tomet-stats              = { workspace = true }
+tomet-tree               = { workspace = true }
+tomet-typst              = { workspace = true }
+tomet-validator          = { workspace = true }
+tomet-workspace          = { workspace = true }
+#--- Crates.io ---
+anyhow         = { workspace = true }
+clap           = { workspace = true }
 jobserver-gate = { workspace = true }
-mimalloc = { workspace = true }
-nanoid = { workspace = true }
-rayon = { workspace = true }
-serde = { workspace = true }
-serde_json = { workspace = true }
-toml = { workspace = true }
-uuid = { workspace = true }
-walkdir = { workspace = true }
+mimalloc       = { workspace = true }
+nanoid         = { workspace = true }
+rayon          = { workspace = true }
+serde          = { workspace = true }
+serde_json     = { workspace = true }
+toml           = { workspace = true }
+uuid           = { workspace = true }
+walkdir        = { workspace = true }
 
 [dev-dependencies]
 jobserver = { workspace = true }

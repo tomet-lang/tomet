@@ -1,42 +1,16 @@
 {
-  "pandoc-api-version": [
-    1,
-    23,
-    1
-  ],
+  "pandoc-api-version": [1, 23, 1],
   "meta": {},
   "blocks": [
     {
       "t": "Div",
       "c": [
-        [
-          "",
-          [
-            "tomet-section"
-          ],
-          [
-            [
-              "id",
-              "entries"
-            ]
-          ]
-        ],
+        ["", ["tomet-section"], [["id", "entries"]]],
         [
           {
             "t": "Div",
             "c": [
-              [
-                "",
-                [
-                  "tomet-card"
-                ],
-                [
-                  [
-                    "title",
-                    "Alpha"
-                  ]
-                ]
-              ],
+              ["", ["tomet-card"], [["title", "Alpha"]]],
               [
                 {
                   "t": "Para",

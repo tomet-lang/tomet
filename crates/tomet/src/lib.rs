@@ -84,10 +84,10 @@ pub use tomet_transform as transform;
 /// Diagnostics for a parsed document.
 pub use tomet_validator as validator;
 
-pub use tomet_load::{DiskResolver, LoadError, Prepared, Unresolved, Vault, load_file};
 /// Parses a data-only document into a [`ast::Value`]. Not a way to read a
 /// document; use [`Vault`] for that.
 pub use tomet_ast_parser::parse_value;
+pub use tomet_load::{DiskResolver, LoadError, Prepared, Unresolved, Vault, load_file};
 
 /// Bare document parser (opt-in feature `parser`).
 #[cfg(feature = "parser")]

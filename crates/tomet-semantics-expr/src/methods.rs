@@ -171,9 +171,9 @@ pub(crate) fn scalar_text(value: &EvalValue) -> Result<String, EvalError> {
 pub(crate) fn index_into(items: &[EvalValue], index: &EvalValue) -> Result<EvalValue, EvalError> {
     let i = match index {
         EvalValue::Int(i) => *i,
-        EvalValue::Number(text) => text.parse::<i64>().map_err(|_| {
-            EvalError::mismatch("`item`", "an integer index", index.type_name())
-        })?,
+        EvalValue::Number(text) => text
+            .parse::<i64>()
+            .map_err(|_| EvalError::mismatch("`item`", "an integer index", index.type_name()))?,
         _ => {
             return Err(EvalError::mismatch(
                 "`item`",

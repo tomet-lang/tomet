@@ -58,8 +58,8 @@ use tomet_cst::{GreenNodeBuilder, SyntaxKind, SyntaxNode};
 use tomet_lexer::{Cursor, tokenize};
 
 use crate::inline::{
-    DELIMITERS, DelimiterIndex, autolink_end, autolink_scheme_at, delimited_probe,
-    escaped_run_len, is_boundary,
+    DELIMITERS, DelimiterIndex, autolink_end, autolink_scheme_at, delimited_probe, escaped_run_len,
+    is_boundary,
 };
 use crate::tail::TailScan;
 
@@ -322,7 +322,8 @@ impl<'a, 't> CstParser<'a, 't> {
             return;
         }
         let is_unclosed_block = self.is_block_comment_open_at(self.pos)
-            && self.block_closers.partition_point(|&c| c <= self.pos + 2) >= self.block_closers.len();
+            && self.block_closers.partition_point(|&c| c <= self.pos + 2)
+                >= self.block_closers.len();
 
         let start = self.start_of(self.pos);
         let end = if self.pos + count >= self.tokens.len() {
@@ -386,9 +387,8 @@ impl<'a, 't> CstParser<'a, 't> {
     }
 
     fn token_at_offset(&self, offset: usize) -> usize {
-        self.tokens.partition_point(|(_, t)| {
-            (t.as_ptr() as usize - self.src.as_ptr() as usize) < offset
-        })
+        self.tokens
+            .partition_point(|(_, t)| (t.as_ptr() as usize - self.src.as_ptr() as usize) < offset)
     }
 
     fn name_tokens_at(&self, from: usize) -> usize {
@@ -523,7 +523,8 @@ impl<'a, 't> CstParser<'a, 't> {
 
         let tok_end = self.token_at_offset(end);
         let count = tok_end.saturating_sub(self.pos).max(1);
-        self.builder.token(K::STRING_LITERAL.into(), &self.src[start..end]);
+        self.builder
+            .token(K::STRING_LITERAL.into(), &self.src[start..end]);
         self.pos += count;
     }
 
@@ -806,9 +807,7 @@ impl<'a, 't> CstParser<'a, 't> {
         match self.kind_at(i) {
             Some(K::L_PAREN | K::L_BRACKET | K::L_BRACE | K::PIPE) => true,
             Some(K::HASH) => self.id_follows(i),
-            Some(K::COLON) => {
-                Self::is_opener(self.kind_at(i + 1)) || self.name_at(i + 1)
-            }
+            Some(K::COLON) => Self::is_opener(self.kind_at(i + 1)) || self.name_at(i + 1),
             _ => false,
         }
     }
@@ -1497,15 +1496,10 @@ fn validate_value_group(node: &SyntaxNode) -> bool {
                 keys.push(key_str);
             }
             K::SEQ_ITEM => {
-                let first_non_trivia = child
-                    .children_with_tokens()
-                    .find(|e| !e.kind().is_trivia());
+                let first_non_trivia = child.children_with_tokens().find(|e| !e.kind().is_trivia());
                 match first_non_trivia {
                     Some(tomet_cst::SyntaxElement::Node(n))
-                        if matches!(
-                            n.kind(),
-                            K::ARGS | K::INLINE_FORM | K::BLOCK_FORM
-                        ) => {}
+                        if matches!(n.kind(), K::ARGS | K::INLINE_FORM | K::BLOCK_FORM) => {}
                     _ => return false,
                 }
             }
@@ -1576,11 +1570,19 @@ fn validate_id_group(node: &SyntaxNode) -> bool {
         return false;
     }
     let tok = &tokens_inside[0];
-    tok.kind() == K::NAME || tok.kind() == K::IDENT || tok.text().chars().all(|c| c.is_alphanumeric() || c == '_' || c == '-')
+    tok.kind() == K::NAME
+        || tok.kind() == K::IDENT
+        || tok
+            .text()
+            .chars()
+            .all(|c| c.is_alphanumeric() || c == '_' || c == '-')
 }
 
 fn validate_connect(node: &SyntaxNode) -> bool {
-    if node.children().any(|n| n.kind() == K::ID_GROUP || n.kind() == K::ERROR) {
+    if node
+        .children()
+        .any(|n| n.kind() == K::ID_GROUP || n.kind() == K::ERROR)
+    {
         return false;
     }
     let has_name = node.children().any(|n| n.kind() == K::NAME)
@@ -1693,7 +1695,6 @@ fn tail_claims_something(groups: &[SyntaxNode]) -> bool {
 }
 
 impl<'a, 't> CstParser<'a, 't> {
-
     fn parse_thematic_break(&mut self) {
         self.builder.start_node(K::THEMATIC_BREAK.into());
         self.builder.start_node(K::FENCE.into());
@@ -2773,7 +2774,9 @@ impl<'a, 't> CstParser<'a, 't> {
             if probe < self.tokens.len() && self.tokens[probe].0 == K::NEWLINE {
                 let mut next_line_probe = probe + 1;
                 let mut has_indent = false;
-                if next_line_probe < self.tokens.len() && self.tokens[next_line_probe].0 == K::WHITESPACE {
+                if next_line_probe < self.tokens.len()
+                    && self.tokens[next_line_probe].0 == K::WHITESPACE
+                {
                     has_indent = true;
                     next_line_probe += 1;
                 }

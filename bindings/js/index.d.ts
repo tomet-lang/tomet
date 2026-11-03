@@ -54,7 +54,7 @@ export type Entry =
   | { Hole: Hole };
 
 /** Whether an element stands on its own or inside running text. */
-export type Placement = 'Block' | 'Inline';
+export type Placement = "Block" | "Inline";
 
 /** An `@name(args)[content]{value}#(id)` element and its `:connect`s. */
 export interface Element {
@@ -218,7 +218,10 @@ export interface ProcessedFile {
 /**
  * Convert `.tmt` source text or a `File` AST object into an HTML string.
  */
-export function toHtml(sourceOrFile: string | File, options?: ProcessOptions): string;
+export function toHtml(
+  sourceOrFile: string | File,
+  options?: ProcessOptions,
+): string;
 
 /**
  * Process `.tmt` markup source text or a `File` AST object into HTML, metadata, title, and TOC.

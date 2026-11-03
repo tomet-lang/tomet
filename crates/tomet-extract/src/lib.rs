@@ -25,8 +25,8 @@ use std::path::{Path, PathBuf};
 pub use comment::{ExtractOptions, extract_comments};
 pub use lang::Language;
 use tomet_ast::{Element, File};
-use tomet_span::Span;
 use tomet_ast_parser::Error as ParseError;
+use tomet_span::Span;
 
 /// The kind of comment in source code.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

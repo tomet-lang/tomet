@@ -1,25 +1,25 @@
 [package]
-name = "tomet-load"
-version.workspace = true
-edition.workspace = true
-description = "The one way to read a .tmt document correctly."
-license.workspace = true
+name                 = "tomet-load"
+version.workspace    = true
+edition.workspace    = true
+description          = "The one way to read a .tmt document correctly."
+license.workspace    = true
 repository.workspace = true
 
 [dependencies]
-tomet-ast = { workspace = true }
-tomet-config = { workspace = true }
-tomet-expr = { workspace = true }
-tomet-indexer = { workspace = true }
-tomet-links = { workspace = true }
+tomet-ast         = { workspace = true }
+tomet-config      = { workspace = true }
+tomet-expr        = { workspace = true }
+tomet-indexer     = { workspace = true }
+tomet-links       = { workspace = true }
 tomet-load-config = { workspace = true }
-tomet-ast-parser = { workspace = true }
-tomet-search = { workspace = true }
+tomet-ast-parser  = { workspace = true }
+tomet-search      = { workspace = true }
 tomet-declaration = { workspace = true }
-tomet-semantics = { workspace = true }
-tomet-sort = { workspace = true }
-tomet-tome = { workspace = true }
-tomet-transform = { workspace = true }
-tomet-validator = { workspace = true }
-tomet-vault = { workspace = true }
-tomet-workspace = { workspace = true }
+tomet-semantics   = { workspace = true }
+tomet-sort        = { workspace = true }
+tomet-tome        = { workspace = true }
+tomet-transform   = { workspace = true }
+tomet-validator   = { workspace = true }
+tomet-vault       = { workspace = true }
+tomet-workspace   = { workspace = true }

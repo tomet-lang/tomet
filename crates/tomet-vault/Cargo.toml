@@ -1,21 +1,21 @@
 [package]
-name = "tomet-vault"
-version.workspace = true
-edition.workspace = true
-description = "A vault's config and vocabularies, and what can be done with them without touching disk."
-license.workspace = true
+name                 = "tomet-vault"
+version.workspace    = true
+edition.workspace    = true
+description          = "A vault's config and vocabularies, and what can be done with them without touching disk."
+license.workspace    = true
 repository.workspace = true
 
 [dependencies]
-tomet-ast = { workspace = true }
-tomet-span = { workspace = true }
-tomet-expr = { workspace = true }
-tomet-config = { workspace = true }
-tomet-ast-parser = { workspace = true }
-tomet-search = { workspace = true }
+tomet-ast         = { workspace = true }
+tomet-span        = { workspace = true }
+tomet-expr        = { workspace = true }
+tomet-config      = { workspace = true }
+tomet-ast-parser  = { workspace = true }
+tomet-search      = { workspace = true }
 tomet-declaration = { workspace = true }
-tomet-semantics = { workspace = true }
-tomet-transform = { workspace = true }
-tomet-tree = { workspace = true }
-tomet-type = { workspace = true }
-tomet-validator = { workspace = true }
+tomet-semantics   = { workspace = true }
+tomet-transform   = { workspace = true }
+tomet-tree        = { workspace = true }
+tomet-type        = { workspace = true }
+tomet-validator   = { workspace = true }

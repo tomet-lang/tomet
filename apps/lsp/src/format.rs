@@ -28,10 +28,7 @@ pub fn format_edits(text: &str, uri: Option<&Uri>) -> Vec<TextEdit> {
 /// 1. The vault config and the folder configs down to the document, already stacked
 ///    (see `tomet_load_config`), for the macros and variables they declare
 /// 2. The document's own `::macros` and `::vars` (highest precedence)
-pub fn resolve_effective_config(
-    doc: &File,
-    uri: Option<&Uri>,
-) -> tomet_semantics::DocumentConfig {
+pub fn resolve_effective_config(doc: &File, uri: Option<&Uri>) -> tomet_semantics::DocumentConfig {
     let mut config = tomet_semantics::document_config(doc);
     let file_path_opt = uri.and_then(uri_to_file_path);
 

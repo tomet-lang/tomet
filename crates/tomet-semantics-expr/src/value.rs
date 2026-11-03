@@ -391,12 +391,18 @@ mod tests {
         assert_eq!(EvalValue::Null.scalar_text().as_deref(), Some(""));
         assert_eq!(EvalValue::Bool(true).scalar_text().as_deref(), Some("true"));
         assert_eq!(EvalValue::Int(42).scalar_text().as_deref(), Some("42"));
-        assert_eq!(EvalValue::Float(3.14).scalar_text().as_deref(), Some("3.14"));
+        assert_eq!(
+            EvalValue::Float(3.14).scalar_text().as_deref(),
+            Some("3.14")
+        );
         assert_eq!(
             EvalValue::Number("1.10".into()).scalar_text().as_deref(),
             Some("1.10")
         );
-        assert_eq!(EvalValue::String("hello".into()).scalar_text().as_deref(), Some("hello"));
+        assert_eq!(
+            EvalValue::String("hello".into()).scalar_text().as_deref(),
+            Some("hello")
+        );
         assert_eq!(
             EvalValue::Version(Version::parse("1.2.3").unwrap())
                 .scalar_text()

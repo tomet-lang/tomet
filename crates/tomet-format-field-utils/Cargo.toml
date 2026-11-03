@@ -1,14 +1,14 @@
 [package]
-name = "tomet-field-utils"
-version.workspace = true
-edition.workspace = true
-description = "Small pure helpers for @meta field values in Tomet documents."
-license.workspace = true
+name                 = "tomet-field-utils"
+version.workspace    = true
+edition.workspace    = true
+description          = "Small pure helpers for @meta field values in Tomet documents."
+license.workspace    = true
 repository.workspace = true
 
 [dependencies]
 tomet-config = { workspace = true }
-tomet-type = { workspace = true }
+tomet-type   = { workspace = true }
 #--- Crates.io ---
 nanoid = { workspace = true }
-uuid = { workspace = true }
+uuid   = { workspace = true }

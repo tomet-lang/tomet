@@ -145,7 +145,10 @@ mod tests {
     #[test]
     fn embed_target_named_key() {
         let el = map_el(Name::bare("embed"), vec![("target", s("a.png"))]);
-        assert_eq!(crate::classify_std_lenient(el.as_view()), ElementKind::Embed);
+        assert_eq!(
+            crate::classify_std_lenient(el.as_view()),
+            ElementKind::Embed
+        );
         assert_eq!(
             link_target_of(el.as_view()),
             Some((ElementKind::Embed, "a.png".to_string()))

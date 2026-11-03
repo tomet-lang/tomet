@@ -102,16 +102,16 @@ impl Type {
 
     /// The base type a name stands for.
     pub fn from_name(name: &str) -> Option<Type> {
-        Type::ALL
-            .iter()
-            .find(|ty| ty.base_name() == name)
-            .cloned()
+        Type::ALL.iter().find(|ty| ty.base_name() == name).cloned()
     }
 
     /// Reads a type specification from text (e.g. `"string"`, `"list"`, or `"list(string)"`).
     pub fn parse_str(name: &str) -> Result<Type, TypeError> {
         let trimmed = name.trim();
-        if let Some(inner) = trimmed.strip_prefix("list(").and_then(|s| s.strip_suffix(')')) {
+        if let Some(inner) = trimmed
+            .strip_prefix("list(")
+            .and_then(|s| s.strip_suffix(')'))
+        {
             let inner_trimmed = inner.trim();
             if inner_trimmed.is_empty() {
                 return Ok(Type::List(None));
@@ -229,7 +229,9 @@ mod tests {
         );
         assert_eq!(
             Type::parse_str("list(list(int))"),
-            Ok(Type::List(Some(Box::new(Type::List(Some(Box::new(Type::Int)))))))
+            Ok(Type::List(Some(Box::new(Type::List(Some(Box::new(
+                Type::Int
+            )))))))
         );
         assert_eq!(
             Type::parse_str("list(string)").unwrap().name(),

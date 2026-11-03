@@ -1,9 +1,5 @@
 {
-  "pandoc-api-version": [
-    1,
-    23,
-    1
-  ],
+  "pandoc-api-version": [1, 23, 1],
   "meta": {
     "uuid": {
       "t": "MetaString",
@@ -15,11 +11,7 @@
       "t": "Header",
       "c": [
         1,
-        [
-          "todo",
-          [],
-          []
-        ],
+        ["todo", [], []],
         [
           {
             "t": "Str",
@@ -32,11 +24,7 @@
       "t": "Header",
       "c": [
         1,
-        [
-          "review",
-          [],
-          []
-        ],
+        ["review", [], []],
         [
           {
             "t": "Str",
@@ -49,11 +37,7 @@
       "t": "Header",
       "c": [
         1,
-        [
-          "feadback",
-          [],
-          []
-        ],
+        ["feadback", [], []],
         [
           {
             "t": "Str",
@@ -66,11 +50,7 @@
       "t": "Header",
       "c": [
         1,
-        [
-          "timeline",
-          [],
-          []
-        ],
+        ["timeline", [], []],
         [
           {
             "t": "Str",

@@ -836,10 +836,7 @@ mod tests {
         let tags = card.param("tags").expect("declared");
         assert!(!tags.required);
         assert!(!tags.positional);
-        assert_eq!(
-            tags.ty,
-            Some(Ok(Type::List(Some(Box::new(Type::String)))))
-        );
+        assert_eq!(tags.ty, Some(Ok(Type::List(Some(Box::new(Type::String))))));
         assert_eq!(
             tags.declared_type(),
             Some(Type::List(Some(Box::new(Type::String))))

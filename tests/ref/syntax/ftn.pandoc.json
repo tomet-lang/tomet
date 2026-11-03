@@ -1,9 +1,5 @@
 {
-  "pandoc-api-version": [
-    1,
-    23,
-    1
-  ],
+  "pandoc-api-version": [1, 23, 1],
   "meta": {},
   "blocks": [
     {
@@ -22,21 +18,7 @@
         },
         {
           "t": "Span",
-          "c": [
-            [
-              "",
-              [
-                "tomet-ftn"
-              ],
-              [
-                [
-                  "value",
-                  "shared"
-                ]
-              ]
-            ],
-            []
-          ]
+          "c": [["", ["tomet-ftn"], [["value", "shared"]]], []]
         },
         {
           "t": "Space"
@@ -61,21 +43,7 @@
         },
         {
           "t": "Span",
-          "c": [
-            [
-              "",
-              [
-                "tomet-ftn"
-              ],
-              [
-                [
-                  "value",
-                  "shared"
-                ]
-              ]
-            ],
-            []
-          ]
+          "c": [["", ["tomet-ftn"], [["value", "shared"]]], []]
         },
         {
           "t": "Str",
@@ -133,13 +101,7 @@
         {
           "t": "Span",
           "c": [
-            [
-              "",
-              [
-                "tomet-ftn"
-              ],
-              []
-            ],
+            ["", ["tomet-ftn"], []],
             [
               {
                 "t": "Str",
@@ -185,18 +147,7 @@
     {
       "t": "Div",
       "c": [
-        [
-          "",
-          [
-            "tomet-ftn"
-          ],
-          [
-            [
-              "value",
-              "shared"
-            ]
-          ]
-        ],
+        ["", ["tomet-ftn"], [["value", "shared"]]],
         [
           {
             "t": "Para",

@@ -1,5 +1,5 @@
 [package]
-name = "tomet-js"
+name              = "tomet-js"
 version.workspace = true
 edition.workspace = true
 
@@ -18,11 +18,10 @@ tomet = { workspace = true, features = [
 tomet-cst = { workspace = true }
 tomet-links = { workspace = true }
 tomet-transform = { workspace = true }
-
-#= Crates.io
-getrandom = { version = "0.2", features = ["js"] }
-js-sys = { workspace = true }
-regex = { workspace = true }
-serde = { workspace = true }
+#--- Crates.io ---
+getrandom          = { version = "0.2", features = ["js"] }
+js-sys             = { workspace = true }
+regex              = { workspace = true }
+serde              = { workspace = true }
 serde-wasm-bindgen = { workspace = true }
-wasm-bindgen = { workspace = true }
+wasm-bindgen       = { workspace = true }

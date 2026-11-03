@@ -426,7 +426,10 @@ pub const FUNCTIONS: &[(&str, &str)] = &[
     ("exists", "Whether a value is not null `exists(value)`"),
     ("emoji", "An emoji by name `emoji(\"sparkles\")`"),
     ("unicode", "A character by code point `unicode(0x2713)`"),
-    ("version", "A version parsed from text `version(\"1.10.0\")`"),
+    (
+        "version",
+        "A version parsed from text `version(\"1.10.0\")`",
+    ),
 ];
 
 /// The names an expression can start with that are values, not functions,
@@ -512,8 +515,9 @@ fn builtin(name: &str, args: Args, cx: &EvalContext) -> Result<EvalValue, EvalEr
         },
         "version" => match args.exactly(name, 1)?.pop() {
             Some(EvalValue::String(text)) => {
-                let v = tomet_type::Version::parse(text.trim())
-                    .ok_or_else(|| EvalError::message(format!("`{text}` is not a valid version")))?;
+                let v = tomet_type::Version::parse(text.trim()).ok_or_else(|| {
+                    EvalError::message(format!("`{text}` is not a valid version"))
+                })?;
                 Ok(EvalValue::Version(v))
             }
             Some(EvalValue::Version(v)) => Ok(EvalValue::Version(v)),
@@ -523,8 +527,9 @@ fn builtin(name: &str, args: Args, cx: &EvalContext) -> Result<EvalValue, EvalEr
                 Ok(EvalValue::Version(v))
             }
             Some(EvalValue::Number(text)) => {
-                let v = tomet_type::Version::parse(text.trim())
-                    .ok_or_else(|| EvalError::message(format!("`{text}` is not a valid version")))?;
+                let v = tomet_type::Version::parse(text.trim()).ok_or_else(|| {
+                    EvalError::message(format!("`{text}` is not a valid version"))
+                })?;
                 Ok(EvalValue::Version(v))
             }
             Some(other) => Err(EvalError::mismatch(

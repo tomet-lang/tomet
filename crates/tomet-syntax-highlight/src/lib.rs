@@ -221,9 +221,7 @@ fn own_tag(token: &SyntaxToken, fences: &HashSet<usize>) -> Option<Tag> {
                 match p.kind() {
                     K::SIGIL => return Some(Tag::TagName),
                     K::SLOT => {
-                        let marked = p
-                            .children_with_tokens()
-                            .any(|e| e.kind() == K::QUESTION);
+                        let marked = p.children_with_tokens().any(|e| e.kind() == K::QUESTION);
                         return Some(if marked { Tag::Hole } else { Tag::Label });
                     }
                     _ => {}
@@ -254,12 +252,7 @@ fn own_tag(token: &SyntaxToken, fences: &HashSet<usize>) -> Option<Tag> {
         }
         K::MARGIN => Some(Tag::Punctuation),
         K::PIPE => is_pipe_opener(token).then_some(Tag::Punctuation),
-        K::L_PAREN
-        | K::R_PAREN
-        | K::L_BRACE
-        | K::R_BRACE
-        | K::L_BRACKET
-        | K::R_BRACKET
+        K::L_PAREN | K::R_PAREN | K::L_BRACE | K::R_BRACE | K::L_BRACKET | K::R_BRACKET
             if is_group_bracket(parent_kind) =>
         {
             Some(Tag::Bracket)
@@ -280,12 +273,7 @@ fn own_tag(token: &SyntaxToken, fences: &HashSet<usize>) -> Option<Tag> {
 fn is_group_bracket(kind: K) -> bool {
     matches!(
         kind,
-        K::ARGS
-            | K::VALUE_DATA
-            | K::CONTENT
-            | K::MAP_LITERAL
-            | K::ID_GROUP
-            | K::INTERP_EXPR
+        K::ARGS | K::VALUE_DATA | K::CONTENT | K::MAP_LITERAL | K::ID_GROUP | K::INTERP_EXPR
     )
 }
 

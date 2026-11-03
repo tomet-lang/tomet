@@ -1,0 +1,17 @@
+- int
+- uint
+- float
+- string
+- bool
+- datetime
+- version
+- uuid
+- nanoid
+- list
+
+====[version]
+
+`` <major>
+`` <major>.<minor>
+`` <major>.<minor>.<patch>
+`` <numeric-parts>(-<pre-release>)(+<build>)

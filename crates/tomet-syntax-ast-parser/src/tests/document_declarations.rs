@@ -10,8 +10,7 @@ fn element(block: &Block) -> &Element {
 #[test]
 fn a_double_colon_line_is_a_document_declaration() {
     let doc =
-        parse_file("::kind(config, 2)\n::meta{ id: x, title: T }\n\n=[ Title ]\n\nbody\n")
-            .unwrap();
+        parse_file("::kind(config, 2)\n::meta{ id: x, title: T }\n\n=[ Title ]\n\nbody\n").unwrap();
     assert_eq!(doc.header.len(), 2);
     let kind = &doc.header[0];
     assert_eq!(kind.name, Name::bare("kind"));
@@ -78,10 +77,7 @@ fn a_double_colon_that_starts_no_declaration_stays_text() {
         "a::kind(x)\n",
     ] {
         let doc = parse_file(src).unwrap();
-        assert!(
-            doc.header.is_empty(),
-            "{src:?} -> {doc:?}"
-        );
+        assert!(doc.header.is_empty(), "{src:?} -> {doc:?}");
     }
 }
 

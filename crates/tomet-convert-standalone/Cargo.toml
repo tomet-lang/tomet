@@ -1,23 +1,23 @@
 [package]
-name = "tomet-convert-standalone"
-version.workspace = true
-edition.workspace = true
-description = "Makes a Tomet document standalone: carries in or freezes what it takes from its vault."
-license.workspace = true
+name                 = "tomet-convert-standalone"
+version.workspace    = true
+edition.workspace    = true
+description          = "Makes a Tomet document standalone: carries in or freezes what it takes from its vault."
+license.workspace    = true
 repository.workspace = true
 
 [dependencies]
-tomet-ast = { workspace = true }
-tomet-span = { workspace = true }
-tomet-declaration = { workspace = true }
-tomet-expr = { workspace = true }
-tomet-ast-parser = { workspace = true }
-tomet-type = { workspace = true }
+tomet-ast               = { workspace = true }
+tomet-span              = { workspace = true }
+tomet-declaration       = { workspace = true }
+tomet-expr              = { workspace = true }
+tomet-ast-parser        = { workspace = true }
+tomet-type              = { workspace = true }
 tomet-validator-profile = { workspace = true }
-tomet-vault = { workspace = true }
+tomet-vault             = { workspace = true }
 
 [dev-dependencies]
-tomet-config = { workspace = true }
+tomet-config   = { workspace = true }
 tomet-markdown = { workspace = true }
-tomet-printer = { workspace = true }
-tomet-tree = { workspace = true }
+tomet-printer  = { workspace = true }
+tomet-tree     = { workspace = true }

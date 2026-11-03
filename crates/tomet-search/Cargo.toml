@@ -1,16 +1,16 @@
 [package]
-name = "tomet-search"
-version.workspace = true
-edition.workspace = true
-description = "Pure, in-memory search and query engine for Tomet documents."
-license.workspace = true
+name                 = "tomet-search"
+version.workspace    = true
+edition.workspace    = true
+description          = "Pure, in-memory search and query engine for Tomet documents."
+license.workspace    = true
 repository.workspace = true
 
 [dependencies]
-tomet-ast = { workspace = true }
-tomet-span = { workspace = true }
+tomet-ast       = { workspace = true }
+tomet-span      = { workspace = true }
 tomet-semantics = { workspace = true }
-tomet-tree = { workspace = true }
+tomet-tree      = { workspace = true }
 
 [dev-dependencies]
 tomet-ast-parser = { workspace = true }

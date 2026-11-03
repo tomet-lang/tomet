@@ -216,8 +216,8 @@ fn normalized_args_in(name: Option<&Name>, data: &Data, bindings: &Bindings) -> 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tomet_semantics_core::POSITIONAL_ENTRY_KEY;
     use tomet_ast::Name;
+    use tomet_semantics_core::POSITIONAL_ENTRY_KEY;
     use tomet_tree::{ValueExt, element_new};
 
     #[test]

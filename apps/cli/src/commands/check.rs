@@ -2,8 +2,8 @@ use std::io::{self, Write};
 use std::path::Path;
 
 use rayon::prelude::*;
-use tomet_position::LineIndex;
 use tomet_load::{Findings, is_error};
+use tomet_position::LineIndex;
 use tomet_validator::Diagnostic;
 
 use crate::util::{format_parse_error, read};
@@ -343,7 +343,12 @@ fn check_ctmt(file: &Path, src: &str, json: bool) -> CheckFileResult {
 
 /// One file that did not parse, as the sweep reports it: JSON when asked for,
 /// else the source line with a caret.
-fn parse_failure(file: &Path, src: &str, err: &tomet_ast_parser::Error, json: bool) -> CheckFileResult {
+fn parse_failure(
+    file: &Path,
+    src: &str,
+    err: &tomet_ast_parser::Error,
+    json: bool,
+) -> CheckFileResult {
     let (json_entry, text) = if json {
         (
             Some(serde_json::json!({

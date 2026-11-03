@@ -146,8 +146,7 @@ mod tests {
 
     #[test]
     fn parses_the_export_declaration_args() {
-        let doc =
-            parse_file("::export(\n  type: commonmark\n  path: \"README.md\"\n)\n").unwrap();
+        let doc = parse_file("::export(\n  type: commonmark\n  path: \"README.md\"\n)\n").unwrap();
 
         let config = document_config(&doc);
         assert_eq!(config.export_type, vec![ExportType::CommonMark]);

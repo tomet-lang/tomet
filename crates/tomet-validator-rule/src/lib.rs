@@ -8,8 +8,8 @@ pub mod decode;
 pub use decode::{RuleArgs, decode_rule_args};
 
 use tomet_ast::{Connect, File};
-use tomet_span::Span;
 use tomet_semantics::Bindings;
+use tomet_span::Span;
 use tomet_tree::Node;
 use tomet_validator_core::{Diagnostic, child_kind_name};
 

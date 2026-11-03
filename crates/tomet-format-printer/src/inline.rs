@@ -153,12 +153,7 @@ pub(crate) fn render_content_blocks(blocks: &[Block], config: &PrinterConfig) ->
 
 /// Appends `text` to `s`, inserting backslash escapes before sequences that
 /// would otherwise be parsed as block or inline syntax.
-fn escape_and_push_text(
-    s: &mut String,
-    text: &str,
-    prev_was_form: bool,
-    rest_inlines: &[Inline],
-) {
+fn escape_and_push_text(s: &mut String, text: &str, prev_was_form: bool, rest_inlines: &[Inline]) {
     if text.is_empty() {
         return;
     }
@@ -222,8 +217,7 @@ fn escape_and_push_text(
             s.push('\n');
             i += 1;
             let line_end = text[i..].find('\n').map_or(text.len(), |off| i + off);
-            line_escape_idx =
-                line_start_trigger_offset(&text[i..line_end]).map(|off| i + off);
+            line_escape_idx = line_start_trigger_offset(&text[i..line_end]).map(|off| i + off);
             continue;
         }
 
@@ -532,9 +526,7 @@ fn unmatched_brackets(bytes: &[u8]) -> Vec<bool> {
     for (i, &b) in bytes.iter().enumerate() {
         if b == b'[' {
             open_stack.push(i);
-        } else if b == b']'
-            && open_stack.pop().is_none()
-        {
+        } else if b == b']' && open_stack.pop().is_none() {
             unmatched[i] = true;
         }
     }

@@ -50,12 +50,12 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use tomet_ast::{Block, File};
-use tomet_span::Span;
 use tomet_config::PrinterConfig;
 use tomet_expr::{
     DocRef, EvalContext, EvalError, EvalValue, Phase, PreparedBlocks, SystemGenerate,
 };
 use tomet_semantics::{Bindings, LoadedDictionaries, LoadedVocabularies};
+use tomet_span::Span;
 
 mod resolve;
 
@@ -752,7 +752,9 @@ mod tests {
             let (doc, _) = prepared(&vault, "a.tmt", src);
             let mut found = Vec::new();
             tomet_tree::for_each_element(&doc, |el| {
-                if tomet_semantics::classify_std_lenient(el.as_view()) == tomet_semantics::ElementKind::Term {
+                if tomet_semantics::classify_std_lenient(el.as_view())
+                    == tomet_semantics::ElementKind::Term
+                {
                     found.push(el.content.as_ref().and_then(|blocks| match blocks.first() {
                         Some(Block::Paragraph(p)) => match p.content.first() {
                             Some(tomet_ast::Inline::Text(t)) => Some(t.value.clone()),

@@ -2,12 +2,12 @@ use tomet_semantics::DeclKind;
 
 use lsp_types::{Hover, HoverContents, MarkupContent, MarkupKind, Position, Range, Uri};
 use tomet_ast::{Declaration, Element, File, InterpExpr, Value};
-use tomet_span::Span;
 use tomet_expr::{DocRef, EvalContext, EvalValue, MemoryResolver, Phase, SystemGenerate, evaluate};
 use tomet_semantics::{
     ElementKind, classify_declaration_lenient, classify_std_lenient, heading_level,
     normalized_declaration_args, normalized_element_args,
 };
+use tomet_span::Span;
 use tomet_tree::{
     ValueExt, for_each_declaration, for_each_element, for_each_interpolation, for_each_list_item,
 };
@@ -79,7 +79,10 @@ pub fn hover_in(text: &str, pos: Position, evaluate: Evaluate<'_>) -> Option<Hov
                     Some(Hover {
                         contents: HoverContents::Markup(MarkupContent {
                             kind: MarkupKind::Markdown,
-                            value: format!("**Heading Level {}**", heading_level(view).unwrap_or(1)),
+                            value: format!(
+                                "**Heading Level {}**",
+                                heading_level(view).unwrap_or(1)
+                            ),
                         }),
                         range: Some(self.positions.range(&span)),
                     })

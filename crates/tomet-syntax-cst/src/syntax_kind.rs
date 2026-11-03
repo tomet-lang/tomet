@@ -9,8 +9,8 @@ pub enum SyntaxKind {
     EOF,
     WHITESPACE,
     COMMENT,
-    COMMENT_LINE_OPEN,  // `//` after whitespace or at start of source
-    COMMENT_BLOCK_OPEN, // `/*`
+    COMMENT_LINE_OPEN,   // `//` after whitespace or at start of source
+    COMMENT_BLOCK_OPEN,  // `/*`
     COMMENT_BLOCK_CLOSE, // `*/`
     NEWLINE,
 

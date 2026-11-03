@@ -1,37 +1,36 @@
 [package]
-name = "tomet-lsp"
-version.workspace = true
-edition.workspace = true
-description = "Language server for Tomet: diagnostics, formatting, hover, symbols, goto-definition, and completions."
-license.workspace = true
+name                 = "tomet-lsp"
+version.workspace    = true
+edition.workspace    = true
+description          = "Language server for Tomet: diagnostics, formatting, hover, symbols, goto-definition, and completions."
+license.workspace    = true
 repository.workspace = true
-publish = false
+publish              = false
 
 [[bin]]
 name = "tomet-lsp"
 path = "src/main.rs"
 
 [dependencies]
-cotomet = { workspace = true }
-cotomet-eval = { workspace = true }
-tomet-address = { workspace = true }
-tomet-ast = { workspace = true }
-tomet-ast-parser = { workspace = true }
-tomet-cst-parser = { workspace = true }
+cotomet           = { workspace = true }
+cotomet-eval      = { workspace = true }
+tomet-address     = { workspace = true }
+tomet-ast         = { workspace = true }
+tomet-ast-parser  = { workspace = true }
+tomet-cst-parser  = { workspace = true }
 tomet-declaration = { workspace = true }
-tomet-expr = { workspace = true }
-tomet-cst = { workspace = true }
-tomet-formatter = { workspace = true }
-tomet-position = { workspace = true }
-tomet-load = { workspace = true }
+tomet-expr        = { workspace = true }
+tomet-cst         = { workspace = true }
+tomet-formatter   = { workspace = true }
+tomet-position    = { workspace = true }
+tomet-load        = { workspace = true }
 tomet-load-config = { workspace = true }
-tomet-semantics = { workspace = true }
-tomet-span = { workspace = true }
-tomet-tree = { workspace = true }
-tomet-validator = { workspace = true }
-
-#= Crates.io
-anyhow = { workspace = true }
+tomet-semantics   = { workspace = true }
+tomet-span        = { workspace = true }
+tomet-tree        = { workspace = true }
+tomet-validator   = { workspace = true }
+#--- Crates.io ---
+anyhow     = { workspace = true }
 lsp-server = { workspace = true }
-lsp-types = { workspace = true }
+lsp-types  = { workspace = true }
 serde_json = { workspace = true }

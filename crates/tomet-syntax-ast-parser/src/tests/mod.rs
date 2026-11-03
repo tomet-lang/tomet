@@ -21,11 +21,11 @@ mod urls;
 mod values;
 
 use super::*;
-pub(crate) use tomet_cst_parser::parse_cst;
 use tomet_ast::{
-    Block, Element, Group, Inline, InterpExpr, InterpExprKind, Literal, Name,
-    Paragraph, Placement, SoftBreak, Value,
+    Block, Element, Group, Inline, InterpExpr, InterpExprKind, Literal, Name, Paragraph, Placement,
+    SoftBreak, Value,
 };
+pub(crate) use tomet_cst_parser::parse_cst;
 use tomet_span::Span;
 
 /// A `SoftBreak` for test expectations -- span never matters, `Span`'s

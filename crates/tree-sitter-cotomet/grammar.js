@@ -29,95 +29,91 @@ const WORD_CHAR = String.raw`(?:[^\s,(){}\[\]":]|:\/\/)`;
 const WORD_START = String.raw`(?:[^\s,(){}\[\]":\/]|\/[^\s,(){}\[\]":\/])`;
 
 module.exports = grammar({
-	name: "cotomet",
+  name: "cotomet",
 
-	// A newline ends an entry, so it is not skipped.
-	extras: ($) => [/[ \t\r]+/, $.comment],
+  // A newline ends an entry, so it is not skipped.
+  extras: ($) => [/[ \t\r]+/, $.comment],
 
-	rules: {
-		source_file: ($) => repeat($._item),
+  rules: {
+    source_file: ($) => repeat($._item),
 
-		_item: ($) =>
-			choice($.declaration, $.pair, $._bare_value, ",", $._newline),
+    _item: ($) => choice($.declaration, $.pair, $._bare_value, ",", $._newline),
 
-		// `::name(args){data}`. The `::` is its own token: where an entry may
-		// start it is read as the sigil, and after a key it is two `:` as before.
-		// `prec.right`: a `{` right after a declaration is its data, not the
-		// start of the next entry.
-		declaration: ($) =>
-			prec.right(
-				seq(
-					"::",
-					field("name", alias($.word, $.name)),
-					optional(field("arguments", $.arguments)),
-					optional(field("data", $.map)),
-				),
-			),
+    // `::name(args){data}`. The `::` is its own token: where an entry may
+    // start it is read as the sigil, and after a key it is two `:` as before.
+    // `prec.right`: a `{` right after a declaration is its data, not the
+    // start of the next entry.
+    declaration: ($) =>
+      prec.right(
+        seq(
+          "::",
+          field("name", alias($.word, $.name)),
+          optional(field("arguments", $.arguments)),
+          optional(field("data", $.map)),
+        ),
+      ),
 
-		// The `(...)` of a declaration, the `(` right after the name.
-		arguments: ($) =>
-			seq(
-				token.immediate("("),
-				repeat(choice($._value, ",", $._newline)),
-				")",
-			),
+    // The `(...)` of a declaration, the `(` right after the name.
+    arguments: ($) =>
+      seq(token.immediate("("), repeat(choice($._value, ",", $._newline)), ")"),
 
-		_newline: (_) => /\n/,
+    _newline: (_) => /\n/,
 
-		comment: (_) => token(seq("//", /[^\n]*/)),
+    comment: (_) => token(seq("//", /[^\n]*/)),
 
-		// `key: value`. The value may start on the next line.
-		pair: ($) =>
-			seq(
-				field("key", choice(alias($.word, $.key), alias($.string, $.quoted_key))),
-				":",
-				repeat($._newline),
-				field("value", $._value),
-			),
+    // `key: value`. The value may start on the next line.
+    pair: ($) =>
+      seq(
+        field(
+          "key",
+          choice(alias($.word, $.key), alias($.string, $.quoted_key)),
+        ),
+        ":",
+        repeat($._newline),
+        field("value", $._value),
+      ),
 
-		// A value after a `:` or inside a call's parentheses: its scalar may
-		// hold a `:` of its own (`note: see: this`, as the parser reads it).
-		_value: ($) => choice($.string, $.map, $.call, $.scalar),
+    // A value after a `:` or inside a call's parentheses: its scalar may
+    // hold a `:` of its own (`note: see: this`, as the parser reads it).
+    _value: ($) => choice($.string, $.map, $.call, $.scalar),
 
-		// A value where an entry could start instead, in a file or a `{...}`.
-		// There the first word and the `:` after it make a key, so a bare
-		// scalar holds no `:` of its own.
-		_bare_value: ($) =>
-			choice($.string, $.map, $.call, alias($._bare_scalar, $.scalar)),
+    // A value where an entry could start instead, in a file or a `{...}`.
+    // There the first word and the `:` after it make a key, so a bare
+    // scalar holds no `:` of its own.
+    _bare_value: ($) =>
+      choice($.string, $.map, $.call, alias($._bare_scalar, $.scalar)),
 
-		map: ($) => seq("{", repeat($._item), "}"),
+    map: ($) => seq("{", repeat($._item), "}"),
 
-		// `name(arg, ...)`, the `(` right after the name. Arguments may
-		// run over several lines.
-		call: ($) =>
-			seq(
-				field("function", alias($.word, $.name)),
-				token.immediate("("),
-				repeat(choice($._value, ",", $._newline)),
-				")",
-			),
+    // `name(arg, ...)`, the `(` right after the name. Arguments may
+    // run over several lines.
+    call: ($) =>
+      seq(
+        field("function", alias($.word, $.name)),
+        token.immediate("("),
+        repeat(choice($._value, ",", $._newline)),
+        ")",
+      ),
 
-		// A bare scalar: words on a line, up to a `,` `)` `}` or a comment.
-		// A `:` is part of it (`localhost:8080`, `12:30`, `see: this`).
-		scalar: ($) =>
-			prec.right(
-				seq($.word, repeat(choice($.word, $._colon_tail, ":"))),
-			),
+    // A bare scalar: words on a line, up to a `,` `)` `}` or a comment.
+    // A `:` is part of it (`localhost:8080`, `12:30`, `see: this`).
+    scalar: ($) =>
+      prec.right(seq($.word, repeat(choice($.word, $._colon_tail, ":")))),
 
-		_bare_scalar: ($) =>
-			prec.right(seq($.word, repeat(choice($.word, $._colon_tail)))),
+    _bare_scalar: ($) =>
+      prec.right(seq($.word, repeat(choice($.word, $._colon_tail)))),
 
-		_colon_tail: (_) => token(new RegExp(`:${WORD_CHAR}+`)),
+    _colon_tail: (_) => token(new RegExp(`:${WORD_CHAR}+`)),
 
-		word: (_) => token(new RegExp(`${WORD_START}${WORD_CHAR}*`)),
+    word: (_) => token(new RegExp(`${WORD_START}${WORD_CHAR}*`)),
 
-		string: ($) =>
-			seq(
-				'"',
-				repeat(choice(token.immediate(prec(1, /[^"\\]+/)), $.escape_sequence)),
-				'"',
-			),
+    string: ($) =>
+      seq(
+        '"',
+        repeat(choice(token.immediate(prec(1, /[^"\\]+/)), $.escape_sequence)),
+        '"',
+      ),
 
-		escape_sequence: (_) => token.immediate(seq("\\", /[\s\S]/)),
-	},
+    escape_sequence: (_) => token.immediate(seq("\\", /[\s\S]/)),
+  },
 });

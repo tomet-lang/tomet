@@ -1,10 +1,10 @@
 [package]
-name = "tomet-java"
+name              = "tomet-java"
 version.workspace = true
 edition.workspace = true
 
 [lib]
-name = "tomet_java"
+name       = "tomet_java"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
@@ -15,8 +15,7 @@ tomet = { workspace = true, features = [
   "format",
   "printer",
 ] }
-
-#= Crates.io
-jni = { workspace = true }
-serde = { workspace = true }
+#--- Crates.io ---
+jni        = { workspace = true }
+serde      = { workspace = true }
 serde_json = { workspace = true }

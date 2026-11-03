@@ -407,9 +407,8 @@ mod tests {
                 .iter()
                 .all(|(k, _)| *k != SyntaxKind::QUOTE)
         );
-        let delim_toks = |src| -> Vec<SyntaxKind> {
-            tokenize(src).into_iter().map(|(k, _)| k).collect()
-        };
+        let delim_toks =
+            |src| -> Vec<SyntaxKind> { tokenize(src).into_iter().map(|(k, _)| k).collect() };
         assert_eq!(
             delim_toks("__strong__"),
             vec![

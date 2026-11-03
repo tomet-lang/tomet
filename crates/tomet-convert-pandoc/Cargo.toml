@@ -1,21 +1,21 @@
 [package]
-name = "tomet-pandoc"
-version.workspace = true
-edition.workspace = true
-description = "Converts between a Tomet AST document and Pandoc's AST, over Pandoc's JSON encoding."
-license.workspace = true
+name                 = "tomet-pandoc"
+version.workspace    = true
+edition.workspace    = true
+description          = "Converts between a Tomet AST document and Pandoc's AST, over Pandoc's JSON encoding."
+license.workspace    = true
 repository.workspace = true
 
 [dependencies]
-tomet-ast = { workspace = true }
-tomet-span = { workspace = true }
+tomet-ast         = { workspace = true }
+tomet-span        = { workspace = true }
 tomet-declaration = { workspace = true }
-tomet-html = { workspace = true }
-tomet-printer = { workspace = true }
-tomet-semantics = { workspace = true }
-tomet-tree = { workspace = true }
+tomet-html        = { workspace = true }
+tomet-printer     = { workspace = true }
+tomet-semantics   = { workspace = true }
+tomet-tree        = { workspace = true }
 #--- Crates.io ---
-serde = { workspace = true }
+serde      = { workspace = true }
 serde_json = { workspace = true }
 
 [dev-dependencies]

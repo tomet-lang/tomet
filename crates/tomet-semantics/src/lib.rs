@@ -89,9 +89,9 @@ pub use positional::{
 };
 pub use rebase::rebase_relative_links;
 pub use tomet_declaration::DeclKind;
+pub use tomet_semantics_core::admits::{Mismatch, admits};
 pub use tomet_tree::{ElementExt, ValueExt};
 pub use vocabulary::{
     Bindings, ContentAllow, ElementDecl, LoadedVocabularies, ParamDecl, RESERVED_ELEMENT_NAMES,
     RESERVED_NAMESPACES, Region, Vocabulary, builtin_doc_vocabularies, is_reserved_element_name,
 };
-pub use tomet_semantics_core::admits::{Mismatch, admits};

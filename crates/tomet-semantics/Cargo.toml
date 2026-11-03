@@ -1,21 +1,20 @@
 [package]
-name = "tomet-semantics"
-version.workspace = true
-edition.workspace = true
-description = "I/O-free semantic classification and normalization layer for Tomet AST elements."
-license.workspace = true
+name                 = "tomet-semantics"
+version.workspace    = true
+edition.workspace    = true
+description          = "I/O-free semantic classification and normalization layer for Tomet AST elements."
+license.workspace    = true
 repository.workspace = true
 
 [dependencies]
-tomet-address = { workspace = true }
-tomet-ast = { workspace = true }
-tomet-declaration = { workspace = true }
+tomet-address        = { workspace = true }
+tomet-ast            = { workspace = true }
+tomet-declaration    = { workspace = true }
 tomet-semantics-core = { workspace = true }
-tomet-span = { workspace = true }
-tomet-tree = { workspace = true }
-tomet-type = { workspace = true }
-
-#= Crates.io
+tomet-span           = { workspace = true }
+tomet-tree           = { workspace = true }
+tomet-type           = { workspace = true }
+#--- Crates.io ---
 serde_json = { workspace = true }
 
 [dev-dependencies]

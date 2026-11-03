@@ -1,8 +1,8 @@
+use tomet_ast_parser::parse_file;
 use tomet_deps::{
     Change, Dependency, DependencyGraph, DependencyKind, DocumentNode, compute_affected_paths,
     extract_document_node, fnv1a_hash,
 };
-use tomet_ast_parser::parse_file;
 
 fn make_node(
     path: &str,

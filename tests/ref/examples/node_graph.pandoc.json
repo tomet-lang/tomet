@@ -1,20 +1,12 @@
 {
-  "pandoc-api-version": [
-    1,
-    23,
-    1
-  ],
+  "pandoc-api-version": [1, 23, 1],
   "meta": {},
   "blocks": [
     {
       "t": "Header",
       "c": [
         1,
-        [
-          "",
-          [],
-          []
-        ],
+        ["", [], []],
         [
           {
             "t": "Str",
@@ -28,26 +20,12 @@
       "c": [
         [
           "",
+          ["tomet-node"],
           [
-            "tomet-node"
-          ],
-          [
-            [
-              "type",
-              "textarea"
-            ],
-            [
-              "id",
-              "dsaf-asdf"
-            ],
-            [
-              "x",
-              "123"
-            ],
-            [
-              "y",
-              "456"
-            ]
+            ["type", "textarea"],
+            ["id", "dsaf-asdf"],
+            ["x", "123"],
+            ["y", "456"]
           ]
         ],
         [
@@ -68,26 +46,12 @@
       "c": [
         [
           "",
+          ["tomet-node"],
           [
-            "tomet-node"
-          ],
-          [
-            [
-              "type",
-              "textarea"
-            ],
-            [
-              "id",
-              "dsaf-asdf"
-            ],
-            [
-              "x",
-              "123"
-            ],
-            [
-              "y",
-              "456"
-            ]
+            ["type", "textarea"],
+            ["id", "dsaf-asdf"],
+            ["x", "123"],
+            ["y", "456"]
           ]
         ],
         [
@@ -122,27 +86,8 @@
       "c": [
         [
           "",
-          [
-            "tomet-node"
-          ],
-          [
-            [
-              "type",
-              "number"
-            ],
-            [
-              "id",
-              "dsaf-asdf"
-            ],
-            [
-              "x",
-              "123"
-            ],
-            [
-              "y",
-              "456"
-            ]
-          ]
+          ["tomet-node"],
+          [["type", "number"], ["id", "dsaf-asdf"], ["x", "123"], ["y", "456"]]
         ],
         []
       ]
@@ -152,27 +97,8 @@
       "c": [
         [
           "",
-          [
-            "tomet-node"
-          ],
-          [
-            [
-              "type",
-              "export"
-            ],
-            [
-              "id",
-              "dsaf-asdf"
-            ],
-            [
-              "x",
-              "123"
-            ],
-            [
-              "y",
-              "456"
-            ]
-          ]
+          ["tomet-node"],
+          [["type", "export"], ["id", "dsaf-asdf"], ["x", "123"], ["y", "456"]]
         ],
         []
       ]
@@ -181,11 +107,7 @@
       "t": "Header",
       "c": [
         1,
-        [
-          "",
-          [],
-          []
-        ],
+        ["", [], []],
         [
           {
             "t": "Str",

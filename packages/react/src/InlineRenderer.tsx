@@ -1,6 +1,6 @@
-import React, { FC, Fragment } from 'react';
-import type { Inline, TometComponents } from './types';
-import { ElementRenderer } from './ElementRenderer';
+import React, { FC, Fragment } from "react";
+import type { Inline, TometComponents } from "./types";
+import { ElementRenderer } from "./ElementRenderer";
 
 interface InlineRendererProps {
   inlines?: Inline[] | null;
@@ -8,22 +8,30 @@ interface InlineRendererProps {
   macros?: Record<string, string>;
 }
 
-export const InlineRenderer: FC<InlineRendererProps> = ({ inlines, components, macros }) => {
+export const InlineRenderer: FC<InlineRendererProps> = ({
+  inlines,
+  components,
+  macros,
+}) => {
   if (!inlines || !Array.isArray(inlines)) return null;
 
   return (
     <Fragment>
       {inlines.map((inline, index) => {
-        if ('Text' in inline) {
+        if ("Text" in inline) {
           return <Fragment key={index}>{inline.Text.value}</Fragment>;
         }
-        if ('type' in inline && inline.type === 'Text') {
+        if ("type" in inline && inline.type === "Text") {
           return <Fragment key={index}>{inline.value}</Fragment>;
         }
-        if ('type' in inline && inline.type === 'Code') {
-          return <code key={index} className="tomet-inline-code">{inline.content}</code>;
+        if ("type" in inline && inline.type === "Code") {
+          return (
+            <code key={index} className="tomet-inline-code">
+              {inline.content}
+            </code>
+          );
         }
-        if ('Element' in inline) {
+        if ("Element" in inline) {
           return (
             <ElementRenderer
               key={index}
@@ -34,7 +42,7 @@ export const InlineRenderer: FC<InlineRendererProps> = ({ inlines, components, m
             />
           );
         }
-        if ('type' in inline && inline.type === 'Element' && inline.data) {
+        if ("type" in inline && inline.type === "Element" && inline.data) {
           return (
             <ElementRenderer
               key={index}
