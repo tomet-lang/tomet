@@ -50,14 +50,12 @@ pub enum Place {
     Sublist,
 }
 
-/// A borrowed cursor over any vertex of a file's AST (Layer 1).
+/// A borrowed reference to any vertex of a file's AST ([`Declaration`], [`Block`], [`Inline`],
+/// [`Value`], [`Entry`], [`Connect`], [`ListItem`], [`List`]).
 ///
-/// Represents a short-lived, `Copy` borrowed reference over every vertex of an AST
-/// ([`Declaration`], [`Block`], [`Inline`], [`Value`], [`Entry`], [`Connect`], [`ListItem`], [`List`]).
-///
-/// In contrast to Layer 2's owned runtime [`tomet_expr::Part`], which represents structured,
-/// addressable parts of a document at expression evaluation time, [`Node`] is the universal
-/// borrowed traversal cursor for tree walkers and validators.
+/// Unlike `tomet_expr::Part`, which is an owned runtime value holding only a structured part of a
+/// document during expression evaluation, [`Node`] is the universal borrowed cursor over the whole
+/// syntax tree.
 ///
 /// An element is not a node of its own: it is the `Block`, `Inline`, `Value` or `Entry` it stands
 /// as (see [`Node::element`] and [`Node::element_view`]). A list at the top of a file is a `Block`;

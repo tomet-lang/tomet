@@ -32,10 +32,19 @@ pub struct DirRef(pub String);
 /// A structured part of a document: an element, a section, a list, a connect,
 /// a declaration, or a list item.
 ///
-/// Unlike whole documents ([`EvalValue::Document`]) or detached block output
-/// ([`EvalValue::Fragment`]), a [`Part`] represents a structured AST vertex
-/// from a document inspectable at runtime via `.name`, `.prop`, `.id`,
-/// `.connects`, `.content`, and `.item(n)`.
+/// Unlike a whole document ([`EvalValue::Document`]) or detached block output
+/// ([`EvalValue::Fragment`]), a [`Part`] belongs to a source document and can
+/// be inspected via `.name`, `.prop`, `.id`, `.connects`, `.content`, and
+/// `.item(n)`.
+///
+/// A heading's id attaches to the whole section (heading and everything under
+/// it), not to a lone element, and a list's to the whole list, not to one of
+/// its items -- which is why each is a part of its own.
+///
+/// A list has an `id` in the tree, but no syntax writes one yet (a trailing
+/// `#(id)` belongs to the last item). It is addressed here by the same rules
+/// as the others, so that when a spelling is chosen nothing in the evaluator
+/// has to change.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Part {
     Element(Box<Element>),

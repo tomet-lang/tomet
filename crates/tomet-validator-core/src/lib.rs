@@ -49,12 +49,9 @@ pub fn child_kind_name(
     node: tomet_tree::Node<'_>,
     bindings: &Bindings,
 ) -> Result<String, tomet_semantics::UnknownName> {
-    if let Some(view) = node.element_view() {
-        Ok(classify_in(view, bindings)?.as_str().to_string())
-    } else if matches!(node, tomet_tree::Node::Item(_)) {
-        Ok(PLAIN_ITEM_KIND_NAME.to_string())
-    } else {
-        Ok(PLAIN_ITEM_KIND_NAME.to_string())
+    match node.element_view() {
+        Some(view) => Ok(classify_in(view, bindings)?.as_str().to_string()),
+        None => Ok(PLAIN_ITEM_KIND_NAME.to_string()),
     }
 }
 
