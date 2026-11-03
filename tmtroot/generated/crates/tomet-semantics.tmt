@@ -1,6 +1,6 @@
 ::kind(api)
 
-::meta{crate: tomet-semantics, dependencies: list(tomet-address, tomet-ast, tomet-ast-parser, tomet-declaration, tomet-semantics-core, tomet-span, tomet-tree, tomet-type), dependents: list(tomet, tomet-ast-parser, tomet-cli, tomet-config, tomet-deps, tomet-html, tomet-indexer, tomet-links, tomet-load, tomet-lsp, tomet-markdown, tomet-pandoc, tomet-printer, tomet-search, tomet-stats, tomet-style, tomet-tests, tomet-transform, tomet-typst, tomet-validator, tomet-validator-blueprint, tomet-validator-core, tomet-validator-profile, tomet-validator-rule, tomet-vault, tomet-workspace)}
+::meta{crate: tomet-semantics, dependencies: list(tomet-address, tomet-ast, tomet-ast-parser, tomet-declaration, tomet-semantics-core, tomet-span, tomet-tree, tomet-type), dependents: list(tomet, tomet-cli, tomet-config, tomet-deps, tomet-html, tomet-indexer, tomet-links, tomet-load, tomet-lsp, tomet-markdown, tomet-pandoc, tomet-printer, tomet-search, tomet-stats, tomet-style, tomet-tests, tomet-transform, tomet-typst, tomet-validator, tomet-validator-blueprint, tomet-validator-core, tomet-validator-profile, tomet-validator-rule, tomet-vault, tomet-workspace)}
 
 =[tomet-semantics]
 
@@ -363,7 +363,7 @@ The key [`FlatData::into_pairs`] gives a positional group's value.
 What a `::vocabulary(ns)` document declares, and how a name resolves
 against the namespaces a document has in scope.
 
-Extraction is pure: it takes a parsed [`Document`] and reads it. The
+Extraction is pure: it takes a parsed [`File`] and reads it. The
 file that document came from is somebody else's problem --
 `tomet-load` finds `.tomet/vocabularies/<ns>.vocabulary.tmt`
 and reads it, because this layer may not do I/O.

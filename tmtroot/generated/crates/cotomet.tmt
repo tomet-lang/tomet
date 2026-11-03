@@ -38,3 +38,7 @@ Unquoted `${...}` expressions are rejected (this reader reads data only).
 
 Parse a standalone cotomet file (`.ctmt`) allowing unquoted `${...}` expressions
 (e.g. for expression evaluation or formatting).
+
+==[Type Aliases]
+
+===[type File]

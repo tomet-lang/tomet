@@ -56,3 +56,7 @@ or every encountered error with line and column.
 ===[fn eval_file]
 
 Evaluates a pre-parsed [`File`], resolving `${...}` expressions against `src`.
+
+==[Type Aliases]
+
+===[type File]

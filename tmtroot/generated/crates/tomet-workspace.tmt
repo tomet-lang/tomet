@@ -149,16 +149,16 @@ being migrated away from.
 
 ===[Functions]
 
-====[fn refactor_document]
+====[fn refactor_file]
 
-Applies configured refactoring transformations to a parsed [`Document`].
+Applies configured refactoring transformations to a parsed [`File`].
 
 ====[fn refactor_source]
 
 Refactors source text, returning the transformed and formatted text alongside the changes count.
 
-@strong[Lossy: this drops comments.] It parses to a `Document` and prints
-the whole document back, and `tomet_ast` has no comment node at all --
+@strong[Lossy: this drops comments.] It parses to a `File` and prints
+the whole file back, and `tomet_ast` has no comment node at all --
 `//` and `/* */` exist in the source text and nowhere in the tree, so
 anything that round-trips through the AST loses them. Measured, not
 assumed: a file carrying `::meta{ type: note }` and a `//` line comes

@@ -22,8 +22,8 @@ validator's singleton check covers only user-vocabulary elements. What the `.tmt
 ones @em[do] -- `use` binds a vocabulary, `blueprint` is instantiated, `config` fills the
 settings -- stays with the host, which matches on [`DeclKind`]. This crate never calls the
 host back.
-- ("A leaf") It depends on [`tomet_ast`] for [`Value`], [`Element`] and [`Document`], on
-[`tomet_tree`] to walk a document's top level, and on [`tomet_type`] for the types a
+- ("A leaf") It depends on [`tomet_ast`] for [`Value`], [`Element`] and [`File`], on
+[`tomet_tree`] to walk a file's top level, and on [`tomet_type`] for the types a
 `::vars` entry names. It does not know a body element, a vocabulary or a vault.
 - ("Two hosts", "one input") A `.tmt` document gives its declarations as [`Declaration`]s through
 [`Declaration::from_ast`]; a `.ctmt` file's header gives the same three things, a

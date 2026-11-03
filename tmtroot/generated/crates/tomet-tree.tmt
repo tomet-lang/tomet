@@ -11,18 +11,8 @@ Provides:
 - (ValueExt) Inspection and accessor methods on [`tomet_ast::Value`].
 - (ElementExt) Builders and name helpers on [`tomet_ast::Element`].
 - (DataExt) Property access on [`tomet_ast::Data`], shared by every node that carries `(args)` and `{value}`.
-- (DocumentExt) Block-level manipulation helpers on [`tomet_ast::Document`].
+- (FileExt) Block-level manipulation helpers on [`tomet_ast::File`].
 - (walk) One definition of what sits inside what ([`children`]), the one recursion over it ([`walk`]), and the walkers built on that.
-
-==[Module document]
-
-Extension trait and block manipulation helpers for [`tomet_ast::Document`].
-
-===[Traits]
-
-====[trait DocumentExt]
-
-Extension trait providing block-level operations on [`Document`].
 
 ==[Module element]
 
@@ -70,6 +60,16 @@ reads for, and silently dropping it here would repeat the exact bug
 `connects` used to have (a full-form list item's parsed connects were
 read and then thrown away at this exact spot).
 
+==[Module file]
+
+Extension trait and block manipulation helpers for [`tomet_ast::File`].
+
+===[Traits]
+
+====[trait FileExt]
+
+Extension trait providing block-level operations on [`File`].
+
 ==[Module value]
 
 Extension trait and helpers for [`tomet_ast::Value`].
@@ -82,7 +82,7 @@ Extension trait providing accessors and inspections on [`Value`].
 
 ==[Module walk]
 
-One definition of what sits inside what in a [`Document`], and the walkers built on it.
+One definition of what sits inside what in a [`File`], and the walkers built on it.
 
 [`children`] says, for any [`Node`], which nodes sit directly inside it and in which [`Place`].
 [`walk`] is the one recursion over that. Every other walker here is [`walk`] with a filter
@@ -104,20 +104,20 @@ Where a node sits in the node that holds it.
 
 ====[enum Node]
 
-A thing in a document's tree, together with what it is in.
+A borrowed reference to any vertex of a file's AST ([`Declaration`], [`Block`], [`Inline`],
+[`Value`], [`Entry`], [`Connect`], [`ListItem`], [`List`]).
+
+Unlike `tomet_expr::Part`, which is an owned runtime value holding only a structured part of a
+document during expression evaluation, [`Node`] is the universal borrowed cursor over the whole
+syntax tree.
 
 An element is not a node of its own: it is the `Block`, `Inline`, `Value` or `Entry` it stands
-as (see [`Node::element`]). A list at the top of a document is a `Block`; the list nested in an
-item is a [`Node::List`].
+as (see [`Node::element`] and [`Node::element_view`]). A list at the top of a file is a `Block`;
+the list nested in an item is a [`Node::List`].
 
 ====[enum Visit]
 
 What a walk does after it has been shown a node.
-
-====[enum Child]
-
-Something nested in a node: an element, or a list item. What a `:rule(allow:...)` constrains,
-and what the region rules run over.
 
 ===[Functions]
 
@@ -132,7 +132,7 @@ or an entry holds what the element or hole holds.
 
 ====[fn walk]
 
-Shows `f` every node of `doc`, each before what it holds, in document order, and goes into
+Shows `f` every node of `file`, each before what it holds, in document order, and goes into
 what `f` answers [`Visit::Descend`] to. [`Visit::Break`] stops the walk and is handed back.
 
 ====[fn walk_node]
@@ -141,85 +141,64 @@ what `f` answers [`Visit::Descend`] to. [`Visit::Break`] stops the walk and is h
 
 ====[fn for_each_node]
 
-Visits every node of `doc` in document order, each before what it holds, wherever it sits:
+Visits every node of `file` in document order, each before what it holds, wherever it sits:
 running text, section titles, `:connect`s, and inside a [`Value`] (`Seq`, `Map`, `Call`, a
 nested element, `[...]` blocks). It is the walk that skips nothing.
 
 ====[fn for_each_element]
 
-Traverses all elements in `doc` in document order and executes `f` for each.
+Traverses all elements in `file` in document order and executes `f` for each.
 
 An element in a `:connect` is not reached.
 
 ====[fn for_each_inline]
 
-Traverses every [`Inline`] in `doc` in document order: paragraph content, section titles and
+Traverses every [`Inline`] in `file` in document order: paragraph content, section titles and
 every `[content]`. An `Inline::Element` is itself passed to `f`, and then descended into.
 
 ====[fn for_each_list_item]
 
-Visits every [`ListItem`] in `doc`, in document order, at any depth: a list item is not an
+Visits every [`ListItem`] in `file`, in document order, at any depth: a list item is not an
 [`Element`], so [`for_each_element`] never passes one.
 
 ====[fn for_each_list]
 
-Visits every [`List`] in `doc`, in document order: those standing as a block, wherever the
+Visits every [`List`] in `file`, in document order: those standing as a block, wherever the
 block is, and the ones nested in a list item.
 
 ====[fn for_each_section]
 
-Visits every [`Section`] in `doc`, in document order, including ones nested under another
+Visits every [`Section`] in `file`, in document order, including ones nested under another
 section's body or in an element's content: a heading's own `:name(...)` connect is checked
 against its `blocks` ([`for_each_descendant_in_blocks`]) the way an element's connect is
 checked against its own content.
 
 ====[fn for_each_interpolation]
 
-Visits every [`Interpolation`] in `doc`, in document order, wherever it sits.
+Visits every [`Interpolation`] in `file`, in document order, wherever it sits.
 
 An interpolation is not an [`Element`], so the element walkers never pass one to their
 visitor; this is the walker to ask for "every `${...}` in the document".
 
 ====[fn for_each_declaration]
 
-Visits every [`Declaration`] in `doc`, in document order, wherever it sits: a declaration is a
-[`Block`], and a block can be in a section's body or an element's content as well as at the
-top, where only it belongs. [`for_each_top_level_declaration`] is the preamble.
+Visits every [`Declaration`] in `file`, in document order, wherever it sits.
 
 ====[fn for_each_hole]
 
-Visits every [`Hole`] in `doc`, in document order, wherever it sits: as a block, in running
+Visits every [`Hole`] in `file`, in document order, wherever it sits: as a block, in running
 text, as an entry of a `{...}` group or as a value.
 
 ====[fn for_each_top_level_element]
 
-Visits every element a reader would find by scanning only the top of the document, in
+Visits every element a reader would find by scanning only the top of the file, in
 document order: every `Block::Element`, and every `Inline::Element` sitting directly in a
 `Block::Paragraph`'s own content (an element that shares its paragraph with other text is
 still at the top; something nested inside another element is not).
 
 This is the one place that decision lives. A caller that wants "the elements at the top of
-this document" should call this instead of walking `doc.blocks` by hand. Declarations are not
-elements: see [`for_each_top_level_declaration`].
-
-====[fn for_each_top_level_declaration]
-
-Visits every declaration at the top level of `doc`, in order.
-
-A declaration is always a [`Block`] of its own, so "the declarations at the top of this
-document" is `doc.blocks` and nothing else: one in a section's body or an element's content is
-misplaced, and the validator reports it (`OutsidePreamble`). A caller that wants the preamble
-should call this instead of walking `doc.blocks` by hand.
-
-====[fn for_each_top_level_declaration_mut]
-
-[`for_each_top_level_declaration`], mutably -- for a caller that rewrites a top-level
-declaration in place (`::blueprint(x)` becoming `::kind(x)`, say) without changing how many
-there are.
-
-====[fn retain_top_level_declarations]
-
-[`for_each_top_level_declaration`], removing every one `keep` rejects.
+this file" should call this instead of walking `file.body` by hand. Declarations are in
+`file.header`.
 
 ====[fn for_each_descendant]
 
@@ -246,21 +225,20 @@ checks against. `direct_only` means just the items themselves, not what is insid
 
 ====[fn for_each_element_mut]
 
-Traverses all elements in `doc` mutably in document order and executes `f` for each in place.
+Traverses all elements in `file` mutably in document order and executes `f` for each in place.
 It reaches what [`for_each_element`] reaches, in the same order: an element in a `:connect` is
 not reached.
 
+====[fn for_each_declaration_mut]
+
+Traverses all declarations in `file` mutably in document order and executes `f` for each in place.
+
 ====[fn for_each_id_mut]
 
-Hands `f` the `#(id)` of every node of `doc` that can carry one (an element, a declaration, a
+Hands `f` the `#(id)` of every node of `file` that can carry one (an element, a declaration, a
 section, a list, a list item, a bare entry), with the node's span, in document order, each node
 before what it holds. It goes into `:connect`s too, as [`for_each_node`] does; the nodes it
 reaches are those for which [`Node::id`] answers.
-
-====[fn transform_elements]
-
-Mutates all elements in `doc` matching `filter` by applying `transform`.
-Returns the number of elements transformed.
 
 ==[Functions]
 

@@ -52,6 +52,39 @@ mod tests {
             set.rewrite_url("https://github.com/tomet/tomet/issues/42"),
             Some("$macro.gh_issue(\"tomet/tomet\", 42)".into())
         );
+
+        let mut doc = parse_doc(
+            "@link(\"https://github.com/tomet/tomet\")[repo]\n@embed{ target: \"https://github.com/tomet/tomet/issues/42\" }\n@note(\"https://github.com/tomet/tomet\")\n",
+        );
+        assert_eq!(transform_link_targets_with_macros(&mut doc, &set), 2);
+
+        use tomet_tree::DataExt;
+        let mut results = Vec::new();
+        tomet_tree::for_each_element(&doc, |el| {
+            let val = el
+                .data
+                .get_attr("target")
+                .or(el.data.args.as_ref())
+                .cloned();
+            results.push((el.name.name.as_str().to_string(), val));
+        });
+        assert_eq!(
+            results,
+            vec![
+                (
+                    "link".into(),
+                    Some(Value::String("$macro.gh(\"tomet/tomet\")".into()))
+                ),
+                (
+                    "embed".into(),
+                    Some(Value::String("$macro.gh_issue(\"tomet/tomet\", 42)".into()))
+                ),
+                (
+                    "note".into(),
+                    Some(Value::String("https://github.com/tomet/tomet".into()))
+                ),
+            ]
+        );
     }
 
     #[test]

@@ -3,7 +3,7 @@
 use std::collections::HashMap;
 use tomet_ast::{File, Value};
 use tomet_semantics::{ElementKind, classify_std_lenient};
-use tomet_tree::{DataExt, transform_elements};
+use tomet_tree::{DataExt, for_each_element_mut};
 
 /// A compiled macro matcher for reverse URL-to-macro rewriting.
 #[derive(Debug, Clone)]
@@ -138,31 +138,25 @@ impl MacroSet {
 
 /// Transforms link targets in `doc` matching any macro in `macro_set` into `$macro(...)` invocations.
 pub fn transform_link_targets_with_macros(doc: &mut File, macro_set: &MacroSet) -> usize {
-    transform_elements(
-        doc,
-        |el| {
-            let kind = classify_std_lenient(el.as_view());
-            matches!(kind, ElementKind::Link | ElementKind::Embed)
-        },
-        |el| {
-            let mut changed = false;
+    let mut count = 0;
+    for_each_element_mut(doc, |el| {
+        let kind = classify_std_lenient(el.as_view());
+        if !matches!(kind, ElementKind::Link | ElementKind::Embed) {
+            return;
+        }
 
-            if let Some(target_val) = el.data.get_attr("target") {
-                if let Value::String(url) = target_val
-                    && let Some(macro_call) = macro_set.rewrite_url(url)
-                {
-                    el.data
-                        .transform_prop("target", |_| Value::String(macro_call));
-                    changed = true;
-                }
-            } else if let Some(Value::String(url)) = &el.data.args
-                && let Some(macro_call) = macro_set.rewrite_url(url)
-            {
-                el.data.args = Some(Value::String(macro_call));
-                changed = true;
+        if let Some(Value::String(url)) = el.data.get_attr("target") {
+            if let Some(macro_call) = macro_set.rewrite_url(url) {
+                el.data
+                    .transform_prop("target", |_| Value::String(macro_call));
+                count += 1;
             }
-
-            changed
-        },
-    )
+        } else if let Some(Value::String(url)) = &el.data.args
+            && let Some(macro_call) = macro_set.rewrite_url(url)
+        {
+            el.data.args = Some(Value::String(macro_call));
+            count += 1;
+        }
+    });
+    count
 }

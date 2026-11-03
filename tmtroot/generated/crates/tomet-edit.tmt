@@ -80,7 +80,7 @@ The diagnostic report of an edited document.
 
 ====[fn diagnose_doc]
 
-Diagnoses an [`EditDoc`] by exporting to source, parsing with [`parse_document`],
+Diagnoses an [`EditDoc`] by exporting to source, parsing with [`parse_file`],
 and running [`validate_document`].
 
 That knows `std` alone, as a document in a vault with no settings and no

@@ -30,7 +30,7 @@ already there.
 
 ==[Not here]
 
-- Printing. The result is a [`Document`]; the command prints it the way the vault prints.
+- Printing. The result is a [`File`]; the command prints it the way the vault prints.
 - A vocabulary, `self.meta` typed by `::fields`, and `@term`: each is left and reported. A file
 
 cannot hold a vocabulary or its own `::fields` yet, and a term is not frozen yet.

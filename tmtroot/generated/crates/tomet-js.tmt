@@ -30,15 +30,15 @@ Options controlling HTML rendering and document processing.
 
 An entry in the document's table of contents.
 
-===[struct ProcessedDoc]
+===[struct ProcessedFile]
 
-High-level output of processing a `.tmt` document.
+High-level output of processing a `.tmt` file.
 
 ==[Functions]
 
-===[fn parse_document]
+===[fn parse_file]
 
-Parse `.tmt` markup source text into a JavaScript `Document` AST object.
+Parse `.tmt` markup source text into a JavaScript `File` AST object.
 
 ===[fn parse_value]
 
@@ -52,31 +52,31 @@ Pre-builds and caches the link resolution index in Wasm memory once for the enti
 
 Clears the cached link resolution index.
 
-===[fn process_document_internal]
+===[fn process_file_internal]
 
 ===[fn to_html]
 
-Convert `.tmt` source text or a `Document` AST object into an HTML body string.
+Convert `.tmt` source text or a `File` AST object into an HTML body string.
 
-===[fn process_document]
+===[fn process_file]
 
-Process `.tmt` markup source text or a `Document` AST object into HTML, metadata, title, and TOC.
+Process `.tmt` markup source text or a `File` AST object into HTML, metadata, title, and TOC.
 
 ===[fn to_markdown]
 
-Convert `.tmt` source text or a `Document` AST object into a CommonMark Markdown string.
+Convert `.tmt` source text or a `File` AST object into a CommonMark Markdown string.
 
 ===[fn to_typst]
 
-Convert `.tmt` source text or a `Document` AST object into a Typst markup string.
+Convert `.tmt` source text or a `File` AST object into a Typst markup string.
 
 ===[fn from_markdown]
 
-Parse CommonMark Markdown text into a `Document` AST object.
+Parse CommonMark Markdown text into a `File` AST object.
 
-===[fn print_document]
+===[fn print_file]
 
-Serialize a `Document` AST object back into formatted `.tmt` source code.
+Serialize a `File` AST object back into formatted `.tmt` source code.
 
 ===[fn format_source]
 

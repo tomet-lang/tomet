@@ -4,7 +4,7 @@
 
 =[tomet-printer]
 
-Serializes a `tomet_ast::Document` back to `.tmt` source text
+Serializes a `tomet_ast::File` back to `.tmt` source text
 (no span info required, unlike `tomet-formatter`, which
 re-formats existing `.tmt` text losslessly using spans -- this crate
 is for documents that never had `.tmt` source to begin with, e.g.
@@ -72,7 +72,7 @@ Rendering inline content and block-permitted content runs.
 
 ===[fn document_to_tm]
 
-Serialize a [`Document`] AST into Tomet (`.tmt`) source string using document-level config or defaults.
+Serialize a [`File`] AST into Tomet (`.tmt`) source string using document-level config or defaults.
 
 ===[fn hole_to_tm]
 

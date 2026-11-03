@@ -10,7 +10,7 @@ Reading a document is four steps: find the config that governs it
 (`tomet-load-config`), load the vocabularies and dictionaries that config declares
 (this crate's own `vocabulary` and `dictionary` modules), parse the source, and bind
 the names. A caller that skips the middle two gets a
-`Document` whose element names resolve against `std` alone, which
+`File` whose element names resolve against `std` alone, which
 silently drops every user-vocabulary element. `twrit` shipped exactly
 that against this workspace's own writs: `@layers` was found and the
 equally legal `@writ.layers` was not, so the rule it was written to
@@ -88,7 +88,7 @@ Everything that is only computation -- [`parse`](tomet_vault::Vault::parse),
 [`bindings`](tomet_vault::Vault::bindings), the `config`/`root` fields --
 is the inner vault's, reached through `Deref`. What is added here is
 finding it ([`Vault::discover`]), reading a file in it
-([`Vault::document`]), and the vault-wide table an index query is
+([`Vault::file`]), and the vault-wide table an index query is
 answered from, which is a walk of the disk.
 
 "Vault" is the directory the config file sits in: `find_config_file`
@@ -103,10 +103,10 @@ Why a document could not be read.
 
 ==[Functions]
 
-===[fn load_document]
+===[fn load_file]
 
 Reads one document correctly, discovering its vault first.
 
 For more than one document in the same vault, use [`Vault::discover`]
-once and [`Vault::document`] per file: this function reloads every
+once and [`Vault::file`] per file: this function reloads every
 declared vocabulary on each call.

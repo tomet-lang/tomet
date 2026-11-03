@@ -19,6 +19,9 @@ above implement.
 also holds documents, directories, functions and datetimes, which can
 be the result of an expression and never data. A fragment (`link`,
 `include`) is the one non-scalar value that can be placed in output.
+Structured document parts (inspectable via `.name`, `.prop`, `.id`,
+`.connects`, `.content`, `.item(n)`) are owned [`Part`]s (Layer 2),
+converted from Layer 1 [`tomet_tree::Node`] via [`Part::from_tree_node`].
 - ("Names by position") A name is looked up in the one table its position selects: a call in
 the builtin functions, a bare name in the lambda parameters and then
 the reserved values ([`RESERVED_VALUES`]). There is no fall through,

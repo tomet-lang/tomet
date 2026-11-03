@@ -11,7 +11,7 @@ Read-only `.tmt` document schema, blueprint, and lint validation facade.
 ==[Architecture & Responsibilities]
 
 - ("Read-Only In-Memory Validation") `tomet-validator` performs pure, read-only semantic and schema validation across
-an in-memory [`Document`]. It performs zero I/O, no reference resolution (handled
+an in-memory [`File`]. It performs zero I/O, no reference resolution (handled
 by `tomet-address` and `tomet-links`), and no AST mutations.
 - ("Facade Architecture") Re-exports and unifies:
 - `tomet-validator-core`: Base semantic element, ID duplicate, and argument checks.
@@ -23,7 +23,7 @@ by `tomet-address` and `tomet-links`), and no AST mutations.
 
 ===[fn validate_document]
 
-Runs all validation rules against a parsed `Document` and returns every
+Runs all validation rules against a parsed `File` and returns every
 violation found. Read-only: never mutates `doc`, never does I/O.
 
 ===[fn validate_document_with]

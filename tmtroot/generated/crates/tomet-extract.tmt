@@ -17,7 +17,7 @@ pub fn resolve(...) { ... }
 This crate extracts contiguous comment blocks from source code across multiple
 programming languages (Rust, Python, JavaScript/TypeScript, Java, C/C++, Go,
 Shell, etc.), strips comment prefixes while mapping every byte offset back to the original file,
-and parses the extracted text into Tomet AST [`tomet_ast::Document`]s.
+and parses the extracted text into Tomet AST [`tomet_ast::File`]s.
 
 By preserving original source locations, links and rule references inside comments
 can be checked by tools like `tomet check-links` or `twrit` with exact line and

@@ -16,8 +16,8 @@ and configuration schemas (`#[derive(Config)]`).
 can define configuration schemas and render `.tmt` specifications by
 depending only on `tomet-spec`.
 - ("Pure In-Memory AST & `.tmt` Generators")
-  - ([`cli`]) Converts `clap::Command` introspection trees into `.tmt` [`Document`](tomet_ast::Document) ASTs and formatted strings.
-  - ([`config`]) Converts [`ConfigGroupSpec`] slices into `.tmt` [`Document`](tomet_ast::Document) ASTs and formatted strings.
+  - ([`cli`]) Converts `clap::Command` introspection trees into `.tmt` [`File`](tomet_ast::File) ASTs and formatted strings.
+  - ([`config`]) Converts [`ConfigGroupSpec`] slices into `.tmt` [`File`](tomet_ast::File) ASTs and formatted strings.
   - ([`util`]) Shared inline code escaping and AST construction utilities.
 
 ==[Module cli]
@@ -32,7 +32,7 @@ Renders a complete formatted CLI specification `.tmt` string from a `clap::Comma
 
 ====[fn document]
 
-Builds a Tomet [`Document`] AST representing the CLI command hierarchy and options.
+Builds a Tomet [`File`] AST representing the CLI command hierarchy and options.
 
 ====[fn push_command]
 
@@ -50,7 +50,7 @@ Renders a complete formatted configuration specification `.tmt` string from [`Co
 
 ====[fn document]
 
-Builds a Tomet [`Document`] AST representing the configuration groups and entries.
+Builds a Tomet [`File`] AST representing the configuration groups and entries.
 
 ====[fn push_group]
 

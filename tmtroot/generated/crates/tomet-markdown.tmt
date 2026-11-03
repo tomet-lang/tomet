@@ -9,14 +9,14 @@ Bidirectional conversion between CommonMark and `tomet_ast`.
 ==[Overview]
 
 Handles conversion between CommonMark Markdown and the Tomet Abstract Syntax Tree
-([`tomet_ast::Document`]), supporting frontmatter, wikilinks, tables, callouts,
+([`tomet_ast::File`]), supporting frontmatter, wikilinks, tables, callouts,
 and standard markup.
 
 ==[Key Functions]
 
-- (from_markdown) Parses CommonMark text into a Tomet [`tomet_ast::Document`].
+- (from_markdown) Parses CommonMark text into a Tomet [`tomet_ast::File`].
 - (from_markdown_with_options) Parses CommonMark text using custom [`ImportOptions`].
-- (to_markdown) Converts a Tomet [`tomet_ast::Document`] into clean CommonMark text.
+- (to_markdown) Converts a Tomet [`tomet_ast::File`] into clean CommonMark text.
 
 ==[Key Types]
 

@@ -7,7 +7,7 @@
 ==[tomet-lowering]
 
 Lowering the Tomet Concrete Syntax Tree (CST) into typed AST representations
-([`tomet_ast::Document`], [`tomet_ast::Value`], [`tomet_ast::File`]).
+([`tomet_ast::File`], [`tomet_ast::Value`]).
 
 ==[Architecture & Responsibilities]
 
@@ -104,9 +104,17 @@ whatever they embed (see [`crate::value::Embedded`]).
 
 ===[Functions]
 
-====[fn lower_document]
+====[fn lower_file]
 
-Reads the CST root as an AST [`Document`].
+Reads the CST root as an AST [`File`].
+
+====[fn is_declaration]
+
+Whether `node` is a `::name(...)` block declaration.
+
+====[fn lower_declaration]
+
+`::name(args){value}[content]#(id)`.
 
 ==[Module value]
 
@@ -118,9 +126,9 @@ Lowering for `Value` and `File`: folds CST nodes into AST [`Value`] or [`File`].
 
 Lowers a CST root from `parse_cst_value` into an AST [`Value`].
 
-====[fn lower_file]
+====[fn lower_data_file]
 
-Lowers a CST root from `parse_cst_value` into a [`File`].
+Lowers a CST root from `parse_cst_value` into a data [`File<Value>`].
 
 ====[fn shift_spans]
 

@@ -12,7 +12,7 @@ whitespace, collapsed excess blank lines, exactly one final newline)
 while losslessly preserving literal whitespace and blank lines inside
 raw/verbatim content (a ``` fenced code block, nested in `[content]`
 or at the document's own top level). It never changes the parsed
-`Document` -- the `does_not_change_the_parsed_document` test in the
+`File` -- the `does_not_change_the_parsed_document` test in the
 `tomet-tests` package asserts this across the whole shared corpus, and
 its `KNOWN_FORMAT_CHANGES_DOCUMENT` exception list is empty.
 

@@ -8,7 +8,7 @@ Pure in-memory measurement and statistics for Tomet documents.
 
 This crate calculates document metrics (prose characters, words,
 elements, headings, and internal links) directly from a parsed
-[`Document`] AST. It performs no disk I/O, filesystem access, or database
+[`File`] AST. It performs no disk I/O, filesystem access, or database
 queries, making it suitable for WebAssembly, mobile apps, and parallel
 processing pipelines.
 

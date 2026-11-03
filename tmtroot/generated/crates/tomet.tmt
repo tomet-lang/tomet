@@ -24,14 +24,14 @@ is what keeps this surface honest -- what a binding still takes directly
 Go through [`Vault`]. It finds the config that governs the file, loads
 the vocabularies that config declares, parses, and binds names -- the
 four steps that have to happen together. The bare parser is deliberately
-not re-exported: a caller that parses on its own gets a [`Document`]
+not re-exported: a caller that parses on its own gets a [`File`]
 whose user-vocabulary elements silently do not resolve.
 
 ```no_run
 use std::path::Path;
 
-let (doc, _bindings) = tomet::load_document(Path::new("docs/intro.tmt"))?;
-# let _ = doc;
+let (file, _bindings) = tomet::load_file(Path::new("docs/intro.tmt"))?;
+# let _ = file;
 # Ok::<(), tomet::LoadError>(())
 ```
 
@@ -78,6 +78,6 @@ step from reading.
 
 ==[Functions]
 
-===[fn measure_document]
+===[fn measure_file]
 
 Measures statistics for a single document on disk.

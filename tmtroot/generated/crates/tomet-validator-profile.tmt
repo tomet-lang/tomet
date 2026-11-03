@@ -22,7 +22,7 @@ standalone works from. [`validate_profile`] is the same list as [`Diagnostic`]s,
 
 ==[Not here]
 
-- `oneline`: it needs the lines of the source, which a parsed [`Document`] does not carry.
+- `oneline`: it needs the lines of the source, which a parsed [`File`] does not carry.
 - A vocabulary the document holds itself. No reader for one exists yet, so any element that is
 
 not built in counts as taken from outside.

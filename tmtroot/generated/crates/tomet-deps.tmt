@@ -30,7 +30,7 @@ Pure in-memory dependency and export extraction from parsed Tomet ASTs.
 
 ====[fn extract_raw_dependencies]
 
-Extracts raw outgoing targets alongside their dependency kind from an AST Document.
+Extracts raw outgoing targets alongside their dependency kind from an AST File.
 
 ====[fn extract_exports_hash]
 

@@ -749,22 +749,6 @@ pub fn for_each_id_mut(file: &mut File, f: impl FnMut(&mut Option<Id>, Span)) {
     walk_mut(file, &mut Ids(f), true);
 }
 
-/// Mutates all elements in `file` matching `filter` by applying `transform`.
-/// Returns the number of elements transformed.
-pub fn transform_elements<F, T>(file: &mut File, mut filter: F, mut transform: T) -> usize
-where
-    F: FnMut(&Element) -> bool,
-    T: FnMut(&mut Element) -> bool,
-{
-    let mut count = 0;
-    for_each_element_mut(file, |el| {
-        if filter(el) && transform(el) {
-            count += 1;
-        }
-    });
-    count
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
