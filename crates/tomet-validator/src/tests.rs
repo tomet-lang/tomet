@@ -217,6 +217,67 @@ fn a_heading_rule_connect_is_not_misclassified_as_an_unknown_element() {
     );
 }
 
+#[test]
+fn a_rule_allowing_item_and_task_accepts_plain_and_task_list_items() {
+    let doc = parse("=[ Todo ]:rule(allow:list(item, task))\n- a plain item\n-@task[ a task item ]\n");
+    let errors = rule_errors(&doc, &Bindings::default());
+    assert_eq!(errors, vec![]);
+}
+
+#[test]
+fn a_rule_allowing_only_task_rejects_plain_list_item() {
+    let doc = parse("=[ Todo ]:rule(allow:list(task))\n- a plain item\n-@task[ a task item ]\n");
+    let errors = rule_errors(&doc, &Bindings::default());
+    assert_eq!(errors.len(), 1, "{errors:?}");
+    assert!(matches!(
+        &errors[0],
+        Diagnostic::DisallowedByRule { name, .. } if name == "item"
+    ));
+}
+
+#[test]
+fn a_rule_allowing_only_item_rejects_task_list_item() {
+    let doc = parse("=[ Todo ]:rule(allow:list(item))\n- a plain item\n-@task[ a task item ]\n");
+    let errors = rule_errors(&doc, &Bindings::default());
+    assert_eq!(errors.len(), 1, "{errors:?}");
+    assert!(matches!(
+        &errors[0],
+        Diagnostic::DisallowedByRule { name, .. } if name == "task"
+    ));
+}
+
+#[test]
+fn an_element_named_item_is_rejected_as_unknown() {
+    let doc = parse("@item[ an item ]\n");
+    let errors = validate_document(&doc);
+    assert!(
+        errors.iter().any(|e| matches!(e, Diagnostic::UnknownElement { name, .. } if name == "item")),
+        "{errors:?}"
+    );
+}
+
+#[test]
+fn an_element_named_item_is_rejected_even_in_open_vocabulary() {
+    let vocab = tomet_ast_parser::parse_file(
+        "::kind(vocabulary)\n::vocabulary(sketch){ open: true }\n",
+    )
+    .expect("vocabulary parses");
+    let bindings = Bindings {
+        kind: Some(tomet_semantics::Vocabulary::from_file(&vocab).expect("valid vocabulary")),
+        ..Bindings::default()
+    };
+    let doc = parse("::kind(sketch)\n\n@item[ item ]\n@widget[ widget ]\n");
+    let errors = validate_document_with(&doc, &bindings);
+    assert!(
+        !errors.iter().any(|e| matches!(e, Diagnostic::UnknownElement { name, .. } if name == "widget")),
+        "{errors:?}"
+    );
+    assert!(
+        errors.iter().any(|e| matches!(e, Diagnostic::UnknownElement { name, .. } if name == "item")),
+        "{errors:?}"
+    );
+}
+
 /// The preamble is the run of preamble-region elements at the top.
 /// A misplaced declaration after body has started is rejected at parse/lowering time.
 #[test]
@@ -375,15 +436,15 @@ fn deck_with_content_allow() -> Bindings {
 ::elements{
   list: {
     display: block
-    // `item` resolves bare here (the document's own `::kind(deck)`), which
-    // `Bindings::classify` normalizes to `deck.item` even though it's
+    // `entry` resolves bare here (the document's own `::kind(deck)`), which
+    // `Bindings::classify` normalizes to `deck.entry` even though it's
     // written bare -- same pre-existing quirk `check_one_rule`'s own doc
     // comment notes for `:rule(allow:...)`, so the allow-list has to name
     // it the same way.
-    content: { allow: list(deck.item) }
+    content: { allow: list(deck.entry) }
     about: | カードの一覧。
   }
-  item: {
+  entry: {
     display: block
     content: { allow: inline }
     about: | 一覧の一項目。
@@ -397,7 +458,7 @@ fn deck_with_content_allow() -> Bindings {
 
 #[test]
 fn content_allowed_by_name_is_clean() {
-    let doc = parse("::kind(deck)\n\n@list[\n  @item[ one ]\n  @item[ two ]\n]\n");
+    let doc = parse("::kind(deck)\n\n@list[\n  @entry[ one ]\n  @entry[ two ]\n]\n");
     let errors = validate_document_with(&doc, &deck_with_content_allow());
     assert!(
         !errors
@@ -409,7 +470,7 @@ fn content_allowed_by_name_is_clean() {
 
 #[test]
 fn content_not_in_the_allow_list_is_reported() {
-    let doc = parse("::kind(deck)\n\n@list[\n  @em[ not an item ]\n]\n");
+    let doc = parse("::kind(deck)\n\n@list[\n  @em[ not an entry ]\n]\n");
     let errors = validate_document_with(&doc, &deck_with_content_allow());
     assert!(
         errors.iter().any(|e| matches!(
@@ -423,12 +484,12 @@ fn content_not_in_the_allow_list_is_reported() {
 
 #[test]
 fn content_declared_inline_only_rejects_multiple_blocks() {
-    let doc = parse("::kind(deck)\n\n@item[\n  one\n\n  two\n]\n");
+    let doc = parse("::kind(deck)\n\n@entry[\n  one\n\n  two\n]\n");
     let errors = validate_document_with(&doc, &deck_with_content_allow());
     assert!(
         errors.iter().any(|e| matches!(
             e,
-            Diagnostic::ContentNotInline { name, .. } if name == "item"
+            Diagnostic::ContentNotInline { name, .. } if name == "entry"
         )),
         "{errors:?}"
     );
@@ -1166,7 +1227,7 @@ const TYPED_DECK: &str = r#"::kind(vocabulary)
 ::vocabulary(deck){}
 
 ::elements{
-  item: {
+  entry: {
     args: {
       id: { type: uint, positional: true }
       label: { type: string }
@@ -1198,16 +1259,16 @@ fn argument_problems(src: &str) -> Vec<String> {
 #[test]
 fn an_argument_is_held_to_the_type_its_parameter_declares() {
     for ok in [
-        "@item(3)",
-        "@item(id: 0, label: 2024, rev: 1.10, done: true)",
-        "@item(label: hello, rev: \"1.10.0\")",
-        "@item(rev: 2)",
-        "@item(label: true)",
+        "@entry(3)",
+        "@entry(id: 0, label: 2024, rev: 1.10, done: true)",
+        "@entry(label: hello, rev: \"1.10.0\")",
+        "@entry(rev: 2)",
+        "@entry(label: true)",
         // not known until evaluated
-        "@item(id: ${vars.n})",
+        "@entry(id: ${vars.n})",
         // `type: person` names no type and `list(string)` has no spelling yet: not checked
-        "@item(owner: anyone, tags: list(a, b))",
-        "@item(tags: 5)",
+        "@entry(owner: anyone, tags: list(a, b))",
+        "@entry(tags: 5)",
     ] {
         assert!(
             argument_problems(ok).is_empty(),
@@ -1216,12 +1277,12 @@ fn an_argument_is_held_to_the_type_its_parameter_declares() {
         );
     }
     for (bad, needle) in [
-        ("@item(id: abc)", "`abc` is not a non-negative integer"),
-        ("@item(id: -1)", "`-1` is not a non-negative integer"),
-        ("@item(id: \"3\")", "`3` is not a non-negative integer"),
-        ("@item(rev: 1.0-beta)", "`1.0-beta` is not a version"),
-        ("@item(done: yes)", "`yes` is not `true` or `false`"),
-        ("@item(label: list(a))", "a list is not a string"),
+        ("@entry(id: abc)", "`abc` is not a non-negative integer"),
+        ("@entry(id: -1)", "`-1` is not a non-negative integer"),
+        ("@entry(id: \"3\")", "`3` is not a non-negative integer"),
+        ("@entry(rev: 1.0-beta)", "`1.0-beta` is not a version"),
+        ("@entry(done: yes)", "`yes` is not `true` or `false`"),
+        ("@entry(label: list(a))", "a list is not a string"),
     ] {
         let found = argument_problems(bad);
         assert_eq!(found.len(), 1, "{bad}: {found:?}");
@@ -1244,13 +1305,13 @@ fn checking_a_vocabulary_reports_a_type_that_names_no_type() {
     assert!(
         problems
             .iter()
-            .any(|p| p.contains("`item.owner`") && p.contains("`person` is not a type")),
+            .any(|p| p.contains("`entry.owner`") && p.contains("`person` is not a type")),
         "{problems:?}"
     );
     assert!(
         problems
             .iter()
-            .any(|p| p.contains("`item.tags`") && p.contains("no spelling yet")),
+            .any(|p| p.contains("`entry.tags`") && p.contains("no spelling yet")),
         "{problems:?}"
     );
 }

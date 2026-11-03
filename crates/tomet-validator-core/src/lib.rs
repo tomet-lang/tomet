@@ -40,7 +40,7 @@ pub fn classify_in(
 
 /// What a `:rule(allow: list(...))` calls a plain `- item`, which has no name
 /// to be called by.
-pub const PLAIN_ITEM_KIND_NAME: &str = "bare";
+pub const PLAIN_ITEM_KIND_NAME: &str = "item";
 
 /// The name a rule's `allow:` list knows a child of a node by: an element by
 /// its kind, a list item by the element it is when it has a name, and a plain

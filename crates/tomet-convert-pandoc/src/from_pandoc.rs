@@ -19,7 +19,7 @@
 //!   the body", so `@deck.card{ title: x, @note[y] }` comes back with the
 //!   entry in `[content]`. A bare `(a)[y]` entry does not share the loss:
 //!   it has no name to carry, so [`crate::to_pandoc`] marks it under
-//!   [`SIGIL_KEY`] and it returns to the group.
+//!   [`ENTRY_KEY`] and it returns to the group.
 //!
 //!   Accepted rather than fixed, and the reason is what this bridge is
 //!   for. It exists to reach the formats Pandoc reads and writes --
@@ -41,7 +41,7 @@ use tomet_ast::{
 use tomet_span::Span;
 use tomet_semantics::EXACT_DATA_KEY;
 
-use crate::to_pandoc::{BARE_SIGIL, SIGIL_KEY};
+use crate::to_pandoc::{BARE_ENTRY, ENTRY_KEY};
 use tomet_tree::{ElementExt, declaration_new, element_new, list, list_item};
 
 use crate::ast::{Attr, Block, Inline, MetaValue, PandocDoc, Row, TableParts};
@@ -586,14 +586,14 @@ fn element_from_attr(attr: &Attr, fallback: impl FnOnce() -> String) -> Element 
 /// `{...}` group around it.
 ///
 /// A bare entry has no name to carry in a class, so [`crate::to_pandoc`]
-/// records it under [`SIGIL_KEY`] instead. Reading it back is what keeps
+/// records it under [`ENTRY_KEY`] instead. Reading it back is what keeps
 /// `@deck.card{ (a)[ x ] }` from returning as an element named `bare` -- a
 /// name no vocabulary declares, which made the round-tripped document fail
 /// validation.
 fn is_bare_entry(attr: &Attr) -> bool {
     attr.2
         .iter()
-        .any(|(k, v)| k == SIGIL_KEY && v == BARE_SIGIL)
+        .any(|(k, v)| k == ENTRY_KEY && v == BARE_ENTRY)
 }
 
 /// The body of a `Div` as the content and the bare entries it came from:
@@ -657,7 +657,7 @@ fn extract_data_from_attr(attr: &Attr) -> (Option<Value>, Option<Group>) {
 
     let mut entries: Vec<(String, Value)> = Vec::new();
     for (k, v) in &attr.2 {
-        if k == EXACT_DATA_KEY || k == SIGIL_KEY {
+        if k == EXACT_DATA_KEY || k == ENTRY_KEY {
             continue;
         }
         entries.push((k.clone(), Value::String(v.clone())));

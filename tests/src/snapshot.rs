@@ -115,7 +115,7 @@ fn a_bare_entry_does_not_come_back_as_an_element_named_bare() {
     });
     assert!(
         !names.iter().any(|n| n == "bare"),
-        "a sigil came back as a name: {names:?}"
+        "a bare entry came back as a name: {names:?}"
     );
 }
 

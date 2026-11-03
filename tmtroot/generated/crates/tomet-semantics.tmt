@@ -453,6 +453,10 @@ feature/content-shape.tmt`).
 
 ===[Functions]
 
+====[fn is_reserved_element_name]
+
+Whether `name` is a reserved element name that no vocabulary may declare.
+
 ====[fn builtin_doc_vocabularies]
 
 The vocabularies tomet ships hardcoded in Rust rather than as a vault's
@@ -492,3 +496,9 @@ them a hardcoded meaning -- `std` conceptually, and now `doc`.
 vocabulary's own namespace string against `"std"`; only individual
 element names were checked, via `shadowed_builtins`). `doc` is the first
 namespace this list actually enforces.
+
+====[const RESERVED_ELEMENT_NAMES]
+
+Element names no vocabulary may declare, because tomet reserves them
+for syntax and structural rules (e.g. `item` for plain list items in
+`:rule(allow: list(item, ...))`).

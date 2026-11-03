@@ -110,3 +110,35 @@ fn heading_descendants_fixture_reports_the_disallowed_one() {
         Diagnostic::DisallowedByRule { name, .. } if name == "heading"
     ));
 }
+
+#[test]
+fn rule_allows_plain_items_and_tasks_when_specified() {
+    let doc = tomet_ast_parser::parse_file(
+        "=[ Tasks ]:rule(allow:list(item, task))\n- plain item\n-@task[ task item ]\n",
+    )
+    .expect("parses");
+    let errors = validate_document(&doc);
+    let rule_errors: Vec<_> = errors
+        .iter()
+        .filter(|e| matches!(e, Diagnostic::DisallowedByRule { .. }))
+        .collect();
+    assert_eq!(rule_errors, Vec::<&Diagnostic>::new(), "{errors:?}");
+}
+
+#[test]
+fn rule_reports_disallowed_plain_item_when_only_task_is_allowed() {
+    let doc = tomet_ast_parser::parse_file(
+        "=[ Tasks ]:rule(allow:list(task))\n- plain item\n-@task[ task item ]\n",
+    )
+    .expect("parses");
+    let errors = validate_document(&doc);
+    let rule_errors: Vec<_> = errors
+        .iter()
+        .filter(|e| matches!(e, Diagnostic::DisallowedByRule { .. }))
+        .collect();
+    assert_eq!(rule_errors.len(), 1, "{errors:?}");
+    assert!(matches!(
+        rule_errors[0],
+        Diagnostic::DisallowedByRule { name, .. } if name == "item"
+    ));
+}

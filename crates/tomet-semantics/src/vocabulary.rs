@@ -172,6 +172,16 @@ pub struct Vocabulary {
 /// namespace this list actually enforces.
 pub const RESERVED_NAMESPACES: [&str; 1] = ["doc"];
 
+/// Element names no vocabulary may declare, because tomet reserves them
+/// for syntax and structural rules (e.g. `item` for plain list items in
+/// `:rule(allow: list(item, ...))`).
+pub const RESERVED_ELEMENT_NAMES: [&str; 1] = ["item"];
+
+/// Whether `name` is a reserved element name that no vocabulary may declare.
+pub fn is_reserved_element_name(name: &str) -> bool {
+    RESERVED_ELEMENT_NAMES.contains(&name)
+}
+
 /// The vocabularies tomet ships hardcoded in Rust rather than as a vault's
 /// `::vocabulary(ns)` document -- the same reason `std`'s elements are a
 /// Rust table (`builtin_kinds`) rather than a `::vocabulary(std)` document:
@@ -286,12 +296,18 @@ impl Vocabulary {
 
     /// Whether this vocabulary answers for `name` -- because it declares
     /// it, or because it is open.
+    ///
+    /// Reserved element names like `item` are never claimed by any vocabulary,
+    /// even if `open: true`.
     pub fn has(&self, name: &str) -> bool {
+        if is_reserved_element_name(name) {
+            return false;
+        }
         self.open || self.elements.contains_key(name)
     }
 
-    /// Names this vocabulary declares that `std` already has, in
-    /// declaration order.
+    /// Names this vocabulary declares that `std` already has, or that tomet
+    /// reserves as structural names, in declaration order.
     ///
     /// Non-empty means the vocabulary is invalid. Reported here, once,
     /// rather than at every use site: `std` winning is what keeps a bare
@@ -299,7 +315,10 @@ impl Vocabulary {
     pub fn shadowed_builtins(&self) -> Vec<&str> {
         self.elements
             .keys()
-            .filter(|name| builtin_kinds().any(|(builtin, _)| builtin == *name))
+            .filter(|name| {
+                builtin_kinds().any(|(builtin, _)| builtin == *name)
+                    || is_reserved_element_name(name)
+            })
             .map(String::as_str)
             .collect()
     }
@@ -406,10 +425,17 @@ impl LoadedVocabularies {
         // Reported here, once, rather than at every document that writes
         // the shadowed name.
         for shadowed in vocab.shadowed_builtins() {
-            self.errors.push(format!(
-                "{label} declares `{shadowed}`, which is already a built-in name; \
-                 std wins, so a vocabulary may not take one"
-            ));
+            self.errors.push(if is_reserved_element_name(shadowed) {
+                format!(
+                    "{label} declares `{shadowed}`, which is a reserved element name; \
+                     a vocabulary may not declare it"
+                )
+            } else {
+                format!(
+                    "{label} declares `{shadowed}`, which is already a built-in name; \
+                     std wins, so a vocabulary may not take one"
+                )
+            });
         }
         for problem in vocab.param_problems() {
             self.errors.push(format!(
@@ -505,6 +531,9 @@ impl Bindings {
             if let Some(kind) = builtin(&name.name) {
                 return Ok(kind);
             }
+            if is_reserved_element_name(&name.name) {
+                return Err(unknown());
+            }
             return match self.kind.as_ref() {
                 Some(vocab) if vocab.has(&name.name) => Ok(ElementKind::Custom(format!(
                     "{}.{}",
@@ -545,6 +574,9 @@ impl Bindings {
 
     /// The declaration behind a name, when one is in scope.
     pub fn declaration(&self, name: &Name) -> Option<&ElementDecl> {
+        if is_reserved_element_name(&name.name) {
+            return None;
+        }
         let vocab = match name.namespace.as_deref() {
             None | Some("std") => self.kind.as_ref()?,
             // Unconditional, like `classify`'s `"doc"` branch -- `doc.icon`
@@ -896,15 +928,46 @@ mod tests {
 
     #[test]
     fn shadowing_a_builtin_is_reported_at_the_declaration() {
-        let v = vocab("::vocabulary(deck)\n\n::elements{ link: {}, ref: {} }\n");
-        assert_eq!(v.shadowed_builtins(), ["link"]);
+        let v = vocab("::vocabulary(deck)\n\n::elements{ link: {}, ref: {}, item: {} }\n");
+        assert_eq!(v.shadowed_builtins(), ["item", "link"]);
         assert!(vocab(WRIT).shadowed_builtins().is_empty());
+    }
+
+    #[test]
+    fn reserved_element_name_item_is_rejected_even_in_open_vocabulary() {
+        let open_v = vocab("::vocabulary(sketch){ open: true }\n");
+        assert!(!open_v.has("item"));
+        assert!(open_v.has("card"));
+
+        let b = Bindings {
+            kind: Some(open_v),
+            ..Default::default()
+        };
+        assert!(b.classify(&name("item")).is_err());
+        assert!(b.classify(&name("sketch.item")).is_err());
+        assert!(b.declaration(&name("item")).is_none());
+    }
+
+    #[test]
+    fn loaded_vocabularies_rejects_reserved_element_name() {
+        let doc = tomet_ast_parser::parse_file(
+            "::kind(vocabulary)\n::vocabulary(deck)\n\n::elements{ item: {} }\n",
+        )
+        .unwrap();
+        let mut loaded = LoadedVocabularies::default();
+        loaded.add("deck.vocabulary.tmt", &doc);
+        assert_eq!(loaded.errors.len(), 1, "{:?}", loaded.errors);
+        assert!(
+            loaded.errors[0].contains("`item`, which is a reserved element name"),
+            "{:?}",
+            loaded.errors
+        );
     }
 
     const DECK: &str = "::vocabulary(deck)
 
 ::elements{
-  item: {
+  entry: {
     args: {
       id: { type: uint, positional: true }
       tags: { type: list(string) }
@@ -955,7 +1018,7 @@ mod tests {
         loaded.add("deck.vocabulary.tmt", &doc);
         assert_eq!(loaded.errors.len(), 3, "{:?}", loaded.errors);
         assert!(
-            loaded.errors[0].starts_with("deck.vocabulary.tmt: `item`'s parameter `"),
+            loaded.errors[0].starts_with("deck.vocabulary.tmt: `entry`'s parameter `"),
             "{:?}",
             loaded.errors
         );

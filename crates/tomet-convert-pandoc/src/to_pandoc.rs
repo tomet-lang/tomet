@@ -546,7 +546,7 @@ fn body_blocks(body: BodyView<'_>) -> Vec<Block> {
 }
 
 /// A bare `(marker)[content]` entry of a `{...}` group. It has no name for
-/// a class to carry, so the attribute says so; see [`SIGIL_KEY`].
+/// a class to carry, so the attribute says so; see [`ENTRY_KEY`].
 fn bare_to_block(bare: &Bare) -> Block {
     let value = bare.data.value.as_ref().map(|v| v.as_data());
     let mut attr = attr_from(
@@ -554,7 +554,7 @@ fn bare_to_block(bare: &Bare) -> Block {
         flatten_data(bare.data.args.as_ref(), value.as_ref()).into_pairs(),
         &[],
     );
-    attr.2.push((SIGIL_KEY.to_string(), BARE_SIGIL.to_string()));
+    attr.2.push((ENTRY_KEY.to_string(), BARE_ENTRY.to_string()));
     Block::Div(attr, body_blocks(bare.as_body_view()))
 }
 
@@ -767,10 +767,10 @@ fn table_alignment(el: ElementView<'_>) -> Alignment {
 /// whose `::kind` names a vocabulary declaring `bare` writes `@bare`
 /// unqualified, and `tomet-bare` would then mean two things. `tomet-data`
 /// established the reserved-key convention this follows.
-pub(crate) const SIGIL_KEY: &str = "tomet-sigil";
+pub(crate) const ENTRY_KEY: &str = "tomet-entry";
 
-/// [`SIGIL_KEY`]'s value for a bare entry.
-pub(crate) const BARE_SIGIL: &str = "bare";
+/// [`ENTRY_KEY`]'s value for a bare entry.
+pub(crate) const BARE_ENTRY: &str = "bare";
 
 /// The `Attr` for an element Pandoc has no equivalent for: its data, plus the
 /// class carrying its name.
