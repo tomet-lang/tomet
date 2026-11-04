@@ -25,7 +25,7 @@ impl std::error::Error for Mismatch {}
 /// `string` and a bare `1.10` is a `version`: what is written decides, not
 /// what the reader would have made of it. A number type takes the numbers
 /// the reader keeps as written too (`1.10` is a `float`, `-0` an `int`).
-pub fn admits(ty: Type, value: &Value) -> Result<(), Mismatch> {
+pub fn admits(ty: &Type, value: &Value) -> Result<(), Mismatch> {
     let integer = || match value {
         Value::Int(n) => Some(*n),
         Value::Number(text) => text.parse::<i64>().ok(),
@@ -36,7 +36,17 @@ pub fn admits(ty: Type, value: &Value) -> Result<(), Mismatch> {
         Type::Uint => integer().is_some_and(|n| n >= 0),
         Type::Float => matches!(value, Value::Int(_)) || value.as_number().is_some(),
         Type::Bool => matches!(value, Value::Bool(_)),
-        Type::List => matches!(value, Value::Seq(_)),
+        Type::List(inner) => match value {
+            Value::Seq(items) => {
+                if let Some(inner_ty) = inner {
+                    for item in items {
+                        admits(inner_ty, item)?;
+                    }
+                }
+                true
+            }
+            _ => false,
+        },
         Type::String | Type::Nanoid => value.scalar_text().is_some(),
         Type::Datetime | Type::Version | Type::Uuid => value
             .scalar_text()
@@ -46,7 +56,7 @@ pub fn admits(ty: Type, value: &Value) -> Result<(), Mismatch> {
         Ok(())
     } else {
         Err(Mismatch {
-            ty,
+            ty: ty.clone(),
             found: describe_value(value),
         })
     }
@@ -103,11 +113,15 @@ mod tests {
             (Type::Version, Value::Number("1.10".to_string())),
             (Type::Uuid, text("123E4567-E89B-12D3-A456-426614174000")),
             (Type::Uuid, text("123e4567-e89b-12d3-a456-426614174000")),
-            (Type::List, Value::Seq(vec![])),
-            (Type::List, Value::Seq(vec![text("a")])),
+            (Type::List(None), Value::Seq(vec![])),
+            (Type::List(None), Value::Seq(vec![text("a")])),
+            (
+                Type::List(Some(Box::new(Type::Int))),
+                Value::Seq(vec![Value::Int(1), Value::Int(2)]),
+            ),
         ];
         for (ty, value) in cases {
-            assert_eq!(admits(*ty, value), Ok(()), "{ty}: {value:?}");
+            assert_eq!(admits(ty, value), Ok(()), "{ty}: {value:?}");
         }
 
         let bad_cases: &[(Type, Value)] = &[
@@ -126,10 +140,14 @@ mod tests {
             (Type::Uuid, text("not-a-uuid")),
             (Type::Nanoid, Value::Seq(vec![])),
             (Type::Nanoid, Value::Map(vec![])),
-            (Type::List, Value::Int(3)),
+            (Type::List(None), Value::Int(3)),
+            (
+                Type::List(Some(Box::new(Type::Int))),
+                Value::Seq(vec![Value::Int(1), Value::String("not an int".into())]),
+            ),
         ];
         for (ty, value) in bad_cases {
-            assert!(admits(*ty, value).is_err(), "{ty}: {value:?}");
+            assert!(admits(ty, value).is_err(), "{ty}: {value:?}");
         }
     }
 }

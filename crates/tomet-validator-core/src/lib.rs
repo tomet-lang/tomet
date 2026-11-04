@@ -367,7 +367,7 @@ fn check_arguments_of(
         if matches!(value, Value::Interp(_)) {
             continue;
         }
-        if let Err(mismatch) = admits(ty, value) {
+        if let Err(mismatch) = admits(&ty, value) {
             errors.push(Diagnostic::InvalidArgument {
                 element: name.to_string(),
                 argument: key.clone(),

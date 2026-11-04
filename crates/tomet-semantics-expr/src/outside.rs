@@ -26,7 +26,7 @@ const PLACEMENT_FUNCTIONS: &[&str] = &["link"];
 /// at this list but the test that holds it to `FUNCTIONS`.
 #[cfg(test)]
 const INSIDE_FUNCTIONS: &[&str] = &[
-    "add", "sub", "mul", "div", "mod", "not", "exists", "emoji", "unicode", "addr",
+    "add", "sub", "mul", "div", "mod", "not", "exists", "emoji", "unicode", "version", "addr",
 ];
 
 /// What an expression takes from outside the file.

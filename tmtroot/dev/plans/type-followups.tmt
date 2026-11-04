@@ -6,15 +6,12 @@
 // 修飾子 (`format` `offset` `length` `prefix`) は意図して `Type` の外にある。
 // `nanoid` が整っているかは `tomet-format-field-utils` が、`prefix` と `length` から決める。
 
-- ( ) 式の中のバージョン
-  - `tomet_type::Version` は `1.10` を `1.9` の後ろに並べるが、式は両者を文字列として比べる (`"1.10" < "1.9"`)。
-    `version(...)` か `EvalValue::Version` を足す。
-- ( ) 型を名指ししない設定
-  - `FieldConfig.field_type` はまだ文字列で、設定の `meta` の欄の `type: person` は黙って無視される。
-    設定を読むところで報告する (語彙の側はすでに報告している)。
-- ( ) `list(string)` と `<list<string>>`
-  - 作者は、要素の型を `<list<string>>` と書くつもりでいる。綴りが決まるまで `Type::parse` は名前だけを読み、
-    語彙の `type: list(string)` は「まだ綴りがない」と報告されて検査されない。
+- (x) 式の中のバージョン
+  - `EvalValue::Version` と組み込み関数 `version(...)` を追加。順序比較（`version("1.10") > version("1.9")`）を実装済み。
+- (x) 型を名指ししない設定
+  - `::fields` の `type:` 欄で未知の型名（`type: person` 等）が書かれた場合に `tomet check` で報告するようにした。
+- (x) `list(string)` と `<list<string>>`
+  - 綴りとして呼び出し構文 `list(...)` を採用。`Type::List(Option<Box<Type>>)` および `parse_type_spec` / `admits` で要素型の指定と検査をサポート。
   - `enum(...)` も同じ: まだ意味を持たない (`:rule` の `allow:` は、リストとして取る)。
 - ( ) 式の中に残した数
   - `EvalValue::from_ast(Number)` は、その数が表す `f64` になるので、型のない `rev: 1.10` の `${meta.rev}` は

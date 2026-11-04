@@ -39,6 +39,7 @@ pub(crate) fn values_equal(a: &EvalValue, b: &EvalValue) -> bool {
             n1 == n2 && a1.len() == a2.len() && a1.iter().zip(a2).all(|(l, r)| values_equal(l, r))
         }
         (V::DateTime(x), V::DateTime(y)) => x == y,
+        (V::Version(x), V::Version(y)) => x == y,
         (V::Document(x), V::Document(y)) => x == y,
         (V::Directory(x), V::Directory(y)) => x == y,
         (V::Namespace(x), V::Namespace(y)) => x == y,
@@ -62,6 +63,7 @@ pub(crate) fn compare(a: &EvalValue, b: &EvalValue) -> Result<Ordering, EvalErro
         (V::Int(x), V::Int(y)) => Ok(x.cmp(y)),
         (V::String(x), V::String(y)) => Ok(x.cmp(y)),
         (V::DateTime(x), V::DateTime(y)) => Ok(x.cmp(y)),
+        (V::Version(x), V::Version(y)) => Ok(x.cmp(y)),
         _ => match (number(a), number(b)) {
             // `None` only for a NaN, which has no place in an order.
             (Some(x), Some(y)) => x.partial_cmp(&y).ok_or_else(not_comparable),

@@ -153,6 +153,9 @@ pub fn check_declarations(declarations: &[Declaration], host: Host) -> Vec<(usiz
             DeclKind::Vars => {
                 check_vars(idx, decl, spec.name, &mut problems);
             }
+            DeclKind::Fields => {
+                check_fields(idx, decl, spec.name, &mut problems);
+            }
             DeclKind::Meta => {
                 if let Some(Value::Map(entries)) = &decl.data
                     && entries.iter().any(|(key, _)| key == "id")
@@ -241,7 +244,7 @@ fn check_declared_version(
     if matches!(&written, Value::Interp(_)) {
         return;
     }
-    if let Err(mismatch) = admits(Type::Version, &written) {
+    if let Err(mismatch) = admits(&Type::Version, &written) {
         problems.push((
             idx,
             Problem::InvalidDefinition {
@@ -340,9 +343,39 @@ fn check_vars(
 
 fn var_problem(decl: &VarDecl) -> Option<String> {
     let default = decl.default.as_ref()?;
-    admits(decl.ty, default)
+    admits(&decl.ty, default)
         .err()
         .map(|err| format!("`default` is not a value of `type: {}`: {err}", decl.ty))
+}
+
+fn check_fields(
+    idx: usize,
+    decl: &Declaration,
+    name: &'static str,
+    problems: &mut Vec<(usize, Problem)>,
+) {
+    let Some(Value::Map(entries)) = &decl.data else {
+        return;
+    };
+    for (field_name, field_def) in entries {
+        let Value::Map(props) = field_def else {
+            continue;
+        };
+        for (k, v) in props {
+            if k == "type" {
+                if let Err(e) = tomet_semantics_core::parse_type_spec(v) {
+                    problems.push((
+                        idx,
+                        Problem::InvalidDefinition {
+                            declaration: name,
+                            name: field_name.clone(),
+                            reason: e.to_string(),
+                        },
+                    ));
+                }
+            }
+        }
+    }
 }
 
 #[cfg(test)]
@@ -686,5 +719,22 @@ mod tests {
         );
         let problems = check_declarations(&[use1, use2], Host::Tmt);
         assert!(problems.is_empty());
+    }
+
+    #[test]
+    fn fields_type_declaration_validation() {
+        let valid = problems_of("::fields{ tags: { type: list(string) } }\n");
+        assert!(valid.is_empty(), "{valid:?}");
+
+        let invalid = problems_of("::fields{ owner: { type: person } }\n");
+        assert_eq!(invalid.len(), 1);
+        assert!(matches!(
+            &invalid[0],
+            Problem::InvalidDefinition {
+                declaration: "fields",
+                name,
+                reason,
+            } if name == "owner" && reason.contains("`person` is not a type")
+        ));
     }
 }

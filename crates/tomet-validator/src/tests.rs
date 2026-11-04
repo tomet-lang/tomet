@@ -1244,6 +1244,7 @@ const TYPED_DECK: &str = r#"::kind(vocabulary)
       done: { type: bool }
       owner: { type: person }
       tags: { type: list(string) }
+      unsupported: { type: set(string) }
     }
   }
 }
@@ -1274,9 +1275,8 @@ fn an_argument_is_held_to_the_type_its_parameter_declares() {
         "@entry(label: true)",
         // not known until evaluated
         "@entry(id: ${vars.n})",
-        // `type: person` names no type and `list(string)` has no spelling yet: not checked
+        // `type: person` names no type: not checked
         "@entry(owner: anyone, tags: list(a, b))",
-        "@entry(tags: 5)",
     ] {
         assert!(
             argument_problems(ok).is_empty(),
@@ -1291,6 +1291,7 @@ fn an_argument_is_held_to_the_type_its_parameter_declares() {
         ("@entry(rev: 1.0-beta)", "`1.0-beta` is not a version"),
         ("@entry(done: yes)", "`yes` is not `true` or `false`"),
         ("@entry(label: list(a))", "a list is not a string"),
+        ("@entry(tags: 5)", "is not a list"),
     ] {
         let found = argument_problems(bad);
         assert_eq!(found.len(), 1, "{bad}: {found:?}");
@@ -1319,7 +1320,7 @@ fn checking_a_vocabulary_reports_a_type_that_names_no_type() {
     assert!(
         problems
             .iter()
-            .any(|p| p.contains("`entry.tags`") && p.contains("no spelling yet")),
+            .any(|p| p.contains("`entry.unsupported`") && p.contains("no spelling yet")),
         "{problems:?}"
     );
 }

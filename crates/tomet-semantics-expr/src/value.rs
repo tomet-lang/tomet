@@ -19,6 +19,7 @@ use std::rc::Rc;
 
 use time::OffsetDateTime;
 use tomet_ast::{Block, Connect, Declaration, Element, InterpExpr, List, ListItem, Section, Value};
+use tomet_type::Version;
 
 /// A document, by vault-relative path with `/` separators. A reference: the
 /// content is fetched through the [`super::Resolver`] when it is needed.
@@ -177,6 +178,7 @@ pub enum EvalValue {
     /// that can be placed where output goes.
     Fragment(Vec<Block>),
     DateTime(OffsetDateTime),
+    Version(Version),
     Function(Closure),
     Namespace(Namespace),
 }
@@ -198,6 +200,7 @@ impl EvalValue {
             EvalValue::Directory(_) => "directory",
             EvalValue::Fragment(_) => "fragment",
             EvalValue::DateTime(_) => "datetime",
+            EvalValue::Version(_) => "version",
             EvalValue::Function(_) => "function",
             EvalValue::Namespace(_) => "namespace",
         }
@@ -277,6 +280,7 @@ impl EvalValue {
                 }
             },
             EvalValue::Fragment(blocks) => Value::Blocks(blocks.clone()),
+            EvalValue::Version(v) => Value::String(v.to_string()),
             EvalValue::Document(_)
             | EvalValue::Directory(_)
             | EvalValue::DateTime(_)

@@ -47,9 +47,12 @@ pub fn typed_meta(config: &PrinterConfig, doc: &File, doc_ref: &DocRef) -> EvalV
 }
 
 fn typed(field: &FieldConfig, value: Option<(&Value, &DocRef)>) -> EvalValue {
-    let ty = field.field_type.as_deref().and_then(Type::from_name);
+    let ty = field
+        .field_type
+        .as_deref()
+        .and_then(|s| Type::parse_str(s).ok());
     match (ty, value) {
-        (Some(Type::List), None) => EvalValue::Seq(Vec::new()),
+        (Some(Type::List(_)), None) => EvalValue::Seq(Vec::new()),
         (Some(ty), Some((value, doc))) => typed_value(ty, value, doc),
         (None, Some((value, doc))) => EvalValue::from_ast(value, doc),
         (_, None) => EvalValue::Null,

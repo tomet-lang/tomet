@@ -400,6 +400,7 @@ pub const FUNCTIONS: &[(&str, &str)] = &[
     ("exists", "Whether a value is not null `exists(value)`"),
     ("emoji", "An emoji by name `emoji(\"sparkles\")`"),
     ("unicode", "A character by code point `unicode(0x2713)`"),
+    ("version", "A version parsed from text `version(\"1.10.0\")`"),
 ];
 
 /// The names an expression can start with that are values, not functions,
@@ -481,6 +482,25 @@ fn builtin(name: &str, args: Args, cx: &EvalContext) -> Result<EvalValue, EvalEr
         },
         "exists" => match args.exactly(name, 1)?.pop() {
             Some(value) => Ok(EvalValue::Bool(value != EvalValue::Null)),
+            None => unreachable!("`exactly` returned one value"),
+        },
+        "version" => match args.exactly(name, 1)?.pop() {
+            Some(EvalValue::String(text)) => {
+                let v = tomet_type::Version::parse(text.trim())
+                    .ok_or_else(|| EvalError::message(format!("`{text}` is not a valid version")))?;
+                Ok(EvalValue::Version(v))
+            }
+            Some(EvalValue::Version(v)) => Ok(EvalValue::Version(v)),
+            Some(EvalValue::Int(n)) if n >= 0 => {
+                let v = tomet_type::Version::parse(&n.to_string())
+                    .ok_or_else(|| EvalError::message(format!("`{n}` is not a valid version")))?;
+                Ok(EvalValue::Version(v))
+            }
+            Some(other) => Err(EvalError::mismatch(
+                "`version`",
+                "a version string or non-negative integer",
+                other.type_name(),
+            )),
             None => unreachable!("`exactly` returned one value"),
         },
         _ => Err(EvalError::UnknownFunction(name.to_string())),

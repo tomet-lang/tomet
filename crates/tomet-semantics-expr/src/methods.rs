@@ -156,6 +156,7 @@ pub(crate) fn scalar_text(value: &EvalValue) -> Result<String, EvalError> {
         EvalValue::Int(i) => Ok(i.to_string()),
         EvalValue::Float(f) => Ok(f.to_string()),
         EvalValue::Bool(b) => Ok(b.to_string()),
+        EvalValue::Version(v) => Ok(v.to_string()),
         other => Err(EvalError::mismatch(
             "turning a value into text",
             "a string, number or bool",

@@ -482,6 +482,7 @@ fn scalar_text(value: &EvalValue) -> Option<String> {
         EvalValue::Int(i) => i.to_string(),
         EvalValue::Float(f) => f.to_string(),
         EvalValue::String(s) => s.clone(),
+        EvalValue::Version(v) => v.to_string(),
         _ => return None,
     })
 }

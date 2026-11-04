@@ -13,7 +13,7 @@
 
 `::meta` の項目の型と形を宣言する。キーは項目の名前で、`.` を含んでもよい（`url.wiki`）。値は、その項目の宣言。
 
-- `type`: 項目の型（`string` `list` `datetime` `uuid` など）。
+- `type`: 項目の型（`string` `list` `list(string)` `datetime` `uuid` など）。
 - `format` `offset`: 日時の書き方。
 - `always_newline`: この項目を、必ず改行して書く。
 

@@ -1877,6 +1877,7 @@ dependencies = [
  "tomet-ast-parser",
  "tomet-declaration",
  "tomet-semantics",
+ "tomet-semantics-core",
  "tomet-spec-derive",
  "tomet-tree",
 ]

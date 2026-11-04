@@ -1639,3 +1639,19 @@ fn a_list_of_documents_is_a_list_that_cannot_be_stored_as_data() {
     let err = evaluate_data(&parse("self"), &cx).unwrap_err();
     assert_eq!(err.to_string(), "a document cannot be stored as data");
 }
+
+#[test]
+fn versions_order_and_compare() {
+    assert_eq!(
+        out("version(\"1.10\") > version(\"1.9\")").unwrap(),
+        EvalValue::Bool(true)
+    );
+    assert_eq!(
+        out("version(\"1.10.0\") == version(\"1.10\")").unwrap(),
+        EvalValue::Bool(true)
+    );
+    assert_eq!(
+        out("version(\"2.0.0\") > version(\"1.99.9\")").unwrap(),
+        EvalValue::Bool(true)
+    );
+}

@@ -121,7 +121,7 @@ pub struct ParamProblem {
 impl ParamDecl {
     /// The declared type, when `type:` names one.
     pub fn declared_type(&self) -> Option<Type> {
-        self.ty.as_ref().and_then(|ty| ty.as_ref().ok().copied())
+        self.ty.as_ref().and_then(|ty| ty.as_ref().ok().cloned())
     }
 }
 
@@ -338,7 +338,7 @@ impl Vocabulary {
                     Some(Ok(ty)) => param
                         .default
                         .as_ref()
-                        .and_then(|default| admits(*ty, default).err())
+                        .and_then(|default| admits(ty, default).err())
                         .map(|mismatch| format!("`default` is not of `type: {ty}`: {mismatch}")),
                     None => None,
                 };
@@ -836,9 +836,14 @@ mod tests {
         let tags = card.param("tags").expect("declared");
         assert!(!tags.required);
         assert!(!tags.positional);
-        // `list(string)` has no spelling as a type yet: kept as the reason.
-        assert_eq!(tags.ty, Some(Err(TypeError::NotAName)));
-        assert_eq!(tags.declared_type(), None);
+        assert_eq!(
+            tags.ty,
+            Some(Ok(Type::List(Some(Box::new(Type::String)))))
+        );
+        assert_eq!(
+            tags.declared_type(),
+            Some(Type::List(Some(Box::new(Type::String))))
+        );
     }
 
     #[test]
@@ -971,6 +976,7 @@ mod tests {
     args: {
       id: { type: uint, positional: true }
       tags: { type: list(string) }
+      unsupported: { type: set(string) }
       owner: { type: person }
       stars: { type: uint, default: \"many\" }
       note: {}
@@ -988,9 +994,9 @@ mod tests {
                 .find(|x| x.param == p)
                 .map(|x| x.reason.as_str())
         };
-        // `list(string)` has no spelling yet, `person` is no type
+        // `set(string)` has no spelling yet, `person` is no type
         assert!(
-            by_param("tags").unwrap().contains("no spelling yet"),
+            by_param("unsupported").unwrap().contains("no spelling yet"),
             "{problems:?}"
         );
         assert!(
@@ -1007,6 +1013,7 @@ mod tests {
         );
         // a good type, and no type at all, are not problems
         assert_eq!(by_param("id"), None);
+        assert_eq!(by_param("tags"), None);
         assert_eq!(by_param("note"), None);
         assert_eq!(problems.len(), 3);
     }

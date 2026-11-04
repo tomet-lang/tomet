@@ -80,7 +80,12 @@ fn parse_meta_field_props(
         let mut field_cfg = fields.get(field_name).cloned().unwrap_or_default();
         for (pk, pv) in props {
             match pk.as_str() {
-                "type" => field_cfg.field_type = pv.as_str().map(String::from),
+                "type" => {
+                    field_cfg.field_type = match tomet_semantics_core::parse_type_spec(pv) {
+                        Ok(ty) => Some(ty.to_string()),
+                        Err(_) => pv.as_str().map(String::from),
+                    };
+                }
                 "format" => field_cfg.format = pv.as_str().map(String::from),
                 "offset" => field_cfg.offset = pv.as_str().map(String::from),
                 "always_newline" => {

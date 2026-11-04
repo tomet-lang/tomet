@@ -11,7 +11,7 @@
 
 use tomet_ast::Value;
 use tomet_declaration::VarDecl;
-use tomet_type::Type;
+use tomet_type::{Type, Version};
 
 use crate::datetime::parse_datetime;
 use crate::value::{DocRef, EvalValue};
@@ -103,10 +103,10 @@ pub fn var_scope(
         let given = passed.iter().rev().find(|(n, _)| n == name);
         let value = match (given, &decl.default) {
             (Some((_, Value::String(text))), _) => {
-                Some(typed_value(decl.ty, &read_text(name, decl.ty, text)?, doc))
+                Some(typed_value(decl.ty.clone(), &read_text(name, &decl.ty, text)?, doc))
             }
             (Some((_, other)), _) => Some(EvalValue::from_ast(other, doc)),
-            (None, Some(default)) => Some(typed_value(decl.ty, default, doc)),
+            (None, Some(default)) => Some(typed_value(decl.ty.clone(), default, doc)),
             (None, None) => None,
         };
         match value {
@@ -121,10 +121,10 @@ pub fn var_scope(
 }
 
 /// A text passed on the command line, as the value of the declared type.
-fn read_text(name: &str, ty: Type, text: &str) -> Result<Value, VarError> {
+fn read_text(name: &str, ty: &Type, text: &str) -> Result<Value, VarError> {
     let bad = |why: String| VarError::BadValue {
         name: name.to_string(),
-        ty,
+        ty: ty.clone(),
         text: text.to_string(),
         why,
     };
@@ -156,7 +156,7 @@ fn read_text(name: &str, ty: Type, text: &str) -> Result<Value, VarError> {
                 Err(bad(format!("`{text}` is not {}", ty.describe())))
             }
         }
-        Type::List => Err(bad("a list has no single-text form".to_string())),
+        Type::List(_) => Err(bad("a list has no single-text form".to_string())),
     }
 }
 
@@ -167,7 +167,7 @@ fn read_text(name: &str, ty: Type, text: &str) -> Result<Value, VarError> {
 /// `"1.10"` and not the number `1.1`, and `2024` for a `string` is `"2024"`.
 /// For any other type the value is read as it is, then [`shaped`].
 pub fn typed_value(ty: Type, value: &Value, doc: &DocRef) -> EvalValue {
-    match (ty, value.scalar_text()) {
+    match (&ty, value.scalar_text()) {
         (Type::String | Type::Version | Type::Uuid | Type::Nanoid, Some(text)) => {
             EvalValue::String(text.into_owned())
         }
@@ -188,9 +188,30 @@ pub fn shaped(ty: Type, value: EvalValue) -> EvalValue {
             Some(parsed) => EvalValue::DateTime(parsed),
             None => EvalValue::String(text),
         },
+        (Type::Version, EvalValue::String(text)) => match Version::parse(text.trim()) {
+            Some(v) => EvalValue::Version(v),
+            None => EvalValue::String(text),
+        },
+        (Type::Version, EvalValue::Int(n)) if n >= 0 => match Version::parse(&n.to_string()) {
+            Some(v) => EvalValue::Version(v),
+            None => EvalValue::Int(n),
+        },
         (Type::Float, EvalValue::Int(i)) => EvalValue::Float(i as f64),
-        (Type::List, list @ EvalValue::Seq(_)) => list,
-        (Type::List, single) => EvalValue::Seq(vec![single]),
+        (Type::List(inner), EvalValue::Seq(items)) => {
+            if let Some(inner) = inner {
+                EvalValue::Seq(items.into_iter().map(|item| shaped(*inner.clone(), item)).collect())
+            } else {
+                EvalValue::Seq(items)
+            }
+        }
+        (Type::List(inner), single) => {
+            let shaped_single = if let Some(inner) = inner {
+                shaped(*inner, single)
+            } else {
+                single
+            };
+            EvalValue::Seq(vec![shaped_single])
+        }
         (_, value) => value,
     }
 }

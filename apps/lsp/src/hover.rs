@@ -554,6 +554,7 @@ fn render_value(value: &EvalValue) -> String {
             format!("{{{}}}", entries.join(", "))
         }
         EvalValue::DateTime(dt) => tomet_expr::format_datetime(dt, "YYYY-MM-DD HH:mm:ss"),
+        EvalValue::Version(v) => v.to_string(),
         EvalValue::Document(doc) => format!("document {}", doc.0),
         EvalValue::Directory(dir) => format!("directory {}", dir.0),
         EvalValue::Part { part, .. } => match part.id() {
