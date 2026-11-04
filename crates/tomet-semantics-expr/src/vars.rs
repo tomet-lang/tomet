@@ -196,7 +196,23 @@ pub fn shaped(ty: Type, value: EvalValue) -> EvalValue {
             Some(v) => EvalValue::Version(v),
             None => EvalValue::Int(n),
         },
+        (Type::Version, EvalValue::Number(text)) => match Version::parse(text.trim()) {
+            Some(v) => EvalValue::Version(v),
+            None => EvalValue::Number(text),
+        },
         (Type::Float, EvalValue::Int(i)) => EvalValue::Float(i as f64),
+        (Type::Float, EvalValue::Number(text)) => match text.parse::<f64>() {
+            Ok(f) => EvalValue::Float(f),
+            Err(_) => EvalValue::Number(text),
+        },
+        (Type::Int, EvalValue::Number(text)) => match text.parse::<i64>() {
+            Ok(i) => EvalValue::Int(i),
+            Err(_) => EvalValue::Number(text),
+        },
+        (Type::Uint, EvalValue::Number(text)) => match text.parse::<i64>() {
+            Ok(n) if n >= 0 => EvalValue::Int(n),
+            _ => EvalValue::Number(text),
+        },
         (Type::List(inner), EvalValue::Seq(items)) => {
             if let Some(inner) = inner {
                 EvalValue::Seq(items.into_iter().map(|item| shaped(*inner.clone(), item)).collect())

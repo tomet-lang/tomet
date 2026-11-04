@@ -169,14 +169,20 @@ pub(crate) fn scalar_text(value: &EvalValue) -> Result<String, EvalError> {
 
 /// `item(n)`: zero-based, no negative index.
 pub(crate) fn index_into(items: &[EvalValue], index: &EvalValue) -> Result<EvalValue, EvalError> {
-    let EvalValue::Int(i) = index else {
-        return Err(EvalError::mismatch(
-            "`item`",
-            "an integer index",
-            index.type_name(),
-        ));
+    let i = match index {
+        EvalValue::Int(i) => *i,
+        EvalValue::Number(text) => text.parse::<i64>().map_err(|_| {
+            EvalError::mismatch("`item`", "an integer index", index.type_name())
+        })?,
+        _ => {
+            return Err(EvalError::mismatch(
+                "`item`",
+                "an integer index",
+                index.type_name(),
+            ));
+        }
     };
-    usize::try_from(*i)
+    usize::try_from(i)
         .ok()
         .and_then(|i| items.get(i))
         .cloned()
@@ -205,13 +211,14 @@ fn function_arg(member: &str, args: Args) -> Result<Closure, EvalError> {
 /// How alike two sort keys must be to be put in order at all.
 fn key_class(key: &EvalValue) -> Result<u8, EvalError> {
     match key {
-        EvalValue::Int(_) | EvalValue::Float(_) => {
+        EvalValue::Int(_) | EvalValue::Float(_) | EvalValue::Number(_) => {
             // A NaN is a number with no place in an order.
             compare(key, key)?;
             Ok(0)
         }
         EvalValue::String(_) => Ok(1),
         EvalValue::DateTime(_) => Ok(2),
+        EvalValue::Version(_) => Ok(3),
         other => Err(EvalError::NotComparable {
             left: other.type_name(),
             right: other.type_name(),

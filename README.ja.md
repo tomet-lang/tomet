@@ -7,10 +7,13 @@
 # Tomet
 
 ![license](https://img.shields.io/github/license/tomet-lang/tomet?style=flat-square&color=brightgreen)
+
 ![release](https://img.shields.io/github/downloads/tomet-lang/tomet/total?style=flat-square&color=orange)
+
 ![npm](https://img.shields.io/npm/v/@tomet/wasm?style=flat-square&color=blue)
 
 ![VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=tomet-lang.tomet)
+
 ![Installs](https://marketplace.visualstudio.com/items?itemName=tomet-lang.tomet)
 
 Tome to me!!

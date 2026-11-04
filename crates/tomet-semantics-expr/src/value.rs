@@ -159,6 +159,10 @@ pub enum EvalValue {
     Bool(bool),
     Int(i64),
     Float(f64),
+    /// A number kept as it was written, because reading it as an `i64` or an
+    /// `f64` would change it: `1.10` (an `f64` prints `1.1`), `1e3`, `-0`, or an
+    /// integer too large for an `i64`.
+    Number(String),
     String(String),
     Seq(Vec<EvalValue>),
     /// Insertion-ordered, like [`Value::Map`].
@@ -191,6 +195,7 @@ impl EvalValue {
             EvalValue::Bool(_) => "bool",
             EvalValue::Int(_) => "int",
             EvalValue::Float(_) => "float",
+            EvalValue::Number(_) => "number",
             EvalValue::String(_) => "string",
             EvalValue::Seq(_) => "list",
             EvalValue::Map(_) => "map",
@@ -214,12 +219,7 @@ impl EvalValue {
             Value::Bool(b) => EvalValue::Bool(*b),
             Value::Int(i) => EvalValue::Int(*i),
             Value::Float(f) => EvalValue::Float(*f),
-            // An expression computes with a number, so a kept-as-written one is the
-            // `f64` it spells; one beyond an `f64` stays the text it is.
-            Value::Number(text) => match value.as_number() {
-                Some(f) => EvalValue::Float(f),
-                None => EvalValue::String(text.clone()),
-            },
+            Value::Number(text) => EvalValue::Number(text.clone()),
             Value::String(s) => EvalValue::String(s.clone()),
             Value::Seq(items) => {
                 EvalValue::Seq(items.iter().map(|v| Self::from_ast(v, doc)).collect())
@@ -255,6 +255,7 @@ impl EvalValue {
             EvalValue::Bool(b) => Value::Bool(*b),
             EvalValue::Int(i) => Value::Int(*i),
             EvalValue::Float(f) => Value::Float(*f),
+            EvalValue::Number(text) => Value::Number(text.clone()),
             EvalValue::String(s) => Value::String(s.clone()),
             EvalValue::Seq(items) => {
                 Value::Seq(items.iter().map(Self::to_ast).collect::<Option<_>>()?)
@@ -303,6 +304,7 @@ impl EvalValue {
             EvalValue::Bool(b) => b.to_string(),
             EvalValue::Int(i) => i.to_string(),
             EvalValue::Float(f) => f.to_string(),
+            EvalValue::Number(text) => text.clone(),
             EvalValue::String(s) => s.clone(),
             EvalValue::Version(v) => v.to_string(),
             _ => return None,
@@ -323,6 +325,15 @@ mod tests {
 
     fn doc() -> DocRef {
         DocRef("a.tmt".to_string())
+    }
+
+    #[test]
+    fn number_preserved_to_eval_and_back() {
+        let ast = Value::Number("1.10".into());
+        let eval = EvalValue::from_ast(&ast, &doc());
+        assert_eq!(eval, EvalValue::Number("1.10".into()));
+        assert_eq!(eval.type_name(), "number");
+        assert_eq!(eval.to_ast(), Some(ast));
     }
 
     #[test]
@@ -381,6 +392,10 @@ mod tests {
         assert_eq!(EvalValue::Bool(true).scalar_text().as_deref(), Some("true"));
         assert_eq!(EvalValue::Int(42).scalar_text().as_deref(), Some("42"));
         assert_eq!(EvalValue::Float(3.14).scalar_text().as_deref(), Some("3.14"));
+        assert_eq!(
+            EvalValue::Number("1.10".into()).scalar_text().as_deref(),
+            Some("1.10")
+        );
         assert_eq!(EvalValue::String("hello".into()).scalar_text().as_deref(), Some("hello"));
         assert_eq!(
             EvalValue::Version(Version::parse("1.2.3").unwrap())

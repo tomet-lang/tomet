@@ -1655,3 +1655,92 @@ fn versions_order_and_compare() {
         EvalValue::Bool(true)
     );
 }
+
+#[test]
+fn eval_value_number_preserves_written_representation_and_computes_numerically() {
+    let ast_num = tomet_ast::Value::Number("1.10".into());
+    let eval_num = EvalValue::from_ast(&ast_num, &DocRef("test.tmt".into()));
+    assert_eq!(eval_num, EvalValue::Number("1.10".into()));
+    assert_eq!(eval_num.scalar_text().as_deref(), Some("1.10"));
+    assert_eq!(eval_num.type_name(), "number");
+
+    let vars = map(vec![("rev", EvalValue::Number("1.10".into()))]);
+
+    // Interpolation / expression value access preserves exact text
+    assert_eq!(
+        create("var.rev", vars.clone()).unwrap(),
+        EvalValue::Number("1.10".into())
+    );
+    assert_eq!(
+        create("var.rev", vars.clone()).unwrap().scalar_text().as_deref(),
+        Some("1.10")
+    );
+
+    // Arithmetic via add / sub / mul
+    assert_eq!(
+        create("add(var.rev, 1)", vars.clone()).unwrap(),
+        EvalValue::Float(2.1)
+    );
+    assert_eq!(
+        create("add(1, var.rev)", vars.clone()).unwrap(),
+        EvalValue::Float(2.1)
+    );
+    assert_eq!(
+        create("sub(var.rev, 0.1)", vars.clone()).unwrap(),
+        EvalValue::Float(1.0)
+    );
+    assert_eq!(
+        create("mul(var.rev, 2)", vars.clone()).unwrap(),
+        EvalValue::Float(2.2)
+    );
+
+    // Equality
+    assert_eq!(
+        create("var.rev == 1.1", vars.clone()).unwrap(),
+        EvalValue::Bool(true)
+    );
+    assert_eq!(
+        create("var.rev == 1.10", vars.clone()).unwrap(),
+        EvalValue::Bool(true)
+    );
+    assert_eq!(
+        create("var.rev != 1.2", vars.clone()).unwrap(),
+        EvalValue::Bool(true)
+    );
+
+    // Ordering
+    assert_eq!(
+        create("var.rev > 1.0", vars.clone()).unwrap(),
+        EvalValue::Bool(true)
+    );
+    assert_eq!(
+        create("var.rev < 1.2", vars.clone()).unwrap(),
+        EvalValue::Bool(true)
+    );
+    assert_eq!(
+        create("var.rev >= 1.1", vars.clone()).unwrap(),
+        EvalValue::Bool(true)
+    );
+    assert_eq!(
+        create("var.rev <= 1.1", vars.clone()).unwrap(),
+        EvalValue::Bool(true)
+    );
+
+    // Sorting in methods
+    let list_vars = map(vec![(
+        "items",
+        seq(vec![
+            EvalValue::Number("1.10".into()),
+            EvalValue::Int(2),
+            EvalValue::Float(0.5),
+        ]),
+    )]);
+    assert_eq!(
+        create("var.items.sort(x => x)", list_vars).unwrap(),
+        seq(vec![
+            EvalValue::Float(0.5),
+            EvalValue::Number("1.10".into()),
+            EvalValue::Int(2),
+        ])
+    );
+}

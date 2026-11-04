@@ -602,3 +602,26 @@ fn only_the_selected_expressions_are_resolved() {
     tomet_tree::for_each_interpolation(&doc, |interp| left.push(interp.expr.to_string()));
     assert_eq!(left, vec!["macro.gh(1)", "self.filename"]);
 }
+
+#[test]
+fn written_number_in_metadata_interpolates_as_written() {
+    let resolver = MemoryResolver::new()
+        .with_source("doc.tmt", "::meta{ rev: 1.10 }\n\nVersion is ${self.meta.rev}.\n")
+        .unwrap();
+    let cx = EvalContext {
+        phase: Phase::Output,
+        resolver: &resolver,
+        generate: &SystemGenerate,
+        self_doc: DocRef("doc.tmt".to_string()),
+        macros: &HashMap::new(),
+        var: &EvalValue::Null,
+        var_unset: &[],
+        includes: &[],
+        heading_level: 0,
+        notes: Default::default(),
+    };
+    let mut doc = tomet_ast_parser::parse_file("::meta{ rev: 1.10 }\n\nVersion is ${self.meta.rev}.\n").unwrap();
+    let unresolved = resolve_expressions(&mut doc, &cx);
+    assert!(unresolved.is_empty());
+    assert_eq!(text_of(&doc), "Version is 1.10.");
+}

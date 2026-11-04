@@ -9,6 +9,15 @@ fn number(value: &EvalValue) -> Option<f64> {
     match value {
         EvalValue::Int(i) => Some(*i as f64),
         EvalValue::Float(f) => Some(*f),
+        EvalValue::Number(text) => text.parse::<f64>().ok(),
+        _ => None,
+    }
+}
+
+fn as_i64(value: &EvalValue) -> Option<i64> {
+    match value {
+        EvalValue::Int(i) => Some(*i),
+        EvalValue::Number(text) => text.parse::<i64>().ok(),
         _ => None,
     }
 }
@@ -19,7 +28,7 @@ fn number(value: &EvalValue) -> Option<f64> {
 pub(crate) fn values_equal(a: &EvalValue, b: &EvalValue) -> bool {
     use EvalValue as V;
     match (a, b) {
-        (V::Int(x), V::Int(y)) => x == y,
+        _ if as_i64(a).is_some() && as_i64(b).is_some() => as_i64(a) == as_i64(b),
         _ if number(a).is_some() && number(b).is_some() => number(a) == number(b),
         (V::Null, V::Null) => true,
         (V::Bool(x), V::Bool(y)) => x == y,
@@ -60,15 +69,19 @@ pub(crate) fn compare(a: &EvalValue, b: &EvalValue) -> Result<Ordering, EvalErro
         right: b.type_name(),
     };
     match (a, b) {
-        (V::Int(x), V::Int(y)) => Ok(x.cmp(y)),
         (V::String(x), V::String(y)) => Ok(x.cmp(y)),
         (V::DateTime(x), V::DateTime(y)) => Ok(x.cmp(y)),
         (V::Version(x), V::Version(y)) => Ok(x.cmp(y)),
-        _ => match (number(a), number(b)) {
-            // `None` only for a NaN, which has no place in an order.
-            (Some(x), Some(y)) => x.partial_cmp(&y).ok_or_else(not_comparable),
-            _ => Err(not_comparable()),
-        },
+        _ => {
+            if let (Some(x), Some(y)) = (as_i64(a), as_i64(b)) {
+                return Ok(x.cmp(&y));
+            }
+            match (number(a), number(b)) {
+                // `None` only for a NaN, which has no place in an order.
+                (Some(x), Some(y)) => x.partial_cmp(&y).ok_or_else(not_comparable),
+                _ => Err(not_comparable()),
+            }
+        }
     }
 }
 
@@ -83,6 +96,19 @@ impl Number {
         match value {
             EvalValue::Int(i) => Ok(Number::Int(*i)),
             EvalValue::Float(f) => Ok(Number::Float(*f)),
+            EvalValue::Number(text) => {
+                if let Ok(i) = text.parse::<i64>() {
+                    Ok(Number::Int(i))
+                } else if let Ok(f) = text.parse::<f64>() {
+                    Ok(Number::Float(f))
+                } else {
+                    Err(EvalError::mismatch(
+                        format!("`{function}`"),
+                        "a number",
+                        value.type_name(),
+                    ))
+                }
+            }
             other => Err(EvalError::mismatch(
                 format!("`{function}`"),
                 "a number",

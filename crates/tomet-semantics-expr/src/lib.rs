@@ -496,6 +496,11 @@ fn builtin(name: &str, args: Args, cx: &EvalContext) -> Result<EvalValue, EvalEr
                     .ok_or_else(|| EvalError::message(format!("`{n}` is not a valid version")))?;
                 Ok(EvalValue::Version(v))
             }
+            Some(EvalValue::Number(text)) => {
+                let v = tomet_type::Version::parse(text.trim())
+                    .ok_or_else(|| EvalError::message(format!("`{text}` is not a valid version")))?;
+                Ok(EvalValue::Version(v))
+            }
             Some(other) => Err(EvalError::mismatch(
                 "`version`",
                 "a version string or non-negative integer",
@@ -599,6 +604,7 @@ fn unicode_char(code: &EvalValue) -> Result<EvalValue, EvalError> {
     let bad = || EvalError::message(format!("`unicode` expects a code point, got {code:?}"));
     let point = match code {
         EvalValue::Int(i) => u32::try_from(*i).map_err(|_| bad())?,
+        EvalValue::Number(text) => text.parse::<u32>().map_err(|_| bad())?,
         EvalValue::String(text) => {
             let digits = text
                 .trim()

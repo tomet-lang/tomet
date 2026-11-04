@@ -541,6 +541,7 @@ fn render_value(value: &EvalValue) -> String {
         EvalValue::Bool(b) => b.to_string(),
         EvalValue::Int(i) => i.to_string(),
         EvalValue::Float(f) => f.to_string(),
+        EvalValue::Number(s) => s.clone(),
         EvalValue::String(s) => s.clone(),
         EvalValue::Seq(items) => {
             let items: Vec<String> = items.iter().map(render_value).collect();

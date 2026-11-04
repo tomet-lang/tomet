@@ -174,9 +174,12 @@ mod tests {
             field(&meta, "title"),
             Some(&EvalValue::String("2024".into()))
         );
-        // not declared: read as it is, as before
+        // not declared: read as it is, preserving the written number
         let meta = meta_of("::meta{ other: 1.10 }\n");
-        assert_eq!(field(&meta, "other"), Some(&EvalValue::Float(1.1)));
+        assert_eq!(
+            field(&meta, "other"),
+            Some(&EvalValue::Number("1.10".into()))
+        );
     }
 
     #[test]
