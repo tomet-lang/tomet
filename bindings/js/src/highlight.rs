@@ -6,6 +6,7 @@ pub struct HighlightSpan {
     pub from: usize,
     pub to: usize,
     pub tag: String,
+    pub depth: usize,
 }
 
 /// The ranges of `src` that have a tag, in order and without overlap. The
@@ -18,6 +19,7 @@ pub fn compute_highlight_spans(src: &str) -> Vec<HighlightSpan> {
             from: s.from,
             to: s.to,
             tag: s.tag.as_str().to_string(),
+            depth: s.depth as usize,
         })
         .collect()
 }
@@ -31,15 +33,19 @@ mod tests {
         let src = "=[ Heading ]\n-| Official: @link(id: \"tasks\")[Tasks]\n";
         let spans = compute_highlight_spans(src);
 
-        let tags: Vec<(&str, &str)> = spans
+        let tags: Vec<(&str, &str, usize)> = spans
             .iter()
-            .map(|s| (&src[s.from..s.to], s.tag.as_str()))
+            .map(|s| (&src[s.from..s.to], s.tag.as_str(), s.depth))
             .collect();
 
-        assert!(tags.contains(&("=", "heading")));
-        assert!(tags.contains(&("-", "list")));
-        assert!(tags.contains(&("@link", "tagName")));
-        assert!(tags.contains(&("id", "propertyName")));
-        assert!(tags.contains(&("\"tasks\"", "string")));
+        assert!(tags.contains(&("=", "heading", 0)));
+        assert!(tags.contains(&("[", "bracket", 1)));
+        assert!(tags.contains(&("]", "bracket", 1)));
+        assert!(tags.contains(&("-", "list", 0)));
+        assert!(tags.contains(&("|", "punctuation", 1)));
+        assert!(tags.contains(&("@link", "tagName", 1)));
+        assert!(tags.contains(&("id", "propertyName", 2)));
+        assert!(tags.contains(&(":", "punctuation", 2)));
+        assert!(tags.contains(&("\"tasks\"", "string", 2)));
     }
 }

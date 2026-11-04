@@ -1,7 +1,7 @@
 //! =[ tomet-highlight ]
 //!
 //! What each part of a Tomet text is, for coloring it: [`highlight`] gives a
-//! list of ranges, each with a [`Tag`]. Nothing here knows a color; an editor
+//! list of ranges, each with a [`Tag`] and group `depth`. Nothing here knows a color; an editor
 //! maps tags to its own.
 //!
 //! =[ Where the answer comes from ]
@@ -18,10 +18,12 @@
 //! - Offsets are bytes of the source, as the CST counts them. An editor that
 //!   counts UTF-16 code units converts.
 //! - They are in order, do not overlap, and each lies between two characters.
-//! - Text with no tag has no range. A range is as long as it can be: the
-//!   neighbours with the same tag are one.
+//! - Text with no tag has no range. A range is as long as it can be: adjacent
+//!   tokens with the same tag and group depth are merged into one span.
 //! - Where two kinds of node meet, the inner one decides: the `code` inside
 //!   `*em*` is code.
+//! - Each span carries a `depth: u8` representing the nesting depth of enclosing
+//!   groups (`0` for top-level, `1` for the first enclosing group, etc.).
 //!
 //! =[ The tags ]
 //!
@@ -58,7 +60,9 @@ pub enum Tag {
     BlockComment,
     /// The key of a `key: value` entry.
     PropertyName,
-    /// The brackets, colons, commas and `|` margins that draw a group.
+    /// The paired delimiters `(`, `)`, `[`, `]`, `{`, `}` of a group.
+    Bracket,
+    /// Non-bracket delimiters such as colons, commas, `#` and `|` margins.
     Punctuation,
     /// The `---` of a thematic break.
     ContentSeparator,
@@ -91,6 +95,7 @@ impl Tag {
             Tag::LineComment => "lineComment",
             Tag::BlockComment => "blockComment",
             Tag::PropertyName => "propertyName",
+            Tag::Bracket => "bracket",
             Tag::Punctuation => "punctuation",
             Tag::ContentSeparator => "contentSeparator",
             Tag::Monospace => "monospace",
@@ -111,6 +116,9 @@ pub struct HighlightSpan {
     /// Byte offset just past the last character.
     pub to: usize,
     pub tag: Tag,
+    /// The nesting depth of enclosing groups (`0` for top-level, `1` for the
+    /// first enclosing group, `2` for nested groups, etc.).
+    pub depth: u8,
 }
 
 /// The ranges of `src` that have a [`Tag`], in order and without overlap.
@@ -138,9 +146,17 @@ pub fn highlight(src: &str) -> Vec<HighlightSpan> {
         let Some(tag) = tag_of(&token, &fences) else {
             continue;
         };
+        let depth = group_depth(&token);
         match spans.last_mut() {
-            Some(last) if last.tag == tag && last.to == from => last.to = to,
-            _ => spans.push(HighlightSpan { from, to, tag }),
+            Some(last) if last.tag == tag && last.depth == depth && last.to == from => {
+                last.to = to;
+            }
+            _ => spans.push(HighlightSpan {
+                from,
+                to,
+                tag,
+                depth,
+            }),
         }
     }
     spans
@@ -244,11 +260,11 @@ fn own_tag(token: &SyntaxToken, fences: &HashSet<usize>) -> Option<Tag> {
         | K::R_BRACE
         | K::L_BRACKET
         | K::R_BRACKET
-        | K::COLON
-        | K::COMMA
-        | K::HASH
-            if is_group_punctuation(parent_kind) =>
+            if is_group_bracket(parent_kind) =>
         {
+            Some(Tag::Bracket)
+        }
+        K::COLON | K::COMMA | K::HASH if is_group_punctuation(parent_kind) => {
             Some(Tag::Punctuation)
         }
         _ if is_key(token) => Some(Tag::PropertyName),
@@ -259,7 +275,21 @@ fn own_tag(token: &SyntaxToken, fences: &HashSet<usize>) -> Option<Tag> {
     }
 }
 
-/// The nodes whose own brackets, colons and commas are punctuation. Those of a
+/// The nodes whose paired delimiters `()`, `[]`, `{}` are group brackets.
+/// Those of a paragraph are prose.
+fn is_group_bracket(kind: K) -> bool {
+    matches!(
+        kind,
+        K::ARGS
+            | K::VALUE_DATA
+            | K::CONTENT
+            | K::MAP_LITERAL
+            | K::ID_GROUP
+            | K::INTERP_EXPR
+    )
+}
+
+/// The nodes whose colons, commas and `#` are punctuation delimiters. Those of a
 /// paragraph are prose.
 fn is_group_punctuation(kind: K) -> bool {
     matches!(
@@ -273,6 +303,16 @@ fn is_group_punctuation(kind: K) -> bool {
             | K::MAP_ENTRY
             | K::INTERP_EXPR
     )
+}
+
+/// The nesting depth of enclosing groups (`ARGS`, `CONTENT`, `VALUE_DATA`,
+/// `MAP_LITERAL`, `ID_GROUP`, `INTERP_EXPR`). Top-level tokens have depth `0`.
+fn group_depth(token: &SyntaxToken) -> u8 {
+    let count = token
+        .parent_ancestors()
+        .filter(|node| is_group_bracket(node.kind()))
+        .count();
+    count.min(u8::MAX as usize) as u8
 }
 
 /// The `-` (and the `.` straight after it) that opens a list item; the rest of
@@ -407,24 +447,24 @@ mod tests {
             tagged("a <?int(n, \"x\")> b\n"),
             [
                 ("<?int", "hole"),
-                ("(", "punctuation"),
+                ("(", "bracket"),
                 (",", "punctuation"),
                 ("\"x\"", "string"),
-                (")", "punctuation"),
+                (")", "bracket"),
                 (">", "hole"),
             ]
         );
         assert!(has("<?>\n", "<?>", "hole"));
-        // The content is outside the box, so its brackets are group punctuation.
+        // The content is outside the box, so its brackets are group brackets.
         assert_eq!(
             tagged("<?(id)>[a]\n"),
             [
                 ("<?", "hole"),
-                ("(", "punctuation"),
-                (")", "punctuation"),
+                ("(", "bracket"),
+                (")", "bracket"),
                 (">", "hole"),
-                ("[", "punctuation"),
-                ("]", "punctuation"),
+                ("[", "bracket"),
+                ("]", "bracket"),
             ]
         );
         assert_eq!(
@@ -484,13 +524,150 @@ mod tests {
     }
 
     #[test]
-    fn groups_draw_punctuation() {
+    fn groups_draw_delimiters() {
         let src = "@x(a: 1)[ t ]{ k: v }\n";
-        // Neighbours with one tag are one range, so ask about each character.
         for (at, c) in src.char_indices() {
-            if "()[]{}:".contains(c) {
-                assert!(punct_at(src, at), "{c} at {at}");
+            if "()[]{}".contains(c) {
+                assert!(
+                    highlight(src)
+                        .iter()
+                        .any(|s| s.tag == Tag::Bracket && s.from <= at && at < s.to),
+                    "{c} at {at} should be bracket"
+                );
+            } else if ":".contains(c) {
+                assert!(punct_at(src, at), "{c} at {at} should be punctuation");
             }
+        }
+    }
+
+    #[test]
+    fn heading_frame_depth_and_brackets() {
+        let src = "=[ Title ]\n";
+        let spans = highlight(src);
+        assert_eq!(
+            spans,
+            [
+                HighlightSpan {
+                    from: 0,
+                    to: 1,
+                    tag: Tag::Heading,
+                    depth: 0,
+                },
+                HighlightSpan {
+                    from: 1,
+                    to: 2,
+                    tag: Tag::Bracket,
+                    depth: 1,
+                },
+                HighlightSpan {
+                    from: 9,
+                    to: 10,
+                    tag: Tag::Bracket,
+                    depth: 1,
+                },
+            ]
+        );
+        // Title itself is untagged prose
+        assert!(!has(src, "Title", "heading"));
+        assert!(!has(src, "Title", "bracket"));
+    }
+
+    #[test]
+    fn nested_group_depths() {
+        // (1) Forms and content groups nesting: ( ... [ ... { ... } ] )
+        let src1 = "@foo(a: [ @bar{ c: 1 } ])\n";
+        let spans1 = highlight(src1);
+        let tagged_depths1: Vec<(&str, &'static str, u8)> = spans1
+            .iter()
+            .map(|s| (&src1[s.from..s.to], s.tag.as_str(), s.depth))
+            .collect();
+        assert_eq!(
+            tagged_depths1,
+            [
+                ("@foo", "tagName", 0),
+                ("(", "bracket", 1),
+                ("a", "propertyName", 1),
+                (":", "punctuation", 1),
+                ("[", "bracket", 2),
+                ("@bar", "tagName", 2),
+                ("{", "bracket", 3),
+                ("c", "propertyName", 3),
+                (":", "punctuation", 3),
+                ("1", "number", 3),
+                ("}", "bracket", 3),
+                ("]", "bracket", 2),
+                (")", "bracket", 1),
+            ]
+        );
+
+        // (2) Nested map literals in values: ( ... { ... { ... } } )
+        let src2 = "@foo(a: { b: { c: 1 } })\n";
+        let spans2 = highlight(src2);
+        let tagged_depths2: Vec<(&str, &'static str, u8)> = spans2
+            .iter()
+            .map(|s| (&src2[s.from..s.to], s.tag.as_str(), s.depth))
+            .collect();
+        assert_eq!(
+            tagged_depths2,
+            [
+                ("@foo", "tagName", 0),
+                ("(", "bracket", 1),
+                ("a", "propertyName", 1),
+                (":", "punctuation", 1),
+                ("{", "bracket", 2),
+                ("b", "propertyName", 2),
+                (":", "punctuation", 2),
+                ("{", "bracket", 3),
+                ("c", "propertyName", 3),
+                (":", "punctuation", 3),
+                ("1", "number", 3),
+                ("}", "bracket", 3),
+                ("}", "bracket", 2),
+                (")", "bracket", 1),
+            ]
+        );
+    }
+
+    #[test]
+    fn commas_and_colons_retain_group_depth() {
+        let src = "@bar(x: 1, y: 2)\n";
+        let spans = highlight(src);
+        let items: Vec<(&str, &'static str, u8)> = spans
+            .iter()
+            .map(|s| (&src[s.from..s.to], s.tag.as_str(), s.depth))
+            .collect();
+        assert_eq!(
+            items,
+            [
+                ("@bar", "tagName", 0),
+                ("(", "bracket", 1),
+                ("x", "propertyName", 1),
+                (":", "punctuation", 1),
+                ("1", "number", 1),
+                (",", "punctuation", 1),
+                ("y", "propertyName", 1),
+                (":", "punctuation", 1),
+                ("2", "number", 1),
+                (")", "bracket", 1),
+            ]
+        );
+    }
+
+    #[test]
+    fn top_level_spans_have_depth_zero() {
+        for (src, text, tag) in [
+            ("== Title\n", "==", "heading"),
+            ("// a comment\n", "// a comment", "lineComment"),
+            ("/* block */\n", "/* block */", "blockComment"),
+            ("- list item\n", "-", "list"),
+            ("---\n", "---", "contentSeparator"),
+        ] {
+            let spans = highlight(src);
+            let span = spans
+                .iter()
+                .find(|s| &src[s.from..s.to] == text && s.tag.as_str() == tag)
+                .expect(src);
+            assert_eq!(span.depth, 0, "depth of {text} in {src}");
         }
     }
 
