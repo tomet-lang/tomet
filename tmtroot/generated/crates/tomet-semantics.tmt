@@ -331,15 +331,6 @@ Callers pass `None` for a group the surrounding mapping has already
 consumed -- a heading's level, a link's target -- so it is not emitted
 a second time as an attribute.
 
-====[fn scalar_string]
-
-The string a value projects to, or `None` when it cannot project.
-
-A sequence joins with `", "`, which is what the HTML writer has always
-done. That is not reversible -- `[p, q]` and the literal `"p, q"`
-project identically -- but it stays readable, and the exact copy is
-what a reader uses when it needs the difference.
-
 ====[fn value_to_json]
 
 Converts a Tomet value to JSON, preserving structure exactly.

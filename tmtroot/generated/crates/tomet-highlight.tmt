@@ -7,7 +7,7 @@
 ==[tomet-highlight]
 
 What each part of a Tomet text is, for coloring it: [`highlight`] gives a
-list of ranges, each with a [`Tag`]. Nothing here knows a color; an editor
+list of ranges, each with a [`Tag`] and group `depth`. Nothing here knows a color; an editor
 maps tags to its own.
 
 ==[Where the answer comes from]
@@ -26,13 +26,17 @@ typed still gets its ranges.
 counts UTF-16 code units converts.
 
 - They are in order, do not overlap, and each lies between two characters.
-- Text with no tag has no range. A range is as long as it can be: the
+- Text with no tag has no range. A range is as long as it can be: adjacent
 
-neighbours with the same tag are one.
+tokens with the same tag and group depth are merged into one span.
 
 - Where two kinds of node meet, the inner one decides: the `code` inside
 
 `*em*` is code.
+
+- Each span carries a `depth: u8` representing the nesting depth of enclosing
+
+groups (`0` for top-level, `1` for the first enclosing group, etc.).
 
 ==[The tags]
 

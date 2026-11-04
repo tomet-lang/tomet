@@ -88,6 +88,16 @@ Extension trait and helpers for [`tomet_ast::Value`].
 
 Extension trait providing accessors and inspections on [`Value`].
 
+===[Functions]
+
+====[fn scalar_string]
+
+The flat string a value projects to, joining sequences with `", "`, or `None` when it cannot project.
+
+Bare scalars delegate to [`Value::scalar_text`]; `Value::Null` projects to an empty string.
+Sequences project if every element projects. Structured nodes (`Map`, `Call`, `Element`, `Blocks`,
+`Interp`, `Hole`) return `None`.
+
 ==[Module walk]
 
 One definition of what sits inside what in a [`File`], and the walkers built on it.

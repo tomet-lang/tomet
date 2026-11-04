@@ -1,0 +1,80 @@
+::kind(api)
+
+::meta{crate: tomet-sort, dependencies: list(), dependents: list()}
+
+=[tomet-sort]
+
+==[Overview & Scope]
+
+Pure character and dictionary collation, sort keys, and ordering primitives.
+
+==[Architecture & Responsibilities]
+
+- ("Pure base crate") This crate is in the base layer (`crates/tomet-base-*`) and depends on
+nothing in the workspace. It contains zero unsafe code and no external
+dependencies.
+- ("Two-level collation") Equivalence groups share a primary weight and are distinguished by
+secondary weights. Streaming comparison compares primary weights first,
+enforces prefix dominance, and breaks ties with secondary weights.
+- ("Greedy longest match") Multi-character tokens are matched greedily using an internal UTF-8 trie,
+falling back to Unicode scalar values for unmapped characters.
+
+==[Module collator]
+
+Compiled collation engine and zero-allocation comparison iterators.
+
+===[Structs]
+
+====[struct Collator]
+
+A compiled collator for comparing and sorting strings according to custom collation rules.
+
+==[Module direction]
+
+Directional collation modes and ordering transformations.
+
+===[Enums]
+
+====[enum Direction]
+
+The ordering direction for collation comparisons.
+
+==[Module error]
+
+Validation and compilation errors for collation specifications.
+
+===[Enums]
+
+====[enum CollationError]
+
+An error encountered when validating or compiling a collation specification.
+
+==[Module key]
+
+Opaque collation keys for two-level lexicographical ordering.
+
+===[Structs]
+
+====[struct SortKey]
+
+A 2-level collation key used for comparing strings.
+
+Collation keys are compared lexicographically by primary weights first.
+If and only if both strings produce identical primary weight sequences,
+ties are broken by secondary weights.
+
+==[Module spec]
+
+Declarative specification of collation steps, equivalence groups, and ignored tokens.
+
+===[Structs]
+
+====[struct CollationSpec]
+
+A declarative specification for custom character and string collation.
+
+===[Enums]
+
+====[enum Step]
+
+A single step in a collation sequence.

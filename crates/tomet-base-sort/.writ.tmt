@@ -1,0 +1,14 @@
+::kind(writ)
+
+@rule(tomet-sort-purity){
+  why: | `tomet-sort` is a pure, side-effect-free base-layer crate providing character and
+       | dictionary collation, sort keys, and ordering primitives. It performs no I/O and
+       | holds zero external dependencies. Layering rules in the root `.writ.tmt` govern
+       | that Layer 1 crates depend on no other workspace crates.
+  guard: { twrit: pure }
+  pure: {
+    crates: [ "crates/tomet-base-sort" ]
+    forbid: [ "std::fs", "std::net", "std::process", "std::env" ]
+    allow-external: []
+  }
+}

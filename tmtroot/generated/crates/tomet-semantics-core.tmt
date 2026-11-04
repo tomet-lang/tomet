@@ -1,6 +1,6 @@
 ::kind(api)
 
-::meta{crate: tomet-semantics-core, dependencies: list(tomet-ast, tomet-type), dependents: list(tomet-declaration, tomet-semantics, tomet-validator-core)}
+::meta{crate: tomet-semantics-core, dependencies: list(tomet-ast, tomet-type), dependents: list(tomet-config, tomet-declaration, tomet-semantics, tomet-validator-core)}
 
 =[tomet-semantics-core]
 
@@ -40,9 +40,10 @@ Parsing of type specifications from AST [`Value`]s.
 
 Reads a `type:` specification as it is written in an AST [`Value`].
 
-Only a name is read. Any other spelling -- a call such as `list(string)`,
-a list, a map -- is a [`TypeError::NotAName`], because a type with a
-parameter has no spelling yet.
+Accepts a bare name (`string`, `list`, `datetime`) as a string, a parameterized
+call in AST form (`list(...)` which the parser resolves to [`Value::Seq`] or
+leaves as [`Value::Call`]), or a string representation of a parameterized type
+(such as `"list(string)"`).
 
 ==[Module positional]
 

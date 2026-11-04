@@ -20,10 +20,11 @@ members = [
   "crates/tree-sitter-tomet",
   "crates/tree-sitter-cotomet",
 
-  #= Base -- positions in source text; depends on nothing in the workspace
+  #= Base -- pure foundational primitives; depends on nothing in the workspace
   "crates/tomet-base-span",
   "crates/tomet-base-position",
   "crates/tomet-base-type",
+  "crates/tomet-base-sort",
 
   #= Syntax -- grammar/parsing
   "crates/tomet-syntax-cst",
@@ -126,6 +127,7 @@ tomet = { path = "crates/tomet", version = "0.5.0" }
 cotomet = { path = "crates/cotomet", version = "0.5.0" }
 #--- Base ---
 tomet-position = { path = "crates/tomet-base-position", version = "0.5.0" }
+tomet-sort = { path = "crates/tomet-base-sort", version = "0.5.0" }
 tomet-span = { path = "crates/tomet-base-span", version = "0.5.0" }
 tomet-type = { path = "crates/tomet-base-type", version = "0.5.0" }
 #--- Syntax ---
