@@ -1172,11 +1172,12 @@ fn version_problems(src: &str) -> Vec<String> {
 }
 
 /// A document's declared version is a version: `1.10` is the version `1.10`, bare or
-/// quoted, and `abc` or `1.0-beta` is not one.
+/// quoted, and `abc` or `1.0.0_beta` is not one.
 #[test]
 fn a_declared_version_is_held_to_the_version_type() {
     for ok in [
         "::vocabulary(deck){ version: \"1.0.0\" }\n",
+        "::vocabulary(deck){ version: \"1.0-beta\" }\n",
         "::vocabulary(deck){ version: 1.10 }\n",
         "::vocabulary(deck){ version: 2 }\n",
         "::blueprint(note){ version: \"1.0\", description: \"x\" }\n",
@@ -1196,8 +1197,8 @@ fn a_declared_version_is_held_to_the_version_type() {
             "`abc` is not a version",
         ),
         (
-            "::vocabulary(deck){ version: \"1.0-beta\" }\n",
-            "`1.0-beta`",
+            "::vocabulary(deck){ version: \"1.0.0_beta\" }\n",
+            "`1.0.0_beta`",
         ),
         (
             "::blueprint(note){ version: true }\n",
@@ -1224,10 +1225,10 @@ fn a_version_field_in_meta_reads_a_bare_number_as_text() {
         check_field_types(&parse(src), &types, &mut errors);
         errors.len()
     };
-    for ok in ["1.10", "\"1.10.0\"", "2", "1.0"] {
+    for ok in ["1.10", "\"1.10.0\"", "\"1.0-beta\"", "2", "1.0"] {
         assert_eq!(problems(&format!("::meta{{ rev: {ok} }}\n")), 0, "{ok}");
     }
-    for bad in ["\"abc\"", "true", "\"1.0-beta\""] {
+    for bad in ["\"abc\"", "true", "\"1.0.0_beta\""] {
         assert_eq!(problems(&format!("::meta{{ rev: {bad} }}\n")), 1, "{bad}");
     }
 }
@@ -1288,7 +1289,7 @@ fn an_argument_is_held_to_the_type_its_parameter_declares() {
         ("@entry(id: abc)", "`abc` is not a non-negative integer"),
         ("@entry(id: -1)", "`-1` is not a non-negative integer"),
         ("@entry(id: \"3\")", "`3` is not a non-negative integer"),
-        ("@entry(rev: 1.0-beta)", "`1.0-beta` is not a version"),
+        ("@entry(rev: 1.0.0_beta)", "`1.0.0_beta` is not a version"),
         ("@entry(done: yes)", "`yes` is not `true` or `false`"),
         ("@entry(label: list(a))", "a list is not a string"),
         ("@entry(tags: 5)", "is not a list"),

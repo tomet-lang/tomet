@@ -513,16 +513,28 @@ mod tests {
     fn declared_versions_held_to_version_type() {
         let good_ver = Declaration::new(
             "version",
-            Some(Value::Map(vec![("version".into(), Value::Float(1.10))])),
+            Some(Value::Map(vec![
+                ("version".into(), Value::Float(1.10)),
+            ])),
             None,
         );
         assert!(check_declarations(&[good_ver], Host::Tmt).is_empty());
+
+        let good_prerelease = Declaration::new(
+            "version",
+            Some(Value::Map(vec![(
+                "version".into(),
+                Value::String("1.0-beta".into()),
+            )])),
+            None,
+        );
+        assert!(check_declarations(&[good_prerelease], Host::Tmt).is_empty());
 
         let bad_ver = Declaration::new(
             "version",
             Some(Value::Map(vec![(
                 "version".into(),
-                Value::String("1.0-beta".into()),
+                Value::String("1.0.0_beta".into()),
             )])),
             None,
         );

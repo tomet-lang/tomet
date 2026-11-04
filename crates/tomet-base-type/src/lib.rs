@@ -21,7 +21,7 @@ use std::borrow::Cow;
 pub mod datetime;
 mod version;
 
-pub use version::Version;
+pub use version::{Identifier, Version};
 
 /// A type a value can be declared as.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -38,9 +38,10 @@ pub enum Type {
     Bool,
     /// A date, or a date and a time ([`datetime::parse_datetime_parts`]).
     Datetime,
-    /// A version: dotted non-negative integers, `1`, `1.0`, `1.10.0`
-    /// ([`Version`]). It is text. A bare `1.10` is read as the text it was
-    /// written as, not as the number it would be.
+    /// A version: dotted non-negative integers (`1`, `1.0`, `1.10.0`), with
+    /// optional pre-release (`-beta`) and build metadata (`+5`) ([`Version`]).
+    /// It is text. A bare `1.10` is read as the text it was written as, not as
+    /// the number it would be.
     Version,
     /// An identifier in the 8-4-4-4-12 hexadecimal form.
     Uuid,

@@ -19,4 +19,8 @@
 - (x) 「値を平文にする関数」が 6 つある
   - `tomet-tree`（Layer 2）に `scalar_string` および `ValueExt::plain_text` を集約し、各変換・セマンティクス・インデクサから散在していた実装を移行。
   - 式評価値については `tomet-semantics-expr` に `EvalValue::scalar_text` を一元化し、`tomet-transform` の重複コードを削除。
-- ( ) バージョンの pre-release とビルドの部分 (`1.0.0-beta`、`+5`) を読む。
+- (x) バージョンの pre-release とビルドの部分 (`1.0.0-beta`、`+5`) を読む。
+  - `Version::parse` で `<core>[-<pre-release>][+<build>]` の構文をサポート。
+  - pre-release 識別子の数値／非数値順序規則・優先順位を実装（SemVer 2.0.0 準拠、先行ゼロ許容）。
+  - build metadata は順序比較・等価判定・ハッシュで完全に無視。
+  - `raw()`（原文取得）と `Display`（正規化表記出力）を実装。

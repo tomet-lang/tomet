@@ -333,6 +333,11 @@ mod tests {
             ok.values,
             EvalValue::Map(vec![("rev".into(), EvalValue::String("1.10.0".into()))])
         );
-        assert!(var_scope(&decls, &doc(), &passed("rev", "1.0-beta")).is_err());
+        let ok_beta = var_scope(&decls, &doc(), &passed("rev", "1.0-beta")).unwrap();
+        assert_eq!(
+            ok_beta.values,
+            EvalValue::Map(vec![("rev".into(), EvalValue::String("1.0-beta".into()))])
+        );
+        assert!(var_scope(&decls, &doc(), &passed("rev", "1.0.0_beta")).is_err());
     }
 }
