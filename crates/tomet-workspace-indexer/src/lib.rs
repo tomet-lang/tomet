@@ -422,13 +422,11 @@ fn collect_meta(data: &tomet_ast::Data, map: &mut BTreeMap<String, String>) {
 }
 
 fn value_to_string(v: &Value) -> String {
+    if let Some(text) = v.scalar_text() {
+        return text.into_owned();
+    }
     match v {
-        Value::String(s) => s.clone(),
-        Value::Int(i) => i.to_string(),
-        Value::Float(f) => f.to_string(),
-        Value::Number(text) => text.clone(),
-        Value::Bool(b) => b.to_string(),
-        Value::Null => String::new(),
+        Value::Null | Value::Hole(_) => String::new(),
         Value::Seq(items) => {
             let s: Vec<_> = items.iter().map(value_to_string).collect();
             format!("[{}]", s.join(", "))
@@ -452,8 +450,8 @@ fn value_to_string(v: &Value) -> String {
             }
         }
         Value::Interp(interp) => format!("${{{}}}", interp.expr),
-        Value::Hole(_) => String::new(),
         Value::Blocks(blocks) => format!("<{} block(s)>", blocks.len()),
+        _ => String::new(),
     }
 }
 

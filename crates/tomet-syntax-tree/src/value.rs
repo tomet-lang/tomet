@@ -36,6 +36,14 @@ pub trait ValueExt {
 
     /// Returns `true` if a sequence or map is empty, or if string is empty, or if null.
     fn is_empty(&self) -> bool;
+
+    /// Returns the flat scalar string projection of this value, joining sequences with `", "`,
+    /// or `None` when this value (or any nested element of a sequence) cannot project to text
+    /// (such as maps, calls, holes, or blocks).
+    fn scalar_string(&self) -> Option<String>;
+
+    /// Returns the plain text representation of this value, or an empty string if it cannot project.
+    fn plain_text(&self) -> String;
 }
 
 impl ValueExt for Value {
@@ -111,11 +119,62 @@ impl ValueExt for Value {
             _ => false,
         }
     }
+
+    fn scalar_string(&self) -> Option<String> {
+        scalar_string(self)
+    }
+
+    fn plain_text(&self) -> String {
+        scalar_string(self).unwrap_or_default()
+    }
+}
+
+/// The flat string a value projects to, joining sequences with `", "`, or `None` when it cannot project.
+///
+/// Bare scalars delegate to [`Value::scalar_text`]; `Value::Null` projects to an empty string.
+/// Sequences project if every element projects. Structured nodes (`Map`, `Call`, `Element`, `Blocks`,
+/// `Interp`, `Hole`) return `None`.
+pub fn scalar_string(v: &Value) -> Option<String> {
+    if let Some(text) = v.scalar_text() {
+        return Some(text.into_owned());
+    }
+    match v {
+        Value::Null => Some(String::new()),
+        Value::Seq(items) => {
+            let parts: Option<Vec<String>> = items.iter().map(scalar_string).collect();
+            Some(parts?.join(", "))
+        }
+        _ => None,
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_scalar_string_and_plain_text() {
+        assert_eq!(Value::Null.scalar_string(), Some("".to_string()));
+        assert_eq!(Value::Null.plain_text(), "");
+
+        assert_eq!(Value::Bool(true).scalar_string(), Some("true".to_string()));
+        assert_eq!(Value::Int(42).scalar_string(), Some("42".to_string()));
+        assert_eq!(Value::Float(3.14).scalar_string(), Some("3.14".to_string()));
+        assert_eq!(Value::Number("1.10".into()).scalar_string(), Some("1.10".to_string()));
+        assert_eq!(Value::String("hello".into()).scalar_string(), Some("hello".to_string()));
+
+        let seq = Value::Seq(vec![Value::String("a".into()), Value::Int(1), Value::Bool(false)]);
+        assert_eq!(seq.scalar_string(), Some("a, 1, false".to_string()));
+        assert_eq!(seq.plain_text(), "a, 1, false");
+
+        let map = Value::Map(vec![("k".into(), Value::Int(1))]);
+        assert_eq!(map.scalar_string(), None);
+        assert_eq!(map.plain_text(), "");
+
+        let seq_with_map = Value::Seq(vec![Value::String("a".into()), map]);
+        assert_eq!(seq_with_map.scalar_string(), None);
+        assert_eq!(seq_with_map.plain_text(), "");
+    }
 
     #[test]
     fn a_kept_number_is_read_as_the_number_it_spells() {

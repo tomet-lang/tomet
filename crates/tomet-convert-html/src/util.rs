@@ -2,6 +2,7 @@
 
 use tomet_ast::{Block, Data, Id, Inline, Value};
 use tomet_semantics::{EXACT_DATA_KEY, flatten_data, is_attribute_key};
+use tomet_tree::ValueExt;
 
 /// Flattens inline content to plain text -- used for the `alt` attribute,
 /// which can't itself carry markup.
@@ -184,31 +185,7 @@ pub(crate) fn push_data_attrs(out: &mut String, args: Option<&Value>, skip: &[&s
 }
 
 pub(crate) fn value_to_plain(v: &Value) -> String {
-    match v {
-        Value::Null => String::new(),
-        Value::Bool(b) => b.to_string(),
-        Value::Int(i) => i.to_string(),
-        Value::Float(f) => Value::float_text(*f),
-        Value::Number(text) => text.clone(),
-        Value::String(s) => s.clone(),
-        Value::Seq(items) => items
-            .iter()
-            .map(value_to_plain)
-            .collect::<Vec<_>>()
-            .join(", "),
-        // A map has no single scalar representation; callers that need
-        // per-key access use `as_map`/`map_get` instead.
-        Value::Map(_) => String::new(),
-        // A call is validation-only (e.g. `:rule`'s `allow:list(...)`)
-        // and has no rendered form.
-        Value::Call(..) => String::new(),
-        // An embedded element has no scalar form either -- same as `Map`.
-        Value::Element(_) => String::new(),
-        // An interpolation is not known until it is evaluated.
-        Value::Interp(_) | Value::Hole(_) => String::new(),
-        // Block content has no scalar form either -- same as `Map`.
-        Value::Blocks(_) => String::new(),
-    }
+    v.plain_text()
 }
 
 pub(crate) fn as_map(v: &Value) -> Option<&Vec<(String, Value)>> {

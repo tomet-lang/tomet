@@ -149,20 +149,22 @@ pub(crate) fn call_method(
     }
 }
 
-/// The text of a scalar, for `.join`. Only scalars have one.
+/// The text of a scalar, for `.join` and macro expansion. Only scalars (other than `null`) have one.
 pub(crate) fn scalar_text(value: &EvalValue) -> Result<String, EvalError> {
-    match value {
-        EvalValue::String(s) => Ok(s.clone()),
-        EvalValue::Int(i) => Ok(i.to_string()),
-        EvalValue::Float(f) => Ok(f.to_string()),
-        EvalValue::Bool(b) => Ok(b.to_string()),
-        EvalValue::Version(v) => Ok(v.to_string()),
-        other => Err(EvalError::mismatch(
+    if matches!(value, EvalValue::Null) {
+        return Err(EvalError::mismatch(
             "turning a value into text",
             "a string, number or bool",
-            other.type_name(),
-        )),
+            value.type_name(),
+        ));
     }
+    value.scalar_text().ok_or_else(|| {
+        EvalError::mismatch(
+            "turning a value into text",
+            "a string, number or bool",
+            value.type_name(),
+        )
+    })
 }
 
 /// `item(n)`: zero-based, no negative index.

@@ -18,6 +18,7 @@
 //! use `.` as a namespace separator, but map keys deliberately do not.
 
 use tomet_ast::{ElementView, Value};
+use tomet_tree::scalar_string;
 
 /// The attribute a consumer should read instead of the flat projection
 /// when it is present.
@@ -121,38 +122,6 @@ pub fn flatten_data(args: Option<&Value>, value: Option<&Value>) -> FlatData {
         pairs,
         positional,
         exact,
-    }
-}
-
-/// The string a value projects to, or `None` when it cannot project.
-///
-/// A sequence joins with `", "`, which is what the HTML writer has always
-/// done. That is not reversible -- `[p, q]` and the literal `"p, q"`
-/// project identically -- but it stays readable, and the exact copy is
-/// what a reader uses when it needs the difference.
-pub fn scalar_string(v: &Value) -> Option<String> {
-    match v {
-        Value::Null => Some(String::new()),
-        Value::Bool(b) => Some(b.to_string()),
-        Value::Int(i) => Some(i.to_string()),
-        Value::Float(f) => Some(Value::float_text(*f)),
-        Value::Number(text) => Some(text.clone()),
-        Value::String(s) => Some(s.clone()),
-        Value::Seq(items) => {
-            let parts: Option<Vec<String>> = items.iter().map(scalar_string).collect();
-            Some(parts?.join(", "))
-        }
-        Value::Map(_) => None,
-        // A call is a structured literal like a map, not a scalar --
-        // there is no single string it collapses to.
-        Value::Call(..) => None,
-        // An embedded element is a whole element, not a scalar -- same
-        // bucket as `Map`/`Call`. So is an interpolation: its value is not
-        // known until it is evaluated.
-        Value::Element(_) | Value::Interp(_) | Value::Hole(_) => None,
-        // Block content (`key: [...]`) is a tree, not a scalar -- same
-        // bucket.
-        Value::Blocks(_) => None,
     }
 }
 

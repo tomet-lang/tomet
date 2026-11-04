@@ -16,8 +16,7 @@
 - ( ) 式の中に残した数
   - `EvalValue::from_ast(Number)` は、その数が表す `f64` になるので、型のない `rev: 1.10` の `${meta.rev}` は
     `1.1` と出る。文字列の型があれば大丈夫 (`tomet_expr::typed_value`)。型のない場合は決まっていない。
-- ( ) 「値を平文にする関数」が 6 つある
-  - html、markdown、typst、`flatten::scalar_string`、`positional::scalar_to_plain`、インデクサ。
-    どれも `Value::scalar_text` と連結でできる。(2026-11-01 時点で `scalar_text_or_debug` (declaration) や
-    transform / expr の `scalar_text` も別にある)
+- (x) 「値を平文にする関数」が 6 つある
+  - `tomet-tree`（Layer 2）に `scalar_string` および `ValueExt::plain_text` を集約し、各変換・セマンティクス・インデクサから散在していた実装を移行。
+  - 式評価値については `tomet-semantics-expr` に `EvalValue::scalar_text` を一元化し、`tomet-transform` の重複コードを削除。
 - ( ) バージョンの pre-release とビルドの部分 (`1.0.0-beta`、`+5`) を読む。

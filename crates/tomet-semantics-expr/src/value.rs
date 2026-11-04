@@ -288,6 +288,33 @@ impl EvalValue {
             | EvalValue::Namespace(_) => return None,
         })
     }
+
+    /// The text of a bare scalar, if that is what the value is.
+    ///
+    /// Following `tmtroot/spec/expressions/overview.expr.tmt`, scalars are
+    /// `Null`, booleans, numbers, strings, and versions. A `Null` evaluates to
+    /// empty text (`""`).
+    ///
+    /// Returns `None` for non-scalar values (such as sequences, maps, parts,
+    /// documents, directories, fragments, functions, or namespaces).
+    pub fn scalar_text(&self) -> Option<String> {
+        Some(match self {
+            EvalValue::Null => String::new(),
+            EvalValue::Bool(b) => b.to_string(),
+            EvalValue::Int(i) => i.to_string(),
+            EvalValue::Float(f) => f.to_string(),
+            EvalValue::String(s) => s.clone(),
+            EvalValue::Version(v) => v.to_string(),
+            _ => return None,
+        })
+    }
+}
+
+/// The text of a bare scalar, if that is what the value is.
+///
+/// See [`EvalValue::scalar_text`].
+pub fn scalar_text(value: &EvalValue) -> Option<String> {
+    value.scalar_text()
 }
 
 #[cfg(test)]
@@ -346,5 +373,23 @@ mod tests {
         assert_eq!(inner.get("y"), Some(&EvalValue::Int(3)));
         assert_eq!(outer.get("x"), Some(&EvalValue::Int(1)));
         assert_eq!(outer.get("y"), None);
+    }
+
+    #[test]
+    fn test_eval_value_scalar_text() {
+        assert_eq!(EvalValue::Null.scalar_text().as_deref(), Some(""));
+        assert_eq!(EvalValue::Bool(true).scalar_text().as_deref(), Some("true"));
+        assert_eq!(EvalValue::Int(42).scalar_text().as_deref(), Some("42"));
+        assert_eq!(EvalValue::Float(3.14).scalar_text().as_deref(), Some("3.14"));
+        assert_eq!(EvalValue::String("hello".into()).scalar_text().as_deref(), Some("hello"));
+        assert_eq!(
+            EvalValue::Version(Version::parse("1.2.3").unwrap())
+                .scalar_text()
+                .as_deref(),
+            Some("1.2.3")
+        );
+        assert_eq!(EvalValue::Seq(vec![]).scalar_text(), None);
+        assert_eq!(EvalValue::Map(vec![]).scalar_text(), None);
+        assert_eq!(EvalValue::Document(doc()).scalar_text(), None);
     }
 }

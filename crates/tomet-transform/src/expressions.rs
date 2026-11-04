@@ -474,21 +474,8 @@ fn misfit(value: &EvalValue) -> String {
     format!("a {} cannot be placed in the text{hint}", value.type_name())
 }
 
-/// The text of a scalar, if that is what the value is.
-fn scalar_text(value: &EvalValue) -> Option<String> {
-    Some(match value {
-        EvalValue::Null => String::new(),
-        EvalValue::Bool(b) => b.to_string(),
-        EvalValue::Int(i) => i.to_string(),
-        EvalValue::Float(f) => f.to_string(),
-        EvalValue::String(s) => s.clone(),
-        EvalValue::Version(v) => v.to_string(),
-        _ => return None,
-    })
-}
-
 fn to_inlines(value: EvalValue, span: Span) -> Result<Vec<Inline>, String> {
-    if let Some(text) = scalar_text(&value) {
+    if let Some(text) = value.scalar_text() {
         return Ok(vec![Inline::Text(Text { value: text, span })]);
     }
     match value {
@@ -504,7 +491,7 @@ fn to_inlines(value: EvalValue, span: Span) -> Result<Vec<Inline>, String> {
 }
 
 fn to_blocks(value: EvalValue, span: Span) -> Result<Vec<Block>, String> {
-    if let Some(text) = scalar_text(&value) {
+    if let Some(text) = value.scalar_text() {
         return Ok(vec![Block::Paragraph(Paragraph::new(
             vec![Inline::Text(Text { value: text, span })],
             span,

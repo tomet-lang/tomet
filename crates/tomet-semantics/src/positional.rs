@@ -1,4 +1,5 @@
 use tomet_ast::{Data, Declaration, ElementView, Name, Value};
+use tomet_tree::ValueExt;
 
 use crate::vocabulary::{Bindings, ElementDecl};
 
@@ -114,7 +115,7 @@ fn recover_target_scheme_entry(
     let (key, value) = &entries[idx];
     entries[idx] = (
         "target".to_string(),
-        Value::String(format!("{key}:{}", scalar_to_plain(value))),
+        Value::String(format!("{key}:{}", value.plain_text())),
     );
     Value::Map(entries)
 }
@@ -142,31 +143,6 @@ fn positional_keys(name: Option<&Name>, bindings: &Bindings) -> Vec<String> {
         .declaration(name)
         .map(ElementDecl::positional_keys)
         .unwrap_or_default()
-}
-
-/// Stringifies a scalar `Value` back to the plain text it would have come
-/// from as a bare (unquoted) scalar -- used to glue a recovered scheme
-/// prefix back onto its value (`tm` + `Int(5)` -> `"tm:5"`). `Seq`/`Map`
-/// can't legitimately appear here (the parser only ever produces those
-/// for a bracketed/braced value, never for a bare `word:value` entry's
-/// value), so they fall back to empty rather than fabricating something
-/// misleading.
-fn scalar_to_plain(v: &Value) -> String {
-    match v {
-        Value::Null => String::new(),
-        Value::Bool(b) => b.to_string(),
-        Value::Int(i) => i.to_string(),
-        Value::Float(f) => Value::float_text(*f),
-        Value::Number(text) => text.clone(),
-        Value::String(s) => s.clone(),
-        Value::Seq(_)
-        | Value::Map(_)
-        | Value::Call(..)
-        | Value::Interp(_)
-        | Value::Hole(_)
-        | Value::Element(_)
-        | Value::Blocks(_) => String::new(),
-    }
 }
 
 /// Returns the normalized `args` map for an [`Element`]. One unified
