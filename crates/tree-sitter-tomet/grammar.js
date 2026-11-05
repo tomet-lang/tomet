@@ -82,7 +82,7 @@ module.exports = grammar({
 		// Two backticks at the start of a line make the whole line raw; the lines
 		// under it that start the same way are more of the same block. A third
 		// backtick is a fence, so the token excludes it. In the middle of a line
-		// two backticks are an inline `code_span`. Like `;`, only at the top level.
+		// a single backtick opens an inline `code_span`. Like `;`, only at the top level.
 		line_raw: ($) => prec.right(repeat1(seq($._line_raw_line, $._newline))),
 		_line_raw_line: (_$) => token(prec(2, /``([^`\n][^\n]*)?/)),
 
@@ -306,6 +306,7 @@ module.exports = grammar({
 		// ---- inline content ---------------------------------------------
 		_line_item: ($) =>
 			choice(
+				$.escape,
 				$.text,
 				$.code_span,
 				$.block_comment,
@@ -321,6 +322,7 @@ module.exports = grammar({
 		// What may open a line of a paragraph: anything but a `;`, which breaks the block.
 		_first_line_item: ($) =>
 			choice(
+				$.escape,
 				$.text,
 				$.code_span,
 				$.block_comment,
@@ -334,6 +336,14 @@ module.exports = grammar({
 				alias($._punctuation_not_semi, $.punctuation),
 			),
 		_bracket_item: ($) => choice($._line_item, $._newline),
+
+		escape: (_$) =>
+			token(
+				prec(
+					2,
+					/\\(\\|!+|"+|#+|\$+|%+|\&+|'+|\(+|\)+|\*+|\++|,+|-+|\.+|\/+|:+|;+|<+|=+|>+|\?+|@+|\[+|\]+|\^+|_+|\`+|\{+|\|+|\}+|~+)/,
+				),
+			),
 
 		// `(`/`[`/`{` are excluded from `text` (and from the `_bracket_item_
 		// no_*` variants below) even though they have no special meaning in
@@ -376,11 +386,12 @@ module.exports = grammar({
 		// same as the other excluded characters.
 		// `<` is excluded for the same longest-match reason: a box (`label`, `hole`) opens with it
 		// and must win over a `text` run that would swallow `<PATH>` whole.
-		text: (_$) => /[^\n`*_=~<@$#:()\[{\]/|;-]+/,
+		text: (_$) => /[^\n\\`*_=~<@$#:()\[{\]/|;-]+/,
 
 		punctuation: ($) => choice($._punctuation_not_semi, ";"),
-		_punctuation_not_semi: (_$) => choice(/[()\[{/<>|~]/, "-", "$", "#", ":", "="),
-		code_span: (_$) => /`[^`\n]*`/,
+		_punctuation_not_semi: (_$) =>
+			choice(/[()\[{/<>|~]/, "-", "$", "#", ":", "=", "\\", /`+/),
+		code_span: (_$) => /`[^`\n]+`/,
 
 		emphasis: ($) =>
 			choice(
@@ -397,6 +408,7 @@ module.exports = grammar({
 
 		_bracket_item_no_star: ($) =>
 			choice(
+				$.escape,
 				$.code_span,
 				$.block_comment,
 				$.strikeout,
@@ -406,10 +418,11 @@ module.exports = grammar({
 				$.interpolation,
 				$._newline,
 				$.punctuation,
-				alias(/[^\n`*=~<@$()\[{\]/|]+/, $.text),
+				alias(/[^\n\\`*=~<@$()\[{\]/|]+/, $.text),
 			),
 		_bracket_item_no_underscore: ($) =>
 			choice(
+				$.escape,
 				$.code_span,
 				$.block_comment,
 				$.strikeout,
@@ -419,10 +432,11 @@ module.exports = grammar({
 				$.interpolation,
 				$._newline,
 				$.punctuation,
-				alias(/[^\n`_=~<@$()\[{\]/|]+/, $.text),
+				alias(/[^\n\\`_=~<@$()\[{\]/|]+/, $.text),
 			),
 		_bracket_item_no_tilde: ($) =>
 			choice(
+				$.escape,
 				$.code_span,
 				$.block_comment,
 				$.emphasis,
@@ -433,7 +447,7 @@ module.exports = grammar({
 				$.interpolation,
 				$._newline,
 				$.punctuation,
-				alias(/[^\n`*_=~<@$()\[{\]/|]+/, $.text),
+				alias(/[^\n\\`*_=~<@$()\[{\]/|]+/, $.text),
 			),
 
 		// ---- `${...}` interpolation ---------------------------------------

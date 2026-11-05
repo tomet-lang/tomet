@@ -824,12 +824,9 @@ Paragraph
       Paragraph
         Text "a"
   SoftBreak
-  Text "\\"
+  Text "@link(target: \""
   Inline @link
-    args    {target: "https://b.example"}
-    content
-      Paragraph
-        Text "b"
+    args    {target: "https://b.example\")[b]"}
 ```
 
 ### 行末の `\` でも同じ木になる
@@ -871,12 +868,9 @@ Paragraph
       Paragraph
         Text "a"
   SoftBreak
-  Text "\\"
+  Text "@link(target: \""
   Inline @link
-    args    {target: "https://b.example"}
-    content
-      Paragraph
-        Text "b"
+    args    {target: "https://b.example\")[b]"}
   SoftBreak
   Inline @link
     args    {target: "https://c.example"}
@@ -902,20 +896,14 @@ Paragraph
         Text "a"
   Text " \\"
   SoftBreak
-  Text "\\"
+  Text "@link(target: \""
   Inline @link
-    args    {target: "https://b.example"}
-    content
-      Paragraph
-        Text "b"
+    args    {target: "https://b.example\")[b]"}
   Text " \\"
   SoftBreak
-  Text "\\"
+  Text "@link(target: \""
   Inline @link
-    args    {target: "https://c.example"}
-    content
-      Paragraph
-        Text "c"
+    args    {target: "https://c.example\")[c]"}
 ```
 
 ### `\` を書かなければ、今まで通り別々のブロックに割れる
@@ -965,12 +953,9 @@ Paragraph
 
 ```
 Paragraph
-  Text "\\"
+  Text "@link(target: \""
   Inline @link
-    args    {target: "https://a.example"}
-    content
-      Paragraph
-        Text "dangling"
+    args    {target: "https://a.example\")[dangling]"}
 ```
 
 ## リスト

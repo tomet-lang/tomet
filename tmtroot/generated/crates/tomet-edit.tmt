@@ -21,7 +21,7 @@ to the original input source across the entire corpus (`export_doc(&import_sourc
 with interspersed trivia, `(args)` and `{data}` slots retain per-entry raw slices, leading/trailing
 trivia, and recursive [`EditValue`] trees, and paragraphs and section headings expose both
 flat text (for character-level CRDTs via [`EditOp::EditText`]) and structured [`InlineItem`]
-runs (preserving `*italic*`, `**bold**`, `` `code` ``, and inline `@el` elements).
+runs (preserving `*italic*`, `**bold**`, \`code\`, and inline `@el` elements).
 - ("First-Class Move & Closed Edit Operations") [`EditOp`] provides a minimal, closed set of operations (`Insert`, `Delete`, `Move`, `Replace`, `EditText`, `SetAttribute`).
 `Move` is a first-class operation, directly supported by tree-based CRDTs (e.g. Loro's MovableTree).
 [`EditOp::SetAttribute`] allows key-level manipulation of an element's `{}` data, `()` args, and `#()` id slot

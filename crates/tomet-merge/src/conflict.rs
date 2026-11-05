@@ -6,7 +6,7 @@
 //! `@conflict` element wherever the tree puts one -- a paragraph, a list item,
 //! a heading, an element's content, a `{ }` value -- so a marker the merge
 //! wrote cannot be written in a place this does not look. Text that is code
-//! (a `` `code span` ``, a fenced block) or a comment holds no element and so
+//! (a \`code span\`, a fenced block) or a comment holds no element and so
 //! no marker. An `@conflict` named in running text, with no `( )` after it, is
 //! a word, not a marker.
 //!

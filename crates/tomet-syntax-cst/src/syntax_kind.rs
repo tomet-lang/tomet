@@ -111,14 +111,15 @@ pub enum SyntaxKind {
     STRONG,
     /// `~~struck~~`.
     STRIKEOUT,
-    /// `` `code` `` (or a longer fence, ``` ``a`b`` ```): the fences are
-    /// `BACKTICK` tokens, everything between them is `TEXT_CHUNK` and is
-    /// never read as syntax.
+    /// `` `code` ``: the opening and closing `BACKTICK` tokens and the
+    /// `TEXT_CHUNK` tokens between them, never read as syntax.
     CODE_SPAN,
     /// A bare `https://`, `http://` or `mailto:` address in running text,
     /// without the punctuation that closes the sentence around it.
     AUTOLINK,
-    /// A `\;` that opens a line: an escape that produces a literal `;` as text.
+    /// A `\` escape in running text (`\\`, or `\` followed by a run of the same
+    /// ASCII punctuation character, such as `\;`, `\*`, `\**`, `` \` ``, `\//`):
+    /// the leading `\` is omitted and the escaped characters are read as literal text.
     ESCAPE,
     /// `<name>`, `<?matcher(args){data}>` and the `[content]` a marked one takes
     /// after its `>`: a seat for a value that is not there yet. The head is

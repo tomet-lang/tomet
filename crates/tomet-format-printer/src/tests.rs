@@ -674,3 +674,75 @@ fn a_semicolon_that_is_text_at_the_start_of_a_line_is_printed_with_a_backslash()
         assert_eq!(again.body.len(), doc.body.len(), "{src:?}");
     }
 }
+
+#[test]
+fn escaped_line_start_constructs_round_trip() {
+    for src in [
+        "\\;a\n",
+        "a\n\\;b\n",
+        "\\= Heading\n",
+        "\\==[Title]\n",
+        "\\---\n",
+        "\\- item\n",
+        "\\-. ordered\n",
+        "\\``not line raw\n",
+        "\\```not fence\n",
+        "\\::meta{a: 1}\n",
+        "\\@standalone\n",
+        "first line\n\\= second line\n\\- third line\n\\---\n",
+    ] {
+        let before = tomet_ast_parser::parse_file(src)
+            .unwrap_or_else(|e| panic!("{src:?} failed to parse: {e}"));
+        let printed = document_to_tm(&before);
+        let after = tomet_ast_parser::parse_file(&printed).unwrap_or_else(|e| {
+            panic!("{src:?} printed as {printed:?}, which failed to parse: {e}")
+        });
+        assert_eq!(
+            before, after,
+            "{src:?} printed as {printed:?} and read back differently"
+        );
+    }
+}
+
+#[test]
+fn escaped_inline_constructs_round_trip() {
+    for src in [
+        "\\*em*\n",
+        "*em\\*\n",
+        "\\**strong**\n",
+        "**strong\\**\n",
+        "\\_em_\n",
+        "\\__strong__\n",
+        "\\~~strike~~\n",
+        "use \\`code\\` literally\n",
+        "text \\// not a comment\n",
+        "text \\/* not a block comment */\n",
+        "call \\@name(x) and \\@tag[y]{z: 1} here\n",
+        "value \\${x} and \\$fn(1)\n",
+        "hole \\<?slot> and \\<?(n)>\n",
+        "@note[a \\[ b \\] c]\n",
+        "literal \\\\* and \\\\\n",
+        "unmarked <PATH> and snake_case_ident and me@example.com stay plain\n",
+    ] {
+        let before = tomet_ast_parser::parse_file(src)
+            .unwrap_or_else(|e| panic!("{src:?} failed to parse: {e}"));
+        let printed = document_to_tm(&before);
+        let after = tomet_ast_parser::parse_file(&printed).unwrap_or_else(|e| {
+            panic!("{src:?} printed as {printed:?}, which failed to parse: {e}")
+        });
+        assert_eq!(
+            before, after,
+            "{src:?} printed as {printed:?} and read back differently"
+        );
+    }
+}
+
+#[test]
+fn inline_raw_with_backtick_falls_back_to_at_raw() {
+    let md = "Use `` `code` `` here.\n";
+    let doc = tomet_markdown::from_markdown(md);
+    let printed = document_to_tm(&doc);
+    assert_eq!(printed.trim(), "Use @raw[\\`code`] here.");
+    let reparsed = tomet_ast_parser::parse_file(&printed).expect("reparses cleanly");
+    assert_eq!(document_to_tm(&reparsed), printed);
+}

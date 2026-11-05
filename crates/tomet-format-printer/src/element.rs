@@ -8,7 +8,7 @@ use tomet_config::{GroupOrder, PrinterConfig};
 use tomet_style::render_nested;
 
 use crate::id::render_id;
-use crate::inline::render_content_blocks;
+use crate::inline::{raw_content_text, render_content_blocks};
 
 /// Render an [`Element`] AST node into Tomet syntax:
 /// `<sigil><name>(args)[content]{value}`.
@@ -36,24 +36,16 @@ pub fn render_element(el: ElementView<'_>, config: &PrinterConfig) -> String {
         if el.placement == Placement::Inline
             && el.data.args.is_none()
             && el.data.value.is_none()
+            && el.id.is_none()
             && el.connects.is_empty()
         {
-            let from_content = el
+            let body = el
                 .content
-                .map(|content| render_content_blocks(content, config));
-            let body = from_content.unwrap_or_default();
-            let longest = body
-                .split(|c| c != '`')
-                .map(|run| run.len())
-                .max()
-                .unwrap_or(0);
-            let fence = "`".repeat(longest + 1);
-            let pad = if body.starts_with('`') || body.ends_with('`') {
-                " "
-            } else {
-                ""
-            };
-            return format!("{fence}{pad}{body}{pad}{fence}");
+                .and_then(raw_content_text)
+                .unwrap_or_default();
+            if !body.is_empty() && !body.contains('`') && !body.contains('\n') {
+                return format!("`{body}`");
+            }
         }
 
         if el.placement == Placement::Block {
@@ -82,8 +74,12 @@ pub fn render_element(el: ElementView<'_>, config: &PrinterConfig) -> String {
                 .unwrap_or_default();
             let body = el
                 .content
-                .map(|content| render_content_blocks(content, config))
-                .unwrap_or_default();
+                .and_then(raw_content_text)
+                .unwrap_or_else(|| {
+                    el.content
+                        .map(|content| render_content_blocks(content, config))
+                        .unwrap_or_default()
+                });
             let longest = body
                 .lines()
                 .map(|l| l.trim_end())

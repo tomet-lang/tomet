@@ -170,8 +170,11 @@ fn a_code_span_is_a_node_and_its_inside_is_not_parsed() {
 }
 
 #[test]
-fn a_code_span_closes_on_a_fence_of_the_same_length() {
-    assert_eq!(texts("x ``a`b`` c\n", K::CODE_SPAN), ["``a`b``"]);
+fn a_code_span_is_single_backtick_only_and_non_empty() {
+    assert_eq!(texts("x `` c\n", K::CODE_SPAN), Vec::<String>::new());
+    assert_eq!(texts("x ``` c\n", K::CODE_SPAN), Vec::<String>::new());
+    assert_eq!(texts("x `a` and \\`b\\` c\n", K::CODE_SPAN), ["`a`"]);
+    assert_eq!(texts("x `a` and \\`b\\` c\n", K::ESCAPE), ["\\`", "\\`"]);
 }
 
 #[test]
@@ -465,4 +468,56 @@ fn a_group_whose_slot_is_taken_is_not_pulled_in_from_the_next_line() {
     assert_eq!(kinds(src, K::BLOCK_FORM), 0);
     assert_eq!(texts(src, K::INLINE_FORM), ["@file(a)"]);
     assert_eq!(kinds(src, K::PARAGRAPH), 1);
+}
+
+// --- backslash escapes -----------------------------------------------------
+
+#[test]
+fn backslash_escapes_ascii_punctuation_runs_and_not_words_or_spaces() {
+    assert_eq!(
+        texts(
+            "\\; \\* \\** \\` \\`` \\``` \\// \\/* \\:: \\=== \\--- \\\\\n",
+            K::ESCAPE
+        ),
+        [
+            "\\;", "\\*", "\\**", "\\`", "\\``", "\\```", "\\//", "\\/", "\\::", "\\===", "\\---",
+            "\\\\"
+        ]
+    );
+    // Unescaped backslash before alphanumeric, whitespace, or non-ASCII is plain text.
+    for src in ["a\\b\n", "C:\\Users\\name\n", "a\\ b\n", "\\あ\n", "\\\n"] {
+        assert_eq!(kinds(src, K::ESCAPE), 0, "{src:?}");
+    }
+}
+
+#[test]
+fn backslash_escapes_prevent_inline_and_block_triggers() {
+    for src in [
+        "\\@name(x) \\${x} \\<slot>\n",
+        "\\*not em*\n",
+        "*not em\\*\n",
+        "\\**not strong**\n",
+        "**not strong\\**\n",
+    ] {
+        assert_eq!(kinds(src, K::INLINE_FORM), 0, "{src:?}");
+        assert_eq!(kinds(src, K::SLOT), 0, "{src:?}");
+        assert_eq!(kinds(src, K::EMPHASIS), 0, "{src:?}");
+        assert_eq!(kinds(src, K::STRONG), 0, "{src:?}");
+    }
+
+    // Double backslash escapes the backslash, leaving `*em*` active.
+    let src = "\\\\*em*\n";
+    assert_eq!(texts(src, K::ESCAPE), ["\\\\"]);
+    assert_eq!(texts(src, K::EMPHASIS), ["*em*"]);
+
+    // Escaped brackets inside `@note[...]` do not close or open the content group.
+    let src = "@note[ a \\[ b \\] c ]\n";
+    assert_eq!(texts(src, K::CONTENT), ["[ a \\[ b \\] c ]"]);
+    assert_eq!(texts(src, K::ESCAPE), ["\\[", "\\]"]);
+
+    // Escaped trailing groups in headings and list items stay in the body.
+    let src = "= Heading \\#(id) \\:connect(x)\n- item \\#(id) \\:connect(x)\n";
+    assert_eq!(kinds(src, K::ID_GROUP), 0);
+    assert_eq!(kinds(src, K::CONNECT), 0);
+    assert_eq!(texts(src, K::ESCAPE), ["\\#", "\\:", "\\#", "\\:"]);
 }

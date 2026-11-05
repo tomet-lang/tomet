@@ -204,8 +204,8 @@ fn lower_paragraph(node: &SyntaxNode) -> Result<Option<Block>> {
 }
 
 /// The running text in `parent` between byte offsets `from` and `to`:
-/// tokens become `Text` and `SoftBreak`, comments are skipped, `\;` becomes `;`,
-/// and the ends are trimmed.
+/// tokens become `Text` and `SoftBreak`, comments are skipped, `\...` escapes
+/// become their escaped punctuation run, and the ends are trimmed.
 fn lower_inlines(parent: &SyntaxNode, from: usize, to: usize) -> Result<Vec<Inline>> {
     let mut items = Vec::new();
     let mut pending_text = String::new();
@@ -298,17 +298,21 @@ fn lower_inlines(parent: &SyntaxNode, from: usize, to: usize) -> Result<Vec<Inli
             }
             SyntaxElement::Node(n) if n.kind() == K::ESCAPE => {
                 flush_softbreak(&mut items, &mut in_softbreak, softbreak_start, softbreak_end);
-                // An escape like `\;` at line start: the `\` is omitted, `;` is text.
+                // A `\...` escape: the leading `\` is omitted, the escaped run is text.
                 // The span starts after `\` (at start + 1) through end.
-                let semi_start = start + 1;
-                let effective_start = if is_first_text && from < semi_start {
+                let escaped_start = start + 1;
+                let effective_start = if is_first_text && from < start {
                     from
                 } else {
-                    semi_start
+                    escaped_start
                 };
                 is_first_text = false;
                 pending_start.get_or_insert(effective_start);
-                pending_text.push(';');
+                for elem in n.children_with_tokens().skip(1) {
+                    if let NodeOrToken::Token(t) = elem {
+                        pending_text.push_str(t.text());
+                    }
+                }
                 pending_end = end;
             }
             SyntaxElement::Node(n) if n.kind() == K::ERROR => {
@@ -378,25 +382,20 @@ fn lower_delimited(node: &SyntaxNode) -> Result<Element> {
         .with_content(vec![Block::Paragraph(Paragraph::new(inner, span))]))
 }
 
-/// A code span: a `raw` element whose content is the text between the backticks.
+/// A code span: a `raw` element whose content is the text between the single opening
+/// and closing backticks.
 fn lower_code_span(node: &SyntaxNode) -> Result<Element> {
     let (start, end) = range_of(node);
-    let fence = node
-        .children_with_tokens()
-        .filter_map(|e| e.into_token())
-        .take_while(|t| t.kind() == K::BACKTICK)
-        .map(|t| t.text().len())
-        .sum::<usize>();
-    if fence == 0 || (end - start) < 2 * fence {
+    if (end - start) < 2 {
         return Err(unsupported("a code span that does not read"));
     }
-    let inner_span = Span::new(start + fence, end - fence);
+    let inner_span = Span::new(start + 1, end - 1);
     let mut inner = String::new();
     for t in node
         .children_with_tokens()
         .filter_map(|e| e.into_token())
-        .skip_while(|t| t.kind() == K::BACKTICK)
-        .take_while(|t| usize::from(t.text_range().end()) <= (end - fence))
+        .skip(1)
+        .take_while(|t| usize::from(t.text_range().end()) <= (end - 1))
     {
         inner.push_str(t.text());
     }
@@ -732,6 +731,7 @@ pub(crate) fn lower_group_list(
             K::LIST
             | K::INLINE_FORM
             | K::SLOT
+            | K::ESCAPE
             | K::EMPHASIS
             | K::STRONG
             | K::STRIKEOUT
@@ -892,7 +892,14 @@ fn sugar_title(heading: &SyntaxNode, _level: usize) -> Result<Vec<Inline>> {
     };
     let (from, to) = range_of(&body);
     let mut title = lower_inlines(&body, from, to)?;
-    trim_trailing_equals(&mut title);
+    let ends_with_unescaped_eq = body
+        .children_with_tokens()
+        .filter(|e| !e.kind().is_trivia())
+        .last()
+        .is_some_and(|e| matches!(e, SyntaxElement::Token(t) if t.kind() == K::EQUAL));
+    if ends_with_unescaped_eq {
+        trim_trailing_equals(&mut title);
+    }
     Ok(title)
 }
 

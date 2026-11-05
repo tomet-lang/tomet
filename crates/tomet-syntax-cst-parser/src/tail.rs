@@ -23,6 +23,8 @@ pub(crate) struct TailScan<'a> {
     src: &'a str,
     /// For each opening bracket, its closing one.
     closer: HashMap<usize, usize>,
+    /// Candidate byte offsets on the first line where a body's trailing groups may begin.
+    candidates: Vec<usize>,
     /// For each place a group, or the `:` of a connect, can start: whether the chain of groups from
     /// there reaches the end of a line, and if so whether it holds a group and where it ends.
     chains: HashMap<usize, Option<(bool, usize)>>,
@@ -36,9 +38,34 @@ impl<'a> TailScan<'a> {
     pub(crate) fn new(src: &'a str, from: usize) -> Self {
         let bytes = src.as_bytes();
         let mut closer = HashMap::new();
+        let mut candidates = Vec::new();
         let mut open: Vec<(usize, u8)> = Vec::new();
+        let (mut after_colon, mut after_name_char) = (false, false);
         let (mut lines, mut line_start, mut i) = (0, from, from);
         while i < bytes.len() {
+            if let Some(len) = crate::inline::escaped_run_len(bytes, i) {
+                after_colon = false;
+                after_name_char = false;
+                i += len;
+                continue;
+            }
+            if lines == 0 && !matches!(bytes[i], b'\n' | b'\r') {
+                let hash_paren = bytes[i] == b'#' && bytes.get(i + 1) == Some(&b'(');
+                if bytes[i] == b':'
+                    || ((hash_paren || bytes[i] == b'{') && !after_colon && !after_name_char)
+                {
+                    candidates.push(i);
+                }
+                if matches!(bytes[i], b' ' | b'\t') {
+                    after_name_char = false;
+                } else {
+                    after_colon = bytes[i] == b':';
+                    after_name_char = matches!(
+                        bytes[i],
+                        b'a'..=b'z' | b'A'..=b'Z' | b'0'..=b'9' | b'_' | b'-'
+                    );
+                }
+            }
             match bytes[i] {
                 b'(' | b'[' | b'{' => open.push((i, bytes[i])),
                 b')' | b']' | b'}' => {
@@ -64,6 +91,7 @@ impl<'a> TailScan<'a> {
         Self {
             src,
             closer,
+            candidates,
             chains: HashMap::new(),
         }
     }
@@ -73,32 +101,9 @@ impl<'a> TailScan<'a> {
     /// `:name(...)`) that starts earlier. A `(` alone is not one -- a parenthetical remark is
     /// prose -- and only reaches here through a `:`.
     pub(crate) fn next_candidate(&self, from: usize) -> Option<usize> {
-        let bytes = self.src.as_bytes();
-        let preceded_by_colon = |pos: usize| {
-            let mut i = pos;
-            while i > 0 && matches!(bytes[i - 1], b' ' | b'\t') {
-                i -= 1;
-            }
-            i > 0 && bytes[i - 1] == b':'
-        };
-        // Names are ASCII, so a byte compare is UTF-8-safe.
-        let preceded_by_name_char = |pos: usize| {
-            pos > 0
-                && matches!(bytes[pos - 1], b'a'..=b'z' | b'A'..=b'Z' | b'0'..=b'9' | b'_' | b'-')
-        };
-        let mut i = from;
-        while i < bytes.len() && !matches!(bytes[i], b'\n' | b'\r') {
-            let hash_paren = bytes[i] == b'#' && bytes.get(i + 1) == Some(&b'(');
-            if bytes[i] == b':'
-                || ((hash_paren || bytes[i] == b'{')
-                    && !preceded_by_colon(i)
-                    && !preceded_by_name_char(i))
-            {
-                return Some(i);
-            }
-            i += if hash_paren { 2 } else { 1 };
-        }
-        None
+        self.candidates
+            .get(self.candidates.partition_point(|&c| c < from))
+            .copied()
     }
 
     /// Where the groups that begin at `at` end the line, if they do and hold a group: the chain of
@@ -173,6 +178,7 @@ impl<'a> TailScan<'a> {
                     | b']'
                     | b'#'
                     | b'|'
+                    | b'\\'
             )
         {
             i += 1;

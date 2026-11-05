@@ -146,9 +146,6 @@ pub const KNOWN_TS_ERRORS: &[(&str, &[&str])] = &[
     // error nodes. The same gap as `combine.tmt` above, in the content
     // group instead of the list marker.
     ("syntax/fences.tmt", &["]", "`", MISSING_NODE]),
-    // Same gap as `syntax/fences.tmt` just above, hit again by
-    // `examples/bookmark.tmt`'s own fenced raw-body notes.
-    ("examples/bookmark.tmt", &["]", "`", MISSING_NODE]),
     // ---- drift the grammar has not caught up with -------------------
     //
     // Everything below was already drifting and nobody could see it: the

@@ -1206,4 +1206,40 @@ mod tests {
             );
         }
     }
+
+    #[test]
+    fn parses_general_backslash_escapes_and_single_backtick_code_spans() {
+        for (src, expected_escapes) in [
+            ("\\*not em\\*\n", vec!["\\*", "\\*"]),
+            ("\\**not strong\\**\n", vec!["\\**", "\\**"]),
+            ("use \\`code\\` and `real`\n", vec!["\\`", "\\`"]),
+            ("text \\// not comment and \\/* not block */\n", vec!["\\//", "\\/"]),
+            ("\\= not section and \\--- not hr and \\- not list\n", vec!["\\=", "\\---", "\\-"]),
+            ("\\::decl(x) and \\@elem(x)\n", vec!["\\::", "\\@"]),
+            ("\\${interp} and \\<?hole>\n", vec!["\\$", "\\<"]),
+            ("@note[a \\[ b \\] c]\n", vec!["\\[", "\\]"]),
+            ("literal \\\\ and \\\\*em* and C:\\Users\\name\n", vec!["\\\\", "\\\\"]),
+        ] {
+            let tree = parse(src);
+            assert!(
+                !tree.root_node().has_error(),
+                "expected no errors for {src:?}: {}",
+                tree.root_node().to_sexp()
+            );
+            let actual_escapes: Vec<&str> = nodes_of_kind(&tree, "escape")
+                .into_iter()
+                .map(|n| n.utf8_text(src.as_bytes()).unwrap())
+                .collect();
+            assert_eq!(actual_escapes, expected_escapes, "for {src:?}");
+        }
+
+        // Empty `` in mid-line is not a code_span; single-backtick `code` is.
+        let tree = parse("mid `` empty and `code` span\n");
+        assert!(!tree.root_node().has_error());
+        let spans: Vec<&str> = nodes_of_kind(&tree, "code_span")
+            .into_iter()
+            .map(|n| n.utf8_text("mid `` empty and `code` span\n".as_bytes()).unwrap())
+            .collect();
+        assert_eq!(spans, ["`code`"]);
+    }
 }

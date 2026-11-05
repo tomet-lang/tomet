@@ -207,3 +207,63 @@ fn the_cst_and_the_ast_agree_on_inline_structure() {
     }
 }
 
+#[test]
+fn general_backslash_escapes_lower_to_literal_text() {
+    assert_eq!(
+        paragraph_text(
+            "\\; \\*em\\* \\**strong\\** \\`code\\` \\// \\/* \\@name(x) \\${x} \\<slot> \\\\\n"
+        ),
+        "; *em* **strong** `code` // /* @name(x) ${x} <slot> \\"
+    );
+    assert_eq!(paragraph_text("\\*em*\n"), "*em*");
+    assert_eq!(paragraph_text("*em\\*\n"), "*em*");
+    assert_eq!(paragraph_text("\\**strong**\n"), "**strong**");
+    assert_eq!(paragraph_text("**strong\\**\n"), "**strong**");
+    assert_eq!(
+        paragraph_text("\\::kind(x)\n\\===[ H ]\n\\---\n\\- item\n"),
+        "::kind(x) ===[ H ] --- - item"
+    );
+    // Unescaped backslash before non-punctuation stays a literal backslash.
+    assert_eq!(
+        paragraph_text("a\\b and C:\\Users\\name and a\\ b\n"),
+        "a\\b and C:\\Users\\name and a\\ b"
+    );
+    // `\\*em*` escapes the backslash and parses `*em*` as emphasis.
+    let doc = parse_file("\\\\*em*\n").unwrap();
+    let Block::Paragraph(p) = &doc.body[0] else {
+        panic!("expected paragraph");
+    };
+    assert_eq!(p.content.len(), 2);
+    assert_eq!(p.content[0], Inline::Text("\\".into()));
+    assert!(matches!(&p.content[1], Inline::Element(e) if e.name == Name::bare("em")));
+
+    // Escaped brackets inside `@note[...]` stay text.
+    let doc = parse_file("@note[ a \\[ b \\] c ]\n").unwrap();
+    let Block::Element(el) = &doc.body[0] else {
+        panic!("expected element");
+    };
+    assert_eq!(el.content, wrap(vec![Inline::Text("a [ b ] c".into())]));
+
+    // Escaped trailing groups on headings and list items stay part of the text.
+    let doc = parse_file("= Heading \\#(id) \\:connect(x)\n\n- item \\#(id) \\:connect(x)\n").unwrap();
+    let Block::Section(sec) = &doc.body[0] else {
+        panic!("expected section");
+    };
+    assert_eq!(sec.id, None);
+    assert!(sec.connects.is_empty());
+    assert_eq!(sec.title, vec![Inline::Text("Heading #(id) :connect(x)".into())]);
+    let Block::List(list) = &sec.blocks[0] else {
+        panic!("expected list");
+    };
+    assert_eq!(list.items[0].id, None);
+    assert!(list.items[0].connects.is_empty());
+    assert_eq!(
+        list.items[0].content,
+        vec![Block::Paragraph(tomet_ast::Paragraph::new(
+            vec![Inline::Text("item #(id) :connect(x)".into())],
+            Span::dummy(),
+        ))]
+    );
+}
+
+

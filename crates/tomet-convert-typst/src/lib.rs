@@ -8,7 +8,7 @@
 //!  | dropped, same as `tomet-convert-markdown`'s heading handling.
 //! -| `mark` renders as `#highlight[...]`, a Typst builtin only available
 //!  | since Typst 0.13 -- older Typst versions will fail to compile it.
-//! -| `${...}` interpolation round-trips as inert raw text (`` `${...}` ``)
+//! -| `${...}` interpolation round-trips as inert raw text (\`\${...}\`)
 //!  | rather than being evaluated: Typst has its own `#`/`{}` expression
 //!  | syntax with unrelated semantics, so naively emitting `${...}`
 //!  | unescaped would risk Typst trying (and failing) to parse it as its
@@ -23,7 +23,7 @@
 //!  | necessity -- there is nowhere to put the dropped `args`/`kind`
 //!  | metadata except that comment.
 //! -| `escape_text` only escapes markup-sensitive characters that Typst
-//!  | recognizes anywhere in a line (`*_`` `#$<>@[]~\`); it does not guard
+//!  | recognizes anywhere in a line (`*_#$<>@[]~\` and `\``); it does not guard
 //!  | against `=`/`-`/`+`/`/` at the very start of a line being
 //!  | misinterpreted as heading/list/term-list syntax -- a known gap, not
 //!  | yet hit by any of this crate's own tests.

@@ -286,22 +286,32 @@ fn a_line_raw_breaks_the_paragraph_before_it_and_not_a_fence_after_it() {
 }
 
 #[test]
-fn two_backticks_inside_a_line_are_still_an_inline_raw() {
-    let doc = parse_file("a ``b`c`` d\n").unwrap();
+fn inline_raw_is_single_backtick_only_and_backtick_runs_can_be_escaped() {
+    let doc = parse_file("a `code` and \\`literal\\` d\n").unwrap();
     let [Block::Paragraph(p)] = doc.body.as_slice() else {
         panic!()
     };
-    assert!(
-        p.content
-            .iter()
-            .any(|i| matches!(i, Inline::Element(el) if el.name == Name::bare("raw")))
-    );
-    // And in a `[content]`, where it is the first thing after the bracket.
-    let doc = parse_file("@x[ ``b`c`` ]\n").unwrap();
-    let Block::Element(el) = &doc.body[0] else {
-        panic!()
-    };
-    assert!(matches!(el.content.as_deref(), Some([Block::Paragraph(_)])));
+    assert_eq!(p.content.len(), 3);
+    assert_eq!(p.content[0], Inline::Text("a ".into()));
+    match &p.content[1] {
+        Inline::Element(el) => {
+            assert_eq!(el.name, Name::bare("raw"));
+            assert_eq!(el.content, wrap(vec![Inline::Raw("code".into())]));
+        }
+        other => panic!("expected raw element, got {other:?}"),
+    }
+    assert_eq!(p.content[2], Inline::Text(" and `literal` d".into()));
+
+    // Escaped `` and ``` at the start of a line become literal paragraph text.
+    let doc = parse_file("\\`` not line raw\n\n\\```rust\n").unwrap();
+    assert_eq!(doc.body.len(), 2);
+    match (&doc.body[0], &doc.body[1]) {
+        (Block::Paragraph(a), Block::Paragraph(b)) => {
+            assert_eq!(a.content, vec![Inline::Text("`` not line raw".into())]);
+            assert_eq!(b.content, vec![Inline::Text("```rust".into())]);
+        }
+        other => panic!("expected two paragraphs, got {other:?}"),
+    }
 }
 
 #[test]

@@ -842,6 +842,10 @@
       "members": [
         {
           "type": "SYMBOL",
+          "name": "escape"
+        },
+        {
+          "type": "SYMBOL",
           "name": "text"
         },
         {
@@ -889,6 +893,10 @@
     "_first_line_item": {
       "type": "CHOICE",
       "members": [
+        {
+          "type": "SYMBOL",
+          "name": "escape"
+        },
         {
           "type": "SYMBOL",
           "name": "text"
@@ -953,9 +961,20 @@
         }
       ]
     },
+    "escape": {
+      "type": "TOKEN",
+      "content": {
+        "type": "PREC",
+        "value": 2,
+        "content": {
+          "type": "PATTERN",
+          "value": "\\\\(\\\\|!+|\"+|#+|\\$+|%+|\\&+|'+|\\(+|\\)+|\\*+|\\++|,+|-+|\\.+|\\/+|:+|;+|<+|=+|>+|\\?+|@+|\\[+|\\]+|\\^+|_+|\\`+|\\{+|\\|+|\\}+|~+)"
+        }
+      }
+    },
     "text": {
       "type": "PATTERN",
-      "value": "[^\\n`*_=~<@$#:()\\[{\\]/|;-]+"
+      "value": "[^\\n\\\\`*_=~<@$#:()\\[{\\]/|;-]+"
     },
     "punctuation": {
       "type": "CHOICE",
@@ -996,12 +1015,20 @@
         {
           "type": "STRING",
           "value": "="
+        },
+        {
+          "type": "STRING",
+          "value": "\\"
+        },
+        {
+          "type": "PATTERN",
+          "value": "`+"
         }
       ]
     },
     "code_span": {
       "type": "PATTERN",
-      "value": "`[^`\\n]*`"
+      "value": "`[^`\\n]+`"
     },
     "emphasis": {
       "type": "CHOICE",
@@ -1118,6 +1145,10 @@
       "members": [
         {
           "type": "SYMBOL",
+          "name": "escape"
+        },
+        {
+          "type": "SYMBOL",
           "name": "code_span"
         },
         {
@@ -1156,7 +1187,7 @@
           "type": "ALIAS",
           "content": {
             "type": "PATTERN",
-            "value": "[^\\n`*=~<@$()\\[{\\]/|]+"
+            "value": "[^\\n\\\\`*=~<@$()\\[{\\]/|]+"
           },
           "named": true,
           "value": "text"
@@ -1168,6 +1199,10 @@
       "members": [
         {
           "type": "SYMBOL",
+          "name": "escape"
+        },
+        {
+          "type": "SYMBOL",
           "name": "code_span"
         },
         {
@@ -1206,7 +1241,7 @@
           "type": "ALIAS",
           "content": {
             "type": "PATTERN",
-            "value": "[^\\n`_=~<@$()\\[{\\]/|]+"
+            "value": "[^\\n\\\\`_=~<@$()\\[{\\]/|]+"
           },
           "named": true,
           "value": "text"
@@ -1216,6 +1251,10 @@
     "_bracket_item_no_tilde": {
       "type": "CHOICE",
       "members": [
+        {
+          "type": "SYMBOL",
+          "name": "escape"
+        },
         {
           "type": "SYMBOL",
           "name": "code_span"
@@ -1260,7 +1299,7 @@
           "type": "ALIAS",
           "content": {
             "type": "PATTERN",
-            "value": "[^\\n`*_=~<@$()\\[{\\]/|]+"
+            "value": "[^\\n\\\\`*_=~<@$()\\[{\\]/|]+"
           },
           "named": true,
           "value": "text"

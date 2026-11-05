@@ -58,7 +58,8 @@ use tomet_cst::{GreenNodeBuilder, SyntaxKind, SyntaxNode};
 use tomet_lexer::{Cursor, tokenize};
 
 use crate::inline::{
-    DELIMITERS, DelimiterIndex, autolink_end, autolink_scheme_at, delimited_probe, is_boundary,
+    DELIMITERS, DelimiterIndex, autolink_end, autolink_scheme_at, delimited_probe,
+    escaped_run_len, is_boundary,
 };
 use crate::tail::TailScan;
 
@@ -776,6 +777,15 @@ impl<'a, 't> CstParser<'a, 't> {
                     continue;
                 }
             }
+            if j > i
+                && let Some(len) = escaped_run_len(self.src.as_bytes(), self.start_of(j))
+            {
+                let end = self.start_of(j) + len;
+                while self.start_of(j) < end {
+                    j += 1;
+                }
+                continue;
+            }
             if k == open {
                 depth += 1;
             } else if k == close {
@@ -1112,7 +1122,7 @@ impl<'a, 't> CstParser<'a, 't> {
     }
 
     /// A fence (three backticks or more), or, at the start of a line, a line raw
-    /// (exactly two). In the middle of a line ``` ``x`` ``` is inline raw.
+    /// (exactly two). A single backtick is an inline code span.
     fn is_code_block_start_at(&self, i: usize) -> bool {
         match self.run_len(i, K::BACKTICK) {
             0 | 1 => false,
@@ -1636,6 +1646,7 @@ fn is_valid_tail_group_list(groups: &[SyntaxNode]) -> bool {
             K::LIST
             | K::INLINE_FORM
             | K::SLOT
+            | K::ESCAPE
             | K::EMPHASIS
             | K::STRONG
             | K::STRIKEOUT
@@ -2214,11 +2225,11 @@ impl<'a, 't> CstParser<'a, 't> {
                 }
                 _ => {}
             }
-            if !(self.try_parse_code_span()
+            if !(self.try_parse_escape()
+                || self.try_parse_code_span()
                 || self.try_parse_autolink(stop)
                 || self.try_parse_inline_form()
-                || self.try_parse_delimited()
-                || self.try_parse_escaped_semi())
+                || self.try_parse_delimited())
             {
                 if self.current_kind() == Some(K::QUOTE) {
                     self.bump_as(K::TEXT_CHUNK);
@@ -2229,35 +2240,19 @@ impl<'a, 't> CstParser<'a, 't> {
         }
     }
 
-    fn is_at_escaped_semi(&self) -> bool {
-        if self.current_kind() != Some(K::TEXT_CHUNK) {
+    fn try_parse_escape(&mut self) -> bool {
+        let start = self.start_of(self.pos);
+        let Some(len) = escaped_run_len(self.src.as_bytes(), start) else {
             return false;
-        }
-        if self.tokens.get(self.pos).map(|(_, t)| *t) != Some("\\") {
-            return false;
-        }
-        if self.kind_at(self.pos + 1) != Some(K::SEMI) {
-            return false;
-        }
-        let mut p = self.pos;
-        while p > 0 {
-            p -= 1;
-            match self.kind_at(p) {
-                Some(K::WHITESPACE | K::MARGIN) => continue,
-                Some(K::NEWLINE) => break,
-                _ => return false,
+        };
+        let end = start + len;
+        self.builder.start_node(K::ESCAPE.into());
+        while self.start_of(self.pos) < end && !self.is_eof() {
+            if let Some(&(kind, text)) = self.tokens.get(self.pos) {
+                self.builder.token(kind.into(), text);
+                self.pos += 1;
             }
         }
-        true
-    }
-
-    fn try_parse_escaped_semi(&mut self) -> bool {
-        if !self.is_at_escaped_semi() {
-            return false;
-        }
-        self.builder.start_node(K::ESCAPE.into());
-        self.bump();
-        self.bump();
         self.builder.finish_node();
         true
     }
@@ -2334,46 +2329,31 @@ impl<'a, 't> CstParser<'a, 't> {
         }
     }
 
-    /// `` `code` `` at the cursor: a run of backticks, then the first run of
-    /// the same length on the same line. What stands between is code, read as
-    /// nothing else -- the tokenizer's idea of a comment or a string included.
+    /// `` `code` `` at the cursor: a single backtick, then the next backtick on
+    /// the same line with at least one character between them. What stands
+    /// between is code, read as nothing else -- the tokenizer's idea of a
+    /// comment or a string included.
     fn try_parse_code_span(&mut self) -> bool {
         if self.current_kind() != Some(K::BACKTICK) {
             return false;
         }
         let bytes = self.src.as_bytes();
         let start = self.start_of(self.pos);
-        let fence = bytes[start..].iter().take_while(|&&b| b == b'`').count();
-        let inner_start = start + fence;
+        let inner_start = start + 1;
         let mut i = inner_start;
-        let mut inner_end = None;
-        while i < bytes.len() {
-            match bytes[i] {
-                b'\n' | b'\r' => break,
-                b'`' => {
-                    let run = bytes[i..].iter().take_while(|&&b| b == b'`').count();
-                    if run == fence {
-                        inner_end = Some(i);
-                        break;
-                    }
-                    i += run;
-                }
-                _ => i += 1,
-            }
+        while i < bytes.len() && !matches!(bytes[i], b'\n' | b'\r' | b'`') {
+            i += 1;
         }
-        let Some(inner_end) = inner_end else {
+        if i == inner_start || bytes.get(i) != Some(&b'`') {
             return false;
-        };
-        self.builder.start_node(K::CODE_SPAN.into());
-        while self.start_of(self.pos) < inner_start {
-            self.bump_as(K::BACKTICK);
         }
+        let inner_end = i;
+        self.builder.start_node(K::CODE_SPAN.into());
+        self.bump_as(K::BACKTICK);
         while self.start_of(self.pos) < inner_end {
             self.bump_as(K::TEXT_CHUNK);
         }
-        while self.start_of(self.pos) < inner_end + fence && !self.is_eof() {
-            self.bump_as(K::BACKTICK);
-        }
+        self.bump_as(K::BACKTICK);
         self.builder.finish_node();
         true
     }

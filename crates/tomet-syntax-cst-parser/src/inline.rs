@@ -22,6 +22,23 @@ pub fn is_boundary(c: Option<char>) -> bool {
     matches!(c, None | Some(' ') | Some('\t') | Some('\n') | Some('\r'))
 }
 
+/// If `bytes[at..]` starts with a `\` escape in running text, returns its byte length:
+/// `2` for `\\`, or `1 + run` for `\` followed by a run of the same ASCII punctuation byte.
+pub fn escaped_run_len(bytes: &[u8], at: usize) -> Option<usize> {
+    if bytes.get(at) != Some(&b'\\') {
+        return None;
+    }
+    let &next = bytes.get(at + 1)?;
+    if !next.is_ascii_punctuation() {
+        return None;
+    }
+    if next == b'\\' {
+        return Some(2);
+    }
+    let run = bytes[at + 1..].iter().take_while(|&&b| b == next).count();
+    Some(1 + run)
+}
+
 /// Where a delimiter could close a span, and where a paragraph ends, found once for a text.
 ///
 /// Whether an opener has a closer is then a lookup. It used to be a scan to the end of the paragraph
@@ -53,14 +70,23 @@ impl DelimiterIndex {
                 paragraph_ends.push(i);
             }
         }
-        let closers = std::array::from_fn(|d| {
-            let (delim, _) = DELIMITERS[d];
-            let delim = delim.as_bytes();
-            (0..bytes.len())
-                .filter(|&q| bytes[q..].starts_with(delim))
-                .filter(|&q| delim == b"~~" || (q > 0 && !blank(bytes[q - 1])))
-                .collect()
-        });
+        let mut closers: [Vec<usize>; DELIMITERS.len()] = Default::default();
+        let mut q = 0;
+        while q < bytes.len() {
+            if let Some(len) = escaped_run_len(bytes, q) {
+                q += len;
+                continue;
+            }
+            for (d, (delim, _)) in DELIMITERS.iter().enumerate() {
+                let delim = delim.as_bytes();
+                if bytes[q..].starts_with(delim)
+                    && (delim == b"~~" || (q > 0 && !blank(bytes[q - 1])))
+                {
+                    closers[d].push(q);
+                }
+            }
+            q += 1;
+        }
         Self {
             paragraph_ends,
             closers,
@@ -77,7 +103,7 @@ impl DelimiterIndex {
             .unwrap_or(usize::MAX);
         let closers = &self.closers[d];
         closers
-            .get(closers.partition_point(|&q| q < open_end))
+            .get(closers.partition_point(|&q| q <= open_end))
             .is_some_and(|&q| q < limit)
     }
 }
@@ -94,7 +120,10 @@ pub fn delimited_probe(cur: &Cursor, delim: &str, index: &DelimiterIndex) -> boo
     }
     let mut open = *cur;
     open.eat_str(delim);
-    if is_boundary(open.peek()) {
+    let delim_char = delim.chars().next().unwrap();
+    let mut after_run = open;
+    after_run.eat_while(|c| c == delim_char);
+    if is_boundary(after_run.peek()) {
         return false;
     }
     let d = DELIMITERS

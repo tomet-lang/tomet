@@ -5,7 +5,7 @@
 //! [`merge`] produces a single valid `.tmt` document that combines both
 //! sets of changes where they do not overlap, and embeds `@conflict`
 //! markers where they do, while preserving untouched formatting, heading
-//! padding, blank lines, inline sugar (`*italic*`, `**bold**`, `` `code` ``),
+//! padding, blank lines, inline sugar (`*italic*`, `**bold**`, \`code\`),
 //! comments (`//`, `/* */`), `{ ... }` brace spacing, and fenced code blocks
 //! byte-for-byte.
 //!

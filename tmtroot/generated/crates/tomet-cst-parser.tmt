@@ -121,6 +121,11 @@ length.
 
 ====[fn is_boundary]
 
+====[fn escaped_run_len]
+
+If `bytes[at..]` starts with a `\` escape in running text, returns its byte length:
+`2` for `\\`, or `1 + run` for `\` followed by a run of the same ASCII punctuation byte.
+
 ====[fn delimited_probe]
 
 Whether `delim` opens a span at `cur`: it stands there, is not the middle

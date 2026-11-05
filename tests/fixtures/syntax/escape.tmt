@@ -1,0 +1,23 @@
+// \ before ASCII punctuation escapes the contiguous run of that same character.
+// \\ escapes a single backslash without escaping what follows it.
+
+\*not em\* and \**not strong\** and \`not code\` and `real code`
+
+text \// not comment and \/* not comment */
+
+\@name(x) and \${x} and \<?slot> and \\*em*
+
+// Line-start constructs become paragraph text when escaped.
+\; not break
+\= not section
+\---
+\- not list
+\`` not line raw
+\``` not fence
+\::decl(x)
+
+// Escaped brackets inside [content] do not open or close the group.
+@callout[ a \[ b \] c ]
+
+// \ before non-punctuation stays a literal backslash.
+C:\Users\name and a\b

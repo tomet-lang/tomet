@@ -176,6 +176,10 @@
           "named": true
         },
         {
+          "type": "escape",
+          "named": true
+        },
+        {
           "type": "hole",
           "named": true
         },
@@ -341,6 +345,10 @@
         },
         {
           "type": "element",
+          "named": true
+        },
+        {
+          "type": "escape",
           "named": true
         },
         {
@@ -1152,6 +1160,10 @@
           "named": true
         },
         {
+          "type": "escape",
+          "named": true
+        },
+        {
           "type": "hole",
           "named": true
         },
@@ -1257,6 +1269,10 @@
           "named": true
         },
         {
+          "type": "escape",
+          "named": true
+        },
+        {
           "type": "hole",
           "named": true
         },
@@ -1309,6 +1325,10 @@
         },
         {
           "type": "emphasis",
+          "named": true
+        },
+        {
+          "type": "escape",
           "named": true
         },
         {
@@ -1407,6 +1427,10 @@
             "named": true
           },
           {
+            "type": "escape",
+            "named": true
+          },
+          {
             "type": "hole",
             "named": true
           },
@@ -1502,6 +1526,10 @@
           "named": true
         },
         {
+          "type": "escape",
+          "named": true
+        },
+        {
           "type": "hole",
           "named": true
         },
@@ -1551,6 +1579,10 @@
         },
         {
           "type": "element",
+          "named": true
+        },
+        {
+          "type": "escape",
           "named": true
         },
         {
@@ -1617,6 +1649,10 @@
           },
           {
             "type": "emphasis",
+            "named": true
+          },
+          {
+            "type": "escape",
             "named": true
           },
           {
@@ -1733,6 +1769,10 @@
         },
         {
           "type": "emphasis",
+          "named": true
+        },
+        {
+          "type": "escape",
           "named": true
         },
         {
@@ -1913,6 +1953,10 @@
     "named": false
   },
   {
+    "type": "\\",
+    "named": false
+  },
+  {
     "type": "]",
     "named": false
   },
@@ -1930,6 +1974,10 @@
   },
   {
     "type": "code_span",
+    "named": true
+  },
+  {
+    "type": "escape",
     "named": true
   },
   {

@@ -58,7 +58,7 @@
 - x コメントアウト
 - x 公式構文 (`#settings`, `#config`, `#meta`, `#references`)
 - x 基本構文 (空白可, 改行可, 順不同)
-- x 基本Markdown記法 (`*`, `**`, `==`, `__`, ``)
+- x 基本Markdown記法 (`*`, `**`, `==`, `__`, @raw[])
 - x 基本要素 (heading, list, horizontal line)
 - x 名前 (element, arg, content, value)
 - x 基本AST (`@T()[]{}`)

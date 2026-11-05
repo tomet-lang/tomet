@@ -1,0 +1,434 @@
+{
+  "pandoc-api-version": [
+    1,
+    23,
+    1
+  ],
+  "meta": {},
+  "blocks": [
+    {
+      "t": "Para",
+      "c": [
+        {
+          "t": "Str",
+          "c": "*not"
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Str",
+          "c": "em*"
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Str",
+          "c": "and"
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Str",
+          "c": "**not"
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Str",
+          "c": "strong**"
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Str",
+          "c": "and"
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Code",
+          "c": [
+            [
+              "",
+              [],
+              []
+            ],
+            "not code"
+          ]
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Str",
+          "c": "and"
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Code",
+          "c": [
+            [
+              "",
+              [],
+              []
+            ],
+            "real code"
+          ]
+        }
+      ]
+    },
+    {
+      "t": "Para",
+      "c": [
+        {
+          "t": "Str",
+          "c": "text"
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Str",
+          "c": "//"
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Str",
+          "c": "not"
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Str",
+          "c": "comment"
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Str",
+          "c": "and"
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Str",
+          "c": "/*"
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Str",
+          "c": "not"
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Str",
+          "c": "comment"
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Str",
+          "c": "*/"
+        }
+      ]
+    },
+    {
+      "t": "Para",
+      "c": [
+        {
+          "t": "Str",
+          "c": "@name(x)"
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Str",
+          "c": "and"
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Str",
+          "c": "${x}"
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Str",
+          "c": "and"
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Str",
+          "c": "<?slot>"
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Str",
+          "c": "and"
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Str",
+          "c": "\\"
+        },
+        {
+          "t": "Emph",
+          "c": [
+            {
+              "t": "Str",
+              "c": "em"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "t": "Para",
+      "c": [
+        {
+          "t": "Str",
+          "c": ";"
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Str",
+          "c": "not"
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Str",
+          "c": "break"
+        },
+        {
+          "t": "SoftBreak"
+        },
+        {
+          "t": "Str",
+          "c": "="
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Str",
+          "c": "not"
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Str",
+          "c": "section"
+        },
+        {
+          "t": "SoftBreak"
+        },
+        {
+          "t": "Str",
+          "c": "---"
+        },
+        {
+          "t": "SoftBreak"
+        },
+        {
+          "t": "Str",
+          "c": "-"
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Str",
+          "c": "not"
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Str",
+          "c": "list"
+        },
+        {
+          "t": "SoftBreak"
+        },
+        {
+          "t": "Code",
+          "c": [
+            [
+              "",
+              [],
+              []
+            ],
+            ""
+          ]
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Str",
+          "c": "not"
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Str",
+          "c": "line"
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Str",
+          "c": "raw"
+        },
+        {
+          "t": "SoftBreak"
+        },
+        {
+          "t": "Code",
+          "c": [
+            [
+              "",
+              [],
+              []
+            ],
+            ""
+          ]
+        },
+        {
+          "t": "Str",
+          "c": "`"
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Str",
+          "c": "not"
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Str",
+          "c": "fence"
+        },
+        {
+          "t": "SoftBreak"
+        },
+        {
+          "t": "Str",
+          "c": "::decl(x)"
+        }
+      ]
+    },
+    {
+      "t": "Div",
+      "c": [
+        [
+          "",
+          [
+            "tomet-callout"
+          ],
+          []
+        ],
+        [
+          {
+            "t": "Para",
+            "c": [
+              {
+                "t": "Str",
+                "c": "a"
+              },
+              {
+                "t": "Space"
+              },
+              {
+                "t": "Str",
+                "c": "["
+              },
+              {
+                "t": "Space"
+              },
+              {
+                "t": "Str",
+                "c": "b"
+              },
+              {
+                "t": "Space"
+              },
+              {
+                "t": "Str",
+                "c": "]"
+              },
+              {
+                "t": "Space"
+              },
+              {
+                "t": "Str",
+                "c": "c"
+              }
+            ]
+          }
+        ]
+      ]
+    },
+    {
+      "t": "Para",
+      "c": [
+        {
+          "t": "Str",
+          "c": "C:\\Users\\name"
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Str",
+          "c": "and"
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Str",
+          "c": "a\\b"
+        }
+      ]
+    }
+  ]
+}
