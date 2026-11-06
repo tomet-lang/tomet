@@ -10,14 +10,17 @@
 //! `tomet-load`'s own `Vault::discover` calls [`find_config_file`]
 //! directly rather than duplicating the walk.
 //!
-//! =[ The three layers ]
+//! =[ The layers ]
 //!
-//! Configuration is a stack of three kinds of file, outermost first:
+//! Configuration is a stack of files, outermost first:
 //!
 //! - (vault) [`VAULT_CONFIG_FILE`]: the vault boundary -- a vault is the
 //!   directory holding it -- and the vault-only settings.
-//! - (folder) [`FOLDER_CONFIG_FILE`]: applies to its folder and below, stacked
-//!   from the vault root down to the document.
+//! - (folder) the Folder's entry file, in each directory from the vault root down to the
+//!   document: its leading `::` declarations apply to its folder and below. The entry file is an
+//!   ordinary document that is also a layer; its name is the vault's to choose
+//!   ([`WorkspaceConfig::folder_entry`](tomet_config::WorkspaceConfig::folder_entry),
+//!   `::workspace{ folder: { entry: ... } }`) and is not a constant of this crate.
 //! - (document) the document's own declarations (`::format`, `::fields`, `::macros`, ...), applied
 //!   by [`config_for`].
 //!
@@ -27,15 +30,21 @@
 //! write (`DeclKind::is_vault_only`: `::workspace`) has no effect in a folder or a document
 //! layer; `tomet check` reports it.
 //!
-//! These two names are the only ones. Every user of them, in code and in
-//! tests, refers to the constants here rather than spelling them.
+//! The walk is not circular because the vault comes first: the vault config is found by its fixed
+//! name, it alone names the entry file, and only then are the folder layers read. Since no other
+//! layer may set the name, one name holds for the whole walk.
+//!
+//! Every user of [`VAULT_CONFIG_FILE`], in code and in tests, refers to the constant here rather
+//! than spelling it.
 //!
 //! Why these names. `vault`, and not `repo`, `root`, `global` or `default`: a vault can be a
 //! subdirectory of a repository (`repo` would lie), `root` collides with `root:` keys, `global`
 //! reads as a per-user layer, and `default` claims the bottom of the stack although it sits above
-//! the built-in defaults. The file is the marker, so no `root: true` key is needed. `.config.tmt`
-//! mirrors `.writ.tmt`: the same name at every level, a dotfile because it is scattered. Any other
-//! `xxx.config.tmt` is left free for other applications.
+//! the built-in defaults. The file is the marker, so no `root: true` key is needed. Any other
+//! `xxx.config.tmt` is left free for other applications. The vault config keeps its own fixed name
+//! because it has to be found before anything can be read from it; a Folder's entry file is a
+//! document of the Folder itself, so its name is a vault setting, with `self.tmt` as the
+//! default.
 
 use std::path::{Path, PathBuf};
 
@@ -43,9 +52,6 @@ use tomet_config::{Config, ConfigError, ConfigLayer};
 
 /// The vault config: the file whose directory is the vault.
 pub const VAULT_CONFIG_FILE: &str = "vault.config.tmt";
-
-/// A folder config: stacked over the vault config for its folder and below.
-pub const FOLDER_CONFIG_FILE: &str = ".config.tmt";
 
 /// The layers governing a path, outermost first, with where the vault is.
 struct Stack {
@@ -64,7 +70,7 @@ fn read_layer(path: &Path) -> ConfigLayer {
         .unwrap_or_default()
 }
 
-/// A folder (or document) layer may not set what only the vault sets.
+/// A folder layer (a Folder's entry file) or a document layer may not set what only the vault sets.
 fn read_folder_layer(path: &Path) -> ConfigLayer {
     let mut layer = read_layer(path);
     layer.strip_vault_only();
@@ -91,12 +97,18 @@ fn find_stack(start: &Path) -> Option<Stack> {
 
     let vault_root = dirs.last()?.clone();
     let vault_file = vault_root.join(VAULT_CONFIG_FILE);
+    // Only the vault config names the entry file, so it is read before any folder layer.
+    let vault_layer = read_layer(&vault_file);
+    let entry = Config::from_layers([&vault_layer])
+        .workspace
+        .folder_entry()
+        .to_string();
     let mut layers = Vec::new();
     for dir in dirs.iter().rev() {
         if *dir == vault_root {
-            layers.push(read_layer(&vault_file));
+            layers.push(vault_layer.clone());
         }
-        let folder = dir.join(FOLDER_CONFIG_FILE);
+        let folder = dir.join(&entry);
         if folder.is_file() {
             layers.push(read_folder_layer(&folder));
         }
@@ -117,7 +129,7 @@ fn find_stack(start: &Path) -> Option<Stack> {
 /// parent directories for the nearest [`VAULT_CONFIG_FILE`].
 ///
 /// Returns `(Config, vault_config_path, vault_directory_path)`. The `Config` is
-/// the vault config with every [`FOLDER_CONFIG_FILE`] between the vault root and
+/// the vault config with every Folder entry file between the vault root and
 /// `start` laid over it; the document's own declarations are not part of it (that
 /// is [`config_for`]'s).
 pub fn find_config_file(start: &Path) -> Option<(Config, PathBuf, PathBuf)> {
@@ -232,11 +244,11 @@ mod tests {
             "::format{ table: { max_col_width: 50 }, link: { no_space: true } }\n::macros{ m: \"vault\", v: \"vault\" }\n",
         );
         dir.write(
-            "a/.config.tmt",
+            "a/self.tmt",
             "::format{ table: { max_col_width: 60 } }\n::macros{ m: \"outer\" }\n",
         );
         dir.write(
-            "a/b/.config.tmt",
+            "a/b/self.tmt",
             "::format{ table: { max_col_width: 70 } }\n::macros{ m: \"inner\" }\n",
         );
         let deep = dir.write("a/b/note.tmt", "");
@@ -263,13 +275,78 @@ mod tests {
             VAULT_CONFIG_FILE,
             "::format{ table: { max_col_width: 50 } }\n",
         );
-        dir.write(
-            FOLDER_CONFIG_FILE,
-            "::format{ table: { max_col_width: 90 } }\n",
-        );
+        dir.write("self.tmt", "::format{ table: { max_col_width: 90 } }\n");
         let note = dir.write("note.tmt", "");
         let (cfg, _, _) = find_config_file(&note).unwrap();
         assert_eq!(cfg.format.table_max_col_width, Some(90));
+    }
+
+    #[test]
+    fn a_folder_entry_file_is_an_ordinary_document_that_is_also_a_layer() {
+        let dir = Dir::new("entry_document");
+        dir.write(VAULT_CONFIG_FILE, "::format{ link: { no_space: true } }\n");
+        let entry = dir.write(
+            "a/self.tmt",
+            "::format{ table: { max_col_width: 60 } }\n\n=[ Folder A ]\n\nIts own body.\n",
+        );
+        let (cfg, _, _) = find_config_file(&entry).unwrap();
+        assert_eq!(cfg.format.table_max_col_width, Some(60));
+        assert!(cfg.format.link_no_space);
+    }
+
+    #[test]
+    fn the_vault_names_the_entry_file() {
+        let dir = Dir::new("entry_custom");
+        dir.write(
+            VAULT_CONFIG_FILE,
+            "::workspace{ folder: { entry: index.tmt } }\n::format{ table: { max_col_width: 50 } }\n",
+        );
+        dir.write("a/index.tmt", "::format{ table: { max_col_width: 61 } }\n");
+        dir.write("b/self.tmt", "::format{ table: { max_col_width: 62 } }\n");
+        let named = dir.write("a/note.tmt", "");
+        let default_name = dir.write("b/note.tmt", "");
+        let (cfg, _, _) = find_config_file(&named).unwrap();
+        assert_eq!(cfg.format.table_max_col_width, Some(61));
+        assert_eq!(cfg.workspace.folder_entry(), "index.tmt");
+        let (cfg, _, _) = find_config_file(&default_name).unwrap();
+        assert_eq!(
+            cfg.format.table_max_col_width,
+            Some(50),
+            "`self.tmt` is an ordinary file when the vault names another entry"
+        );
+    }
+
+    #[test]
+    fn a_folder_cannot_rename_the_entry_file() {
+        let dir = Dir::new("entry_folder_rename");
+        dir.write(VAULT_CONFIG_FILE, "::kind(config)\n");
+        dir.write(
+            "a/self.tmt",
+            "::workspace{ folder: { entry: other.tmt } }\n::format{ table: { max_col_width: 61 } }\n",
+        );
+        dir.write(
+            "a/b/other.tmt",
+            "::format{ table: { max_col_width: 99 } }\n",
+        );
+        dir.write("a/b/self.tmt", "::format{ table: { max_col_width: 62 } }\n");
+        let note = dir.write("a/b/note.tmt", "");
+        let (cfg, _, _) = find_config_file(&note).unwrap();
+        assert_eq!(cfg.workspace.folder_entry(), "self.tmt");
+        assert_eq!(cfg.format.table_max_col_width, Some(62));
+    }
+
+    #[test]
+    fn an_entry_name_that_is_not_a_file_name_is_not_obeyed() {
+        let dir = Dir::new("entry_invalid");
+        dir.write(
+            VAULT_CONFIG_FILE,
+            "::workspace{ folder: { entry: \"../self.tmt\" } }\n",
+        );
+        dir.write("a/self.tmt", "::format{ table: { max_col_width: 61 } }\n");
+        let note = dir.write("a/note.tmt", "");
+        let (cfg, _, _) = find_config_file(&note).unwrap();
+        assert_eq!(cfg.workspace.folder_entry(), "self.tmt");
+        assert_eq!(cfg.format.table_max_col_width, Some(61));
     }
 
     #[test]
@@ -295,7 +372,7 @@ mod tests {
             "::workspace{ ignore: list(\"target\") }\n",
         );
         dir.write(
-            "a/.config.tmt",
+            "a/self.tmt",
             "::workspace{ ignore: list(\"elsewhere\") }\n::format{ link: { no_space: true } }\n",
         );
         let note = dir.write("a/note.tmt", "");

@@ -65,8 +65,15 @@ impl Vault {
         // What only the vault config may set has no effect anywhere else. This
         // is the one check that needs the path: the validator cannot tell a
         // vault config from any other document by what is in it.
-        if !may_set_vault_only(path, doc) {
+        if !may_set_vault_only(path, doc, self.config.workspace.folder_entry()) {
             tomet_validator::check_vault_only_declarations(doc, &mut diagnostics);
+        }
+
+        // The vault config names the Folder entry file, and what it names must be a file name.
+        if path.file_name().and_then(|name| name.to_str())
+            == Some(tomet_load_config::VAULT_CONFIG_FILE)
+        {
+            diagnostics.extend(folder_entry_problem(doc));
         }
 
         diagnostics.extend(self.registry_name_mismatches(doc));
@@ -99,16 +106,33 @@ impl Vault {
 ///
 /// The vault config may. So may a config document that is not a layer of any
 /// stack -- a sample or a template under another name -- because nothing reads it,
-/// so there is nothing for the setting to fail to affect. A folder config
-/// ([`tomet_load_config::FOLDER_CONFIG_FILE`]) and an ordinary document are the
-/// layers it would be wrongly written in.
-fn may_set_vault_only(path: &Path, doc: &File) -> bool {
+/// so there is nothing for the setting to fail to affect. A Folder's entry file
+/// (named `entry`, see [`tomet_config::WorkspaceConfig::folder_entry`]) and an
+/// ordinary document are the layers it would be wrongly written in.
+fn may_set_vault_only(path: &Path, doc: &File, entry: &str) -> bool {
     let name = path.file_name().and_then(|name| name.to_str());
     if name == Some(tomet_load_config::VAULT_CONFIG_FILE) {
         return true;
     }
-    name != Some(tomet_load_config::FOLDER_CONFIG_FILE)
-        && tomet_declaration::document_kind(doc).as_deref() == Some("config")
+    name != Some(entry) && tomet_declaration::document_kind(doc).as_deref() == Some("config")
+}
+
+/// The report on `workspace.folder.entry` in the vault config `doc`, when it is not a bare file
+/// name. Read off `doc` itself, not the vault's loaded config: the text may be an unsaved edit.
+fn folder_entry_problem(doc: &File) -> Option<tomet_validator::Diagnostic> {
+    let reason = tomet_config::Config::from_doc(doc)
+        .workspace
+        .folder_entry_problem()?;
+    let span = tomet_declaration::declarations(doc)
+        .into_iter()
+        .find(|found| found.kind == tomet_declaration::DeclKind::Workspace)?
+        .span;
+    Some(tomet_validator::Diagnostic::InvalidDefinition {
+        declaration: "workspace",
+        name: "folder.entry".to_string(),
+        reason: reason.to_string(),
+        span,
+    })
 }
 
 impl Vault {

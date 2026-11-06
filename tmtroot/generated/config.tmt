@@ -40,6 +40,7 @@ Workspace-level configuration for vault indexing and file discovery.
 
 - `workspace.ignore` (list(string)): Paths that are not part of this vault (neither swept nor resolvable). Aliases: `ignore.files`.
 - `workspace.unswept` (list(string)): Paths that are in the vault and left alone (e.g. `tests/fixtures` frozen test corpus).
+- `workspace.folder.entry` (string, default: `self.tmt`): The file name of a Folder's entry file: the file in a directory whose leading `::` declarations are that Folder's own settings, laid over the vault config for the Folder and below. One name for the whole vault, so only the vault config sets it. A bare file name: not empty, no path separator, not `.` or `..`.
 
 ==[ registry ]
 

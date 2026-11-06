@@ -552,6 +552,7 @@ mod unswept_tests {
             workspace: tomet_config::WorkspaceConfig {
                 ignore: ignore.iter().map(|s| s.to_string()).collect(),
                 unswept: unswept.iter().map(|s| s.to_string()).collect(),
+                ..Default::default()
             },
             ..PrinterConfig::default()
         }

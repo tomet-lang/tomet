@@ -544,8 +544,8 @@ mod tests {
             "tomet_test_load_vault_only",
             &[
                 (
-                    "a/.config.tmt",
-                    "::kind(config)\n::workspace{ ignore: list(\"x\") }\n",
+                    "a/self.tmt",
+                    "::kind(config)\n::workspace{ ignore: list(\"x\") }\n\n=[ A ]\n",
                 ),
                 ("note.tmt", "::workspace{ unswept: list(\"y\") }\n\nbody\n"),
             ],
@@ -561,7 +561,7 @@ mod tests {
             })
         };
 
-        for rel in ["a/.config.tmt", "note.tmt"] {
+        for rel in ["a/self.tmt", "note.tmt"] {
             let findings = findings_of(&root.join(rel));
             assert!(reported(&findings), "{rel}: {:?}", findings.diagnostics);
             assert!(findings.has_errors(), "{rel}");
@@ -580,6 +580,71 @@ mod tests {
         let vault_file = root.join(tomet_load_config::VAULT_CONFIG_FILE);
         fs::write(&vault_file, "::workspace{ ignore: list(\"x\") }\n").unwrap();
         assert!(!reported(&findings_of(&vault_file)));
+    }
+
+    #[test]
+    fn the_entry_file_is_the_one_the_vault_names() {
+        let root = include_vault(
+            "tomet_test_load_entry_named",
+            &[
+                (
+                    "a/index.tmt",
+                    "::kind(config)\n::workspace{ ignore: list(\"x\") }\n",
+                ),
+                (
+                    "a/self.tmt",
+                    "::kind(config)\n::workspace{ ignore: list(\"x\") }\n",
+                ),
+            ],
+        );
+        let vault_file = root.join(tomet_load_config::VAULT_CONFIG_FILE);
+        fs::write(&vault_file, "::workspace{ folder: { entry: index.tmt } }\n").unwrap();
+        let vault = Vault::discover(&root);
+        let reported = |rel: &str| {
+            let path = root.join(rel);
+            let doc = tomet_ast_parser::parse_file(&fs::read_to_string(&path).unwrap()).unwrap();
+            vault
+                .findings(&path, &doc)
+                .diagnostics
+                .iter()
+                .any(|d| matches!(d, tomet_validator::Diagnostic::VaultOnlyDeclaration { .. }))
+        };
+        assert!(reported("a/index.tmt"), "the named entry file is a layer");
+        assert!(
+            !reported("a/self.tmt"),
+            "any other config document is a sample"
+        );
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn an_entry_name_that_is_not_a_file_name_is_reported_in_the_vault_config() {
+        let root = include_vault("tomet_test_load_entry_invalid", &[]);
+        let path = root.join(tomet_load_config::VAULT_CONFIG_FILE);
+        fs::write(&path, "::workspace{ folder: { entry: \"a/self.tmt\" } }\n").unwrap();
+        let vault = Vault::discover(&root);
+        let doc = tomet_ast_parser::parse_file(&fs::read_to_string(&path).unwrap()).unwrap();
+        let findings = vault.findings(&path, &doc);
+        assert!(
+            findings.diagnostics.iter().any(|d| matches!(
+                d,
+                tomet_validator::Diagnostic::InvalidDefinition { declaration: "workspace", name, .. }
+                    if name == "folder.entry"
+            )),
+            "{:?}",
+            findings.diagnostics
+        );
+        assert!(findings.has_errors());
+
+        fs::write(&path, "::workspace{ folder: { entry: index.tmt } }\n").unwrap();
+        let doc = tomet_ast_parser::parse_file(&fs::read_to_string(&path).unwrap()).unwrap();
+        assert!(
+            Vault::discover(&root)
+                .findings(&path, &doc)
+                .diagnostics
+                .is_empty()
+        );
+        let _ = fs::remove_dir_all(&root);
     }
 
     #[test]
