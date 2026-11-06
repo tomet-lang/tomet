@@ -168,7 +168,25 @@ pub fn collect_tm_files_with_config(
     config: &PrinterConfig,
     config_root: &Path,
 ) -> Vec<PathBuf> {
-    collect_files_with_config(path, config, config_root, is_tm_file)
+    collect_files(path, is_tm_file, |p| {
+        is_path_unswept(p, Some(config_root), config)
+    })
+}
+
+/// Collects every `.tmt`/`.tm` document the vault holds under `path`, the way
+/// [`collect_tm_files_with_config`] does, except that the `unswept` ones are collected too.
+///
+/// `unswept` says a path is in the vault and is left alone by a sweep; it is still a document of
+/// the vault, so whatever assembles the vault's documents (rather than sweeping them) asks this.
+/// Only `ignore` takes a path out.
+pub fn collect_vault_tm_files_with_config(
+    path: &Path,
+    config: &PrinterConfig,
+    config_root: &Path,
+) -> Vec<PathBuf> {
+    collect_files(path, is_tm_file, |p| {
+        is_path_ignored(p, Some(config_root), &config.workspace.ignore)
+    })
 }
 
 /// Collects every `.tmt`/`.tm` document and every `.ctmt` cotomet file under
@@ -196,16 +214,19 @@ pub fn collect_tm_and_ctmt_files_with_config(
     config: &PrinterConfig,
     config_root: &Path,
 ) -> Vec<PathBuf> {
-    collect_files_with_config(path, config, config_root, |p| {
-        is_tm_file(p) || is_ctmt_file(p)
-    })
+    collect_files(
+        path,
+        |p| is_tm_file(p) || is_ctmt_file(p),
+        |p| is_path_unswept(p, Some(config_root), config),
+    )
 }
 
-fn collect_files_with_config(
+/// Every file under `path` that `accept` takes and `skip` does not. A single file given as `path`
+/// is judged by `accept` alone.
+fn collect_files(
     path: &Path,
-    config: &PrinterConfig,
-    config_root: &Path,
     accept: impl Fn(&Path) -> bool,
+    skip: impl Fn(&Path) -> bool,
 ) -> Vec<PathBuf> {
     let mut files = Vec::new();
     if path.is_file() {
@@ -221,7 +242,7 @@ fn collect_files_with_config(
             .filter(|e| e.file_type().is_some_and(|ft| ft.is_file()))
         {
             let p = entry.path();
-            if is_path_unswept(p, Some(config_root), config) {
+            if skip(p) {
                 continue;
             }
             if accept(p) {

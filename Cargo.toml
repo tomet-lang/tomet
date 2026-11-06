@@ -83,6 +83,9 @@ members = [
   #= Vault -- a vault's config and vocabularies, no disk
   "crates/tomet-vault",
 
+  #= Tome -- a vault's parsed documents as one tree, no disk
+  "crates/tomet-tome",
+
   #= Convert -- conversion to/from external document formats
   "crates/tomet-convert-markdown",
   "crates/tomet-convert-standalone",
@@ -173,6 +176,7 @@ tomet-edit = { path = "crates/tomet-edit", version = "0.5.0" }
 tomet-merge = { path = "crates/tomet-merge", version = "0.5.0" }
 tomet-stats = { path = "crates/tomet-stats", version = "0.5.0" }
 tomet-vault = { path = "crates/tomet-vault", version = "0.5.0" }
+tomet-tome = { path = "crates/tomet-tome", version = "0.5.0" }
 tomet-extract = { path = "crates/tomet-extract", version = "0.5.0" }
 #--- Workspace ---
 tomet-config = { path = "crates/tomet-config", version = "0.5.0" }

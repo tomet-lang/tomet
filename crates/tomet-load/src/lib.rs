@@ -247,6 +247,66 @@ impl Vault {
         self.prepare(&mut doc, path);
         Ok((doc, bindings))
     }
+
+    /// Reads every document of the vault as written and assembles them into one tree
+    /// ([`tomet_tome`]).
+    ///
+    /// The documents are the vault's `.tmt` and `.tm` files except those under `ignore`, which are
+    /// not the vault's; `unswept` ones are in the tree, since that list only says a sweep leaves
+    /// them alone. A `.ctmt` is data, not a document, and is not in it. The vault config
+    /// ([`tomet_load_config::VAULT_CONFIG_FILE`]) is the tree's heading part and no child of the
+    /// root. A Folder's entry document is the one named by
+    /// [`WorkspaceConfig::folder_entry`](tomet_config::WorkspaceConfig::folder_entry), and children
+    /// are ordered by code point (`Collator::codepoint`): the vault has no setting for another
+    /// order.
+    ///
+    /// Fails if a document cannot be read or parsed: a tree with a hole in it is a different
+    /// document from the vault's.
+    pub fn tome(&self) -> Result<tomet_tome::Tome, LoadError> {
+        let root = &self.core.root;
+        let config_path = root.join(tomet_load_config::VAULT_CONFIG_FILE);
+        let read = |path: &Path| -> Result<tomet_tome::NamedFile, LoadError> {
+            Ok(tomet_tome::NamedFile {
+                name: file_name(path),
+                file: self.file(path)?.0,
+            })
+        };
+
+        let config = if config_path.is_file() {
+            Some(read(&config_path)?)
+        } else {
+            None
+        };
+        let mut files = Vec::new();
+        for path in tomet_indexer::collect_vault_tm_files_with_config(root, &self.core.config, root)
+        {
+            if path == config_path {
+                continue;
+            }
+            let relative = path
+                .strip_prefix(root)
+                .expect("a file collected under the root is under the root")
+                .components()
+                .map(|c| c.as_os_str().to_string_lossy())
+                .collect::<Vec<_>>()
+                .join("/");
+            files.push((relative, self.file(&path)?.0));
+        }
+        tomet_tome::Tome::build(
+            self.core.config.workspace.folder_entry(),
+            &tomet_sort::Collator::codepoint(),
+            config,
+            files,
+        )
+        .map_err(LoadError::Tome)
+    }
+}
+
+/// The last component of `path`, as text.
+fn file_name(path: &Path) -> String {
+    path.file_name()
+        .map(|name| name.to_string_lossy().into_owned())
+        .unwrap_or_default()
 }
 
 /// Reads one document correctly, discovering its vault first.
@@ -269,6 +329,8 @@ pub enum LoadError {
         path: PathBuf,
         source: tomet_ast_parser::Error,
     },
+    /// The vault's documents do not make a tree; see [`Vault::tome`].
+    Tome(tomet_tome::BuildError),
 }
 
 impl std::fmt::Display for LoadError {
@@ -279,6 +341,7 @@ impl std::fmt::Display for LoadError {
             // in both places prints it twice.
             LoadError::Io { path, .. } => write!(f, "failed to read {}", path.display()),
             LoadError::Parse { path, .. } => write!(f, "failed to parse {}", path.display()),
+            LoadError::Tome(_) => write!(f, "the vault's documents do not make a tree"),
         }
     }
 }
@@ -288,6 +351,7 @@ impl std::error::Error for LoadError {
         match self {
             LoadError::Io { source, .. } => Some(source),
             LoadError::Parse { source, .. } => Some(source),
+            LoadError::Tome(source) => Some(source),
         }
     }
 }
@@ -643,6 +707,133 @@ mod tests {
                 .findings(&path, &doc)
                 .diagnostics
                 .is_empty()
+        );
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    /// `dir NAME`, `entry NAME` and `file NAME` for each Folder of a tome, indented by depth.
+    fn layout(tome: &tomet_tome::Tome) -> Vec<String> {
+        fn go(folder: &tomet_tome::Folder, depth: usize, out: &mut Vec<String>) {
+            let pad = "  ".repeat(depth);
+            out.push(format!("{pad}dir {}", folder.name));
+            if let Some(entry) = &folder.entry {
+                out.push(format!("{pad}  entry {}", entry.name));
+            }
+            for child in &folder.children {
+                match child {
+                    tomet_tome::Child::Folder(f) => go(f, depth + 1, out),
+                    tomet_tome::Child::File(d) => out.push(format!("{pad}  file {}", d.name)),
+                }
+            }
+        }
+        let mut out = Vec::new();
+        go(&tome.vault.root, 0, &mut out);
+        out
+    }
+
+    #[test]
+    fn the_tome_holds_the_vaults_documents_in_their_folders() {
+        let root = include_vault(
+            "tomet_test_load_tome_layout",
+            &[
+                ("self.tmt", "::kind(note)\n\n=[ Home ]\n"),
+                ("b.tmt", "=[ B ]\n"),
+                ("a.tmt", "=[ A ]\n"),
+                ("sub/self.tmt", "::kind(note)\n"),
+                ("sub/c.tmt", "=[ C ]\n"),
+                ("data.ctmt", "key: 1\n"),
+                ("skipped/x.tmt", "=[ X ]\n"),
+                ("frozen/y.tmt", "=[ Y ]\n"),
+                ("empty/readme.txt", "not a document\n"),
+            ],
+        );
+        fs::write(
+            root.join(tomet_load_config::VAULT_CONFIG_FILE),
+            "::kind(config)\n::workspace{ ignore: list(\"skipped\"), unswept: list(\"frozen\") }\n",
+        )
+        .unwrap();
+
+        let tome = Vault::discover(&root).tome().expect("assembles");
+        // `skipped` is ignored and so not the vault's; `frozen` is unswept and so still is; the
+        // `.ctmt` is data and `empty` holds no document.
+        assert_eq!(
+            layout(&tome),
+            [
+                "dir ",
+                "  entry self.tmt",
+                "  file a.tmt",
+                "  file b.tmt",
+                "  dir frozen",
+                "    file y.tmt",
+                "  dir sub",
+                "    entry self.tmt",
+                "    file c.tmt",
+            ]
+        );
+        // The vault config is the vault's own node, not a child of the root.
+        let config = tome.vault.config.as_ref().expect("a config document");
+        assert_eq!(config.name, tomet_load_config::VAULT_CONFIG_FILE);
+        assert_eq!(
+            tomet_tome::Node::Vault(&tome.vault)
+                .heading()
+                .declarations
+                .len(),
+            2
+        );
+        // The entry document is read, and heads its folder.
+        assert_eq!(
+            tomet_tome::Node::Folder(&tome.vault.root)
+                .heading()
+                .declarations
+                .len(),
+            1
+        );
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn the_tome_takes_the_entry_name_from_the_vault() {
+        let root = include_vault(
+            "tomet_test_load_tome_entry",
+            &[("index.tmt", "::kind(note)\n"), ("self.tmt", "=[ S ]\n")],
+        );
+        fs::write(
+            root.join(tomet_load_config::VAULT_CONFIG_FILE),
+            "::workspace{ folder: { entry: index.tmt } }\n",
+        )
+        .unwrap();
+
+        let tome = Vault::discover(&root).tome().expect("assembles");
+        assert_eq!(
+            layout(&tome),
+            ["dir ", "  entry index.tmt", "  file self.tmt"]
+        );
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn a_vault_with_no_config_document_has_a_tome_without_one() {
+        let root = std::env::temp_dir().join("tomet_test_load_tome_no_config");
+        let _ = fs::remove_dir_all(&root);
+        fs::create_dir_all(&root).unwrap();
+        fs::write(root.join("a.tmt"), "=[ A ]\n").unwrap();
+
+        let tome = Vault::discover(&root).tome().expect("assembles");
+        assert!(tome.vault.config.is_none());
+        assert_eq!(layout(&tome), ["dir ", "  file a.tmt"]);
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn a_document_that_does_not_parse_fails_the_tome() {
+        let root = include_vault(
+            "tomet_test_load_tome_broken",
+            &[("a.tmt", "=[ A ]\n"), ("b.tmt", "@caution[ unterminated\n")],
+        );
+        let error = Vault::discover(&root).tome().expect_err("b.tmt is broken");
+        assert!(
+            matches!(&error, LoadError::Parse { path, .. } if path.ends_with("b.tmt")),
+            "{error:?}"
         );
         let _ = fs::remove_dir_all(&root);
     }

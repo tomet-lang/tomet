@@ -17,6 +17,8 @@ tomet-ast-parser = { workspace = true }
 tomet-search = { workspace = true }
 tomet-declaration = { workspace = true }
 tomet-semantics = { workspace = true }
+tomet-sort = { workspace = true }
+tomet-tome = { workspace = true }
 tomet-transform = { workspace = true }
 tomet-validator = { workspace = true }
 tomet-vault = { workspace = true }
