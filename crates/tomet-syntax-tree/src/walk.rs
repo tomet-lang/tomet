@@ -1,7 +1,8 @@
 //! One definition of what sits inside what in a [`File`], and the walkers built on it.
 //!
 //! [`children`] says, for any [`Node`], which nodes sit directly inside it and in which [`Place`].
-//! [`walk`] is the one recursion over that. Every other walker here is [`walk`] with a filter
+//! [`walk`] is the one recursion over that, through [`walk_node_scoped`], which also says when a
+//! node is done with, for a walker that must know where a block ends. Every other walker here is [`walk`] with a filter
 //! and, where a position must stay unseen, a [`Visit::Skip`] written at the walker, so what a
 //! walker leaves out is read in its own body and not in a copy of the recursion.
 //!
@@ -331,17 +332,45 @@ pub fn walk_node<'a, B>(
     place: Place,
     f: &mut impl FnMut(Node<'a>, Place) -> Visit<B>,
 ) -> ControlFlow<B> {
-    match f(node, place) {
+    walk_node_scoped(node, place, f, &mut |_, _| {})
+}
+
+/// [`walk_node`] that also says when it is done with a node.
+///
+/// `enter` is `walk_node`'s `f`: shown each node before what it holds, and answering what to do
+/// next. `leave` is shown the same node and place once everything the node holds has been walked.
+/// It is called for a node `enter` answered [`Visit::Descend`] to and for one it answered
+/// [`Visit::Skip`] to (entered, and just holding nothing the walk looked at), and not for one it
+/// answered [`Visit::Break`] to, because the walk ends there.
+///
+/// This is for a walker whose answer depends on where a node ends. The text of a run of blocks
+/// puts a blank line between two blocks and none between a line of text and the paragraph an
+/// inline element holds; a visitor that is only shown entries cannot tell which paragraph it is
+/// in, and could only guess it from the order it was shown things in. This is still the one
+/// recursion: [`walk_node`] is this with a `leave` that does nothing.
+pub fn walk_node_scoped<'a, B>(
+    node: Node<'a>,
+    place: Place,
+    enter: &mut impl FnMut(Node<'a>, Place) -> Visit<B>,
+    leave: &mut impl FnMut(Node<'a>, Place),
+) -> ControlFlow<B> {
+    match enter(node, place) {
         Visit::Break(b) => return ControlFlow::Break(b),
-        Visit::Skip => return ControlFlow::Continue(()),
+        Visit::Skip => {
+            leave(node, place);
+            return ControlFlow::Continue(());
+        }
         Visit::Descend => {}
     }
     let mut flow = ControlFlow::Continue(());
     children(node, &mut |child, at| {
         if flow.is_continue() {
-            flow = walk_node(child, at, f);
+            flow = walk_node_scoped(child, at, enter, leave);
         }
     });
+    if flow.is_continue() {
+        leave(node, place);
+    }
     flow
 }
 
@@ -798,6 +827,57 @@ mod tests {
         let file = tomet_ast_parser::parse_file("@outer[ @mid[ text ] ]\n").unwrap();
         let outer = element_of(&file);
         assert!(!names(outer, false).contains(&"outer".to_string()));
+    }
+
+    /// `<` for entering and `>` for leaving, `P` for a paragraph and `E` for an element.
+    fn scope_events(src: &str, enter_answer: Visit) -> String {
+        let file = tomet_ast_parser::parse_file(src).unwrap();
+        let events = std::cell::RefCell::new(String::new());
+        let label = |node: Node<'_>| match node {
+            Node::Block(Block::Paragraph(_)) => Some('P'),
+            Node::Block(Block::Element(_)) | Node::Inline(Inline::Element(_)) => Some('E'),
+            _ => None,
+        };
+        for block in &file.body {
+            let _ = walk_node_scoped(
+                Node::Block(block),
+                Place::Top,
+                &mut |node, _| {
+                    if let Some(c) = label(node) {
+                        let mut events = events.borrow_mut();
+                        events.push('<');
+                        events.push(c);
+                        if c == 'E' {
+                            return enter_answer;
+                        }
+                    }
+                    Visit::Descend
+                },
+                &mut |node, _| {
+                    if let Some(c) = label(node) {
+                        let mut events = events.borrow_mut();
+                        events.push('>');
+                        events.push(c);
+                    }
+                },
+            );
+        }
+        events.into_inner()
+    }
+
+    #[test]
+    fn a_scoped_walk_leaves_a_node_after_everything_it_holds() {
+        // The paragraph inside the inline element is told apart from the two around it by
+        // when it is left, which is what a walker that only sees entries cannot do.
+        assert_eq!(
+            scope_events("a @em[ x ] b\n", Visit::Descend),
+            "<P<E<P>P>E>P"
+        );
+    }
+
+    #[test]
+    fn a_scoped_walk_leaves_a_node_it_was_told_to_skip() {
+        assert_eq!(scope_events("a @em[ x ] b\n", Visit::Skip), "<P<E>E>P");
     }
 
     #[test]
