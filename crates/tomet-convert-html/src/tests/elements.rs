@@ -179,3 +179,43 @@ fn a_path_key_stays_out_of_data_attributes_and_in_the_exact_copy() {
     assert!(!body.contains("data-tmtroot"), "{body}");
     assert!(body.contains("tmtroot/a.tmt"), "exact copy: {body}");
 }
+
+#[test]
+fn a_comment_renders_as_an_html_comment() {
+    let doc = parse_file("@comment[ A block comment ]\n").unwrap();
+    assert_eq!(render_body(&doc), "<!-- A block comment -->\n");
+
+    let doc = parse_file("before @comment[ inline ] after\n").unwrap();
+    assert_eq!(render_body(&doc), "<p>before <!-- inline --> after</p>\n");
+}
+
+#[test]
+fn a_comment_written_in_std_is_the_same_comment() {
+    let doc = parse_file("@std.comment[ Generated from file.tmt. ]\n").unwrap();
+    assert_eq!(render_body(&doc), "<!-- Generated from file.tmt. -->\n");
+}
+
+#[test]
+fn a_comment_cannot_end_early() {
+    let doc = parse_file("@comment[ a --> b ]\n").unwrap();
+    assert_eq!(render_body(&doc), "<!-- a -- > b -->\n");
+}
+
+#[test]
+fn a_comment_with_no_text_is_the_empty_comment() {
+    let doc = parse_file("@comment[]\n").unwrap();
+    assert_eq!(render_body(&doc), "<!---->\n");
+}
+
+#[test]
+fn a_comment_has_no_source_span_attributes_to_carry() {
+    // Attributes are spliced into an opening tag, and a comment is not one.
+    let options = RenderOptions {
+        emit_source_spans: true,
+        ..RenderOptions::default()
+    };
+    let doc = parse_file("@comment[ note ]\n\nwords\n").unwrap();
+    let body = render_body_with(&doc, &options);
+    assert!(body.starts_with("<!-- note -->\n"), "{body}");
+    assert!(body.contains("<p data-tmt-start="), "{body}");
+}

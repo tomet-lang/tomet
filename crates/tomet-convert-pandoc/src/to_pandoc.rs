@@ -5,8 +5,9 @@ use tomet_ast::{
     Interpolation, List, Placement, Value,
 };
 use tomet_semantics::{
-    ElementKind, TableRow, classify_std_lenient, flatten_data, flatten_element_data, heading_level,
-    is_directive, link_target, normalized_element_args, parse_table_rows, path_target,
+    ElementKind, TableRow, classify_std_lenient, comment_text, flatten_data, flatten_element_data,
+    heading_level, is_directive, link_target, normalized_element_args, parse_table_rows,
+    path_target,
 };
 
 use crate::ast::{
@@ -155,6 +156,11 @@ fn element_to_blocks(el: ElementView<'_>) -> Vec<Block> {
             }
             vec![Block::Para(inlines)]
         }
+        // Pandoc's AST has no comment, and says "this text is for one output format only" as a raw
+        // block. HTML's comment is the one every reader that carries raw HTML understands, and the
+        // writers for every other format leave a raw block that is not theirs out -- which is what a
+        // comment with no syntax in the target should do.
+        "comment" => vec![Block::RawBlock("html".to_string(), html_comment(el))],
         // Both sides, each a real nested `Div`, rather than the generic
         // `Div`/`flatten_element_data` fallback below -- `a`/`b` are
         // block content (`Value::Blocks`), which that fallback flattens
@@ -235,6 +241,7 @@ fn element_to_inlines(el: ElementView<'_>) -> Vec<Inline> {
             Target::url(link_target(el, &kind).unwrap_or_default()),
         )],
         "raw" => vec![Inline::Code(code_attr(el), content_to_plain_text(el))],
+        "comment" => vec![Inline::RawInline("html".to_string(), html_comment(el))],
         // Same reasoning as the block-position arm above -- both sides
         // shown, not one silently dropped. Pandoc's `Inline` has no
         // block-content carrier, so each side's blocks are flattened to
@@ -263,6 +270,11 @@ fn element_to_inlines(el: ElementView<'_>) -> Vec<Inline> {
             content_to_inlines(el),
         )],
     }
+}
+
+/// A `@comment` as the text of an HTML comment.
+fn html_comment(el: ElementView<'_>) -> String {
+    tomet_html::comment::render(&comment_text(el))
 }
 
 /// `a`/`b` out of `@conflict`'s `(args)` -- block content

@@ -775,3 +775,59 @@ fn test_bare_angle_brackets_not_escaped() {
     );
     assert_eq!(exported.trim(), md.trim());
 }
+
+fn comment_of(el: &Element) -> String {
+    assert_eq!(el.name, Name::bare("comment"));
+    tomet_semantics::comment_text(el.as_view())
+}
+
+#[test]
+fn a_block_html_comment_becomes_a_comment() {
+    let doc = from_markdown("<!-- A block comment -->\n");
+    let [Block::Element(el)] = &doc.body[..] else {
+        panic!("expected one element, got {:?}", doc.body);
+    };
+    assert_eq!(el.placement, Placement::Block);
+    assert_eq!(comment_of(el), "A block comment");
+}
+
+#[test]
+fn a_comment_over_several_lines_keeps_its_lines() {
+    let doc = from_markdown("<!--\none\n\ntwo\n-->\n");
+    let [Block::Element(el)] = &doc.body[..] else {
+        panic!("expected one element, got {:?}", doc.body);
+    };
+    assert_eq!(comment_of(el), "one\n\ntwo");
+}
+
+#[test]
+fn an_inline_html_comment_becomes_a_comment() {
+    let doc = from_markdown("before <!-- an inline comment --> after\n");
+    let [Block::Paragraph(p)] = &doc.body[..] else {
+        panic!("expected one paragraph, got {:?}", doc.body);
+    };
+    let comment = p
+        .content
+        .iter()
+        .find_map(|inline| match inline {
+            Inline::Element(el) => Some(el),
+            _ => None,
+        })
+        .expect("the paragraph holds a comment");
+    assert_eq!(comment.placement, Placement::Inline);
+    assert_eq!(comment_of(comment), "an inline comment");
+}
+
+#[test]
+fn other_html_is_still_dropped_as_a_block() {
+    let doc = from_markdown("<div>kept out</div>\n\nafter\n");
+    assert_eq!(doc.body.len(), 1, "{:?}", doc.body);
+}
+
+#[test]
+fn a_comment_survives_a_round_trip_through_markdown() {
+    for md in ["<!-- A block comment -->\n", "before <!-- note --> after\n"] {
+        let exported = crate::export::to_markdown(&from_markdown(md));
+        assert_eq!(exported.trim(), md.trim());
+    }
+}

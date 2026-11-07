@@ -11,12 +11,17 @@
 //! - (Advanced Rendering Options)
 //!   | Heading numbering (`number_headings: true`), automatic slug anchors (`auto_slug_headings: true`),
 //!   | document language setting, and semantic CSS classes for callouts and custom elements.
+//! - (Comment Syntax (`comment`))
+//!   | `@comment` renders as an HTML comment. The syntax of one (`<!-- ... -->`, and what may not
+//!   | appear inside) is [`comment::render`] and [`comment::parse`], which the converters for
+//!   | formats that carry raw HTML (CommonMark, Pandoc) use as well, so it is spelled once.
 //!
 //! This is a generic, data-driven mapping: most `<T>`/`@name` elements become `<div>`/`<span>`
 //! tags carrying `args` as `data-*` attributes. Built-in elements like `@link`, `::meta`, and
 //! `@links{}` containers receive dedicated HTML representations.
 
 mod block;
+pub mod comment;
 pub(crate) mod elements;
 mod util;
 

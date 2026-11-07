@@ -38,7 +38,7 @@ use tomet_ast::{
     Bare, Block as TmBlock, Data, Declaration, Element, Entry, File, Group, Id, Inline as TmInline,
     LineBreak, List, Name, Paragraph, Placement, RawText, Section, SoftBreak, Text, Value,
 };
-use tomet_semantics::EXACT_DATA_KEY;
+use tomet_semantics::{EXACT_DATA_KEY, comment_element};
 use tomet_span::Span;
 
 use crate::to_pandoc::{BARE_ENTRY, ENTRY_KEY};
@@ -221,6 +221,12 @@ fn block_element(block: &Block) -> Element {
             el
         }
         Block::RawBlock(format, text) => {
+            // An HTML comment is the one raw block Tomet has a spelling for.
+            if format == "html"
+                && let Some(comment) = tomet_html::comment::parse(text)
+            {
+                return comment_element(&comment, Placement::Block);
+            }
             // No Tomet spelling for "raw output in some other format", so
             // it lands as a code block tagged with the format rather than
             // being dropped.
@@ -468,7 +474,15 @@ fn inline_from_pandoc(inline: &Inline) -> TmInline {
             TmInline::Element(el)
         }
         Inline::Math(_, text) => TmInline::Text(Text::from(text.clone())),
-        Inline::RawInline(_, text) => TmInline::Text(Text::from(text.clone())),
+        Inline::RawInline(format, text) => {
+            match (format == "html")
+                .then(|| tomet_html::comment::parse(text))
+                .flatten()
+            {
+                Some(comment) => TmInline::Element(comment_element(&comment, Placement::Inline)),
+                None => TmInline::Text(Text::from(text.clone())),
+            }
+        }
         Inline::Emph(inner) => inline_element("em", &Attr::empty(), inner),
         Inline::Underline(inner) => inline_element("em", &Attr::empty(), inner),
         Inline::Strong(inner) => inline_element("strong", &Attr::empty(), inner),
@@ -758,6 +772,80 @@ mod tests {
     fn round_trip(src: &str) -> String {
         let doc = parse_file(src).unwrap();
         document_to_tm(&from_pandoc(&to_pandoc(&doc)))
+    }
+
+    #[test]
+    fn a_comment_is_a_raw_html_block_and_comes_back() {
+        let pandoc = to_pandoc(&parse_file("@comment[ a block comment ]\n").unwrap());
+        assert_eq!(
+            pandoc.blocks,
+            vec![Block::RawBlock(
+                "html".to_string(),
+                "<!-- a block comment -->".to_string()
+            )]
+        );
+        assert_eq!(
+            round_trip("@comment[ a block comment ]\n").trim(),
+            "@comment[a block comment]"
+        );
+    }
+
+    #[test]
+    fn an_inline_comment_is_a_raw_html_inline_and_comes_back() {
+        let pandoc = to_pandoc(&parse_file("before @comment[ inline ] after\n").unwrap());
+        let [Block::Para(inlines)] = &pandoc.blocks[..] else {
+            panic!("expected one paragraph, got {:?}", pandoc.blocks);
+        };
+        assert!(inlines.contains(&Inline::RawInline(
+            "html".to_string(),
+            "<!-- inline -->".to_string()
+        )));
+        assert_eq!(
+            round_trip("before @comment[ inline ] after\n").trim(),
+            "before @comment[inline] after"
+        );
+    }
+
+    #[test]
+    fn a_code_span_in_a_comment_survives_pandoc() {
+        let back = from_pandoc(&PandocDoc::new(vec![Block::RawBlock(
+            "html".to_string(),
+            "<!-- run `tomet export .` now -->".to_string(),
+        )]));
+        let TmBlock::Element(el) = &back.body[0] else {
+            panic!("expected an element, got {:?}", back.body[0]);
+        };
+        assert_eq!(tomet_semantics::comment_text(el.as_view()), "run `tomet export .` now");
+        assert_eq!(
+            round_trip("@comment[ run `tomet export .` now ]\n").trim(),
+            "@comment[run `tomet export .` now]"
+        );
+    }
+
+    #[test]
+    fn raw_html_that_is_not_one_comment_is_not_a_comment() {
+        for text in ["<div>x</div>", "<!-- a --> b", "<!-- a --><!-- b -->"] {
+            let back = from_pandoc(&PandocDoc::new(vec![Block::RawBlock(
+                "html".to_string(),
+                text.to_string(),
+            )]));
+            let TmBlock::Element(el) = &back.body[0] else {
+                panic!("expected an element, got {:?}", back.body[0]);
+            };
+            assert_eq!(el.name, Name::bare("raw"), "for {text:?}");
+        }
+    }
+
+    #[test]
+    fn a_comment_in_another_raw_format_is_not_a_comment() {
+        let back = from_pandoc(&PandocDoc::new(vec![Block::RawBlock(
+            "latex".to_string(),
+            "<!-- a -->".to_string(),
+        )]));
+        let TmBlock::Element(el) = &back.body[0] else {
+            panic!("expected an element, got {:?}", back.body[0]);
+        };
+        assert_eq!(el.name, Name::bare("raw"));
     }
 
     #[test]

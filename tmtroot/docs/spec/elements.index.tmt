@@ -53,6 +53,14 @@ Tometの仕様、Markdownの基本的な記法
 @dir
 ```
 
+---[ Output source ]---
+
+エクスポートしたソースを読む人に宛てる。描画された文書には現れない。
+
+```tm
+@comment
+```
+
 =[ Doc vocabulary ]
 
 Tometは構文を持つが、実際の振る舞いはアプリに任せる。

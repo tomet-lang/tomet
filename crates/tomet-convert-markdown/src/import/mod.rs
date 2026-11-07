@@ -15,8 +15,9 @@
 //! `Vec<Block>`), so a list inside a quote has its items' content
 //! flattened into that run too. A nested list under a plain (non-quote)
 //! list item is not lossy -- it's kept as that item's own
-//! `ListItem::sublist`. HTML
-//! blocks are dropped; inline HTML round-trips as literal text. Soft and
+//! `ListItem::sublist`. An HTML comment, as a block or inline, becomes a `@comment`
+//! (`tomet_html::comment` says what one is). Other HTML
+//! blocks are dropped; other inline HTML round-trips as literal text. Soft and
 //! hard breaks map to `Inline::SoftBreak`/`Inline::LineBreak` respectively,
 //! not collapsed into a space -- see those types' doc comments.
 //!
@@ -32,7 +33,7 @@ use tomet_ast::{
     Block, Data, Element, File, Inline, LineBreak, List, ListItem, Name, Paragraph, Placement,
     RawText, Section, SoftBreak, Text, Value,
 };
-use tomet_semantics::{ElementKind, classify_std_lenient};
+use tomet_semantics::{ElementKind, classify_std_lenient, comment_element};
 use tomet_span::Span;
 use tomet_tree::{declaration_new, element_new, list, list_item};
 
@@ -97,7 +98,10 @@ enum Frame {
     TableCell {
         content: Vec<Inline>,
     },
-    /// HTML blocks/inline HTML -- swallow everything until the matching
+    /// An HTML block, collected as written: the lines arrive as separate events, and whether the
+    /// block is a comment is only known from the whole of it.
+    HtmlBlock(String),
+    /// Anything the importer has no meaning for -- swallow everything until the matching
     /// End, out of scope for v1 (see module docs).
     Discard,
 }
@@ -210,13 +214,20 @@ pub fn from_markdown_with_options(src: &str, options: &ImportOptions) -> File {
             }
             Event::InlineHtml(html) => {
                 if !matches!(stack.last(), Some(Frame::Discard)) {
-                    push_inline(
-                        &mut stack,
-                        Inline::Text(Text::new(html.to_string(), Span::dummy())),
-                    );
+                    let inline = match tomet_html::comment::parse(&html) {
+                        Some(text) => {
+                            Inline::Element(comment_element(&text, Placement::Inline))
+                        }
+                        None => Inline::Text(Text::new(html.to_string(), Span::dummy())),
+                    };
+                    push_inline(&mut stack, inline);
                 }
             }
-            Event::Html(_) => {}
+            Event::Html(html) => {
+                if let Some(Frame::HtmlBlock(source)) = stack.last_mut() {
+                    source.push_str(&html);
+                }
+            }
             Event::SoftBreak => push_inline(
                 &mut stack,
                 Inline::SoftBreak(SoftBreak {
@@ -335,7 +346,8 @@ fn start_frame(tag: Tag) -> Frame {
         Tag::TableCell => Frame::TableCell {
             content: Vec::new(),
         },
-        // HtmlBlock and anything gated behind unset Options (footnotes, strikethrough, etc.).
+        Tag::HtmlBlock => Frame::HtmlBlock(String::new()),
+        // Anything gated behind unset Options (footnotes, strikethrough, etc.).
         _ => Frame::Discard,
     }
 }
@@ -655,7 +667,16 @@ fn end_frame(stack: &mut Vec<Frame>, tag_end: TagEnd, options: &ImportOptions) {
             let el = build_table_element(rows, alignments, options);
             push_block(stack, Block::Element(el));
         }
-        // HtmlBlock and anything routed to Discard.
+        // An HTML block is kept when it is a comment, and dropped when it is anything else.
+        (Frame::HtmlBlock(source), TagEnd::HtmlBlock) => {
+            if let Some(text) = tomet_html::comment::parse(&source) {
+                push_block(
+                    stack,
+                    Block::Element(comment_element(&text, Placement::Block)),
+                );
+            }
+        }
+        // Anything routed to Discard.
         (Frame::Discard, _) => {}
         (_, _) => {}
     }

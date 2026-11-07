@@ -1,0 +1,34 @@
+::kind(fixture)
+::meta{ x: 1 }
+
+// `@comment[ ... ]` is a note for whoever reads the exported source. Each
+// output writes it in its own comment syntax.
+
+=[ ブロックコメント ]
+
+@comment[ ここは出力先のソースにだけ残る注記。 ]
+
+=[ インラインコメント ]
+
+文の途中に @comment[ インラインの注記 ] が置かれる。
+
+=[ std 名前空間での明示指定 ]
+
+@std.comment[ Generated from the fixture. ]
+
+=[ 複数段落と改行 ]
+
+@comment[
+  一段落目。
+  同じ段落の2行目。
+
+  二段落目。
+]
+
+=[ コードと区切りの扱い ]
+
+@comment[ Edit that, then run `tomet export .` -- and a --> inside is made harmless. ]
+
+=[ 本文のないコメント ]
+
+@comment[]

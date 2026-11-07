@@ -5,9 +5,9 @@ use std::collections::HashSet;
 
 use tomet_ast::{Block, ElementView, File, Inline, Interpolation, List, Placement, Section, Value};
 use tomet_semantics::{
-    FootnoteRegistry, TargetScheme, classify_std_lenient, extract_tags, heading_level,
-    is_directive, link_target, normalized_element_args, parse_table_rows, path_target,
-    target_scheme,
+    FootnoteRegistry, TargetScheme, classify_std_lenient, comment_text, extract_tags,
+    heading_level, is_directive, link_target, normalized_element_args, parse_table_rows,
+    path_target, target_scheme,
 };
 
 pub(crate) struct TypstCtx<'a> {
@@ -206,6 +206,7 @@ fn element_to_typst(cx: &TypstCtx, el: ElementView<'_>, inline: bool) -> String 
         }
         "tag" => render_tag(el),
         "task" => render_task(cx, el, inline),
+        "comment" => render_comment(el),
         _ => render_generic(cx, el, kind.as_str(), inline),
     }
 }
@@ -248,6 +249,20 @@ fn render_footnote_ref_or_def(
             .unwrap_or_else(|| format!("fn-{}", item.index));
         format!("#footnote(<{label}>)")
     }
+}
+
+/// `@comment` as a Typst block comment, `/* ... */`. A block comment, not `//` lines: it is also
+/// right in the middle of a line of text, where a line comment would swallow the rest of the line.
+///
+/// Typst block comments nest, so `*/` would end it early and a stray `/*` would leave it open; a
+/// space is put inside each.
+fn render_comment(el: ElementView<'_>) -> String {
+    let text = comment_text(el);
+    if text.is_empty() {
+        return "/**/".to_string();
+    }
+    let safe = text.replace("*/", "* /").replace("/*", "/ *");
+    format!("/* {safe} */")
 }
 
 fn render_tag(el: ElementView<'_>) -> String {

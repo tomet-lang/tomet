@@ -17,7 +17,7 @@ use escape::{escape_attr, escape_text, fence_for};
 
 use tomet_ast::{Block, ElementView, File, Inline, Interpolation, List, Placement, Section, Value};
 use tomet_semantics::{
-    FootnoteRegistry, TargetScheme, classify_std_lenient, extract_tags, heading_level,
+    FootnoteRegistry, TargetScheme, classify_std_lenient, comment_text, extract_tags, heading_level,
     is_attribute_key, is_directive, link_target, normalized_element_args, path_target,
     target_scheme,
 };
@@ -220,6 +220,8 @@ fn element_to_md(cx: &MarkdownCtx, el: ElementView<'_>, inline: bool) -> String 
         }
         "tag" => render_tag(el),
         "task" => render_task(cx, el, inline),
+        // CommonMark carries raw HTML, and an HTML comment is how it spells a comment.
+        "comment" => tomet_html::comment::render(&comment_text(el)),
         _ => render_generic(cx, el, kind.as_str(), inline),
     }
 }

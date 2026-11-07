@@ -2199,6 +2199,7 @@ dependencies = [
  "tomet-ast",
  "tomet-ast-parser",
  "tomet-declaration",
+ "tomet-html",
  "tomet-printer",
  "tomet-semantics",
  "tomet-span",

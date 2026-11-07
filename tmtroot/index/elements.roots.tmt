@@ -30,6 +30,10 @@
 -@root(fixme)|
 -@root(std.conflict)|
 
+---[ output source ]---
+
+-@root(std.comment)|
+
 ---[ styling ]---
 
 -@root(std.em)|

@@ -614,3 +614,24 @@ fn a_key_that_is_not_an_attribute_name_adds_no_attribute() {
     assert!(md.contains(" data-plain=\"2\""), "{md}");
     assert!(!md.contains("onclick="), "{md}");
 }
+
+#[test]
+fn a_comment_exports_as_an_html_comment() {
+    let doc = tomet_ast_parser::parse_file("@comment[ A block comment ]\n").unwrap();
+    assert_eq!(to_markdown(&doc), "<!-- A block comment -->\n\n");
+
+    let doc = tomet_ast_parser::parse_file("before @comment[ an inline comment ] after\n").unwrap();
+    assert_eq!(to_markdown(&doc).trim(), "before <!-- an inline comment --> after");
+}
+
+#[test]
+fn a_comment_written_in_std_exports_the_same() {
+    let doc = tomet_ast_parser::parse_file("@std.comment[ Generated from file.tmt. ]\n").unwrap();
+    assert_eq!(to_markdown(&doc), "<!-- Generated from file.tmt. -->\n\n");
+}
+
+#[test]
+fn a_comment_cannot_end_early() {
+    let doc = tomet_ast_parser::parse_file("@comment[ foo --> bar ]\n").unwrap();
+    assert_eq!(to_markdown(&doc), "<!-- foo -- > bar -->\n\n");
+}

@@ -24,7 +24,7 @@ use crate::util::{
 use crate::{CustomElementCtx, RenderCtx};
 use tomet_ast::{Bare, BodyView, ElementView, Entry, Group, Interpolation};
 use tomet_semantics::{
-    classify_std_lenient, extract_tags, is_directive, normalized_element_args_in,
+    classify_std_lenient, comment_text, extract_tags, is_directive, normalized_element_args_in,
 };
 
 pub(crate) fn render_element(cx: &RenderCtx, el: ElementView<'_>, out: &mut String, inline: bool) {
@@ -57,8 +57,17 @@ pub(crate) fn render_element(cx: &RenderCtx, el: ElementView<'_>, out: &mut Stri
         "table" => render_table_element(cx, el, out),
         "tag" => render_tag_element(cx, el, out, inline),
         "task" => render_task_element(cx, el, out, inline),
+        "comment" => render_comment_element(el, out, inline),
         "conflict" => render_conflict_element(cx, el, out, inline),
         _ => render_custom_or_generic_element(cx, el, kind.as_str(), out, inline),
+    }
+}
+
+/// `@comment` as an HTML comment, on a line of its own when it stands as a block.
+fn render_comment_element(el: ElementView<'_>, out: &mut String, inline: bool) {
+    out.push_str(&crate::comment::render(&comment_text(el)));
+    if !inline {
+        out.push('\n');
     }
 }
 

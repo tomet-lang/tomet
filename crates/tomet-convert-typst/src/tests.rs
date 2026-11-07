@@ -171,3 +171,41 @@ fn renders_tag_elements() {
         "#box(fill: luma(240), inset: (x: 3pt, y: 0pt), radius: 2pt)[\\#rust] #box(fill: luma(240), inset: (x: 3pt, y: 0pt), radius: 2pt)[\\#tomet] and #box(fill: luma(240), inset: (x: 3pt, y: 0pt), radius: 2pt)[\\#spec]\n\n"
     );
 }
+
+#[test]
+fn a_comment_renders_as_a_typst_block_comment() {
+    assert_eq!(typst("@comment[ A block comment ]\n"), "/* A block comment */\n\n");
+    assert_eq!(
+        typst("before @comment[ inline ] after\n"),
+        "before /* inline */ after\n\n"
+    );
+}
+
+#[test]
+fn a_comment_written_in_std_is_the_same_comment() {
+    assert_eq!(
+        typst("@std.comment[ Generated from file.tmt. ]\n"),
+        "/* Generated from file.tmt. */\n\n"
+    );
+}
+
+#[test]
+fn a_comment_can_neither_end_early_nor_stay_open() {
+    // Built rather than parsed: `/*` and `*/` are an author's comment in a `.tmt` source.
+    let comment = |text: &str| {
+        let mut doc = parse_file("\n").unwrap();
+        doc.body = vec![tomet_ast::Block::Element(tomet_semantics::comment_element(
+            text,
+            tomet_ast::Placement::Block,
+        ))];
+        to_typst(&doc)
+    };
+    assert_eq!(comment("a */ b"), "/* a * / b */\n\n");
+    assert_eq!(comment("a /* b"), "/* a / * b */\n\n");
+    assert_eq!(comment("/**/"), "/* / ** / */\n\n");
+}
+
+#[test]
+fn a_comment_with_no_text_is_the_empty_comment() {
+    assert_eq!(typst("@comment[]\n"), "/**/\n\n");
+}

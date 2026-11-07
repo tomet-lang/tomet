@@ -141,8 +141,17 @@ pub(crate) fn push_span_attrs(cx: &RenderCtx, out: &mut String, span: Span) {
 /// attributes right before the first `>` found at or after byte `start`
 /// of `out`. Only sound when `out[start..]` begins with a fresh opening
 /// tag with no attribute value containing a literal `>` -- see the call
-/// site in `render_block` for why that holds here.
+/// site in `render_block` for why that holds here. It checks the first
+/// half: output that is not an opening tag (a comment, text) has nowhere
+/// to carry attributes and is left as it is.
 fn splice_span_attrs(out: &mut String, start: usize, span: Span) {
+    let opens_a_tag = out[start..]
+        .strip_prefix('<')
+        .and_then(|rest| rest.chars().next())
+        .is_some_and(|c| c.is_ascii_alphabetic());
+    if !opens_a_tag {
+        return;
+    }
     if let Some(rel_gt) = out[start..].find('>') {
         let gt = start + rel_gt;
         out.insert_str(
