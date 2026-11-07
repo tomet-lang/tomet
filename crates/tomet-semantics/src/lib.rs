@@ -43,7 +43,7 @@
 //!   | Extracts and normalizes an element's `{...}` data group via [`data::element_data`].
 //! - (Element-Specific Semantics (`elements`))
 //!   | Dedicated normalization and extraction
-//!   | logic for concrete built-in element families (`config`, `footnote`,
+//!   | logic for concrete built-in element families (`comment`, `config`, `footnote`,
 //!   | `heading`, `table`, `tag`, `target`).
 //!
 
@@ -62,6 +62,7 @@ pub use connect_member::{
 };
 pub use data::element_data;
 pub use dictionary::{Dictionary, LoadedDictionaries, Term, TermProblem, TermRef};
+pub use elements::comment::{comment_element, comment_text};
 pub use elements::config::{DocumentConfig, ExportType, document_config};
 pub use elements::footnote::{self, FootnoteItem, FootnoteRegistry};
 pub use elements::heading::heading_level;

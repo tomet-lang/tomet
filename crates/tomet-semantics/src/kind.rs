@@ -159,6 +159,14 @@ pub enum ElementKind {
     /// mention of a term a dictionary defines. In a `::dictionary` the same element is the definition:
     /// `"vault.config.tmt": @term[description]#(vault-config)`.
     Term,
+    /// `@comment[ ... ]` -- a note for whoever reads the exported *source*, not the rendered
+    /// document. Each exporter writes it in its target's own comment syntax (`<!-- -->` in HTML and
+    /// CommonMark, `/* */` in Typst), and a target that has none leaves it out. What it says is
+    /// [`comment_text`](crate::comment_text).
+    ///
+    /// This is an element, so it stays in the tree. It is not the `//` and `/* */` an author
+    /// writes in a `.tmt` file: those end at the parser and are in no tree.
+    Comment,
 }
 
 impl ElementKind {
@@ -194,6 +202,7 @@ impl ElementKind {
             ElementKind::Tag => "tag",
             ElementKind::Task => "task",
             ElementKind::Term => "term",
+            ElementKind::Comment => "comment",
         }
     }
 }
@@ -228,7 +237,7 @@ impl ElementKind {
 /// hard-coded namespace and not as a permanent exemption. The useful test
 /// while designing the format is to try to express `@link` in it -- what
 /// that cannot say is exactly what is still missing.
-const BODY_KINDS: [(&str, ElementKind); 24] = [
+const BODY_KINDS: [(&str, ElementKind); 25] = [
     ("data", ElementKind::Data),
     // Marks on the document about the document. `//(TODO)` was the first
     // spelling tried and cannot work: `tomet_ast` has no comment node, so
@@ -257,6 +266,7 @@ const BODY_KINDS: [(&str, ElementKind); 24] = [
     ("tag", ElementKind::Tag),
     ("task", ElementKind::Task),
     ("term", ElementKind::Term),
+    ("comment", ElementKind::Comment),
 ];
 
 /// Every recognized bare name and what it is: the standard declarations, then the body elements.
@@ -286,10 +296,11 @@ fn builtin_kind(name: &str) -> Option<ElementKind> {
 /// from a `Name`. That resolution is `Bindings::classify`; this is the
 /// narrower question underneath it.
 ///
-/// A namespaced name is always `Custom` -- namespaces are exactly how a
-/// user-defined element declares it is not part of the built-in
-/// vocabulary. A bare name must be in [`builtin_kinds`]; anything else is
-/// [`UnknownName`], not a silent `Custom`.
+/// A name in any namespace but `std` is `Custom` -- namespaces are exactly
+/// how a user-defined element declares it is not part of the built-in
+/// vocabulary. A bare name, or one written in `std` (`@std.link` is `@link`),
+/// must be in [`builtin_kinds`]; anything else is [`UnknownName`], not a
+/// silent `Custom`. `Bindings::classify` reads `std.` the same way.
 ///
 /// That silent fallback -- `builtin_kind(name).unwrap_or_else(|| Custom(name))`
 /// -- is where the old sigil ambiguity actually lived. `<T>` and `@name`
@@ -298,7 +309,7 @@ fn builtin_kind(name: &str) -> Option<ElementKind> {
 /// tree. Namespaces carry it now, and this returns an error instead of
 /// inventing a kind.
 pub fn classify_std_name(name: &Name) -> Result<ElementKind, UnknownName> {
-    if !name.is_bare() {
+    if !is_written_in_std(name) {
         return Ok(ElementKind::Custom(name.to_string()));
     }
     builtin_kind(&name.name).ok_or_else(|| UnknownName {
@@ -317,7 +328,7 @@ pub fn refuse_declaration_as_element(
     name: &Name,
     kind: ElementKind,
 ) -> Result<ElementKind, UnknownName> {
-    if name.is_bare() && builtin_region(&kind) == crate::vocabulary::Region::Preamble {
+    if is_written_in_std(name) && builtin_region(&kind) == crate::vocabulary::Region::Preamble {
         return Err(UnknownName {
             name: name.to_string(),
             unbound_namespace: None,
@@ -325,6 +336,12 @@ pub fn refuse_declaration_as_element(
         });
     }
     Ok(kind)
+}
+
+/// Whether `name` is one of `std`'s: bare, or spelled with the `std` namespace. They are one
+/// vocabulary written two ways, so every rule about `std`'s names holds for both.
+fn is_written_in_std(name: &Name) -> bool {
+    matches!(name.namespace.as_deref(), None | Some("std"))
 }
 
 /// An unrecognized bare element name.
@@ -495,6 +512,8 @@ pub fn required_shape(kind: &ElementKind) -> Option<Shape> {
         // Either shape: a mention sits inside a sentence, and the definition in a `::dictionary` stands as
         // an entry of its value group.
         Term => return None,
+        // Either shape: a banner stands alone, and a note can sit inside a sentence of the source.
+        Comment => return None,
         Custom(_) => return None,
     })
 }
@@ -565,7 +584,10 @@ pub fn builtin_content_shape(kind: &ElementKind) -> Option<ContentShape> {
         // commonly spans several paragraphs; an admonition/card/footnote
         // can too; a table's rows/cells; a task's details.
         // A term's description is the content of its definition; a mention has none.
-        Quote | Callout | Card | Table | Footnote | Task | Term => Some(ContentShape::Block),
+        // A comment may run to several paragraphs.
+        Quote | Callout | Card | Table | Footnote | Task | Term | Comment => {
+            Some(ContentShape::Block)
+        }
         // Not a built-in bare name at all.
         Custom(_) => None,
     }
@@ -757,6 +779,48 @@ mod tests {
             builtin_content_shape(&ElementKind::Task),
             Some(ContentShape::Block)
         );
+    }
+
+    #[test]
+    fn named_at_sigil_with_comment_name_is_recognized() {
+        let el = element_new(Name::bare("comment"));
+        assert_eq!(classify_std_lenient(el.as_view()), ElementKind::Comment);
+        assert_eq!(required_shape(&ElementKind::Comment), None);
+        assert_eq!(
+            builtin_content_shape(&ElementKind::Comment),
+            Some(ContentShape::Block)
+        );
+    }
+
+    #[test]
+    fn a_name_written_in_std_is_the_bare_name() {
+        // `@std.link` is `@link`: every built-in reads the same either way.
+        for (name, kind) in builtin_kinds() {
+            assert_eq!(
+                classify_std_name(&Name::namespaced("std", name)),
+                Ok(kind),
+                "for {name:?}"
+            );
+        }
+        let el = element_new(Name::namespaced("std", "comment"));
+        assert_eq!(classify_std_lenient(el.as_view()), ElementKind::Comment);
+    }
+
+    #[test]
+    fn an_unknown_name_in_std_is_an_error_not_custom() {
+        let err = classify_std_name(&Name::namespaced("std", "nope")).unwrap_err();
+        assert_eq!(err.name, "std.nope");
+    }
+
+    #[test]
+    fn a_declaration_written_as_an_element_in_std_is_refused_like_the_bare_one() {
+        for name in [Name::bare("kind"), Name::namespaced("std", "kind")] {
+            let kind = classify_std_name(&name).unwrap();
+            assert!(
+                refuse_declaration_as_element(&name, kind).is_err(),
+                "for {name}"
+            );
+        }
     }
 
     #[test]
