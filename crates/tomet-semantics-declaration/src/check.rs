@@ -302,18 +302,44 @@ fn check_macros(
             continue;
         };
         for (macro_name, template) in entries {
-            if !matches!(template, Value::String(_)) {
+            if let Some(reason) = macro_problem(&template) {
                 problems.push((
                     idx,
                     Problem::InvalidDefinition {
                         declaration: name,
                         name: macro_name,
-                        reason: "a macro is a string template, such as `\"https://x/${1}\"`"
-                            .to_string(),
+                        reason,
                     },
                 ));
             }
         }
+    }
+}
+
+/// Why `template` cannot be a macro's, or `None` if it can. A string is a text macro. A `[ ... ]`
+/// is a block macro, whose only interpolations are the places arguments go.
+fn macro_problem(template: &Value) -> Option<String> {
+    match template {
+        Value::String(_) => None,
+        Value::Blocks(_) => {
+            let expressions = crate::expressions_in_body(template);
+            if expressions.is_empty() {
+                None
+            } else {
+                let written: Vec<String> =
+                    expressions.iter().map(|e| format!("`${{{e}}}`")).collect();
+                Some(format!(
+                    "in a block macro `${{...}}` is where an argument goes (`${{1}}`, `${{name}}`), not an \
+                     expression; found {}",
+                    written.join(", ")
+                ))
+            }
+        }
+        _ => Some(
+            "a macro is a string template, such as `\"https://x/${1}\"`, or block content, such as \
+             `[ @card[ ${1} ] ]`"
+                .to_string(),
+        ),
     }
 }
 
@@ -594,6 +620,25 @@ mod tests {
     }
 
     #[test]
+    fn a_block_macro_may_hold_only_places_for_arguments() {
+        let doc = parse(
+            "::macros{ ok: [ @card(title: ${1})[ ${who} ] ], bad: [ ${a.b} and ${f(1)} ${1} ] }\n",
+        );
+        let decls: Vec<_> = declarations(&doc)
+            .into_iter()
+            .map(|f| f.declaration)
+            .collect();
+        let problems = check_declarations(&decls, Host::Tmt);
+        assert_eq!(problems.len(), 1, "{problems:?}");
+        let Problem::InvalidDefinition { name, reason, .. } = &problems[0].1 else {
+            panic!("expected an invalid definition, got {:?}", problems[0].1);
+        };
+        assert_eq!(name, "bad");
+        // What follows "found" is the expressions, and `${1}` is a place, not one of them.
+        assert_eq!(reason.split("found ").nth(1), Some("`${a.b}`, `${f(1)}`"));
+    }
+
+    #[test]
     fn macros_and_vars_checks() {
         let bad_macro = Declaration::new(
             "macros",
@@ -607,7 +652,9 @@ mod tests {
             Problem::InvalidDefinition {
                 declaration: "macros",
                 name: "gh".into(),
-                reason: "a macro is a string template, such as `\"https://x/${1}\"`".into(),
+                reason: "a macro is a string template, such as `\"https://x/${1}\"`, or block \
+                         content, such as `[ @card[ ${1} ] ]`"
+                    .into(),
             }
         );
 

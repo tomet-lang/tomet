@@ -70,6 +70,13 @@ Nesting was destroyed by any print-then-parse cycle.
 Public because the printer renders a value group's pairs itself and
 needs the same rule.
 
+===[fn render_nested_with_blocks]
+
+[`render_nested`] with the block renderer supplied explicitly, the way
+[`render_args_with_blocks`] has it for `(args)`: a printer that can render blocks in full
+passes its own, so a `key: [...]` value of a `{...}` group is not cut down to
+paragraph-inlines only.
+
 ===[fn render_value_inner_with_config]
 
 ===[fn render_value_inner_with_blocks]

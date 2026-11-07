@@ -29,6 +29,19 @@ fn vault() -> MemoryResolver {
         .unwrap()
 }
 
+/// The block macro `name` whose body is `body`, as `::macros{ name: [ body ] }` defines it.
+fn block_macro(name: &str, body: &str) -> Value {
+    let src = format!("::macros{{ {name}: [{body}] }}\n");
+    let file = tomet_ast_parser::parse_file(&src).expect("the macro parses");
+    let Some(Group(entries)) = &file.header[0].data.value else {
+        panic!("expected a {{...}} group");
+    };
+    let tomet_ast::Entry::Pair(_, value) = &entries[0] else {
+        panic!("expected a key: value entry");
+    };
+    value.clone()
+}
+
 /// Resolves `src` as the document `here.tmt` of the small vault above.
 fn run_with(src: &str, phase: Phase, vars: &EvalValue) -> (File, Vec<Unresolved>) {
     let resolver = vault();
@@ -42,7 +55,10 @@ fn run_in(
     vars: &EvalValue,
 ) -> (File, Vec<Unresolved>) {
     let mut macros = HashMap::new();
-    macros.insert("gh".to_string(), "https://x/issues/${1}".to_string());
+    macros.insert("gh".to_string(), Value::String("https://x/issues/${1}".to_string()));
+    macros.insert("note".to_string(), block_macro("note", "Note: ${1}"));
+    macros.insert("card".to_string(), block_macro("card", "\n@card(title: ${1})[ ${2} ]\n"));
+    macros.insert("pair".to_string(), block_macro("pair", "\none ${1}\n\ntwo ${1}\n"));
     let cx = EvalContext {
         phase,
         resolver,
@@ -249,10 +265,10 @@ fn a_macro_is_called_through_its_namespace() {
 #[test]
 fn macro_table_cases() {
     let mut macros = HashMap::new();
-    macros.insert("gh".to_string(), "https://x/${1}".to_string());
-    macros.insert("two".to_string(), "${1}-${2}".to_string());
-    macros.insert("named".to_string(), "hi ${who}".to_string());
-    macros.insert("none".to_string(), "const".to_string());
+    macros.insert("gh".to_string(), Value::String("https://x/${1}".to_string()));
+    macros.insert("two".to_string(), Value::String("${1}-${2}".to_string()));
+    macros.insert("named".to_string(), Value::String("hi ${who}".to_string()));
+    macros.insert("none".to_string(), Value::String("const".to_string()));
     let resolver = vault();
     let cx = EvalContext {
         phase: Phase::Output,
@@ -624,4 +640,48 @@ fn written_number_in_metadata_interpolates_as_written() {
     let unresolved = resolve_expressions(&mut doc, &cx);
     assert!(unresolved.is_empty());
     assert_eq!(text_of(&doc), "Version is 1.10.");
+}
+
+// ---- block macros ----
+
+#[test]
+fn a_block_macro_on_its_own_line_is_its_blocks() {
+    let (doc, unresolved) = run("${macro.card(\"Title\", \"words\")}\n");
+    assert_eq!(text_of(&doc), "<card>");
+    assert!(unresolved.is_empty(), "{unresolved:?}");
+    let Block::Element(card) = &doc.body[0] else {
+        panic!("expected the card, got {:?}", doc.body[0]);
+    };
+    assert_eq!(
+        card.data.args,
+        Some(Value::Map(vec![(
+            "title".to_string(),
+            Value::String("Title".to_string())
+        )]))
+    );
+}
+
+#[test]
+fn a_block_macro_of_one_paragraph_is_spliced_into_a_paragraph() {
+    let (doc, unresolved) = run("before ${macro.note(\"x\")} after\n");
+    assert_eq!(text_of(&doc), "before Note: x after");
+    assert!(unresolved.is_empty(), "{unresolved:?}");
+}
+
+#[test]
+fn a_block_macro_of_several_blocks_has_no_place_in_a_paragraph() {
+    let (doc, unresolved) = run("before ${macro.pair(\"x\")} after\n");
+    // Written back as it was, and reported: nothing is lost and nothing is fatal.
+    assert_eq!(unresolved.len(), 1, "{unresolved:?}");
+    assert_eq!(text_of(&doc), "before ${macro.pair(\"x\")} after");
+    let (doc, unresolved) = run("${macro.pair(\"x\")}\n");
+    assert!(unresolved.is_empty(), "{unresolved:?}");
+    assert_eq!(text_of(&doc), "one x|two x");
+}
+
+#[test]
+fn a_block_macro_called_wrongly_is_reported_and_kept() {
+    let (doc, unresolved) = run("${macro.card(\"only one\")}\n");
+    assert_eq!(unresolved.len(), 1, "{unresolved:?}");
+    assert_eq!(text_of(&doc), "${macro.card(\"only one\")}");
 }

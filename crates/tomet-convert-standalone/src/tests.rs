@@ -13,8 +13,10 @@ fn vault() -> Vault {
     let mut config = PrinterConfig::default();
     config.macros.insert(
         "gh".to_string(),
-        "https://github.com/x/issues/${1}".to_string(),
+        Value::String("https://github.com/x/issues/${1}".to_string()),
     );
+    let note = tomet_ast_parser::parse_file("::macros{ note: [ Note: ${1} ] }\n").expect("parses");
+    config.macros.extend(tomet_declaration::document_macros(&note));
     config.vars.push((
         "topic".to_string(),
         tomet_declaration::VarDecl {
@@ -59,6 +61,17 @@ fn a_macro_the_vault_defines_is_written_into_the_file() {
         "the call stays a call: {text}"
     );
     assert!(text.contains("::profile(standalone)"), "{text}");
+    assert_eq!(treatments(&converted), vec![Treatment::Carried]);
+    assert!(converted.remaining.is_empty(), "{:?}", converted.remaining);
+}
+
+#[test]
+fn a_block_macro_the_vault_defines_is_written_into_the_file_as_blocks() {
+    let converted = convert("${macro.note(\"x\")}\n", Options::default());
+    let text = printed(&converted);
+    assert!(text.contains("::macros"), "{text}");
+    assert!(text.contains("Note: ${1}"), "{text}");
+    assert!(text.contains("${macro.note(\"x\")}"), "the call stays a call: {text}");
     assert_eq!(treatments(&converted), vec![Treatment::Carried]);
     assert!(converted.remaining.is_empty(), "{:?}", converted.remaining);
 }

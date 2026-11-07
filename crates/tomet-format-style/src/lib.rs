@@ -226,7 +226,11 @@ pub fn render_nested(v: &Value, config: &PrinterConfig) -> String {
     render_nested_with_blocks(v, config, &mut default_block_renderer)
 }
 
-fn render_nested_with_blocks(
+/// [`render_nested`] with the block renderer supplied explicitly, the way
+/// [`render_args_with_blocks`] has it for `(args)`: a printer that can render blocks in full
+/// passes its own, so a `key: [...]` value of a `{...}` group is not cut down to
+/// paragraph-inlines only.
+pub fn render_nested_with_blocks(
     v: &Value,
     config: &PrinterConfig,
     render_blocks: &mut BlockRenderer,

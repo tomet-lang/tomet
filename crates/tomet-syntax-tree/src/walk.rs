@@ -12,14 +12,15 @@
 //! The groups of a node come in one order: `(args)`, `{value}`, `[content]`, then its
 //! `:connect`s. The AST keeps no order of groups, so this is the order of every walker.
 //!
-//! The one exception to "one recursion" is [`for_each_element_mut`]: a mutable walk cannot share
-//! the borrow with [`children`], so it lists the children again, and `tests/walk_coverage.rs`
-//! holds the two to the same reach.
+//! The one exception to "one recursion" is the mutable walk ([`for_each_element_mut`],
+//! [`for_each_id_mut`], [`fill_interpolations`]): a mutable walk cannot share the borrow with
+//! [`children`], so it lists the children again, and `tests/walk_coverage.rs` holds the two to the
+//! same reach.
 
 use std::ops::ControlFlow;
 use tomet_ast::{
     Block, Connect, Data, Declaration, Element, ElementView, Entry, File, Group, Hole, Id, Inline,
-    Interpolation, List, ListItem, Section, Value,
+    Interpolation, List, ListItem, Paragraph, Section, Text, Value,
 };
 use tomet_span::Span;
 
@@ -605,6 +606,12 @@ pub fn for_each_item_descendant(items: &[ListItem], direct_only: bool, f: impl F
 trait Sink {
     fn element(&mut self, _el: &mut Element) {}
     fn id(&mut self, _id: &mut Option<Id>, _span: Span) {}
+    /// Each inline, before it is looked into. The sink may replace it.
+    fn inline(&mut self, _inline: &mut Inline) {}
+    /// Each block, before it is looked into. The sink may replace it.
+    fn block(&mut self, _block: &mut Block) {}
+    /// Each value, before it is looked into. The sink may replace it.
+    fn value(&mut self, _value: &mut Value) {}
 }
 
 struct MutWalk<'s, S: Sink> {
@@ -621,6 +628,7 @@ impl<S: Sink> MutWalk<'_, S> {
 
     #[deny(clippy::wildcard_enum_match_arm)]
     fn block(&mut self, block: &mut Block) {
+        self.sink.block(block);
         match block {
             Block::Paragraph(p) => self.inlines(&mut p.content),
             Block::Element(el) => self.element(el),
@@ -642,6 +650,7 @@ impl<S: Sink> MutWalk<'_, S> {
     #[deny(clippy::wildcard_enum_match_arm)]
     fn inlines(&mut self, items: &mut [Inline]) {
         for inline in items {
+            self.sink.inline(inline);
             match inline {
                 Inline::Element(el) => self.element(el),
                 Inline::Hole(h) => self.groups(&mut h.data, h.content.as_deref_mut()),
@@ -711,6 +720,7 @@ impl<S: Sink> MutWalk<'_, S> {
 
     #[deny(clippy::wildcard_enum_match_arm)]
     fn value(&mut self, value: &mut Value) {
+        self.sink.value(value);
         match value {
             Value::Element(el) => self.element(el),
             Value::Hole(h) => self.groups(&mut h.data, h.content.as_deref_mut()),
@@ -782,6 +792,75 @@ pub fn for_each_id_mut(file: &mut File, f: impl FnMut(&mut Option<Id>, Span)) {
         }
     }
     walk_mut(file, &mut Ids(f), true);
+}
+
+/// Visits every [`Interpolation`] under `value`, in document order, wherever it sits: the value
+/// itself, an element's `(args)` and `{value}` entries, running text and blocks of a `[...]`.
+///
+/// Unlike [`for_each_descendant_in_blocks`] this goes into `(args)` and the values of
+/// `key: value` entries, because here the question is "what is written anywhere in this value", and
+/// not "what does this element hold". `:connect`s are reached, as [`for_each_node`] reaches them.
+pub fn for_each_interpolation_in_value(value: &Value, mut f: impl FnMut(&Interpolation)) {
+    let _ = walk_node(Node::Value(value), Place::Part, &mut |node, _| {
+        if let Some(interp) = node.interpolation() {
+            f(interp);
+        }
+        Visit::<()>::Descend
+    });
+}
+
+/// Replaces, in place, each interpolation under `value` that `fill` has a value for. It is shown
+/// them in the order [`for_each_interpolation_in_value`] shows them, and an interpolation it answers
+/// `None` for is left as written.
+///
+/// What the value becomes depends on where the interpolation sits, which is the one thing this
+/// function knows:
+///
+/// - as a value (`(args)`, an entry of `{value}`, a `[...]` value): the value itself, whatever type
+///   it has;
+/// - in running text: text, of the value's scalar text;
+/// - as a block of its own: a paragraph of that text.
+///
+/// A value with no scalar text (a map, a list) has no place in text, so there the interpolation is
+/// left as written too.
+pub fn fill_interpolations(value: &mut Value, fill: impl FnMut(&Interpolation) -> Option<Value>) {
+    struct Fill<F>(F);
+    impl<F: FnMut(&Interpolation) -> Option<Value>> Fill<F> {
+        fn text(&mut self, interp: &Interpolation) -> Option<Text> {
+            let filled = (self.0)(interp)?;
+            let text = filled.scalar_text()?.into_owned();
+            Some(Text::new(text, interp.span))
+        }
+    }
+    impl<F: FnMut(&Interpolation) -> Option<Value>> Sink for Fill<F> {
+        fn inline(&mut self, inline: &mut Inline) {
+            if let Inline::Interp(interp) = inline
+                && let Some(text) = self.text(interp)
+            {
+                *inline = Inline::Text(text);
+            }
+        }
+        fn block(&mut self, block: &mut Block) {
+            if let Block::Interp(interp) = block
+                && let Some(text) = self.text(interp)
+            {
+                let span = interp.span;
+                *block = Block::Paragraph(Paragraph::new(vec![Inline::Text(text)], span));
+            }
+        }
+        fn value(&mut self, value: &mut Value) {
+            if let Value::Interp(interp) = value
+                && let Some(filled) = (self.0)(interp)
+            {
+                *value = filled;
+            }
+        }
+    }
+    MutWalk {
+        sink: &mut Fill(fill),
+        connects: true,
+    }
+    .value(value);
 }
 
 #[cfg(test)]
@@ -878,6 +957,89 @@ mod tests {
     #[test]
     fn a_scoped_walk_leaves_a_node_it_was_told_to_skip() {
         assert_eq!(scope_events("a @em[ x ] b\n", Visit::Skip), "<P<E>E>P");
+    }
+
+    /// The `[...]` value of `::macros{ m: [ ... ] }` in `src`.
+    fn macro_body(file: &mut File) -> &mut Value {
+        let Some(Group(entries)) = &mut file.header[0].data.value else {
+            panic!("expected a {{...}} group");
+        };
+        let Entry::Pair(_, value) = &mut entries[0] else {
+            panic!("expected a key: value entry");
+        };
+        value
+    }
+
+    /// Two blocks: an element on a line of its own, then a `${2}` on a line of its own.
+    const BODY: &str =
+        "::macros{ m: [\n@card(title: ${1}, n: ${3})[ hi ${name} ]\n\n${2}\n] }\n";
+
+    fn interpolations(value: &Value) -> Vec<String> {
+        let mut found = Vec::new();
+        for_each_interpolation_in_value(value, |i| found.push(i.expr.to_string()));
+        found
+    }
+
+    #[test]
+    fn the_interpolations_under_a_value_include_arguments_and_entries() {
+        let mut file = tomet_ast_parser::parse_file(BODY).unwrap();
+        // `(args)` is where a descendant walk does not look; here it is the point.
+        assert_eq!(interpolations(macro_body(&mut file)), ["1", "3", "name", "2"]);
+    }
+
+    #[test]
+    fn a_filled_interpolation_is_a_value_in_data_and_text_in_text() {
+        let mut file = tomet_ast_parser::parse_file(BODY).unwrap();
+        let body = macro_body(&mut file);
+        fill_interpolations(body, |i| match i.expr.to_string().as_str() {
+            "1" => Some(Value::String("Welcome".to_string())),
+            "3" => Some(Value::Int(5)),
+            "name" => Some(Value::Int(7)),
+            "2" => Some(Value::String("end".to_string())),
+            _ => None,
+        });
+        assert!(interpolations(body).is_empty(), "{:?}", interpolations(body));
+        let Value::Blocks(blocks) = &*body else {
+            panic!("expected blocks");
+        };
+        let Block::Element(card) = &blocks[0] else {
+            panic!("expected the card, got {:?}", blocks[0]);
+        };
+        let Some(Value::Map(args)) = &card.data.args else {
+            panic!("expected named arguments, got {:?}", card.data.args);
+        };
+        assert_eq!(args[0].1, Value::String("Welcome".to_string()));
+        assert_eq!(args[1].1, Value::Int(5), "a number stays a number in data");
+        let Some([Block::Paragraph(p)]) = card.content.as_deref() else {
+            panic!("expected one paragraph, got {:?}", card.content);
+        };
+        assert!(
+            matches!(&p.content[..], [Inline::Text(a), Inline::Text(b)]
+                if a.value == "hi " && b.value == "7"),
+            "{:?}",
+            p.content
+        );
+        let Block::Paragraph(last) = &blocks[1] else {
+            panic!("a block of its own becomes a paragraph, got {:?}", blocks[1]);
+        };
+        assert!(matches!(&last.content[..], [Inline::Text(t)] if t.value == "end"));
+    }
+
+    #[test]
+    fn an_interpolation_nothing_fills_is_left_as_written() {
+        let mut file = tomet_ast_parser::parse_file(BODY).unwrap();
+        let body = macro_body(&mut file);
+        fill_interpolations(body, |i| (i.expr.to_string() == "2").then_some(Value::Int(1)));
+        assert_eq!(interpolations(body), ["1", "3", "name"]);
+    }
+
+    #[test]
+    fn a_value_that_has_no_text_has_no_place_in_text() {
+        let mut file = tomet_ast_parser::parse_file(BODY).unwrap();
+        let body = macro_body(&mut file);
+        fill_interpolations(body, |_| Some(Value::Map(Vec::new())));
+        // Data takes a map as it is; running text and a block of its own cannot.
+        assert_eq!(interpolations(body), ["name", "2"]);
     }
 
     #[test]

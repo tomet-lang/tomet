@@ -53,7 +53,7 @@ pub struct DocumentConfig {
     /// Per-export-type output paths specified by `::export`'s `path` as a map of format to path.
     pub export_paths: HashMap<ExportType, String>,
     /// User-defined macro templates, from the `::macros` declaration.
-    pub macros: HashMap<String, String>,
+    pub macros: HashMap<String, Value>,
     /// The variables declared with `::vars`, in the order written. A later
     /// declaration of a name replaces an earlier one.
     pub vars: Vec<(String, VarDecl)>,
@@ -192,11 +192,11 @@ mod tests {
         let doc = parse_file("::macros{\n  gh: \"https://github.com/org/repo/issues/$1\"\n  jira: \"https://jira.org/browse/$1\"\n}\n").unwrap();
         let config = document_config(&doc);
         assert_eq!(
-            config.macros.get("gh").map(|s| s.as_str()),
+            config.macros.get("gh").and_then(|v| v.as_str()),
             Some("https://github.com/org/repo/issues/$1")
         );
         assert_eq!(
-            config.macros.get("jira").map(|s| s.as_str()),
+            config.macros.get("jira").and_then(|v| v.as_str()),
             Some("https://jira.org/browse/$1")
         );
     }

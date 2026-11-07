@@ -129,6 +129,12 @@ pub const KNOWN_TS_ERRORS: &[(&str, &[&str])] = &[
     // directly. `tomet-parser`'s `list.rs::eat_list_marker` recognizes
     // it; `grammar.js` has not been taught the combine form yet.
     ("syntax/combine.tmt", &[ANY_ERROR]),
+    // A block where a `{...}` group's value goes (`card: [ @card[ ${2} ] ]`, the body of a block
+    // macro in `::macros{ ... }`): `grammar.js` reads a `[ ... ]` value in `(args)` but not as the
+    // value of a pair in `{...}`, even when it holds a single paragraph. `tomet-parser` reads it
+    // (`syntax/block-macro.tmt` is in the corpus for that); highlighting it is the grammar's to
+    // catch up on.
+    ("syntax/block-macro.tmt", &["{\n  card: ", "{\n  notice: ", "]"]),
     // A box where a value goes (`url: <?(u)>`, `type: <?(kind)>`): `grammar.js` has
     // `hole` only in running text and its content, and leaves a value to the
     // external `scalar` token, which takes `<?(u)` and strands the `>` and the

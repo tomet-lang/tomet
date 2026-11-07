@@ -108,10 +108,15 @@ pub struct MacroSet {
 }
 
 impl MacroSet {
-    pub fn from_map(macros: &HashMap<String, String>) -> Self {
+    /// The patterns of the text macros in `macros`. A URL is text, so only a text macro can stand
+    /// for one; a block macro is not a pattern a link target could match, and is left out.
+    pub fn from_map(macros: &HashMap<String, Value>) -> Self {
         let mut patterns: Vec<MacroPattern> = macros
             .iter()
-            .map(|(name, tmpl)| MacroPattern::from_template(name, tmpl))
+            .filter_map(|(name, tmpl)| match tmpl {
+                Value::String(tmpl) => Some(MacroPattern::from_template(name, tmpl)),
+                _ => None,
+            })
             .collect();
 
         patterns.sort_by(|a, b| {

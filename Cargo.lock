@@ -2119,6 +2119,7 @@ dependencies = [
 name = "tomet-load-config"
 version = "0.5.0"
 dependencies = [
+ "tomet-ast",
  "tomet-ast-parser",
  "tomet-config",
 ]

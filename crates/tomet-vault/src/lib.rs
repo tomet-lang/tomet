@@ -128,7 +128,7 @@ pub fn validate_sources(
 /// What an evaluation in one document is done in. See [`Vault::scope`].
 struct Scope<'a> {
     overlay: Overlay<'a>,
-    macros: std::collections::HashMap<String, String>,
+    macros: std::collections::HashMap<String, tomet_ast::Value>,
     chain: Vec<DocRef>,
     self_doc: DocRef,
     var: EvalValue,

@@ -102,17 +102,12 @@ pub fn meta(declaration: &Declaration) -> Option<Value> {
 
 /// The macros a `::macros` defines, in the order written: each entry is a name and its template.
 ///
-/// An entry whose value is not a string is not a macro and is left out; `tomet check` reports a
-/// definition it cannot use. The `(args)` form (`::macros(gh: "...")`) and the `{data}` form are both
-/// read.
-pub fn macros(declaration: &Declaration) -> Vec<(String, String)> {
+/// A template is a [`Value`]: a string is a text macro, and `[ ... ]` is a block macro (see
+/// [`crate::Arity`]). An entry of any other kind is returned too, because refusing it is
+/// `tomet check`'s business and not a reader's; whoever calls the macro finds out it cannot. The
+/// `(args)` form (`::macros(gh: "...")`) and the `{data}` form are both read.
+pub fn macros(declaration: &Declaration) -> Vec<(String, Value)> {
     entries(declaration)
-        .into_iter()
-        .filter_map(|(name, template)| match template {
-            Value::String(template) => Some((name, template)),
-            _ => None,
-        })
-        .collect()
 }
 
 /// The `(name, value)` entries of a declaration whose body is a map, `(args)` first, then `{data}`.
@@ -193,7 +188,7 @@ pub fn document_entries<B>(doc: &File<B>, kind: DeclKind) -> Vec<(String, Value)
 
 /// Every macro the document defines, in the order written; a name defined twice appears twice,
 /// and the later one is the one that stands.
-pub fn document_macros<B>(doc: &File<B>) -> Vec<(String, String)> {
+pub fn document_macros<B>(doc: &File<B>) -> Vec<(String, Value)> {
     declarations(doc)
         .iter()
         .filter(|found| found.kind == DeclKind::Macros)
@@ -385,18 +380,21 @@ mod tests {
     }
 
     #[test]
-    fn macros_are_the_string_entries_of_every_macros_declaration() {
-        let doc = parse("::macros{ gh: \"https://x/${1}\", n: 3, wiki: \"w/${1}\" }\n");
-        assert_eq!(
-            document_macros(&doc),
-            [
-                ("gh".to_string(), "https://x/${1}".to_string()),
-                ("wiki".to_string(), "w/${1}".to_string())
-            ]
-        );
+    fn macros_are_the_entries_of_every_macros_declaration() {
+        let doc = parse("::macros{ gh: \"https://x/${1}\", n: 3, wiki: \"w/${1}\", blk: [ hello ] }\n");
+        let read = document_macros(&doc);
+        let names: Vec<&str> = read.iter().map(|(name, _)| name.as_str()).collect();
+        // A template of any kind is read; refusing a kind is `check`'s.
+        assert_eq!(names, ["gh", "n", "wiki", "blk"]);
+        assert_eq!(read[0].1, Value::String("https://x/${1}".to_string()));
+        assert_eq!(read[1].1, Value::Int(3));
+        assert!(matches!(read[3].1, Value::Blocks(_)));
         // the args form is read too
         let doc = parse("::macros(gh: \"g\")\n");
-        assert_eq!(document_macros(&doc), [("gh".to_string(), "g".to_string())]);
+        assert_eq!(
+            document_macros(&doc),
+            [("gh".to_string(), Value::String("g".to_string()))]
+        );
     }
 
     #[test]

@@ -1,6 +1,6 @@
 ::kind(api)
 
-::meta{crate: tomet-tree, dependencies: list(tomet-ast, tomet-ast-parser, tomet-span), dependents: list(tomet-address, tomet-ast-parser, tomet-cli, tomet-config, tomet-convert-standalone, tomet-cst-parser, tomet-declaration, tomet-deps, tomet-edit, tomet-expr, tomet-extract, tomet-formatter, tomet-html, tomet-indexer, tomet-links, tomet-lowering, tomet-lsp, tomet-markdown, tomet-pandoc, tomet-printer, tomet-search, tomet-semantics, tomet-spec, tomet-stats, tomet-style, tomet-tests, tomet-transform, tomet-typst, tomet-validator-blueprint, tomet-validator-core, tomet-validator-profile, tomet-validator-rule, tomet-vault, tomet-workspace)}
+::meta{crate: tomet-tree, dependencies: list(tomet-ast, tomet-ast-parser, tomet-span), dependents: list(tomet-address, tomet-ast-parser, tomet-cli, tomet-config, tomet-convert-standalone, tomet-cst-parser, tomet-declaration, tomet-deps, tomet-edit, tomet-expr, tomet-extract, tomet-formatter, tomet-html, tomet-indexer, tomet-links, tomet-lowering, tomet-lsp, tomet-markdown, tomet-pandoc, tomet-printer, tomet-search, tomet-semantics, tomet-spec, tomet-stats, tomet-style, tomet-tests, tomet-tome, tomet-transform, tomet-typst, tomet-validator-blueprint, tomet-validator-core, tomet-validator-profile, tomet-validator-rule, tomet-vault, tomet-workspace)}
 
 =[tomet-tree]
 
@@ -103,7 +103,8 @@ Sequences project if every element projects. Structured nodes (`Map`, `Call`, `E
 One definition of what sits inside what in a [`File`], and the walkers built on it.
 
 [`children`] says, for any [`Node`], which nodes sit directly inside it and in which [`Place`].
-[`walk`] is the one recursion over that. Every other walker here is [`walk`] with a filter
+[`walk`] is the one recursion over that, through [`walk_node_scoped`], which also says when a
+node is done with, for a walker that must know where a block ends. Every other walker here is [`walk`] with a filter
 and, where a position must stay unseen, a [`Visit::Skip`] written at the walker, so what a
 walker leaves out is read in its own body and not in a copy of the recursion.
 
@@ -113,9 +114,10 @@ All structural walks across the workspace route through [`children`] and [`walk`
 The groups of a node come in one order: `(args)`, `{value}`, `[content]`, then its
 `:connect`s. The AST keeps no order of groups, so this is the order of every walker.
 
-The one exception to "one recursion" is [`for_each_element_mut`]: a mutable walk cannot share
-the borrow with [`children`], so it lists the children again, and `tests/walk_coverage.rs`
-holds the two to the same reach.
+The one exception to "one recursion" is the mutable walk ([`for_each_element_mut`],
+[`for_each_id_mut`], [`fill_interpolations`]): a mutable walk cannot share the borrow with
+[`children`], so it lists the children again, and `tests/walk_coverage.rs` holds the two to the
+same reach.
 
 ===[Enums]
 
@@ -159,6 +161,22 @@ what `f` answers [`Visit::Descend`] to. [`Visit::Break`] stops the walk and is h
 ====[fn walk_node]
 
 [`walk`] from one node, which sits in `place`.
+
+====[fn walk_node_scoped]
+
+[`walk_node`] that also says when it is done with a node.
+
+`enter` is `walk_node`'s `f`: shown each node before what it holds, and answering what to do
+next. `leave` is shown the same node and place once everything the node holds has been walked.
+It is called for a node `enter` answered [`Visit::Descend`] to and for one it answered
+[`Visit::Skip`] to (entered, and just holding nothing the walk looked at), and not for one it
+answered [`Visit::Break`] to, because the walk ends there.
+
+This is for a walker whose answer depends on where a node ends. The text of a run of blocks
+puts a blank line between two blocks and none between a line of text and the paragraph an
+inline element holds; a visitor that is only shown entries cannot tell which paragraph it is
+in, and could only guess it from the order it was shown things in. This is still the one
+recursion: [`walk_node`] is this with a `leave` that does nothing.
 
 ====[fn for_each_node]
 
@@ -260,6 +278,34 @@ Hands `f` the `#(id)` of every node of `file` that can carry one (an element, a 
 section, a list, a list item, a bare entry), with the node's span, in document order, each node
 before what it holds. It goes into `:connect`s too, as [`for_each_node`] does; the nodes it
 reaches are those for which [`Node::id`] answers.
+
+====[fn for_each_interpolation_in_value]
+
+Visits every [`Interpolation`] under `value`, in document order, wherever it sits: the value
+itself, an element's `(args)` and `{value}` entries, running text and blocks of a `[...]`.
+
+Unlike [`for_each_descendant_in_blocks`] this goes into `(args)` and the values of
+`key: value` entries, because here the question is "what is written anywhere in this value", and
+not "what does this element hold". `:connect`s are reached, as [`for_each_node`] reaches them.
+
+====[fn fill_interpolations]
+
+Replaces, in place, each interpolation under `value` that `fill` has a value for. It is shown
+them in the order [`for_each_interpolation_in_value`] shows them, and an interpolation it answers
+`None` for is left as written.
+
+What the value becomes depends on where the interpolation sits, which is the one thing this
+function knows:
+
+- as a value (`(args)`, an entry of `{value}`, a `[...]` value): the value itself, whatever type
+
+it has;
+
+- in running text: text, of the value's scalar text;
+- as a block of its own: a paragraph of that text.
+
+A value with no scalar text (a map, a list) has no place in text, so there the interpolation is
+left as written too.
 
 ==[Functions]
 

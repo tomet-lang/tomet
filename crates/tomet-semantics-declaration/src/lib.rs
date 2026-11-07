@@ -40,6 +40,7 @@ pub use tomet_ast::{Element, File, Value};
 mod check;
 mod declaration;
 mod kind;
+mod macros;
 mod profile;
 mod read;
 mod vars;
@@ -47,6 +48,7 @@ mod vars;
 pub use check::{Problem, check_declarations};
 pub use declaration::{Declaration, Found, declarations, declarations_from_header};
 pub use kind::{Cardinality, DeclKind, Host, Scope, Spec};
+pub use macros::{Arity, Placeholder, expressions_in_body, is_ident_placeholder, placeholder_of};
 pub use profile::Profile;
 pub use read::{
     blueprint_target, dictionary_name, document_blueprint, document_dictionary, document_entries,

@@ -9,7 +9,7 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
 use time::OffsetDateTime;
-use tomet_ast::{Block, File};
+use tomet_ast::{Block, File, Value};
 
 use super::value::{DirRef, DocRef, EvalValue};
 
@@ -170,7 +170,7 @@ pub struct EvalContext<'a> {
     /// The document the expression was written in: what `self` is.
     pub self_doc: DocRef,
     /// Macro name to template, already merged (the document's own win).
-    pub macros: &'a HashMap<String, String>,
+    pub macros: &'a HashMap<String, Value>,
     /// `var`: the variables in scope, a map from name to value. The value is the
     /// one passed to `tomet new --var`, else the declaration's `default`.
     pub var: &'a EvalValue,

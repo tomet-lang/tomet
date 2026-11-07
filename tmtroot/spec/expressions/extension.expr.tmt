@@ -7,7 +7,7 @@
 
 =[ 今できること ]
 
-利用者が足せるのは、マクロだけ。`::macros` に、引数を差し込む文字列のテンプレートを書く（@file(tmtroot/spec/expressions/macro.expr.tmt)）。
+利用者が足せるのは、マクロだけ。`::macros` に、引数を差し込むテンプレート（文字列、または `[ ... ]` のブロック）を書く（@file(tmtroot/spec/expressions/macro.expr.tmt)）。
 
 次のものは、今はできない。
 

@@ -1,6 +1,6 @@
 ::kind(api)
 
-::meta{crate: tomet-load-config, dependencies: list(tomet-ast-parser, tomet-config), dependents: list(tomet-cli, tomet-indexer, tomet-load, tomet-lsp, tomet-tests, tomet-workspace)}
+::meta{crate: tomet-load-config, dependencies: list(tomet-ast, tomet-ast-parser, tomet-config), dependents: list(tomet-cli, tomet-indexer, tomet-load, tomet-lsp, tomet-tests, tomet-workspace)}
 
 =[tomet-load-config]
 
@@ -16,17 +16,20 @@ Shares the `tomet-load` name prefix deliberately: both crates are
 `tomet-load`'s own `Vault::discover` calls [`find_config_file`]
 directly rather than duplicating the walk.
 
-==[The three layers]
+==[The layers]
 
-Configuration is a stack of three kinds of file, outermost first:
+Configuration is a stack of files, outermost first:
 
 - (vault) `VAULT_CONFIG_FILE` vault boundary -- a vault is the:the
 
 directory holding it -- and the vault-only settings.
 
-- (folder) `FOLDER_CONFIG_FILE` to its folder and below, stacked:applies
+- (folder) the Folder's entry file, in each directory from the vault root down to the
 
-from the vault root down to the document.
+document: its leading `::` declarations apply to its folder and below. The entry file is an
+ordinary document that is also a layer; its name is the vault's to choose
+([`WorkspaceConfig::folder_entry`](tomet_config::WorkspaceConfig::folder_entry),
+`::workspace{ folder: { entry: ... } }`) and is not a constant of this crate.
 
 - (document) the document's own declarations (`::format`, `::fields`, `::macros`, ...), applied
 
@@ -38,15 +41,21 @@ never leaks into an inner one. A declaration that only the vault config may
 write (`DeclKind::is_vault_only`: `::workspace`) has no effect in a folder or a document
 layer; `tomet check` reports it.
 
-These two names are the only ones. Every user of them, in code and in
-tests, refers to the constants here rather than spelling them.
+The walk is not circular because the vault comes first: the vault config is found by its fixed
+name, it alone names the entry file, and only then are the folder layers read. Since no other
+layer may set the name, one name holds for the whole walk.
+
+Every user of [`VAULT_CONFIG_FILE`], in code and in tests, refers to the constant here rather
+than spelling it.
 
 Why these names. `vault`, and not `repo`, `root`, `global` or `default`: a vault can be a
 subdirectory of a repository (`repo` would lie), `root` collides with `root:` keys, `global`
 reads as a per-user layer, and `default` claims the bottom of the stack although it sits above
-the built-in defaults. The file is the marker, so no `root: true` key is needed. `.config.tmt`
-mirrors `.writ.tmt`: the same name at every level, a dotfile because it is scattered. Any other
-`xxx.config.tmt` is left free for other applications.
+the built-in defaults. The file is the marker, so no `root: true` key is needed. Any other
+`xxx.config.tmt` is left free for other applications. The vault config keeps its own fixed name
+because it has to be found before anything can be read from it; a Folder's entry file is a
+document of the Folder itself, so its name is a vault setting, with `self.tmt` as the
+default.
 
 ==[Functions]
 
@@ -56,7 +65,7 @@ The vault governing `start` and its stacked config: searches `start` and its
 parent directories for the nearest [`VAULT_CONFIG_FILE`].
 
 Returns `(Config, vault_config_path, vault_directory_path)`. The `Config` is
-the vault config with every [`FOLDER_CONFIG_FILE`] between the vault root and
+the vault config with every Folder entry file between the vault root and
 `start` laid over it; the document's own declarations are not part of it (that
 is [`config_for`]'s).
 
@@ -78,7 +87,3 @@ declarations are used, and failing that the defaults.
 ===[const VAULT_CONFIG_FILE]
 
 The vault config: the file whose directory is the vault.
-
-===[const FOLDER_CONFIG_FILE]
-
-A folder config: stacked over the vault config for its folder and below.

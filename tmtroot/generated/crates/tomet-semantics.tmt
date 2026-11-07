@@ -42,7 +42,7 @@ vault registers in [`LoadedDictionaries`], and resolves what a `@term` names ([`
 table parsing (`table`).
 - ("Element Data Extraction (`data`)") Extracts and normalizes an element's `{...}` data group via [`data::element_data`].
 - ("Element-Specific Semantics (`elements`)") Dedicated normalization and extraction
-logic for concrete built-in element families (`config`, `footnote`,
+logic for concrete built-in element families (`comment`, `config`, `footnote`,
 `heading`, `table`, `tag`, `target`).
 
 ==[Module data]
@@ -133,12 +133,56 @@ While the root of `tomet-semantics` provides the general semantic framework
 and connect evaluation), this module houses the logic specific to individual
 built-in element families:
 
+- (comment) What a comment says (`@comment`), and the element an importer builds from the text of one.
 - (config) Document configuration (`::config`, `::settings`).
 - (footnote) Footnote collection and indexing (`@ftn(id)[...]`, and `@ftn(id)` to refer to one).
 - (heading) Heading level calculation and bounds clamping (`heading`).
 - (table) Table rows and cell structures (`@table`).
 - (tag) Tag collection (`#tag`).
 - (target) Target URI and scheme resolution (`@link`, `@embed`, `@file`, `@dir`).
+
+===[Module comment]
+
+====[comment]
+
+`@comment[ ... ]`: a note for whoever reads the exported source.
+
+What a comment @em[says] is decided once, here: [`comment_text`]. An exporter does not read the
+tree for it; it takes the text and writes it in the comment syntax of its target, which is the
+only thing that differs between targets. [`comment_element`] is the other direction: what an
+importer builds from the text of a comment it found.
+
+====[Functions]
+
+=====[fn comment_text]
+
+The text of a comment's `[content]`, as it reads in source.
+
+- Blocks (paragraphs, a section's title and body, list items) are separated by a blank line.
+
+A paragraph inside an inline element is not a block of its own and is not separated.
+
+- A line break, soft or hard, is a newline: the author wrapped the line there.
+- A code span keeps its backticks, with a fence long enough for what is in it.
+- An `${...}` nobody evaluated is written as it was, the way a reader of the source would
+
+find it. A hole is left out: it has no text until it is filled.
+
+- Markup around text (`@em[x]`) contributes its text. `(args)`, `{value}` and `:connect`s are
+
+not part of what the content says, and are not read.
+
+An element with no content has no text: the empty string.
+
+=====[fn comment_element]
+
+A `@comment` that says `text`, standing at `placement`: the element an importer builds from
+the text of a comment it found.
+
+The inverse of [`comment_text`] for what that can say: a blank line starts a paragraph, a line
+break inside one is a soft break, and a run of backticks closed by a run of the same length is a
+code span (the way CommonMark reads one; a run with no partner is only text). The element is
+spelled bare, as `std`'s elements are. An empty text is a comment with no content.
 
 ===[Module config]
 

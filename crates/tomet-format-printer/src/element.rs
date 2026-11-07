@@ -5,7 +5,6 @@ use tomet_ast::{
     Placement, Value,
 };
 use tomet_config::{GroupOrder, PrinterConfig};
-use tomet_style::render_nested;
 
 use crate::id::render_id;
 use crate::inline::{raw_content_text, render_content_blocks};
@@ -348,10 +347,17 @@ pub(crate) fn render_group_entries(entries: &[Entry], config: &PrinterConfig) ->
         .map(|entry| match entry {
             // `render_nested`, not `render_value_inner_with_config`: a
             // nested map needs its own braces here or `m: { k: v }`
-            // prints as `m: k: v` and reparses as a string.
-            Entry::Pair(k, v) => {
-                format!("{}: {}", tomet_style::key_text(k), render_nested(v, config))
-            }
+            // prints as `m: k: v` and reparses as a string. With this crate's own
+            // block renderer, as `(args)` has: a `key: [...]` value (a block macro
+            // in `::macros{ ... }`) holds whole blocks, and the restricted default
+            // would print an element in it as nothing.
+            Entry::Pair(k, v) => format!(
+                "{}: {}",
+                tomet_style::key_text(k),
+                tomet_style::render_nested_with_blocks(v, config, &mut |blocks, cfg| {
+                    render_content_blocks(blocks, cfg)
+                })
+            ),
             Entry::Element(child) => render_element(child.as_view(), config),
             Entry::Hole(hole) => render_hole(hole, config),
             Entry::Bare(bare) => render_bare(bare, config),

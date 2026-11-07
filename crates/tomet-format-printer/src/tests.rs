@@ -746,3 +746,21 @@ fn inline_raw_with_backtick_falls_back_to_at_raw() {
     let reparsed = tomet_ast_parser::parse_file(&printed).expect("reparses cleanly");
     assert_eq!(document_to_tm(&reparsed), printed);
 }
+
+#[test]
+fn a_block_value_in_a_group_keeps_every_block_it_holds() {
+    // `::macros{ name: [ ... ] }` is a `{...}` group, whose `key: [...]` values used to be printed
+    // as paragraph inlines only: an element in one came out as `[]`.
+    for src in [
+        "::macros{ card: [ @card(title: ${1})[ ${2} ] ] }\n",
+        "::macros{ two: [\none ${1}\n\n@card[ x ]\n] }\n",
+        "::macros{ note: [ Note: ${msg} ] }\n",
+    ] {
+        let before = tomet_ast_parser::parse_file(src).unwrap();
+        let printed = document_to_tm(&before);
+        assert!(!printed.contains("[]"), "{src:?} printed as {printed:?}");
+        let after = tomet_ast_parser::parse_file(&printed).expect("the print reparses");
+        assert_eq!(before, after, "{src:?} printed as {printed:?}");
+        assert_eq!(document_to_tm(&after), printed, "{src:?}: printing is not stable");
+    }
+}

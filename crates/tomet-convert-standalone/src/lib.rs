@@ -277,7 +277,7 @@ fn carry(vault: &Vault, groups: &[Place<'_>], decisions: &[Decision], document: 
                     if !macros.iter().any(|(held, _)| held == name) =>
                 {
                     if let Some(template) = vault.config.macros.get(name) {
-                        macros.push((name.clone(), Value::String(template.clone())));
+                        macros.push((name.clone(), template.clone()));
                     }
                 }
                 Dirt::Expression(Reach::Var(name))

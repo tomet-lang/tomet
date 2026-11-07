@@ -49,7 +49,7 @@ pub struct Config {
     pub workspace: WorkspaceConfig,
     /// The macros a vault defines with `::macros`: name to template. Not a
     /// setting, so it is not read from the `::settings`/`::config` tree.
-    pub macros: std::collections::HashMap<String, String>,
+    pub macros: std::collections::HashMap<String, tomet_ast::Value>,
     /// The variables a vault declares with `::vars`, in the order written.
     pub vars: Vec<(String, tomet_declaration::VarDecl)>,
     pub registry: RegistryConfig,

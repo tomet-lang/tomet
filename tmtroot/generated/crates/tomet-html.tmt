@@ -1,6 +1,6 @@
 ::kind(api)
 
-::meta{crate: tomet-html, dependencies: list(tomet-ast, tomet-ast-parser, tomet-expr, tomet-printer, tomet-semantics, tomet-span, tomet-tree), dependents: list(tomet, tomet-cli, tomet-markdown, tomet-tests)}
+::meta{crate: tomet-html, dependencies: list(tomet-ast, tomet-ast-parser, tomet-expr, tomet-printer, tomet-semantics, tomet-span, tomet-tree), dependents: list(tomet, tomet-cli, tomet-markdown, tomet-pandoc, tomet-tests)}
 
 =[tomet-html]
 
@@ -15,10 +15,41 @@ with DOCTYPE, CSS styling, and head metadata.
 [`render_body`] / [`render_body_with`]: Renders the HTML fragment representing the body content.
 - ("Advanced Rendering Options") Heading numbering (`number_headings: true`), automatic slug anchors (`auto_slug_headings: true`),
 document language setting, and semantic CSS classes for callouts and custom elements.
+- ("Comment Syntax (`comment`)") `@comment` renders as an HTML comment. The syntax of one (`<!-- ... -->`, and what may not
+appear inside) is [`comment::render`] and [`comment::parse`], which the converters for
+formats that carry raw HTML (CommonMark, Pandoc) use as well, so it is spelled once.
 
 This is a generic, data-driven mapping: most `<T>`/`@name` elements become `<div>`/`<span>`
 tags carrying `args` as `data-*` attributes. Built-in elements like `@link`, `::meta`, and
 `@links{}` containers receive dedicated HTML representations.
+
+==[Module comment]
+
+===[comment]
+
+HTML's comment syntax, `<!-- ... -->`, written and read in one place.
+
+A comment is HTML syntax wherever HTML is written: a page, but also the raw HTML that CommonMark
+passes through and the `"html"` raw blocks of Pandoc's AST. So the converters for those
+formats use this instead of each spelling the delimiters, and escaping what may not appear
+inside them, for themselves. What a `@comment` says is `tomet_semantics::comment_text`.
+
+===[Functions]
+
+====[fn render]
+
+`text` as an HTML comment.
+
+What cannot appear inside a comment (`-->`, `--!>` and `<!--`) is broken with a space, so the
+comment ends where it is meant to and nowhere earlier. A line of text is padded by a space on
+each side; an empty text is the empty comment `<!---->`.
+
+====[fn parse]
+
+The text of `source` if it is exactly one HTML comment, and `None` if it is anything else:
+text around it, or more than one comment.
+
+Whitespace around the comment, and between its delimiters and its text, is not part of the text.
 
 ==[Structs]
 

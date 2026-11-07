@@ -47,7 +47,7 @@ fn run_with(
     src: &str,
     phase: Phase,
     var: &EvalValue,
-    macros: &HashMap<String, String>,
+    macros: &HashMap<String, Value>,
 ) -> Result<EvalValue, EvalError> {
     let cx = EvalContext {
         phase,
@@ -523,8 +523,8 @@ fn a_function_is_not_data() {
 #[test]
 fn a_macro_fills_positional_and_named_placeholders() {
     let mut macros = HashMap::new();
-    macros.insert("gh".to_string(), "https://x/issues/${1}".to_string());
-    macros.insert("who".to_string(), "hi ${name}".to_string());
+    macros.insert("gh".to_string(), Value::String("https://x/issues/${1}".to_string()));
+    macros.insert("who".to_string(), Value::String("hi ${name}".to_string()));
     let run = |src: &str| run_with(src, Phase::Output, &EvalValue::Null, &macros);
     assert_eq!(run("macro.gh(12)").unwrap(), text("https://x/issues/12"));
     assert_eq!(run("macro.who(name: \"ann\")").unwrap(), text("hi ann"));
@@ -537,7 +537,7 @@ fn a_macro_fills_positional_and_named_placeholders() {
 #[test]
 fn macro_bare_word_argument_is_unknown_name() {
     let mut macros = HashMap::new();
-    macros.insert("gh".to_string(), "https://x/issues/${1}".to_string());
+    macros.insert("gh".to_string(), Value::String("https://x/issues/${1}".to_string()));
     let run = |src: &str| run_with(src, Phase::Output, &EvalValue::Null, &macros);
     assert_eq!(
         run("macro.gh(tomet)"),
@@ -550,7 +550,7 @@ fn macro_non_placeholder_in_template_treated_as_plain_text() {
     let mut macros = HashMap::new();
     macros.insert(
         "env".to_string(),
-        "${HOME}/bin:${PATH:-/bin}:${}".to_string(),
+        Value::String("${HOME}/bin:${PATH:-/bin}:${}".to_string()),
     );
     let run = |src: &str| run_with(src, Phase::Output, &EvalValue::Null, &macros);
     assert_eq!(
@@ -562,7 +562,7 @@ fn macro_non_placeholder_in_template_treated_as_plain_text() {
 #[test]
 fn a_macro_cannot_be_named_without_being_called_and_has_no_bare_form() {
     let mut macros = HashMap::new();
-    macros.insert("gh".to_string(), "x".to_string());
+    macros.insert("gh".to_string(), Value::String("x".to_string()));
     let run = |src: &str| run_with(src, Phase::Output, &EvalValue::Null, &macros);
     assert!(run("macro.gh").is_err());
     // The bare name is not a macro and not a function.
@@ -1743,4 +1743,131 @@ fn eval_value_number_preserves_written_representation_and_computes_numerically()
             EvalValue::Int(2),
         ])
     );
+}
+
+// ---- block macros: `::macros{ name: [ ... ] }` ----
+
+/// The `[ ... ]` value of the first entry of the `::macros` declaration in `src`.
+fn block_macro(src: &str) -> Value {
+    let file = tomet_ast_parser::parse_file(src).expect("parses");
+    let Some(tomet_ast::Group(entries)) = &file.header[0].data.value else {
+        panic!("expected a {{...}} group");
+    };
+    let tomet_ast::Entry::Pair(_, value) = &entries[0] else {
+        panic!("expected a key: value entry");
+    };
+    value.clone()
+}
+
+fn macros_of(entries: &[(&str, Value)]) -> HashMap<String, Value> {
+    entries
+        .iter()
+        .map(|(name, template)| (name.to_string(), template.clone()))
+        .collect()
+}
+
+#[test]
+fn a_block_macro_is_its_blocks_with_the_places_filled_in() {
+    let macros = macros_of(&[
+        (
+            "card",
+            block_macro("::macros{ card: [\n@card(title: ${1})[ ${2} ]\n] }\n"),
+        ),
+        ("notice", block_macro("::macros{ notice: [ Notice: ${msg} ] }\n")),
+    ]);
+    let run = |src: &str| run_with(src, Phase::Output, &EvalValue::Null, &macros);
+
+    let EvalValue::Fragment(blocks) = run("macro.card(\"Welcome\", \"Hello\")").unwrap() else {
+        panic!("a block macro is a fragment");
+    };
+    let [tomet_ast::Block::Element(card)] = &blocks[..] else {
+        panic!("expected the card, got {blocks:?}");
+    };
+    assert_eq!(
+        card.data.args,
+        Some(Value::Map(vec![(
+            "title".to_string(),
+            Value::String("Welcome".to_string())
+        )]))
+    );
+    let Some([tomet_ast::Block::Paragraph(p)]) = card.content.as_deref() else {
+        panic!("expected one paragraph, got {:?}", card.content);
+    };
+    assert!(matches!(&p.content[..], [tomet_ast::Inline::Text(t)] if t.value == "Hello"));
+
+    let EvalValue::Fragment(blocks) = run("macro.notice(msg: \"Important\")").unwrap() else {
+        panic!("a block macro is a fragment");
+    };
+    let [tomet_ast::Block::Paragraph(p)] = &blocks[..] else {
+        panic!("expected a paragraph, got {blocks:?}");
+    };
+    assert!(
+        matches!(&p.content[..], [tomet_ast::Inline::Text(a), tomet_ast::Inline::Text(b)]
+            if a.value == "Notice: " && b.value == "Important"),
+        "{:?}",
+        p.content
+    );
+}
+
+#[test]
+fn a_number_given_to_a_block_macro_stays_a_number_in_data() {
+    let macros = macros_of(&[(
+        "n",
+        block_macro("::macros{ n: [\n@meter(of: ${1})\n] }\n"),
+    )]);
+    let run = |src: &str| run_with(src, Phase::Output, &EvalValue::Null, &macros);
+    let EvalValue::Fragment(blocks) = run("macro.n(7)").unwrap() else {
+        panic!("a block macro is a fragment");
+    };
+    let [tomet_ast::Block::Element(el)] = &blocks[..] else {
+        panic!("expected an element, got {blocks:?}");
+    };
+    assert_eq!(
+        el.data.args,
+        Some(Value::Map(vec![("of".to_string(), Value::Int(7))]))
+    );
+}
+
+#[test]
+fn a_block_macro_checks_its_arguments_as_a_text_macro_does() {
+    let macros = macros_of(&[
+        (
+            "card",
+            block_macro("::macros{ card: [\n@card(title: ${1})[ ${2} ]\n] }\n"),
+        ),
+        ("notice", block_macro("::macros{ notice: [ Notice: ${msg} ] }\n")),
+        ("none", block_macro("::macros{ none: [ plain ] }\n")),
+    ]);
+    let run = |src: &str| run_with(src, Phase::Output, &EvalValue::Null, &macros);
+    assert_eq!(
+        run("macro.card(\"only one\")"),
+        Err(EvalError::WrongArgCount {
+            function: "macro.card".to_string(),
+            expected: "2".to_string(),
+            got: 1
+        })
+    );
+    assert_eq!(
+        run("macro.notice()"),
+        Err(EvalError::message("macro.notice expects named argument `msg`"))
+    );
+    assert_eq!(
+        run("macro.none(1)"),
+        Err(EvalError::WrongArgCount {
+            function: "macro.none".to_string(),
+            expected: "0".to_string(),
+            got: 1
+        })
+    );
+    assert!(matches!(run("macro.none()"), Ok(EvalValue::Fragment(_))));
+}
+
+#[test]
+fn a_template_that_is_neither_a_string_nor_blocks_cannot_be_called() {
+    let macros = macros_of(&[("three", Value::Int(3))]);
+    let run = |src: &str| run_with(src, Phase::Output, &EvalValue::Null, &macros);
+    let Err(error) = run("macro.three()") else {
+        panic!("a number is not a template");
+    };
+    assert!(error.to_string().contains("macro.three"), "{error}");
 }

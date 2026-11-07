@@ -28,7 +28,7 @@ pub struct ConfigLayer {
     blueprints: Vec<(String, Value)>,
     vocabularies: Vec<(String, Value)>,
     dictionaries: Vec<(String, Value)>,
-    macros: HashMap<String, String>,
+    macros: HashMap<String, Value>,
     vars: Vec<(String, VarDecl)>,
 }
 
@@ -110,7 +110,7 @@ impl ConfigLayer {
         &self.workspace
     }
 
-    pub(crate) fn macros(&self) -> &HashMap<String, String> {
+    pub(crate) fn macros(&self) -> &HashMap<String, Value> {
         &self.macros
     }
 
@@ -200,8 +200,8 @@ mod tests {
         // ... and kept where it does not, down to a sibling key of the same map.
         assert!(cfg.format.link_no_space);
         assert!(cfg.meta.always_newline);
-        assert_eq!(cfg.macros.get("a").map(String::as_str), Some("outer-a"));
-        assert_eq!(cfg.macros.get("b").map(String::as_str), Some("inner-b"));
+        assert_eq!(cfg.macros.get("a").and_then(|v| v.as_str()), Some("outer-a"));
+        assert_eq!(cfg.macros.get("b").and_then(|v| v.as_str()), Some("inner-b"));
     }
 
     #[test]

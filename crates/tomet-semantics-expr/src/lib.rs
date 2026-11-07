@@ -41,6 +41,12 @@
 //! The pass that puts the values back into a document is
 //! `tomet_transform::resolve_expressions`.
 
+use std::collections::HashMap;
+
+use tomet_ast::Value;
+use tomet_declaration::{Arity, Placeholder, is_ident_placeholder, placeholder_of};
+use tomet_tree::fill_interpolations;
+
 mod address;
 mod args;
 mod chars;
@@ -294,82 +300,102 @@ fn generate_call(name: &str, args: Args, cx: &EvalContext) -> Result<EvalValue, 
     }
 }
 
-fn is_ident_placeholder(s: &str) -> bool {
-    let mut chars = s.chars();
-    let Some(first) = chars.next() else {
-        return false;
-    };
-    (first.is_alphabetic() || first == '_')
-        && chars.all(|c| c.is_alphanumeric() || c == '_' || c == '-')
-}
-
-/// `macro.name(args)`: the template with its placeholders filled in.
-/// Positional placeholders `${1}`, `${2}`, ... take positional arguments, and
-/// named placeholders `${ident}` take named arguments. Any other `${...}` in
-/// the template is treated as plain text.
+/// `macro.name(args)`: the template with its places filled in.
+///
+/// A template is a [`Value`] ([`tomet_declaration::Arity`] says what its places are). A string is
+/// a text macro: `${1}`, `${2}`, ... take positional arguments, `${ident}` takes a named one, any
+/// other `${...}` in it is plain text, and the call is a string. A `[ ... ]` is a block macro: the
+/// same places, written as the interpolations `${1}` and `${name}` in its blocks, are filled in on
+/// the tree, and the call is a fragment ([`EvalValue::Fragment`]) of those blocks.
 ///
 /// Arguments are ordinary expressions. Missing or excess arguments report arity
 /// errors, missing named arguments report the missing name, and an unknown
-/// macro reports `unknown macro`.
+/// macro reports `unknown macro`. A template of any other kind is not a macro yet.
 fn macro_call(name: &str, args: Args, cx: &EvalContext) -> Result<EvalValue, EvalError> {
     let template = cx
         .macros
         .get(name)
         .ok_or_else(|| EvalError::UnknownFunction(format!("macro.{name}")))?;
 
-    let mut max_pos = 0;
-    let mut named_keys = Vec::new();
-    let mut rest = template.as_str();
-    while let Some(start) = rest.find("${") {
-        rest = &rest[start + 2..];
-        if let Some(end) = rest.find('}') {
-            let key = &rest[..end];
-            if !key.is_empty() && key.chars().all(|c| c.is_ascii_digit()) {
-                if let Ok(idx) = key.parse::<usize>() {
-                    max_pos = max_pos.max(idx);
+    match template {
+        Value::String(template) => {
+            macro_args_fit(name, &Arity::of_text(template), &args)?;
+            let mut text = template.clone();
+            for (key, value) in &args.named {
+                if is_ident_placeholder(key) {
+                    text = text.replace(&format!("${{{key}}}"), &methods::scalar_text(value)?);
                 }
-            } else if is_ident_placeholder(key) && !named_keys.contains(&key.to_string()) {
-                named_keys.push(key.to_string());
             }
-            rest = &rest[end + 1..];
+            for (i, value) in args.positional.iter().enumerate() {
+                text = text.replace(&format!("${{{}}}", i + 1), &methods::scalar_text(value)?);
+            }
+            Ok(EvalValue::String(text))
         }
+        Value::Blocks(_) => {
+            macro_args_fit(name, &Arity::of_body(template), &args)?;
+            let mut fills: HashMap<Placeholder, Value> = HashMap::new();
+            let named = args
+                .named
+                .iter()
+                .filter(|(key, _)| is_ident_placeholder(key))
+                .map(|(key, value)| (Placeholder::Named(key.clone()), value));
+            let positional = args
+                .positional
+                .iter()
+                .enumerate()
+                .map(|(i, value)| (Placeholder::Positional(i + 1), value));
+            for (place, value) in named.chain(positional) {
+                let filled = value.to_ast().ok_or_else(|| {
+                    EvalError::mismatch(
+                        format!("an argument of macro.{name}"),
+                        "a value that can be written in a document",
+                        value.type_name(),
+                    )
+                })?;
+                fills.insert(place, filled);
+            }
+            let mut body = template.clone();
+            fill_interpolations(&mut body, |interp| {
+                placeholder_of(interp).and_then(|place| fills.get(&place).cloned())
+            });
+            match body {
+                Value::Blocks(blocks) => Ok(EvalValue::Fragment(blocks)),
+                other => unreachable!("filling a block macro left {other:?}"),
+            }
+        }
+        _ => Err(EvalError::message(format!(
+            "macro.{name} is not a string or block content, so it cannot be called"
+        ))),
     }
+}
 
-    if max_pos > 0 && args.positional.len() != max_pos {
+/// Whether the arguments of a call to macro `name` are the ones its template takes.
+///
+/// One check for a text macro and a block macro, because what a template takes is
+/// [`Arity`]'s answer for both.
+fn macro_args_fit(name: &str, arity: &Arity, args: &Args) -> Result<(), EvalError> {
+    if arity.positional > 0 && args.positional.len() != arity.positional {
         return Err(EvalError::WrongArgCount {
             function: format!("macro.{name}"),
-            expected: max_pos.to_string(),
+            expected: arity.positional.to_string(),
             got: args.positional.len(),
         });
     }
-    if max_pos == 0
-        && named_keys.is_empty()
-        && (!args.positional.is_empty() || !args.named.is_empty())
-    {
+    if arity.is_empty() && (!args.positional.is_empty() || !args.named.is_empty()) {
         return Err(EvalError::WrongArgCount {
             function: format!("macro.{name}"),
             expected: "0".to_string(),
             got: args.positional.len() + args.named.len(),
         });
     }
-    for expected_key in &named_keys {
+    for expected_key in &arity.named {
         if !args.named.iter().any(|(k, _)| k == expected_key) {
             return Err(EvalError::message(format!(
                 "macro.{name} expects named argument `{expected_key}`"
             )));
         }
     }
-
-    let mut text = template.clone();
-    for (key, value) in &args.named {
-        if is_ident_placeholder(key) {
-            text = text.replace(&format!("${{{key}}}"), &methods::scalar_text(value)?);
-        }
-    }
-    for (i, value) in args.positional.iter().enumerate() {
-        text = text.replace(&format!("${{{}}}", i + 1), &methods::scalar_text(value)?);
-    }
-    Ok(EvalValue::String(text))
+    Ok(())
 }
 
 /// The functions an expression can call by a bare name, each with a line
