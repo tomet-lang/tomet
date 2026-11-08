@@ -1,0 +1,163 @@
+=[ 宣言パス `::path(...)`・括弧糖衣・および `::` と `.` の大統一構造 ]
+
+Status: 設計確定（2026-11-09）。`::id(config-vault)` と `::macros(copyright: "...")` の違和感から出発し、単数ルート＋ドットパス宣言 `::field.author(...)`、同名ルート縮約規則（`X.X == X`）、後置括弧の完全脱糖衣（`{}` $\equiv$ `::meta()` / `#()` $\equiv$ `::id()` / `[]` $\equiv$ `(prose: [])`）、値位置での `()` 配列リテラル、および `::`（Nexus 間移動）と `.`（データキー／メソッド）の完全分離へと至った最終構造の定義。
+
+==[ 1. Tomet の本質的定義 ]
+
+Tomet は **「完全アドレス可能なシリアライズ言語であり、"糖衣" と "Prose" の多様によって人が読みやすい形にしたもの」** である。
+すべての Tomet 文書は、糖衣を剥がせば「すべてのノード（Nexus）と属性（Data）に一意のアドレスで到達できる厳密な木」になり、糖衣を着せれば「人間が心地よく読み書きできる散文（Tome）」になる。
+
+==[ 2. 結論①: 単数ルート宣言 `::path(...)` と同名ルート縮約規則（`X.X == X`） ]
+
+=== [ 正式形: `::field.author(...)` — 宣言ヘッドでの単数ルート＋ドットパス指定 ]
+
+組み込み宣言のルート名はすべて **単数形**（`id`, `kind`, `version`, `profile`, `use`, `tag`, `rule`, `meta`, `macro`, `var`, `format`, `field`, `workspace`, `export`, `migration`, `vocabulary`, `dictionary`, `blueprint`, `element`）に統一する。
+対象キーは位置引数として押し込むのではなく、**宣言ヘッド自体にドットパスとして書く**（または親パスの `(...)` 内に名前付き引数としてまとめて書く）。
+
+```tm
+::id(config-vault)
+::kind(config, 2)
+::meta(a: xxx, b: xxx, c: xxx)
+
+::macro.copyright("(C) 2026 Tomet Projects")
+::macro.generated_by[ @comment[ Generated from ${1}. Edit that, then `tomet export .`. ] ]
+
+::format.meta(always_newline: true)
+::format.heading(space_inside_brackets: true)
+::format.table(adjust_width: auto, max_col_width: 50)
+
+::field.aliases(type: list, always_newline: true)
+::field.created(type: datetime, format: rfc3339, offset: "+09:00")
+::field.url.wiki(type: list, always_newline: true)
+::field.author(type: string, required: true)[ 文書の著者 ]
+
+::var.title(type: string, default: "Untitled")[ 作成するノートの題 ]
+::var.draft(type: bool, default: false)
+
+::vocabulary.writ(@file(tmtroot/schema/vocabularies/writ.vocabulary.tmt))
+::blueprint.writ(@file(tmtroot/schema/blueprints/writ.blueprint.tmt))
+::dictionary.tomet(@file(tmtroot/dict/tomet.dict.tmt))
+```
+
+=== [ 同名ルート縮約規則（`X.X == X`） ]
+
+Nexus の `(...)` は常に **名前付き引数のマップ（Args）** である。
+ではなぜ `::id(config-vault)` や `::macro.copyright("(C) 2026")` のような位置引数が単一の値としてそのパス自身に束縛されるのか？
+それは **「すべてのノード `X` において、第1位置引数は自身と同名のスロット `X.X` に束縛され、かつ `X.X == X` として自己値に縮約される」** からである。
+
+- `@typst.typst` がルート要素 `@typst` と同値であるのと同じく、`id.id = "config-vault"` は `id = "config-vault"` と同値である。
+- これにより、ノード `X` は **「自身のスカラー値（`X.X`）」と「子の属性（`X.other`）」を同時に持つ** ことができる。
+  - 例: `::kind(config, 2)` は `::kind(kind: config, version: 2)` であり、`self::kind`（$= \text{kind.kind}$）は `"config"` を返し、`self::kind.version` は `2` を返す。
+- また、まとめて書く `::macro(copyright: "(C) 2026")`（`macro.copyright` キーへの指定）と、ドットパスで位置引数を渡す `::macro.copyright("(C) 2026")`（`macro.copyright.copyright` $\equiv$ `macro.copyright` への指定）が、**例外規則ゼロで数学的に100%一致** する。
+
+@table
+|[ 構文 ][ 脱糖衣・正規形 ][ 意味（データツリー上のパス） ]
+|[ `::id(config-vault)` ][ `::id(id: "config-vault")` ][ `id.id` $\equiv$ `id = "config-vault"` ]
+|[ `::kind(config, 2)` ][ `::kind(kind: "config", version: 2)` ][ `kind = "config"`, `kind.version = 2` ]
+|[ `::meta(a: 1, b: 2)` ][ `::meta(a: 1, b: 2)` ][ `meta.a = 1`, `meta.b = 2` ]
+|[ `::macro.copyright("(C)")` ][ `::macro.copyright(copyright: "(C)")` ][ `macro.copyright = "(C)"` ]
+|[ `::macro(copyright: "(C)")` ][ `::macro(copyright: "(C)")` ][ `macro.copyright = "(C)"`（上と完全同値） ]
+|[ `::field.author(type: string)[著者]` ][ `::field.author(type: string, about: [著者])` ][ `field.author = { type: "string", about: [著者] }` ]
+
+==[ 3. 結論②: 後置括弧の完全脱糖衣と、Declaration / Connect の `::` への統一 ]
+
+=== [ Nexus の2層構造（引数空間とコネクト空間） ]
+
+Nexus の後ろに付くグループは、以下の **2つの層** に分かれる：
+
+1. **要素・宣言自身の引数空間（`(...)` と、その1キー外出し糖衣である `[...]`）**：
+   - `[...]` は `(...)` 内の特定1キー（デフォルトは `prose`、語彙・宣言定義により `@link` では `label`、`::field` / `::var` / `::element` では `about`、`@callout` では `body` 等に変更可）を外出しにする糖衣である。
+   - `@name(a: 1)[文章]` $\equiv$ `@name(a: 1, prose: [文章])`
+2. **ノードに接続されるコネクト空間（`::name(...)` と、その専用糖衣である `#(...)`・`{...}`）**：
+   - **`#(id)` は `::id(id)` コネクトの糖衣** である。
+   - **`{a: 1}`（散文直後では `::{a: 1}`）は `::meta(a: 1)` コネクトの糖衣** である。
+   - これにより、「なぜ `@name` を持たない見出し `==[ Section ]#(s1)` やリスト `- item #(i1)` に `#(id)` や `{}` が付くのか」「なぜファイル先頭の `::id` / `::meta` と対になっているのか」が完全に一本化される。
+
+=== [ Declaration と Connect の `::` 統一 ]
+
+これまでファイル先頭の宣言は `::rule(...)`（コロン2つ）、要素や見出しの後置コネクトは `:rule(...)`（コロン1つ）と分かれていたが、どちらも **「親 Nexus に子 Nexus を接続する操作（`Nexus::Nexus`）」** であるため、**すべて二重コロン `::` に統一** する。
+
+- **左辺があるとき（後置接続）**：`@user(id: "u1")::id(a1)::meta(tag: "vip")::rule(...)`（糖衣形：`@user(id: "u1")#(a1){tag: "vip"}::rule(...)`）
+- **左辺がないとき（行頭プリアンブル宣言）**：`::id(doc1)`、`::meta(author: "Tefla")`、`::rule(...)`
+  - 行頭でコロンが2つなのは、**暗黙の左辺 `self`（その Division 自身）が省略された `(self)::id(doc1)` / `(self)::meta(...)` そのものだから** である。
+
+これにより、Tomet における3つの区切りシジル `:`・`::`・`.` の役割が **「1記号＝1意味」** に純化される：
+- **`:`（単一コロン）**：常に `key: value`（名前と値のペア）専用。
+- **`::`（二重コロン）**：常に `Nexus::Nexus`（ノードへの接続・宣言・式でのノード間移動）専用。
+- **`.`（ドット）**：常に `Nexus.key` / `Value.method()`（データマップのキー参照・ドットパス・メソッド呼び出し）専用。
+
+==[ 4. 結論③: 式・アドレス空間（`${...}`）における `::` と `.` の分離（`.prop` の廃止） ]
+
+`@user(id: "u123", name: "Alice")#(u1){tag: "vip"}` のように、ユーザーが `()` 内で `id`・`name`・`parent`・`path`・`title` 等のキーを使うことは日常茶飯事である。
+これまで要素の引数を `.prop.id` のように人工的な `.prop` 経由にしていたのは、システム属性（`id`, `parent`, `path` 等）との衝突を避けるためだったが、**「Nexus 間移動は `::`、データキー参照は `.`」** という原則によって、`.prop` という架空の階層は完全に不要となる。
+
+@table
+|[ アクセス構文 ][ 意味 ][ 具体例（`@user(id: "u123")#(u1){tag: "vip"}`） ]
+|[ **`X::name`** ][ **Nexus から Nexus（コネクト・Division）へ渡る** ][ `u1::id`（$\to$ `"u1"`）、`u1::meta`、`self::doc::meta`、`self::parent` ]
+|[ **`X.key`** ][ **Nexus の腹の中（`()` や `{}`）のデータキーを読む** ][ `u1.id`（$\to$ `"u123"`）、`u1::meta.tag`（$\to$ `"vip"`）、`self::meta.author` ]
+|[ **`X.method(...)`** ][ **値やノードのメソッドを呼ぶ**（`()` の有無でキー参照と一意に区別） ][ `self::meta.tags.join(", ")`、`u1::meta.list.to_string()`、`self.link()` ]
+
+==[ 5. 結論④: `list()` の解消と、値位置での裸の `(a, b, c)` 配列リテラル ]
+
+Tomet のデータ空間（`Value`）には中置演算式が存在しない（式はすべて `${ ... }` の中にある）。
+したがって、値の位置（`key: <ここ>` や配列要素の位置）において、前に識別子を伴わない **裸の `( ... )`** は算術括弧と衝突することが原理的にないため、これを **配列リテラル（`Value::Seq`）** とする。
+
+- 値位置の `(x)` はカンマがなくても常に1要素の配列 `[x]`、`()` は空配列 `[]` となる。
+- データ空間から英単語キーワード `list()` が不要になり、すべての基本データ構造が括弧記号（`[]`, `{}`, `()`）だけで表現される。
+- `list` は `::field.topics(type: list(string))` のような **型空間（`Type`）専用の名前** に戻る。
+
+@table
+|[ 括弧    ][ 構造的意味        ][ 値の位置（`key: ...`）                ][ Nexus の頭・後置（`@name...` / `::path...`）            ]
+|[ `[...]` ][ Prose（文章空間） ][ `key: [ 文章 ]`（`Value::Blocks`）    ][ `@name[ 文章 ]` $\equiv$ `@name(prose: [ 文章 ])`       ]
+|[ `{...}` ][ Map（辞書空間）   ][ `key: { a: 1, b: 2 }`（`Value::Map`） ][ `@name(...) { a: 1 }` $\equiv$ `@name(...)::meta(a: 1)` ]
+|[ `(...)` ][ Seq / Args 空間   ][ `key: (a, b, c)`（`Value::Seq`）      ][ `@name(a: 1)` / `::meta(a: 1, b: 2)`（引数マップ）      ]
+|[ `#(...)` ][ ID コネクト糖衣  ][ —                                     ][ `@name(...)#(x)` $\equiv$ `@name(...)::id(x)`           ]
+
+```tm
+::workspace.ignore("00-09 System/01 Apps/obsidian")
+::workspace.unswept("tests/fixtures", "tests/ref", "tests/store")
+
+// あるいは親パスでまとめて書く場合も `list(...)` ではなく値位置の裸の `(...)` になる:
+::workspace(
+  ignore: ("00-09 System/01 Apps/obsidian")
+  unswept: ("tests/fixtures", "tests/ref", "tests/store")
+)
+```
+
+==[ 6. 結論⑤: 辞書（`::dictionary`）と語彙（`::vocabulary`）の正式構造 ]
+
+=== [ 辞書ファイル（`.dict.tmt`） ]
+
+ファイル全体がすでに1つの辞書（`::kind(dictionary)` + `::dictionary(tomet)`）であるため、全エントリを巨大な `{}` や `|` の中に閉じ込めない。
+ヘッダで `::dictionary(tomet)` と宣言し、本文（Prose 空間）に通常のブロックとして `;@term("語")[説明]#(id)`（または複数行 `| 説明`）を並べる。
+
+```tm
+::kind(dictionary)
+::id(dictionary.tomet)
+::dictionary(tomet)
+
+;@term("vault")#(vault)
+| @term(#vault-config) のあるディレクトリと、その下の文書の全体。tomet が設定と語彙を読む単位。
+
+;@term("vault.config.tmt")#(vault-config)
+| @term(#vault) の境目を示す設定ファイル。上の階層の vault 設定は、ここで打ち切られる。
+
+;@term("prose")[ 散文。`[]`や`|`の中でかく文字 ]
+;@term("data")[ データ。`{}`や`()`、Cotomet内で書くやつ。 ]
+```
+
+=== [ 語彙ファイル（`.vocabulary.tmt`） ]
+
+`::element` も `::field` とまったく同じ単数ルート＋ドットパス構造で統一する。名前空間と同名の要素 `::element.<ns>` を宣言すれば、`X.X == X` 規則によりそのまま名前空間ルート要素（`@typst.typst` $\equiv$ `@typst`）の宣言となる。
+
+```tm
+::kind(vocabulary)
+::vocabulary.writ(version: "1.0.0")
+
+::element.rule(display: block, singleton: false)[
+  一つの規則。パラメータは自分の group の中に持つ。
+]
+::element.rule.arg.id(type: string, positional: true)[
+  規則の識別子。見出しではなくここが名前である。
+]
+```

@@ -1,5 +1,7 @@
 # The dev shell still has the old twrit: the repository's own rules are not checked
 
+> Cross-repository coordination: `bearings/initiatives/follow-declarations.tmt` (the table and the order live there; the work stays here).
+
 `just docs-check` here prints `tomet 0.5.0, twrit 0.2.0`. `twrit 0.2.0` reads **0 rules** from a `.writ.tmt` whose vocabulary is
 in the `::elements` map form (it cannot resolve `@rule`), says `ok`, and exits 0. Measured on 2026-10-24 in this repository's dev shell:
 `twrit check .` prints `3 writs, 0 rules,`. So `crate-layering` and every other guard in this repository's `.writ.tmt` files are off.

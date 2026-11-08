@@ -16,7 +16,7 @@
     「最初の宣言はどこか」付きのエラーにする。単一ファイルの `check` は見ない。
     `id-generation-settings` が同じ問い (一意性を強制するか、`ref:` を id で解決するか) を未決として持っている。
 - ( ) `#(id)` のリネームと参照の追従
-  - `@link(#x)`、`@link(id:x)`、`${#x.prop...}`、`@link(tmt:p#x)`、`@link(ref:N#x)`、`${tmt("p")#x}` を
+  - `@link(#x)`、`@link(id:x)`、`${#x.key}` / `${#x::meta.key}`、`@link(tmt:p#x)`、`${addr(tmt:p#x)}` を
     すべて書き換える。
   - 材料: 定義側は `tomet_address::find_anchor`、参照の解釈は LSP の `reference_at`
     (`apps/lsp/src/definition.rs`、`vault_definition.rs`)。「ある id への参照を span 付きで全部返す」関数は無い。

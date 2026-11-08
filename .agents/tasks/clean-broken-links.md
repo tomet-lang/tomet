@@ -1,5 +1,7 @@
 # Clean the broken links, so `sisho check` can run `tomet check-links`
 
+> Cross-repository coordination: `bearings/initiatives/check-links.tmt` (the table and the order live there; the work stays here).
+
 `tomet check-links` is back (0.5.0, `feat(cli): bring back check-links`). `sisho check` does not run it yet because this
 repository is red: **90 broken links** on 2026-10-24 (twrit has 2, sisho 0). When this repository is green, sisho adds the step
 (see `sisho/.agents/tasks/check-links-in-check.md`). Until then `sisho tomet check-links .` is the way to run it.

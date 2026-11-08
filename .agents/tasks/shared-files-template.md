@@ -1,5 +1,7 @@
 # Shared files across the repositories: a template
 
+> Moved to `bearings/initiatives/commonfiles-rollout.tmt` (2026-11-06); update it there. This file stays only until the author confirms it can go.
+
 Surveyed 2026-10-24 (`git ls-files`, byte-identical, > 200 bytes, lockfiles excluded).
 
 ## Byte-identical files

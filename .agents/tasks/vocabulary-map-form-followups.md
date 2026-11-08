@@ -27,8 +27,9 @@ Each item is a separate decision or piece of work; none blocks landing that task
       mark it superseded by `tmtroot/spec/features/vocabulary.tmt`.
 - [ ] `tomet-format-printer` prints a pipe value back as `[ ... ]` (same as `|content` everywhere); `tomet format`
       only normalizes whitespace, so vocabulary files keep their `|` form. Confirm that is acceptable.
-- [ ] `::vocabulary(doc)` still takes its name as a parenthesised argument, the one place a name is not a key.
-      Decide whether the header should be `::vocabulary{ name: doc, version: ... }`.
+- [x] `::vocabulary(doc)` header & `::elements{}` form: superseded on 2026-11-09 by singular dot-path declarations
+      `::vocabulary.doc(version: "1.0.0")` and `::element.<name>(...)[about]` / `::element.<name>.arg.<param>(...)[about]`
+      (see `tmtroot/dev/design/nexus-brackets-and-singular-declarations.tmt` and `.agents/tasks/nexus-syntax-impl.md`).
 - [ ] A vocabulary declared locally at the head of an ordinary document (preamble block, same form as the
       shared file): `ElementKind::Elements` is preamble-region and singleton, but no loader reads a vocabulary
       out of a non-vocabulary document yet.
