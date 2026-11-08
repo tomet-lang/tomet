@@ -1,17 +1,20 @@
 ::kind(api)
+::meta(
+  crate:        tomet-extract
+  dependencies: list(tomet-ast, tomet-ast-parser, tomet-cst, tomet-position, tomet-span, tomet-tree)
+  dependents:   list()
+)
 
-::meta(crate: tomet-extract, dependencies: list(tomet-ast, tomet-ast-parser, tomet-cst, tomet-position, tomet-span, tomet-tree), dependents: list())
-
-=[tomet-extract]
+=[ tomet-extract ]
 
 Extraction and mapping of Tomet markup embedded inside source code comments.
 
 Code comments often refer to specifications, architectural rules, or invariants:
 
 ```rust,ignore
-/// Resolves document relative paths.
-/// See @file(docs/spec/resolution.tmt) and @rule(crate-layering).
-pub fn resolve(...) { ... }
+`` /// Resolves document relative paths.
+`` /// See @file(docs/spec/resolution.tmt) and @rule(crate-layering).
+`` pub fn resolve(...) { ... }
 ```
 
 This crate extracts contiguous comment blocks from source code across multiple
@@ -23,49 +26,49 @@ By preserving original source locations, links and rule references inside commen
 can be checked by tools like `tomet check-links` or `twrit` with exact line and
 column diagnostics pointing back to the original source file.
 
-==[Module comment]
+==[ Module comment ]
 
 Generic comment extraction engine supporting line and block comments across languages.
 
-===[Structs]
+===[ Structs ]
 
-====[struct ExtractOptions]
+====[ struct ExtractOptions ]
 
 Options for comment extraction.
 
-===[Functions]
+===[ Functions ]
 
-====[fn extract_comments]
+====[ fn extract_comments ]
 
 Extracts comments from source code based on language syntax.
 
-==[Module lang]
+==[ Module lang ]
 
 Supported programming languages and their comment syntax rules.
 
-===[Structs]
+===[ Structs ]
 
-====[struct CommentSyntax]
+====[ struct CommentSyntax ]
 
 Comment syntax definitions for a language.
 
-===[Enums]
+===[ Enums ]
 
-====[enum Language]
+====[ enum Language ]
 
 Supported languages for comment extraction.
 
-==[Structs]
+==[ Structs ]
 
-===[struct ExtractedCommentBlock]
+===[ struct ExtractedCommentBlock ]
 
 A contiguous block of comment lines extracted from a source file.
 
-===[struct LineOrigin]
+===[ struct LineOrigin ]
 
 Where one line of an extracted comment block came from.
 
-===[struct CommentSourceMap]
+===[ struct CommentSourceMap ]
 
 Records where each line of an extracted comment block sits in the source file.
 
@@ -74,39 +77,39 @@ Everything is a byte offset: a [`Span`] from parsing `text` points into
 file, and the caller resolves a line and column from the file with a
 `tomet_position::LineIndex` when it has to show one.
 
-===[struct ParsedComment]
+===[ struct ParsedComment ]
 
 A parsed Tomet comment document along with its source map.
 
-==[Enums]
+==[ Enums ]
 
-===[enum CommentKind]
+===[ enum CommentKind ]
 
 The kind of comment in source code.
 
-==[Functions]
+==[ Functions ]
 
-===[fn extract_comments_from_file]
+===[ fn extract_comments_from_file ]
 
 Extracts comments from a source file, automatically detecting the language
 from the file path extension.
 
-===[fn extract_rust_comments]
+===[ fn extract_rust_comments ]
 
 Extracts contiguous Rust doc comments (`///` and `//!`) from source text.
 
-===[fn parse_comments]
+===[ fn parse_comments ]
 
 Parses extracted comments from source into Tomet documents for a given language.
 
-===[fn parse_rust_comments]
+===[ fn parse_rust_comments ]
 
 Parses all extracted doc comments in a Rust source file into Tomet documents.
 
-===[fn collect_comment_elements_for_lang]
+===[ fn collect_comment_elements_for_lang ]
 
 Collects all Tomet elements found in comments for a specific language.
 
-===[fn collect_comment_elements]
+===[ fn collect_comment_elements ]
 
 Collects all Tomet elements found in comments, auto-detecting language from `file`.

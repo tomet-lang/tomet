@@ -10,10 +10,10 @@
 特別な関数ではなく、`Seq` のメソッドと無名関数（@file(tmtroot/spec/expressions/lambda.expr.tmt)）の組み合わせで書く。
 
 ```tm
-- ${vault::docs
-    .filter(d => d::meta.tags.contains("rust"))
-    .sort(d => d::meta.created, "desc")
-    .map(d => d.link())}
+`` - ${vault::docs
+``     .filter(d => d::meta.tags.contains("rust"))
+``     .sort(d => d::meta.created, "desc")
+``     .map(d => d.link())}
 ```
 
 - 対象は、文書の `Seq`。`vault::docs` や `addr(dir:docs/notes)::docs`（@file(tmtroot/spec/expressions/self.expr.tmt)）が作る。対象を省いた暗黙の既定はない。

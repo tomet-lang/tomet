@@ -2,23 +2,23 @@ vocabulary は、ある kind の文書が使える要素の名前と、その要
 文書。`::vocabulary.ns()` で名前空間を名乗り、`::element` に要素を並べる。
 
 ```tm
-::kind(vocabulary)
-::vocabulary.deck(version: "1.0.0")
-
-::element(
-  card: (
-    display: block
-    about: | カード一枚。
-    args: (
-      id: (
-        type: uint
-        positional: true
-        required: true
-        about: | 通し番号。
-      )
-    )
-  )
-)
+`` ::kind(vocabulary)
+`` ::vocabulary.deck(version: "1.0.0")
+`` 
+`` ::element(
+``   card: (
+``     display: block
+``     about: | カード一枚。
+``     args: (
+``       id: (
+``         type: uint
+``         positional: true
+``         required: true
+``         about: | 通し番号。
+``       )
+``     )
+``   )
+`` )
 ```
 
 `version:` は版で、`1.0.0` や `1.10` のように、ピリオドで区切った整数

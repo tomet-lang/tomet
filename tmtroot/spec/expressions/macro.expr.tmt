@@ -8,8 +8,8 @@
 =[ 呼び方 ]
 
 ```tm
-$macro.gh(12)
-${macro.gh("tomet/tomet")}
+`` $macro.gh(12)
+`` ${macro.gh("tomet/tomet")}
 ```
 
 - `macro.` を必ず付ける。`macro` は予約された値で、定義されたマクロを持つ名前空間（@file(tmtroot/spec/expressions/names.expr.tmt)）。
@@ -25,10 +25,10 @@ ${macro.gh("tomet/tomet")}
 文書の先頭の `::macro` に、名前とテンプレートを書く（@file(tmtroot/spec/elements/std.macros.element.tmt)）。
 
 ```tm
-::macro(
-  gh: "https://github.com/tomet/tomet/issues/${1}"
-  card: [ @card(title: ${1})[ ${2} ] ]
-)
+`` ::macro(
+``   gh: "https://github.com/tomet/tomet/issues/${1}"
+``   card: [ @card(title: ${1})[ ${2} ] ]
+`` )
 ```
 
 - テンプレートの中の `${1}`、`${2}` は引数の位置、`${key}` は名前付き引数の差し込み位置。式ではない。
@@ -39,13 +39,13 @@ ${macro.gh("tomet/tomet")}
 本体を `[ ... ]` で書くと、呼び出しは文字列でなくブロックになる。
 
 ```tm
-::macro(
-  card: [ @card(title: ${1})[ ${2} ] ]
-  notice: [ Notice: ${msg} ]
-)
-
-${macro.card("Welcome", "Hello")}
-文章の中の ${macro.notice(msg: "ここ")} にも置ける。
+`` ::macro(
+``   card: [ @card(title: ${1})[ ${2} ] ]
+``   notice: [ Notice: ${msg} ]
+`` )
+``
+`` ${macro.card("Welcome", "Hello")}
+`` 文章の中の ${macro.notice(msg: "ここ")} にも置ける。
 ```
 
 - 差し込み位置は文字列マクロと同じ `${1}`、`${key}`。ブロックの中のどこに書いてもよく、要素の引数（`@card(title: ${1})`）の中でもよい。

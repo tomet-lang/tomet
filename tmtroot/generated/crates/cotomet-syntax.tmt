@@ -1,10 +1,13 @@
 ::kind(api)
+::meta(
+  crate:        cotomet-syntax
+  dependencies: list(tomet-ast, tomet-lexer)
+  dependents:   list(cotomet, cotomet-eval, serde_cotomet, tomet-declaration, tomet-edit, tomet-formatter, tomet-html, tomet-markdown, tomet-parser, tomet-printer, tomet-semantics, tomet-style, tomet-tests)
+)
 
-::meta(crate: cotomet-syntax, dependencies: list(tomet-ast, tomet-lexer), dependents: list(cotomet, cotomet-eval, serde_cotomet, tomet-declaration, tomet-edit, tomet-formatter, tomet-html, tomet-markdown, tomet-parser, tomet-printer, tomet-semantics, tomet-style, tomet-tests))
+=[ cotomet-syntax ]
 
-=[cotomet-syntax]
-
-==[cotomet-syntax]
+==[ cotomet-syntax ]
 
 The syntax of cotomet, the data language dual to tomet (`tmt` / `ctmt`): a
 lightweight, expressive syntax for values, maps and sequences. A standalone
@@ -13,7 +16,7 @@ cotomet file is a top-level map written as bare `key: value` lines.
 Depend on `cotomet` instead unless you are a crate below it; it re-exports this
 crate and `serde_cotomet`.
 
-==[Overview]
+==[ Overview ]
 
 cotomet-syntax provides:
 
@@ -23,7 +26,7 @@ cotomet-syntax provides:
 
 Serde integration lives in `serde_cotomet`.
 
-==[Relation to tmt]
+==[ Relation to tmt ]
 
 The extension `.ctmt` says "a tmt-family file", and this is what that
 promises. cotomet is the value language of tmt standing alone: the
@@ -38,35 +41,35 @@ What a `.ctmt` does not have is what the hook adds: elements (`@name`) and
 A `.ctmt` is data, not a vault document: it has no vocabulary, no index and
 no links.
 
-==[Key Functions]
+==[ Key Functions ]
 
 - (write_key) Write a map key, quoted only when it is not an identifier. Every printer that emits `key: value` calls it.
 - (float_text) Spell a float so it reads back as a float. Every printer that emits a [`Value::Float`] calls it.
 
-==[Keys]
+==[ Keys ]
 
 A map key is a bare identifier (letters, digits, `_`, `-`, `.`) or a quoted
 string, so a key can be a path or a URL:
 
 ```text
-"tmtroot/schema/rust.vocabulary.tmt": "../vocabularies/rust.vocabulary.tmt"
-plain.key: 1
+`` "tmtroot/schema/rust.vocabulary.tmt": "../vocabularies/rust.vocabulary.tmt"
+`` plain.key: 1
 ```
 
 A quoted string is a key only when a `:` follows it; otherwise it is a
 value. The empty key is the positional-entry marker, so `"": v` is an error.
 
-==[Files]
+==[ Files ]
 
 A standalone cotomet file (`.ctmt`) is a top-level map written as bare
 `key: value` lines, with no braces around it, and may open with
 declarations about the file:
 
 ```text
-::kind(catalog, 2)
-::use(deck)
-
-"tmtroot/a.tmt": "../a.tmt"
+`` ::kind(catalog, 2)
+`` ::use(deck)
+``
+`` "tmtroot/a.tmt": "../a.tmt"
 ```
 
 [`parse_file`] reads one into a [`File`]. A declaration is `::name`, then
@@ -93,7 +96,7 @@ A named key may appear once in a map: writing it again is an error at the
 second one (`duplicate key `a``), whether it is spelled bare or quoted.
 Positional entries have no key and may repeat.
 
-==[Scalars]
+==[ Scalars ]
 
 A bare (unquoted) scalar is typed by its text, and only these are not
 strings:
@@ -122,7 +125,7 @@ written with the `float(...)` constructor (see below).
 Serializing a `u64` above `i64::MAX` is an error rather than a wrapped
 value, since [`Value::Int`] is an `i64`.
 
-==[Constructors]
+==[ Constructors ]
 
 `name(arg, ...)` with a name in [`LITERAL_CONSTRUCTORS`] is resolved by the
 parser to the plain value it stands for, so a reader never sees these as a
@@ -149,17 +152,17 @@ parsed. It is the only way to write `float(nan)`, `float(inf)` and
 Any other callee (`enum(...)`, a typo) stays a [`Value::Call`] for a later
 pass to judge; cotomet does not.
 
-==[Module error]
+==[ Module error ]
 
-===[Structs]
+===[ Structs ]
 
-====[struct Error]
+====[ struct Error ]
 
-===[Type Aliases]
+===[ Type Aliases ]
 
-====[type Result]
+====[ type Result ]
 
-==[Module parser]
+==[ Module parser ]
 
 Parsing for cotomet data:
 map bodies (`key: value`), `{ ... }` blocks, `"..."` strings,
@@ -168,13 +171,13 @@ map bodies (`key: value`), `{ ... }` blocks, `"..."` strings,
 A list value is spelled `list(...)` (a `Value::Call`,
 normalized to `Value::Seq` downstream).
 
-===[Structs]
+===[ Structs ]
 
-====[struct NoHook]
+====[ struct NoHook ]
 
 The default no-op hook for pure cotomet documents.
 
-====[struct Declaration]
+====[ struct Declaration ]
 
 A declaration about a file, written `::name(args){data}` at its top: what
 the file is (`::kind(catalog, 2)`), what it brings in (`::use(deck)`), the
@@ -183,100 +186,100 @@ information about it (`::meta{ id: x }`).
 The arguments are read like `.tmt`'s (mixed positional and named); the data is a
 map. What a name means is not for this crate to say: it reads the shape.
 
-====[struct File]
+====[ struct File ]
 
 A standalone cotomet file: its declarations, then its entries.
 
-===[Traits]
+===[ Traits ]
 
-====[trait ValueHook]
+====[ trait ValueHook ]
 
 A hook allowing callers (such as `tomet-syntax-parser`) to parse custom
 embedded values (e.g. `@element` or `$interp`) at value positions.
 
-===[Functions]
+===[ Functions ]
 
-====[fn parse_value]
+====[ fn parse_value ]
 
 Parse an entire source string as one `Value` using pure cotomet syntax.
 
 A source with nothing but whitespace and comments is the empty map.
 
-====[fn parse_value_with]
+====[ fn parse_value_with ]
 
 Parse an entire source string as one `Value` with a custom [`ValueHook`].
 
 A source with nothing but whitespace and comments is the empty map. Only
 the document may be empty: a value slot inside it (`k:`) still needs a value.
 
-====[fn err]
+====[ fn err ]
 
-====[fn is_ident_char]
+====[ fn is_ident_char ]
 
 Characters legal inside a @strong[map key].
 
-====[fn is_name_start]
+====[ fn is_name_start ]
 
 First character of one segment of an element/identifier name.
 
-====[fn is_name_char]
+====[ fn is_name_char ]
 
 Subsequent characters of one segment of an element/identifier name.
 
-====[fn is_interp_start]
+====[ fn is_interp_start ]
 
 Whether an expression begins at `cur`: `$` immediately followed by `{`,
 or an identifier and `(`.
 
-====[fn is_interp_ident_start]
+====[ fn is_interp_ident_start ]
 
 First character of an interpolation expression identifier.
 
-====[fn is_interp_ident_char]
+====[ fn is_interp_ident_char ]
 
 Subsequent characters of an interpolation expression identifier.
 
-====[fn is_inline_ws]
+====[ fn is_inline_ws ]
 
-====[fn skip_inline_ws]
+====[ fn skip_inline_ws ]
 
-====[fn skip_ws_and_newlines]
+====[ fn skip_ws_and_newlines ]
 
-====[fn skip_line_comment]
+====[ fn skip_line_comment ]
 
 `// ...` to end of line/EOF.
 
-====[fn skip_block_comment]
+====[ fn skip_block_comment ]
 
-====[fn skip_ws_newlines_and_comments]
+====[ fn skip_ws_newlines_and_comments ]
 
 Like `skip_ws_and_newlines`, but also consumes `//` line comments.
 
-====[fn eat_ident]
+====[ fn eat_ident ]
 
-====[fn eat_name]
+====[ fn eat_name ]
 
 Reads one `.`-separated name, or `None` if `cur` is not at a name start.
 
-====[fn eat_name_segment]
+====[ fn eat_name_segment ]
 
-====[fn is_name_start_at]
+====[ fn is_name_start_at ]
 
 Whether `cur` is at the start of a name, without consuming it.
 
-====[fn eat_scalar_raw]
+====[ fn eat_scalar_raw ]
 
 Raw scalar text stops at any character that could plausibly end an
 entry/sequence item.
 
-====[fn try_parse_call]
+====[ fn try_parse_call ]
 
 `name(arg, arg, ...)` -- an immediately-resolved literal such as
 `list(card, ns.mycard)`.
 
-====[fn try_parse_call_with]
+====[ fn try_parse_call_with ]
 
-====[fn scalar_from_text]
+====[ fn scalar_from_text ]
 
 Types the text of a bare scalar (see the crate-level "Scalars" section).
 
@@ -289,15 +292,15 @@ Everything else is a string, so no text is ever changed by reading it.
 The `Result` is kept for the callers that match on one; reading a bare scalar
 has no error left in it.
 
-====[fn parse_quoted]
+====[ fn parse_quoted ]
 
 Reads a `"..."` string, with `\"`, `\\`, `\n` and `\t` escapes; a raw newline
 is part of the text. A string that never closes is an error at its opening
 quote, not at the end of the file where it ran out.
 
-====[fn parse_one_entry]
+====[ fn parse_one_entry ]
 
-====[fn parse_one_entry_with]
+====[ fn parse_one_entry_with ]
 
 Parses one `key: value` entry, or a bare value as a positional entry.
 
@@ -306,14 +309,14 @@ A key is a bare identifier (`is_ident_char`) or a quoted string
 string with no `:` after it is a positional value, not a key. An empty
 quoted key is an error: `""` is [`POSITIONAL_ENTRY_KEY`].
 
-====[fn parse_map_body]
+====[ fn parse_map_body ]
 
-====[fn duplicate_key_error]
+====[ fn duplicate_key_error ]
 
 The error for a named key written twice in one map. Positional entries
 (`POSITIONAL_ENTRY_KEY`) are not keys and may repeat.
 
-====[fn parse_map_body_with]
+====[ fn parse_map_body_with ]
 
 Parses `key: value` entries until a closer or the end, as a `Value::Map`.
 
@@ -322,7 +325,7 @@ A named key may appear once: a second one is an error at its position
 a duplicate too. A map that held the same key twice would mean different
 things to a reader that keeps the first, the last, or both.
 
-====[fn parse_file]
+====[ fn parse_file ]
 
 Parse a standalone cotomet file (`.ctmt`): declarations, then a map of
 `key: value` entries.
@@ -339,7 +342,7 @@ Declarations at the top take no expressions. The body uses [`NoHook`], which
 rejects unquoted expressions (this reader reads data only; write them in
 quotes or use [`parse_file_with`] with an expression-aware hook).
 
-====[fn parse_file_with]
+====[ fn parse_file_with ]
 
 Parse a standalone cotomet file (`.ctmt`) with a custom [`ValueHook`].
 
@@ -347,21 +350,21 @@ Like [`parse_file`], but passes values through `hook`. Declarations at the
 top take no expressions: an expression there is an error saying "a declaration
 takes no expression".
 
-====[fn parse_entry_value]
+====[ fn parse_entry_value ]
 
-====[fn parse_entry_value_with]
+====[ fn parse_entry_value_with ]
 
-====[fn parse_value_at]
+====[ fn parse_value_at ]
 
-====[fn parse_value_at_with]
+====[ fn parse_value_at_with ]
 
-====[fn starts_absolute_path]
+====[ fn starts_absolute_path ]
 
-====[fn is_scheme_uri_colon]
+====[ fn is_scheme_uri_colon ]
 
-===[Constants]
+===[ Constants ]
 
-====[const LITERAL_CONSTRUCTORS]
+====[ const LITERAL_CONSTRUCTORS ]
 
 The callees the parser resolves to a plain [`Value`] at parse time: the
 literal constructors. Any other `name(...)` stays a [`Value::Call`] for a
@@ -376,34 +379,34 @@ taken as written, so `string(1.50)` is `"1.50"`.
 
 [`construct_float`]).
 
-====[const POSITIONAL_ENTRY_KEY]
+====[ const POSITIONAL_ENTRY_KEY ]
 
 Sentinel key for a positional (unkeyed) entry inside a map body.
 
-==[Module print]
+==[ Module print ]
 
 Renders a `Value` back into cotomet data text:
 a top-level map is written as bare `key: value` lines (no enclosing braces);
 nested maps use `{ ... }`, and a sequence prints as `list(...)`.
 
-===[Functions]
+===[ Functions ]
 
-====[fn print_value]
+====[ fn print_value ]
 
-====[fn write_float]
+====[ fn write_float ]
 
 Writes a float so it reads back as the same float, never as an int:
 `1.0` stays `1.0` and `1e21` stays `1e21`. A non-finite float has no bare
 spelling, so it is written with the `float(...)` constructor
 (`float(nan)`, `float(inf)`, `float(-inf)`).
 
-====[fn float_text]
+====[ fn float_text ]
 
 [`write_float`] as an owned string, for callers that build with `format!`.
 
-====[fn write_scalar_string]
+====[ fn write_scalar_string ]
 
-====[fn write_key]
+====[ fn write_key ]
 
 Writes a map key: bare when it is a non-empty run of [`is_ident_char`],
 quoted (`"tmtroot/a/b.tmt"`) otherwise, so the output reads back as the
@@ -413,11 +416,11 @@ An empty key is [`crate::POSITIONAL_ENTRY_KEY`] and has no keyed spelling; calle
 print such an entry as a bare value. It is quoted here only so a stray one
 fails to parse instead of reading back as something else.
 
-====[fn key_text]
+====[ fn key_text ]
 
 [`write_key`] as an owned string, for callers that build with `format!`.
 
-====[fn quoted_text]
+====[ fn quoted_text ]
 
 `s` as a `"..."` string whatever it holds, where [`key_text`] quotes only what
 has to be. For a place that uses `.` as a separator: a bare key may hold one.

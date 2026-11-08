@@ -90,16 +90,12 @@ module.exports = grammar({
     // There the first word and the `:` after it make a key, so a bare
     // scalar holds no `:` of its own.
     _bare_value: ($) =>
-      choice(
-        $.string,
-        $.tuple,
-        $.call,
-        alias($._bare_scalar, $.scalar),
-      ),
+      choice($.string, $.tuple, $.call, alias($._bare_scalar, $.scalar)),
 
     // `(a, b)` / `(k: v)`: a tuple, the one container of the language.
     // Holds named and unnamed entries.
-    tuple: ($) => seq("(", repeat(choice($.pair, $._bare_value, ",", $._newline)), ")"),
+    tuple: ($) =>
+      seq("(", repeat(choice($.pair, $._bare_value, ",", $._newline)), ")"),
 
     map: ($) => seq("{", repeat($._item), "}"),
 

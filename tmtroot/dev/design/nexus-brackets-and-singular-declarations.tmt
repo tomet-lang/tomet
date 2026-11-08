@@ -15,28 +15,28 @@ Tomet は **「完全アドレス可能なシリアライズ言語であり、"�
 対象キーは位置引数として押し込むのではなく、**宣言ヘッド自体にドットパスとして書く**（または親パスの `(...)` 内に名前付き引数としてまとめて書く）。
 
 ```tm
-::id(config-vault)
-::kind(config, 2)
-::meta(a: xxx, b: xxx, c: xxx)
-
-::macro.copyright("(C) 2026 Tomet Projects")
-::macro.generated_by[ @comment[ Generated from ${1}. Edit that, then `tomet export .`. ] ]
-
-::format.meta(always_newline: true)
-::format.heading(space_inside_brackets: true)
-::format.table(adjust_width: auto, max_col_width: 50)
-
-::field.aliases(type: list, always_newline: true)
-::field.created(type: datetime, format: rfc3339, offset: "+09:00")
-::field.url.wiki(type: list, always_newline: true)
-::field.author(type: string, required: true)[ 文書の著者 ]
-
-::var.title(type: string, default: "Untitled")[ 作成するノートの題 ]
-::var.draft(type: bool, default: false)
-
-::vocabulary.writ(@file(tmtroot/schema/vocabularies/writ.vocabulary.tmt))
-::blueprint.writ(@file(tmtroot/schema/blueprints/writ.blueprint.tmt))
-::dictionary.tomet(@file(tmtroot/dict/tomet.dict.tmt))
+`` ::id(config-vault)
+`` ::kind(config, 2)
+`` ::meta(a: xxx, b: xxx, c: xxx)
+``
+`` ::macro.copyright("(C) 2026 Tomet Projects")
+`` ::macro.generated_by[ @comment[ Generated from ${1}. Edit that, then `tomet export .`. ] ]
+``
+`` ::format.meta(always_newline: true)
+`` ::format.heading(space_inside_brackets: true)
+`` ::format.table(adjust_width: auto, max_col_width: 50)
+``
+`` ::field.aliases(type: list, always_newline: true)
+`` ::field.created(type: datetime, format: rfc3339, offset: "+09:00")
+`` ::field.url.wiki(type: list, always_newline: true)
+`` ::field.author(type: string, required: true)[ 文書の著者 ]
+``
+`` ::var.title(type: string, default: "Untitled")[ 作成するノートの題 ]
+`` ::var.draft(type: bool, default: false)
+``
+`` ::vocabulary.writ(@file(tmtroot/schema/vocabularies/writ.vocabulary.tmt))
+`` ::blueprint.writ(@file(tmtroot/schema/blueprints/writ.blueprint.tmt))
+`` ::dictionary.tomet(@file(tmtroot/dict/tomet.dict.tmt))
 ```
 
 === [ 同名ルート縮約規則（`X.X == X`） ]
@@ -114,14 +114,14 @@ Tomet のデータ空間（`Value`）には中置演算式が存在しない（�
 |[ `#(...)` ][ ID コネクト糖衣   ][ —                                     ][ `@name(...)#(x)` $\equiv$ `@name(...)::id(x)` ]
 
 ```tm
-::workspace.ignore("00-09 System/01 Apps/obsidian")
-::workspace.unswept("tests/fixtures", "tests/ref", "tests/store")
-
-// あるいは親パスでまとめて書く場合も `list(...)` ではなく値位置の裸の `(...)` になる:
-::workspace(
-  ignore: ("00-09 System/01 Apps/obsidian")
-  unswept: ("tests/fixtures", "tests/ref", "tests/store")
-)
+`` ::workspace.ignore("00-09 System/01 Apps/obsidian")
+`` ::workspace.unswept("tests/fixtures", "tests/ref", "tests/store")
+``
+`` // あるいは親パスでまとめて書く場合も `list(...)` ではなく値位置の裸の `(...)` になる:
+`` ::workspace(
+``   ignore: ("00-09 System/01 Apps/obsidian")
+``   unswept: ("tests/fixtures", "tests/ref", "tests/store")
+`` )
 ```
 
 ==[ 6. 結論⑤: 辞書（`::dictionary`）と語彙（`::vocabulary`）の正式構造 ]
@@ -132,18 +132,18 @@ Tomet のデータ空間（`Value`）には中置演算式が存在しない（�
 ヘッダで `::dictionary(tomet)` と宣言し、本文（Prose 空間）に通常のブロックとして `;@term("語")[説明]#(id)`（または複数行 `| 説明`）を並べる。
 
 ```tm
-::kind(dictionary)
-::id(dictionary.tomet)
-::dictionary(tomet)
-
-;@term("vault")#(vault)
-| @term(#vault-config) のあるディレクトリと、その下の文書の全体。tomet が設定と語彙を読む単位。
-
-;@term("vault.config.tmt")#(vault-config)
-| @term(#vault) の境目を示す設定ファイル。上の階層の vault 設定は、ここで打ち切られる。
-
-;@term("prose")[ 散文。`[]`や`|`の中でかく文字 ]
-;@term("data")[ データ。`{}`や`()`、Cotomet内で書くやつ。 ]
+`` ::kind(dictionary)
+`` ::id(dictionary.tomet)
+`` ::dictionary(tomet)
+``
+`` ;@term("vault")#(vault)
+`` | @term(#vault-config) のあるディレクトリと、その下の文書の全体。tomet が設定と語彙を読む単位。
+``
+`` ;@term("vault.config.tmt")#(vault-config)
+`` | @term(#vault) の境目を示す設定ファイル。上の階層の vault 設定は、ここで打ち切られる。
+``
+`` ;@term("prose")[ 散文。`[]`や`|`の中でかく文字 ]
+`` ;@term("data")[ データ。`{}`や`()`、Cotomet内で書くやつ。 ]
 ```
 
 === [ 語彙ファイル（`.vocabulary.tmt`） ]
@@ -151,13 +151,13 @@ Tomet のデータ空間（`Value`）には中置演算式が存在しない（�
 `::element` も `::field` とまったく同じ単数ルート＋ドットパス構造で統一する。名前空間と同名の要素 `::element.<ns>` を宣言すれば、`X.X == X` 規則によりそのまま名前空間ルート要素（`@typst.typst` $\equiv$ `@typst`）の宣言となる。
 
 ```tm
-::kind(vocabulary)
-::vocabulary.writ(version: "1.0.0")
-
-::element.rule(display: block, singleton: false)[
-  一つの規則。パラメータは自分の group の中に持つ。
-]
-::element.rule.arg.id(type: string, positional: true)[
-  規則の識別子。見出しではなくここが名前である。
-]
+`` ::kind(vocabulary)
+`` ::vocabulary.writ(version: "1.0.0")
+``
+`` ::element.rule(display: block, singleton: false)[
+``   一つの規則。パラメータは自分の group の中に持つ。
+`` ]
+`` ::element.rule.arg.id(type: string, positional: true)[
+``   規則の識別子。見出しではなくここが名前である。
+`` ]
 ```

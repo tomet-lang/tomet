@@ -1,14 +1,17 @@
 ::kind(api)
+::meta(
+  crate:        tomet-validator
+  dependencies: list(tomet-ast, tomet-ast-parser, tomet-cst, tomet-cst-parser, tomet-declaration, tomet-position, tomet-semantics, tomet-span, tomet-validator-blueprint, tomet-validator-core, tomet-validator-profile, tomet-validator-rule)
+  dependents:   list(tomet, tomet-cli, tomet-edit, tomet-load, tomet-lsp, tomet-tests, tomet-vault)
+)
 
-::meta(crate: tomet-validator, dependencies: list(tomet-ast, tomet-ast-parser, tomet-cst, tomet-cst-parser, tomet-declaration, tomet-position, tomet-semantics, tomet-span, tomet-validator-blueprint, tomet-validator-core, tomet-validator-profile, tomet-validator-rule), dependents: list(tomet, tomet-cli, tomet-edit, tomet-load, tomet-lsp, tomet-tests, tomet-vault))
+=[ tomet-validator ]
 
-=[tomet-validator]
-
-==[tomet-validator]
+==[ tomet-validator ]
 
 Read-only `.tmt` document schema, blueprint, and lint validation facade.
 
-==[Architecture & Responsibilities]
+==[ Architecture & Responsibilities ]
 
 - ("Read-Only In-Memory Validation") `tomet-validator` performs pure, read-only semantic and schema validation across
 an in-memory [`File`]. It performs zero I/O, no reference resolution (handled
@@ -19,13 +22,13 @@ by `tomet-address` and `tomet-links`), and no AST mutations.
 - `tomet-validator-blueprint`: Document structural blueprint extraction and conformance.
 - `tomet-validator-profile`: Whether a document keeps the promise of its `::profile(...)`.
 
-==[Functions]
+==[ Functions ]
 
-===[fn validate_document]
+===[ fn validate_document ]
 
 Runs all validation rules against a parsed `File` and returns every
 violation found. Read-only: never mutates `doc`, never does I/O.
 
-===[fn validate_document_with]
+===[ fn validate_document_with ]
 
 [`validate_document`], with the namespaces the document has in scope.

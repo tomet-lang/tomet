@@ -44,7 +44,7 @@
 整形されていることを確かめるには:
 
 ```bash
-just docs-check
+`` just docs-check
 ```
 
 見る範囲は @dir(docs/) に限らない。ワークスペースの索引を通すので、

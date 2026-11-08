@@ -1,26 +1,29 @@
 ::kind(api)
+::meta(
+  crate:        tomet-semantics-core
+  dependencies: list(tomet-ast, tomet-type)
+  dependents:   list(tomet-config, tomet-declaration, tomet-semantics, tomet-validator-core)
+)
 
-::meta(crate: tomet-semantics-core, dependencies: list(tomet-ast, tomet-type), dependents: list(tomet-config, tomet-declaration, tomet-semantics, tomet-validator-core))
+=[ tomet-semantics-core ]
 
-=[tomet-semantics-core]
-
-==[tomet-semantics-core]
+==[ tomet-semantics-core ]
 
 Shared core semantic model and type admission for Tomet and cotomet documents.
 
-==[Module admits]
+==[ Module admits ]
 
 Type admission and conformance checking for AST [`Value`]s.
 
-===[Structs]
+===[ Structs ]
 
-====[struct Mismatch]
+====[ struct Mismatch ]
 
 A value that is not of the type it was held to.
 
-===[Functions]
+===[ Functions ]
 
-====[fn admits]
+====[ fn admits ]
 
 Whether `value`, as a document holds it, is of this type.
 
@@ -30,13 +33,13 @@ A type that is text -- `string`, `version`, `uuid`, `nanoid`, and `datetime`
 what the reader would have made of it. A number type takes the numbers
 the reader keeps as written too (`1.10` is a `float`, `-0` an `int`).
 
-==[Module parse]
+==[ Module parse ]
 
 Parsing of type specifications from AST [`Value`]s.
 
-===[Functions]
+===[ Functions ]
 
-====[fn parse_type_spec]
+====[ fn parse_type_spec ]
 
 Reads a `type:` specification as it is written in an AST [`Value`].
 
@@ -45,7 +48,7 @@ call in AST form (`list(...)` which the parser resolves to [`Value::Seq`] or
 leaves as [`Value::Call`]), or a string representation of a parameterized type
 (such as `"list(string)"`).
 
-==[Module positional]
+==[ Module positional ]
 
 Giving positional arguments their names.
 
@@ -54,9 +57,9 @@ what the first, the second... are called is a signature, and the signature belon
 owns the element: a declaration's to `tomet-declaration`, a body element's to `tomet-semantics`.
 The binding itself is the same for all of them, and is here, next to the key it undoes.
 
-===[Functions]
+===[ Functions ]
 
-====[fn bind_positional]
+====[ fn bind_positional ]
 
 Names the positional arguments of `(args)` after `keys`, in order.
 
@@ -80,8 +83,8 @@ With no `keys` -- an element that has no positional slots -- `args` comes back u
 
 This is the mechanism only; the signatures are the callers'.
 
-===[Constants]
+===[ Constants ]
 
-====[const POSITIONAL_ENTRY_KEY]
+====[ const POSITIONAL_ENTRY_KEY ]
 
 Sentinel key for a positional (unkeyed) entry inside a map body or args.

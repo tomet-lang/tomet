@@ -9,15 +9,15 @@ repository.workspace = true
 [dependencies]
 tomet-address        = { workspace = true }
 tomet-ast            = { workspace = true }
-tomet-span           = { workspace = true }
 tomet-cst            = { workspace = true }
-tomet-position       = { workspace = true }
 tomet-declaration    = { workspace = true }
 tomet-expr           = { workspace = true }
+tomet-position       = { workspace = true }
 tomet-semantics      = { workspace = true }
+tomet-semantics-core = { workspace = true }
+tomet-span           = { workspace = true }
 tomet-tree           = { workspace = true }
 tomet-type           = { workspace = true }
-tomet-semantics-core = { workspace = true }
 #--- Crates.io ---
 serde = { workspace = true }
 

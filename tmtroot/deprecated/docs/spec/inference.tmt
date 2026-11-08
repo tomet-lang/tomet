@@ -22,8 +22,8 @@
 ]
 
 ```tm
-@link("https://example.com")        // target: "https://example.com" と同じ
-@link(target:"https://example.com")
+`` @link("https://example.com")        // target: "https://example.com" と同じ
+`` @link(target:"https://example.com")
 ```
 
 list item の `(...)` マーカーは `marker` に正規化される

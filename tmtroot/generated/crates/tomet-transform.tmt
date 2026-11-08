@@ -1,8 +1,11 @@
 ::kind(api)
+::meta(
+  crate:        tomet-transform
+  dependencies: list(tomet-ast, tomet-ast-parser, tomet-expr, tomet-search, tomet-semantics, tomet-span, tomet-style, tomet-tree)
+  dependents:   list(tomet, tomet-js, tomet-load, tomet-tests, tomet-vault, tomet-workspace)
+)
 
-::meta(crate: tomet-transform, dependencies: list(tomet-ast, tomet-ast-parser, tomet-expr, tomet-search, tomet-semantics, tomet-span, tomet-style, tomet-tree), dependents: list(tomet, tomet-js, tomet-load, tomet-tests, tomet-vault, tomet-workspace))
-
-=[tomet-transform]
+=[ tomet-transform ]
 
 Pure in-memory AST refactoring and structural transformations for Tomet documents.
 
@@ -15,41 +18,41 @@ evaluator's typed values put back according to where each expression sits.
 - (structural) Structural AST query matching and in-place transformations (rename tag, rename key, replace value).
 - (meta) Batch `::meta` key/value updates.
 
-==[Module blueprint]
+==[ Module blueprint ]
 
 Blueprint schema extraction, transformation, and instantiation.
 
-===[Structs]
+===[ Structs ]
 
-====[struct BlueprintInfo]
+====[ struct BlueprintInfo ]
 
 What a `::blueprint` directive says about the blueprint. Its variables are
 not here: the blueprint declares them with `::vars`.
 
-====[struct Instantiated]
+====[ struct Instantiated ]
 
 What [`instantiate_blueprint`] did.
 
-===[Functions]
+===[ Functions ]
 
-====[fn extract_blueprint_info]
+====[ fn extract_blueprint_info ]
 
 Extracts [`BlueprintInfo`] from `doc` if it declares a top-level `::blueprint` directive.
 
-====[fn instantiate_blueprint]
+====[ fn instantiate_blueprint ]
 
 Instantiates a blueprint `doc` in-place by:
 1. Promoting/converting `::blueprint(target)` to `::kind(target)` and stripping schema blocks.
 2. Resolving every `${...}` in it, with `cx` -- which is a creating context
 (`Phase::Create`), the only place `generate.*` exists.
 
-==[Module directive]
+==[ Module directive ]
 
 Directive promotion and Value DSL normalization transformations.
 
-===[Functions]
+===[ Functions ]
 
-====[fn promote_prop_to_directive]
+====[ fn promote_prop_to_directive ]
 
 Promotes a property `prop_key` from a declaration matching `source_filter` into a new top-level
 declaration `::target_directive_name(val)` (or `::target_directive_name{...}`), inserting it at `target_index`
@@ -58,16 +61,16 @@ declaration `::target_directive_name(val)` (or `::target_directive_name{...}`), 
 If the property is absent, empty, or null, it is simply removed without creating a directive.
 Returns `true` if a directive was created and inserted.
 
-====[fn promote_meta_id_to_id]
+====[ fn promote_meta_id_to_id ]
 
 Promotes `::meta`'s `id:` field to a top-level `::id(...)` element, after the `::version` and
 `::kind` that lead the document.
 
-====[fn promote_meta_type_to_kind]
+====[ fn promote_meta_type_to_kind ]
 
 Promotes `::meta`'s `type:` field to a top-level `::kind(...)` element.
 
-==[Module expressions]
+==[ Module expressions ]
 
 Resolving every `${...}` in a document, once, before anything renders it.
 
@@ -89,7 +92,7 @@ spliced in, anything else is a mismatch;
 
 place in output at all.
 
-===[A value that does not fit]
+===[ A value that does not fit ]
 
 Nothing is dropped and nothing is fatal. An expression that cannot be
 evaluated, or whose value has no place at its position, is written back
@@ -98,32 +101,32 @@ list, so `tomet check` can warn about it. That keeps a document that
 shows `${...}` as an example working, and still gives a typo somewhere
 to surface.
 
-===[What an expression sees]
+===[ What an expression sees ]
 
 The caller's [`EvalContext`] decides: which phase, which documents, which
 macros. References resolve through its resolver, so a caller that wants
 them answered from the document @strong[as written] -- and it should -- hands
 in a resolver that returns the document from before this pass rewrote it.
 
-===[Structs]
+===[ Structs ]
 
-====[struct Unresolved]
+====[ struct Unresolved ]
 
 Something the pass left as it found it, and says so.
 
-===[Enums]
+===[ Enums ]
 
-====[enum UnresolvedKind]
+====[ enum UnresolvedKind ]
 
 What an [`Unresolved`] is about.
 
-===[Functions]
+===[ Functions ]
 
-====[fn resolve_expressions]
+====[ fn resolve_expressions ]
 
 Replaces every `${...}` in `doc` with what it stands for.
 
-====[fn resolve_expressions_where]
+====[ fn resolve_expressions_where ]
 
 [`resolve_expressions`] for the `${...}` that `selected` picks, by the span of the
 [`Interpolation`](tomet_ast::Interpolation) in `doc` as it is passed in. The others are left
@@ -134,65 +137,65 @@ as the interpolations they are, not as text, and are not reported.
 This is what makes a file hold its own values for only some of its expressions: the ones
 that depend on where it sits, and none of the ones it can still evaluate for itself.
 
-==[Module links]
+==[ Module links ]
 
-===[Enums]
+===[ Enums ]
 
-====[enum TargetMode]
+====[ enum TargetMode ]
 
 Destination target format when rewriting `ref:` links and `@embed` assets.
 
-===[Functions]
+===[ Functions ]
 
-====[fn resolve_document_links]
+====[ fn resolve_document_links ]
 
 Walks `doc` and resolves any `ref:` targets and local `@embed` targets using `resolver`.
 
 - Resolved links have their target rewritten according to `mode`.
 - Unresolved links are rewritten to the `unresolved:` scheme (e.g. `unresolved:Note Name`).
 
-==[Module macro_rewrite]
+==[ Module macro_rewrite ]
 
 Reverse URL-to-macro pattern matching and rewriting.
 
-===[Structs]
+===[ Structs ]
 
-====[struct MacroPattern]
+====[ struct MacroPattern ]
 
 A compiled macro matcher for reverse URL-to-macro rewriting.
 
-====[struct MacroSet]
+====[ struct MacroSet ]
 
 A collection of macro patterns sorted by specificity (longer constant prefix first).
 
-===[Functions]
+===[ Functions ]
 
-====[fn transform_link_targets_with_macros]
+====[ fn transform_link_targets_with_macros ]
 
 Transforms link targets in `doc` matching any macro in `macro_set` into `$macro(...)` invocations.
 
-==[Module meta]
+==[ Module meta ]
 
 Metadata element manipulation in documents.
 
-===[Functions]
+===[ Functions ]
 
-====[fn set_meta_in_doc]
+====[ fn set_meta_in_doc ]
 
 Updates or inserts a key-value pair in a target directive/metadata block (e.g. `::meta`).
 If the target block is not found, prepends a new directive block at position 0.
 
-==[Module structural]
+==[ Module structural ]
 
 Structural in-place AST transformations.
 
-===[Enums]
+===[ Enums ]
 
-====[enum StructuralAction]
+====[ enum StructuralAction ]
 
-===[Functions]
+===[ Functions ]
 
-====[fn apply_structural_action]
+====[ fn apply_structural_action ]
 
 Applies a structural refactoring action to all matching elements in `doc`.
 Returns the number of transformations applied.

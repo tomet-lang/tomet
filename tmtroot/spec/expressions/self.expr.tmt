@@ -49,9 +49,9 @@
 |[ `::children` ][ そのディレクトリの直下にある文書だけ。サブディレクトリの中は含まない。文書の Seq ]
 
 ```tm
-${vault::docs}
-${addr(dir:docs/notes)::docs}
-${addr(dir:docs/notes)::children}
+`` ${vault::docs}
+`` ${addr(dir:docs/notes)::docs}
+`` ${addr(dir:docs/notes)::children}
 ```
 
 `::docs` と `::children` は別の名前で持つ。片方をもう片方の意味で読まないため（`::path` と `::filename` を分けたのと同じ理由）。

@@ -1,15 +1,18 @@
 ::kind(api)
+::meta(
+  crate:        tomet-parser
+  dependencies: list(cotomet-syntax, tomet-ast, tomet-cst, tomet-lexer, tomet-semantics, tomet-tree)
+  dependents:   list(cotomet-eval, tomet, tomet-address, tomet-benches, tomet-cli, tomet-config, tomet-convert-standalone, tomet-declaration, tomet-deps, tomet-edit, tomet-expr, tomet-extract, tomet-formatter, tomet-highlight, tomet-html, tomet-indexer, tomet-links, tomet-load, tomet-load-config, tomet-lsp, tomet-markdown, tomet-merge, tomet-pandoc, tomet-printer, tomet-search, tomet-semantics, tomet-spec, tomet-stats, tomet-tests, tomet-transform, tomet-tree, tomet-typst, tomet-validator, tomet-validator-blueprint, tomet-validator-profile, tomet-validator-rule, tomet-vault, tomet-workspace)
+)
 
-::meta(crate: tomet-parser, dependencies: list(cotomet-syntax, tomet-ast, tomet-cst, tomet-lexer, tomet-semantics, tomet-tree), dependents: list(cotomet-eval, tomet, tomet-address, tomet-benches, tomet-cli, tomet-config, tomet-convert-standalone, tomet-declaration, tomet-deps, tomet-edit, tomet-expr, tomet-extract, tomet-formatter, tomet-highlight, tomet-html, tomet-indexer, tomet-links, tomet-load, tomet-load-config, tomet-lsp, tomet-markdown, tomet-merge, tomet-pandoc, tomet-printer, tomet-search, tomet-semantics, tomet-spec, tomet-stats, tomet-tests, tomet-transform, tomet-tree, tomet-typst, tomet-validator, tomet-validator-blueprint, tomet-validator-profile, tomet-validator-rule, tomet-vault, tomet-workspace))
+=[ tomet-parser ]
 
-=[tomet-parser]
-
-==[tomet-parser]
+==[ tomet-parser ]
 
 The recursive-descent parser (`&str -> Document / Value`) and authoritative
 source of truth for the Tomet grammar.
 
-==[Architecture & Responsibilities]
+==[ Architecture & Responsibilities ]
 
 - ("Deterministic Static Parser Boundary")
   - `tomet-parser` is strictly a pure, side-effect-free, deterministic static parser.
@@ -26,7 +29,7 @@ what a hole matches belongs to the caller (tandr), never to this crate.
 `tree-sitter-tomet` is a separate hand-maintained grammar approximation used for
 editor syntax highlighting.
 
-==[Module Layout]
+==[ Module Layout ]
 
 - (dialect) Which sigils may open an element: `@` always, `?` (a hole) only in a pattern.
 
@@ -56,7 +59,7 @@ probes for formatting delimiters (`*em*`, `**strong**`, `==mark==`) and autolink
 - (interp) `${...}` interpolation expressions (identifiers, member chains, calls, literals).
 - (error) Parse errors: a message plus a byte offset, with line and column resolved once at the entry points (`located_in`).
 
-==[Module cst]
+==[ Module cst ]
 
 Resilient, lossless Concrete Syntax Tree (CST) parser for Tomet.
 
@@ -69,10 +72,10 @@ never fails: broken input still gets a tree, and the errors a document is
 refused with are found when the tree is lowered.
 
 ```text
-ROOT
-  SECTION                    `=[ T ]` and everything up to the next section
-    SECTION_HEADING          of the same or a shallower level (they nest)
-    PARAGRAPH | LIST | BLOCK_ELEMENT | CODE_BLOCK | THEMATIC_BREAK | SECTION ...
+`` ROOT
+``   SECTION                    `=[ T ]` and everything up to the next section
+``     SECTION_HEADING          of the same or a shallower level (they nest)
+``     PARAGRAPH | LIST | BLOCK_ELEMENT | CODE_BLOCK | THEMATIC_BREAK | SECTION ...
 ```
 
 An element (`BLOCK_ELEMENT`, `INLINE_ELEMENT`) is a `SIGIL` followed by
@@ -109,27 +112,27 @@ last case (a marker in a column that continues nothing) is lowering's, not the t
 line is a `PIPE` token among the content's own, but the grammar reads it as
 white space, so the blocks of a run are the blocks the bracketed form has.
 
-===[Functions]
+===[ Functions ]
 
-====[fn parse_cst]
+====[ fn parse_cst ]
 
 Parse `src` into a lossless, resilient [`SyntaxNode`].
 
 Guaranteed Invariant: `parse_cst(src).text().to_string() == src`.
 
-====[fn parse_cst_pattern]
+====[ fn parse_cst_pattern ]
 
 [`parse_cst`] for a pattern: `?matcher(...)` is a hole, an element of its own
 kind, where in a document `?` is text.
 
-==[Functions]
+==[ Functions ]
 
-===[fn parse_document]
+===[ fn parse_document ]
 
 Parse an entire source string as a markup [`tomet_ast::Document`]: the CST of
 the text ([`parse_cst`]), read as the AST it stands for.
 
-===[fn parse_pattern]
+===[ fn parse_pattern ]
 
 Parse an entire source string as a pattern: a [`tomet_ast::Document`] in which
 `?name(args){options}[content]` is a hole ([`tomet_ast::Hole`]).
@@ -137,6 +140,6 @@ Parse an entire source string as a pattern: a [`tomet_ast::Document`] in which
 It is [`parse_document`] with one more sigil. Everything else is read by the same code, so a
 pattern is written in, and printed as, ordinary tomet.
 
-===[fn parse_interpolation_str]
+===[ fn parse_interpolation_str ]
 
 Parse a `$func(args)` or `${expr}` interpolation directly from a string slice.

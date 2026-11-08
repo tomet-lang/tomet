@@ -4,14 +4,14 @@
 =[ 全容 ]
 
 ```tm
-::kind(dictionary)
-::id(dictionary.tomet)
-::dictionary(tomet)
-
-;@term("vault.config.tmt")#(vault-config)
-| vault の境目を示す設定ファイル。
-
-;@term("ボールト")[ vault の別の言い方。 ]
+`` ::kind(dictionary)
+`` ::id(dictionary.tomet)
+`` ::dictionary(tomet)
+``
+`` ;@term("vault.config.tmt")#(vault-config)
+`` | vault の境目を示す設定ファイル。
+``
+`` ;@term("ボールト")[ vault の別の言い方。 ]
 ```
 
 語の定義を集めた辞書の文書。ファイル全体が一つの辞書で、`::dictionary(名前)` が辞書の名前、その名前で言及される。語は、本文のブロックとして並べる。ヘッダに `{ ... }` は取らない。取る形は廃止されていて、書くと `tomet check` が、語を本文に書くよう案内する。
@@ -29,9 +29,9 @@
 文書の本文からは `@term` で言及する。出力には、語そのものが文字として出る。
 
 ```tm
-@term(tomet#vault-config)               識別子で引く
-@term(tomet#name("vault.config.tmt"))   語で引く
-@term("vault.config.tmt")               辞書を指定せず、登録された全辞書から探す
+`` @term(tomet#vault-config)               識別子で引く
+`` @term(tomet#name("vault.config.tmt"))   語で引く
+`` @term("vault.config.tmt")               辞書を指定せず、登録された全辞書から探す
 ```
 
 - 識別子は、辞書の中でしか一意ではないので、辞書の名前を左に付ける。辞書を省いた `@term(#vault-config)` は、辞書のファイルの中でだけ書ける（`#` だけなら、この文書の中を指す、という決まりのとおり）。

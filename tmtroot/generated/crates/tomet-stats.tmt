@@ -1,8 +1,11 @@
 ::kind(api)
+::meta(
+  crate:        tomet-stats
+  dependencies: list(tomet-address, tomet-ast, tomet-ast-parser, tomet-semantics, tomet-tree)
+  dependents:   list(tomet, tomet-cli)
+)
 
-::meta(crate: tomet-stats, dependencies: list(tomet-address, tomet-ast, tomet-ast-parser, tomet-semantics, tomet-tree), dependents: list(tomet, tomet-cli))
-
-=[tomet-stats]
+=[ tomet-stats ]
 
 Pure in-memory measurement and statistics for Tomet documents.
 
@@ -12,7 +15,7 @@ elements, headings, and internal links) directly from a parsed
 queries, making it suitable for WebAssembly, mobile apps, and parallel
 processing pipelines.
 
-==[Counting rules]
+==[ Counting rules ]
 
 - (Characters) Reader-visible prose text inside `[...]` and section
 headings, with whitespace omitted. `(args)`, `{value}`, and code block
@@ -26,14 +29,14 @@ whitespace characters.
 counted as workspace document links.
 - (Headings) Count of section headings and maximum heading depth.
 
-==[Structs]
+==[ Structs ]
 
-===[struct Stats]
+===[ struct Stats ]
 
 Structural statistics for one or more Tomet documents.
 
-==[Functions]
+==[ Functions ]
 
-===[fn measure]
+===[ fn measure ]
 
 Measures one parsed document.

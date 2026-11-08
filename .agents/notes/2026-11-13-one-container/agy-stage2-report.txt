@@ -1,0 +1,920 @@
+status ERROR duration_min 94.1 tokens 2830793 denied None
+I will read `tmtroot/dev/design/one-container.tmt` to understand the design requirements, specifically sections 2 to 5 and 9 as requested.
+I will read `.writ.tmt` to understand the crate layering and architecture rules.
+I will read `tests/README.md` to see snapshot references and test instructions.
+I will run `jj status --no-pager` to check the current working copy status.
+I will check `.agents/tasks/` to see existing task files.
+I will check recent commits in Jujutsu to understand what was done just before this stage.
+I will run `cargo check --workspace` to verify the baseline build status.
+I will examine `crates/tomet-syntax-ast/src` to see the current AST definitions.
+I will search for `enum Value` and related definitions in `crates/tomet-syntax-ast/src/lib.rs`.
+I will read lines 80 to 160 of `crates/tomet-syntax-ast/src/lib.rs`.
+I will search for `POSITIONAL_ENTRY_KEY` across the codebase.
+I will search for occurrences of `Value::(Seq|Map|Call)`, `EvalValue::Call`, `POSITIONAL_ENTRY_KEY`, `as_seq`, and `as_map`.
+I will group the pattern occurrences by crate / directory.
+I will check the matches in `crates/tree-sitter-tomet`.
+I will create `.agents/tasks/one-container-2-progress.md` with the planned steps.
+I will search for `struct Data` and `Group` in `crates/tomet-syntax-ast/src/lib.rs`.
+I will search for `Group` methods in `crates/tomet-syntax-ast/src/lib.rs`.
+I will read lines 1095 to 1120 in `crates/tomet-syntax-ast/src/lib.rs`.
+I will search for `from_map` and `as_data` across the repository.
+I will search for `fn as_seq` and `fn as_map`.
+I will search for `BodyView` in `crates/tomet-syntax-ast/src/lib.rs`.
+I will search for `fn args` in `crates/tomet-syntax-ast/src/lib.rs`.
+I will examine commit `eeb9d178` to understand the removal of nameless entries in `Group`.
+I will update Step 0 in `.agents/tasks/one-container-2-progress.md` to done.
+I will search for `Serialize` and `Deserialize` on `Value` in `crates/tomet-syntax-ast/src/lib.rs`.
+I will read lines 200 to 320 of `crates/tomet-syntax-ast/src/lib.rs`.
+I will read lines 1 to 55 of `crates/tomet-syntax-ast/src/lib.rs`.
+I will check the inherent methods on `Value` in `crates/tomet-syntax-ast/src/lib.rs`.
+I will inspect `crates/cotomet/src/lib.rs` to see how `as_data` is used.
+I will read lines 51 to 100 in `crates/cotomet/src/lib.rs`.
+I will check how `as_data` is used in `crates/tomet-printer/src/block.rs`.
+I will search for `.args` in `crates/tomet-syntax-ast/src/lib.rs`.
+I will search for `Seq`, `Map`, and `Call` in `crates/tomet-syntax-ast/src/lib.rs`.
+I will read lines 1050 to 1090 in `crates/tomet-syntax-ast/src/lib.rs`.
+I will search for `impl Data` in `crates/tomet-syntax-ast/src/lib.rs`.
+I will read the tests in `crates/tomet-syntax-ast/src/lib.rs`.
+I will update `crates/tomet-syntax-ast/src/lib.rs` with the `Container` and `ContainerEntry` definitions, replace `Value::Seq`, `Value::Map`, and `Value::Call` with `Value::Container(Container)`, update `Data.args`, `Group` methods, and serialization/deserialization.
+I will update the `Value` enum variants and comments in `crates/tomet-syntax-ast/src/lib.rs`.
+I will read lines 120 to 170 of `crates/tomet-syntax-ast/src/lib.rs`.
+I will read lines 180 to 260 of `crates/tomet-syntax-ast/src/lib.rs`.
+I will update `crates/tomet-syntax-ast/src/lib.rs` to insert `ContainerEntry`, `Container`, and update the `Serialize` and `Deserialize` implementations.
+I will read around `Data`, `ElementView`, `BodyView`, and `Group` in `crates/tomet-syntax-ast/src/lib.rs`.
+I will read lines 1215 to 1460 in `crates/tomet-syntax-ast/src/lib.rs`.
+I will update `Data`, `ElementView::args`, `BodyView::args`, and `Group` in `crates/tomet-syntax-ast/src/lib.rs`.
+I will update `ElementView::args` and `BodyView::args` in `crates/tomet-syntax-ast/src/lib.rs`.
+I will update `BodyView::args` in `crates/tomet-syntax-ast/src/lib.rs`.
+I will update `Entry` comments and `Group` methods in `crates/tomet-syntax-ast/src/lib.rs`.
+I will read lines 1930 to 2010 of `crates/tomet-syntax-ast/src/lib.rs`.
+I will read lines 1880 to 1930 of `crates/tomet-syntax-ast/src/lib.rs`.
+I will read lines 1850 to 1880 of `crates/tomet-syntax-ast/src/lib.rs`.
+I will update the test in `crates/tomet-syntax-ast/src/lib.rs`.
+I will update the assertions in `crates/tomet-syntax-ast/src/lib.rs`.
+I will define `expected_args` in the test in `crates/tomet-syntax-ast/src/lib.rs`.
+I will check if `tomet-syntax-ast` compiles cleanly.
+I will check `Cargo.toml` in `crates/tomet-syntax-ast`.
+I will read `crates/tomet-syntax-ast/Cargo.toml`.
+I will run `cargo check -p tomet-ast`.
+I will inspect lines 630 to 650 in `crates/tomet-syntax-ast/src/lib.rs`.
+I will remove the duplicated lines from `crates/tomet-syntax-ast/src/lib.rs`.
+I will run `cargo test -p tomet-ast`.
+I will add the explicit type annotations to `map.next_entry::<String, Value>()?`.
+I will run `cargo test -p tomet-ast` to verify `tomet-ast` compiles and passes all its tests.
+I will add unit tests for `Container` and `Value` JSON serialization/deserialization to `crates/tomet-syntax-ast/src/lib.rs`.
+I will run `cargo test -p tomet-ast` to check if `serde_json` is available.
+I will read lines 1855 to 1910 in `crates/tomet-syntax-ast/src/lib.rs`.
+I will restore the fn header for `test_element_view_and_list_item_as_element_view`.
+I will run `cargo test -p tomet-ast`.
+I will check root `Cargo.toml` for `serde_json`.
+I will search `.writ.tmt` for rules regarding `tomet-syntax-ast` or `tomet-ast` dependencies.
+I will update `test_container_methods` in `crates/tomet-syntax-ast/src/lib.rs` to test the container API without needing `serde_json`.
+I will run `cargo test -p tomet-ast`.
+I will remove the unused `mut` warning from the test in `crates/tomet-syntax-ast/src/lib.rs`.
+I will run `cargo test -p tomet-ast` again.
+I will update Step 1 in `.agents/tasks/one-container-2-progress.md` to done.
+I will list files in `crates/tomet-syntax-tree/src`.
+I will read `crates/tomet-syntax-tree/src/value.rs`.
+I will read `crates/tomet-syntax-tree/src/element.rs`.
+I will read lines 101 to 200 in `crates/tomet-syntax-tree/src/element.rs`.
+I will read lines 200 to 348 in `crates/tomet-syntax-tree/src/element.rs`.
+I will search for `Value` in `crates/tomet-syntax-tree/src/walk.rs`.
+I will search for `args` in `crates/tomet-syntax-tree/src/walk.rs`.
+I will check `enum Node` in `crates/tomet-syntax-tree/src/walk.rs`.
+I will search for `Place::Args` in `crates/tomet-syntax-tree/src/walk.rs`.
+I will search for `Node::` variants in `crates/tomet-syntax-tree/src/walk.rs`.
+I will search for `Value::(Seq|Map|Call)` in `crates/tomet-syntax-tree`.
+I will read lines 110 to 140 of `crates/tomet-syntax-tree/src/lib.rs`.
+I will read lines 20 to 125 in `crates/tomet-syntax-tree/src/value.rs`.
+I will edit `crates/tomet-syntax-tree/src/value.rs`.
+I will edit `crates/tomet-syntax-tree/src/element.rs`.
+I will update `list_item` in `crates/tomet-syntax-tree/src/element.rs`.
+I will read lines 235-265, 314-325, and 730-765 in `crates/tomet-syntax-tree/src/walk.rs`.
+I will read lines 314-325 and 730-765 in `crates/tomet-syntax-tree/src/walk.rs`.
+I will read lines 730-765 in `crates/tomet-syntax-tree/src/walk.rs`.
+I will update `crates/tomet-syntax-tree/src/walk.rs` with the container walking logic and tests.
+I will update `fn data` in `crates/tomet-syntax-tree/src/walk.rs`.
+I will update `WalkSink::data` and `WalkSink::value` in `crates/tomet-syntax-tree/src/walk.rs`.
+I will read lines 1095 to 1195 in `crates/tomet-syntax-tree/src/walk.rs`.
+I will read lines 1340 to 1390 in `crates/tomet-syntax-tree/src/walk.rs`.
+I will update the tests in `crates/tomet-syntax-tree/src/walk.rs`.
+I will update lines 1143-1185 in `crates/tomet-syntax-tree/src/walk.rs`.
+I will check imports in `walk.rs` tests.
+I will update imports and `Value::Map(Vec::new())` in `walk.rs` tests.
+I will replace `Value::Map(Vec::new())` in `walk.rs` tests.
+I will update the remaining `Value::Map(Vec::new())` in `walk.rs`.
+I will read lines 118 to 126 in `crates/tomet-syntax-tree/src/lib.rs`.
+I will update `crates/tomet-syntax-tree/src/lib.rs`.
+I will run `cargo check -p tomet-tree`.
+I will read lines 65 to 80 in `crates/tomet-syntax-tree/src/lib.rs`.
+I will update `element_attrs_view` and `element_attrs_mut` in `crates/tomet-syntax-tree/src/lib.rs`.
+I will run `cargo test -p tomet-tree`.
+I will run `cargo test -p tomet-tree --lib`.
+I will run `cargo check -p tomet-tree --lib`.
+I will update Step 2 in `.agents/tasks/one-container-2-progress.md` to done.
+I will search for `lower_paren_value` in `crates/tomet-syntax-lowering/src/element.rs`.
+I will search for `lower_paren_value` across `crates/tomet-syntax-lowering`.
+I will read lines 1 to 100 in `crates/tomet-syntax-lowering/src/element.rs`.
+I will search for `lower_map_entries` in `crates/tomet-syntax-lowering/src/element.rs`.
+I will read lines 320 to 450 in `crates/tomet-syntax-lowering/src/element.rs`.
+I will search for `lower_map_entries` in `crates/tomet-syntax-lowering`.
+I will read lines 280 to 320 in `crates/tomet-syntax-lowering/src/element.rs`.
+I will read lines 550 to 600 in `crates/tomet-syntax-lowering/src/element.rs`.
+I will search for `lower_call_args` in `crates/tomet-syntax-lowering/src/element.rs`.
+I will read lines 645 to 730 in `crates/tomet-syntax-lowering/src/element.rs`.
+I will search for `resolve_call` in `crates/tomet-syntax-lowering`.
+I will search for `lower_value` in `crates/tomet-syntax-lowering`.
+I will read lines 80 to 210 in `crates/tomet-syntax-lowering/src/lower/connect.rs`.
+I will search for `Value::` in `crates/tomet-merge`.
+I will search for `args` in `crates/tomet-merge`.
+I will read lines 50 to 75 of `crates/tomet-syntax-lowering/src/lower/code_block.rs`.
+I will update `code_block.rs` to use `Container` for `args`.
+I will read lines 1 to 20 of `crates/tomet-syntax-lowering/src/lower/code_block.rs`.
+I will update `code_block.rs`.
+I will update line 64 in `code_block.rs`.
+I will read lines 30 to 55 in `crates/tomet-syntax-lowering/src/lower/groups.rs`.
+I will read lines 340 to 370 in `crates/tomet-syntax-lowering/src/lower/paragraph.rs`.
+I will update `crates/tomet-syntax-lowering/src/lower/paragraph.rs` to use `Container` for autolink `args`.
+I will update line 353 in `crates/tomet-syntax-lowering/src/lower/paragraph.rs`.
+I will read `crates/tomet-syntax-lowering/src/value.rs`.
+I will update `shift_spans` and `find_interp_in_value` in `crates/tomet-syntax-lowering/src/value.rs`.
+I will read lines 80 to 140 of `crates/tomet-syntax-lowering/src/lower/connect.rs`.
+I will read lines 1 to 25 of `crates/tomet-syntax-lowering/src/lower/connect.rs`.
+I will edit `crates/tomet-syntax-lowering/src/lower/connect.rs`.
+I will update lines 80 to 207 in `crates/tomet-syntax-lowering/src/lower/connect.rs`.
+I will read lines 40 to 80 in `crates/tomet-syntax-lowering/src/element.rs`.
+I will update imports, remove `POSITIONAL_ENTRY_KEY`, and update `lower_paren_value` in `crates/tomet-syntax-lowering/src/element.rs`.
+I will update `lower_paren_value` and remove `POSITIONAL_ENTRY_KEY` in `crates/tomet-syntax-lowering/src/element.rs`.
+I will update `lower_paren_value` in `crates/tomet-syntax-lowering/src/element.rs`.
+I will read lines 285 to 450 in `crates/tomet-syntax-lowering/src/element.rs`.
+I will read lines 440 to 475 in `crates/tomet-syntax-lowering/src/element.rs`.
+I will read lines 835 to 855 in `crates/tomet-syntax-lowering/src/element.rs`.
+I will search for `Value::(Seq|Map|Call)` in `crates/tomet-syntax-lowering`.
+I will read lines 280 to 470 in `crates/tomet-syntax-lowering/src/element.rs`.
+I will update `lower_value`, `lower_file_body`, `lower_container_entries`, and `lower_entry_item` in `crates/tomet-syntax-lowering/src/element.rs`.
+I will read lines 565 to 590 in `crates/tomet-syntax-lowering/src/element.rs`.
+I will update `K::MAP_LITERAL` and `K::ARGS` in `crates/tomet-syntax-lowering/src/element.rs`.
+I will read lines 830 to 850 in `crates/tomet-syntax-lowering/src/element.rs`.
+I will update `resolve_call` in `crates/tomet-syntax-lowering/src/element.rs`.
+I will read lines 90 to 120 in `crates/tomet-syntax-lowering/src/tests.rs`.
+I will read lines 1 to 25 in `crates/tomet-syntax-lowering/src/tests.rs`.
+I will update `crates/tomet-syntax-lowering/src/tests.rs`.
+I will update line 104 in `crates/tomet-syntax-lowering/src/tests.rs`.
+I will run `cargo check -p tomet-lowering`.
+I will read lines 185 to 220 in `crates/tomet-syntax-lowering/src/element.rs`.
+I will update `lower_value_group` in `crates/tomet-syntax-lowering/src/element.rs`.
+I will run `cargo check -p tomet-lowering`.
+I will run `cargo check -p tomet-ast-parser`.
+I will read lines 45 to 125 in `crates/tomet-syntax-ast-parser/src/lib.rs`.
+I will add `find_interp_in_container` to `crates/tomet-syntax-lowering/src/value.rs`.
+I will update `crates/tomet-syntax-ast-parser/src/lib.rs`.
+I will update line 81 and line 113 in `crates/tomet-syntax-ast-parser/src/lib.rs`.
+I will update line 113 in `crates/tomet-syntax-ast-parser/src/lib.rs`.
+I will run `cargo check -p tomet-ast-parser`.
+I will run `cargo test -p tomet-ast-parser`.
+I will list files in `crates/tomet-syntax-ast-parser/src/tests`.
+I will read `crates/tomet-syntax-ast-parser/src/tests/mod.rs`.
+I will update `crates/tomet-syntax-ast-parser/src/tests/mod.rs`.
+I will search for `Value::(Seq|Map|Call)` and `from_map` in `crates/tomet-syntax-ast-parser/src/tests`.
+I will check the matches in `crates/tomet-syntax-ast-parser/src/tests/elements.rs`.
+I will read lines 1 to 45 in `crates/tomet-syntax-ast-parser/src/tests/elements.rs`.
+I will read the task progress file `.agents/tasks/one-container-2-progress.md` to verify the exact status of completed steps.
+I will run `cargo check` on `tomet-lowering` and `tomet-ast-parser` to see the current compiler status and errors in their test targets.
+I will read `crates/tomet-syntax-ast-parser/src/tests/mod.rs` to see what helper functions and imports are defined for unit tests.
+I will read lines 130-340 of `crates/tomet-syntax-ast-parser/src/tests/comments.rs`.
+I will update `crates/tomet-syntax-ast-parser/src/tests/comments.rs` to use `Container` instead of `Value::Map` and `Value::Seq`.
+I will update lines 220-335 of `crates/tomet-syntax-ast-parser/src/tests/comments.rs`.
+I will read lines 220-270 of `crates/tomet-syntax-ast-parser/src/tests/comments.rs`.
+I will edit lines 224-263 in `crates/tomet-syntax-ast-parser/src/tests/comments.rs`.
+I will read lines 220 to 240 of `crates/tomet-syntax-ast-parser/src/tests/comments.rs`.
+I will run a command to check line endings in `crates/tomet-syntax-ast-parser/src/tests/comments.rs`.
+I will edit lines 225-230 of `crates/tomet-syntax-ast-parser/src/tests/comments.rs`.
+I will update `::meta` in `crates/tomet-syntax-ast-parser/src/tests/comments.rs`.
+I will update the remaining `Value::Seq` and `Value::Map` in `crates/tomet-syntax-ast-parser/src/tests/comments.rs`.
+I will update the remaining lines in `crates/tomet-syntax-ast-parser/src/tests/comments.rs`.
+I will update the remaining references in `crates/tomet-syntax-ast-parser/src/tests/comments.rs`.
+I will update the path test in `crates/tomet-syntax-ast-parser/src/tests/comments.rs`.
+I will update line 330 of `crates/tomet-syntax-ast-parser/src/tests/comments.rs`.
+I will read `crates/tomet-syntax-ast-parser/src/tests/connects.rs`.
+I will read lines 50 to 120 of `crates/tomet-syntax-ast-parser/src/tests/connects.rs`.
+I will read lines 121 to 250 of `crates/tomet-syntax-ast-parser/src/tests/connects.rs`.
+I will read lines 251 to 371 of `crates/tomet-syntax-ast-parser/src/tests/connects.rs`.
+I will update `crates/tomet-syntax-ast-parser/src/tests/connects.rs` to replace `Group::from_map`, `Value::Map`, `Value::Seq`, and scalar `data.args` with `Container`.
+I will update the remaining occurrences in `crates/tomet-syntax-ast-parser/src/tests/connects.rs`.
+I will update lines 140-180 of `crates/tomet-syntax-ast-parser/src/tests/connects.rs`.
+I will update lines 227-315 of `crates/tomet-syntax-ast-parser/src/tests/connects.rs`.
+I will search for `Value::` and `Group::` in `crates/tomet-syntax-ast-parser/src/tests/elements.rs`.
+I will read lines 1 to 45 of `crates/tomet-syntax-ast-parser/src/tests/elements.rs`.
+I will update `crates/tomet-syntax-ast-parser/src/tests/elements.rs`.
+I will search for AST value patterns in `crates/tomet-syntax-ast-parser/src/tests/fences.rs`.
+I will read lines 80 to 105 of `crates/tomet-syntax-ast-parser/src/tests/fences.rs`.
+I will update `crates/tomet-syntax-ast-parser/src/tests/fences.rs` line 92.
+I will search for AST patterns in `crates/tomet-syntax-ast-parser/src/tests/groups.rs`.
+I will read lines 120-145 and 200-235 of `crates/tomet-syntax-ast-parser/src/tests/groups.rs`.
+I will read lines 200 to 232 of `crates/tomet-syntax-ast-parser/src/tests/groups.rs`.
+I will update `crates/tomet-syntax-ast-parser/src/tests/groups.rs`.
+I will update lines 207 and 226 in `crates/tomet-syntax-ast-parser/src/tests/groups.rs`.
+I will search for AST patterns in `crates/tomet-syntax-ast-parser/src/tests/holes.rs`.
+I will read lines 60 to 125 of `crates/tomet-syntax-ast-parser/src/tests/holes.rs`.
+I will read lines 125 to 274 of `crates/tomet-syntax-ast-parser/src/tests/holes.rs`.
+I will update `crates/tomet-syntax-ast-parser/src/tests/holes.rs` to reflect that `args` is `Option<Container>`.
+I will update the remaining lines of `crates/tomet-syntax-ast-parser/src/tests/holes.rs`.
+I will search for AST patterns in `crates/tomet-syntax-ast-parser/src/tests/id.rs`.
+I will read relevant lines of `crates/tomet-syntax-ast-parser/src/tests/id.rs`.
+I will read lines 105-165 of `crates/tomet-syntax-ast-parser/src/tests/id.rs`.
+I will update `crates/tomet-syntax-ast-parser/src/tests/id.rs` with `Container`.
+I will update lines 108 and 156 of `crates/tomet-syntax-ast-parser/src/tests/id.rs`.
+I will update line 156 of `crates/tomet-syntax-ast-parser/src/tests/id.rs`.
+I will search for AST patterns in `crates/tomet-syntax-ast-parser/src/tests/lists.rs`.
+I will read lines 30 to 120 of `crates/tomet-syntax-ast-parser/src/tests/lists.rs`.
+I will read lines 145 to 205 and 255 to 300 of `crates/tomet-syntax-ast-parser/src/tests/lists.rs`.
+I will read lines 255 to 300 and 390 to 410 of `crates/tomet-syntax-ast-parser/src/tests/lists.rs`.
+I will read lines 390 to 410 of `crates/tomet-syntax-ast-parser/src/tests/lists.rs`.
+I will update `crates/tomet-syntax-ast-parser/src/tests/lists.rs` lines 37 to 120.
+I will update lines 155-300 in `crates/tomet-syntax-ast-parser/src/tests/lists.rs`.
+I will read lines 150 to 185 of `crates/tomet-syntax-ast-parser/src/tests/lists.rs`.
+I will update lines 157-195 in `crates/tomet-syntax-ast-parser/src/tests/lists.rs`.
+I will read lines 260 to 310 of `crates/tomet-syntax-ast-parser/src/tests/lists.rs`.
+I will update lines 268-305 in `crates/tomet-syntax-ast-parser/src/tests/lists.rs`.
+I will read lines 395-415 of `crates/tomet-syntax-ast-parser/src/tests/lists.rs`.
+I will update lines 404-412 of `crates/tomet-syntax-ast-parser/src/tests/lists.rs`.
+I will search for AST patterns in `crates/tomet-syntax-ast-parser/src/tests/nexus.rs`.
+I will read relevant lines of `crates/tomet-syntax-ast-parser/src/tests/nexus.rs`.
+I will read lines 450 to 480 of `crates/tomet-syntax-ast-parser/src/tests/nexus.rs`.
+I will update `crates/tomet-syntax-ast-parser/src/tests/nexus.rs` with `Container`.
+I will update lines 457-474 of `crates/tomet-syntax-ast-parser/src/tests/nexus.rs`.
+I will search for AST patterns in `crates/tomet-syntax-ast-parser/src/tests/slots.rs`.
+I will read lines 150-170 of `crates/tomet-syntax-ast-parser/src/tests/slots.rs`.
+I will update `crates/tomet-syntax-ast-parser/src/tests/slots.rs`.
+I will search for AST patterns in `crates/tomet-syntax-ast-parser/src/tests/type_seats.rs`.
+I will read lines 180-220 and 400-430 of `crates/tomet-syntax-ast-parser/src/tests/type_seats.rs`.
+I will read lines 400 to 435 of `crates/tomet-syntax-ast-parser/src/tests/type_seats.rs`.
+I will update `crates/tomet-syntax-ast-parser/src/tests/type_seats.rs` to use `Container`.
+I will read lines 410 to 435 of `crates/tomet-syntax-ast-parser/src/tests/type_seats.rs`.
+I will update lines 412-430 in `crates/tomet-syntax-ast-parser/src/tests/type_seats.rs`.
+I will search for AST patterns in `crates/tomet-syntax-ast-parser/src/tests/urls.rs`.
+I will read lines 1 to 110 of `crates/tomet-syntax-ast-parser/src/tests/urls.rs`.
+I will read lines 140 to 216 of `crates/tomet-syntax-ast-parser/src/tests/urls.rs`.
+I will update `crates/tomet-syntax-ast-parser/src/tests/urls.rs` with `Container`.
+I will update lines 47-110 of `crates/tomet-syntax-ast-parser/src/tests/urls.rs`.
+I will update lines 145-215 of `crates/tomet-syntax-ast-parser/src/tests/urls.rs`.
+I will search for AST patterns in `crates/tomet-syntax-ast-parser/src/tests/values.rs`.
+I will read lines 1 to 100 of `crates/tomet-syntax-ast-parser/src/tests/values.rs`.
+I will read lines 101 to 210 of `crates/tomet-syntax-ast-parser/src/tests/values.rs`.
+I will read lines 211 to 401 of `crates/tomet-syntax-ast-parser/src/tests/values.rs`.
+I will update lines 4 to 100 in `crates/tomet-syntax-ast-parser/src/tests/values.rs`.
+I will read lines 110-210 of `crates/tomet-syntax-ast-parser/src/tests/values.rs`.
+I will update lines 112-210 in `crates/tomet-syntax-ast-parser/src/tests/values.rs`.
+I will read lines 230 to 310 of `crates/tomet-syntax-ast-parser/src/tests/values.rs`.
+I will read lines 311 to 428 of `crates/tomet-syntax-ast-parser/src/tests/values.rs`.
+I will update the remaining tests in `crates/tomet-syntax-ast-parser/src/tests/values.rs`.
+I will run `cargo test -p tomet-lowering -p tomet-ast-parser` to verify the tests compile and pass.
+I will fix the two type errors in `crates/tomet-syntax-ast-parser/src/tests/values.rs`.
+I will fix line 351 in `crates/tomet-syntax-ast-parser/src/tests/values.rs`.
+I will run `cargo test -p tomet-lowering -p tomet-ast-parser`.
+I will check the status of the test run.
+I will update `.agents/tasks/one-container-2-progress.md` to check off Step 3.
+I will list the files in `crates/serde_cotomet/src/`.
+I will read `crates/serde_cotomet/src/lib.rs`.
+I will run `cargo check -p serde_cotomet` to see the current compilation status.
+I will read `crates/serde_cotomet/src/de.rs`.
+I will read lines 161 to 262 of `crates/serde_cotomet/src/de.rs`.
+I will read `crates/serde_cotomet/src/print.rs`.
+I will read lines 111-154 of `crates/serde_cotomet/src/print.rs`.
+I will read lines 60 to 190 of `crates/serde_cotomet/src/ser.rs`.
+I will read lines 230 to 260 of `crates/serde_cotomet/src/ser.rs`.
+I will read lines 50 to 180 of `crates/serde_cotomet/src/lib.rs`.
+I will search for `Value::` in `crates/serde_cotomet/src/ser.rs`.
+I will read lines 1 to 20 of `crates/serde_cotomet/src/ser.rs`.
+I will update `crates/serde_cotomet/src/ser.rs` to use `Value::Container`.
+I will update container creations in `crates/serde_cotomet/src/ser.rs`.
+I will update `finish_seq` and `finish_map` in `crates/serde_cotomet/src/ser.rs`.
+I will update `finish_map` in `crates/serde_cotomet/src/ser.rs`.
+I will update `crates/serde_cotomet/src/print.rs`.
+I will read lines 60 to 160 of `crates/serde_cotomet/src/de.rs`.
+I will update `crates/serde_cotomet/src/de.rs` with `Container` and the new deserialization rules.
+I will update `ValueDeserializer` implementation in `crates/serde_cotomet/src/de.rs`.
+I will read lines 230 to 280 of `crates/serde_cotomet/src/de.rs`.
+I will read lines 320 to 356 of `crates/serde_cotomet/src/de.rs`.
+I will update `forward_to_deserialize_any!` and `newtype_variant_seed` in `crates/serde_cotomet/src/de.rs`.
+I will update `newtype_variant_seed` in `crates/serde_cotomet/src/de.rs`.
+I will read lines 120-140 of `crates/serde_cotomet/src/lib.rs`.
+I will check `crates/serde_cotomet/Cargo.toml`.
+I will add the tests for `deserialize_seq`, `deserialize_map`, `deserialize_enum`, and `deserialize_any` to `crates/serde_cotomet/src/lib.rs`.
+I will make `ValueDeserializer` `pub(crate)` in `crates/serde_cotomet/src/de.rs`.
+I will update `from_value_deserializer` to `ValueDeserializer` in `crates/serde_cotomet/src/lib.rs`.
+I will run `cargo test -p serde_cotomet`.
+I will update `crates/serde_cotomet/src/ser.rs` to specify the collect type, and `crates/serde_cotomet/src/de.rs` to revert `newtype_variant_seed` to standard seed deserialization.
+I will update `newtype_variant_seed` and remove unused `mut` in `crates/serde_cotomet/src/de.rs`.
+I will update `newtype_variant_seed` in `crates/serde_cotomet/src/de.rs`.
+I will import `DeserializeSeed` in `crates/serde_cotomet/src/lib.rs`.
+I will run `cargo test -p serde_cotomet`.
+I will read lines 410 to 425 of `crates/serde_cotomet/src/lib.rs`.
+I will grep for `a_list_call_is_not_a_sequence` in `crates/serde_cotomet`.
+I will read lines 390-410 of `crates/serde_cotomet/src/lib.rs`.
+I will run a test command to see what CST is produced for `remote(host: "localhost")`.
+I will search for `CALL_EXPR` in `crates/tomet-syntax-cst-parser`.
+I will search for call syntax kind in `crates/tomet-syntax-cst`.
+I will update the tests in `crates/serde_cotomet/src/lib.rs`.
+I will update imports and `a_list_call_is_not_a_sequence` in `crates/serde_cotomet/src/lib.rs`.
+I will update `a_list_call_is_not_a_sequence` in `crates/serde_cotomet/src/lib.rs`.
+I will run `cargo test -p serde_cotomet`.
+I will fix the type annotation in `crates/serde_cotomet/src/lib.rs` and the unused import in `crates/serde_cotomet/src/de.rs`.
+I will remove unused import in `crates/serde_cotomet/src/de.rs`.
+I will run `cargo test -p serde_cotomet`.
+I will update `.agents/tasks/one-container-2-progress.md` to mark Step 4 as completed.
+I will run `cargo check -p cotomet`.
+I will read lines 50 to 80 of `crates/cotomet/src/lib.rs`.
+I will read lines 80 to 200 of `crates/cotomet/src/lib.rs`.
+I will read lines 201 to 295 of `crates/cotomet/src/lib.rs`.
+I will update `crates/cotomet/src/lib.rs` to handle `Container` in `find_not_data` and update unit tests.
+I will update the tests in `crates/cotomet/src/lib.rs`.
+I will read lines 140 to 225 of `crates/cotomet/src/lib.rs`.
+I will read lines 226 to 293 of `crates/cotomet/src/lib.rs`.
+I will update unit tests in `crates/cotomet/src/lib.rs`.
+I will update lines 280-293 in `crates/cotomet/src/lib.rs`.
+I will run `cargo test -p cotomet`.
+I will update `.agents/tasks/one-container-2-progress.md` to mark Step 5 as completed.
+I will run `cargo check -p tomet-semantics-core`.
+I will read `crates/tomet-semantics-core/src/positional.rs`.
+I will read lines 71 to 132 of `crates/tomet-semantics-core/src/positional.rs`.
+I will search for all callers of `bind_positional`.
+I will search for `bind_positional` across the repository using `git grep`.
+I will read `crates/tomet-semantics-declaration/src/declaration.rs`.
+I will read lines 50 to 110 of `crates/tomet-semantics-declaration/src/declaration.rs`.
+I will read lines 111 to 140 of `crates/tomet-semantics-declaration/src/declaration.rs`.
+I will read `crates/tomet-semantics-core/src/parse.rs`.
+I will read lines 50 to 145 of `crates/tomet-semantics-core/src/parse.rs`.
+I will read lines 30 to 140 of `crates/tomet-semantics-core/src/admits.rs`.
+I will read lines 135 to 250 of `crates/tomet-semantics-core/src/admits.rs`.
+I will read lines 251 to 304 of `crates/tomet-semantics-core/src/admits.rs`.
+I will read `crates/tomet-semantics-core/src/lib.rs`.
+I will update `crates/tomet-semantics-core/src/positional.rs`.
+I will update exports in `crates/tomet-semantics-core/src/lib.rs`.
+I will read lines 20 to 45 of `crates/tomet-semantics-core/src/parse.rs`.
+I will update `crates/tomet-semantics-core/src/parse.rs`.
+I will update line 105 in `crates/tomet-semantics-core/src/parse.rs`.
+I will read lines 40 to 135 of `crates/tomet-semantics-core/src/admits.rs`.
+I will update `crates/tomet-semantics-core/src/admits.rs`.
+I will read lines 1-10 of `crates/tomet-semantics-core/src/admits.rs`.
+I will update imports in `crates/tomet-semantics-core/src/admits.rs`.
+I will update `admits`, `datum_value`, and `describe_value` in `crates/tomet-semantics-core/src/admits.rs`.
+I will check the current task progress tracking file `.agents/tasks/one-container-2-progress.md` and inspect `crates/tomet-semantics-core/src/admits.rs` to see what remains for completing Step 6.
+I will run `cargo test -p tomet-semantics-core` with the required environment variables to see the current compiler output for `tomet-semantics-core`.
+I will inspect `crates/tomet-syntax-ast/src/lib.rs` around `from_named`.
+I will update `Container::from_named` in `crates/tomet-syntax-ast/src/lib.rs` to accept `Item = (K, Value)` where `K: Into<String>`.
+I will inspect `crates/tomet-semantics-core/src/admits.rs` around line 180-320 to see the test cases that need updating.
+I will read `crates/tomet-semantics-core/src/admits.rs` around lines 100-150.
+I will check where `enum Datum` is defined.
+I will read `datum_value` in `crates/tomet-semantics-core/src/admits.rs`.
+I will update the test cases in `crates/tomet-semantics-core/src/admits.rs` to use `Value::Container`.
+I will read lines 145-180 of `crates/tomet-semantics-core/src/admits.rs`.
+I will update `admits.rs` with `seq` helper and update cases in `admits_intended_values`.
+I will read lines 190-245 of `crates/tomet-semantics-core/src/admits.rs`.
+I will update the test cases in lines 193-240 of `crates/tomet-semantics-core/src/admits.rs`.
+I will read lines 245-316 of `crates/tomet-semantics-core/src/admits.rs`.
+I will edit lines 252-315 in `crates/tomet-semantics-core/src/admits.rs`.
+I will run `cargo test -p tomet-semantics-core`.
+I will run `git status --short crates/tomet-semantics-core` to verify changes in `tomet-semantics-core`.
+I will update `.agents/tasks/one-container-2-progress.md` to mark Step 6 complete.
+I will read `crates/tomet-semantics-declaration/src/lib.rs` and its module documentation.
+I will check `tomet-semantics-declaration` using cargo.
+I will read `crates/tomet-semantics-declaration/Cargo.toml`.
+I will run `cargo test -p tomet-declaration` to inspect the compiler errors.
+I will inspect `crates/tomet-semantics-declaration/src/declaration.rs`.
+I will read lines 181-270 of `crates/tomet-semantics-declaration/src/declaration.rs`.
+I will check `Group` methods in `crates/tomet-syntax-ast/src/lib.rs`.
+I will read lines 265-408 of `crates/tomet-semantics-declaration/src/declaration.rs`.
+I will inspect `crates/tomet-semantics-declaration/src/read.rs`.
+I will search for `fn text` in `crates/tomet-semantics-declaration/src/read.rs`.
+I will read lines 220-250 of `crates/tomet-semantics-declaration/src/read.rs`.
+I will search for callers of `document_meta` and `pub fn meta` across the codebase.
+I will read lines 390-437 of `crates/tomet-semantics-declaration/src/read.rs`.
+I will inspect `crates/tomet-semantics-declaration/src/vars.rs`.
+I will read lines 300-360 of `crates/tomet-semantics-declaration/src/check.rs`.
+I will read lines 490-540 of `crates/tomet-semantics-declaration/src/check.rs`.
+I will read lines 800-890 of `crates/tomet-semantics-declaration/src/check.rs`.
+I will read lines 110-150 of `crates/tomet-semantics-declaration/src/macros.rs`.
+I will check `crates/tomet-semantics-declaration/src/lib.rs`.
+I will update `pub use tomet_ast::{Container, Element, File, Value};` in `crates/tomet-semantics-declaration/src/lib.rs`.
+I will edit `crates/tomet-semantics-declaration/src/declaration.rs`.
+I will read lines 260-410 in `crates/tomet-semantics-declaration/src/declaration.rs`.
+I will update the tests in `crates/tomet-semantics-declaration/src/declaration.rs` to use `Container`.
+I will update the remaining tests in `crates/tomet-semantics-declaration/src/declaration.rs`.
+I will edit `crates/tomet-semantics-declaration/src/read.rs`.
+I will update the tests in `crates/tomet-semantics-declaration/src/read.rs`.
+I will read lines 120-171 of `crates/tomet-semantics-declaration/src/vars.rs`.
+I will update `VarDecl::from_value` in `crates/tomet-semantics-declaration/src/vars.rs`.
+I will edit `crates/tomet-semantics-declaration/src/check.rs`.
+I will read lines 490-540 of `crates/tomet-semantics-declaration/src/check.rs`.
+I will read lines 810-880 of `crates/tomet-semantics-declaration/src/check.rs`.
+I will update `check_fields` and tests in `crates/tomet-semantics-declaration/src/check.rs`.
+I will update the tests in `crates/tomet-semantics-declaration/src/check.rs`.
+I will update `body` helper in `crates/tomet-semantics-declaration/src/macros.rs`.
+I will run `cargo test -p tomet-declaration`.
+I will read the methods of `Container` in `crates/tomet-syntax-ast/src/lib.rs`.
+I will read lines 341-380 of `crates/tomet-syntax-ast/src/lib.rs`.
+I will add `has_unnamed` and `first_unnamed` methods to `Container` in `crates/tomet-syntax-ast/src/lib.rs`.
+I will add `IntoIterator` for `&Container` in `crates/tomet-syntax-ast/src/lib.rs`.
+I will read lines 620-675 of `crates/tomet-semantics-declaration/src/check.rs`.
+I will read lines 740-775 of `crates/tomet-semantics-declaration/src/check.rs`.
+I will update `args.entries().iter().any` in `crates/tomet-semantics-declaration/src/declaration.rs`.
+I will update `args.entries().iter().map` in `crates/tomet-semantics-declaration/src/read.rs`.
+I will update `args.entries().first()` in `crates/tomet-semantics-declaration/src/macros.rs`.
+I will update the imports and test cases in `crates/tomet-semantics-declaration/src/check.rs`.
+I will update the test cases in `crates/tomet-semantics-declaration/src/check.rs`.
+I will update the remaining test cases in `crates/tomet-semantics-declaration/src/check.rs`.
+I will run `cargo test -p tomet-declaration`.
+I will inspect lines 445-460 in `crates/tomet-syntax-ast/src/lib.rs`.
+I will remove the duplicate `IntoIterator` implementation from `crates/tomet-syntax-ast/src/lib.rs`.
+I will run `cargo test -p tomet-declaration`.
+I will read lines 580-615 in `crates/tomet-semantics-declaration/src/check.rs`.
+I will inspect `Container::new` in `crates/tomet-syntax-ast/src/lib.rs`.
+I will read lines 225-245 of `crates/tomet-semantics-declaration/src/read.rs`.
+I will update `Container::new` in `crates/tomet-syntax-ast/src/lib.rs` to accept `impl IntoIterator<Item = ContainerEntry>`.
+I will remove the unused `use tomet_tree::ValueExt;` in `crates/tomet-semantics-declaration/src/read.rs`.
+I will update lines 587-605 in `crates/tomet-semantics-declaration/src/check.rs`.
+I will read lines 580-610 of `crates/tomet-semantics-declaration/src/check.rs`.
+I will update lines 587-605 of `crates/tomet-semantics-declaration/src/check.rs`.
+I will read lines 585-607 of `crates/tomet-semantics-declaration/src/check.rs`.
+I will update lines 587-595 in `crates/tomet-semantics-declaration/src/check.rs`.
+I will update `bad_version` in `crates/tomet-semantics-declaration/src/check.rs`.
+I will run `cargo test -p tomet-declaration`.
+I will read lines 1425-1445 of `crates/tomet-syntax-ast/src/lib.rs`.
+I will remove `.collect()` in `Group::as_container` in `crates/tomet-syntax-ast/src/lib.rs`.
+I will run `cargo test -p tomet-declaration`.
+I will run `git status --short crates/tomet-semantics-declaration` to verify the modified files.
+I will update `.agents/tasks/one-container-2-progress.md` marking Step 7 complete.
+I will check Cargo.toml files for `tomet-semantics`.
+I will read `crates/tomet-semantics/Cargo.toml` and `crates/tomet-semantics/src/lib.rs`.
+I will run `cargo test -p tomet-semantics`.
+I will search for `value_to_json` in `crates/tomet-semantics`.
+I will read lines 80-160 of `crates/tomet-semantics/src/flatten.rs`.
+I will read lines 161-220 of `crates/tomet-semantics/src/flatten.rs`.
+I will read lines 220-336 in `crates/tomet-semantics/src/flatten.rs`.
+I will read lines 1-60 of `crates/tomet-semantics/src/flatten.rs`.
+I will read `crates/tomet-semantics/src/data.rs`.
+I will search for callers of `element_data` and `declaration_entries`.
+I will search for `declaration_entries` and `declaration_data`.
+I will update `crates/tomet-semantics/src/data.rs` to return `Option<Container>`.
+I will update `crates/tomet-semantics/src/flatten.rs`.
+I will read lines 70-170 of `crates/tomet-semantics/src/flatten.rs`.
+I will update `flatten_element_data`, `flatten_data`, `container_to_json`, and `value_to_json` in `crates/tomet-semantics/src/flatten.rs`.
+I will read lines 205-225 of `crates/tomet-semantics/src/flatten.rs`.
+I will read lines 230-347 of `crates/tomet-semantics/src/flatten.rs`.
+I will update `value_to_json` for `Value::Element` and the test cases in `crates/tomet-semantics/src/flatten.rs`.
+I will read `crates/tomet-semantics/src/positional.rs`.
+I will read lines 101-220 of `crates/tomet-semantics/src/positional.rs`.
+I will search for callers of `normalized_element_args` across all crates.
+I will search for `normalized_list_marker` across all crates.
+I will read lines 215-300 of `crates/tomet-semantics/src/positional.rs`.
+I will read lines 301-430 of `crates/tomet-semantics/src/positional.rs`.
+I will read lines 431-550 of `crates/tomet-semantics/src/positional.rs`.
+I will update `crates/tomet-semantics/src/positional.rs`.
+I will update `normalized_list_marker`, `recover_target_scheme_entry`, and the normalization functions in `crates/tomet-semantics/src/positional.rs`.
+I will read lines 215-285 of `crates/tomet-semantics/src/positional.rs`.
+I will read lines 205-225 of `crates/tomet-semantics/src/positional.rs`.
+I will update the tests in `crates/tomet-semantics/src/positional.rs`.
+I will read lines 320-420 of `crates/tomet-semantics/src/positional.rs`.
+I will read lines 421-530 of `crates/tomet-semantics/src/positional.rs`.
+I will update tests from line 324 to the end of `crates/tomet-semantics/src/positional.rs`.
+I will read lines 80-120 of `crates/tomet-semantics/src/rebase.rs`.
+I will update `set_target` in `crates/tomet-semantics/src/rebase.rs`.
+I will read lines 90-145 of `crates/tomet-semantics/src/elements/config.rs`.
+I will read lines 145-209 of `crates/tomet-semantics/src/elements/config.rs`.
+I will update `process_export_type` and `process_export_path` in `crates/tomet-semantics/src/elements/config.rs`.
+I will read `crates/tomet-semantics/src/elements/tag.rs`.
+I will read lines 80-132 of `crates/tomet-semantics/src/elements/tag.rs`.
+I will update `crates/tomet-semantics/src/elements/tag.rs`.
+I will update tests in `crates/tomet-semantics/src/elements/tag.rs`.
+I will read lines 270-320 of `crates/tomet-semantics/src/vocabulary.rs`.
+I will read lines 630-730 of `crates/tomet-semantics/src/vocabulary.rs`.
+I will check `ValueExt::get` in `crates/tomet-syntax-tree/src/value.rs`.
+I will search for `Map`, `Seq`, and `Call` in `crates/tomet-semantics/src/vocabulary.rs`.
+I will update `crates/tomet-semantics/src/vocabulary.rs`.
+I will update `header`, `content_allow_from_value`, and `params_from_value` in `crates/tomet-semantics/src/vocabulary.rs`.
+I will update `content_allow_from_value` and `params_from_value` in `crates/tomet-semantics/src/vocabulary.rs`.
+I will read lines 685-740 of `crates/tomet-semantics/src/vocabulary.rs`.
+I will update `content_allow_from_value` and `params_from_value` in `crates/tomet-semantics/src/vocabulary.rs`.
+I will run `cargo test -p tomet-semantics`.
+I will read lines 165-190 of `crates/tomet-semantics/src/elements/footnote.rs`.
+I will update `get_element_id` and remove the unused `ValueExt` import in `crates/tomet-semantics/src/elements/footnote.rs`.
+I will update `get_element_id` in `crates/tomet-semantics/src/elements/footnote.rs`.
+I will read lines 45-70 of `crates/tomet-semantics/src/elements/target.rs`.
+I will read lines 90-170 of `crates/tomet-semantics/src/elements/target.rs`.
+I will read lines 250-275 of `crates/tomet-semantics/src/elements/target.rs`.
+I will update `target_arg` and tests in `crates/tomet-semantics/src/elements/target.rs`.
+I will update the tests in `crates/tomet-semantics/src/elements/target.rs`.
+I will update `path_el` in `crates/tomet-semantics/src/elements/target.rs`.
+I will read lines 20-115 of `crates/tomet-semantics/src/elements/heading.rs`.
+I will update tests in `crates/tomet-semantics/src/elements/heading.rs`.
+I will read lines 600-630 of `crates/tomet-semantics/src/vocabulary.rs`.
+I will update `used_namespaces` in `crates/tomet-semantics/src/vocabulary.rs`.
+I will read lines 745-770 and lines 820-845 of `crates/tomet-semantics/src/kind.rs`.
+I will read lines 820-845 of `crates/tomet-semantics/src/kind.rs`.
+I will read lines 720-745 of `crates/tomet-semantics/src/kind.rs`.
+I will check line numbers of `mod tests` in `crates/tomet-semantics/src/kind.rs`.
+I will read lines 639-655 of `crates/tomet-semantics/src/kind.rs`.
+I will update `use tomet_ast::{Container, Value}` in `crates/tomet-semantics/src/kind.rs`.
+I will update lines 755 and 828 in `crates/tomet-semantics/src/kind.rs`.
+I will update line 828 in `crates/tomet-semantics/src/kind.rs`.
+I will run `cargo test -p tomet-semantics`.
+I will check the modified files in `crates/tomet-semantics`.
+I will update `.agents/tasks/one-container-2-progress.md` marking Step 8 complete.
+I will locate the crates for `tomet-semantics-expr` and `tomet-semantics-eval`.
+I will find the eval crate.
+I will read `crates/tomet-semantics-expr/src/lib.rs`.
+I will run `cargo test -p tomet-expr`.
+I will read lines 1-100 of `crates/tomet-semantics-expr/src/value.rs`.
+I will read lines 101-200 of `crates/tomet-semantics-expr/src/value.rs`.
+I will read lines 201-300 of `crates/tomet-semantics-expr/src/value.rs`.
+I will search for `EvalValue::Call` in `crates/tomet-semantics-expr/`.
+I will read lines 320-380 of `crates/tomet-semantics-expr/src/value.rs`.
+I will read lines 135-180 of `crates/tomet-semantics-expr/src/parts.rs`.
+I will read lines 200-240 of `crates/tomet-semantics-expr/src/parts.rs`.
+I will read lines 20-50 of `crates/tomet-semantics-expr/src/fragments.rs`.
+I will read lines 75-100 of `crates/tomet-semantics-expr/src/memory.rs`.
+I will read lines 1160-1180 of `crates/tomet-semantics-expr/src/tests.rs`.
+I will read lines 1820-1910 of `crates/tomet-semantics-expr/src/tests.rs`.
+I will read lines 230-260 of `crates/tomet-semantics-expr/src/lib.rs`.
+I will search for `refers_to_vault` in `crates/tomet-semantics-expr/src/lib.rs`.
+I will read lines 105-125 of `crates/tomet-semantics-expr/src/lib.rs`.
+I will remove the `EvalValue::Call` arm from `refers_to_vault` in `crates/tomet-semantics-expr/src/lib.rs`.
+I will update `EvalValue`, `from_ast`, `to_ast`, and tests in `crates/tomet-semantics-expr/src/value.rs`.
+I will read lines 170-290 of `crates/tomet-semantics-expr/src/value.rs`.
+I will update `EvalValue`, `type_name`, `from_ast`, and `to_ast` in `crates/tomet-semantics-expr/src/value.rs`.
+I will read `crates/tomet-semantics-expr/src/parts.rs`, `crates/tomet-semantics-expr/src/fragments.rs`, and `crates/tomet-semantics-expr/src/memory.rs` to prepare the edits for `tomet-expr`.
+I will read `crates/tomet-semantics-expr/src/parts.rs` around line 430 to inspect the `data` helper.
+I will search for `fn data` in `crates/tomet-semantics-expr/src`.
+I will read `crates/tomet-semantics-expr/src/parts.rs` lines 140 to 180.
+I will read `crates/tomet-semantics-expr/src/fragments.rs` around line 34.
+I will read `crates/tomet-semantics-expr/src/memory.rs` lines 75 to 95.
+I will read `crates/tomet-semantics-expr/src/value.rs` from line 360 to the end.
+I will read `crates/tomet-semantics-expr/src/tests.rs` lines 1160 to 1175.
+I will read `crates/tomet-semantics-expr/src/tests.rs` lines 1820 to 1910.
+I will search for any remaining references to `Value::Map`, `Value::Seq`, `Value::Call`, `as_seq`, `as_map` in `crates/tomet-semantics-expr`.
+I will read `crates/tomet-semantics-expr/src/types.rs` lines 105 to 135.
+I will edit `crates/tomet-semantics-expr/src/types.rs` to handle `Value::Container(c) if c.is_all_unnamed()`.
+I will edit `crates/tomet-semantics-expr/src/parts.rs` to import `Container` and update `fn data` to accept `&Option<Container>`.
+I will edit `crates/tomet-semantics-expr/src/parts.rs` to update `fn data` merging logic.
+I will read lines 1 to 15 of `crates/tomet-semantics-expr/src/fragments.rs`.
+I will edit `crates/tomet-semantics-expr/src/fragments.rs` to use `Container`.
+I will edit `crates/tomet-semantics-expr/src/fragments.rs` line 34.
+I will read lines 1 to 20 of `crates/tomet-semantics-expr/src/memory.rs`.
+I will edit `crates/tomet-semantics-expr/src/memory.rs` to use `Value::Container(Container::empty())`.
+I will edit `crates/tomet-semantics-expr/src/memory.rs` line 85.
+I will read `crates/tomet-semantics-expr/src/value.rs` lines 355 to 390.
+I will read lines 330 to 355 of `crates/tomet-semantics-expr/src/value.rs`.
+I will read lines 1 to 25 of `crates/tomet-semantics-expr/src/value.rs`.
+I will read lines 25 to 50 of `crates/tomet-semantics-expr/src/value.rs`.
+I will edit the unit tests in `crates/tomet-semantics-expr/src/value.rs`.
+I will read lines 1 to 20 of `crates/tomet-semantics-expr/src/tests.rs`.
+I will edit `crates/tomet-semantics-expr/src/tests.rs` line 1168 to read the first unnamed argument.
+I will edit `crates/tomet-semantics-expr/src/tests.rs` lines 1825-1831.
+I will edit `crates/tomet-semantics-expr/src/tests.rs` lines 1860-1866 and 1896-1899.
+I will edit lines 1896-1899 of `crates/tomet-semantics-expr/src/tests.rs`.
+I will run `cargo test -p tomet-expr` to test `crates/tomet-semantics-expr`.
+I will read `crates/tomet-semantics-expr/src/ops.rs` lines 30 to 60.
+I will remove the `EvalValue::Call` arm from `crates/tomet-semantics-expr/src/ops.rs`.
+I will read lines 310 to 325 of `crates/tomet-semantics-expr/src/parts.rs`.
+I will edit `crates/tomet-semantics-expr/src/parts.rs` line 317 to wrap `group.as_data()` in `Value::Container`.
+I will read lines 25 to 35 of `crates/tomet-semantics-expr/src/value.rs`.
+I will remove `ContainerEntry` from the top-level imports in `crates/tomet-semantics-expr/src/value.rs` and import it in `mod tests`.
+I will read lines 340 to 355 of `crates/tomet-semantics-expr/src/value.rs`.
+I will add `use tomet_ast::ContainerEntry;` to `mod tests` in `crates/tomet-semantics-expr/src/value.rs`.
+I will run `cargo test -p tomet-expr` to verify the build and tests of `tomet-expr`.
+I will run `cargo test -p cotomet-eval` to test `crates/tomet-semantics-eval`.
+I will read `crates/tomet-semantics-eval/src/lib.rs` lines 170 to 215.
+I will read lines 1 to 30 of `crates/tomet-semantics-eval/src/lib.rs`.
+I will read lines 31 to 65 of `crates/tomet-semantics-eval/src/lib.rs`.
+I will read lines 215 to 310 of `crates/tomet-semantics-eval/src/lib.rs`.
+I will read lines 311 to 450 of `crates/tomet-semantics-eval/src/lib.rs`.
+I will edit `crates/tomet-semantics-eval/src/lib.rs` to replace `Value::Map`, `Value::Seq`, `Value::Call` with `Value::Container`.
+I will update `walk_value` in `crates/tomet-semantics-eval/src/lib.rs`.
+I will update the tests in `crates/tomet-semantics-eval/src/lib.rs`.
+I will update `var_default`, `var_that_holds_a_list_giving_a_list`, and `a_map_comes_from_the_caller_not_from_a_declared_default` in `crates/tomet-semantics-eval/src/lib.rs`.
+I will read lines 320 to 445 of `crates/tomet-semantics-eval/src/lib.rs`.
+I will update the remaining tests in `crates/tomet-semantics-eval/src/lib.rs`.
+I will edit `built_in_add`, `expression_nested_in_map_in_list`, and `quoted_expression_left_as_text` in `crates/tomet-semantics-eval/src/lib.rs`.
+I will run `cargo test -p cotomet-eval` to verify `cotomet-eval`.
+I will read `.agents/tasks/one-container-2-progress.md` around Step 9.
+I will read `.agents/tasks/one-container-2-progress.md` from line 1.
+I will update `.agents/tasks/one-container-2-progress.md` to mark Step 9 as completed and add the observation about mixed container visibility in expressions.
+I will add the observation on mixed container observation in expressions to `.agents/tasks/one-container-2-progress.md`.
+I will list the validator crates and run `cargo check` on them to identify any compilation errors.
+I will find all crates in `crates` related to validator.
+I will check the package names in `crates/tomet-validator*/Cargo.toml`.
+I will check `Cargo.toml` in `crates/tomet-validator`.
+I will run `cargo check` on the validator crates.
+I will read `crates/tomet-validator-core/src/lib.rs` lines 310 to 380.
+I will read lines 715 to 735 and lines 795 to 815 of `crates/tomet-validator-core/src/lib.rs`.
+I will read lines 795 to 815 of `crates/tomet-validator-core/src/lib.rs`.
+I will edit `crates/tomet-validator-core/src/lib.rs` to update `check_arguments_of`, `declaration_entries` inspection, and `Value::Container` wording.
+I will read lines 330 to 385 of `crates/tomet-validator-core/src/lib.rs`.
+I will read lines 380 to 400 of `crates/tomet-validator-core/src/lib.rs`.
+I will edit `check_arguments_of` in `crates/tomet-validator-core/src/lib.rs`.
+I will read lines 715 to 740 of `crates/tomet-validator-core/src/lib.rs`.
+I will update lines 710 and 724-733 in `crates/tomet-validator-core/src/lib.rs`.
+I will read lines 705 to 715 of `crates/tomet-validator-core/src/lib.rs`.
+I will remove the unused `use tomet_tree::ValueExt;` import from `crates/tomet-validator-core/src/lib.rs`.
+I will read lines 795 to 810 of `crates/tomet-validator-core/src/lib.rs`.
+I will edit `describe_value` in `crates/tomet-validator-core/src/lib.rs`.
+I will run `cargo check` on the validator crates.
+I will read `crates/tomet-validator-rule/src/decode.rs`.
+I will read the tests in `crates/tomet-validator-rule/src/decode.rs`.
+I will update `decode_rule_args` in `crates/tomet-validator-rule/src/decode.rs`.
+I will read lines 708 to 716 of `crates/tomet-validator-core/src/lib.rs`.
+I will remove the unused `use tomet_ast::Value;` at line 712 in `crates/tomet-validator-core/src/lib.rs`.
+I will check the git diff for `crates/tomet-validator-core/src/lib.rs`.
+I will read lines 1 to 30 of `crates/tomet-validator-core/src/lib.rs`.
+I will add `Value` and `Container` to top-level imports in `crates/tomet-validator-core/src/lib.rs`.
+I will check the validator crates.
+I will use `Container` unqualified in `check_arguments_of` in `crates/tomet-validator-core/src/lib.rs`.
+I will read `crates/tomet-validator-blueprint/src/lib.rs` lines 65 to 115.
+I will read `crates/tomet-validator-blueprint/src/lib.rs` lines 175 to 210.
+I will read lines 350 to 370 of `crates/tomet-validator-blueprint/src/lib.rs`.
+I will search for `Value::Seq` or `Value::Map` or `Value::Call` in `crates/tomet-validator-blueprint`.
+I will edit `crates/tomet-validator-blueprint/src/lib.rs` to update blueprint schema extraction, document validation, and `describe_value`.
+I will read lines 180 to 205 of `crates/tomet-validator-blueprint/src/lib.rs`.
+I will edit lines 186 to 203 of `crates/tomet-validator-blueprint/src/lib.rs`.
+I will read lines 355 to 375 of `crates/tomet-validator-blueprint/src/lib.rs`.
+I will update `describe_value` in `crates/tomet-validator-blueprint/src/lib.rs`.
+I will run `cargo check` on the validator crates.
+I will run `cargo test` on all validator crates.
+I will read lines 1360 to 1425 of `crates/tomet-validator/src/tests.rs`.
+I will read lines 1350 to 1365 of `crates/tomet-validator/src/tests.rs`.
+I will search for any other occurrences of old AST variants in `crates/tomet-validator/`.
+I will edit `crates/tomet-validator/src/tests.rs` to use `Container` for declaration arguments.
+I will run `cargo test` on all validator crates.
+I will update `.agents/tasks/one-container-2-progress.md` to mark Step 10 as completed.
+I will find all config crates.
+I will read `crates/tomet-config/Cargo.toml` lines 1 to 10.
+I will read `crates/tomet-load-config/Cargo.toml` lines 1 to 10.
+I will search Cargo.toml files for config.
+I will run `cargo check` on `tomet-config` and `tomet-load-config`.
+I will read `crates/tomet-config/src/tree.rs`.
+I will read lines 80 to 130 of `crates/tomet-config/src/lib.rs`.
+I will search for `ConfigLayer` in `crates/tomet-config`.
+I will read lines 20 to 80 of `crates/tomet-config/src/layer.rs`.
+I will read lines 240 to 288 of `crates/tomet-config/src/layer.rs`.
+I will search for `document_entries` in `crates/tomet-config/src/layer.rs`.
+I will check `Container` methods in `tomet-syntax-ast/src/lib.rs`.
+I will read lines 250 to 320 of `crates/tomet-syntax-ast/src/lib.rs`.
+I will read lines 320 to 360 of `crates/tomet-syntax-ast/src/lib.rs`.
+I will read `crates/tomet-config/src/groups/format.rs` lines 85 to 115.
+I will read `crates/tomet-config/src/groups/meta.rs` lines 35 to 105.
+I will read lines 340 to 370 of `crates/tomet-syntax-ast/src/lib.rs`.
+I will read lines 330 to 350 of `crates/tomet-syntax-ast/src/lib.rs`.
+I will add `push`, `set`, and `get_or_insert_container` to `Container` in `crates/tomet-syntax-ast/src/lib.rs`.
+I will edit `crates/tomet-config/src/tree.rs` to use `Container`.
+I will read lines 90 to 125 of `crates/tomet-config/src/lib.rs`.
+I will read lines 1 to 30 of `crates/tomet-config/src/lib.rs`.
+I will read lines 40 to 65 of `crates/tomet-config/src/lib.rs`.
+I will edit `crates/tomet-config/src/lib.rs` to use `Container` in `from_merged`.
+I will update `from_merged` in `crates/tomet-config/src/lib.rs`.
+I will read lines 93 to 110 of `crates/tomet-config/src/groups/format.rs`.
+I will edit `parse_element_configs` in `crates/tomet-config/src/groups/format.rs`.
+I will read lines 38 to 50 of `crates/tomet-config/src/groups/meta.rs`.
+I will read lines 80 to 100 of `crates/tomet-config/src/groups/meta.rs`.
+I will edit `crates/tomet-config/src/groups/meta.rs` to use `Value::Container`.
+I will update `parse_meta_field_props` in `crates/tomet-config/src/groups/meta.rs`.
+I will check `tomet-config` and `tomet-load-config`.
+I will read lines 440 to 455 of `crates/tomet-syntax-ast/src/lib.rs`.
+I will remove the duplicate `push` method from `crates/tomet-syntax-ast/src/lib.rs`.
+I will check `tomet-config` and `tomet-load-config`.
+I will edit lines 137 and 139 in `crates/tomet-config/src/groups/format.rs` to convert `&str` to `String`.
+I will run `cargo check` on `tomet-config` and `tomet-load-config`.
+I will run `cargo test` on `tomet-config` and `tomet-load-config`.
+I will read lines 65 to 110 of `crates/tomet-config/tests/derive_test.rs`.
+I will read lines 1 to 25 of `crates/tomet-config/tests/derive_test.rs`.
+I will edit `crates/tomet-config/tests/derive_test.rs` to use `Value::Container`.
+I will update lines 72-97 in `crates/tomet-config/tests/derive_test.rs`.
+I will run `cargo test -p tomet-config -p tomet-load-config`.
+I will read `crates/tomet-config/src/groups/workspace.rs`.
+I will search for `collect_paths` or `type = "list(string)"` across crates.
+A container that represents a list (or has unnamed entries, or isn't specifically being merged as a named map) must NOT be recursively merged as sub-entries.
+In `tree.rs`:
+`else if let Value::Container(incoming_map) = value if incoming_map.is_all_named()` (or `if !incoming_map.is_all_unnamed()`)!
+Wait, in config merging:
+A map in config is a container of named settings: `incoming_map.is_all_named() && !incoming_map.is_empty()`.
+Wait, what if someone wrote an empty map `{}`? An empty container `Container::empty()` has `is_all_named() == true` and `is_all_unnamed() == true`.
+If `incoming_map` is all-unnamed (a list like `("target", "build")`), it is a LEAF value (a list of paths)! It must be set as `existing_map.set(key, value.clone())`!
+And in general, a setting value that is a list is a container where all entries are unnamed: `incoming_map.is_all_unnamed() && !incoming_map.is_empty()`.
+Wait, what if `incoming_map.is_empty()`? An empty container in `tmt` config:
+If someone writes `::workspace(ignore: ())`, `ignore` should be set to `Value::Container(Container::empty())`!
+Wait, if `merge_entry` recursed into `incoming_map.named()` for an empty container, nothing was set for `key`!
+Let's check:
+When should `merge_entry` descend?
+Only when `value` is a container of named settings, i.e.:
+`!incoming_map.is_all_unnamed()`!
+Wait, if `incoming_map.is_all_unnamed()`: it is a list!
+It should go to `else { target.set(key, value.clone()); }`!
+Let's check:
+```rust
+    } else if let Value::Container(incoming_map) = value
+        && !incoming_map.is_all_unnamed()
+    {
+        let existing_map = target.get_or_insert_container(key);
+        if key == "meta" {
+            for (sub_k, sub_v) in incoming_map.named() {
+                insert_or_merge_prop(existing_map, sub_k, sub_v);
+            }
+        } else {
+            for (sub_k, sub_v) in incoming_map.named() {
+                merge_entry(existing_map, sub_k, sub_v);
+            }
+        }
+    } else {
+        target.set(key, value.clone());
+    }
+```
+Wait! What about `insert_or_merge_prop` in `tree.rs`?
+Let's check `insert_or_merge_prop`:
+```rust
+fn insert_or_merge_prop(container: &mut Container, key: &str, value: &Value) {
+    if let Some(existing) = container.get_mut(key) {
+        match (existing, value) {
+            (Value::Container(ex_props), Value::Container(new_props))
+                if !ex_props.is_all_unnamed() && !new_props.is_all_unnamed() =>
+            {
+                for (pk, pv) in new_props.named() {
+                    ex_props.set(pk, pv.clone());
+                }
+            }
+            (ex, val) => {
+                *ex = val.clone();
+            }
+        }
+    } else {
+        container.set(key, value.clone());
+    }
+}
+```
+Exactly! If `new_props` is a list (all unnamed), it must replace `ex` rather than attempting to merge by name!
+And look at `collect_paths`:
+```rust
+pub fn collect_paths(value: &Value, out: &mut Vec<String>) {
+    match value {
+        Value::Container(c) if c.is_all_unnamed() => {
+            for item in c.unnamed() {
+                if let Some(path) = item.as_str()
+                    && !out.iter().any(|p| p == path)
+                {
+                    out.push(path.to_string());
+                }
+            }
+        }
+        other => {
+            if let Some(path) = other.as_str()
+                && !out.iter().any(|p| p == path)
+            {
+                out.push(path.to_string());
+            }
+        }
+    }
+}
+```
+Wait, what if someone wrote `ignore: "single/path"`?
+`other.as_str()` matches and pushes it.
+What if `ignore: ("a", "b")`?
+`c.is_all_unnamed()` matches and iterates over `c.unnamed()`.
+What if `c` is empty `()`?
+`c.is_all_unnamed()` matches, loop does nothing, out is empty.
+What if someone wrote `ignore: ("a")` (one item in parentheses)?
+In the new container model: `("a")` is a Container with ONE UNNAMED entry `"a"`!
+`c.is_all_unnamed()` matches! And `c.unnamed()` yields `"a"`!
+
+Let's edit `crates/tomet-config/src/tree.rs`.I will edit `crates/tomet-config/src/tree.rs` so that only containers with named entries are recursed into during config merging.
+I will run `cargo test` on `tomet-config` and `tomet-load-config`.
+I will update `.agents/tasks/one-container-2-progress.md` to mark Step 11 as completed.
+I will run `cargo check` on `tomet-printer` and `tomet-formatter`.
+I will read `crates/tomet-printer/src/value.rs` lines 1 to 120.
+I will read lines 120 to 260 of `crates/tomet-printer/src/value.rs`.
+I will read lines 260 to 330 of `crates/tomet-printer/src/value.rs`.
+I will read lines 165 to 300 of `crates/tomet-printer/src/block.rs`.
+I will read lines 40 to 90 of `crates/tomet-printer/src/element.rs`.
+I will read lines 90 to 160 of `crates/tomet-printer/src/element.rs`.
+I will read lines 200 to 260 of `crates/tomet-printer/src/element.rs`.
+I will search for `render_element_value` in `crates/tomet-printer/src/element.rs`.
+I will read lines 261 to 290 of `crates/tomet-printer/src/element.rs`.
+I will search for `render_value` across the entire codebase.
+I will search for `render_group_entries` in `crates/tomet-printer/src/element.rs`.
+I will read lines 309 to 350 of `crates/tomet-printer/src/element.rs`.
+I will read lines 50 to 75 of `crates/tomet-printer/src/element.rs`.
+I will search for the compilation error in `tomet-formatter`.
+I will read `crates/tomet-formatter/src/clean.rs` lines 65 to 90.
+I will read lines 1 to 20 of `crates/tomet-printer/src/block.rs`.
+I will edit `crates/tomet-printer/src/block.rs` to use `render_element_value` for `{value}` groups and update `render_args` calls.
+I will read lines 170 to 220 of `crates/tomet-printer/src/block.rs`.
+I will read lines 265 to 300 of `crates/tomet-printer/src/block.rs`.
+I will edit `crates/tomet-printer/src/block.rs` to render `{value}` using `render_element_value`.
+I will edit lines 207-210 in `crates/tomet-printer/src/block.rs`.
+I will edit lines 268-295 in `crates/tomet-printer/src/block.rs`.
+I will update `is_raw_element` in `crates/tomet-formatter/src/clean.rs`.
+I will update `lang` extraction from `args` in `crates/tomet-printer/src/element.rs`.
+I will read lines 20 to 110 of `crates/tomet-printer/src/value.rs`.
+I will read lines 195 to 220 of `crates/tomet-printer/src/value.rs`.
+I will read lines 330 to 420 of `crates/tomet-printer/src/value.rs`.
+I will read lines 420 to 500 of `crates/tomet-printer/src/value.rs`.
+I will read lines 500 to 608 of `crates/tomet-printer/src/value.rs`.
+I will edit `crates/tomet-printer/src/value.rs` to implement the container printing rules.
+I will read lines 190 to 330 of `crates/tomet-printer/src/value.rs`.
+I will edit `render_args`, `render_meta_field_value`, and `render_meta_declaration` in `crates/tomet-printer/src/value.rs`.
+I will read lines 330 to 450 of `crates/tomet-printer/src/value.rs`.
+I will read lines 440 to 520 of `crates/tomet-printer/src/value.rs`.
+I will read lines 520 to 615 of `crates/tomet-printer/src/value.rs`.
+I will update the tests in `crates/tomet-printer/src/value.rs` to use `Container` and cover the new printing rules.
+I will run `cargo check` on `tomet-printer` and `tomet-formatter`.
+I will read lines 55 to 135 of `crates/tomet-printer/src/value.rs`.
+I will remove the duplicated lines 108 to 123 from `crates/tomet-printer/src/value.rs`.
+I will read lines 1 to 15 of `crates/tomet-formatter/src/clean.rs`.
+I will update imports in `crates/tomet-formatter/src/clean.rs`.
+I will run `cargo check` on `tomet-printer` and `tomet-formatter`.
+I will update imports in `crates/tomet-printer/src/element.rs`.
+I will read lines 1 to 20 of `crates/tomet-printer/src/element.rs`.
+I will edit imports in `crates/tomet-printer/src/element.rs`.
+I will read lines 8 to 15 of `crates/tomet-printer/src/value.rs`.
+I will edit imports in `crates/tomet-printer/src/value.rs`.
+I will read lines 340 to 350 of `crates/tomet-printer/src/value.rs`.
+I will read lines 320 to 335 of `crates/tomet-printer/src/value.rs`.
+I will add `use tomet_ast::ContainerEntry;` to `mod tests` in `crates/tomet-printer/src/value.rs`.
+I will read lines 70 to 82 of `crates/tomet-formatter/src/clean.rs`.
+I will edit `crates/tomet-formatter/src/clean.rs` line 75 to borrow `el.data.args`.
+I will run `cargo check` on `tomet-printer` and `tomet-formatter`.
+I will add `#[cfg(test)]` to `render_value` in `crates/tomet-printer/src/value.rs`.
+I will run `cargo test` on `tomet-printer` and `tomet-formatter`.
+I will run unit tests for `tomet-printer` and `tomet-formatter`.
+I will run `cargo test -p tomet-printer --lib`.
+I will read `crates/tomet-printer/Cargo.toml`.
+I will list package names in `crates/tomet-convert-*/Cargo.toml`.
+I will read lines 60 to 200 of `crates/tomet-convert-html/src/util.rs`.
+I will search for `as_map` in `crates/tomet-convert-html`.
+I will read `crates/tomet-convert-html/src/elements/mod.rs` lines 70 to 145.
+I will read lines 185 to 210 of `crates/tomet-convert-html/src/elements/mod.rs`.
+I will search for `CustomElementCtx` in `crates/tomet-convert-html/`.
+I will read lines 105 to 155 of `crates/tomet-convert-html/src/lib.rs`.
+I will read lines 235 to 275 of `crates/tomet-convert-html/src/block.rs`.
+I will read lines 80 to 95 and lines 180 to 190 of `crates/tomet-convert-html/src/block.rs`.
+I will search for `as_map` in `crates/tomet-convert-html/src/elements/`.
+I will read `.agents/tasks/one-container-2-progress.md` to review the task tracker and current state.
+I will run `cargo check -p tomet-html` with `CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=0` to check for compilation errors in `tomet-html`.
+I will read `crates/tomet-convert-html/src/lib.rs` to inspect `CustomElementCtx` and its usage.
+I will read lines 125 to 160 of `crates/tomet-convert-html/src/lib.rs`.
+I will read lines 60 to 200 of `crates/tomet-convert-html/src/util.rs`.
+I will read `crates/tomet-semantics/src/flatten.rs` to see what `flatten_data` returns.
+I will read lines 110-180 of `crates/tomet-semantics/src/flatten.rs`.
+I will read lines 60-110 of `crates/tomet-semantics/src/flatten.rs`.
+I will search for `as_map` and `map_get` in `crates/tomet-convert-html`.
+I will read lines 70 to 150 of `crates/tomet-convert-html/src/elements/mod.rs`.
+I will read lines 180 to 240 of `crates/tomet-convert-html/src/elements/mod.rs`.
+I will read lines 80-95, 180-195, and 235-280 of `crates/tomet-convert-html/src/block.rs`.
+I will read lines 180-195 and 235-280 of `crates/tomet-convert-html/src/block.rs`.
+I will read lines 20-35 of `crates/tomet-convert-html/src/elements/table.rs`.
+I will read lines 40-85 of `crates/tomet-convert-html/src/elements/text.rs`.
+I will read lines 1-15 of `crates/tomet-convert-html/src/elements/text.rs`.
+I will update `CustomElementCtx` in `crates/tomet-convert-html/src/lib.rs` to use `Option<Container>`.
+I will read lines 1 to 30 of `crates/tomet-convert-html/src/lib.rs`.
+I will read lines 30 to 60 of `crates/tomet-convert-html/src/lib.rs`.
+I will edit `crates/tomet-convert-html/src/lib.rs` to import `Container` and update `CustomElementCtx`.
+I will read lines 120 to 155 of `crates/tomet-convert-html/src/lib.rs`.
+I will edit `CustomElementCtx` in `crates/tomet-convert-html/src/lib.rs` to take and return `Option<Container>`.
+I will read lines 60 to 195 of `crates/tomet-convert-html/src/util.rs`.
+I will read lines 1 to 30 of `crates/tomet-convert-html/src/util.rs`.
+I will edit `crates/tomet-convert-html/src/util.rs` to update `split_attrs`, `push_data_attrs`, and remove `as_map`/`map_get`.
+I will update `split_attrs`, `push_data_attrs`, and remove `as_map`/`map_get` in `crates/tomet-convert-html/src/util.rs`.
+I will update `push_data_attrs` and remove `as_map` and `map_get` in `crates/tomet-convert-html/src/util.rs`.
+I will read lines 245 to 276 of `crates/tomet-convert-html/src/block.rs`.
+I will edit `crates/tomet-convert-html/src/block.rs` to handle `item.data.args: Option<Container>`.
+I will edit `crates/tomet-convert-html/src/elements/mod.rs` to use `Container` methods in `render_task_element` and `conflict_sides`.
+I will edit `conflict_sides` in `crates/tomet-convert-html/src/elements/mod.rs`.
+I will read lines 1 to 35 of `crates/tomet-convert-html/src/elements/table.rs`.
+I will edit `crates/tomet-convert-html/src/elements/table.rs` to remove `as_map`/`map_get` and use `Container::get`.
+I will read lines 1 to 15 and 45 to 85 of `crates/tomet-convert-html/src/elements/text.rs`.
+I will edit `crates/tomet-convert-html/src/elements/text.rs` to remove `as_map`/`map_get` and use `Container::get`.
+I will update `render_ruby_element` and `render_raw_element` in `crates/tomet-convert-html/src/elements/text.rs`.
+I will run `cargo check -p tomet-html` with `CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=0` to verify `tomet-html`.
+I will read lines 110 to 145 of `crates/tomet-convert-html/src/elements/link.rs`.
+I will read lines 90 to 120 of `crates/tomet-convert-html/src/elements/link.rs`.
+I will edit `crates/tomet-convert-html/src/elements/link.rs` to remove the `Value::Map` check and call `push_data_attrs`.
+I will edit `crates/tomet-convert-html/src/lib.rs` to remove the unused `Value` import.
+I will run `cargo test -p tomet-html` with `CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=0`.
+I will read lines 50 to 80 of `crates/tomet-convert-html/src/tests/elements.rs`.
+I will read lines 1 to 25 of `crates/tomet-convert-html/src/tests/elements.rs`.
+I will edit `crates/tomet-convert-html/src/tests/elements.rs` to import `Value` and use `Container::get`.
+I will update `get` in `crates/tomet-convert-html/src/tests/elements.rs`.
+I will read lines 1 to 15 of `crates/tomet-convert-html/src/elements/link.rs`.
+I will edit `crates/tomet-convert-html/src/elements/link.rs` to remove unused `Value` import.
+I will run `cargo test -p tomet-html` with `CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=0`.
+I will check `tomet-markdown` using `CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=0 cargo check -p tomet-markdown`.
+I will read lines 300 to 360 of `crates/tomet-convert-markdown/src/export/mod.rs`.
+I will read lines 400 to 450 of `crates/tomet-convert-markdown/src/export/mod.rs`.
+I will read lines 450 to 520 and 740 to 760 of `crates/tomet-convert-markdown/src/export/mod.rs`.
+I will read lines 740 to 760 of `crates/tomet-convert-markdown/src/export/mod.rs`.
+I will read lines 720 to 745 of `crates/tomet-convert-markdown/src/export/mod.rs`.
+I will edit `render_ruby` and `render_raw` in `crates/tomet-convert-markdown/src/export/mod.rs`.
+I will edit `render_raw` in `crates/tomet-convert-markdown/src/export/mod.rs`.
+I will edit `render_callout` in `crates/tomet-convert-markdown/src/export/mod.rs`.
+I will read lines 710 to 750 of `crates/tomet-convert-markdown/src/export/mod.rs`.
+I will edit `value_to_plain` in `crates/tomet-convert-markdown/src/export/mod.rs` and remove `as_map`/`map_get`.
+I will read lines 160 to 190 of `crates/tomet-convert-markdown/src/import/mod.rs`.
+

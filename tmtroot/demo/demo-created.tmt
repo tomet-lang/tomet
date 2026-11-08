@@ -1,0 +1,16 @@
+::kind(demo)
+::id(demo-DhfNPoTN)
+::meta(
+  title:    "Untitled Demo"
+  created:  2026-11-12T08:42:16+09:00
+  due_date: 2026-11-12
+  tags:     (tomet, demo)
+  score:    53
+)
+
+=[ Overview ]#(overview)
+
+File: demo-created.tmt
+Due: 2026-11-12
+
+=[ Tasks ]#(tasks)

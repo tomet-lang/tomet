@@ -1,33 +1,42 @@
+::id(agents)
 ::export(
   type: commonmark,
   path: "AGENTS.md"
 )
+::meta(
+  lang: "en"
+)
 
-${macro.generated_by(self::path)}
+$macro.generated_by(self::path)
 
 =[ Tomet ]
 
 ==[ Core Philosophy & Principles ]
 
 ===[ Precedence of Instructions ]
+
 The rules in this document serve as the project baseline and defaults. Explicit instructions given by the user in a conversation always take precedence over these defaults.
 
 ===[ User-First Design over Developer Convenience ]
+
 Always prioritize the end-user experience, syntax ergonomics, and API design.
 If there is tension between developer or implementation convenience and user simplicity, user simplicity must always win. Never compromise user experience just because an implementation is easier.
 
 ===[ Resist Path-of-Least-Resistance & Legacy Bias ]
+
 The existing implementation is never a justification or reason for new design choices.
 -| Do not justify decisions with "it is already implemented this way, so let's stick with it."
 -| Prioritize architectural beauty, elegance, and long-term correctness over the path of least resistance.
 -| Understand the existing context thoroughly, but never take shortcuts or settle for lazy patches.
 
 ===[ Transparent Execution ]
+
 Always state what you intend to do before doing it. Never execute non-trivial actions or commands silently.
 
 ==[ Single Source of Truth & Documentation ]
 
 ===[ Never edit `.md` directly ]
+
 All Markdown files (`README.md`, `AGENTS.md`, `CLAUDE.md`, and crate `README.md` files) are generated build artifacts, not source files.
 - Never edit a `.md` file directly.
 - Always edit the corresponding `.tmt` file under @dir(tmtroot/) (or the crate's own `.tmt`).
@@ -35,6 +44,7 @@ All Markdown files (`README.md`, `AGENTS.md`, `CLAUDE.md`, and crate `README.md`
 - Direct edits to generated `.md` files will be overwritten and will fail CI / lint checks.
 
 ===[ Source of Truth Hierarchy (Preventing Drift) ]
+
 To prevent drift between documentation and implementation:
 -.| **Behavior & API Truth**: The Rust source code and its inner doc-comments (`//!`, `///`) are the
   | authoritative source of truth. If prose documentation contradicts the source code, the code
@@ -45,6 +55,7 @@ To prevent drift between documentation and implementation:
 -.| **Narrative & Overview Truth**: Lives in @dir(tmtroot/).
 
 ===[ Reference over Restatement ]
+
 Do not duplicate code signatures, struct layouts, or implementation prose into documentation files. Duplicate prose inevitably drifts.
 -| Use pointers and links (@file(...), @dir(...), or symbol references) instead of
  | copy-pasting code definitions.

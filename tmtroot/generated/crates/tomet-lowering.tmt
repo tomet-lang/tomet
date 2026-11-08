@@ -1,15 +1,18 @@
 ::kind(api)
+::meta(
+  crate:        tomet-lowering
+  dependencies: list(tomet-ast, tomet-cst, tomet-lexer, tomet-position, tomet-span, tomet-tree)
+  dependents:   list(tomet-ast-parser)
+)
 
-::meta(crate: tomet-lowering, dependencies: list(tomet-ast, tomet-cst, tomet-lexer, tomet-position, tomet-span, tomet-tree), dependents: list(tomet-ast-parser))
+=[ tomet-lowering ]
 
-=[tomet-lowering]
-
-==[tomet-lowering]
+==[ tomet-lowering ]
 
 Lowering the Tomet Concrete Syntax Tree (CST) into typed AST representations
 ([`tomet_ast::File`], [`tomet_ast::Value`]).
 
-==[Architecture & Responsibilities]
+==[ Architecture & Responsibilities ]
 
 - ("Deterministic Static Lowering Boundary")
   - `tomet-lowering` is strictly a pure, side-effect-free, deterministic lowering engine.
@@ -19,7 +22,7 @@ Given an identical CST, it produces identical AST output.
   - Past [`tomet_cst::MAX_DEPTH`] levels the CST keeps the text flat in a `TOO_DEEP` node,
 and lowering refuses it with an error.
 
-==[Module element]
+==[ Module element ]
 
 The values a group holds.
 
@@ -27,61 +30,61 @@ Lowering of group values: `(args)` ([`lower_paren_value`]), `{value}`
 ([`lower_value_group`]) and `#(id)` ([`lower_hash_id`]).
 They fold CST nodes into AST values and groups without re-reading source text.
 
-===[Functions]
+===[ Functions ]
 
-====[fn scalar_from_text]
+====[ fn scalar_from_text ]
 
-====[fn resolve_call]
+====[ fn resolve_call ]
 
-===[Constants]
+===[ Constants ]
 
-====[const POSITIONAL_ENTRY_KEY]
+====[ const POSITIONAL_ENTRY_KEY ]
 
 Sentinel key for a positional (unkeyed) entry inside a map body or args.
 
-==[Module error]
+==[ Module error ]
 
-===[Structs]
+===[ Structs ]
 
-====[struct Error]
+====[ struct Error ]
 
-===[Type Aliases]
+===[ Type Aliases ]
 
-====[type Result]
+====[ type Result ]
 
-==[Module inline]
+==[ Module inline ]
 
 Inline AST sequence operations: trimming at edges and merging adjacent
 `Text` or `SoftBreak` items during lowering.
 
-===[Constants]
+===[ Constants ]
 
-====[const DELIMITERS]
+====[ const DELIMITERS ]
 
 The inline delimiters and the element each one makes, longest first so
 `**` is tried before `*`.
 
-==[Module interp]
+==[ Module interp ]
 
-===[Functions]
+===[ Functions ]
 
-====[fn is_interp_ident_start]
+====[ fn is_interp_ident_start ]
 
 First character of an interpolation expression identifier.
 
-====[fn is_interp_ident_char]
+====[ fn is_interp_ident_char ]
 
 Subsequent characters of an interpolation expression identifier.
 
-====[fn parse_quoted]
+====[ fn parse_quoted ]
 
 Reads a `"..."` string, with `\"`, `\\`, `\n`, `\t` escapes.
 
-====[fn parse_interpolation]
+====[ fn parse_interpolation ]
 
 `${ Expr }` or `$func(args)` or `$macro.func(args)`.
 
-==[Module lower]
+==[ Module lower ]
 
 Lowering: the CST read as an AST.
 
@@ -101,42 +104,42 @@ source text becomes `Text` and `SoftBreak` items, and the grammars of the leaves
 `${...}` expressions and a group's values, which hand back to the CST
 whatever they embed.
 
-===[Functions]
+===[ Functions ]
 
-====[fn lower_file]
+====[ fn lower_file ]
 
 Reads the CST root as an AST [`File`].
 
-====[fn is_declaration]
+====[ fn is_declaration ]
 
 Whether `node` is a `::name(...)` block declaration.
 
-====[fn lower_declaration]
+====[ fn lower_declaration ]
 
 `::name(args){value}[content]#(id)`.
 
-==[Module value]
+==[ Module value ]
 
 Lowering for `Value` and `File`: folds CST nodes into AST [`Value`] or [`File`].
 
-===[Functions]
+===[ Functions ]
 
-====[fn lower_value]
+====[ fn lower_value ]
 
 Lowers a CST root from `parse_cst_value` into an AST [`Value`].
 
-====[fn lower_data_file]
+====[ fn lower_data_file ]
 
 Lowers a CST root from `parse_cst_value` into a data [`File<Value>`].
 
-====[fn shift_spans]
+====[ fn shift_spans ]
 
 Shifts spans of all interpolations in `value` by `delta`.
 
-====[fn find_interp_in_value]
+====[ fn find_interp_in_value ]
 
 Finds the byte offset of the first interpolation in `v`, if any.
 
-====[fn find_interp_in_group]
+====[ fn find_interp_in_group ]
 
 Finds the byte offset of the first interpolation in `g`, if any.

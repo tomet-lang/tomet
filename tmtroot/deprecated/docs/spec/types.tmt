@@ -15,10 +15,10 @@
 `[content]` `{value}` とは排他で、一行形式はない。
 
 ```
-@memo+++
-あ あ
-あ
-+++
+`` @memo+++
+`` あ あ
+`` あ
+`` +++
 ```
 
 ---[ `<content:nest>` ]---
@@ -27,15 +27,15 @@
 // `[...]` ではなく `{...}` を使い、`(id):[ ]` のようなコロンも書かない。
 
 ```
-// @foot[
-//   (id:@string):[ @content ]
-//   (id:@string):[ @content ]
-// ]
-
-@links{
-  (id1)[ content ]
-  (id2)[ content ]
-}
+`` // @foot[
+`` //   (id:@string):[ @content ]
+`` //   (id:@string):[ @content ]
+`` // ]
+``
+`` @links{
+``   (id1)[ content ]
+``   (id2)[ content ]
+`` }
 ```
 
 #[ `@value` ]
@@ -49,10 +49,10 @@ json、yaml、toml の中から選択可能。
 独自軽量言語のみ。
 
 ```tm
-string:"string",
-key:["list1","list2"]
-group:{key:value, key:value}
-
-// group.number:1              // 未実装: ネストへの自動展開はされない(識別子の一部として扱われる)
-// group{key:value, key:value} // 未実装: `:` を省略した省略記法は未対応
+`` string:"string",
+`` key:["list1","list2"]
+`` group:{key:value, key:value}
+``
+`` // group.number:1              // 未実装: ネストへの自動展開はされない(識別子の一部として扱われる)
+`` // group{key:value, key:value} // 未実装: `:` を省略した省略記法は未対応
 ```

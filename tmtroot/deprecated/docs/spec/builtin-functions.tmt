@@ -36,11 +36,11 @@ config のマクロ」を順に試し、当たったものを黙って採る。�
   ついてのメタで、別の層である。
 
 ```tmt
-${add(1, 4)}                    // = ${std.add(1, 4)}
-${some-id}                      // この文書の要素
-${macro.gh(12)}                 // 設定のマクロ。常に書く
-${self.filename}                // 自分自身の path
-${self.config.export.path}      // この文書に効いている設定
+`` ${add(1, 4)}                    // = ${std.add(1, 4)}
+`` ${some-id}                      // この文書の要素
+`` ${macro.gh(12)}                 // 設定のマクロ。常に書く
+`` ${self.filename}                // 自分自身の path
+`` ${self.config.export.path}      // この文書に効いている設定
 ```
 
 ==[ `self` であって `file` ではない ]
@@ -48,7 +48,7 @@ ${self.config.export.path}      // この文書に効いている設定
 いずれ他の文書を指す形が要る。
 
 ```tmt
-${file("readme.tmt").config.export.path}
+`` ${file("readme.tmt").config.export.path}
 ```
 
 そのとき「`()` が無ければ自分」とはしない。`file.config` を

@@ -1,8 +1,11 @@
 ::kind(api)
+::meta(
+  crate:        tomet-style
+  dependencies: list(tomet-ast, tomet-config, tomet-field-utils, tomet-semantics, tomet-tree, tomet-type)
+  dependents:   list(tomet-edit, tomet-printer, tomet-transform)
+)
 
-::meta(crate: tomet-style, dependencies: list(tomet-ast, tomet-config, tomet-field-utils, tomet-semantics, tomet-tree, tomet-type), dependents: list(tomet-edit, tomet-printer, tomet-transform))
-
-=[tomet-style]
+=[ tomet-style ]
 
 Applies `tomet_config::PrinterConfig`'s style rules (meta format,
 link-key spacing (`target`, `@link`/`<embed>`'s one shared key), per-field
@@ -21,43 +24,43 @@ element-rendering logic for every other sigil/kind, which stays in
 `tomet-printer` since it recurses into inline/child content and
 is genuinely part of rebuilding a whole file from its AST.
 
-==[Functions]
+==[ Functions ]
 
-===[fn render_value]
+===[ fn render_value ]
 
-===[fn render_value_inner]
+===[ fn render_value_inner ]
 
-===[fn quote_scalar_string]
+===[ fn quote_scalar_string ]
 
 Formats a string scalar for Tomet source text, wrapping in `"` and escaping
 inner quotes and special characters only when necessary.
 
-===[fn is_ident_char]
+===[ fn is_ident_char ]
 
 Characters legal inside a bare map key.
 
-===[fn write_quoted]
+===[ fn write_quoted ]
 
 Writes `s` as a `"..."` string, with `\"`, `\\`, `\n`, `\r`, `\t` escapes.
 
-===[fn quoted_text]
+===[ fn quoted_text ]
 
 `s` as a `"..."` string whatever it holds.
 
-===[fn write_key]
+===[ fn write_key ]
 
 Writes a map key: bare when it is a non-empty run of [`is_ident_char`],
 quoted (`"tmtroot/a/b.tmt"`) otherwise.
 
-===[fn key_text]
+===[ fn key_text ]
 
 [`write_key`] as an owned string.
 
-===[fn write_scalar_string]
+===[ fn write_scalar_string ]
 
 Appends a safely quoted/escaped string scalar to `out`.
 
-===[fn render_nested]
+===[ fn render_nested ]
 
 Renders a value that sits @em[inside] another one.
 
@@ -70,29 +73,29 @@ Nesting was destroyed by any print-then-parse cycle.
 Public because the printer renders a value group's pairs itself and
 needs the same rule.
 
-===[fn render_nested_with_blocks]
+===[ fn render_nested_with_blocks ]
 
 [`render_nested`] with the block renderer supplied explicitly, the way
 [`render_args_with_blocks`] has it for `(args)`: a printer that can render blocks in full
 passes its own, so a `key: [...]` value of a `{...}` group is not cut down to
 paragraph-inlines only.
 
-===[fn render_value_inner_with_config]
+===[ fn render_value_inner_with_config ]
 
-===[fn render_value_inner_with_blocks]
+===[ fn render_value_inner_with_blocks ]
 
 Same as [`render_value_inner_with_config`], but with the block
 renderer supplied explicitly instead of defaulting to the restricted
 one. See [`BlockRenderer`].
 
-===[fn render_args_with_config]
+===[ fn render_args_with_config ]
 
-===[fn render_args_with_blocks]
+===[ fn render_args_with_blocks ]
 
 Same as [`render_args_with_config`], but with the block renderer
 supplied explicitly. See [`BlockRenderer`].
 
-===[fn render_meta_declaration]
+===[ fn render_meta_declaration ]
 
 Renders a `::meta(...){...}` declaration per `config`'s meta format
 settings (multi-line, one field per line with per-field formatting
@@ -102,9 +105,9 @@ line). Scoped to `::meta`'s actual shape -- `value` must be
 produces for `::meta`; anything else renders as a bare `::meta` (with
 args, if any).
 
-==[Type Aliases]
+==[ Type Aliases ]
 
-===[type BlockRenderer]
+===[ type BlockRenderer ]
 
 Renders a `Vec<Block>` slot (an element's `[content]`, or a `key:
 [...]` value) back into `.tmt` source text.

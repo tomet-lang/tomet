@@ -4,24 +4,24 @@
 # Keep project-specific ignore rules in the top section.
 # -----------------------------------------------------------------------
 
-#= WASM build
+# --- WASM build ---
 bindings/js/pkg/
 
-#= Zed extension build
+# --- Zed extension build ---
 editors/zed/extension.wasm
 editors/zed/grammars/
 
-#= npm
+# --- npm ---
 node_modules/
 
-#= Test output
+# --- Test output ---
 tests/store/
 
 # -----------------------------------------------------------------------
 # Shared ignore rules
 # -----------------------------------------------------------------------
 
-#= Build
+# --- Build ---
 build/
 dist/
 package/
@@ -29,9 +29,10 @@ result
 result-*
 target/
 
-#= Develop
+# --- Develop ---
 .direnv/
 .claude/
+.agents/notes/
 .agents/workspaces/
 .cargo/config.toml
 .idea/
@@ -40,12 +41,12 @@ target/
 *.swp
 *~
 
-#= Environment
+# --- Environment ---
 .env
 .env.*
 !.env.example
 
-#= OS
+# --- OS ---
 .DS_Store
 Desktop.ini
 Thumbs.db

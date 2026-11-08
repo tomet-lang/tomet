@@ -38,14 +38,14 @@ Status: 第1段階（`@kind` 等から `::name` への移行）は実装済み�
 ==[ 構文 ]
 
 ```tm
-::kind(config, 2)
-::use(deck, 3)
-::meta(id: doc-kWBcIUUz, title: "Daily")
-::character(birth: 1990)
-
-=[ 本文 ]
-
-@callout(note)[ ここからが本文。 ]
+`` ::kind(config, 2)
+`` ::use(deck, 3)
+`` ::meta(id: doc-kWBcIUUz, title: "Daily")
+`` ::character(birth: 1990)
+``
+`` =[ 本文 ]
+``
+`` @callout(note)[ ここからが本文。 ]
 ```
 
 - `::` の直後に名前が続き、そのあとに `(args)` `{data}` `[content]` `#(id)` と、後置のコネクトが付く。groups の規則は `@name` と同じ。
@@ -59,17 +59,17 @@ Status: 第1段階（`@kind` 等から `::name` への移行）は実装済み�
 名前の定義は、設定ではなく宣言として書く。
 
 ```tm
-::macro(
-  gh: "https://github.com/tomet/tomet/issues/${1}"
-)
-
-::var(
-  title: {
-    type: string
-    about: | 作成するノートの題。
-  }
-  draft: { type: bool, default: false }
-)
+`` ::macro(
+``   gh: "https://github.com/tomet/tomet/issues/${1}"
+`` )
+``
+`` ::var(
+``   title: {
+``     type: string
+``     about: | 作成するノートの題。
+``   }
+``   draft: { type: bool, default: false }
+`` )
 ```
 
 @table
@@ -107,11 +107,11 @@ Status: 第1段階（`@kind` 等から `::name` への移行）は実装済み�
 純粋な cotomet のファイルは、**ヘッダー**と**本体**でできている。
 
 ```tm
-::kind(catalog, 2)
-::use(deck)
-
-"tmtroot/a.tmt": "../a.tmt"
-m: { git: x, rev: y }:rule(allow:list(git, rev, path))
+`` ::kind(catalog, 2)
+`` ::use(deck)
+``
+`` "tmtroot/a.tmt": "../a.tmt"
+`` m: { git: x, rev: y }:rule(allow:list(git, rev, path))
 ```
 
 - ヘッダー: 先頭の `::name(args){data}`。引数とデータは**値**なので、`cotomet-syntax` は要素を知らずに読める。

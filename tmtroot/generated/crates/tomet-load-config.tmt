@@ -1,10 +1,13 @@
 ::kind(api)
+::meta(
+  crate:        tomet-load-config
+  dependencies: list(tomet-ast, tomet-ast-parser, tomet-config)
+  dependents:   list(tomet-cli, tomet-indexer, tomet-load, tomet-lsp, tomet-tests, tomet-workspace)
+)
 
-::meta(crate: tomet-load-config, dependencies: list(tomet-ast, tomet-ast-parser, tomet-config), dependents: list(tomet-cli, tomet-indexer, tomet-load, tomet-lsp, tomet-tests, tomet-workspace))
+=[ tomet-load-config ]
 
-=[tomet-load-config]
-
-==[tomet-load-config]
+==[ tomet-load-config ]
 
 Finds the config that governs a path, by walking up from it, and
 reads it. `tomet-config` owns the `Config` type and its pure parsing
@@ -16,7 +19,7 @@ Shares the `tomet-load` name prefix deliberately: both crates are
 `tomet-load`'s own `Vault::discover` calls [`find_config_file`]
 directly rather than duplicating the walk.
 
-==[The layers]
+==[ The layers ]
 
 Configuration is a stack of files, outermost first:
 
@@ -57,9 +60,9 @@ because it has to be found before anything can be read from it; a Folder's entry
 document of the Folder itself, so its name is a vault setting, with `self.tmt` as the
 default.
 
-==[Functions]
+==[ Functions ]
 
-===[fn find_config_file]
+===[ fn find_config_file ]
 
 The vault governing `start` and its stacked config: searches `start` and its
 parent directories for the nearest [`VAULT_CONFIG_FILE`].
@@ -69,11 +72,11 @@ the vault config with every Folder entry file between the vault root and
 `start` laid over it; the document's own declarations are not part of it (that
 is [`config_for`]'s).
 
-===[fn load_config_from_file]
+===[ fn load_config_from_file ]
 
 Reads one config file on its own, with no layer under or over it.
 
-===[fn config_for]
+===[ fn config_for ]
 
 The config that governs `path`, for a tool about to act on `src`.
 
@@ -82,8 +85,8 @@ document's own declarations on top, each layer winning over the ones before
 it. With no vault to find there are no file layers: the document's own
 declarations are used, and failing that the defaults.
 
-==[Constants]
+==[ Constants ]
 
-===[const VAULT_CONFIG_FILE]
+===[ const VAULT_CONFIG_FILE ]
 
 The vault config: the file whose directory is the vault.

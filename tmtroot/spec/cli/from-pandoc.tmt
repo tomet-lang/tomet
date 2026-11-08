@@ -13,7 +13,7 @@
 + 出す。出力先と `--dry-run`、`--remove-original` の扱いは、@file(tmtroot/spec/cli/overview.tmt) の「変換コマンドの入力と出力先」。ディレクトリは受けない。
 
 ```
-pandoc -t json report.docx | tomet from-pandoc -
+`` pandoc -t json report.docx | tomet from-pandoc -
 ```
 
 JSON が Pandoc の構文木として読めなければ、`not a Pandoc JSON document (<理由>). Produce one with `pandoc -t json <file>`.` と標準エラー出力に出して1で終わる。Pandoc 自体は呼ばない。

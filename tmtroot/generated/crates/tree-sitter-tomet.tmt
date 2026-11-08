@@ -1,10 +1,13 @@
 ::kind(api)
+::meta(
+  crate:        tree-sitter-tomet
+  dependencies: list()
+  dependents:   list(tomet-tests)
+)
 
-::meta(crate: tree-sitter-tomet, dependencies: list(), dependents: list(tomet-tests))
+=[ tree-sitter-tomet ]
 
-=[tree-sitter-tomet]
-
-==[tree-sitter-tomet]
+==[ tree-sitter-tomet ]
 
 Rust binding for the Tomet tree-sitter grammar (`grammar.js` at
 the crate root; `src/parser.c` etc. are generated from it via
@@ -143,18 +146,18 @@ pre-existing case (`###[ [] のルール ]`, a `[]` immediately inside a
 too (confirmed separately against `tomet-parser`), so this
 grammar erroring on it as well isn't a regression.
 
-==[Constants]
+==[ Constants ]
 
-===[const LANGUAGE]
+===[ const LANGUAGE ]
 
 The tree-sitter language function for Tomet. Convert to a
 `tree_sitter::Language` via `.into()` to build a `tree_sitter::Parser`.
 
-===[const NODE_TYPES]
+===[ const NODE_TYPES ]
 
 The grammar's `node-types.json`, e.g. for tooling that wants to
 inspect the node type set without parsing anything.
 
-===[const HIGHLIGHTS_QUERY]
+===[ const HIGHLIGHTS_QUERY ]
 
 The grammar's `highlights.scm` query string for syntax highlighting.

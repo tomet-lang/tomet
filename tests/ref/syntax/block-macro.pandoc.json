@@ -1,20 +1,12 @@
 {
-  "pandoc-api-version": [
-    1,
-    23,
-    1
-  ],
+  "pandoc-api-version": [1, 23, 1],
   "meta": {},
   "blocks": [
     {
       "t": "Header",
       "c": [
         1,
-        [
-          "",
-          [],
-          []
-        ],
+        ["", [], []],
         [
           {
             "t": "Str",
@@ -29,11 +21,7 @@
         {
           "t": "Code",
           "c": [
-            [
-              "",
-              [],
-              []
-            ],
+            ["", [], []],
             "$macro.card(\"Welcome\", \"Hello from a block macro\")"
           ]
         }
@@ -44,14 +32,7 @@
       "c": [
         {
           "t": "Code",
-          "c": [
-            [
-              "",
-              [],
-              []
-            ],
-            "$macro.notice(msg: \"Important\")"
-          ]
+          "c": [["", [], []], "$macro.notice(msg: \"Important\")"]
         }
       ]
     },
@@ -67,14 +48,7 @@
         },
         {
           "t": "Code",
-          "c": [
-            [
-              "",
-              [],
-              []
-            ],
-            "$macro.notice(msg: \"ここ\")"
-          ]
+          "c": [["", [], []], "$macro.notice(msg: \"ここ\")"]
         },
         {
           "t": "Space"
@@ -97,14 +71,7 @@
         },
         {
           "t": "Code",
-          "c": [
-            [
-              "",
-              [],
-              []
-            ],
-            "$macro.plain(\"x\")"
-          ]
+          "c": [["", [], []], "$macro.plain(\"x\")"]
         }
       ]
     }

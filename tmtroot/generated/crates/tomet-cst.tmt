@@ -1,14 +1,17 @@
 ::kind(api)
+::meta(
+  crate:        tomet-cst
+  dependencies: list()
+  dependents:   list(tomet-ast-parser, tomet-cst-parser, tomet-edit, tomet-extract, tomet-highlight, tomet-js, tomet-lexer, tomet-lowering, tomet-lsp, tomet-merge, tomet-tests, tomet-validator, tomet-validator-core)
+)
 
-::meta(crate: tomet-cst, dependencies: list(), dependents: list(tomet-ast-parser, tomet-cst-parser, tomet-edit, tomet-extract, tomet-highlight, tomet-js, tomet-lexer, tomet-lowering, tomet-lsp, tomet-merge, tomet-tests, tomet-validator, tomet-validator-core))
+=[ tomet-cst ]
 
-=[tomet-cst]
-
-==[tomet-cst]
+==[ tomet-cst ]
 
 Concrete Syntax Tree (CST) foundation for Tomet, powered by `rowan`.
 
-==[Architecture & Responsibilities]
+==[ Architecture & Responsibilities ]
 
 - ("Lossless Green/Red Tree Foundation") `tomet-cst` provides a Rowan-based syntax tree architecture preserving 100% of
 source characters, whitespace, newlines, and comments.
@@ -25,53 +28,53 @@ forms and their groups, and `key: value` entries. A `|` run's later lines
 begin with a `MARGIN` token, a run's opener is a `PIPE`; the mistakes the
 parser can name stay in the tree as `ERROR` nodes.
 
-==[Module syntax_kind]
+==[ Module syntax_kind ]
 
 Defines the raw token and composite node kinds for Tomet's Concrete Syntax Tree (CST).
 
-===[Enums]
+===[ Enums ]
 
-====[enum SyntaxKind]
+====[ enum SyntaxKind ]
 
-==[Module typed]
+==[ Module typed ]
 
 Typed AST wrappers over Rowan's [`SyntaxNode`].
 
-===[Traits]
+===[ Traits ]
 
-====[trait AstNode]
+====[ trait AstNode ]
 
-====[trait AstToken]
+====[ trait AstToken ]
 
-==[Enums]
+==[ Enums ]
 
-===[enum TometLanguage]
+===[ enum TometLanguage ]
 
-==[Functions]
+==[ Functions ]
 
-===[fn replace_range]
+===[ fn replace_range ]
 
 Replaces the byte slice defined by `range` in `source` with `replacement`.
 
-===[fn splice_node]
+===[ fn splice_node ]
 
 Replaces the exact source range occupied by `target` in `source` with `replacement`.
 
-==[Type Aliases]
+==[ Type Aliases ]
 
-===[type SyntaxNode]
+===[ type SyntaxNode ]
 
-===[type SyntaxToken]
+===[ type SyntaxToken ]
 
-===[type SyntaxElement]
+===[ type SyntaxElement ]
 
-===[type SyntaxNodeChildren]
+===[ type SyntaxNodeChildren ]
 
-===[type SyntaxElementChildren]
+===[ type SyntaxElementChildren ]
 
-==[Constants]
+==[ Constants ]
 
-===[const MAX_DEPTH]
+===[ const MAX_DEPTH ]
 
 How deep constructs may nest: past this depth, parsing halts recursion and
 emits a `TOO_DEEP` node.

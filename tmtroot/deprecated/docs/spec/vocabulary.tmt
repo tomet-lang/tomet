@@ -13,9 +13,9 @@
 要素の名前は名前空間と局所名からなる。区切りは `.`。
 
 ```tm
-@std.link(target:"...")     // 名前空間 std の link
-@writ.layers{}              // 名前空間 writ の layers
-@acme.docs.bookmark()       // 入れ子の名前空間
+`` @std.link(target:"...")     // 名前空間 std の link
+`` @writ.layers{}              // 名前空間 writ の layers
+`` @acme.docs.bookmark()       // 入れ子の名前空間
 ```
 
 `.` を区切りに選んだのは、`:` が `key:value` とコネクト構文に、`/` がパスに
@@ -59,9 +59,9 @@
 =[ 語彙の置き場所 ]
 
 ```
-.tomet/
-├── blueprints/writ.blueprint.tmt      構造（検証に要る）
-└── vocabularies/writ.vocabulary.tmt   要素の語彙（読むのに要る）
+`` .tomet/
+`` ├── blueprints/writ.blueprint.tmt      構造（検証に要る）
+`` └── vocabularies/writ.vocabulary.tmt   要素の語彙（読むのに要る）
 ```
 
 `@kind(X)` は `.tomet/vocabularies/X.vocabulary.tmt` を名前で引き、その語彙を
@@ -70,8 +70,8 @@
 kind に紐づかない語彙、つまり複数の kind で共有するものだけが `@use` を要する。
 
 ```tm
-@use(deck)              // 名前空間を指す。パスではない
-@use(deck){ as: other } // 衝突時だけ、別名を与える
+`` @use(deck)              // 名前空間を指す。パスではない
+`` @use(deck){ as: other } // 衝突時だけ、別名を与える
 ```
 
 引数は**名前空間であってパスではない**。どこにあるかは vault が既に宣言して
@@ -103,22 +103,22 @@ kind に紐づかない語彙、つまり複数の kind で共有するものだ
 語彙ファイルは JSON の塊ではなく文書である。
 
 ```tm
-@kind(vocabulary)
-@vocabulary(writ){ version: "1.0.0" }
-
-@element(layers){
-  display: block
-  singleton: true
-
-  @args{
-    @param(level){ type: uint, positional: true }[ 層の番号。大きいほど上。 ]
-    @param(crates){ type: [string] }[ その層に属するディレクトリのパターン。 ]
-  }
-  @data{ open: false }
-  @content{ allow: (link, em) }
-}[
-  各クレートがどの層にいるか。上の層は下の層にだけ依存できる。
-]
+`` @kind(vocabulary)
+`` @vocabulary(writ){ version: "1.0.0" }
+``
+`` @element(layers){
+``   display: block
+``   singleton: true
+``
+``   @args{
+``     @param(level){ type: uint, positional: true }[ 層の番号。大きいほど上。 ]
+``     @param(crates){ type: [string] }[ その層に属するディレクトリのパターン。 ]
+``   }
+``   @data{ open: false }
+``   @content{ allow: (link, em) }
+`` }[
+``   各クレートがどの層にいるか。上の層は下の層にだけ依存できる。
+`` ]
 ```
 
 `@vocabulary(X)` はヘッダで、`@kind` と同じ位置に立つ。`@element` は文書の
@@ -179,8 +179,8 @@ kind に紐づかない語彙、つまり複数の kind で共有するものだ
 `{data}` が任意のキーを取るか、決まったキーしか取らないかは、明示する。
 
 ```tm
-@data{ open: true }   // @meta のように、任意のキーを取る
-@data{ open: false }  // @blueprint のように、宣言したキーだけ
+`` @data{ open: true }   // @meta のように、任意のキーを取る
+`` @data{ open: false }  // @blueprint のように、宣言したキーだけ
 ```
 
 導出しない。「まだ書いていない」と「開いている」が区別できなくなるため。
@@ -192,9 +192,9 @@ kind に紐づかない語彙、つまり複数の kind で共有するものだ
 インライン要素と別のカテゴリではない。残る問いは、どの要素が入れるかだけ。
 
 ```tm
-@content{ allow: (link, em, strong, mark) }  // 明示。これが基本形
-@content{ allow: inline }                    // 省略形: display: inline のもの全部
-@content{ allow: any }
+`` @content{ allow: (link, em, strong, mark) }  // 明示。これが基本形
+`` @content{ allow: inline }                    // 省略形: display: inline のもの全部
+`` @content{ allow: any }
 ```
 
 省略形の語彙は `display` の値そのもので、二つ目の分類体系を作らない。

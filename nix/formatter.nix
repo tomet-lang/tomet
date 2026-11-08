@@ -21,11 +21,11 @@
         };
         rule = [
           {
-            include = [ "Cargo.toml" ];
             keys = [
               "dependencies"
               "dev-dependencies"
               "build-dependencies"
+              "workspace.dependencies"
             ];
             formatting = {
               reorder_keys = true;

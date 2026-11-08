@@ -8,7 +8,7 @@
 }
 ::id(${uuid()})
 ::meta(
-  title: ${vars.title}
+  title:  ${vars.title}
   author: ${vars.author}
   status: draft
 )

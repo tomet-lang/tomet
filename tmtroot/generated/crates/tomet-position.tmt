@@ -1,27 +1,30 @@
 ::kind(api)
+::meta(
+  crate:        tomet-position
+  dependencies: list()
+  dependents:   list(cotomet, cotomet-eval, tomet-ast-parser, tomet-cli, tomet-cst-parser, tomet-extract, tomet-lowering, tomet-lsp, tomet-validator, tomet-validator-core)
+)
 
-::meta(crate: tomet-position, dependencies: list(), dependents: list(cotomet, cotomet-eval, tomet-ast-parser, tomet-cli, tomet-cst-parser, tomet-extract, tomet-lowering, tomet-lsp, tomet-validator, tomet-validator-core))
+=[ tomet-position ]
 
-=[tomet-position]
-
-==[About]
+==[ About ]
 
 Mapping between byte offsets and 1-based line/column positions ([`LineIndex`], [`LineCol`]).
 
-==[Overview & Design]
+==[ Overview & Design ]
 
 - ("On-Demand Position Resolution") Spans and syntax trees carry only byte offsets; lines and columns are a view
 of the source text, built on demand when needed for diagnostics or editor positions.
 - ("Binary Search Lookup") Building [`LineIndex`] requires a single pass over source newlines; querying
 line and column performs a fast binary search over line starts.
 
-==[Structs]
+==[ Structs ]
 
-===[struct LineCol]
+===[ struct LineCol ]
 
 A 1-based line and a 1-based column, the column counted in `char`s.
 
-===[struct LineIndex]
+===[ struct LineIndex ]
 
 Resolves byte offsets of one source text to lines and columns, and back.
 

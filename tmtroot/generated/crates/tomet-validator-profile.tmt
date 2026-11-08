@@ -1,14 +1,17 @@
 ::kind(api)
+::meta(
+  crate:        tomet-validator-profile
+  dependencies: list(tomet-ast, tomet-ast-parser, tomet-declaration, tomet-expr, tomet-semantics, tomet-span, tomet-tree, tomet-validator-core)
+  dependents:   list(tomet-convert-standalone, tomet-validator)
+)
 
-::meta(crate: tomet-validator-profile, dependencies: list(tomet-ast, tomet-ast-parser, tomet-declaration, tomet-expr, tomet-semantics, tomet-span, tomet-tree, tomet-validator-core), dependents: list(tomet-convert-standalone, tomet-validator))
+=[ tomet-validator-profile ]
 
-=[tomet-validator-profile]
-
-==[tomet-validator-profile]
+==[ tomet-validator-profile ]
 
 Checks that a document keeps the promise of its `::profile(...)`.
 
-==[Architecture & Responsibilities]
+==[ Architecture & Responsibilities ]
 
 - (Standalone) A document that promises `standalone` means what its own bytes say. [`standalone_findings`]
 finds everything it takes from outside, by trying to resolve each thing in a world with
@@ -20,33 +23,33 @@ check needs no vault.
 standalone works from. [`validate_profile`] is the same list as [`Diagnostic`]s, for
 `tomet check`, and is empty unless the document declares the profile.
 
-==[Not here]
+==[ Not here ]
 
 - `oneline`: it needs the lines of the source, which a parsed [`File`] does not carry.
 - A vocabulary the document holds itself. No reader for one exists yet, so any element that is
 
 not built in counts as taken from outside.
 
-==[Structs]
+==[ Structs ]
 
-===[struct Finding]
+===[ struct Finding ]
 
 One thing a document takes from outside, and where it is written.
 
-==[Enums]
+==[ Enums ]
 
-===[enum Dirt]
+===[ enum Dirt ]
 
 What a document takes from outside itself.
 
-==[Functions]
+==[ Functions ]
 
-===[fn standalone_findings]
+===[ fn standalone_findings ]
 
 Everything `doc` takes from outside itself, in the order it is written, whether or not it
 promises `standalone`.
 
-===[fn validate_profile]
+===[ fn validate_profile ]
 
 What `doc` breaks of the profiles it declares. Empty when it declares none that this checks.
 

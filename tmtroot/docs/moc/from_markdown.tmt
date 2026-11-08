@@ -3,106 +3,106 @@
 ==[ Heading ]
 
 ```tm
-# heading
-
-#[ heading ]
-#[ heading ]{}
+`` # heading
+``
+`` #[ heading ]
+`` #[ heading ]{}
 ```
 
 ==[ Outline ]
 
 ```tm
-- outline
-- (x) checked
-1. sorted
-
-- outline
-- outline ::{}
-- (x) checked
-- (x) checked ::{}
--. sorted
+`` - outline
+`` - (x) checked
+`` 1. sorted
+``
+`` - outline
+`` - outline ::{}
+`` - (x) checked
+`` - (x) checked ::{}
+`` -. sorted
 ```
 
 ==[ Link ]
 
 ```tm
-[display](path)
-[[wikilink]]
-
-@link(file:path)[display]
-@link(target:"ref:file_name")
+`` [display](path)
+`` [[wikilink]]
+``
+`` @link(file:path)[display]
+`` @link(target:"ref:file_name")
 ```
 
 ==[ Embed ]
 
 ```tm
-![embed](path)
-![[embed]]
-
-@embed[embed](path:path)
-@embed(ref:file_name)
+`` ![embed](path)
+`` ![[embed]]
+``
+`` @embed[embed](path:path)
+`` @embed(ref:file_name)
 ```
 
 ==[ Blockquote ]
 
 ```tm
-> blockquote
-
-@quote
-[ blockquote ]
+`` > blockquote
+``
+`` @quote
+`` [ blockquote ]
 ```
 
 ==[ Callout ]
 
 ```tm
-> [!info] Title
->
-> Contents
-
-@callout(info, title: Title)
-[ Contents ]
+`` > [!info] Title
+`` >
+`` > Contents
+``
+`` @callout(info, title: Title)
+`` [ Contents ]
 ```
 
 ```tm
-\`\`\`tm
-\`\`\`
-
-@codeblock(tm)[
-]
-\`\`\`(tm)
-\`\`\`
-\`\`\`tm
-\`\`\`
+`` \`\`\`tm
+`` \`\`\`
+``
+`` @codeblock(tm)[
+`` ]
+`` \`\`\`(tm)
+`` \`\`\`
+`` \`\`\`tm
+`` \`\`\`
 ```
 
 ```tm
-**strong**
-*siranai*
-==marker==
-_torikesi_
-`nanikore?`
+`` **strong**
+`` *siranai*
+`` ==marker==
+`` _torikesi_
+`` `nanikore?`
 ```
 
 ```tm
----
-
-----
------
----[ display ]---
-----[💫]----
+`` ---
+``
+`` ----
+`` -----
+`` ---[ display ]---
+`` ----[💫]----
 ```
 
 ==[ Table ]
 
 ```tm
-| table | ---- | ---- |
-| asdff | asdf | asdf |
-
-@table()[
-[ title ][ sdfasdf    ][ fasdf       ][ sdffdsf ]
-[ title ][ sdfddfasdf ][ fasddfdfdff ][ sdffdsf ]
-[ title ][ sdfasdf    ][ fasdf       ][ sdffdsf ]
-]{}
+`` | table | ---- | ---- |
+`` | asdff | asdf | asdf |
+``
+`` @table()[
+`` [ title ][ sdfasdf    ][ fasdf       ][ sdffdsf ]
+`` [ title ][ sdfddfasdf ][ fasddfdfdff ][ sdffdsf ]
+`` [ title ][ sdfasdf    ][ fasdf       ][ sdffdsf ]
+`` ]{}
 ```
 
 =[ Unsupported ]

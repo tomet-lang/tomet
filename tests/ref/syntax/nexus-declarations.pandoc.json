@@ -1,9 +1,5 @@
 {
-  "pandoc-api-version": [
-    1,
-    23,
-    1
-  ],
+  "pandoc-api-version": [1, 23, 1],
   "meta": {
     "tags": {
       "t": "MetaList",
@@ -50,11 +46,7 @@
       "t": "Header",
       "c": [
         1,
-        [
-          "",
-          [],
-          []
-        ],
+        ["", [], []],
         [
           {
             "t": "Str",

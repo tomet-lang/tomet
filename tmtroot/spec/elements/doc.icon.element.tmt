@@ -6,5 +6,5 @@ Tomet側ではアイコンの解決を行わず、アプリ側が処理する想
 それを越える機能を求める場合は自分で作れば良い。
 
 ```tm
-@doc.icon("star", pkg:"lucide")
+`` @doc.icon("star", pkg:"lucide")
 ```

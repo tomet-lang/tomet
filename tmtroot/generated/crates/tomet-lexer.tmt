@@ -1,14 +1,17 @@
 ::kind(api)
+::meta(
+  crate:        tomet-lexer
+  dependencies: list(tomet-cst, tomet-span)
+  dependents:   list(tomet-ast-parser, tomet-cst-parser, tomet-lowering)
+)
 
-::meta(crate: tomet-lexer, dependencies: list(tomet-cst, tomet-span), dependents: list(tomet-ast-parser, tomet-cst-parser, tomet-lowering))
+=[ tomet-lexer ]
 
-=[tomet-lexer]
-
-==[tomet-lexer]
+==[ tomet-lexer ]
 
 Byte-position cursor ([`Cursor`]) and lossless tokenizer ([`tokenize`]) for Tomet.
 
-==[Overview & Design]
+==[ Overview & Design ]
 
 - ("Context-Free Tokenization") The tokenizer is strictly context-free: a token decision never depends on
 anything past the token itself and at most one character of lookbehind. The
@@ -34,13 +37,13 @@ Lookahead & Peeking: `peek()`, `peek_at()`, `starts_with()`.
 Span Mapping: `span_from()`, `column()`. Spans are byte offsets; lines and columns are not
 computed while scanning -- resolve them on demand using `tomet-position`.
 
-==[Structs]
+==[ Structs ]
 
-===[struct Cursor]
+===[ struct Cursor ]
 
-==[Functions]
+==[ Functions ]
 
-===[fn tokenize]
+===[ fn tokenize ]
 
 Losslessly tokenizes `src` into a list of `(SyntaxKind, &str)` tokens.
 

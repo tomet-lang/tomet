@@ -1,16 +1,14 @@
 ::kind(dictionary)
 ::id(dictionary.tomet)
+::profile(oneline)
 ::dictionary(tomet)
 
 ;@term("vault")#(vault)
 | @term(#vault-config) のあるディレクトリと、その下の文書の全体。tomet が設定と語彙を読む単位。
-
 ;@term("vault.config.tmt")#(vault-config)
 | @term(#vault) の境目を示す設定ファイル。上の階層の vault 設定は、ここで打ち切られる。詳しくは @file(tmtroot/spec/features/config.tmt)。
-
 ;@term(".config.tmt")#(folder-config)
 | フォルダごとの設定。そのフォルダと下の文書に、@term(#vault-config) の上に重ねて効く。
-
 ;@term("tomet")[ Tomet ]
 ;@term("cotomet")[]
 ;@term("syntax")[]

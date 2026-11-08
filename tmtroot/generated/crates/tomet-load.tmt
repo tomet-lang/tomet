@@ -1,8 +1,11 @@
 ::kind(api)
+::meta(
+  crate:        tomet-load
+  dependencies: list(tomet-ast, tomet-ast-parser, tomet-config, tomet-declaration, tomet-expr, tomet-indexer, tomet-links, tomet-load-config, tomet-search, tomet-semantics, tomet-transform, tomet-validator, tomet-vault, tomet-workspace)
+  dependents:   list(tomet, tomet-cli, tomet-lsp)
+)
 
-::meta(crate: tomet-load, dependencies: list(tomet-ast, tomet-ast-parser, tomet-config, tomet-declaration, tomet-expr, tomet-indexer, tomet-links, tomet-load-config, tomet-search, tomet-semantics, tomet-transform, tomet-validator, tomet-vault, tomet-workspace), dependents: list(tomet, tomet-cli, tomet-lsp))
-
-=[tomet-load]
+=[ tomet-load ]
 
 The one way to read a `.tmt` document correctly.
 
@@ -24,7 +27,7 @@ crate named after one of its four steps is not findable. `tomet-config`
 already carried three of the four dependencies, so the cheaper change
 was available and was not taken for that reason.
 
-==[Two levels, because vocabularies belong to a vault]
+==[ Two levels, because vocabularies belong to a vault ]
 
 [`Vault::discover`] pays for config discovery and vocabulary loading
 once. [`Vault::document`] is per file. Collapsing the two into a single
@@ -33,7 +36,7 @@ every declared vocabulary for every document -- seven vocabularies
 times eighty-five documents in this repository. [`load_document`] is
 for the case where there genuinely is one document.
 
-==[A fifth step, for output]
+==[ A fifth step, for output ]
 
 The four steps above produce the document @em[as written]. Something that
 is about to render it needs one more: every `${...}` in it put back as
@@ -59,7 +62,7 @@ directory, what a note name stands for, what another document's `::meta`
 says -- through [`Vault::resolver`], and a document is read at most once
 however many expressions ask for it.
 
-===[Who prepares, and who must not]
+===[ Who prepares, and who must not ]
 
 Anything producing output does: `export`, `html` (and so `serve`),
 `to-md`, `to-typst`, `to-pandoc`. They read through this crate for that
@@ -77,9 +80,9 @@ An editor holds documents that are not saved. [`Vault::set_buffer`] tells
 the vault about one, and a document that reads that file -- an `include` of
 it -- reads the editor's text.
 
-==[Structs]
+==[ Structs ]
 
-===[struct Vault]
+===[ struct Vault ]
 
 A vault found on disk: `tomet_vault::Vault` plus the parts that need
 a filesystem.
@@ -95,15 +98,15 @@ answered from, which is a walk of the disk.
 walks up until it finds one, and that file's position is what says
 where the vault begins.
 
-==[Enums]
+==[ Enums ]
 
-===[enum LoadError]
+===[ enum LoadError ]
 
 Why a document could not be read.
 
-==[Functions]
+==[ Functions ]
 
-===[fn load_file]
+===[ fn load_file ]
 
 Reads one document correctly, discovering its vault first.
 

@@ -1,17 +1,20 @@
 ::kind(api)
+::meta(
+  crate:        tomet-cli
+  dependencies: list(cotomet, cotomet-eval, tomet-ast, tomet-ast-parser, tomet-config, tomet-convert-standalone, tomet-declaration, tomet-expr, tomet-formatter, tomet-html, tomet-indexer, tomet-links, tomet-load, tomet-load-config, tomet-markdown, tomet-pandoc, tomet-position, tomet-printer, tomet-semantics, tomet-spec, tomet-stats, tomet-tree, tomet-typst, tomet-validator, tomet-workspace)
+  dependents:   list()
+)
 
-::meta(crate: tomet-cli, dependencies: list(cotomet, cotomet-eval, tomet-ast, tomet-ast-parser, tomet-config, tomet-convert-standalone, tomet-declaration, tomet-expr, tomet-formatter, tomet-html, tomet-indexer, tomet-links, tomet-load, tomet-load-config, tomet-markdown, tomet-pandoc, tomet-position, tomet-printer, tomet-semantics, tomet-spec, tomet-stats, tomet-tree, tomet-typst, tomet-validator, tomet-workspace), dependents: list())
-
-=[tomet-cli]
+=[ tomet-cli ]
 
 Command-line interface and developer tools for the Tomet toolchain.
 
-==[Overview]
+==[ Overview ]
 
 Provides the `tomet` command-line executable, orchestrating parser, resolver,
 validator, formatter, and converter components for `.tmt` document processing.
 
-==[Subcommands]
+==[ Subcommands ]
 
 - ("Inspection & Validation") `check`, `check-links`, `ast`, `roundtrip`, and `stats`.
 - ("Transformation & Formatting") `format`, `refactor` and `standalone`.

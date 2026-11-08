@@ -1,58 +1,61 @@
 ::kind(api)
+::meta(
+  crate:        tomet-search
+  dependencies: list(tomet-ast, tomet-ast-parser, tomet-semantics, tomet-span, tomet-tree)
+  dependents:   list(tomet-load, tomet-transform, tomet-vault, tomet-workspace)
+)
 
-::meta(crate: tomet-search, dependencies: list(tomet-ast, tomet-ast-parser, tomet-semantics, tomet-span, tomet-tree), dependents: list(tomet-load, tomet-transform, tomet-vault, tomet-workspace))
+=[ tomet-search ]
 
-=[tomet-search]
-
-==[tomet-search]
+==[ tomet-search ]
 
 Pure, in-memory search and query engine for Tomet documents.
 
-==[Scope & Layering]
+==[ Scope & Layering ]
 
 Performs pure, in-memory querying and matching without filesystem I/O.
 Filesystem scanning and disk caching belong to higher layers
 (`tomet-workspace-indexer` and `tomet-workspace`).
 
-==[Query Engines]
+==[ Query Engines ]
 
 - ("`structural`") AST element query matching by tag, key, and value content.
 
 Querying documents by their metadata is not done here: it is an expression
 (`vault.docs.filter(d => ...)`), evaluated by `tomet-expr`.
 
-==[Module structural]
+==[ Module structural ]
 
 Structural AST query matching.
 
 Provides pure in-memory querying over Tomet AST elements by tag,
 attribute/property key, and value content.
 
-===[Structs]
+===[ Structs ]
 
-====[struct StructuralQuery]
+====[ struct StructuralQuery ]
 
 Criteria for matching AST elements.
 
-====[struct StructuralMatch]
+====[ struct StructuralMatch ]
 
 A matched AST element occurrence with its span and tag name.
 
-===[Functions]
+===[ Functions ]
 
-====[fn matches_query]
+====[ fn matches_query ]
 
 Checks if a single element matches `query`.
 
-====[fn matches_declaration_query]
+====[ fn matches_declaration_query ]
 
 Checks if a single declaration matches `query`.
 
-====[fn count_structural_matches]
+====[ fn count_structural_matches ]
 
 Counts matching elements and declarations in `doc` for `query`.
 
-====[fn find_structural_matches]
+====[ fn find_structural_matches ]
 
 Finds all matching element and declaration occurrences in `doc` for
 `query`, in document order.

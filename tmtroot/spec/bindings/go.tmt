@@ -1,4 +1,4 @@
-::id(bindings.go)
+::id(binding.go)
 
 =[ Go 言語バインディングの設計方針 ]
 

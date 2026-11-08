@@ -148,8 +148,8 @@ and Japanese is what they are written for.
 No kana in any `.writ.tmt`. Currently true.
 
 ```bash
-find . -name '.writ.tmt' -not -path './target/*' \
-  -exec grep -lP '[\x{3040}-\x{30ff}]' {} +
+`` find . -name '.writ.tmt' -not -path './target/*' \
+``   -exec grep -lP '[\x{3040}-\x{30ff}]' {} +
 ```
 
 ==[ generated-md-not-edited ]
@@ -194,7 +194,7 @@ Exporting it is now a decision rather than a wait.
 ---[ Guard ]---
 
 ```bash
-tomet export --check .
+`` tomet export --check .
 ```
 
 Re-renders every source that declares an output and compares it against

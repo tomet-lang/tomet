@@ -1,15 +1,18 @@
 ::kind(api)
+::meta(
+  crate:        tomet-convert-standalone
+  dependencies: list(tomet-ast, tomet-ast-parser, tomet-config, tomet-declaration, tomet-expr, tomet-markdown, tomet-printer, tomet-span, tomet-tree, tomet-type, tomet-validator-profile, tomet-vault)
+  dependents:   list(tomet-cli)
+)
 
-::meta(crate: tomet-convert-standalone, dependencies: list(tomet-ast, tomet-ast-parser, tomet-config, tomet-declaration, tomet-expr, tomet-markdown, tomet-printer, tomet-span, tomet-tree, tomet-type, tomet-validator-profile, tomet-vault), dependents: list(tomet-cli))
+=[ tomet-convert-standalone ]
 
-=[tomet-convert-standalone]
-
-==[tomet-convert-standalone]
+==[ tomet-convert-standalone ]
 
 Makes a document standalone: what it takes from its vault is carried into the file, or frozen
 to the value it has there, so that it can be taken out and still mean the same.
 
-==[Architecture & Responsibilities]
+==[ Architecture & Responsibilities ]
 
 - ("The worklist is the validator's") [`make_standalone`] starts from [`tomet_validator_profile::standalone_findings`], the same list
 `tomet check` reports for a file that promises `::profile(standalone)`. Each finding is
@@ -28,7 +31,7 @@ in it needs no definition once the call is a value.
 - ("The promise") The result declares `::profile(standalone)`, adding `standalone` to a `::profile` that is
 already there.
 
-==[Not here]
+==[ Not here ]
 
 - Printing. The result is a [`File`]; the command prints it the way the vault prints.
 - A vocabulary, `self.meta` typed by `::fields`, and `@term`: each is left and reported. A file
@@ -36,29 +39,29 @@ already there.
 cannot hold a vocabulary or its own `::fields` yet, and a term is not frozen yet.
 `Options::freeze_fields` is the way out for `self.meta`.
 
-==[Structs]
+==[ Structs ]
 
-===[struct Options]
+===[ struct Options ]
 
 What more than the minimum a conversion may do. The default does none of it.
 
-===[struct Change]
+===[ struct Change ]
 
 One finding of the original document and what was done about it.
 
-===[struct Converted]
+===[ struct Converted ]
 
 The result of [`make_standalone`].
 
-==[Enums]
+==[ Enums ]
 
-===[enum Treatment]
+===[ enum Treatment ]
 
 What was done about one thing the document took from outside.
 
-==[Functions]
+==[ Functions ]
 
-===[fn make_standalone]
+===[ fn make_standalone ]
 
 Makes `doc`, which sits at `path` in `vault`, standalone.
 

@@ -3,37 +3,37 @@
 =[ multiline ]
 
 ```tmt
-@callout(info)
-| content
+`` @callout(info)
+`` | content
 ```
 
 ```tmt
-- | aaaa
-  | aaaa
-  | aaaa
-- | bbbb
-  | bbbb
-- | cccc
-- (x) | detail
-      | detail
-- (x) | content
-- ( ) | content2
-      | content2
+`` - | aaaa
+``   | aaaa
+``   | aaaa
+`` - | bbbb
+``   | bbbb
+`` - | cccc
+`` - (x) | detail
+``       | detail
+`` - (x) | content
+`` - ( ) | content2
+``       | content2
 ```
 
 ```tmt
-@tree
-| @tree
-| | @tree
-| | | - outline
-| | | - outline
-| | @tree
-| | | - outline
-| | | - outline
-@tree
-| @tree
-| | - outline
-| | - outline
+`` @tree
+`` | @tree
+`` | | @tree
+`` | | | - outline
+`` | | | - outline
+`` | | @tree
+`` | | | - outline
+`` | | | - outline
+`` @tree
+`` | @tree
+`` | | - outline
+`` | | - outline
 ```
 
 =[ raw fence ]
@@ -78,9 +78,9 @@
 - `\` の直後が英数字・空白・改行・非 ASCII 文字・末尾のときはエスケープにならず、`\` 自身がそのまま文字として残る（`C:\Users\name` など）
 
 ```tmt
-\*強調にならない* \**太字にならない** \`rawにならない`
-\@要素にならない(x) \${展開されない} \// コメントにならない
-\= 見出しにならない
+`` \*強調にならない* \**太字にならない** \`rawにならない`
+`` \@要素にならない(x) \${展開されない} \// コメントにならない
+`` \= 見出しにならない
 ```
 
 =[ break ]
@@ -90,23 +90,23 @@
 - `;` 行頭だけで働くブロックの切れ目
 
 ```tmt
-a
-b           // 続く行は畳まれる (soft break)
-
-a
-
-b           // 空行で段落が分かれる
-
-a
-;b          // 行頭の `;` でも段落が分かれる。空行は要らない
-;c
+`` a
+`` b           // 続く行は畳まれる (soft break)
+``
+`` a
+``
+`` b           // 空行で段落が分かれる
+``
+`` a
+`` ;b          // 行頭の `;` でも段落が分かれる。空行は要らない
+`` ;c
 ```
 
 `;` は `-` と同じく「ここから新しいブロック」という印である。要素も文章の一部なので、続く行は畳まれる。要素を1行に1つずつ並べるときは、行頭に `;` を付ける。
 
 ```tmt
-;@file(readme.md)
-;@file(src)
+`` ;@file(readme.md)
+`` ;@file(src)
 ```
 
 行の途中の `;` は文字である。行頭に文字として書きたいときは `\;` とする。
@@ -126,13 +126,13 @@ a
 （`tomet-syntax-parser`の`parse_groups_with_pipe_stack`のコロン分岐）。
 
 ```tmt
-- @link(ref:x) {id:breakfast}      // {id:breakfast} は @link 自身の value
-- @link(ref:x) ::{id:breakfast}     // list item 自身の attrs
-- content ::(x:1){y:2}              // bare connect は (args)/{value} どちらも、どちらが先でもよい
-- content
-  ::{y:2}                          // 空行1つまでなら次の行に置いてもよい
-- content ::rule(allow:(card)) // named connect は list item にも直接付けられる
-= title ::rule(allow:(card))   // 見出しの sugar form も同様
+`` - @link(ref:x) {id:breakfast}      // {id:breakfast} は @link 自身の value
+`` - @link(ref:x) ::{id:breakfast}     // list item 自身の attrs
+`` - content ::(x:1){y:2}              // bare connect は (args)/{value} どちらも、どちらが先でもよい
+`` - content
+``   ::{y:2}                          // 空行1つまでなら次の行に置いてもよい
+`` - content ::rule(allow:(card)) // named connect は list item にも直接付けられる
+`` = title ::rule(allow:(card))   // 見出しの sugar form も同様
 ```
 
 `::name(...)`（named connect）の集合は閉じている。現在のメンバーは

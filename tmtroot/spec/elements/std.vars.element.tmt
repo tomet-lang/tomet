@@ -6,17 +6,17 @@
 `::var` は、この文書が持つ変数を宣言する。変数1つを、名前をヘッドに書いた宣言1つで書き、直後の `[ ... ]` がその説明（`about`）になる。式からは `${var.名前}` で読む（@file(tmtroot/spec/expressions/names.expr.tmt)）。
 
 ```tm
-::var.title(type: string)[ 作成するノートの題。 ]
-::var.draft(type: bool, default: false)
+`` ::var.title(type: string)[ 作成するノートの題。 ]
+`` ::var.draft(type: bool, default: false)
 ```
 
 名前をキーにした表を `::var(...)` に渡す形も、同じ木になる。
 
 ```tm
-::var(
-  title: ( type: string, about: | 作成するノートの題。 )
-  draft: ( type: bool, default: false )
-)
+`` ::var(
+``   title: ( type: string, about: | 作成するノートの題。 )
+``   draft: ( type: bool, default: false )
+`` )
 ```
 
 @table

@@ -15,7 +15,7 @@
 Pandoc は、標準入力から `-f json` でこの JSON を読む。
 
 ```
-tomet to-pandoc doc.tmt | pandoc -f json -t docx -o doc.docx
+`` tomet to-pandoc doc.tmt | pandoc -f json -t docx -o doc.docx
 ```
 
 逆向きは @file(tmtroot/spec/cli/from-pandoc.tmt)。

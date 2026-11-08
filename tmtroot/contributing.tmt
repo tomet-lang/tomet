@@ -1,9 +1,13 @@
+::id(contributing)
 ::export(
   type: commonmark,
   path: "CONTRIBUTING.md"
 )
+::meta(
+  lang: "en"
+)
 
-${macro.generated_by(self::path)}
+$macro.generated_by(self::path)
 
 =[ Contributing to Tomet ]
 
@@ -18,7 +22,8 @@ ${macro.generated_by(self::path)}
 
 All commits must follow the Conventional Commits format: `type(scope): description`.
 
-=== Types
+===[ Types ]
+
 -| `feat`: New feature or capability.
 -| `fix`: Bug fix.
 -| `docs`: Documentation changes (`.tmt` or exported docs).
@@ -27,7 +32,8 @@ All commits must follow the Conventional Commits format: `type(scope): descripti
 -| `test`: Adding or correcting tests.
 -| `chore`: Build scripts, dependencies, tooling, repo maintenance.
 
-=== Scopes
+===[ Scopes ]
+
 Use the affected component or crate name as the scope:
 
 -| **Apps**: `cli`, `lsp`

@@ -1,9 +1,5 @@
 {
-  "pandoc-api-version": [
-    1,
-    23,
-    1
-  ],
+  "pandoc-api-version": [1, 23, 1],
   "meta": {
     "id": {
       "t": "MetaInlines",
@@ -19,39 +15,14 @@
     {
       "t": "Div",
       "c": [
-        [
-          "vault",
-          [
-            "tomet-term"
-          ],
-          [
-            [
-              "value",
-              "vault"
-            ]
-          ]
-        ],
+        ["vault", ["tomet-term"], [["value", "vault"]]],
         [
           {
             "t": "Para",
             "c": [
               {
                 "t": "Span",
-                "c": [
-                  [
-                    "",
-                    [
-                      "tomet-term"
-                    ],
-                    [
-                      [
-                        "value",
-                        "#vault-config"
-                      ]
-                    ]
-                  ],
-                  []
-                ]
+                "c": [["", ["tomet-term"], [["value", "#vault-config"]]], []]
               },
               {
                 "t": "Space"
@@ -68,39 +39,14 @@
     {
       "t": "Div",
       "c": [
-        [
-          "vault-config",
-          [
-            "tomet-term"
-          ],
-          [
-            [
-              "value",
-              "vault.config.tmt"
-            ]
-          ]
-        ],
+        ["vault-config", ["tomet-term"], [["value", "vault.config.tmt"]]],
         [
           {
             "t": "Para",
             "c": [
               {
                 "t": "Span",
-                "c": [
-                  [
-                    "",
-                    [
-                      "tomet-term"
-                    ],
-                    [
-                      [
-                        "value",
-                        "#vault"
-                      ]
-                    ]
-                  ],
-                  []
-                ]
+                "c": [["", ["tomet-term"], [["value", "#vault"]]], []]
               },
               {
                 "t": "Space"
@@ -117,18 +63,7 @@
     {
       "t": "Div",
       "c": [
-        [
-          "",
-          [
-            "tomet-term"
-          ],
-          [
-            [
-              "value",
-              "prose"
-            ]
-          ]
-        ],
+        ["", ["tomet-term"], [["value", "prose"]]],
         [
           {
             "t": "Para",
@@ -139,14 +74,7 @@
               },
               {
                 "t": "Code",
-                "c": [
-                  [
-                    "",
-                    [],
-                    []
-                  ],
-                  "[]"
-                ]
+                "c": [["", [], []], "[]"]
               },
               {
                 "t": "Str",
@@ -154,14 +82,7 @@
               },
               {
                 "t": "Code",
-                "c": [
-                  [
-                    "",
-                    [],
-                    []
-                  ],
-                  "|"
-                ]
+                "c": [["", [], []], "|"]
               },
               {
                 "t": "Str",
@@ -174,21 +95,7 @@
     },
     {
       "t": "Div",
-      "c": [
-        [
-          "",
-          [
-            "tomet-term"
-          ],
-          [
-            [
-              "value",
-              "empty"
-            ]
-          ]
-        ],
-        []
-      ]
+      "c": [["", ["tomet-term"], [["value", "empty"]]], []]
     }
   ]
 }

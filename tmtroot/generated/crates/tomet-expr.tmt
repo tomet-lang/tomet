@@ -1,15 +1,18 @@
 ::kind(api)
+::meta(
+  crate:        tomet-expr
+  dependencies: list(tomet-ast, tomet-ast-parser, tomet-declaration, tomet-span, tomet-tree, tomet-type)
+  dependents:   list(cotomet-eval, tomet-cli, tomet-convert-standalone, tomet-html, tomet-load, tomet-lsp, tomet-markdown, tomet-tests, tomet-transform, tomet-validator-profile, tomet-vault, tomet-workspace)
+)
 
-::meta(crate: tomet-expr, dependencies: list(tomet-ast, tomet-ast-parser, tomet-declaration, tomet-span, tomet-tree, tomet-type), dependents: list(cotomet-eval, tomet-cli, tomet-convert-standalone, tomet-html, tomet-load, tomet-lsp, tomet-markdown, tomet-tests, tomet-transform, tomet-validator-profile, tomet-vault, tomet-workspace))
+=[ tomet-expr ]
 
-=[tomet-expr]
-
-==[tomet-expr]
+==[ tomet-expr ]
 
 Expression evaluation for the `${...}` expressions of a Tomet document
 ([`InterpExpr`]), following `tmtroot/spec/expressions/`.
 
-==[Architecture & Responsibilities]
+==[ Architecture & Responsibilities ]
 
 - ("Pure Boundary (Zero I/O)") Evaluation performs no I/O and reads no clock. What it cannot know by
 itself -- another document, a directory, the vault's settings, the
@@ -41,27 +44,27 @@ required named arguments, reporting `unknown macro` when missing.
 The pass that puts the values back into a document is
 `tomet_transform::resolve_expressions`.
 
-==[Functions]
+==[ Functions ]
 
-===[fn evaluate]
+===[ fn evaluate ]
 
 Evaluates `expr` in `cx`.
 
-===[fn evaluate_data]
+===[ fn evaluate_data ]
 
 Evaluates `expr` in `cx`, requiring the result to have a data representation.
 
 If evaluation succeeds but the value cannot be stored as data, an [`EvalError::NotData`]
 is returned.
 
-==[Constants]
+==[ Constants ]
 
-===[const RESERVED_VALUES]
+===[ const RESERVED_VALUES ]
 
 The names that stand for a value and that no lambda parameter may take.
 `generate` exists only while a document is being created.
 
-===[const FUNCTIONS]
+===[ const FUNCTIONS ]
 
 The functions an expression can call by a bare name, each with a line
 saying what it does -- what an editor offers when `${` is typed.
@@ -71,7 +74,7 @@ is written like a call. Every other name is one [`builtin`] answers, which
 a test holds to; a function added there is added here, so the editor does
 not offer the language of last month.
 
-===[const RESERVED_NAMES]
+===[ const RESERVED_NAMES ]
 
 The names an expression can start with that are values, not functions,
 each with a line saying what it is.

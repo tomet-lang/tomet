@@ -1,10 +1,13 @@
 ::kind(api)
+::meta(
+  crate:        cotomet
+  dependencies: list(cotomet-eval, serde_cotomet, tomet-ast, tomet-ast-parser, tomet-position, tomet-span)
+  dependents:   list(tomet-cli, tomet-lsp, tomet-tests)
+)
 
-::meta(crate: cotomet, dependencies: list(cotomet-eval, serde_cotomet, tomet-ast, tomet-ast-parser, tomet-position, tomet-span), dependents: list(tomet-cli, tomet-lsp, tomet-tests))
+=[ cotomet ]
 
-=[cotomet]
-
-==[cotomet]
+==[ cotomet ]
 
 The data language dual to tomet (`tmt` / `ctmt`): a lightweight, expressive
 syntax for values, maps and sequences. This is the crate to depend on when
@@ -19,26 +22,26 @@ using cotomet from Rust.
 
 files when the optional `eval` feature is enabled.
 
-==[Module syntax]
+==[ Module syntax ]
 
-===[Functions]
+===[ Functions ]
 
-====[fn parse_file_with]
+====[ fn parse_file_with ]
 
-==[Functions]
+==[ Functions ]
 
-===[fn parse_file]
+===[ fn parse_file ]
 
 Parse a standalone cotomet file (`.ctmt`): declarations, then a map of
 `key: value` entries.
 
 Unquoted `${...}` expressions are rejected (this reader reads data only).
 
-===[fn parse_file_with_expressions]
+===[ fn parse_file_with_expressions ]
 
 Parse a standalone cotomet file (`.ctmt`) allowing unquoted `${...}` expressions
 (e.g. for expression evaluation or formatting).
 
-==[Type Aliases]
+==[ Type Aliases ]
 
-===[type File]
+===[ type File ]

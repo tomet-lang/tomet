@@ -1,0 +1,24 @@
+::kind(blueprint)
+::blueprint(demo){
+  version:     "1.0",
+  description: "Demo blueprint showcasing type seats, expressions, and apply"
+}
+::var(
+  title:      { default: "Untitled Demo" }
+  base_score: { type: int, default: 10 }
+)
+::id(<$nanoid(length: 8, prefix: "demo-", default: auto, overwrite: true)>)
+::meta(
+  title:    $(var.title)
+  created:  <$datetime(default: auto)>
+  due_date: <$date(default: auto)>
+  tags:     <$list(string, default: ("tomet", "demo"))>
+  score:    {$ var.base_score + 5 - 2 }
+)
+
+=[ Overview ]#(overview)
+
+File: $(self::filename)
+Due: <$date(default: auto)>
+
+=[ Tasks ]#(tasks)

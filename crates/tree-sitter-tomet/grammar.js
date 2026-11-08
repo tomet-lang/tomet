@@ -215,7 +215,12 @@ module.exports = grammar({
               choice(
                 seq(
                   alias("``", $.line_marker),
-                  optional(seq(token.immediate(" "), optional(alias(/[^\n]+/, $.text)))),
+                  optional(
+                    seq(
+                      token.immediate(" "),
+                      optional(alias(/[^\n]+/, $.text)),
+                    ),
+                  ),
                   $._newline,
                 ),
                 seq(
@@ -532,12 +537,7 @@ module.exports = grammar({
     interp_dollar_call: ($) =>
       seq($.interp_dollar_head, optional($._interp_args), ")"),
     interp_dollar_head: (_$) =>
-      token(
-        prec(
-          1,
-          /\$[A-Za-z_][A-Za-z0-9_-]*(\.[A-Za-z_][A-Za-z0-9_-]*)*\(/,
-        ),
-      ),
+      token(prec(1, /\$[A-Za-z_][A-Za-z0-9_-]*(\.[A-Za-z_][A-Za-z0-9_-]*)*\(/)),
     // The expression language, as far as highlighting needs it: operators
     // (`+` `-` `==` `!=` `<` `<=` `>` `>=` `&&` `||`), `( expr )`, lambdas
     // (`x => body`, `(a, b) => body`), `doc#id`, and `addr(...)`. See
@@ -580,11 +580,7 @@ module.exports = grammar({
       seq(
         "(",
         optional(
-          seq(
-            $._interp_expr,
-            repeat(seq(",", $._interp_expr)),
-            optional(","),
-          ),
+          seq($._interp_expr, repeat(seq(",", $._interp_expr)), optional(",")),
         ),
         ")",
       ),
@@ -752,9 +748,7 @@ module.exports = grammar({
     type_seat: ($) =>
       seq(
         $.type_seat_open,
-        optional(
-          seq("(", choice($._blank_gap, optional($._seat_args)), ")"),
-        ),
+        optional(seq("(", choice($._blank_gap, optional($._seat_args)), ")")),
         alias($.hole_close, $.type_seat_close),
       ),
     // The arguments may run over lines, as the real parser's do: a line break goes around
@@ -1097,12 +1091,7 @@ module.exports = grammar({
     // `(x)` has one entry. Holds named entries (`map_entry`) and unnamed
     // values uniformly.
     tuple: ($) =>
-      seq(
-        "(",
-        optional($._tuple_items),
-        optional($._blank_gap),
-        ")",
-      ),
+      seq("(", optional($._tuple_items), optional($._blank_gap), ")"),
     _tuple_items: ($) =>
       seq(
         optional($._blank_gap),
@@ -1112,14 +1101,7 @@ module.exports = grammar({
       ),
     _tuple_entry: ($) => choice($.map_entry, $._unnamed_entry),
     _unnamed_entry: ($) =>
-      choice(
-        $.call,
-        $.tuple,
-        $.string,
-        $.type_seat,
-        $.interpolation,
-        $.scalar,
-      ),
+      choice($.call, $.tuple, $.string, $.type_seat, $.interpolation, $.scalar),
     _entry_value: ($) =>
       choice(
         $.call,

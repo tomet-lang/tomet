@@ -16,13 +16,13 @@
 中の JSON / TOML / YAML でもよい。
 
 ```tm
-@settings{
-  format: { heading: { space_inside_brackets: true } }
-}
-
-@settings(format:json)+++
-{ "format": { "heading": { "space_inside_brackets": true } } }
-+++
+`` @settings{
+``   format: { heading: { space_inside_brackets: true } }
+`` }
+``
+`` @settings(format:json)+++
+`` { "format": { "heading": { "space_inside_brackets": true } } }
+`` +++
 ```
 
 ##[ format は剥がされる ]
@@ -31,9 +31,9 @@
 ときには `format` は取り除かれている。したがって次の三つは同じ意味になる。
 
 ```tm
-@settings{ format: { element: { callout: { style: { content: block } } } } }
-@settings{ format.element.callout.style.content: block }
-@settings{ element: { callout: { style: { content: block } } } }
+`` @settings{ format: { element: { callout: { style: { content: block } } } } }
+`` @settings{ format.element.callout.style.content: block }
+`` @settings{ element: { callout: { style: { content: block } } } }
 ```
 
 ドット記法は入れ子形へ機械的に展開できる省略形であり、`explicit-form-first`
@@ -60,12 +60,12 @@
 `meta` の直下で、上の二つ以外のキーはフィールド名として読まれる。
 
 ```tm
-@settings{
-  meta: {
-    created: { type: datetime, format: rfc3339, offset: "+09:00" }
-    topics:  { type: list, always_newline: false }
-  }
-}
+`` @settings{
+``   meta: {
+``     created: { type: datetime, format: rfc3339, offset: "+09:00" }
+``     topics:  { type: list, always_newline: false }
+``   }
+`` }
 ```
 
 @table[
@@ -85,11 +85,11 @@
 `${名前(引数)}` の展開先。`${1}`、`${2}` が位置引数になる。`macro` は別名。
 
 ```tm
-@settings{
-  macros: {
-    gh: "https://github.com/tomet/tomet/issues/${1}"
-  }
-}
+`` @settings{
+``   macros: {
+``     gh: "https://github.com/tomet/tomet/issues/${1}"
+``   }
+`` }
 ```
 
 `${...}` は `+++` の中では展開されない。マクロの定義そのものが `+++` の中に

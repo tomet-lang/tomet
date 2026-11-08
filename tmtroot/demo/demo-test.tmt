@@ -1,0 +1,15 @@
+::kind(demo)
+::id(demo-ulT6FUxD)
+::meta(
+  title:    "Existing Work in Progress"
+  score:    99
+  created:  2026-11-12T08:42:29+09:00
+  due_date: 2026-11-12
+  tags:     (tomet, demo)
+)
+
+=[ Overview ]#(overview)
+
+This is existing handwritten content that should be preserved.
+
+=[ Tasks ]#(tasks)

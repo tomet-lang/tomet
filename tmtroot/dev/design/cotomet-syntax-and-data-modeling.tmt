@@ -26,9 +26,9 @@ cotomet の構文やノードツリーを洗練させていく過程で生じた
 ネストしたマップ `space: { key: value, key1: value }` の視認性を上げるため、TOML の `[table]` のようにフラットに記述できる新構文として以下が考えられた。
 
 ```tm
-space
-:key: value
-:key1: value
+`` space
+`` :key: value
+`` :key1: value
 ```
 
 あるいは、`::element{ key: value }` をデータ空間の名前空間として一般化することは可能か？
@@ -56,17 +56,17 @@ space
 設定ファイル等（例: `catasto`）で以下のような記述を見たとき、`:` や `{}`、`""` の多さが視認性を損ねているように感じられる。
 
 ```tm
-".editorconfig": {
-  source: { upstream: commonfiles, path: ".editorconfig" }
-}
+`` ".editorconfig": {
+``   source: { upstream: commonfiles, path: ".editorconfig" }
+`` }
 ```
 
 これを以下のように書くことはなぜ可能であり、どういう意味を持つのか？
 
 ```tm
-".editorconfig": {
-  source: upstream(commonfiles, ".editorconfig")
-}
+`` ".editorconfig": {
+``   source: upstream(commonfiles, ".editorconfig")
+`` }
 ```
 
 ===[ 考察: 自己記述性 vs 簡潔性（Positional） ]

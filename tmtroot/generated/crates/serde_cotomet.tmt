@@ -1,23 +1,26 @@
 ::kind(api)
+::meta(
+  crate:        serde_cotomet
+  dependencies: list(tomet-ast, tomet-ast-parser)
+  dependents:   list(cotomet)
+)
 
-::meta(crate: serde_cotomet, dependencies: list(tomet-ast, tomet-ast-parser), dependents: list(cotomet))
+=[ serde_cotomet ]
 
-=[serde_cotomet]
-
-==[serde_cotomet]
+==[ serde_cotomet ]
 
 Serde support for cotomet: read a cotomet document into a Rust type and write a
 Rust type out as one. The language itself is `cotomet`; depend on
 `cotomet` instead unless you are a crate below it.
 
-==[Key Functions]
+==[ Key Functions ]
 
 - (from_str) Parse a cotomet data document into a Rust type via Serde.
 - (to_string) Render a Rust type into cotomet data text via Serde.
 - (from_value) Convert a [`Value`] into a Rust type via Serde deserializer.
 - (to_value) Convert a Rust type into a [`Value`] via Serde serializer.
 
-==[Errors]
+==[ Errors ]
 
 [`Error::Syntax`] is text that is not cotomet, with a line and column.
 [`Error::Data`] is a value that does not fit the Rust type, with the path
@@ -29,72 +32,72 @@ variant is a key (`effect.Blur`). A `missing field` error is at the map
 that lacks the field. There is no line or column on a data error, because a
 [`Value`] carries no positions.
 
-==[Module de]
+==[ Module de ]
 
-===[Functions]
+===[ Functions ]
 
-====[fn from_value]
+====[ fn from_value ]
 
-==[Module error]
+==[ Module error ]
 
-===[Enums]
+===[ Enums ]
 
-====[enum Error]
+====[ enum Error ]
 
 What went wrong reading or writing a Rust type as cotomet.
 
-====[enum Segment]
+====[ enum Segment ]
 
 One step from a map or sequence down to a value inside it.
 
-===[Type Aliases]
+===[ Type Aliases ]
 
-====[type Result]
+====[ type Result ]
 
-==[Module print]
+==[ Module print ]
 
 Renders a `Value` back into cotomet data text:
 a top-level map is written as bare `key: value` lines (no enclosing braces);
 nested maps use `{ ... }`, and a sequence prints as `list(...)`.
 
-===[Functions]
+===[ Functions ]
 
-====[fn print_value]
+====[ fn print_value ]
 
-====[fn write_float]
+====[ fn write_float ]
 
-====[fn float_text]
+====[ fn float_text ]
 
-====[fn is_ident_char]
+====[ fn is_ident_char ]
 
-====[fn write_scalar_string]
+====[ fn write_scalar_string ]
 
-====[fn write_key]
+====[ fn write_key ]
 
-====[fn key_text]
+====[ fn key_text ]
 
-====[fn quoted_text]
+====[ fn quoted_text ]
 
-==[Module ser]
+==[ Module ser ]
 
-===[Structs]
+===[ Structs ]
 
-====[struct ValueSerializer]
+====[ struct ValueSerializer ]
 
-====[struct SeqSerializer]
+====[ struct SeqSerializer ]
 
-====[struct MapSerializer]
+====[ struct MapSerializer ]
 
-===[Functions]
+===[ Functions ]
 
-====[fn to_value]
+====[ fn to_value ]
 
-==[Functions]
+==[ Functions ]
 
-===[fn from_str]
+===[ fn from_str ]
 
 Parse a cotomet data document into `T` via Serde.
 
-===[fn to_string]
+===[ fn to_string ]
 
 Render `T` into cotomet data text via Serde.

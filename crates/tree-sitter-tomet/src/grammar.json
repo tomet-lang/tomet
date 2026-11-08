@@ -3499,30 +3499,13 @@
     }
   ],
   "conflicts": [
-    [
-      "section"
-    ],
-    [
-      "_tuple_items"
-    ],
-    [
-      "_entry_sep",
-      "_tuple_items"
-    ],
-    [
-      "map"
-    ],
-    [
-      "children"
-    ],
-    [
-      "_interp_operand",
-      "interp_lambda"
-    ],
-    [
-      "thematic_break",
-      "titled_thematic_break"
-    ]
+    ["section"],
+    ["_tuple_items"],
+    ["_entry_sep", "_tuple_items"],
+    ["map"],
+    ["children"],
+    ["_interp_operand", "interp_lambda"],
+    ["thematic_break", "titled_thematic_break"]
   ],
   "precedences": [],
   "externals": [

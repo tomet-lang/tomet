@@ -23,10 +23,10 @@ typst     = ["dep:tomet-typst"]
 
 [dependencies]
 tomet-ast         = { workspace = true }
-tomet-config      = { workspace = true }
-tomet-load        = { workspace = true }
 tomet-ast-parser  = { workspace = true }
+tomet-config      = { workspace = true }
 tomet-declaration = { workspace = true }
+tomet-load        = { workspace = true }
 tomet-semantics   = { workspace = true }
 tomet-transform   = { workspace = true }
 tomet-validator   = { workspace = true }

@@ -8,10 +8,10 @@
 =[ 形 ]
 
 ```tm
-${include(addr(tmt:docs/a.tmt))}
-${include(addr(tmt:docs/a.tmt#intro))}
-${include(tmt("docs/a.tmt")#intro, level: 1)}
-${include(addr(tmt:docs/a.tmt#intro), heading: false)}
+`` ${include(addr(tmt:docs/a.tmt))}
+`` ${include(addr(tmt:docs/a.tmt#intro))}
+`` ${include(tmt("docs/a.tmt")#intro, level: 1)}
+`` ${include(addr(tmt:docs/a.tmt#intro), heading: false)}
 ```
 
 - 第1引数は、文書か要素（参照）。

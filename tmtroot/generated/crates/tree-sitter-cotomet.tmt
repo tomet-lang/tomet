@@ -1,10 +1,13 @@
 ::kind(api)
+::meta(
+  crate:        tree-sitter-cotomet
+  dependencies: list()
+  dependents:   list(tomet-tests)
+)
 
-::meta(crate: tree-sitter-cotomet, dependencies: list(), dependents: list(tomet-tests))
+=[ tree-sitter-cotomet ]
 
-=[tree-sitter-cotomet]
-
-==[tree-sitter-cotomet]
+==[ tree-sitter-cotomet ]
 
 Rust binding for the cotomet tree-sitter grammar (`grammar.js` at the crate
 root; `src/parser.c` etc. are generated from it by
@@ -37,17 +40,17 @@ notion of "before", so one after an entry is read as a declaration too.
 - @strong[No block comments.] cotomet has `//` only; `/* */` is a tomet
 document construct.
 
-==[Constants]
+==[ Constants ]
 
-===[const LANGUAGE]
+===[ const LANGUAGE ]
 
 The tree-sitter language function for cotomet. Convert to a
 `tree_sitter::Language` via `.into()` to build a `tree_sitter::Parser`.
 
-===[const NODE_TYPES]
+===[ const NODE_TYPES ]
 
 The grammar's `node-types.json`.
 
-===[const HIGHLIGHTS_QUERY]
+===[ const HIGHLIGHTS_QUERY ]
 
 The grammar's `highlights.scm` query string for syntax highlighting.

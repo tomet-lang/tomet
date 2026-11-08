@@ -4,7 +4,6 @@
 // 2026-09-26 時点の状態: `tomet cli-docs` は完了してコミット済み (9b4a905。`apps/cli/src/commands/cli_docs.rs` の `//!` を参照)。
 // ここにあるのは残りだけ。どれも始めていない。作者待ちの項目には手を付けない。
 // 全部片付いたら、決まったことを doc comment や writ に畳んで、この文書を消す。
-
 =[ 方針 (決まっている) ]
 
 - man ページの取り込みは `pandoc -f man -t json page.1 | tomet from-pandoc -`。

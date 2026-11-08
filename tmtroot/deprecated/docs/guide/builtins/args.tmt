@@ -1,15 +1,15 @@
 ---[ `(args)` ]---
 
 ```(lang:tm)
-format: json                  // json / toml / yaml のいずれか。`+++` の中身を
-                              // そのフォーマットの生ソースとして扱う。
-                              // その要素にだけ効く。文書全体の既定にはならない。
-
-target: "https://..."         // @link / @embed が指す先。キーはこの一つだけ。
-                              // 何を指しているかは接頭辞が決める
-                              // (tomet_semantics::target_scheme)。
-                              // 位置引数は target に正規化されるので
-                              // @link("https://...") と書ける。
+`` format: json                  // json / toml / yaml のいずれか。`+++` の中身を
+``                               // そのフォーマットの生ソースとして扱う。
+``                               // その要素にだけ効く。文書全体の既定にはならない。
+``
+`` target: "https://..."         // @link / @embed が指す先。キーはこの一つだけ。
+``                               // 何を指しているかは接頭辞が決める
+``                               // (tomet_semantics::target_scheme)。
+``                               // 位置引数は target に正規化されるので
+``                               // @link("https://...") と書ける。
 ```
 
 ==[ target の接頭辞 ]
@@ -30,8 +30,8 @@ target: "https://..."         // @link / @embed が指す先。キーはこの�
 （`tomet_semantics::RECOVERABLE_TARGET_SCHEMES`）。
 
 ```tm
-@link(url:"https://example.com")[Wiki]    // target: "https://example.com" に回収
-@link(https:"//example.com")[Wiki]        // 回収されない。target は空のまま
+`` @link(url:"https://example.com")[Wiki]    // target: "https://example.com" に回収
+`` @link(https:"//example.com")[Wiki]        // 回収されない。target は空のまま
 ```
 
 キー名から要素の種別を推論する短縮（`@(url:...)` が link になる）は撤去
@@ -41,24 +41,24 @@ target: "https://..."         // @link / @embed が指す先。キーはこの�
 ==[ 未実装 ]
 
 ```tm
-// format: kdl              // kdl は embedded format として認識されない
-// path:(@path,@path#@var)  // path というキーに特別な意味は無い
-// url:(@url#@var)          // `#var` のようなフラグメント／変数展開は無い
+`` // format: kdl              // kdl は embedded format として認識されない
+`` // path:(@path,@path#@var)  // path というキーに特別な意味は無い
+`` // url:(@url#@var)          // `#var` のようなフラグメント／変数展開は無い
 ```
 
 ---[ `{value}` ]---
 
 ```tm
-id: xxxx-xxxx        // 見出し・リスト項目・codeblock の id（html: id 属性）
-cssclass: "name"     // 同上、cssclass（html: class 属性）。値は単一の文字列
-
-// type: @settings   // 未実装: type という特別なキーはどの consumer からも読まれない
-                     // 文書の種別は @kind が持つ
+`` id: xxxx-xxxx        // 見出し・リスト項目・codeblock の id（html: id 属性）
+`` cssclass: "name"     // 同上、cssclass（html: class 属性）。値は単一の文字列
+``
+`` // type: @settings   // 未実装: type という特別なキーはどの consumer からも読まれない
+``                      // 文書の種別は @kind が持つ
 ```
 
 ---[ special ]---
 
 ```tm
-// @self             // 未実装。要素の位置での自己参照。補間側の `${self.*}` と
-                     // 同じ語を使う (docs/spec/builtin-functions.tmt)
+`` // @self             // 未実装。要素の位置での自己参照。補間側の `${self.*}` と
+``                      // 同じ語を使う (docs/spec/builtin-functions.tmt)
 ```

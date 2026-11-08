@@ -46,21 +46,21 @@
 ]
 
 ```tm
-@kind(@string)
-@version(@string)
-@meta(format:json)
-@config(format:json)
-@config(export: { type: commonmark, path: "README.md" })
-
-// blueprint は生成物の雛形。識別子・入力・データがそのまま:
-// 何であるか(blueprint)、何を対象にするか(位置引数)、自身について何を言うか。
-// 実体化のとき @blueprint(X) は @kind(X) に昇格する。
-@blueprint(@string){ version: @string, description: @string }
-
-// @import は二つの仕事を一語に負わせていた。分けて、名前を別にした。
-@use(@namespace)                // 語彙を scope に入れる。パスではなく名前空間名
-@use(@namespace){ as: @string } // as: は名前が衝突したときの逃げ道だけ
-@include(@file)                 // 認識だけ。展開はまだ何もしない
+`` @kind(@string)
+`` @version(@string)
+`` @meta(format:json)
+`` @config(format:json)
+`` @config(export: { type: commonmark, path: "README.md" })
+``
+`` // blueprint は生成物の雛形。識別子・入力・データがそのまま:
+`` // 何であるか(blueprint)、何を対象にするか(位置引数)、自身について何を言うか。
+`` // 実体化のとき @blueprint(X) は @kind(X) に昇格する。
+`` @blueprint(@string){ version: @string, description: @string }
+``
+`` // @import は二つの仕事を一語に負わせていた。分けて、名前を別にした。
+`` @use(@namespace)                // 語彙を scope に入れる。パスではなく名前空間名
+`` @use(@namespace){ as: @string } // as: は名前が衝突したときの逃げ道だけ
+`` @include(@file)                 // 認識だけ。展開はまだ何もしない
 ```
 
 ==[ 語彙 ]
@@ -81,15 +81,15 @@
 ]
 
 ```tm
-// vocabulary は語彙。どの要素名が存在するかを宣言する。blueprint とは別物で、
-// blueprint は実体化で消費されるが語彙は消費されず、必要になる時期も違う
-// (語彙は文書を読むのに、blueprint は検証するのに要る)。
-@vocabulary(@string){ version: @string }
-@element(@string){ display: block, region: preamble, singleton: @bool }[ 説明 ]
-@param(@string){ type: @type, required: @bool, positional: @bool, default: @any }[ 説明 ]
-@args{ ... }                  // @element の中。(args) スロットの記述
-@data{ open: @bool, ... }     // @element の中。{value} スロットの記述
-@content{ allow: (@name) }    // @element の中。[content] スロットの記述
+`` // vocabulary は語彙。どの要素名が存在するかを宣言する。blueprint とは別物で、
+`` // blueprint は実体化で消費されるが語彙は消費されず、必要になる時期も違う
+`` // (語彙は文書を読むのに、blueprint は検証するのに要る)。
+`` @vocabulary(@string){ version: @string }
+`` @element(@string){ display: block, region: preamble, singleton: @bool }[ 説明 ]
+`` @param(@string){ type: @type, required: @bool, positional: @bool, default: @any }[ 説明 ]
+`` @args{ ... }                  // @element の中。(args) スロットの記述
+`` @data{ open: @bool, ... }     // @element の中。{value} スロットの記述
+`` @content{ allow: (@name) }    // @element の中。[content] スロットの記述
 ```
 
 `param` が宣言の側、`args` が呼ぶ側の名前である。表に出るスロットが `(args)` の
@@ -106,8 +106,8 @@
 ]
 
 ```tm
-@draft[ 何が足りないか ]
-@fixme[ 何が間違っているか ]
+`` @draft[ 何が足りないか ]
+`` @fixme[ 何が間違っているか ]
 ```
 
 見れば決まる境目である。`draft` は不在、`fixme` は誤った存在。出力でも違い、
@@ -132,20 +132,20 @@ kind の語彙も所有できず、共有語彙にすると穴のある文書す
 ]
 
 ```tm
-// link/embed のキーは `target` ひとつだけ。何を指しているか(url/file/dir/tm/id/ref)は
-// キーではなく、target 文字列自身の接頭辞から導かれる (tomet_semantics::target_scheme)。
-@link("https://example.com")[ display_name ]   // 位置引数は target に正規化される
-@link(target:"file:a/b.tmt")[ display_name ]
-@link(target:"ref:note")
-
-@embed(file:@file)[alt]
-
-@references[
-  @id(asdf-asdf):()
-  @id(asdf-asdf):[]
-  @id(asdf-asd2):{tag: important}
-  @id(asdf-asdf):(){}[]
-]
+`` // link/embed のキーは `target` ひとつだけ。何を指しているか(url/file/dir/tm/id/ref)は
+`` // キーではなく、target 文字列自身の接頭辞から導かれる (tomet_semantics::target_scheme)。
+`` @link("https://example.com")[ display_name ]   // 位置引数は target に正規化される
+`` @link(target:"file:a/b.tmt")[ display_name ]
+`` @link(target:"ref:note")
+``
+`` @embed(file:@file)[alt]
+``
+`` @references[
+``   @id(asdf-asdf):()
+``   @id(asdf-asdf):[]
+``   @id(asdf-asd2):{tag: important}
+``   @id(asdf-asdf):(){}[]
+`` ]
 ```
 
 旧い per-scheme キーは、target 一本に統一する前の綴りである。回収されるのは
@@ -154,11 +154,11 @@ kind の語彙も所有できず、共有語彙にすると穴のある文書す
 `@link(tmt:...)` は動かない。
 
 ```tm
-@link(url:@url)[ display_name ]
-@link(file:@file)[ display_name ]
-@link(tm:@tmt_file)[ display_name ]
-@link(id:@id)[ display_name ]
-@link(ref:@ref)
+`` @link(url:@url)[ display_name ]
+`` @link(file:@file)[ display_name ]
+`` @link(tm:@tmt_file)[ display_name ]
+`` @link(id:@id)[ display_name ]
+`` @link(ref:@ref)
 ```
 
 ==[ file: と dir: ]
@@ -182,9 +182,9 @@ kind の語彙も所有できず、共有語彙にすると穴のある文書す
 「`codeblock.rs` を読め」と言うとき、そこへ連れていく申し出はしていない。
 
 ```tm
-@file(crates/tomet-config/src/lib.rs)
-@dir(docs/spec)
-@file(crates/tomet-config/src/lib.rs)[`lib.rs`]
+`` @file(crates/tomet-config/src/lib.rs)
+`` @dir(docs/spec)
+`` @file(crates/tomet-config/src/lib.rs)[`lib.rs`]
 ```
 
 検査は `@link(file:...)` と同じで、実在してファイル（ディレクトリ）である
@@ -232,19 +232,19 @@ kind の語彙も所有できず、共有語彙にすると穴のある文書す
 ]
 
 ```tm
-@heading(level: @int)[ display_name ]
-@codeblock(lang:@language)[ @code ]
-@quote[ @content ]
-@callout(@variant)[ @content ]     // 位置引数は variant。`{title:}` も取る
-@callout(variant:info, title:@string)[ @content ]
-
-// card は分類を持たない、ただの題名+本文の区画。callout のように
-// variant を持たない代わりに、位置引数もない — title は常に named。
-@card[ @content ]
-@card(title:@string)[ @content ]
-
-- (marker:@string) content         // ul
--. (marker:@string) content        // ol
+`` @heading(level: @int)[ display_name ]
+`` @codeblock(lang:@language)[ @code ]
+`` @quote[ @content ]
+`` @callout(@variant)[ @content ]     // 位置引数は variant。`{title:}` も取る
+`` @callout(variant:info, title:@string)[ @content ]
+``
+`` // card は分類を持たない、ただの題名+本文の区画。callout のように
+`` // variant を持たない代わりに、位置引数もない — title は常に named。
+`` @card[ @content ]
+`` @card(title:@string)[ @content ]
+``
+`` - (marker:@string) content         // ul
+`` -. (marker:@string) content        // ol
 ```
 
 ==[ 文字 ]
@@ -271,10 +271,10 @@ content」の形にそのまま乗れるため。`rt` は必須で、文字列�
 書けるが、`std` の名前ではないので裸では通らない。汎用要素として扱われる。
 
 ```tm
-@tag{}
-@index()[ title ]
-@style()
-@color()
+`` @tag{}
+`` @index()[ title ]
+`` @style()
+`` @color()
 ```
 
 =[ 名前は通るが何もしないもの ]
@@ -296,9 +296,9 @@ content」の形にそのまま乗れるため。`rt` は必須で、文字列�
 @link[`spec/builtin-functions.tmt`](file:docs/spec/builtin-functions.tmt) を見る。
 
 ```tm
-${func(args) ...}
-$func(args)
-$(@var)
+`` ${func(args) ...}
+`` $func(args)
+`` $(@var)
 ```
 
 演算子は無い。算術は関数形のみ (`${sub(1, 2)}`)。入れるなら `-` の前後に空白が
@@ -307,6 +307,6 @@ $(@var)
 =[ コメント ]
 
 ```tm
-// comment
-/* comments */
+`` // comment
+`` /* comments */
 ```

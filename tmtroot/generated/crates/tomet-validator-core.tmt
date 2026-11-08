@@ -1,19 +1,22 @@
 ::kind(api)
+::meta(
+  crate:        tomet-validator-core
+  dependencies: list(tomet-address, tomet-ast, tomet-ast-parser, tomet-cst, tomet-declaration, tomet-position, tomet-semantics, tomet-semantics-core, tomet-span, tomet-tree, tomet-type)
+  dependents:   list(tomet-validator, tomet-validator-blueprint, tomet-validator-profile, tomet-validator-rule)
+)
 
-::meta(crate: tomet-validator-core, dependencies: list(tomet-address, tomet-ast, tomet-ast-parser, tomet-cst, tomet-declaration, tomet-position, tomet-semantics, tomet-semantics-core, tomet-span, tomet-tree, tomet-type), dependents: list(tomet-validator, tomet-validator-blueprint, tomet-validator-profile, tomet-validator-rule))
-
-=[tomet-validator-core]
+=[ tomet-validator-core ]
 
 Core document structure and semantic validation.
 
 Validates standard and custom elements, duplicate IDs, singleton directives,
 regions (preamble vs body), argument declarations, and dangling intra-document anchors.
 
-==[Module diagnostic]
+==[ Module diagnostic ]
 
-===[Enums]
+===[ Enums ]
 
-====[enum Severity]
+====[ enum Severity ]
 
 How much a [`Diagnostic`] matters.
 
@@ -21,7 +24,7 @@ Derived from the variant rather than stored: severity is a property of
 the rule, not of the occurrence, so keeping a field would be a second
 place the same fact lives.
 
-====[enum Diagnostic]
+====[ enum Diagnostic ]
 
 Something `validate_document` found and a reader should know about.
 
@@ -30,20 +33,20 @@ python}` each bind the result to `diagnostics`. It was
 `ValidationError` while every variant really was an error; `Draft` and
 `Fixme` are not, so the name moved rather than the meaning stretching.
 
-====[enum CstValidationError]
+====[ enum CstValidationError ]
 
 A validation error tied directly to precise byte ranges in the CST.
 
-==[Module id]
+==[ Module id ]
 
-===[Functions]
+===[ Functions ]
 
-====[fn collect_ids]
+====[ fn collect_ids ]
 
 Walks every node in `doc` and returns `(id, span)` for each
 anchor ID found, in document order.
 
-====[fn collect_ids_cst]
+====[ fn collect_ids_cst ]
 
 Scans `root` for every `#(id)` slot and returns the exact [`TextRange`]
 of each id's value, in document order.
@@ -55,44 +58,44 @@ an `ID_GROUP` node can only ever appear where `parse_groups`/
 for, and no attribute-key collision with `@link`'s own `id` argument
 to guard against (that argument is not this slot).
 
-==[Structs]
+==[ Structs ]
 
-===[struct Declared]
+===[ struct Declared ]
 
 A declaration paired with its source span.
 
-==[Functions]
+==[ Functions ]
 
-===[fn classify_in]
+===[ fn classify_in ]
 
 Classifies `el` against `std` and the namespaces in scope.
 
-===[fn child_kind_name]
+===[ fn child_kind_name ]
 
 The name a rule's `allow:` list knows a child of a node by: an element by
 its kind, a list item by the element it is when it has a name, and a plain
 list item by [`PLAIN_ITEM_KIND_NAME`].
 
-===[fn shape_str]
+===[ fn shape_str ]
 
-===[fn validate_core]
+===[ fn validate_core ]
 
 Runs core element, ID, region, and argument validations on `doc`.
 
-===[fn check_singletons_and_regions]
+===[ fn check_singletons_and_regions ]
 
 Enforces the `singleton` and `region` axes.
 
-===[fn check_unfinished]
+===[ fn check_unfinished ]
 
-===[fn check_arguments]
+===[ fn check_arguments ]
 
-===[fn check_document_declarations]
+===[ fn check_document_declarations ]
 
 Runs checks on the standard declarations in `doc`, mapping each [`tomet_declaration::Problem`]
 back to a [`Diagnostic`] with the declaration element's span.
 
-===[fn check_ctmt_declarations]
+===[ fn check_ctmt_declarations ]
 
 Validates declarations from a `.ctmt` file header against [`tomet_declaration::Host::Ctmt`].
 
@@ -101,23 +104,23 @@ too many arguments, and invalid macro/var definitions. Declarations whose
 names are not standard are ignored (their meaning belongs to the tool that
 reads the file).
 
-===[fn check_content_shape]
+===[ fn check_content_shape ]
 
-===[fn check_vocabulary_params]
+===[ fn check_vocabulary_params ]
 
 Checks how a vocabulary document declares its parameters: a `type:` that names
 no type, a `default:` that is not of its `type:`. The same findings are reported
 where a vault reads the vocabulary ([`tomet_semantics::LoadedVocabularies`]);
 this is for checking the vocabulary file itself.
 
-===[fn check_vault_only_declarations]
+===[ fn check_vault_only_declarations ]
 
 Reports each top-level declaration only the vault config may write (`DeclKind::is_vault_only`).
 
 The caller decides whether the document is allowed to write them (the vault config is; a folder
 config and an ordinary document are not), because that takes the path, which this crate never has.
 
-===[fn check_field_types]
+===[ fn check_field_types ]
 
 Checks the form of the `::meta` fields the settings declare a `type:` for.
 
@@ -129,13 +132,13 @@ Only a `type:` with a form can be wrong: `uuid` and `datetime`. A field the
 document does not write, an empty one (the state in which `tomet format`
 generates one), and a `${...}` not yet evaluated are not reported.
 
-===[fn check_dangling_anchors]
+===[ fn check_dangling_anchors ]
 
-===[fn validate_cst]
+===[ fn validate_cst ]
 
-==[Constants]
+==[ Constants ]
 
-===[const PLAIN_ITEM_KIND_NAME]
+===[ const PLAIN_ITEM_KIND_NAME ]
 
 What a `:rule(allow: list(...))` calls a plain `- item`, which has no name
 to be called by.

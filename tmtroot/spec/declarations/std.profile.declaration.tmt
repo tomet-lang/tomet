@@ -4,7 +4,7 @@
 =[ 全容 ]
 
 ```tm
-::profile(oneline, standalone)
+`` ::profile(oneline, standalone)
 ```
 
 この文書が、tomet の部分集合に収まっていることを約束する宣言。名前は一つ以上で、順序に意味はない。
@@ -31,8 +31,8 @@ profile は記法も意味も変えない。約束を守っている文書は、
 禁じるのは、書いていないものを外から補う省略。書いてあるリンクは禁じない。
 
 ```tm
-::macro(gh: "https://github.com/tomet/tomet/issues/${1}")
-${macro.gh(123)}
+`` ::macro(gh: "https://github.com/tomet/tomet/issues/${1}")
+`` ${macro.gh(123)}
 ```
 
 使うマクロはこのファイルの `::macro` に定義がある。vault の設定にだけあるマクロを呼ぶ式は、外から補っているので使えない。

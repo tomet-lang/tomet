@@ -7,15 +7,15 @@ license.workspace    = true
 repository.workspace = true
 
 [dependencies]
-tomet-ast         = { workspace = true }
-tomet-config      = { workspace = true }
-tomet-semantics   = { workspace = true }
-tomet-spelling    = { workspace = true }
-tomet-style       = { workspace = true }
-tomet-tree        = { workspace = true }
-tomet-type        = { workspace = true }
+tomet-ast       = { workspace = true }
+tomet-config    = { workspace = true }
+tomet-semantics = { workspace = true }
+tomet-spelling  = { workspace = true }
+tomet-style     = { workspace = true }
+tomet-tree      = { workspace = true }
+tomet-type      = { workspace = true }
 
 [dev-dependencies]
-tomet-markdown   = { workspace = true }
 tomet-ast-parser = { workspace = true }
+tomet-markdown   = { workspace = true }
 tomet-span       = { workspace = true }

@@ -1,10 +1,13 @@
 ::kind(api)
+::meta(
+  crate:        cotomet-eval
+  dependencies: list(tomet-ast, tomet-ast-parser, tomet-declaration, tomet-expr, tomet-position, tomet-span)
+  dependents:   list(cotomet, tomet-cli, tomet-lsp)
+)
 
-::meta(crate: cotomet-eval, dependencies: list(tomet-ast, tomet-ast-parser, tomet-declaration, tomet-expr, tomet-position, tomet-span), dependents: list(cotomet, tomet-cli, tomet-lsp))
+=[ cotomet-eval ]
 
-=[cotomet-eval]
-
-==[cotomet-eval]
+==[ cotomet-eval ]
 
 Evaluation for cotomet (`.ctmt`) data files.
 
@@ -12,7 +15,7 @@ Evaluates `${macro....}` and `${var....}` expressions within `.ctmt` data files
 while enforcing data constraints: pure output phase, no vault access, and
 reporting all expression errors with source line and column.
 
-==[Architecture & Responsibilities]
+==[ Architecture & Responsibilities ]
 
 - ("Data-only evaluation") Evaluates expressions in value positions of a `.ctmt` file, replacing
 expressions with their evaluated data values (`Value::String`, `Value::Int`,
@@ -25,7 +28,7 @@ and variable defaults. Caller-supplied variables override defaults.
 - ("Comprehensive error reporting") Every evaluation error carries 1-based line, column, and AST span. Evaluation
 walks the entire file and collects all errors rather than stopping at the first.
 
-==[Not here]
+==[ Not here ]
 
 - Address resolution: address checking in `.ctmt` requires a vault and is out of scope.
 - Map-returning macros: a macro is a parameterized string template. A list comes from a
@@ -35,15 +38,15 @@ only as a value the caller passes for a declared name.
 
 - Grammar parsing: expression parsing is delegated to `tomet-parser`'s `CotometValueHook`.
 
-==[Structs]
+==[ Structs ]
 
-===[struct Error]
+===[ struct Error ]
 
 An evaluation or parse error located at a specific line and column.
 
-==[Functions]
+==[ Functions ]
 
-===[fn eval_str]
+===[ fn eval_str ]
 
 Evaluates a `.ctmt` source string, resolving `${...}` expressions.
 
@@ -53,10 +56,10 @@ and variable defaults. Values in `vars` override declared variable defaults.
 Returns the parsed [`File`] with expressions replaced by their evaluated data values,
 or every encountered error with line and column.
 
-===[fn eval_file]
+===[ fn eval_file ]
 
 Evaluates a pre-parsed [`File`], resolving `${...}` expressions against `src`.
 
-==[Type Aliases]
+==[ Type Aliases ]
 
-===[type File]
+===[ type File ]

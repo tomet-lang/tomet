@@ -57,29 +57,29 @@
 ==[ `:head:` ]
 
 ```(tmt)
-::upstreams{
-  origiri: { git: "https://github.com/kakusika/commonfiles.git", rev: main, root: origiri }
-  origiri-mobile: { git: "https://github.com/kakusika/commonfiles.git", rev: main, root: origiri-mobile }
-}
-
-:".envrc":
-source: { upstream: origiri, path: ".envrc" }
-
-:source:
-upstream: origiri
-path: ".gitattributes"
-
-:"CLAUDE.md":
-source: { upstream: origiri, path: "CLAUDE.md" }
-source: { upstream: origiri, path: ".gitattributes" }
-
-:"default.config.tmt":
-source: { upstream: origiri, path: "default.config.tmt" }
-source: { upstream: origiri, path: ".gitattributes" }
-
-:".gitattributes":
-source: { upstream: origiri, path: ".gitattributes" }
-source: { upstream: origiri, path: ".gitattributes" }
-source: { upstream: origiri, path: ".gitattributes" }
-source: { upstream: origiri, path: ".gitattributes" }
+`` ::upstreams{
+``   origiri: { git: "https://github.com/kakusika/commonfiles.git", rev: main, root: origiri }
+``   origiri-mobile: { git: "https://github.com/kakusika/commonfiles.git", rev: main, root: origiri-mobile }
+`` }
+``
+`` :".envrc":
+`` source: { upstream: origiri, path: ".envrc" }
+``
+`` :source:
+`` upstream: origiri
+`` path: ".gitattributes"
+``
+`` :"CLAUDE.md":
+`` source: { upstream: origiri, path: "CLAUDE.md" }
+`` source: { upstream: origiri, path: ".gitattributes" }
+``
+`` :"default.config.tmt":
+`` source: { upstream: origiri, path: "default.config.tmt" }
+`` source: { upstream: origiri, path: ".gitattributes" }
+``
+`` :".gitattributes":
+`` source: { upstream: origiri, path: ".gitattributes" }
+`` source: { upstream: origiri, path: ".gitattributes" }
+`` source: { upstream: origiri, path: ".gitattributes" }
+`` source: { upstream: origiri, path: ".gitattributes" }
 ```

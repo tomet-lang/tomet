@@ -1,9 +1,17 @@
 ::kind(todo)
 
+`` *> jfieoefjweifej
+`` *> jfioewfjeifjei
+`` 
+`` <%>
+`` <* jslkdfj>
+`` <#tag>
+
+- rustのタプル
+- 設定 -> sectionにすべき、elementにすべき。
+  - `sort`項目が必要。
 - 属性付与->(`@crate`とか`deps`に登録などの挙動に大きく携わりそう。)
 - インクリメンタルパース
-- `printer`は`format`グループでは間違いなくない。
-- ``を`//`と同じ扱いにすれば結構完璧。
 - changeset
 - 現在どうやら`elements`で複数ネームスペースを入れられないみたい。
 - depslock -> `https`なども含めることができ、それをインポートして検証可能にする。
@@ -12,44 +20,32 @@
 - コメントの中の言及まで書き換える仕組み
 - `--`, `->`で、`--`を説明にする？or `-/`
 - イベント型パーサーに肉薄する 90 MB/s を出している Tomet
-- `::macro.xxx()`
 - Onelineを見据えた構文追加``, `*`
   - `(){}`の`|`みたいに、一行単位で宣言可能にするなにか。`*`, `:prop()`
 - websiteにtmtrootをコピーする
 - `todo`, `task`語彙
-- `root.config.tmt`, `global.config.tmt`
 - `@legacy` タグ要素
 - `@comment`, `:target(html, ...)`
-- `| aaaaa |`が`[ aaaaa ]`の代替になるのではないか？
 - クレートの責務を把握せずにクレートに手をつけようとするな
 - アプリが対応している語彙を出力
 - 会話形式の語彙
-- `@type(oneline)`の輸入
+- `@profile(oneline)`の輸入
 - `tellme`, `show`
 - `@ui`, `@input`, `@html.xxx`
 - 語彙マネージャー？
   - `@owner`と`fss`？
-- `@type(list)`
+- `@type(list)` -> profileでも無いし、ruleか？
 - rust用の追加要素
 - `:rule()`にnamespace
----
-| 複数行ルール
----
-- `;`、schema
-- コネクト構文`^`説
 - 双方向性リンク
 - twrit.*
-- 全configエクスポート
 - rule補充
 - `fixme()`などを収集したい？
 - exportしたcratesのノートの規則性、blueprint使用。
 - 固有名詞なくす。たそ、00 Obsidianもあるみたい...
-- address絶対性
-- `directive`は本当に`@`なのか。
 - tove内の`@`は何を意味するのか？
 - `details` and `summary`
 - `:ignore`, `:nocheck`
-- `$generate.uuid`
 - cliの色付け
 - `cmd`, `kbd`
 - githubのreadme

@@ -1,14 +1,17 @@
 ::kind(api)
+::meta(
+  crate:        tomet-span
+  dependencies: list()
+  dependents:   list(cotomet, cotomet-eval, tomet-address, tomet-ast, tomet-ast-parser, tomet-convert-standalone, tomet-cst-parser, tomet-declaration, tomet-expr, tomet-extract, tomet-html, tomet-lexer, tomet-links, tomet-lowering, tomet-lsp, tomet-markdown, tomet-pandoc, tomet-printer, tomet-search, tomet-semantics, tomet-spec, tomet-transform, tomet-tree, tomet-validator, tomet-validator-blueprint, tomet-validator-core, tomet-validator-profile, tomet-validator-rule, tomet-vault)
+)
 
-::meta(crate: tomet-span, dependencies: list(), dependents: list(cotomet, cotomet-eval, tomet-address, tomet-ast, tomet-ast-parser, tomet-convert-standalone, tomet-cst-parser, tomet-declaration, tomet-expr, tomet-extract, tomet-html, tomet-lexer, tomet-links, tomet-lowering, tomet-lsp, tomet-markdown, tomet-pandoc, tomet-printer, tomet-search, tomet-semantics, tomet-spec, tomet-transform, tomet-tree, tomet-validator, tomet-validator-blueprint, tomet-validator-core, tomet-validator-profile, tomet-validator-rule, tomet-vault))
+=[ tomet-span ]
 
-=[tomet-span]
-
-==[About]
+==[ About ]
 
 Source span representations ([`Span`]) for the Tomet toolchain.
 
-==[Design & Invariants]
+==[ Design & Invariants ]
 
 - ("Byte Offsets Only") A [`Span`] records byte offsets (`start`, `end`) into source text. Line and column
 numbers are not stored; resolve them on demand using a line index.
@@ -16,9 +19,9 @@ numbers are not stored; resolve them on demand using a line index.
 equality comparisons ignore source positions. Use [`Span::exact_eq()`] when exact
 byte offsets need to be compared.
 
-==[Structs]
+==[ Structs ]
 
-===[struct Span]
+===[ struct Span ]
 
 A source span: a range of byte offsets into the text it was parsed from.
 

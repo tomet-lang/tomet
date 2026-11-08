@@ -1,14 +1,17 @@
 ::kind(api)
+::meta(
+  crate:        tomet-config
+  dependencies: list(tomet-ast, tomet-ast-parser, tomet-declaration, tomet-semantics, tomet-semantics-core, tomet-spec-derive, tomet-tree)
+  dependents:   list(tomet, tomet-benches, tomet-cli, tomet-convert-standalone, tomet-edit, tomet-field-utils, tomet-formatter, tomet-indexer, tomet-links, tomet-load, tomet-load-config, tomet-printer, tomet-spec, tomet-style, tomet-tests, tomet-vault, tomet-workspace)
+)
 
-::meta(crate: tomet-config, dependencies: list(tomet-ast, tomet-ast-parser, tomet-declaration, tomet-semantics, tomet-semantics-core, tomet-spec-derive, tomet-tree), dependents: list(tomet, tomet-benches, tomet-cli, tomet-convert-standalone, tomet-edit, tomet-field-utils, tomet-formatter, tomet-indexer, tomet-links, tomet-load, tomet-load-config, tomet-printer, tomet-spec, tomet-style, tomet-tests, tomet-vault, tomet-workspace))
+=[ tomet-config ]
 
-=[tomet-config]
-
-==[tomet-config]
+==[ tomet-config ]
 
 Configuration parsing and styling rule definitions ([`Config`], [`FormatConfig`], [`MetaConfig`], [`WorkspaceConfig`]).
 
-==[Architecture & Responsibilities]
+==[ Architecture & Responsibilities ]
 
 - ("Centralized Configuration Domain") `tomet-config` owns configuration data structures and pure parsing
 ([`load_config_from_str`]). Finding and reading a config file off
@@ -18,7 +21,7 @@ disk is `tomet-load-config`'s job, one layer up.
   - (discovery) Configuration parsing and error handling.
   - (tree) AST tree normalization and path lookup utilities.
 
-==[Module discovery]
+==[ Module discovery ]
 
 Config parsing and error reporting. Finding and reading a config file
 off disk is `tomet-load-config`'s job, one layer up -- this stays
@@ -26,15 +29,15 @@ pure so `tomet-config` itself can stay layer 3 and disk-free.
 [`ConfigError::Io`] exists for that crate's `load_config_from_file`
 to construct; nothing in this crate ever produces it.
 
-===[Enums]
+===[ Enums ]
 
-====[enum ConfigError]
+====[ enum ConfigError ]
 
-===[Functions]
+===[ Functions ]
 
-====[fn load_config_from_str]
+====[ fn load_config_from_str ]
 
-==[Module groups]
+==[ Module groups ]
 
 Root configuration groups corresponding to `::settings{ ... }` / `::config{ ... }` sections.
 
@@ -45,55 +48,55 @@ Each submodule defines a dedicated strongly-typed configuration struct for a spe
 - ("`workspace`") Vault file indexing exclusions and unswept rules ([`WorkspaceConfig`]).
 - ("`registry`") Blueprints, vocabularies and dictionaries declarations ([`RegistryConfig`]).
 
-===[Module format]
+===[ Module format ]
 
 Formatting and printer rule configuration ([`FormatConfig`], [`GroupOrder`]).
 
-====[Structs]
+====[ Structs ]
 
-=====[struct FormatConfig]
+=====[ struct FormatConfig ]
 
 Formatting and printer rule configuration.
 
-====[Enums]
+====[ Enums ]
 
-=====[enum GroupOrder]
+=====[ enum GroupOrder ]
 
-===[Module meta]
+===[ Module meta ]
 
 Metadata styling rules and per-field constraints ([`MetaConfig`], [`FieldConfig`]).
 
-====[Structs]
+====[ Structs ]
 
-=====[struct FieldConfig]
+=====[ struct FieldConfig ]
 
 Per-field metadata schema and constraint rules.
 
-=====[struct MetaConfig]
+=====[ struct MetaConfig ]
 
 Document metadata formatting and schema rules.
 
-===[Module registry]
+===[ Module registry ]
 
 Blueprint, vocabulary and dictionary file registry declarations ([`RegistryConfig`]).
 
-====[Structs]
+====[ Structs ]
 
-=====[struct RegistryConfig]
+=====[ struct RegistryConfig ]
 
 Blueprint, vocabulary and dictionary file registry declarations.
 
-===[Module workspace]
+===[ Module workspace ]
 
 Workspace-level configuration ([`WorkspaceConfig`]).
 
-====[Structs]
+====[ Structs ]
 
-=====[struct WorkspaceConfig]
+=====[ struct WorkspaceConfig ]
 
 Workspace-level configuration for vault indexing and file discovery.
 
-==[Module layer]
+==[ Module layer ]
 
 One config file's contribution to a stacked [`Config`](crate::Config).
 
@@ -110,74 +113,74 @@ Merging happens on those values, before they become a [`Config`](crate::Config):
 cannot tell a key that was never written from one written with its default, so two typed groups
 cannot be merged without guessing.
 
-===[Structs]
+===[ Structs ]
 
-====[struct ConfigLayer]
+====[ struct ConfigLayer ]
 
 The settings, name tables, macros and variables one file declares, ready to be stacked.
 
-===[Functions]
+===[ Functions ]
 
-====[fn registry_entries]
+====[ fn registry_entries ]
 
 The `(name, path)` pairs a document registers in its `::blueprints`, `::vocabularies` or
 `::dictionaries` (`kind`), in the order written. An entry that is not a reference to a file is left out.
 
-==[Module schema]
+==[ Module schema ]
 
 Runtime configuration schema models and trait definitions.
 
-===[Structs]
+===[ Structs ]
 
-====[struct ConfigEntrySpec]
+====[ struct ConfigEntrySpec ]
 
 Specification of a single configuration key/entry.
 
-====[struct ConfigGroupSpec]
+====[ struct ConfigGroupSpec ]
 
 Specification of a configuration group (e.g. `::config.format`, `::config.workspace`).
 
-===[Traits]
+===[ Traits ]
 
-====[trait ConfigSpecProvider]
+====[ trait ConfigSpecProvider ]
 
 Trait implemented by configuration structs (typically via `#[derive(Config)]`)
 to provide runtime schema metadata.
 
-===[Functions]
+===[ Functions ]
 
-====[fn all_config_specs]
+====[ fn all_config_specs ]
 
 Returns the runtime specifications of all registered configuration groups.
 
-==[Module tree]
+==[ Module tree ]
 
 AST tree normalization and path-based lookup utilities for configuration.
 
-===[Functions]
+===[ Functions ]
 
-====[fn get_path]
+====[ fn get_path ]
 
 Traverses nested `Value::Map` nodes along `path`, returning the referenced value if found.
 
-====[fn collect_paths]
+====[ fn collect_paths ]
 
 Reads a declared list of paths. A single string is accepted as a
 one-element list shorthand.
 
-====[fn merge_entry]
+====[ fn merge_entry ]
 
 Recursively merges `key` and `value` into `target`, normalizing dotted keys
 into hierarchical `Value::Map` entries while preserving flat keys for `meta`.
 
-==[Structs]
+==[ Structs ]
 
-===[struct Config]
+===[ struct Config ]
 
 Full Tomet document / vault configuration.
 
-==[Type Aliases]
+==[ Type Aliases ]
 
-===[type PrinterConfig]
+===[ type PrinterConfig ]
 
 Type alias for backward compatibility with earlier code referencing `PrinterConfig`.

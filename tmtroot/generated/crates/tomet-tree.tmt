@@ -1,12 +1,15 @@
 ::kind(api)
+::meta(
+  crate:        tomet-tree
+  dependencies: list(tomet-ast, tomet-ast-parser, tomet-span)
+  dependents:   list(tomet-address, tomet-ast-parser, tomet-cli, tomet-config, tomet-convert-standalone, tomet-cst-parser, tomet-declaration, tomet-deps, tomet-edit, tomet-expr, tomet-extract, tomet-formatter, tomet-html, tomet-indexer, tomet-links, tomet-lowering, tomet-lsp, tomet-markdown, tomet-pandoc, tomet-printer, tomet-search, tomet-semantics, tomet-spec, tomet-stats, tomet-style, tomet-tests, tomet-tome, tomet-transform, tomet-typst, tomet-validator-blueprint, tomet-validator-core, tomet-validator-profile, tomet-validator-rule, tomet-vault, tomet-workspace)
+)
 
-::meta(crate: tomet-tree, dependencies: list(tomet-ast, tomet-ast-parser, tomet-span), dependents: list(tomet-address, tomet-ast-parser, tomet-cli, tomet-config, tomet-convert-standalone, tomet-cst-parser, tomet-declaration, tomet-deps, tomet-edit, tomet-expr, tomet-extract, tomet-formatter, tomet-html, tomet-indexer, tomet-links, tomet-lowering, tomet-lsp, tomet-markdown, tomet-pandoc, tomet-printer, tomet-search, tomet-semantics, tomet-spec, tomet-stats, tomet-style, tomet-tests, tomet-tome, tomet-transform, tomet-typst, tomet-validator-blueprint, tomet-validator-core, tomet-validator-profile, tomet-validator-rule, tomet-vault, tomet-workspace))
-
-=[tomet-tree]
+=[ tomet-tree ]
 
 AST node accessors, extension traits, builders, and recursive tree traversal for Tomet.
 
-==[Single Source of Truth for Traversal]
+==[ Single Source of Truth for Traversal ]
 
 AST tree traversal must never be reimplemented by handwritten recursion in downstream
 crates. All structural walks across the workspace route through [`children`] and [`walk()`]
@@ -22,41 +25,41 @@ Provides:
 - (FileExt) Block-level manipulation helpers on [`tomet_ast::File`].
 - (walk) One definition of what sits inside what ([`children`]), the one recursion over it ([`walk()`]), and the walkers built on that.
 
-==[Module element]
+==[ Module element ]
 
 Extension traits, property helpers, and constructors for [`tomet_ast::Element`], [`tomet_ast::Declaration`] and [`tomet_ast::Data`].
 
-===[Traits]
+===[ Traits ]
 
-====[trait ElementExt]
+====[ trait ElementExt ]
 
 Extension trait providing accessors, attribute manipulations, and inspections on [`Element`].
 
-====[trait DataExt]
+====[ trait DataExt ]
 
 Extension trait providing property access on [`Data`]: what every node that
 carries `(args)` and a `{value}` group shares, so an element, a declaration,
 a section and a connect read and write their properties the same way.
 
-===[Functions]
+===[ Functions ]
 
-====[fn element_new]
+====[ fn element_new ]
 
 Creates a new [`Element`] with given `name` and default empty fields.
 
 The placement is [`Placement::Inline`]; a caller building a block uses
 [`ElementExt::with_placement`], and the parser sets it from position.
 
-====[fn declaration_new]
+====[ fn declaration_new ]
 
 Creates a new [`Declaration`] named with the bare name `name` and every
 group empty.
 
-====[fn list]
+====[ fn list ]
 
 A list constructor (ordered if `ordered`, i.e. `-.`, else `-`).
 
-====[fn list_item]
+====[ fn list_item ]
 
 A list item constructor. `name` is `None` for a plain `- content` item, or
 the element's name for the `-@name(...)` combine form -- which takes the
@@ -68,29 +71,29 @@ reads for, and silently dropping it here would repeat the exact bug
 `connects` used to have (a full-form list item's parsed connects were
 read and then thrown away at this exact spot).
 
-==[Module file]
+==[ Module file ]
 
 Extension trait and block manipulation helpers for [`tomet_ast::File`].
 
-===[Traits]
+===[ Traits ]
 
-====[trait FileExt]
+====[ trait FileExt ]
 
 Extension trait providing block-level operations on [`File`].
 
-==[Module value]
+==[ Module value ]
 
 Extension trait and helpers for [`tomet_ast::Value`].
 
-===[Traits]
+===[ Traits ]
 
-====[trait ValueExt]
+====[ trait ValueExt ]
 
 Extension trait providing accessors and inspections on [`Value`].
 
-===[Functions]
+===[ Functions ]
 
-====[fn scalar_string]
+====[ fn scalar_string ]
 
 The flat string a value projects to, joining sequences with `", "`, or `None` when it cannot project.
 
@@ -98,7 +101,7 @@ Bare scalars delegate to [`Value::scalar_text`]; `Value::Null` projects to an em
 Sequences project if every element projects. Structured nodes (`Map`, `Call`, `Element`, `Blocks`,
 `Interp`, `Hole`) return `None`.
 
-==[Module walk]
+==[ Module walk ]
 
 One definition of what sits inside what in a [`File`], and the walkers built on it.
 
@@ -119,13 +122,13 @@ The one exception to "one recursion" is the mutable walk ([`for_each_element_mut
 [`children`], so it lists the children again, and `tests/walk_coverage.rs` holds the two to the
 same reach.
 
-===[Enums]
+===[ Enums ]
 
-====[enum Place]
+====[ enum Place ]
 
 Where a node sits in the node that holds it.
 
-====[enum Node]
+====[ enum Node ]
 
 A borrowed reference to any vertex of a file's AST ([`Declaration`], [`Block`], [`Inline`],
 [`Value`], [`Entry`], [`Connect`], [`ListItem`], [`List`]).
@@ -138,13 +141,13 @@ An element is not a node of its own: it is the `Block`, `Inline`, `Value` or `En
 as (see [`Node::element`] and [`Node::element_view`]). A list at the top of a file is a `Block`;
 the list nested in an item is a [`Node::List`].
 
-====[enum Visit]
+====[ enum Visit ]
 
 What a walk does after it has been shown a node.
 
-===[Functions]
+===[ Functions ]
 
-====[fn children]
+====[ fn children ]
 
 Calls `f` for every node sitting directly in `node`, with the [`Place`] it sits in.
 
@@ -153,16 +156,16 @@ This is the one place that says what is inside what. A section holds its title, 
 entries and `[content]` blocks; an element or a hole inside a block, a line of text, a value
 or an entry holds what the element or hole holds.
 
-====[fn walk]
+====[ fn walk ]
 
 Shows `f` every node of `file`, each before what it holds, in document order, and goes into
 what `f` answers [`Visit::Descend`] to. [`Visit::Break`] stops the walk and is handed back.
 
-====[fn walk_node]
+====[ fn walk_node ]
 
 [`walk`] from one node, which sits in `place`.
 
-====[fn walk_node_scoped]
+====[ fn walk_node_scoped ]
 
 [`walk_node`] that also says when it is done with a node.
 
@@ -178,57 +181,57 @@ inline element holds; a visitor that is only shown entries cannot tell which par
 in, and could only guess it from the order it was shown things in. This is still the one
 recursion: [`walk_node`] is this with a `leave` that does nothing.
 
-====[fn for_each_node]
+====[ fn for_each_node ]
 
 Visits every node of `file` in document order, each before what it holds, wherever it sits:
 running text, section titles, `:connect`s, and inside a [`Value`] (`Seq`, `Map`, `Call`, a
 nested element, `[...]` blocks). It is the walk that skips nothing.
 
-====[fn for_each_element]
+====[ fn for_each_element ]
 
 Traverses all elements in `file` in document order and executes `f` for each.
 
 An element in a `:connect` is not reached.
 
-====[fn for_each_inline]
+====[ fn for_each_inline ]
 
 Traverses every [`Inline`] in `file` in document order: paragraph content, section titles and
 every `[content]`. An `Inline::Element` is itself passed to `f`, and then descended into.
 
-====[fn for_each_list_item]
+====[ fn for_each_list_item ]
 
 Visits every [`ListItem`] in `file`, in document order, at any depth: a list item is not an
 [`Element`], so [`for_each_element`] never passes one.
 
-====[fn for_each_list]
+====[ fn for_each_list ]
 
 Visits every [`List`] in `file`, in document order: those standing as a block, wherever the
 block is, and the ones nested in a list item.
 
-====[fn for_each_section]
+====[ fn for_each_section ]
 
 Visits every [`Section`] in `file`, in document order, including ones nested under another
 section's body or in an element's content: a heading's own `:name(...)` connect is checked
 against its `blocks` ([`for_each_descendant_in_blocks`]) the way an element's connect is
 checked against its own content.
 
-====[fn for_each_interpolation]
+====[ fn for_each_interpolation ]
 
 Visits every [`Interpolation`] in `file`, in document order, wherever it sits.
 
 An interpolation is not an [`Element`], so the element walkers never pass one to their
 visitor; this is the walker to ask for "every `${...}` in the document".
 
-====[fn for_each_declaration]
+====[ fn for_each_declaration ]
 
 Visits every [`Declaration`] in `file`, in document order, wherever it sits.
 
-====[fn for_each_hole]
+====[ fn for_each_hole ]
 
 Visits every [`Hole`] in `file`, in document order, wherever it sits: as a block, in running
 text, as an entry of a `{...}` group or as a value.
 
-====[fn for_each_top_level_element]
+====[ fn for_each_top_level_element ]
 
 Visits every element a reader would find by scanning only the top of the file, in
 document order: every `Block::Element`, and every `Inline::Element` sitting directly in a
@@ -239,47 +242,47 @@ This is the one place that decision lives. A caller that wants "the elements at 
 this file" should call this instead of walking `file.body` by hand. Declarations are in
 `file.header`.
 
-====[fn for_each_descendant]
+====[ fn for_each_descendant ]
 
 What is nested in `el`: its `[content]` and the elements that are entries of its `{value}`.
 With `direct_only`, only the first level.
 
 Neither `el.args` nor `el.connects` is looked at; see `descendants` for why.
 
-====[fn for_each_descendant_of_item]
+====[ fn for_each_descendant_of_item ]
 
 [`for_each_descendant`] for a list item: what is nested in its content and in its `{value}`
 group, not its `sublist` and not its `(args)` marker.
 
-====[fn for_each_descendant_in_blocks]
+====[ fn for_each_descendant_in_blocks ]
 
 Every descendant reachable from `blocks`, in document order: [`for_each_descendant`]'s own
 `content` handling for any block sequence (a [`Section`]'s `blocks` has the same shape), so a
 heading's own `:rule(...)` can check what sits @em[under] the heading.
 
-====[fn for_each_item_descendant]
+====[ fn for_each_item_descendant ]
 
 [`for_each_descendant_in_blocks`] for a list's own items: what a list's own `:rule(allow:...)`
 checks against. `direct_only` means just the items themselves, not what is inside each one.
 
-====[fn for_each_element_mut]
+====[ fn for_each_element_mut ]
 
 Traverses all elements in `file` mutably in document order and executes `f` for each in place.
 It reaches what [`for_each_element`] reaches, in the same order: an element in a `:connect` is
 not reached.
 
-====[fn for_each_declaration_mut]
+====[ fn for_each_declaration_mut ]
 
 Traverses all declarations in `file` mutably in document order and executes `f` for each in place.
 
-====[fn for_each_id_mut]
+====[ fn for_each_id_mut ]
 
 Hands `f` the `#(id)` of every node of `file` that can carry one (an element, a declaration, a
 section, a list, a list item, a bare entry), with the node's span, in document order, each node
 before what it holds. It goes into `:connect`s too, as [`for_each_node`] does; the nodes it
 reaches are those for which [`Node::id`] answers.
 
-====[fn for_each_interpolation_in_value]
+====[ fn for_each_interpolation_in_value ]
 
 Visits every [`Interpolation`] under `value`, in document order, wherever it sits: the value
 itself, an element's `(args)` and `{value}` entries, running text and blocks of a `[...]`.
@@ -288,7 +291,7 @@ Unlike [`for_each_descendant_in_blocks`] this goes into `(args)` and the values 
 `key: value` entries, because here the question is "what is written anywhere in this value", and
 not "what does this element hold". `:connect`s are reached, as [`for_each_node`] reaches them.
 
-====[fn fill_interpolations]
+====[ fn fill_interpolations ]
 
 Replaces, in place, each interpolation under `value` that `fill` has a value for. It is shown
 them in the order [`for_each_interpolation_in_value`] shows them, and an interpolation it answers
@@ -307,34 +310,34 @@ it has;
 A value with no scalar text (a map, a list) has no place in text, so there the interpolation is
 left as written too.
 
-==[Functions]
+==[ Functions ]
 
-===[fn element_get_attr]
+===[ fn element_get_attr ]
 
-===[fn element_get_attr_mut]
+===[ fn element_get_attr_mut ]
 
-===[fn element_has_prop_key]
+===[ fn element_has_prop_key ]
 
-===[fn element_set_prop]
+===[ fn element_set_prop ]
 
-===[fn element_rename_prop_key]
+===[ fn element_rename_prop_key ]
 
-===[fn element_replace_prop_value]
+===[ fn element_replace_prop_value ]
 
-===[fn element_remove_prop]
+===[ fn element_remove_prop ]
 
-===[fn element_transform_prop]
+===[ fn element_transform_prop ]
 
-===[fn element_attrs_view]
+===[ fn element_attrs_view ]
 
-===[fn element_attrs_mut]
+===[ fn element_attrs_mut ]
 
-===[fn insert_block_at]
+===[ fn insert_block_at ]
 
-===[fn remove_block_at]
+===[ fn remove_block_at ]
 
-===[fn replace_block_at]
+===[ fn replace_block_at ]
 
-===[fn find_block_index]
+===[ fn find_block_index ]
 
-===[fn find_element_block_index]
+===[ fn find_element_block_index ]

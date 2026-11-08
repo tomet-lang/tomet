@@ -9,7 +9,7 @@
 タグは要素として、引数に名前を並べて書く。
 
 ```tmt
-@tag(rust, parser)
+`` @tag(rust, parser)
 ```
 
 内容に書く `@tag[rust]` も同じタグを表す。

@@ -7,13 +7,13 @@ Tometの仕様、Markdownの基本的な記法
 言語を制御するうえで必要な語彙
 
 ```tm
-::version
-::meta
-::config
-::settings
-::kind
-::blueprint
-::vocabulary
+`` ::version
+`` ::meta
+`` ::config
+`` ::settings
+`` ::kind
+`` ::blueprint
+`` ::vocabulary
 ```
 
 ---[ Expression ]---
@@ -21,14 +21,14 @@ Tometの仕様、Markdownの基本的な記法
 構造を作る。
 
 ```tm
-@heading     | #
-@list        | - -.
-@link
-@embed
-@codeblock   | ```
-@callout
-@card
-@task
+`` @heading     | #
+`` @list        | - -.
+`` @link
+`` @embed
+`` @codeblock   | ```
+`` @callout
+`` @card
+`` @task
 ```
 
 ---[ Literal ]---
@@ -36,12 +36,12 @@ Tometの仕様、Markdownの基本的な記法
 文字の見た目や挙動
 
 ```tm
-@em          | *x*
-@strikeout   | ~~x~~
-@mark        | ==x==
-@fence       | `x`
-@quote
-@ruby
+`` @em          | *x*
+`` @strikeout   | ~~x~~
+`` @mark        | ==x==
+`` @fence       | `x`
+`` @quote
+`` @ruby
 ```
 
 ---[ Vocabulary ]---
@@ -49,8 +49,8 @@ Tometの仕様、Markdownの基本的な記法
 その文字の役割を明確化する
 
 ```tm
-@file
-@dir
+`` @file
+`` @dir
 ```
 
 ---[ Output source ]---
@@ -58,7 +58,7 @@ Tometの仕様、Markdownの基本的な記法
 エクスポートしたソースを読む人に宛てる。描画された文書には現れない。
 
 ```tm
-@comment
+`` @comment
 ```
 
 =[ Doc vocabulary ]
@@ -66,8 +66,8 @@ Tometの仕様、Markdownの基本的な記法
 Tometは構文を持つが、実際の振る舞いはアプリに任せる。
 
 ```tm
-@doc.icon
-@doc.index
+`` @doc.icon
+`` @doc.index
 ```
 
 =[ Experimental ]
@@ -75,24 +75,24 @@ Tometは構文を持つが、実際の振る舞いはアプリに任せる。
 現在試験的に入れいているもので、今後記法が変わる場合がある。
 
 ```tm
-@table
-@id
-@links
-@fixme
-@draft
-@conflict
+`` @table
+`` @id
+`` @links
+`` @fixme
+`` @draft
+`` @conflict
 ```
 
 =[ Draft ]
 
 ```tm
-@crate
-@todo
-@tree
-@tag
-@doc.latex
-@doc.typst
-@foot
-@language
-@grid
+`` @crate
+`` @todo
+`` @tree
+`` @tag
+`` @doc.latex
+`` @doc.typst
+`` @foot
+`` @language
+`` @grid
 ```

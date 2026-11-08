@@ -1,8 +1,11 @@
 ::kind(api)
+::meta(
+  crate:        tomet-typst
+  dependencies: list(tomet-ast, tomet-ast-parser, tomet-printer, tomet-semantics, tomet-tree)
+  dependents:   list(tomet, tomet-cli, tomet-tests)
+)
 
-::meta(crate: tomet-typst, dependencies: list(tomet-ast, tomet-ast-parser, tomet-printer, tomet-semantics, tomet-tree), dependents: list(tomet, tomet-cli, tomet-tests))
-
-=[tomet-typst]
+=[ tomet-typst ]
 
 `tomet_ast::File` -> Typst markup source, hand-written (same
 reasoning as `tomet-convert-markdown`: the output space is much

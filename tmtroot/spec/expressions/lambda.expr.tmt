@@ -8,8 +8,8 @@
 =[ 形 ]
 
 ```tm
-d => d::meta.tags.contains("rust")
-(a, b) => a >= b
+`` d => d::meta.tags.contains("rust")
+`` (a, b) => a >= b
 ```
 
 - 引数が1つのときは括弧を省ける。複数のときは括弧で囲む。

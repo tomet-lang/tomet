@@ -4,7 +4,7 @@
 =[ 全容 ]
 
 ```tm
-::id(std.config)
+`` ::id(std.config)
 ```
 
 この文書の識別子を宣言する。引数は一つで、`.` も名前の一部（`std.config`）。`::id(id: std.config)` とも書ける。
@@ -20,8 +20,8 @@
 `::meta(id: ...)` は旧い書き方。tomet 自身が読む文書の性質は `::meta` から出ていて（種別が `::kind` になったのと同じ）、`id` もその一つ。`::meta` に書くと `tomet check` が報告する。手元の文書を移すには:
 
 ```bash
-tomet refactor --check --meta-id .   # 残っている箇所を数える
-tomet refactor --in-place --meta-id .
+`` tomet refactor --check --meta-id .   # 残っている箇所を数える
+`` tomet refactor --in-place --meta-id .
 ```
 
 =[ 型の検査 ]

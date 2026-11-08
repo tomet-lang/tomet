@@ -11,8 +11,8 @@ Status: 2026-11-11 の議論で、作者が決めたことだけを書く。AI �
 ==[ 型の席 ]
 
 ```tmt
-<$date(default: auto)>
-<$list(string, length: 6)>
+`` <$date(default: auto)>
+`` <$list(string, length: 6)>
 ```
 
 - 印は `$`。引数は `()` だけに書く。`{}` は使わない。
@@ -32,10 +32,10 @@ Status: 2026-11-11 の議論で、作者が決めたことだけを書く。AI �
 - ゲートが中身の役割を決める。ゲートの中の印が、中身の言語を切り替える。
 
 ```tm
-{$ a + b }
-<$list(string)>
-$(var)
-$name(args)
+`` {$ a + b }
+`` <$list(string)>
+`` $(var)
+`` $name(args)
 ```
 
 - 式の展開は `{$ expr }`。閉じの印は付けない。`{}` は map に明け渡す。`<$type>` と対称になる。
@@ -48,8 +48,15 @@ $name(args)
 
 ==[ blueprint ]
 
-- 既存の文書に blueprint を適用する操作は `apply`。
-- `overwrite` は blueprint の機能。席の引数として持つ。作者は「たぶんそう」と答えた暫定。
+- 既存の文書に blueprint を適用する操作は `apply`（CLI は `tomet apply <path>`、文書の `::kind` から blueprint を引く。kind が無い文書向けに `--kind` / `--blueprint` 指定も可）。
+- ID のポリシーは blueprint の `::id(<$uuid(default: auto)>)` や `::id(<$nanoid(length: 8, prefix: "note-", default: auto, overwrite: true)>)` のように型の席で宣言する。ID を持たない kind の blueprint には `::id` を書かず、「blueprint に `::id` がある＝ID が必須」とする（旧 `force` 設定は不要）。
+- `overwrite: bool` は型の席の引数として持つ。`apply` の際、既存の値がその席の型の形式を満たしていないとき、`overwrite: true` であれば席の `default`（`auto` 含む）で上書きし、形式を満たしていればそのまま維持する（`overwrite` が無いか `false` なら既存の値は変えない）。
+- `apply` が既存文書に対して行うこと：
+  - blueprint の `::id` や `::meta` にある項目のうち、既存文書に欠けているものを追加し、席の `default`（`auto` 含む）や固定値で埋める。
+  - 既存の `::id` / `::meta` 項目は維持し、`overwrite: true` かつ型不適合のときだけ席の `default`（`auto`）で置き換える。
+  - 欠けている必須セクション見出し（`RequiredSection`）があれば末尾に補い、既存の本文には手をつけない。
+- Vault 設定の `::field(id: ...)` による ID 生成設定と `tomet_printer::ensure_document_id_with_config` は廃止し、`from-md` 等の変換時には勝手に ID を振らない。
+- `tomet-validator-blueprint`（`tomet check` / LSP）は、必須キーの有無だけでなく、`::id` および `::meta` の各キーの値が blueprint の席の型（`Type`）を満たしているかも静的に検査する。
 - 後方互換は付けない。
 - `::var` は今は触らない。`::field` は要らなくなる可能性がある。
 - この件では、`%` と `!` は使わない。

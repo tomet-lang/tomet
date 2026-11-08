@@ -1,8 +1,11 @@
 ::kind(api)
+::meta(
+  crate:        tomet-merge
+  dependencies: list(tomet-ast-parser, tomet-cst, tomet-cst-parser, tomet-edit)
+  dependents:   list(tomet)
+)
 
-::meta(crate: tomet-merge, dependencies: list(tomet-ast-parser, tomet-cst, tomet-cst-parser, tomet-edit), dependents: list(tomet))
-
-=[tomet-merge]
+=[ tomet-merge ]
 
 Format-preserving three-way merge and conflict resolution for Tomet
 documents, built on [`tomet_edit::EditDoc`].

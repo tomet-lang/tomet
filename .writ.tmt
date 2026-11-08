@@ -146,7 +146,7 @@ Each source says so in its own output, from the macro rather than by
 hand:
 
 ```tmt
-$macro.generated_by(self::path)
+`` $macro.generated_by(self::path)
 ```
 
 `.gitattributes` marks `/AGENTS.md` and `/README.ja.md`
@@ -242,7 +242,7 @@ the search already accepts.
 ---[ Guard ]---
 
 ```bash
-git ls-files --others --ignored --exclude-standard .tomet
+`` git ls-files --others --ignored --exclude-standard .tomet
 ```
 
 Empty while nothing under @dir(.tomet/) is ignored. It catches the failure
@@ -260,11 +260,11 @@ A blueprint declares what it is, what it targets, and what it says about
 itself -- in that order, in the three slots every element has.
 
 ```tmt
-::kind(blueprint)
-::blueprint(writ){
-  version: "1.0.0"
-  description: "twrit"
-}
+`` ::kind(blueprint)
+`` ::blueprint(writ){
+``   version: "1.0.0"
+``   description: "twrit"
+`` }
 ```
 
 `::kind(blueprint)` is written, never inferred from `::blueprint` being

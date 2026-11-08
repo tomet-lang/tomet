@@ -1,7 +1,7 @@
 =[ Experimental ]
 
 ```tm
-:as()
-:rule()
-:section()
+`` :as()
+`` :rule()
+`` :section()
 ```

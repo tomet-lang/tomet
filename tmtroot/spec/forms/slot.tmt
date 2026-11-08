@@ -30,9 +30,9 @@
 箱にならない例を挙げる。
 
 ```
-a < b          x<=1          <->          <3>          <a b>
-<!doctype html>          </x>          <x/>
-<?int          <? int>          a<b と c>d
+`` a < b          x<=1          <->          <3>          <a b>
+`` <!doctype html>          </x>          <x/>
+`` <?int          <? int>          a<b と c>d
 ```
 
 HTML っぽい形(`<!xxx>`、`</xxx>`、`<xxx/>`)は、箱ではなく、文字として残る。エラーも出ない。

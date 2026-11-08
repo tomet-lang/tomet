@@ -1,9 +1,5 @@
 {
-  "pandoc-api-version": [
-    1,
-    23,
-    1
-  ],
+  "pandoc-api-version": [1, 23, 1],
   "meta": {
     "icon": {
       "t": "MetaString",
@@ -138,11 +134,7 @@
       "t": "Header",
       "c": [
         1,
-        [
-          "",
-          [],
-          []
-        ],
+        ["", [], []],
         [
           {
             "t": "Str",
@@ -242,9 +234,7 @@
       "c": [
         [
           "",
-          [
-            "tomet-item"
-          ],
+          ["tomet-item"],
           [
             [
               "tomet-data",
@@ -260,9 +250,7 @@
       "c": [
         [
           "",
-          [
-            "tomet-item"
-          ],
+          ["tomet-item"],
           [
             [
               "tomet-data",
@@ -336,9 +324,7 @@
       "c": [
         [
           "",
-          [
-            "tomet-item"
-          ],
+          ["tomet-item"],
           [
             [
               "tomet-data",
@@ -405,14 +391,9 @@
       "c": [
         [
           "",
+          ["tomet-item"],
           [
-            "tomet-item"
-          ],
-          [
-            [
-              "numbered",
-              "a, b"
-            ],
+            ["numbered", "a, b"],
             [
               "tomet-data",
               "{\"args\":{\"ordered\":{\"1\":\"a\",\"0\":\"b\"},\"status\":{\"404\":\"x\",\"500\":\"y\"},\"numbered\":[\"a\",\"b\"]}}"

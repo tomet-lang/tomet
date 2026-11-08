@@ -1,10 +1,13 @@
 ::kind(api)
+::meta(
+  crate:        tomet-address
+  dependencies: list(tomet-ast, tomet-ast-parser, tomet-span, tomet-tree)
+  dependents:   list(tomet-deps, tomet-edit, tomet-links, tomet-lsp, tomet-semantics, tomet-stats, tomet-validator-core)
+)
 
-::meta(crate: tomet-address, dependencies: list(tomet-ast, tomet-ast-parser, tomet-span, tomet-tree), dependents: list(tomet-deps, tomet-edit, tomet-links, tomet-lsp, tomet-semantics, tomet-stats, tomet-validator-core))
+=[ tomet-address ]
 
-=[tomet-address]
-
-==[tomet-address]
+==[ tomet-address ]
 
 What a link or an element points at, recognized without ever touching
 disk: the scheme of a link target ([`Address`], [`is_explicit_scheme`]),

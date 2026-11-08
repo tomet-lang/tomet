@@ -8,7 +8,7 @@
 =[ 形 ]
 
 ```tm
-<文書>#<文書内アドレス>
+`` <文書>#<文書内アドレス>
 ```
 
 `#` は、文書とその中を分ける境目。リンクの `tmt:docs/a.tmt#intro` と同じ意味を持つ。
@@ -18,10 +18,10 @@
 - 右は、一意アドレス `#(x)` / `#x` と、その後ろに続くステップ。
 
 ```tm
-${#intro.tags}
-${self#intro.tags}
-${tmt("docs/a.tmt")#intro.tags.item(2)}
-${tmt("docs/a.tmt")}
+`` ${#intro.tags}
+`` ${self#intro.tags}
+`` ${tmt("docs/a.tmt")#intro.tags.item(2)}
+`` ${tmt("docs/a.tmt")}
 ```
 
 右を省く（`#` ごと書かない）と、文書全体を指す。
@@ -45,10 +45,10 @@ ${tmt("docs/a.tmt")}
 リンクで使う書き方 `tmt:docs/a.tmt#intro` を、式の中で書く。
 
 ```tm
-${addr(tmt:docs/a.tmt#intro)}
-${addr(tmt:docs/a.tmt#intro.tags.item(2))}
-${addr("tmt:docs/a (copy).tmt#intro")}
-${#note.source.addr().title}
+`` ${addr(tmt:docs/a.tmt#intro)}
+`` ${addr(tmt:docs/a.tmt#intro.tags.item(2))}
+`` ${addr("tmt:docs/a (copy).tmt#intro")}
+`` ${#note.source.addr().title}
 ```
 
 - `addr(` の直後から、対応する `)` までを、生の文字列として読む。`:`、`.`、`-`、`/` は式の記号として解釈されない。`@link` に書いたアドレスをそのまま貼れる。
@@ -65,7 +65,7 @@ ${#note.source.addr().title}
 プロパティなどに文字列で持たせたアドレスは、文字列のメソッド `.addr()` で辿る。`addr(...)` と同じ規則で文字列を解釈して、文書、要素、値を返す。
 
 ```tm
-${#note.source.addr().title}
+`` ${#note.source.addr().title}
 ```
 
 `addr(...)` はソースに書かれたアドレス、`.addr()` は実行時に得た文字列。見た目が同じ文字の並びでも、混同されない。解釈できない文字列はエラー。

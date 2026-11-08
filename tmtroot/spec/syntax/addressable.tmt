@@ -3,7 +3,7 @@
 =[ 形 ]
 
 ```
-<文書>#<文書内アドレス>
+`` <文書>#<文書内アドレス>
 ```
 
 `#` の左側が文書、右側がその文書の中の要素や値。右側を省くと文書全体を指す。
@@ -14,7 +14,7 @@
 - `ref:target`。ノート名や識別子による参照。
 
 ```
-tmt:docs/spec/syntax.tmt#intro
+`` tmt:docs/spec/syntax.tmt#intro
 ```
 
 左が `tmt:` スキームの文書パス、右が `#intro` で文書内の要素アンカーを指す。
@@ -30,7 +30,7 @@ tmt:docs/spec/syntax.tmt#intro
 `file:` `dir:` `https:` は `#` 以降を持たない。文書の中を指したいときは、`tmt:` か `ref:` を左に置く。
 
 ```
-tmt:docs/spec/syntax.tmt#intro
+`` tmt:docs/spec/syntax.tmt#intro
 ```
 
 =[ 文書内アドレス ]
@@ -38,12 +38,12 @@ tmt:docs/spec/syntax.tmt#intro
 式 `${}` やリンク内アドレスにおいて、一意アドレス `#id` を起点にプロパティや子要素を辿る。式の中での書き方（文書の値、`#` の左側、`addr(...)`）は @file(tmtroot/spec/expressions/address.expr.tmt)。式の中では、`#` を付けない裸の `${intro}` は書けない。
 
 ```
-#intro                          一意アドレス
-#intro.tags                     intro の tags プロパティ
-#intro.tags.item(2)             tags リストの 3 番目の要素
-#intro::id                      intro 自身の ID（`.id` なら、引数にユーザーが書いた id）
-#intro.item(2)                  intro の 3 番目の子ブロック
-#item(0).item(1)                ルートからの絶対位置
+`` #intro                          一意アドレス
+`` #intro.tags                     intro の tags プロパティ
+`` #intro.tags.item(2)             tags リストの 3 番目の要素
+`` #intro::id                      intro 自身の ID（`.id` なら、引数にユーザーが書いた id）
+`` #intro.item(2)                  intro の 3 番目の子ブロック
+`` #item(0).item(1)                ルートからの絶対位置
 ```
 
 ==[ ステップとプロパティ ]
@@ -66,11 +66,11 @@ tmt:docs/spec/syntax.tmt#intro
 タプルの値の中は、`.key` の後ろに `item(n)` をつないで指す。添字は 0 始まり。
 
 ```
-@card(tags: (a, b, c)) #(intro)
-
-${#intro.tags}                 (a, b, c) を指す
-${#intro.tags.item(2)}         c を指す
-${#intro.tags.item(2)}        関数呼び出し記法（等価）
+`` @card(tags: (a, b, c)) #(intro)
+``
+`` ${#intro.tags}                 (a, b, c) を指す
+`` ${#intro.tags.item(2)}         c を指す
+`` ${#intro.tags.item(2)}        関数呼び出し記法（等価）
 ```
 
 ==[ 絶対アドレス ]
@@ -102,11 +102,11 @@ ${#intro.tags.item(2)}        関数呼び出し記法（等価）
 - ユーザーが定義するユニークプロパティも、`#(x)` と同じ仕組みでアドレスに使える。どのプロパティが一意かは `.settings`（`default.config.tmt`）で宣言する。
 
 ```
-::config(
-  meta: (
-    isbn: ( type: string, unique: true )
-  )
-)
+`` ::config(
+``   meta: (
+``     isbn: ( type: string, unique: true )
+``   )
+`` )
 ```
 
 `default.config.tmt` の `meta:` の欄に、`unique: true` を書く。

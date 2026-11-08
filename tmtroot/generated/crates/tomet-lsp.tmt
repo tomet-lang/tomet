@@ -1,8 +1,11 @@
 ::kind(api)
+::meta(
+  crate:        tomet-lsp
+  dependencies: list(cotomet, cotomet-eval, tomet-address, tomet-ast, tomet-ast-parser, tomet-cst, tomet-cst-parser, tomet-declaration, tomet-expr, tomet-formatter, tomet-load, tomet-load-config, tomet-position, tomet-semantics, tomet-span, tomet-tree, tomet-validator)
+  dependents:   list()
+)
 
-::meta(crate: tomet-lsp, dependencies: list(cotomet, cotomet-eval, tomet-address, tomet-ast, tomet-ast-parser, tomet-cst, tomet-cst-parser, tomet-declaration, tomet-expr, tomet-formatter, tomet-load, tomet-load-config, tomet-position, tomet-semantics, tomet-span, tomet-tree, tomet-validator), dependents: list())
-
-=[tomet-lsp]
+=[ tomet-lsp ]
 
 Language server library for Tomet (`tomet-lsp`).
 Provides diagnostics (what the text alone says, and what `tomet check`
@@ -10,19 +13,19 @@ says of a document in its vault), document formatting, hover, document
 symbols, goto definition, and completions. A standalone cotomet file
 (`.ctmt`) is served as data: see [`data`].
 
-==[Module completion]
+==[ Module completion ]
 
-===[Functions]
+===[ Functions ]
 
-====[fn completions_for]
+====[ fn completions_for ]
 
 Provides autocompletion items for elements, keywords, and builtin compute functions.
 
-====[fn completions_for_with_uri]
+====[ fn completions_for_with_uri ]
 
 Provides autocompletion items with document URI awareness for path completions.
 
-==[Module data]
+==[ Module data ]
 
 A standalone cotomet file (`.ctmt`) as the language server serves it.
 
@@ -31,77 +34,77 @@ the whitespace formatter formats it, and the features that read a document
 (hover, symbols, completion, folding, definition) have nothing to say. It
 never reaches the vault, which holds documents.
 
-===[Functions]
+===[ Functions ]
 
-====[fn is_data_uri]
+====[ fn is_data_uri ]
 
 Whether `uri` names a `.ctmt` file. The query and fragment are not part of
 the name.
 
-====[fn request_is_for_data]
+====[ fn request_is_for_data ]
 
 Whether a request's `params` are about a `.ctmt`: the document a request
 names is at `textDocument.uri` in all of them.
 
-====[fn data_diagnostics_for]
+====[ fn data_diagnostics_for ]
 
 What the cotomet parser and evaluator say of `text` as a standalone file.
 
 Returns parse errors, declaration errors, and expression evaluation errors,
 underlined at their locations in the source text.
 
-==[Module definition]
+==[ Module definition ]
 
-===[Functions]
+===[ Functions ]
 
-====[fn definition_for]
+====[ fn definition_for ]
 
 Provides Goto Definition target for reference links or interpolation
 expressions, from the text alone: the references to a node of the same
 document. One into another document needs the vault
 ([`Workspace::definition`](crate::Workspace::definition)).
 
-==[Module diagnostic]
+==[ Module diagnostic ]
 
-===[Functions]
+===[ Functions ]
 
-====[fn diagnostics_for]
+====[ fn diagnostics_for ]
 
 Parses `text` and produces diagnostics (both parse errors and CST validation rules).
 
-==[Module folding]
+==[ Module folding ]
 
 Provides folding ranges for sections, blocks, and comments in the editor.
 
-===[Functions]
+===[ Functions ]
 
-====[fn folding_ranges_for]
+====[ fn folding_ranges_for ]
 
 Computes folding ranges for the given document text.
 
-==[Module format]
+==[ Module format ]
 
-===[Functions]
+===[ Functions ]
 
-====[fn format_edits]
+====[ fn format_edits ]
 
 Formats the document using `tomet-formatter` with loaded or inferred configuration.
 
 A `.ctmt` is formatted by whitespace alone, whatever the config says, as
 `tomet format` does.
 
-====[fn resolve_effective_config]
+====[ fn resolve_effective_config ]
 
 Resolves the merged configuration for a document by combining:
 1. The vault config and the folder configs down to the document, already stacked
 (see `tomet_load_config`), for the macros and variables they declare
 2. The document's own `::macros` and `::vars` (highest precedence)
 
-==[Module hover]
+==[ Module hover ]
 
-===[Functions]
+===[ Functions ]
 
-====[fn hover_for]
+====[ fn hover_for ]
 
 Provides hover information for the symbol under the cursor, from the text
 alone.
@@ -110,22 +113,22 @@ An expression is evaluated against this one document and its settings, so
 what reaches for another file fails and says so. A document that has a
 vault is better served by [`hover_in`], with the vault's evaluation.
 
-====[fn hover_in]
+====[ fn hover_in ]
 
 [`hover_for`], with `evaluate` deciding what an expression comes to.
 
-===[Type Aliases]
+===[ Type Aliases ]
 
-====[type Evaluate]
+====[ type Evaluate ]
 
 What an expression comes to, for a hover: given the document it is written
 in, and the expression.
 
-==[Module position]
+==[ Module position ]
 
-===[Structs]
+===[ Structs ]
 
-====[struct TextPositions]
+====[ struct TextPositions ]
 
 Converts between byte offsets into one document's text and LSP positions
 (a 0-based line and a UTF-16 character offset within it).
@@ -134,19 +137,19 @@ Spans and parse errors carry byte offsets only. Build one of these per
 request, from the text the request is about, and pass it down: building it
 is one pass over the text, and every conversion after that is cheap.
 
-===[Functions]
+===[ Functions ]
 
-====[fn uri_to_file_path]
+====[ fn uri_to_file_path ]
 
-==[Module symbol]
+==[ Module symbol ]
 
-===[Functions]
+===[ Functions ]
 
-====[fn document_symbols_for]
+====[ fn document_symbols_for ]
 
 Provides document symbols for outline navigation in the editor.
 
-==[Module workspace]
+==[ Module workspace ]
 
 The vaults the open documents belong to, and the diagnostics that need one.
 
@@ -158,13 +161,13 @@ of that belongs to a vault. [`Workspace`] finds the vault of each open
 document the way the CLI does, from the file's own path, and asks it for
 the same findings `tomet check` reports.
 
-===[Structs]
+===[ Structs ]
 
-====[struct Workspace]
+====[ struct Workspace ]
 
 The open documents, and the vaults they are in.
 
-====[struct Debounce]
+====[ struct Debounce ]
 
 Waits until things have stopped changing: each [`touch`](Debounce::touch)
 pushes the moment back, and [`due`](Debounce::due) says when it has come.
@@ -172,9 +175,9 @@ pushes the moment back, and [`due`](Debounce::due) says when it has come.
 What a vault is asked for on every keystroke would be wasted work for a
 document being typed into, so it is done once the typing pauses.
 
-===[Functions]
+===[ Functions ]
 
-====[fn to_diagnostics]
+====[ fn to_diagnostics ]
 
 `findings` of the document with text `text`, as LSP diagnostics.
 

@@ -10,8 +10,8 @@
 式には2つの書き方がある。木としては同じもので、`$` が sigil、その後ろが式の本体。
 
 ```tm
-${self::meta.created.format("YYYY-MM-DD")}
-$include(addr(tmt:docs/a.tmt))
+`` ${self::meta.created.format("YYYY-MM-DD")}
+`` $include(addr(tmt:docs/a.tmt))
 ```
 
 - `${式}`: 波括弧で式を包む。

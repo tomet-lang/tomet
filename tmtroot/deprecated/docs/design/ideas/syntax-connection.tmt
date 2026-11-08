@@ -1,4 +1,5 @@
 ::kind(idea)
+
 =[ コネクト構文 ]
 
 ---[ `@T()[]{}:(){}` ]---
@@ -20,14 +21,14 @@
 という考えはどうだろうか？
 
 ```(tm)
-@references[
-  @id(asdf-asdf):(description: "詳しい説明を記入する？でも、データ内に改行アリで文章を書けるのが、Tometの一つの特徴であるから、要検討。追加概念が必要かもしれない。")
-  @id(asdf-asdf):[
-    @description[ やるならおそらくこう。 ]
-  ]
-  @id(asdf-asd2):{tag: important}
-  <ids:[asdf-asdf, asdf-asd2]>:[ `:`は、新たなElementという認識が可能なため、idに複数値を設定して複数に同じものを共有させることが可能なのではなかろうか？ ]
-]
+`` @references[
+``   @id(asdf-asdf):(description: "詳しい説明を記入する？でも、データ内に改行アリで文章を書けるのが、Tometの一つの特徴であるから、要検討。追加概念が必要かもしれない。")
+``   @id(asdf-asdf):[
+``     @description[ やるならおそらくこう。 ]
+``   ]
+``   @id(asdf-asd2):{tag: important}
+``   <ids:[asdf-asdf, asdf-asd2]>:[ `:`は、新たなElementという認識が可能なため、idに複数値を設定して複数に同じものを共有させることが可能なのではなかろうか？ ]
+`` ]
 ```
 
 ==[ リスト構文に ]
@@ -35,9 +36,9 @@
 現在のリスト構文は、
 
 ```(tm)
-- () [ content ]{id: asdf-asdf}
-または、
-- () content {id: asdfasdf}となっている。 
+`` - () [ content ]{id: asdf-asdf}
+`` または、
+`` - () content {id: asdfasdf}となっている。 
 ```
 
 しかし、`@`や`@T`をトリガーとして囲い込みを行うという統一性のとれたTometにおいて、
@@ -45,5 +46,5 @@
 そこで、今回のコネクト構文の登場である。
 
 ```(tm)
-- () content :{id: asdf-asdf}
+`` - () content :{id: asdf-asdf}
 ```

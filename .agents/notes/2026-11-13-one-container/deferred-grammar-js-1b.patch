@@ -1,0 +1,49 @@
+diff --git a/crates/tree-sitter-tomet/grammar.js b/crates/tree-sitter-tomet/grammar.js
+index 0977443f..de807b38 100644
+--- a/crates/tree-sitter-tomet/grammar.js
++++ b/crates/tree-sitter-tomet/grammar.js
+@@ -882,11 +882,10 @@ module.exports = grammar({
+         ),
+       ),
+     // `{...}` is always data. Entries are read uniformly, each a
+-    // `key: value` pair, a bare `(marker)[content]` entry, or a named
+-    // element, in source order -- nothing here consults the enclosing
+-    // element's name. `@links(){ (1)[a] note: x (2)[b] }` and
+-    // `@element(c){ display: block @args(){ @param(id){} } }` are the two
+-    // shapes that needs.
++    // `key: value` pair or a named element, in source order -- nothing
++    // here consults the enclosing element's name.
++    // `@element(c){ display: block @args(){ @param(id){} } }` is the shape
++    // that needs.
+     //
+     value_group: ($) =>
+       seq(
+@@ -899,10 +898,8 @@ module.exports = grammar({
+         optional($._blank_gap),
+         "}",
+       ),
+-    // A `{...}` group's elements: bare `(args)[content]` entries whose
+-    // container supplies the type (`@links(){ (1)[...] (2)[...] }`), and
+-    // named ones (`@element(c){ @args(){ @param(id){} } }`), which is how
+-    // a vocabulary declares an element's slots.
++    // A `{...}` group's elements: named ones (`@element(c){ @args(){ @param(id){} } }`),
++    // which is how a vocabulary declares an element's slots.
+     //
+     // Pairs and elements in the *same* group are a shape the real
+     // parser takes and this rule does not -- see `KNOWN_TS_ERRORS`.
+@@ -911,14 +908,8 @@ module.exports = grammar({
+     // keyed `review`, and the lexer prefers `identifier` over a scalar.
+     children: ($) =>
+       repeat1(
+-        seq(optional($._blank_gap), choice($.bare_element, $.inline_element)),
++        seq(optional($._blank_gap), $.inline_element),
+       ),
+-    // Simplification: unlike `args_group`/`value_group`'s own internal
+-    // gaps, `content_group` here must immediately follow (inline whitespace
+-    // only, no blank-line tolerance) -- avoids an LR conflict where a
+-    // lone newline can't be told apart from "no content_group at all" with
+-    // only one token of lookahead.
+-    bare_element: ($) => seq($.args_group, optional($.content_group)),
+     // A group opener with no leading `:` at all -- what a connect's
+     // own body may take (see `connect`, below). Not the same list as
+     // `_element_group`'s (just below) because a connect's own groups

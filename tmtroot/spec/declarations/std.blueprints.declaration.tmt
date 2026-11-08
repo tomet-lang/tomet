@@ -4,8 +4,8 @@
 =[ 全容 ]
 
 ```tm
-::blueprint.writ(@file(tmtroot/schema/blueprints/writ.blueprint.tmt))
-::blueprint.crate(@file(tmtroot/schema/blueprints/crate.blueprint.tmt))
+`` ::blueprint.writ(@file(tmtroot/schema/blueprints/writ.blueprint.tmt))
+`` ::blueprint.crate(@file(tmtroot/schema/blueprints/crate.blueprint.tmt))
 ```
 
 この vault が使うブループリントのファイルを、名前をつけて登録する。ブループリントとは何かは @file(tmtroot/spec/features/blueprint.tmt)。

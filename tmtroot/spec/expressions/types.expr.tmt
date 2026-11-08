@@ -79,10 +79,10 @@
 記号以外の文字は、そのまま出る。`"YYYY年MM月DD日"` と書ける。大文字と小文字で、月（`MM`）と分（`mm`）を区別する。
 
 ```tm
-${self::meta.created.format("YYYY-MM-DD")}
-${generate.now().format("YYYY-MM-DD HH:mm")}
-${self::meta.created.at("Z").format("HH:mm")}
-${d::meta.created.year}
+`` ${self::meta.created.format("YYYY-MM-DD")}
+`` ${generate.now().format("YYYY-MM-DD HH:mm")}
+`` ${self::meta.created.at("Z").format("HH:mm")}
+`` ${d::meta.created.year}
 ```
 
 =[ まだ決まっていないこと ]

@@ -1,8 +1,11 @@
 ::kind(api)
+::meta(
+  crate:        tomet-vault
+  dependencies: list(tomet-ast, tomet-ast-parser, tomet-config, tomet-declaration, tomet-expr, tomet-search, tomet-semantics, tomet-span, tomet-transform, tomet-tree, tomet-type, tomet-validator)
+  dependents:   list(tomet, tomet-convert-standalone, tomet-edit, tomet-load)
+)
 
-::meta(crate: tomet-vault, dependencies: list(tomet-ast, tomet-ast-parser, tomet-config, tomet-declaration, tomet-expr, tomet-search, tomet-semantics, tomet-span, tomet-transform, tomet-tree, tomet-type, tomet-validator), dependents: list(tomet, tomet-convert-standalone, tomet-edit, tomet-load))
-
-=[tomet-vault]
+=[ tomet-vault ]
 
 A vault's config and vocabularies, and what can be done with them
 without touching the disk.
@@ -23,7 +26,7 @@ binding handed vocabulary text -- builds one directly with
 [`Vault::from_sources`] and gets the same verdicts, because both go
 through the same rules (`LoadedVocabularies::add` in `tomet-semantics`).
 
-==[A document that reads alone]
+==[ A document that reads alone ]
 
 A document that declares `::profile(standalone)` is read as if the vault held nothing: the
 macros and variables, the `type:` of a metadata field, the vocabularies, the dictionaries and
@@ -33,7 +36,7 @@ check of [`Vault::diagnostics`] read this way. What a vault only checks and does
 meaning of (a blueprint, the form a metadata field must have) still applies.
 [`Vault::prepare_selected`] does not: it is what makes a document keep that promise.
 
-==[wasm]
+==[ wasm ]
 
 This crate, and `tomet` and `tomet-load` above it, compile for
 `wasm32-unknown-unknown` (the host supplies `getrandom`'s `js` feature,
@@ -43,7 +46,7 @@ disk. Measured on `bindings/js` (release, `wasm-opt -Oz`), routing a
 parse through `from_sources` added about 1% to the module and reaching
 `tomet-load` as well added about 0.3% more.
 
-==[Preparing]
+==[ Preparing ]
 
 [`Vault::prepare`] resolves every `${...}` in a document, once, against a
 [`Resolver`] the caller supplies. What the vault adds is what only it
@@ -52,9 +55,9 @@ knows: the macros in scope, the settings' `type:` declarations that make
 as it was written. Where the other documents come from -- the disk, a
 host's memory -- is the caller's resolver; `tomet-load` supplies the disk.
 
-==[Structs]
+==[ Structs ]
 
-===[struct Prepared]
+===[ struct Prepared ]
 
 What [`Vault::prepare`] could not do.
 
@@ -63,7 +66,7 @@ the output as written, so a document showing `${...}` as an example
 still renders. `tomet check` reports the list as warnings, which is
 what tells a typo apart from an example.
 
-===[struct Vault]
+===[ struct Vault ]
 
 A vault's config and the vocabularies it declares, resolved once.
 
@@ -71,9 +74,9 @@ A vault's config and the vocabularies it declares, resolved once.
 a directory that exists is not this type's concern; it only decides
 what `${self.path}` is measured from.
 
-==[Functions]
+==[ Functions ]
 
-===[fn validate_sources]
+===[ fn validate_sources ]
 
 Validates `source` the way a host with no disk can: what `tomet check` says
 of it, given the vault's pieces as text.

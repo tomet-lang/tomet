@@ -9,9 +9,9 @@ repository.workspace = true
 [dependencies]
 tomet-address    = { workspace = true }
 tomet-ast        = { workspace = true }
+tomet-ast-parser = { workspace = true }
 tomet-cst        = { workspace = true }
 tomet-cst-parser = { workspace = true }
-tomet-ast-parser = { workspace = true }
 tomet-spelling   = { workspace = true }
 tomet-tree       = { workspace = true }
 tomet-validator  = { workspace = true }
