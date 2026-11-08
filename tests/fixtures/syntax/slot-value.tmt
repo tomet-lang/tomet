@@ -2,7 +2,7 @@
 
 @link(url: <?(u)>)[<?(text)>]
 
-@meta{ type: <?(kind)> }
+@meta(){ type: <?(kind)> }
 
 @opt(<name>)
 

@@ -98,6 +98,10 @@ pub fn render_element(el: ElementView<'_>, config: &PrinterConfig) -> String {
     {
         if style == "expanded" {
             let mut out = String::from("@callout");
+            out.push_str(empty_primary_group(
+                el.data.args.is_some(),
+                el.content.is_some(),
+            ));
             if let Some(args) = &el.data.args {
                 out.push('(');
                 out.push_str(&render_args(args, config));
@@ -121,6 +125,10 @@ pub fn render_element(el: ElementView<'_>, config: &PrinterConfig) -> String {
             return out;
         } else if style == "block" {
             let mut out = String::from("@callout");
+            out.push_str(empty_primary_group(
+                el.data.args.is_some(),
+                el.content.is_some(),
+            ));
             if let Some(args) = &el.data.args {
                 out.push('(');
                 out.push_str(&render_args(args, config));
@@ -159,6 +167,10 @@ pub fn render_element(el: ElementView<'_>, config: &PrinterConfig) -> String {
             return out;
         } else if style == "box" {
             let mut out = String::from("@callout");
+            out.push_str(empty_primary_group(
+                el.data.args.is_some(),
+                el.content.is_some(),
+            ));
             if let Some(args) = &el.data.args {
                 out.push('(');
                 out.push_str(&render_args(args, config));
@@ -205,6 +217,10 @@ pub fn render_element(el: ElementView<'_>, config: &PrinterConfig) -> String {
     // by standing alone on its line, which is the same condition the parser
     // reads it back with.
     let mut out = format!("@{}", el.name);
+    out.push_str(empty_primary_group(
+        el.data.args.is_some(),
+        el.content.is_some(),
+    ));
     let name = el.name.name.as_str();
     out.push_str(&render_groups(name, el.data, el.content, config));
     out.push_str(&render_id(el.id));
@@ -256,6 +272,10 @@ pub fn render_declaration(declaration: &Declaration, config: &PrinterConfig) -> 
         return out;
     }
     let mut out = format!("::{}", declaration.name);
+    out.push_str(empty_primary_group(
+        declaration.data.args.is_some(),
+        declaration.content.is_some(),
+    ));
     out.push_str(&render_groups(
         &declaration.name.name,
         &declaration.data,
@@ -264,6 +284,13 @@ pub fn render_declaration(declaration: &Declaration, config: &PrinterConfig) -> 
     ));
     out.push_str(&render_id(declaration.id.as_ref()));
     out
+}
+
+/// The `()` a nexus (`@name`, `::name`, `:name`) is written with when it has neither `(args)`
+/// nor `[content]`: it stands on a primary group, and `{value}`, `#(id)` and a `:connect` only add
+/// to one, so without it the head would not read back. Empty, when it already has one.
+fn empty_primary_group(has_args: bool, has_content: bool) -> &'static str {
+    if has_args || has_content { "" } else { "()" }
 }
 
 /// `(args)`, `[content]` and `{value}` as one node of that bare `name` has
@@ -343,7 +370,7 @@ pub(crate) fn render_group_entries(entries: &[Entry], config: &PrinterConfig) ->
             // nested map needs its own braces here or `m: { k: v }`
             // prints as `m: k: v` and reparses as a string. With this crate's own
             // block renderer, as `(args)` has: a `key: [...]` value (a block macro
-            // in `::macros{ ... }`) holds whole blocks, and the restricted default
+            // in `::macros(...)`) holds whole blocks, and the restricted default
             // would print an element in it as nothing.
             Entry::Pair(k, v) => format!(
                 "{}: {}",
@@ -359,7 +386,7 @@ pub(crate) fn render_group_entries(entries: &[Entry], config: &PrinterConfig) ->
         .collect();
 
     // A group of pairs stays on one line; one holding elements gets a
-    // line each, which is how `@links{ (1)[..] (2)[..] }` has always been
+    // line each, which is how `@links(){ (1)[..] (2)[..] }` has always been
     // written.
     if !has_element {
         format!(" {} ", rendered.join(", "))
@@ -391,6 +418,10 @@ pub(crate) fn render_connects(connects: &[Connect], config: &PrinterConfig) -> S
     for connect in connects {
         out.push(':');
         out.push_str(&connect.name.to_string());
+        out.push_str(empty_primary_group(
+            connect.data.args.is_some(),
+            connect.content.is_some(),
+        ));
         if let Some(args) = &connect.data.args {
             out.push('(');
             out.push_str(&render_args(args, config));

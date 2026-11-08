@@ -1,6 +1,6 @@
 //! Pure in-memory dependency and export extraction from parsed Tomet ASTs.
 
-use tomet_ast::File;
+use tomet_ast::{File, Value};
 use tomet_semantics::{ElementKind, TargetScheme, link_target_of, path_target_of, target_scheme};
 use tomet_tree::for_each_element;
 
@@ -43,10 +43,23 @@ pub fn extract_exports_hash(doc: &File) -> u64 {
     let mut hash_bytes = Vec::new();
     for declaration in &doc.header {
         hash_bytes.extend_from_slice(declaration.name.name.as_bytes());
-        if let Some(args) = &declaration.data.args
-            && let Some(text) = args.scalar_text()
-        {
-            hash_bytes.extend_from_slice(text.as_bytes());
+        match &declaration.data.args {
+            // `::kind(note)`: the one value.
+            Some(args) if args.scalar_text().is_some() => {
+                if let Some(text) = args.scalar_text() {
+                    hash_bytes.extend_from_slice(text.as_bytes());
+                }
+            }
+            // `::meta(title: T)`: the entries, which is where those declarations keep what they say.
+            Some(Value::Map(entries)) => {
+                for (k, v) in entries {
+                    hash_bytes.extend_from_slice(k.as_bytes());
+                    if let Some(text) = v.scalar_text() {
+                        hash_bytes.extend_from_slice(text.as_bytes());
+                    }
+                }
+            }
+            _ => {}
         }
         if let Some(val) = &declaration.data.value {
             for (k, v) in val.pairs() {

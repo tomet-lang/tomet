@@ -429,6 +429,12 @@ pub fn check_document_declarations(doc: &File, errors: &mut Vec<Diagnostic>) {
             Problem::MetaIdMoved => {
                 errors.push(Diagnostic::MetaIdMoved { span });
             }
+            Problem::UnexpectedData { declaration } => {
+                errors.push(Diagnostic::UnexpectedDeclarationData { declaration, span });
+            }
+            Problem::ExpectedEntries { declaration } => {
+                errors.push(Diagnostic::ExpectedEntries { declaration, span });
+            }
         }
     }
 }
@@ -471,6 +477,12 @@ pub fn check_ctmt_declarations(declarations: &[Declared], errors: &mut Vec<Diagn
             }
             Problem::MetaIdMoved => {
                 errors.push(Diagnostic::MetaIdMoved { span });
+            }
+            Problem::UnexpectedData { declaration } => {
+                errors.push(Diagnostic::UnexpectedDeclarationData { declaration, span });
+            }
+            Problem::ExpectedEntries { declaration } => {
+                errors.push(Diagnostic::ExpectedEntries { declaration, span });
             }
             Problem::InvalidVersion { declaration, found } => {
                 errors.push(Diagnostic::InvalidVersion {
@@ -646,9 +658,9 @@ pub fn check_field_types(
             tomet_semantics::ElementKind::Declaration(DeclKind::Meta) if !checked_meta => {
                 checked_meta = true;
                 let Some(Value::Map(entries)) =
-                    tomet_semantics::data::declaration_data(declaration)
+                    tomet_semantics::data::declaration_entries(declaration)
                 else {
-                    return;
+                    continue;
                 };
                 for (field, value) in &entries {
                     errors.extend(field_value_error(

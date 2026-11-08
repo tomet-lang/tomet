@@ -283,16 +283,16 @@ mod tests {
 
     #[test]
     fn value_sides() {
-        let src = "@x{ k: @conflict(a: 2, b: 3), s: @conflict(a: \"one\", b: \"two\") }\n";
-        assert_eq!(resolve_all(src, A).unwrap(), "@x{ k: 2, s: \"one\" }\n");
-        assert_eq!(resolve_all(src, B).unwrap(), "@x{ k: 3, s: \"two\" }\n");
+        let src = "@x(){ k: @conflict(a: 2, b: 3), s: @conflict(a: \"one\", b: \"two\") }\n";
+        assert_eq!(resolve_all(src, A).unwrap(), "@x(){ k: 2, s: \"one\" }\n");
+        assert_eq!(resolve_all(src, B).unwrap(), "@x(){ k: 3, s: \"two\" }\n");
         assert_eq!(
             resolve_all(src, Both).unwrap(),
-            "@x{ k: 2, s: \"one / two\" }\n"
+            "@x(){ k: 2, s: \"one / two\" }\n"
         );
         assert_eq!(
             resolve_all(src, Rewritten("a \"b\"".into())).unwrap(),
-            "@x{ k: \"a \\\"b\\\"\", s: \"a \\\"b\\\"\" }\n"
+            "@x(){ k: \"a \\\"b\\\"\", s: \"a \\\"b\\\"\" }\n"
         );
     }
 
@@ -357,7 +357,7 @@ mod tests {
             ),
             ("- one\n- two\n", "- uno\n- two\n", "- ein\n- two\n"),
             ("=[ One ]\n", "=[ Uno ]\n", "=[ Ein ]\n"),
-            ("@x{ k: 1 }\n", "@x{ k: 2 }\n", "@x{ k: 3 }\n"),
+            ("@x(){ k: 1 }\n", "@x(){ k: 2 }\n", "@x(){ k: 3 }\n"),
             ("text\n", "- a list\n", "= A heading\n"),
             ("a *x* b\n", "a *y* b\n", "a **z** b\n"),
         ];
@@ -395,7 +395,7 @@ mod pipe_value_tests {
     // swallow the `, b: ...`: the merge once wrote a document the parser
     // refuses. The run is written as the `[ ... ]` it means.
     const BASE: &str =
-        "::elements{\n  line: {\n    about: | one\n           | two\n    k: 1\n  }\n}\n";
+        "::elements(\n  line: {\n    about: | one\n           | two\n    k: 1\n  }\n)\n";
 
     fn conflicted() -> String {
         let m = merge(

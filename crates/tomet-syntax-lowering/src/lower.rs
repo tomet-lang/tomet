@@ -722,13 +722,15 @@ pub fn lower_declaration(node: &SyntaxNode) -> Result<Declaration> {
         .ok_or_else(|| unsupported("a declaration without a sigil"))?;
     let (start, _) = range_of(&sigil);
     let name = name_of(&sigil)?;
-    let read = lower_groups(node)?;
-    if !read.connects.is_empty() {
+    // Before any group is read: a nameless `:(...)` would otherwise merge into the args.
+    if node.children().any(|n| n.kind() == K::CONNECT) {
         return Err(err(
             start,
             "a `::` declaration takes no `:connect`: a connect belongs to an element",
         ));
     }
+    require_primary_group(node, &sigil.text().to_string(), start)?;
+    let read = lower_groups(node)?;
     let end = node
         .children()
         .map(|n| range_of(&n).1)
@@ -753,6 +755,8 @@ pub(crate) fn lower_element(node: &SyntaxNode) -> Result<Element> {
         return Err(unsupported("a sigil that is not `@`"));
     }
     let name = name_of(&sigil)?;
+    // Before any group is read: a nameless `:(...)` would otherwise merge into the args.
+    require_primary_group(node, &sigil.text().to_string(), sigil_start)?;
     let read = lower_groups(node)?;
     // The element ends with its last group; the white space and comments the
     // node also holds are not part of it.
@@ -770,6 +774,44 @@ pub(crate) fn lower_element(node: &SyntaxNode) -> Result<Element> {
         connects: read.connects,
         span: Span::new(sigil_start, end),
     })
+}
+
+/// A nexus -- `@name`, `::name`, `:name` -- stands on a primary group: `(args)` or `[content]`
+/// (a `|` run is the latter). `{value}`, `#(id)` and a `:connect` only add to one, so none of
+/// them can be all a nexus has. `head` is how the nexus is written, `at` where it starts.
+///
+/// Only the groups written on `node` itself count: those of a nameless `:` connect merge into the
+/// owner's after the fact, and a nexus does not stand on a group it borrows.
+fn require_primary_group(node: &SyntaxNode, head: &str, at: usize) -> Result<()> {
+    if node
+        .children()
+        .any(|n| matches!(n.kind(), K::ARGS | K::CONTENT))
+    {
+        return Ok(());
+    }
+    let mut lone: Vec<&str> = Vec::new();
+    for child in node.children() {
+        let group = match child.kind() {
+            K::VALUE_DATA | K::MAP_LITERAL => "`{...}`",
+            K::ID_GROUP => "`#(id)`",
+            K::CONNECT => "`:connect`",
+            _ => continue,
+        };
+        if !lone.contains(&group) {
+            lone.push(group);
+        }
+    }
+    let message = if lone.is_empty() {
+        format!(
+            "`{head}` needs a primary group, `(...)` or `[...]`: write `{head}()` for an empty one"
+        )
+    } else {
+        format!(
+            "`{head}` needs a primary group, `(...)` or `[...]`: {} cannot stand without one",
+            lone.join(", ")
+        )
+    };
+    Err(err(at, message))
 }
 
 /// The groups of `node`: `(args)`, `{value}`, `[content]`, `#(id)` and the
@@ -857,6 +899,12 @@ fn lower_connect(node: &SyntaxNode) -> Result<Connect> {
             "a `:connect` takes no `#(id)`: write the id of its owner before the first `:connect`",
         ));
     }
+    let written = node
+        .children()
+        .find(|n| n.kind() == K::NAME)
+        .map(|n| n.text().to_string())
+        .unwrap_or_default();
+    require_primary_group(node, &format!(":{written}"), start)?;
     let read = lower_groups(node)?;
     let end = node
         .children()
@@ -1203,6 +1251,13 @@ fn merge_connect(node: &SyntaxNode, read: &mut Groups) -> Result<()> {
                     _ => None,
                 };
                 read.data.value = Some(merged.unwrap_or(value));
+            }
+            K::CONTENT => {
+                return Err(err(
+                    range_of(&child).0,
+                    "a nameless `:` connect merges `(args)` or `{value}` into its owner; \
+                     `[content]` needs a name: write `:name[...]`",
+                ));
             }
             other => return Err(unsupported(format!("{other:?} in a nameless connect"))),
         }

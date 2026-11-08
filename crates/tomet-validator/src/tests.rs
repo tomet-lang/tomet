@@ -33,7 +33,7 @@ fn duplicate_top_level_ids_are_reported() {
 /// document is -- passed every check this project had.
 #[test]
 fn a_second_singleton_is_reported() {
-    let doc = parse("::kind(note)\n::meta{a: 1}\n::meta{b: 2}\n\n#[ T ]\n");
+    let doc = parse("::kind(note)\n::meta(a: 1)\n::meta(b: 2)\n\n#[ T ]\n");
     let errors = validate_document(&doc);
     assert_eq!(errors.len(), 1, "{errors:?}");
     assert!(matches!(
@@ -44,7 +44,7 @@ fn a_second_singleton_is_reported() {
 
 #[test]
 fn a_repeated_standard_declaration_says_where_the_first_is() {
-    let src = "::kind(note)\n::meta{a: 1}\n::meta{b: 2}\n\n#[ T ]\n";
+    let src = "::kind(note)\n::meta(a: 1)\n::meta(b: 2)\n\n#[ T ]\n";
     let doc = parse(src);
     let errors = validate_document(&doc);
     assert_eq!(errors.len(), 1, "{errors:?}");
@@ -61,7 +61,7 @@ fn a_repeated_standard_declaration_says_where_the_first_is() {
 #[test]
 fn a_vocabularys_singleton_is_enforced_too() {
     let vocab = tomet_ast_parser::parse_file(
-        "::kind(vocabulary)\n::vocabulary(deck)\n\n::elements{ spread: { singleton: true } }\n",
+        "::kind(vocabulary)\n::vocabulary(deck)\n\n::elements(spread: { singleton: true })\n",
     )
     .expect("vocabulary parses");
     let bindings = Bindings {
@@ -69,7 +69,7 @@ fn a_vocabularys_singleton_is_enforced_too() {
         ..Bindings::default()
     };
 
-    let doc = parse("::kind(deck)\n\n#[ T ]\n\n@spread{}\n@spread{}\n");
+    let doc = parse("::kind(deck)\n\n#[ T ]\n\n@spread()\n@spread()\n");
     let errors = validate_document_with(&doc, &bindings);
     assert_eq!(errors.len(), 1, "{errors:?}");
     assert!(matches!(
@@ -149,7 +149,7 @@ fn a_typoed_connect_name_is_reported() {
 #[test]
 fn allow_list_resolves_a_namespaced_custom_element_via_bindings() {
     let vocab = tomet_ast_parser::parse_file(
-        "::kind(vocabulary)\n::vocabulary(ns)\n\n::elements{ mycard: {} }\n",
+        "::kind(vocabulary)\n::vocabulary(ns)\n\n::elements(mycard: {})\n",
     )
     .expect("vocabulary parses");
     let bindings = Bindings {
@@ -160,7 +160,7 @@ fn allow_list_resolves_a_namespaced_custom_element_via_bindings() {
         ..Bindings::default()
     };
 
-    let doc = parse("@section[ @ns.mycard{} @card[a] ]:rule(allow:list(card, ns.mycard))\n");
+    let doc = parse("@section[ @ns.mycard() @card[a] ]:rule(allow:list(card, ns.mycard))\n");
     assert_eq!(rule_errors(&doc, &bindings), vec![]);
 }
 
@@ -313,7 +313,7 @@ fn a_double_colon_declaration_after_the_body_is_reported() {
     for src in [
         "::kind(note)\n\n#[ T ]\n\n::use(deck)\n",
         "::kind(note)\n\n=[ T ]\n\n::use(deck)\n",
-        "::kind(note)\n\ntext\n\n::nonesuch{}\n",
+        "::kind(note)\n\ntext\n\n::nonesuch()\n",
     ] {
         assert!(tomet_ast_parser::parse_file(src).is_err(), "{src:?}");
     }
@@ -321,7 +321,7 @@ fn a_double_colon_declaration_after_the_body_is_reported() {
 
 #[test]
 fn a_run_of_double_colon_declarations_at_the_top_is_the_preamble() {
-    let doc = parse("::kind(note)\n::use(deck)\n::use(cards)\n::meta{ id: x }\n\n=[ T ]\n");
+    let doc = parse("::kind(note)\n::use(deck)\n::use(cards)\n::meta(id: x)\n\n=[ T ]\n");
     let errors = validate_document(&doc);
     assert!(
         !errors.iter().any(|e| matches!(
@@ -342,7 +342,7 @@ fn the_two_spellings_share_one_preamble_and_one_singleton_count() {
             .any(|e| matches!(e, Diagnostic::DuplicateSingleton { name, .. } if name == "kind")),
         "{errors:?}"
     );
-    let errors = validate_document(&parse("::kind(note)\n::meta{ title: x }\n\n=[ T ]\n"));
+    let errors = validate_document(&parse("::kind(note)\n::meta(title: x)\n\n=[ T ]\n"));
     assert!(errors.is_empty(), "{errors:?}");
 }
 
@@ -363,11 +363,11 @@ fn a_body_element_written_with_double_colon_is_reported_with_the_sigil_to_use() 
 #[test]
 fn a_user_declared_preamble_element_is_a_declaration() {
     let vocab = tomet_semantics::Vocabulary::from_file(&parse(
-        "::kind(vocabulary)\n::vocabulary(deck){}\n\n::elements{ character: { region: preamble, singleton: true } }\n",
+        "::kind(vocabulary)\n::vocabulary(deck){}\n\n::elements(character: { region: preamble, singleton: true })\n",
     ))
     .expect("a vocabulary");
     let bindings = Bindings::for_document(&parse("::kind(deck)\n"), [vocab]);
-    let doc = parse("::kind(deck)\n::character{ a: 1 }\n\ntext\n");
+    let doc = parse("::kind(deck)\n::character(a: 1)\n\ntext\n");
     let errors = validate_document_with(&doc, &bindings);
     assert!(
         !errors
@@ -383,7 +383,7 @@ fn deck_with_params() -> Bindings {
         r#"::kind(vocabulary)
 ::vocabulary(deck){}
 
-::elements{
+::elements(
   card: {
     args: {
       id: {
@@ -400,7 +400,7 @@ fn deck_with_params() -> Bindings {
   plain: {
     about: | 宣言なし。
   }
-}
+)
 "#,
     ))
     .expect("a vocabulary");
@@ -436,7 +436,7 @@ fn deck_with_content_allow() -> Bindings {
         r#"::kind(vocabulary)
 ::vocabulary(deck){}
 
-::elements{
+::elements(
   list: {
     display: block
     // `entry` resolves bare here (the document's own `::kind(deck)`), which
@@ -452,7 +452,7 @@ fn deck_with_content_allow() -> Bindings {
     content: { allow: inline }
     about: | 一覧の一項目。
   }
-}
+)
 "#,
     ))
     .expect("a vocabulary");
@@ -647,7 +647,7 @@ fn an_unfinished_marker_is_not_a_shape_error_in_either_position() {
 /// is correct and not merely unfinished.
 #[test]
 fn an_unknown_element_is_still_an_error() {
-    let doc = parse("::kind(note)\n\n@nonesuch{}\n");
+    let doc = parse("::kind(note)\n\n@nonesuch()\n");
     let diagnostics = validate_document(&doc);
     assert!(diagnostics.iter().all(|d| d.severity() == Severity::Error));
 }
@@ -655,14 +655,14 @@ fn an_unknown_element_is_still_an_error() {
 /// The identity of a document is `::id(...)`; `id` in `::meta` is reported, not read.
 #[test]
 fn an_id_in_meta_is_reported_and_an_id_declaration_is_not() {
-    let moved = validate_document(&parse("::meta{ id: a, title: T }\n"));
+    let moved = validate_document(&parse("::meta(id: a, title: T)\n"));
     assert!(
         moved
             .iter()
             .any(|e| matches!(e, Diagnostic::MetaIdMoved { .. }))
     );
 
-    let declared = validate_document(&parse("::id(a)\n::meta{ title: T }\n"));
+    let declared = validate_document(&parse("::id(a)\n::meta(title: T)\n"));
     assert!(declared.is_empty(), "{declared:?}");
 
     let twice = validate_document(&parse("::id(a)\n::id(b)\n"));
@@ -684,15 +684,15 @@ fn definition_problems(src: &str) -> Vec<String> {
 /// A macro is a string template: a map or a number has nothing to substitute into.
 #[test]
 fn a_macro_that_is_not_a_string_is_reported() {
-    assert!(definition_problems("::macros{\n  gh: \"https://x/${1}\"\n}\n").is_empty());
-    let found = definition_problems("::macros{\n  gh: 3\n  ok: \"x\"\n}\n");
+    assert!(definition_problems("::macros(\n  gh: \"https://x/${1}\"\n)\n").is_empty());
+    let found = definition_problems("::macros(\n  gh: 3\n  ok: \"x\"\n)\n");
     assert_eq!(found.len(), 1, "{found:?}");
     assert!(found[0].contains("`gh` in `::macros`"), "{found:?}");
 }
 
 #[test]
 fn a_variable_is_a_declaration_with_a_type_it_can_have_and_a_default_that_fits() {
-    let good = "::vars{\n  title: {\n    type: string\n    about: | 題。\n  }\n  n: { type: int, default: 3 }\n  at: { type: datetime, default: \"2026-10-25T09:00:00+09:00\" }\n  tags: { type: list, default: list(a, b) }\n}\n";
+    let good = "::vars(\n  title: {\n    type: string\n    about: | 題。\n  }\n  n: { type: int, default: 3 }\n  at: { type: datetime, default: \"2026-10-25T09:00:00+09:00\" }\n  tags: { type: list, default: list(a, b) }\n)\n";
     assert!(
         definition_problems(good).is_empty(),
         "{:?}",
@@ -700,18 +700,18 @@ fn a_variable_is_a_declaration_with_a_type_it_can_have_and_a_default_that_fits()
     );
 
     for (src, needle) in [
-        ("::vars{\n  title: \"x\"\n}\n", "declared as a map"),
+        ("::vars(\n  title: \"x\"\n)\n", "declared as a map"),
         (
-            "::vars{\n  title: { kind: string }\n}\n",
+            "::vars(\n  title: { kind: string }\n)\n",
             "unknown key `kind`",
         ),
-        ("::vars{\n  title: { type: date }\n}\n", "is not a type"),
+        ("::vars(\n  title: { type: date }\n)\n", "is not a type"),
         (
-            "::vars{\n  n: { type: int, default: \"3\" }\n}\n",
+            "::vars(\n  n: { type: int, default: \"3\" }\n)\n",
             "`default` is not a value of `type: int`",
         ),
         (
-            "::vars{\n  at: { type: datetime, default: \"tomorrow\" }\n}\n",
+            "::vars(\n  at: { type: datetime, default: \"tomorrow\" }\n)\n",
             "`default` is not a value of `type: datetime`",
         ),
     ] {
@@ -725,11 +725,11 @@ fn a_variable_is_a_declaration_with_a_type_it_can_have_and_a_default_that_fits()
 #[test]
 fn the_config_declarations_are_clean() {
     let doc = parse(
-        "::kind(config)\n::format{ callout: { style: { content: block } } }\n\
-         ::fields{ created: { type: datetime } }\n\
-         ::blueprints{ a: @file(a.blueprint.tmt) }\n\
-         ::vocabularies{ deck: @file(deck.vocabulary.tmt) }\n\
-         ::workspace{ ignore: list(\"x\") }\n\
+        "::kind(config)\n::format(callout: { style: { content: block } })\n\
+         ::fields(created: { type: datetime })\n\
+         ::blueprints(a: @file(a.blueprint.tmt))\n\
+         ::vocabularies(deck: @file(deck.vocabulary.tmt))\n\
+         ::workspace(ignore: list(\"x\"))\n\
          ::export(type: commonmark)\n",
     );
     let errors = validate_document(&doc);
@@ -741,7 +741,7 @@ fn the_config_declarations_are_clean() {
 fn the_dissolved_config_and_settings_are_unknown_declarations() {
     for name in ["config", "settings"] {
         let doc = parse(&format!(
-            "::{name}{{ format: {{ link: {{ no_space: true }} }} }}\n"
+            "::{name}(format: {{ link: {{ no_space: true }} }})\n"
         ));
         let errors = validate_document(&doc);
         assert!(
@@ -763,7 +763,7 @@ fn the_dissolved_config_and_settings_are_unknown_declarations() {
 /// saying so here is what keeps these tests about duplicate ids.
 fn with_deck() -> Bindings {
     let vocab = tomet_ast_parser::parse_file(
-        "::kind(vocabulary)\n::vocabulary(deck)\n\n::elements{ task: {}, ref: {} }\n",
+        "::kind(vocabulary)\n::vocabulary(deck)\n\n::elements(task: {}, ref: {})\n",
     )
     .expect("vocabulary parses");
     Bindings {
@@ -781,7 +781,7 @@ fn with_deck() -> Bindings {
 fn duplicate_id_between_heading_and_element_is_reported() {
     // `deck.task` is namespaced and `deck` is in scope, so the only
     // rule left to fire is the one being tested.
-    let doc = parse("=[ one ]#(a)\n\n@deck.task#(a)\n");
+    let doc = parse("=[ one ]#(a)\n\n@deck.task()#(a)\n");
     let errors = validate_document_with(&doc, &with_deck());
     assert_eq!(errors.len(), 1);
     assert!(matches!(
@@ -795,7 +795,7 @@ fn duplicate_id_nested_inline_is_reported() {
     // The second id is on an element embedded inline inside a
     // paragraph's content, not a top-level block -- exercises the
     // `visit_inlines` recursion, not just top-level `Block`s.
-    let doc = parse("=[ one ]#(a)\n\ntext @deck.ref#(a) more text\n");
+    let doc = parse("=[ one ]#(a)\n\ntext @deck.ref()#(a) more text\n");
     let errors = validate_document_with(&doc, &with_deck());
     assert_eq!(errors.len(), 1);
     assert!(matches!(
@@ -866,11 +866,11 @@ fn test_validate_cst_exact_range() {
 fn validate_cst_counts_only_the_id_group_not_any_attribute_named_id() {
     // A literal `id:` key -- nested in a map, or `@link`'s own -- is
     // ordinary data now, never this slot, so none of these count.
-    let src = "@a{id: x}\n@b{meta: {id: x}}\n@link[t](id: x)\n";
+    let src = "@a(){id: x}\n@b(){meta: {id: x}}\n@link[t](id: x)\n";
     let cst = tomet_cst_parser::parse_cst(src);
     assert!(validate_cst(&cst).is_empty());
 
-    let src = "@a#(x)\ntext @b#(x)\n";
+    let src = "@a()#(x)\ntext @b()#(x)\n";
     let cst = tomet_cst_parser::parse_cst(src);
     assert_eq!(validate_cst(&cst).len(), 1);
 }
@@ -890,7 +890,7 @@ fn validate_cst_catches_a_duplicate_id_nested_inside_content() {
     // section's heading-level `#(id)` does. This is the LSP's only
     // duplicate-id diagnostic (`apps/lsp` never calls the AST-based
     // `validate_document`).
-    let src = "@a#(x)\n@outer[\n=[ Heading ]#(x)\n]\n";
+    let src = "@a()#(x)\n@outer[\n=[ Heading ]#(x)\n]\n";
     let cst = tomet_cst_parser::parse_cst(src);
     assert_eq!(validate_cst(&cst).len(), 1);
 }
@@ -940,7 +940,7 @@ fn dangling_embed_is_reported() {
 
 #[test]
 fn valid_path_traversal_anchor_is_fine() {
-    let doc = parse("@card#(intro)\n\n@link(#intro.prop.tags)\n");
+    let doc = parse("@card()#(intro)\n\n@link(#intro.prop.tags)\n");
     assert_eq!(validate_document(&doc), vec![]);
 }
 
@@ -1035,7 +1035,7 @@ fn a_uuid_field_holding_anything_else_is_reported() {
 #[test]
 fn an_absent_empty_or_unevaluated_uuid_is_not_reported() {
     let declared = [("id", "uuid")];
-    assert_eq!(field_diagnostics("::meta{ title: x }\n", &declared), vec![]);
+    assert_eq!(field_diagnostics("::meta(title: x)\n", &declared), vec![]);
     assert_eq!(field_diagnostics("::id(\"\")\n", &declared), vec![]);
     assert_eq!(
         field_diagnostics("::id(${generate.uuid()})\n", &declared),
@@ -1048,7 +1048,7 @@ fn an_absent_empty_or_unevaluated_uuid_is_not_reported() {
 /// that have a form.
 #[test]
 fn an_undeclared_field_or_a_type_with_no_form_is_left_alone() {
-    let source = "::id(nonsense)\n::meta{ title: nonsense }\n";
+    let source = "::id(nonsense)\n::meta(title: nonsense)\n";
     assert_eq!(field_diagnostics(source, &[]), vec![]);
     assert_eq!(field_diagnostics(source, &[("title", "string")]), vec![]);
     assert_eq!(field_diagnostics(source, &[("id", "uuid")]).len(), 1);
@@ -1063,11 +1063,11 @@ fn a_datetime_field_has_to_read_as_one() {
         "2026-10-17T09:00",
         "2026-10-17 09:00:00",
     ] {
-        let source = format!("::meta{{ created: {good} }}\n");
+        let source = format!("::meta(created: {good})\n");
         assert_eq!(field_diagnostics(&source, &declared), vec![], "{good}");
     }
     for bad in ["yesterday", "2026-13-01", "2026-10-17T25:00", "2026-1-1"] {
-        let source = format!("::meta{{ created: \"{bad}\" }}\n");
+        let source = format!("::meta(created: \"{bad}\")\n");
         let errors = field_diagnostics(&source, &declared);
         assert_eq!(errors.len(), 1, "{bad}: {errors:?}");
         assert!(
@@ -1077,9 +1077,9 @@ fn a_datetime_field_has_to_read_as_one() {
         );
     }
     // Absent, empty and not yet evaluated are not reported, as for `uuid`.
-    assert_eq!(field_diagnostics("::meta{ title: x }\n", &declared), vec![]);
+    assert_eq!(field_diagnostics("::meta(title: x)\n", &declared), vec![]);
     assert_eq!(
-        field_diagnostics("::meta{ created: ${generate.now()} }\n", &declared),
+        field_diagnostics("::meta(created: ${generate.now()})\n", &declared),
         vec![]
     );
 }
@@ -1232,17 +1232,17 @@ fn a_version_field_in_meta_reads_a_bare_number_as_text() {
         errors.len()
     };
     for ok in ["1.10", "\"1.10.0\"", "\"1.0-beta\"", "2", "1.0"] {
-        assert_eq!(problems(&format!("::meta{{ rev: {ok} }}\n")), 0, "{ok}");
+        assert_eq!(problems(&format!("::meta(rev: {ok})\n")), 0, "{ok}");
     }
     for bad in ["\"abc\"", "true", "\"1.0.0_beta\""] {
-        assert_eq!(problems(&format!("::meta{{ rev: {bad} }}\n")), 1, "{bad}");
+        assert_eq!(problems(&format!("::meta(rev: {bad})\n")), 1, "{bad}");
     }
 }
 
 const TYPED_DECK: &str = r#"::kind(vocabulary)
 ::vocabulary(deck){}
 
-::elements{
+::elements(
   entry: {
     args: {
       id: { type: uint, positional: true }
@@ -1254,7 +1254,7 @@ const TYPED_DECK: &str = r#"::kind(vocabulary)
       unsupported: { type: set(string) }
     }
   }
-}
+)
 "#;
 
 fn typed_deck() -> Bindings {
@@ -1358,11 +1358,11 @@ fn check_ctmt_declarations_reports_expected_diagnostics() {
         Declared::new(
             Declaration::new(
                 "meta",
-                None,
                 Some(Value::Map(vec![(
                     "author".into(),
                     Value::String("me".into()),
                 )])),
+                None,
             ),
             Span::new(26, 40),
         ),
@@ -1388,8 +1388,8 @@ fn check_ctmt_declarations_reports_expected_diagnostics() {
         ),
         Declaration::new(
             "macros",
-            None,
             Some(Value::Map(vec![("bad".into(), Value::Int(123))])),
+            None,
         ),
     ];
     let spans: Vec<Span> = (0..decls.len())

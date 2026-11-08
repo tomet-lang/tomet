@@ -17,32 +17,16 @@ use crate::vars::{VarDecl, read_var_decls};
 ///
 /// The second positional slot, the major version, is not part of the name.
 pub fn kind_name(declaration: &Declaration) -> Option<String> {
-    if let Some(args) = declaration.bound_args() {
-        if let Some(name) = args.get("kind").and_then(text) {
-            return Some(name);
-        }
-        if let Some(name) = text(&args) {
-            return Some(name);
-        }
-    }
-    let data = declaration.data.as_ref()?;
-    data.get("kind").and_then(text).or_else(|| text(data))
+    let args = declaration.bound_args()?;
+    args.get("kind").and_then(text).or_else(|| text(&args))
 }
 
 /// The identity a `::id(...)` declares: `::id(std.config)` or `::id(id: std.config)`.
 ///
 /// `None` when it is not written as text, such as `::id(${uuid()})` before it is evaluated.
 pub fn id_name(declaration: &Declaration) -> Option<String> {
-    if let Some(args) = declaration.bound_args() {
-        if let Some(name) = args.get("id").and_then(text) {
-            return Some(name);
-        }
-        if let Some(name) = text(&args) {
-            return Some(name);
-        }
-    }
-    let data = declaration.data.as_ref()?;
-    data.get("id").and_then(text).or_else(|| text(data))
+    let args = declaration.bound_args()?;
+    args.get("id").and_then(text).or_else(|| text(&args))
 }
 
 /// The kind of document a `::blueprint(X)` or `::blueprint(target: X)` is for.
@@ -85,19 +69,18 @@ pub fn profile_names(declaration: &Declaration) -> Vec<String> {
 
 /// The version a `::version(...)` declares, as written: `::version(1.10)` is `"1.10"`, not `"1.1"`.
 pub fn version_string(declaration: &Declaration) -> Option<String> {
-    let from = |value: &Value| match value.get("version") {
+    let args = declaration.bound_args()?;
+    Some(match args.get("version") {
         Some(version) => scalar_text_or_debug(version),
-        None => scalar_text_or_debug(value),
-    };
-    if let Some(args) = declaration.bound_args() {
-        return Some(from(&args));
-    }
-    declaration.data.as_ref().map(from)
+        None => scalar_text_or_debug(&args),
+    })
 }
 
-/// What a `::meta{ ... }` states: its data, the map of fields. `None` for a `::meta` with no `{...}`.
+/// What a `::meta(...)` states: the map of its fields. `::meta()` states none, and is an empty map
+/// rather than nothing. `None` when the arguments are not `name: value` entries
+/// ([`check_declarations`](crate::check_declarations) says so).
 pub fn meta(declaration: &Declaration) -> Option<Value> {
-    declaration.data.clone()
+    entries_value(declaration)
 }
 
 /// The macros a `::macros` defines, in the order written: each entry is a name and its template.
@@ -110,17 +93,22 @@ pub fn macros(declaration: &Declaration) -> Vec<(String, Value)> {
     entries(declaration)
 }
 
-/// The `(name, value)` entries of a declaration whose body is a map, `(args)` first, then `{data}`.
+/// The `(args)` of a declaration whose arguments are `name: value` entries, as the map they are.
+/// `None` for no `(args)`, or for ones that are not entries (a lone `::meta(x)`).
+fn entries_value(declaration: &Declaration) -> Option<Value> {
+    match declaration.bound_args() {
+        Some(map @ Value::Map(_)) => Some(map),
+        _ => None,
+    }
+}
+
+/// The `(name, value)` entries of a declaration whose `(...)` is a map (`::macros(gh: "...")`).
+/// Empty for `::name()`, and for arguments that are not entries.
 pub(crate) fn entries(declaration: &Declaration) -> Vec<(String, Value)> {
-    let args = match declaration.bound_args() {
+    match entries_value(declaration) {
         Some(Value::Map(entries)) => entries,
         _ => Vec::new(),
-    };
-    let data = match &declaration.data {
-        Some(Value::Map(entries)) => entries.clone(),
-        _ => Vec::new(),
-    };
-    args.into_iter().chain(data).collect()
+    }
 }
 
 fn first<B>(doc: &File<B>, kind: DeclKind) -> Option<Declaration> {
@@ -172,14 +160,15 @@ pub fn document_version<B>(doc: &File<B>) -> Option<String> {
     version_string(&first(doc, DeclKind::Version)?)
 }
 
-/// The data of the document's first `::meta`. Only the first is read: `::meta` is written once.
+/// The fields of the document's first `::meta(...)`: a map, empty for `::meta()`. Only the first is
+/// read: `::meta` is written once.
 pub fn document_meta<B>(doc: &File<B>) -> Option<Value> {
     meta(&first(doc, DeclKind::Meta)?)
 }
 
-/// The `(name, value)` entries of the document's first declaration of `kind` whose body is a map
-/// (`::format{ ... }`, `::fields{ ... }`, `::blueprints{ ... }`): `(args)` first, then `{data}`.
-/// Empty when the document does not write it.
+/// The `(name, value)` entries of the document's first declaration of `kind` whose `(...)` is a map
+/// (`::format(...)`, `::fields(...)`, `::blueprints(...)`). Empty when the document does not
+/// write it.
 pub fn document_entries<B>(doc: &File<B>, kind: DeclKind) -> Vec<(String, Value)> {
     first(doc, kind)
         .map(|found| entries(&found))
@@ -282,7 +271,7 @@ mod tests {
         };
         assert_eq!(names("::profile(oneline, pure)\n"), ["oneline", "pure"]);
         assert_eq!(names("::profile(7)\n"), ["7"]);
-        assert!(names("::profile\n").is_empty());
+        assert!(names("::profile()\n").is_empty());
     }
 
     #[test]
@@ -309,8 +298,8 @@ mod tests {
             Some("doc-kWBcIUUz")
         );
         assert_eq!(document_id(&parse("::kind(x)\n")), None);
-        // `::meta{ id: ... }` is not an identity any more.
-        assert_eq!(document_id(&parse("::meta{ id: a }\n")), None);
+        // `::meta(id: ...)` is not an identity any more.
+        assert_eq!(document_id(&parse("::meta(id: a)\n")), None);
     }
 
     #[test]
@@ -327,7 +316,7 @@ mod tests {
             document_kind(&parse("::kind(kind: note)\n")).as_deref(),
             Some("note")
         );
-        assert_eq!(document_kind(&parse("::meta{ id: x }\n")), None);
+        assert_eq!(document_kind(&parse("::meta(id: x)\n")), None);
         // written as an element it is not a declaration
         assert_eq!(document_kind(&parse("@kind(config)\n")), None);
     }
@@ -368,20 +357,26 @@ mod tests {
     }
 
     #[test]
-    fn meta_is_the_data_of_the_first_meta_declaration() {
-        let value = document_meta(&parse("::meta{ title: Hello }\n")).expect("meta");
+    fn meta_is_the_fields_of_the_first_meta_declaration() {
+        let value = document_meta(&parse("::meta(title: Hello)\n")).expect("meta");
         assert_eq!(
             value,
             Value::Map(vec![("title".into(), Value::String("Hello".into()))])
         );
         assert_eq!(document_meta(&parse("#[ Hello ]\n")), None);
-        // no `{...}`: nothing to read
-        assert_eq!(document_meta(&parse("::meta\n")), None);
+        // `::meta()` states no field: an empty map, not nothing
+        assert_eq!(
+            document_meta(&parse("::meta()\n")),
+            Some(Value::Map(Vec::new()))
+        );
+        // a value without a name is not a field
+        assert_eq!(document_meta(&parse("::meta(x)\n")), None);
     }
 
     #[test]
     fn macros_are_the_entries_of_every_macros_declaration() {
-        let doc = parse("::macros{ gh: \"https://x/${1}\", n: 3, wiki: \"w/${1}\", blk: [ hello ] }\n");
+        let doc =
+            parse("::macros(gh: \"https://x/${1}\", n: 3, wiki: \"w/${1}\", blk: [ hello ])\n");
         let read = document_macros(&doc);
         let names: Vec<&str> = read.iter().map(|(name, _)| name.as_str()).collect();
         // A template of any kind is read; refusing a kind is `check`'s.
@@ -389,17 +384,13 @@ mod tests {
         assert_eq!(read[0].1, Value::String("https://x/${1}".to_string()));
         assert_eq!(read[1].1, Value::Int(3));
         assert!(matches!(read[3].1, Value::Blocks(_)));
-        // the args form is read too
-        let doc = parse("::macros(gh: \"g\")\n");
-        assert_eq!(
-            document_macros(&doc),
-            [("gh".to_string(), Value::String("g".to_string()))]
-        );
+        // no entries, no macros
+        assert!(document_macros(&parse("::macros()\n")).is_empty());
     }
 
     #[test]
     fn a_variable_declared_twice_is_the_later_declaration() {
-        let doc = parse("::vars{ a: { default: 1 } }\n::vars{ a: { default: 2 }, b: {} }\n");
+        let doc = parse("::vars(a: { default: 1 })\n::vars(a: { default: 2 }, b: {})\n");
         let vars = document_vars(&doc);
         assert_eq!(vars.len(), 2);
         assert_eq!(vars[0].0, "a");

@@ -1,7 +1,7 @@
 ::kind(guide)
-::meta{
+::meta(
   title: "設定の層"
-}
+)
 
 tomet の設定は、三つの層を重ねて決まる。外側から順に、@term(tomet#vault-config)、@term(tomet#folder-config)、文書自身の宣言。内側の層が、外側を上書きする。
 
@@ -22,13 +22,13 @@ tomet の設定は、三つの層を重ねて決まる。外側から順に、@t
 - マクロ、変数、登録された名前(ブループリント、語彙、辞書)は、名前ごとに置き換わる。
 
 ```tm
-::format{ table: { max_col_width: 50 }, link: { no_space: true } }
+::format(table: { max_col_width: 50 }, link: { no_space: true })
 ```
 
 これが @term(tomet#vault-config) に書かれ、あるフォルダの @term(tomet#folder-config) が次を書くと、
 
 ```tm
-::format{ table: { max_col_width: 80 } }
+::format(table: { max_col_width: 80 })
 ```
 
 そのフォルダでは `table.max_col_width` が 80 になり、`link.no_space` は `true` のままになる。

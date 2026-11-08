@@ -31,7 +31,7 @@ profile は記法も意味も変えない。約束を守っている文書は、
 禁じるのは、書いていないものを外から補う省略。書いてあるリンクは禁じない。
 
 ```tm
-::macros{ gh: "https://github.com/tomet/tomet/issues/${1}" }
+::macros(gh: "https://github.com/tomet/tomet/issues/${1}")
 ${macro.gh(123)}
 ```
 

@@ -1,5 +1,5 @@
 ::kind(config)
-::format{
+::format(
   meta: {
     always_newline: true
   }
@@ -28,8 +28,8 @@
       }
     }
   }
-}
-::fields{
+)
+::fields(
   id: {
     type: nanoid
     length: 8
@@ -68,11 +68,11 @@
     type: list
     always_newline: true
   }
-}
-::workspace{
+)
+::workspace(
   ignore: list("00-09 System/01 Apps/obsidian")
-}
-::migration{
+)
+::migration(
   created: {
     type: datetime
     format: iso8601
@@ -82,4 +82,4 @@
     format: iso8601
     merge: modified
   }
-}
+)

@@ -279,7 +279,7 @@ mod tests {
     fn a_field_type_the_settings_declare_is_checked() {
         let root = vault(
             "types",
-            "::kind(config)\n::fields{ id: { type: uuid } }\n",
+            "::kind(config)\n::fields(id: { type: uuid })\n",
             &[],
         );
         let path = root.join("a.tmt");
@@ -305,18 +305,18 @@ mod tests {
     fn the_vaults_vocabulary_is_in_scope() {
         let root = vault(
             "vocab",
-            "::kind(config)\n::vocabularies{ deck: @file(.tomet/vocabularies/deck.vocabulary.tmt) }\n",
+            "::kind(config)\n::vocabularies(deck: @file(.tomet/vocabularies/deck.vocabulary.tmt))\n",
             &[(
                 ".tomet/vocabularies/deck.vocabulary.tmt",
-                "::kind(vocabulary)\n::vocabulary(deck)\n\n::elements{ card: {} }\n",
+                "::kind(vocabulary)\n::vocabulary(deck)\n\n::elements(card: {})\n",
             )],
         );
         let path = root.join("a.tmt");
         let mut ws = Workspace::new();
-        ws.set_buffer(path.clone(), "::kind(deck)\n\n@card{}\n".to_string());
+        ws.set_buffer(path.clone(), "::kind(deck)\n\n@card()\n".to_string());
         assert!(ws.findings_diagnostics(&path).is_empty());
 
-        ws.set_buffer(path.clone(), "::kind(deck)\n\n@nonesuch{}\n".to_string());
+        ws.set_buffer(path.clone(), "::kind(deck)\n\n@nonesuch()\n".to_string());
         let diags = ws.findings_diagnostics(&path);
         assert_eq!(diags.len(), 1, "{:?}", messages(&diags));
         assert!(diags[0].message.contains("unknown element"));
@@ -395,7 +395,7 @@ mod tests {
 
         fs::write(
             root.join(tomet_load_config::VAULT_CONFIG_FILE),
-            "::kind(config)\n::fields{ id: { type: uuid } }\n",
+            "::kind(config)\n::fields(id: { type: uuid })\n",
         )
         .unwrap();
         ws.files_changed();
@@ -421,7 +421,7 @@ mod tests {
     fn a_vault_complaint_is_made_once_until_it_is_fixed_and_broken_again() {
         let root = vault(
             "notices",
-            "::kind(config)\n::vocabularies{ missing: @file(.tomet/vocabularies/missing.vocabulary.tmt) }\n",
+            "::kind(config)\n::vocabularies(missing: @file(.tomet/vocabularies/missing.vocabulary.tmt))\n",
             &[],
         );
         let path = root.join("a.tmt");
@@ -443,7 +443,7 @@ mod tests {
         let declared = root.join(".tomet/vocabularies/missing.vocabulary.tmt");
         fs::write(
             &declared,
-            "::kind(vocabulary)\n::vocabulary(deck)\n\n::elements{ tile: {} }\n",
+            "::kind(vocabulary)\n::vocabulary(deck)\n\n::elements(tile: {})\n",
         )
         .unwrap();
         ws.files_changed();
@@ -473,8 +473,8 @@ mod tests {
     fn hover_evaluates_an_expression_in_the_vault() {
         let root = vault(
             "hover",
-            "::kind(config)\n::macros{ gh: \"https://github.com/o/r/issues/${1}\" }\n",
-            &[("b.tmt", "::meta{ title: Saved }\n")],
+            "::kind(config)\n::macros(gh: \"https://github.com/o/r/issues/${1}\")\n",
+            &[("b.tmt", "::meta(title: Saved)\n")],
         );
         let (a, b) = (root.join("a.tmt"), root.join("b.tmt"));
         let mut ws = Workspace::new();
@@ -490,7 +490,7 @@ mod tests {
         assert!(hover_text(ws.hover(&a, at(2))).contains("https://github.com/o/r/issues/7"));
 
         // `b.tmt` is edited in the editor and not saved.
-        ws.set_buffer(b.clone(), "::meta{ title: Edited }\n".to_string());
+        ws.set_buffer(b.clone(), "::meta(title: Edited)\n".to_string());
         assert!(hover_text(ws.hover(&a, at(0))).contains("Edited"));
         let _ = fs::remove_dir_all(&root);
     }
@@ -533,7 +533,7 @@ mod tests {
         ws.completions(&path, lsp_types::Position::new(line, character), None)
     }
 
-    const DECK: &str = "::kind(vocabulary)\n::vocabulary(deck)\n\n::elements{\n  tile: {\n    display: block\n    args: {\n      label: {\n        type: string\n        positional: true\n        about: | The label.\n      }\n    }\n    about: | One tile.\n  }\n}\n";
+    const DECK: &str = "::kind(vocabulary)\n::vocabulary(deck)\n\n::elements(\n  tile: {\n    display: block\n    args: {\n      label: {\n        type: string\n        positional: true\n        about: | The label.\n      }\n    }\n    about: | One tile.\n  }\n)\n";
 
     /// After `@`, the elements of the vocabulary the document's `::kind` binds
     /// are offered with the built-in ones, which the text alone cannot know.
@@ -541,7 +541,7 @@ mod tests {
     fn at_offers_the_elements_of_the_vocabulary_in_scope() {
         let root = vault(
             "at",
-            "::kind(config)\n::vocabularies{ deck: @file(.tomet/vocabularies/deck.vocabulary.tmt) }\n",
+            "::kind(config)\n::vocabularies(deck: @file(.tomet/vocabularies/deck.vocabulary.tmt))\n",
             &[(".tomet/vocabularies/deck.vocabulary.tmt", DECK)],
         );
         let in_deck = completions_at_the_end(&root, "::kind(deck)\n\n@");

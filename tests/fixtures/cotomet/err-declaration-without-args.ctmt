@@ -1,0 +1,4 @@
+// A declaration is `::name(...)`; the parentheses are what make it one.
+::meta
+
+"tmtroot/a.tmt": "../a.tmt"

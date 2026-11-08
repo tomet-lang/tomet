@@ -174,7 +174,7 @@ pub fn from_markdown_with_options(src: &str, options: &ImportOptions) -> File {
         }
         if !had_id || !entries.is_empty() {
             let mut meta_declaration = declaration_new("meta");
-            meta_declaration.data.value = Some(tomet_ast::Group::from_map(Value::Map(entries)));
+            meta_declaration.data.args = Some(Value::Map(entries));
             header.push(meta_declaration);
         }
     }
@@ -215,9 +215,7 @@ pub fn from_markdown_with_options(src: &str, options: &ImportOptions) -> File {
             Event::InlineHtml(html) => {
                 if !matches!(stack.last(), Some(Frame::Discard)) {
                     let inline = match tomet_html::comment::parse(&html) {
-                        Some(text) => {
-                            Inline::Element(comment_element(&text, Placement::Inline))
-                        }
+                        Some(text) => Inline::Element(comment_element(&text, Placement::Inline)),
                         None => Inline::Text(Text::new(html.to_string(), Span::dummy())),
                     };
                     push_inline(&mut stack, inline);

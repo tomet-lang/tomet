@@ -1,0 +1,3 @@
+// An empty `{}` is still only `{...}`: write `@memo(){}`, or just `@memo()`.
+
+@memo{}

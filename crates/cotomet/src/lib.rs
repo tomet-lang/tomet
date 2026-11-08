@@ -114,7 +114,7 @@ mod tests {
     #[cfg(feature = "eval")]
     #[test]
     fn eval_feature_evaluates_expression() {
-        let src = "::macros{ vocab: \"vocabularies/${1}/${1}@${2}.vocabulary.tmt\" }\na: ${macro.vocab(\"writ\", \"1.0.0\")}\n";
+        let src = "::macros(vocab: \"vocabularies/${1}/${1}@${2}.vocabulary.tmt\")\na: ${macro.vocab(\"writ\", \"1.0.0\")}\n";
         let file = eval::eval_str(src, &[]).unwrap();
         let Value::Map(entries) = file.body else {
             panic!("expected map");
@@ -131,7 +131,7 @@ mod tests {
     #[test]
     fn a_file_may_open_with_declarations() {
         let f = parse_file(
-            "// header\n::kind(catalog, 2)\n::use(deck)\n::meta{ id: x, n: 1 }\n\n\"a/b\": 1\nm: { k: v }\n",
+            "// header\n::kind(catalog, 2)\n::use(deck)\n::meta(id: x, n: 1)\n\n\"a/b\": 1\nm: { k: v }\n",
         )
         .unwrap();
         assert_eq!(
@@ -148,8 +148,8 @@ mod tests {
                 ("use".to_string(), Some(text("deck")), None),
                 (
                     "meta".to_string(),
-                    None,
-                    Some(map(&[("id", text("x")), ("n", Value::Int(1))]))
+                    Some(map(&[("id", text("x")), ("n", Value::Int(1))])),
+                    None
                 ),
             ]
         );
@@ -175,8 +175,13 @@ mod tests {
         );
         let f = parse_file("::x{ c: 1 }(a)\n").unwrap();
         assert_eq!(f.header[0].data.args, Some(text("a")));
-        let f = parse_file("::draft\n").unwrap();
-        assert_eq!(declared(&f), [("draft".to_string(), None, None)]);
+        // `()` is a declaration's primary group, empty: `::draft` alone does not parse.
+        let f = parse_file("::draft()\n").unwrap();
+        assert_eq!(
+            declared(&f),
+            [("draft".to_string(), Some(Value::Map(vec![])), None)]
+        );
+        assert!(parse_file("::draft\n").is_err());
     }
 
     #[test]

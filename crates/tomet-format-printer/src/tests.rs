@@ -73,7 +73,7 @@ fn a_named_connect_round_trips_on_a_heading() {
 #[test]
 fn connects_survive_the_specially_printed_kinds() {
     for src in [
-        "@hr:rule(allow: list(card))\n",
+        "@hr():rule(allow: list(card))\n",
         "@raw[x]:rule(allow: list(card))\n",
     ] {
         let doc = tomet_ast_parser::parse_file(src).unwrap();
@@ -259,13 +259,13 @@ fn test_wikilink_no_space_setting() {
 
 #[test]
 fn test_nanoid_generation_and_ensure_document_id() {
-    let settings_src = r#"::fields{
+    let settings_src = r#"::fields(
   id: {
     type: nanoid
     length: 8
     prefix: "doc-"
   }
-}
+)
 "#;
     let cfg = load_config_from_str(settings_src).expect("failed to parse settings");
     let id_cfg = cfg.meta.fields.get("id").expect("id config present");
@@ -287,7 +287,7 @@ fn test_nanoid_generation_and_ensure_document_id() {
 
 #[test]
 fn test_nanoid_force_and_overwrite_behavior() {
-    let settings_src = r#"::fields{
+    let settings_src = r#"::fields(
   id: {
     type: nanoid
     length: 8
@@ -295,7 +295,7 @@ fn test_nanoid_force_and_overwrite_behavior() {
     force: true
     overwrite: true
   }
-}
+)
 "#;
     let cfg = load_config_from_str(settings_src).expect("failed to parse settings");
     let id_cfg = cfg.meta.fields.get("id").unwrap();
@@ -497,7 +497,7 @@ fn test_container_children_indentation() {
 
     let doc = File::new(Vec::new(), vec![Block::Element(links)], Span::dummy());
     let printed = document_to_tm(&doc);
-    assert!(printed.contains("@links{\n  (1)[note 1]\n  (2)[note 2]\n}"));
+    assert!(printed.contains("@links(){\n  (1)[note 1]\n  (2)[note 2]\n}"));
 
     // Verify re-parsing
     let re_parsed = tomet_ast_parser::parse_file(&printed).expect("valid doc");
@@ -640,7 +640,7 @@ fn test_headingless_section_printing() {
 /// does not become the `1.1` an `f64` prints.
 #[test]
 fn a_number_reading_would_change_is_printed_as_written() {
-    let src = "::meta{ rev: 1.10, ratio: 2.5, big: 12345678901234567890, zero: -0 }\n\n@x(1.10)\n";
+    let src = "::meta(rev: 1.10, ratio: 2.5, big: 12345678901234567890, zero: -0)\n\n@x(1.10)\n";
     let doc = tomet_ast_parser::parse_file(src).unwrap();
     let printed = document_to_tm_with_config(&doc, &PrinterConfig::default());
     for kept in [
@@ -685,7 +685,7 @@ fn escaped_line_start_constructs_round_trip() {
         "\\-. ordered\n",
         "\\``not line raw\n",
         "\\```not fence\n",
-        "\\::meta{a: 1}\n",
+        "\\::meta(a: 1)\n",
         "\\@standalone\n",
         "first line\n\\= second line\n\\- third line\n\\---\n",
     ] {
@@ -747,18 +747,232 @@ fn inline_raw_with_backtick_falls_back_to_at_raw() {
 
 #[test]
 fn a_block_value_in_a_group_keeps_every_block_it_holds() {
-    // `::macros{ name: [ ... ] }` is a `{...}` group, whose `key: [...]` values used to be printed
+    // `::macros(name: [ ... ])` is a `{...}` group, whose `key: [...]` values used to be printed
     // as paragraph inlines only: an element in one came out as `[]`.
     for src in [
-        "::macros{ card: [ @card(title: ${1})[ ${2} ] ] }\n",
-        "::macros{ two: [\none ${1}\n\n@card[ x ]\n] }\n",
-        "::macros{ note: [ Note: ${msg} ] }\n",
+        "::macros(card: [ @card(title: ${1})[ ${2} ] ])\n",
+        "::macros(two: [\none ${1}\n\n@card[ x ]\n])\n",
+        "::macros(note: [ Note: ${msg} ])\n",
     ] {
         let before = tomet_ast_parser::parse_file(src).unwrap();
         let printed = document_to_tm(&before);
         assert!(!printed.contains("[]"), "{src:?} printed as {printed:?}");
         let after = tomet_ast_parser::parse_file(&printed).expect("the print reparses");
         assert_eq!(before, after, "{src:?} printed as {printed:?}");
-        assert_eq!(document_to_tm(&after), printed, "{src:?}: printing is not stable");
+        assert_eq!(
+            document_to_tm(&after),
+            printed,
+            "{src:?}: printing is not stable"
+        );
     }
+}
+
+// --- a nexus is always printed on a primary group --------------------------
+
+/// An element with neither `(args)` nor `[content]` is printed `@name()`: bare, or with only its
+/// `{value}`, `#(id)` or a `:connect`, it would not read back.
+#[test]
+fn an_element_without_a_primary_group_is_printed_with_an_empty_one() {
+    let value = Group::from_map(Value::Map(vec![("a".to_string(), Value::Int(1))]));
+
+    let bare = element_new(Name::bare("memo"));
+    let mut with_value = element_new(Name::bare("memo"));
+    with_value.data.value = Some(value.clone());
+    let mut with_id = element_new(Name::bare("memo"));
+    with_id.id = Some(tomet_ast::Id("x".into()));
+    let mut with_connect = element_new(Name::bare("memo"));
+    with_connect.connects.push(tomet_ast::Connect {
+        name: Name::bare("rule"),
+        data: Data {
+            args: Some(Value::Map(vec![("k".to_string(), Value::Int(1))])),
+            value: None,
+        },
+        content: None,
+        span: Span::dummy(),
+    });
+
+    for (el, expected) in [
+        (bare, "@memo()"),
+        (with_value, "@memo(){ a: 1 }"),
+        (with_id, "@memo()#(x)"),
+        (with_connect, "@memo():rule(k: 1)"),
+    ] {
+        let doc = File::new(Vec::new(), vec![Block::Element(el)], Span::dummy());
+        let printed = document_to_tm(&doc);
+        assert_eq!(printed.trim(), expected);
+        let again = tomet_ast_parser::parse_file(&printed).expect(expected);
+        assert!(matches!(&again.body[0], Block::Element(_)), "{expected}");
+    }
+}
+
+#[test]
+fn an_element_that_has_a_primary_group_gets_no_extra_one() {
+    for src in ["@memo(a: 1)\n", "@memo[x]\n", "@memo(a: 1){ b: 2 }#(i)\n"] {
+        let doc = tomet_ast_parser::parse_file(src).unwrap();
+        assert_eq!(document_to_tm(&doc), src);
+    }
+}
+
+#[test]
+fn a_named_connect_is_printed_on_a_primary_group() {
+    let mut el = element_new(Name::bare("memo"));
+    el.data.args = Some(Value::Map(vec![("a".to_string(), Value::Int(1))]));
+    el.connects.push(tomet_ast::Connect {
+        name: Name::bare("rule"),
+        data: Data {
+            args: None,
+            value: Some(Group::from_map(Value::Map(vec![(
+                "k".to_string(),
+                Value::Int(1),
+            )]))),
+        },
+        content: None,
+        span: Span::dummy(),
+    });
+    let doc = File::new(Vec::new(), vec![Block::Element(el)], Span::dummy());
+    let printed = document_to_tm(&doc);
+    assert_eq!(printed.trim(), "@memo(a: 1):rule(){ k: 1 }");
+    let again = tomet_ast_parser::parse_file(&printed).unwrap();
+    let Block::Element(back) = &again.body[0] else {
+        panic!("expected an element")
+    };
+    assert_eq!(back.connects.len(), 1);
+}
+
+#[test]
+fn a_callout_without_a_primary_group_is_printed_with_an_empty_one() {
+    for style in ["expanded", "block", "box"] {
+        let cfg = PrinterConfig {
+            format: FormatConfig {
+                callout_content_style: Some(style.to_string()),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        let doc = File::new(
+            Vec::new(),
+            vec![Block::Element(element_new(Name::bare("callout")))],
+            Span::dummy(),
+        );
+        let printed = document_to_tm_with_config(&doc, &cfg);
+        assert_eq!(printed.trim(), "@callout()", "{style}");
+        assert!(tomet_ast_parser::parse_file(&printed).is_ok(), "{style}");
+    }
+}
+
+#[test]
+fn a_declaration_without_a_primary_group_is_printed_with_an_empty_one() {
+    let decl = tomet_ast::Declaration {
+        name: Name::bare("thing"),
+        data: Data::default(),
+        content: None,
+        id: None,
+        span: Span::dummy(),
+    };
+    let doc = File::new(vec![decl], Vec::new(), Span::dummy());
+    let printed = document_to_tm(&doc);
+    assert_eq!(printed.trim(), "::thing()");
+    assert_eq!(
+        tomet_ast_parser::parse_file(&printed).unwrap().header.len(),
+        1
+    );
+}
+
+/// `@hr` has its own spelling, `---`; with a group it has none, and is a nexus like any other.
+#[test]
+fn a_thematic_break_is_printed_as_dashes_and_never_as_a_bare_hr() {
+    for src in ["---\n", "---[ title ]---\n", "@hr()\n"] {
+        let doc = tomet_ast_parser::parse_file(src).unwrap();
+        let printed = document_to_tm(&doc);
+        assert!(
+            !printed.contains("@hr\n") && !printed.trim_end().ends_with("@hr"),
+            "{printed:?}"
+        );
+        let again = tomet_ast_parser::parse_file(&printed).unwrap();
+        assert!(matches!(&again.body[0], Block::Element(el) if el.name == Name::bare("hr")));
+    }
+    let mut hr = element_new(Name::bare("hr"));
+    hr.data.value = Some(Group::from_map(Value::Map(vec![(
+        "a".to_string(),
+        Value::Int(1),
+    )])));
+    let doc = File::new(Vec::new(), vec![Block::Element(hr)], Span::dummy());
+    assert_eq!(document_to_tm(&doc).trim(), "@hr(){ a: 1 }");
+}
+
+/// A nexus with a primary group and a pipe run, a nameless connect, and the sugar kept for the
+/// forms that are not nexuses all print back as they were read.
+#[test]
+fn the_forms_that_stay_valid_round_trip() {
+    for src in [
+        "@table\n| a | b\n",
+        "@el(a: 1):{b: 2}\n",
+        "- item :{a: 1}\n",
+        "= heading {a: 1}\n",
+        "- #(id)\n",
+        "==#(id)\n",
+    ] {
+        let doc = tomet_ast_parser::parse_file(src).unwrap_or_else(|e| panic!("{src:?}: {e}"));
+        let printed = document_to_tm(&doc);
+        let again = tomet_ast_parser::parse_file(&printed)
+            .unwrap_or_else(|e| panic!("{src:?} printed as {printed:?}: {e}"));
+        assert_eq!(document_to_tm(&again), printed, "{src:?}");
+    }
+}
+
+// --- declarations are printed on their parentheses -----------------------------
+
+/// The twelve standard declarations that hold their content in `(...)` are printed as
+/// `::name(...)`, in the same shape they were read, and the print reads back to the same tree.
+#[test]
+fn a_declaration_of_entries_is_printed_in_parentheses_and_reads_back() {
+    for src in [
+        "::meta(title: Hello, draft: true)\n",
+        "::meta()\n",
+        "::macros(gh: \"https://x/${1}\")\n",
+        "::macros()\n",
+        "::vars(n: {type: int, default: 3})\n",
+        "::format(link: {no_space: true})\n",
+        "::fields(tags: {type: list(string)})\n",
+        "::workspace(ignore: list(a, b))\n",
+        "::export(type: html)\n",
+        "::blueprints(daily: @file(b.tmt))\n",
+        "::vocabularies(deck: @file(deck.tmt))\n",
+        "::dictionaries(tomet: @file(dict.tmt))\n",
+        "::migration(source: obsidian)\n",
+        "::elements(card: {}, ref: {})\n",
+    ] {
+        let before = tomet_ast_parser::parse_file(src).unwrap();
+        let printed = document_to_tm(&before);
+        assert_eq!(printed, src, "{src:?} is printed as written");
+        let after = tomet_ast_parser::parse_file(&printed).expect("the print reparses");
+        assert_eq!(before.header[0].data, after.header[0].data, "{src:?}");
+    }
+}
+
+/// `::vocabulary`, `::blueprint` and `::dictionary` keep a `{...}` body after their parentheses.
+#[test]
+fn a_declaration_with_a_body_keeps_its_braces() {
+    for src in [
+        "::vocabulary(deck){ version: 1.0.0, open: true }\n",
+        "::blueprint(note){ description: \"A note\" }\n",
+        "::dictionary(tomet){ term: @term[desc] }\n",
+    ] {
+        let before = tomet_ast_parser::parse_file(src).unwrap();
+        assert!(before.header[0].data.value.is_some(), "{src:?}");
+        let printed = document_to_tm(&before);
+        assert_eq!(printed, src, "{src:?} is printed as written");
+        assert_eq!(tomet_ast_parser::parse_file(&printed).unwrap(), before);
+    }
+}
+
+/// A declaration built with no group at all is still printed so that it reads back: `::meta()`.
+#[test]
+fn a_declaration_without_a_group_is_printed_with_an_empty_one() {
+    let doc = File::new(
+        vec![tomet_tree::declaration_new("macros")],
+        Vec::new(),
+        Span::dummy(),
+    );
+    assert_eq!(document_to_tm(&doc), "::macros()\n");
 }

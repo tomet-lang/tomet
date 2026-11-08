@@ -21,8 +21,8 @@ fn messages(source: &str) -> Vec<String> {
 fn a_document_that_needs_nothing_from_outside_has_no_findings() {
     let source = "\
 ::profile(standalone)
-::macros{ gh: \"https://x/${1}\" }
-::vars{ topic: { type: string, default: \"a\" } }
+::macros(gh: \"https://x/${1}\")
+::vars(topic: { type: string, default: \"a\" })
 
 See ${macro.gh(1)} on ${var.topic}, a ${self.kind} and ${add(1, 2)}.
 ";
@@ -65,9 +65,9 @@ fn an_expression_is_found_wherever_it_is_written() {
         ("a heading", "=[ T ${self.path} ]\n"),
         ("a list item", "- ${self.path} x\n"),
         ("an element's content", "@note[ ${self.path} ]\n"),
-        ("an element's value", "@note{ k: ${self.path} }\n"),
+        ("an element's value", "@note(){ k: ${self.path} }\n"),
         ("an element's argument", "@note(k: ${self.path})\n"),
-        ("a declaration's data", "::meta{ k: ${self.path} }\n"),
+        ("a declaration's data", "::meta(k: ${self.path})\n"),
         ("a section's value", "=[ T ]{ k: ${self.path} }\n"),
         ("a connect", "@note[ x ]:rule(k: ${self.path})\n"),
     ];

@@ -86,7 +86,7 @@ fn printed_source_parses() {
     // parse -> print -> parse. This asserts only that `tomet-printer`
     // emits syntax `tomet-parser` accepts, not that the round trip is an
     // identity: the printer is a *styling* serializer and applies
-    // `PrinterConfig` defaults, so e.g. a bare `::meta{...}` may come back
+    // `PrinterConfig` defaults, so e.g. a bare `::meta(...)` may come back
     // multi-line (`meta.always_newline`) -- a different AST shape for the
     // same meaning. What the printer actually emits is pinned by
     // `snapshot.rs`'s `printed_source_matches_reference` instead.
@@ -245,7 +245,7 @@ fn a_hole_survives_print_and_parse() {
         "<?alt(doc, list([adr-<?int(n)>], [rfc-<?int(n)>]))>",
         "@link(url: <?(u)>)[<?(text)>]",
         "<?tandr.heading(h)>",
-        "@meta{ type: <?(kind)> }",
+        "@meta(){ type: <?(kind)> }",
         "--out <PATH> and Vec<T>",
     ] {
         let before = tomet_ast_parser::parse_file(src)

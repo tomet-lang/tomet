@@ -609,14 +609,17 @@ module.exports = grammar({
     // expresses by listing the rule among `_block`s, so a `::` in the
     // middle of a line (`std::vec`) is lexed as the two `:` it is. The
     // real parser reads what follows the name exactly as it does after
-    // an `@`, and so does this.
+    // an `@`, and so does this: a nexus needs a primary group, so
+    // `::meta(a: 1)` is a declaration and `::meta{ a: 1 }` is an error
+    // (see `_nexus_groups`). `::vocabulary(ns){ ... }` keeps its `{...}`
+    // body as a secondary group after its `(ns)`.
     document_element: ($) =>
       prec.right(
         3,
         seq(
           token(prec(2, "::")),
           field("name", $._element_name),
-          repeat(choice($._element_group, $.connect, $.id_group)),
+          $._nexus_groups,
         ),
       ),
     // `prec.right(3, ...)` wraps the *whole* rule (not just the trailing
@@ -637,9 +640,45 @@ module.exports = grammar({
         seq(
           "@",
           optional(field("name", $._element_name)),
+          optional($._nexus_groups),
+        ),
+      ),
+    // ---- the nexus rule ---------------------------------------------
+    //
+    // `@name`, `::name` and `:name` are nexus points: they take groups, and the
+    // groups are not equal. `(args)`, `[content]` and a `|` run are the
+    // *primary* groups; `{value}`, `#(id)` and a `:connect` only add to one
+    // and cannot stand as the first group on their own. So `@name(...)` and
+    // `@name[...]` are elements, `@name{}`, `@name#(id)`, `@name:rule(...)`
+    // are errors, and a primary group may follow the secondary ones
+    // (`@name{...}(...)`) as in the real parser. `tomet-parser`'s
+    // `tomet-syntax-cst-parser` doc has the same rule in prose.
+    //
+    // Two shapes are exempt, both of the *inline* `@name` alone and neither a
+    // nexus error in the real parser: no group at all is prose, and a nameless
+    // `:{...}` / `:(...)` connect is a plain group. This rule is the
+    // only place the grammar says "primary first"; the three element-shaped
+    // rules call it instead of repeating the groups.
+    //
+    // Known simplification: the real parser also reports a block-level bare
+    // `@name` as an error (`@name()` is the empty element), since the line is
+    // an element rather than a word in a paragraph. Position is not
+    // something this grammar sees (see `element`), so a bare `@name` is
+    // accepted wherever it stands.
+    _nexus_groups: ($) =>
+      prec.right(
+        3,
+        seq(
+          repeat(choice($.value_group, $.id_group)),
+          $._primary_group,
           repeat(choice($._element_group, $.connect, $.id_group)),
         ),
       ),
+    // The groups that make a nexus: `(args)`, `[content]`, and the `|` run
+    // that stands for a `[content]` without its brackets (`@table` then `|`
+    // rows on the next lines).
+    _primary_group: ($) =>
+      choice($.args_group, $.content_group, $.marked_content),
     // Two adjacent `optional($._blank_gap)` around an optional middle
     // piece is ambiguous (nothing forces how a run of blank lines splits
     // between "leading" and "trailing" when the middle is absent), so
@@ -649,7 +688,7 @@ module.exports = grammar({
     //
     // The opening `(`/`[`/`{` are wrapped in `prec(1, ...)`: once
     // `extras` (inline whitespace) sits between an element's sigil and
-    // its first group -- `@links {` rather than `@links{` -- that same
+    // its first group -- `@links() {` rather than `@links(){` -- that same
     // character is *also* reachable as a fresh `_line_item` via
     // `punctuation` (an equal-length, 1-character match), and precedence
     // is what breaks an equal-length lexer tie in `punctuation`'s favor
@@ -690,8 +729,8 @@ module.exports = grammar({
     // `{...}` is always data. Entries are read uniformly, each a
     // `key: value` pair, a bare `(marker)[content]` entry, or a named
     // element, in source order -- nothing here consults the enclosing
-    // element's name. `@links{ (1)[a] note: x (2)[b] }` and
-    // `@element(c){ display: block @args{ @param(id){} } }` are the two
+    // element's name. `@links(){ (1)[a] note: x (2)[b] }` and
+    // `@element(c){ display: block @args(){ @param(id){} } }` are the two
     // shapes that needs.
     //
     value_group: ($) =>
@@ -706,8 +745,8 @@ module.exports = grammar({
         "}",
       ),
     // A `{...}` group's elements: bare `(args)[content]` entries whose
-    // container supplies the type (`@links{ (1)[...] (2)[...] }`), and
-    // named ones (`@element(c){ @args{ @param(id){} } }`), which is how
+    // container supplies the type (`@links(){ (1)[...] (2)[...] }`), and
+    // named ones (`@element(c){ @args(){ @param(id){} } }`), which is how
     // a vocabulary declares an element's slots.
     //
     // Pairs and elements in the *same* group are a shape the real
@@ -796,6 +835,8 @@ module.exports = grammar({
         seq(
           token(prec(1, ":")),
           field("name", $._element_name),
+          repeat(choice($.value_group, $.id_group)),
+          $._primary_group,
           repeat(choice($._plain_group, $.id_group)),
         ),
       ),
@@ -833,7 +874,7 @@ module.exports = grammar({
     // the block level), so groups that tolerate embedded blank lines
     //
     // No `$.call` alternative here (see this crate's module doc for
-    // why `@id(list(a, b))`/`@meta{list(a, b)}` -- a bare `list(...)`
+    // why `@id(list(a, b))`/`::meta(list(a, b))` -- a bare `list(...)`
     // occupying the *whole* `(args)`/`{value}` -- still errors,
     // unlike `a: list(...)` under a named key).
     value: ($) => choice($.map, $.string, $.interpolation, $.scalar),

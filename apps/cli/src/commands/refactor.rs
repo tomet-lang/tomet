@@ -135,13 +135,13 @@ mod tests {
         let src_file = temp_dir.join("doc.tmt");
 
         let src_content = r#"::version(1.0)
-::meta{
+::meta(
   type: note
   title: "My Title"
-}
-::macros{
+)
+::macros(
   gh: "https://github.com/${1}"
-}
+)
 
 - @link("https://github.com/tomet/tomet")[Repo]
 "#;
@@ -167,11 +167,11 @@ mod tests {
         let _ = fs::create_dir_all(&frozen_dir);
         fs::write(
             vault.join(tomet_load_config::VAULT_CONFIG_FILE),
-            "::kind(config)\n::workspace{ unswept: list(\"tests/fixtures\") }\n",
+            "::kind(config)\n::workspace(unswept: list(\"tests/fixtures\"))\n",
         )
         .unwrap();
         let frozen = frozen_dir.join("f.tmt");
-        let old = "::meta{\n  type: note\n}\n";
+        let old = "::meta(\n  type: note\n)\n";
         fs::write(&frozen, old).unwrap();
 
         refactor_cmd(&frozen, true, false, false, false, false, false).unwrap();

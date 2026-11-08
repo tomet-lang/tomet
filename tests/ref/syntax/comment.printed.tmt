@@ -1,6 +1,6 @@
 ::kind(fixture)
 
-::meta{x: 1}
+::meta(x: 1)
 
 =[ブロックコメント]
 @comment[ここは出力先のソースにだけ残る注記。]

@@ -4,9 +4,9 @@
 =[ 全容 ]
 
 ```tm
-::vocabularies{
+::vocabularies(
   deck: @file(tmtroot/schema/vocabularies/deck.vocabulary.tmt)
-}
+)
 ```
 
 この vault が使う語彙のファイルを、名前をつけて登録する。キーは、ファイルが `::vocabulary(deck)` で名乗る名前空間。登録の決まりは @file(tmtroot/spec/declarations/std.blueprints.declaration.tmt) と同じ。

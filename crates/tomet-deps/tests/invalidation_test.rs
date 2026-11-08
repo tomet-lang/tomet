@@ -307,3 +307,14 @@ Check out @link("guide/setup") or @embed("snippets/code").
         .expect("should have embed to snippets/code");
     assert_eq!(embed_dep.kind, DependencyKind::Embed);
 }
+
+/// What a document exports includes what its `::meta(...)` says: the fields are the entries of the
+/// parentheses, and changing one changes the hash.
+#[test]
+fn test_exports_hash_follows_the_fields_of_meta() {
+    let hash = |src: &str| tomet_deps::extract_exports_hash(&parse_file(src).unwrap());
+    assert_ne!(hash("::meta(title: One)\n"), hash("::meta(title: Two)\n"));
+    assert_ne!(hash("::meta(a: 1)\n"), hash("::meta(b: 1)\n"));
+    assert_eq!(hash("::meta(a: 1)\n"), hash("::meta(a: 1)\n"));
+    assert_ne!(hash("::kind(note)\n"), hash("::kind(memo)\n"));
+}

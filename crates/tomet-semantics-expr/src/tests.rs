@@ -523,7 +523,10 @@ fn a_function_is_not_data() {
 #[test]
 fn a_macro_fills_positional_and_named_placeholders() {
     let mut macros = HashMap::new();
-    macros.insert("gh".to_string(), Value::String("https://x/issues/${1}".to_string()));
+    macros.insert(
+        "gh".to_string(),
+        Value::String("https://x/issues/${1}".to_string()),
+    );
     macros.insert("who".to_string(), Value::String("hi ${name}".to_string()));
     let run = |src: &str| run_with(src, Phase::Output, &EvalValue::Null, &macros);
     assert_eq!(run("macro.gh(12)").unwrap(), text("https://x/issues/12"));
@@ -537,7 +540,10 @@ fn a_macro_fills_positional_and_named_placeholders() {
 #[test]
 fn macro_bare_word_argument_is_unknown_name() {
     let mut macros = HashMap::new();
-    macros.insert("gh".to_string(), Value::String("https://x/issues/${1}".to_string()));
+    macros.insert(
+        "gh".to_string(),
+        Value::String("https://x/issues/${1}".to_string()),
+    );
     let run = |src: &str| run_with(src, Phase::Output, &EvalValue::Null, &macros);
     assert_eq!(
         run("macro.gh(tomet)"),
@@ -581,10 +587,10 @@ fn named_arguments_outside_a_call_are_rejected() {
 // ---- documents, addresses, directories -------------------------------------
 
 const HERE: &str = "::kind(note)
-::meta{
+::meta(
   title: Here
   tags: list(a, b)
-}
+)
 
 @card(n: 0)
 
@@ -595,16 +601,16 @@ Some body.
 @card(n: 1, tags: list(x, y, z)){ extra: yes }#(c1)
 ";
 
-const DOC_A: &str = "::meta{
+const DOC_A: &str = "::meta(
   title: A
-}
+)
 
 @card(x: 7)#(top)
 ";
 
-const DOC_B: &str = "::meta{
+const DOC_B: &str = "::meta(
   title: B
-}
+)
 ";
 
 fn vault() -> MemoryResolver {
@@ -1180,7 +1186,7 @@ fn unicode_takes_a_code_point_as_a_number_or_hex_text() {
 // ---- include ----------------------------------------------------------------
 
 const GUIDE: &str = "::kind(note)
-::meta{ title: Guide }
+::meta(title: Guide)
 
 =[ Install ]#(install)
 
@@ -1205,7 +1211,7 @@ fn guide_vault() -> MemoryResolver {
     MemoryResolver::new()
         .with_source("docs/guide.tmt", GUIDE)
         .unwrap()
-        .with_source("here.tmt", "::meta{ title: Here }\n")
+        .with_source("here.tmt", "::meta(title: Here)\n")
         .unwrap()
         .with_source("docs/sub/host.tmt", "Host\n")
         .unwrap()
@@ -1748,18 +1754,15 @@ fn eval_value_number_preserves_written_representation_and_computes_numerically()
     );
 }
 
-// ---- block macros: `::macros{ name: [ ... ] }` ----
+// ---- block macros: `::macros(name: [ ... ])` ----
 
 /// The `[ ... ]` value of the first entry of the `::macros` declaration in `src`.
 fn block_macro(src: &str) -> Value {
     let file = tomet_ast_parser::parse_file(src).expect("parses");
-    let Some(tomet_ast::Group(entries)) = &file.header[0].data.value else {
-        panic!("expected a {{...}} group");
+    let Some(Value::Map(entries)) = &file.header[0].data.args else {
+        panic!("expected `(name: template)` entries");
     };
-    let tomet_ast::Entry::Pair(_, value) = &entries[0] else {
-        panic!("expected a key: value entry");
-    };
-    value.clone()
+    entries[0].1.clone()
 }
 
 fn macros_of(entries: &[(&str, Value)]) -> HashMap<String, Value> {
@@ -1774,9 +1777,12 @@ fn a_block_macro_is_its_blocks_with_the_places_filled_in() {
     let macros = macros_of(&[
         (
             "card",
-            block_macro("::macros{ card: [\n@card(title: ${1})[ ${2} ]\n] }\n"),
+            block_macro("::macros(card: [\n@card(title: ${1})[ ${2} ]\n])\n"),
         ),
-        ("notice", block_macro("::macros{ notice: [ Notice: ${msg} ] }\n")),
+        (
+            "notice",
+            block_macro("::macros(notice: [ Notice: ${msg} ])\n"),
+        ),
     ]);
     let run = |src: &str| run_with(src, Phase::Output, &EvalValue::Null, &macros);
 
@@ -1814,10 +1820,7 @@ fn a_block_macro_is_its_blocks_with_the_places_filled_in() {
 
 #[test]
 fn a_number_given_to_a_block_macro_stays_a_number_in_data() {
-    let macros = macros_of(&[(
-        "n",
-        block_macro("::macros{ n: [\n@meter(of: ${1})\n] }\n"),
-    )]);
+    let macros = macros_of(&[("n", block_macro("::macros(n: [\n@meter(of: ${1})\n])\n"))]);
     let run = |src: &str| run_with(src, Phase::Output, &EvalValue::Null, &macros);
     let EvalValue::Fragment(blocks) = run("macro.n(7)").unwrap() else {
         panic!("a block macro is a fragment");
@@ -1836,10 +1839,13 @@ fn a_block_macro_checks_its_arguments_as_a_text_macro_does() {
     let macros = macros_of(&[
         (
             "card",
-            block_macro("::macros{ card: [\n@card(title: ${1})[ ${2} ]\n] }\n"),
+            block_macro("::macros(card: [\n@card(title: ${1})[ ${2} ]\n])\n"),
         ),
-        ("notice", block_macro("::macros{ notice: [ Notice: ${msg} ] }\n")),
-        ("none", block_macro("::macros{ none: [ plain ] }\n")),
+        (
+            "notice",
+            block_macro("::macros(notice: [ Notice: ${msg} ])\n"),
+        ),
+        ("none", block_macro("::macros(none: [ plain ])\n")),
     ]);
     let run = |src: &str| run_with(src, Phase::Output, &EvalValue::Null, &macros);
     assert_eq!(
@@ -1852,7 +1858,9 @@ fn a_block_macro_checks_its_arguments_as_a_text_macro_does() {
     );
     assert_eq!(
         run("macro.notice()"),
-        Err(EvalError::message("macro.notice expects named argument `msg`"))
+        Err(EvalError::message(
+            "macro.notice expects named argument `msg`"
+        ))
     );
     assert_eq!(
         run("macro.none(1)"),

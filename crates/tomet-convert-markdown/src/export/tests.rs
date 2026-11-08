@@ -72,7 +72,7 @@ fn directives_have_no_markdown_output() {
     for src in [
         "::export(path:out.md)\n",
         "::use(deck)\n",
-        "::meta{type: note}\n",
+        "::meta(type: note)\n",
     ] {
         let doc = tomet_ast_parser::parse_file(src).unwrap();
         assert_eq!(to_markdown(&doc).trim(), "", "for {src:?}");
@@ -621,7 +621,10 @@ fn a_comment_exports_as_an_html_comment() {
     assert_eq!(to_markdown(&doc), "<!-- A block comment -->\n\n");
 
     let doc = tomet_ast_parser::parse_file("before @comment[ an inline comment ] after\n").unwrap();
-    assert_eq!(to_markdown(&doc).trim(), "before <!-- an inline comment --> after");
+    assert_eq!(
+        to_markdown(&doc).trim(),
+        "before <!-- an inline comment --> after"
+    );
 }
 
 #[test]

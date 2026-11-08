@@ -4,10 +4,10 @@
 =[ 全容 ]
 
 ```tm
-::workspace{
+::workspace(
   ignore: list( "00-09 System/01 Apps/obsidian" )
   unswept: list( "tests/fixtures", "tests/ref" )
-}
+)
 ```
 
 どのパスが vault の一部かを決める。パスは vault のルートからの相対で書く。

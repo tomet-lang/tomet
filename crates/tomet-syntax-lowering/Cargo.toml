@@ -15,3 +15,6 @@ tomet-tree     = { workspace = true }
 tomet-lexer    = { workspace = true }
 #--- Crates.io ---
 unicode-width = { workspace = true }
+
+[dev-dependencies]
+tomet-cst-parser = { workspace = true }

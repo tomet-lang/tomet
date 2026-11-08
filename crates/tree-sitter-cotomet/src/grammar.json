@@ -58,20 +58,12 @@
             }
           },
           {
-            "type": "CHOICE",
-            "members": [
-              {
-                "type": "FIELD",
-                "name": "arguments",
-                "content": {
-                  "type": "SYMBOL",
-                  "name": "arguments"
-                }
-              },
-              {
-                "type": "BLANK"
-              }
-            ]
+            "type": "FIELD",
+            "name": "arguments",
+            "content": {
+              "type": "SYMBOL",
+              "name": "arguments"
+            }
           },
           {
             "type": "CHOICE",
@@ -109,7 +101,11 @@
             "members": [
               {
                 "type": "SYMBOL",
-                "name": "_value"
+                "name": "pair"
+              },
+              {
+                "type": "SYMBOL",
+                "name": "_bare_value"
               },
               {
                 "type": "STRING",

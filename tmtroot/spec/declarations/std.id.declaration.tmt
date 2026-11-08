@@ -17,7 +17,7 @@
 
 =[ `::meta` には書かない ]
 
-`::meta{ id: ... }` は旧い書き方。tomet 自身が読む文書の性質は `::meta` から出ていて（種別が `::kind` になったのと同じ）、`id` もその一つ。`::meta` に書くと `tomet check` が報告する。手元の文書を移すには:
+`::meta(id: ...)` は旧い書き方。tomet 自身が読む文書の性質は `::meta` から出ていて（種別が `::kind` になったのと同じ）、`id` もその一つ。`::meta` に書くと `tomet check` が報告する。手元の文書を移すには:
 
 ```bash
 tomet refactor --check --meta-id .   # 残っている箇所を数える
@@ -32,4 +32,4 @@ tomet refactor --in-place --meta-id .
 
 - vault の文書のあいだでの一意性。そうあるべきだが、検査していない。
 - `::id` から文書を引く道。`ref:` はファイル名で引くだけで、`::id` を読まない。
-- 識別子を作る設定（`type` `length` `prefix` `force` `overwrite`）の置き場所。いまは `::fields{ id: { ... } }` に書き、読むのは `tomet convert` だけ。置き場所は未定。
+- 識別子を作る設定（`type` `length` `prefix` `force` `overwrite`）の置き場所。いまは `::fields(id: { ... })` に書き、読むのは `tomet convert` だけ。置き場所は未定。

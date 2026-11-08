@@ -1,0 +1,4 @@
+// A declaration without `(...)`: `::meta` alone is not one; the empty declaration is `::meta()`.
+
+::kind(fixture)
+::meta

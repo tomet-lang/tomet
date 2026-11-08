@@ -12,6 +12,11 @@
 //! - (Nesting Limit)
 //!   -| Past [`tomet_cst::MAX_DEPTH`] levels the CST keeps the text flat in a `TOO_DEEP` node,
 //!    | and lowering refuses it with an error.
+//! - (Nexus Primary Group)
+//!   -| Lowering refuses a nexus (`@name`, `::name`, `:name`) without a primary group, `(args)`
+//!    | or `[content]`, at the nexus, before it reads any group: a nameless `:(...)` connect would
+//!    | otherwise merge into the args and pass for them. A `::` declaration takes no connect.
+//!    | The grammar is in the `tomet-cst-parser` crate docs.
 
 pub mod element;
 pub mod error;
@@ -23,3 +28,6 @@ pub mod value;
 pub use error::{Error, Result};
 pub use lower::{is_declaration, lower_declaration, lower_file};
 pub use value::{lower_data_file, lower_value};
+
+#[cfg(test)]
+mod tests;

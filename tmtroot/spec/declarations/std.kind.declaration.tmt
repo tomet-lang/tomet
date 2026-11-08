@@ -42,12 +42,12 @@
 
 ```tm
 ::kind(config)
-::meta{
+::meta(
   id: doc-kWBcIUUz
-}
+)
 ```
 
-種別は `::meta` の中には書かない。`::meta{ type: ... }` は旧い書き方で、
+種別は `::meta` の中には書かない。`::meta(type: ...)` は旧い書き方で、
 `::kind` に置き換わっている。手元の文書を移すには:
 
 ```bash

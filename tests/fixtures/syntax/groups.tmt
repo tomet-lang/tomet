@@ -45,10 +45,10 @@
 宣言する形はこれが無いと書けない。
 
 @element(card){
-  @args{
+  @args(){
     @param(id){ type: uint, positional: true }[ 通し番号。 ]
   }
-  @data{ open: false }
+  @data(){ open: false }
 }[
   カード一枚。
 ]

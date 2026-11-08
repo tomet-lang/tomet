@@ -5,7 +5,7 @@ vocabulary は、ある kind の文書が使える要素の名前と、その要
 ::kind(vocabulary)
 ::vocabulary(deck){ version: "1.0.0" }
 
-::elements{
+::elements(
   card: {
     display: block
     about: | カード一枚。
@@ -18,7 +18,7 @@ vocabulary は、ある kind の文書が使える要素の名前と、その要
       }
     }
   }
-}
+)
 ```
 
 `version:` は版で、`1.0.0` や `1.10` のように、ピリオドで区切った整数

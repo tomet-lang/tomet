@@ -105,7 +105,7 @@ fn pandoc_output_matches_reference() {
 /// returns to the `{...}` group it was written in.
 #[test]
 fn a_bare_entry_does_not_come_back_as_an_element_named_bare() {
-    let src = "@deck.card{ title: t, (a)[ x ] }\n";
+    let src = "@deck.card(){ title: t, (a)[ x ] }\n";
     let doc = tomet_ast_parser::parse_file(src).unwrap();
     let back = tomet_pandoc::from_pandoc(&tomet_pandoc::to_pandoc(&doc));
 

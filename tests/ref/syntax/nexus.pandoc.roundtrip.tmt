@@ -1,0 +1,51 @@
+=[Primary groups]
+@memo[]
+
+@memo[本文]
+
+@memo[]{ a: "1" }
+
+@memo[本文]{ a: "1" }
+
+@memo[本文]{ value: a }#(first)
+
+=[Secondary groups follow a primary one]
+@memo[]{ k: v }
+
+@memo[]#(second)
+
+@memo[]{ a: "1", k: v }#(third)
+
+@memo[]{ k: v }#(fourth)
+
+=[Connects]
+A nameless connect `:{...}` or `:(...)` is the one place `{...}` stands without
+a nexus of its own: it puts data into the host it follows.
+
+@memo[]{ a: "1", b: "2" }
+
+@memo[]{ b: "2" }
+
+@memo[]{ a: "1", b: "2" }
+
+- 項目
+
+- 項目
+
+- 項目
+
+=[見出し] {k: v}
+
+=[見出し]
+
+=[In running text]
+An `@` with no group after it is prose: me@example.com, or a mention of @someone.
+An empty element is written with its group: a @memo[] in a sentence, or a
+@memo[body] with content.
+
+=[In a list]
+- @memo[]{ a: "1" }
+
+- @memo[本文]
+
+- @memo[]

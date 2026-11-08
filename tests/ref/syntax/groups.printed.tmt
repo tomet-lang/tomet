@@ -39,8 +39,8 @@
 宣言する形はこれが無いと書けない。
 
 @element(card)[カード一枚。]{
-  @args{ @param(id)[通し番号。]{ type: uint, positional: true } }
-  @data{ open: false }
+  @args(){ @param(id)[通し番号。]{ type: uint, positional: true } }
+  @data(){ open: false }
 }
 
 行頭にあって行を終える要素はブロック配置になる。`[content]` の中と同じ規則で、

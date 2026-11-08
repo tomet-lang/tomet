@@ -1,0 +1,37 @@
+= Primary groups
+
+// tomet:memo
+本文
+
+// tomet:memo
+本文
+
+// tomet:memo
+本文
+
+= Secondary groups follow a primary one
+
+= Connects
+
+A nameless connect `:{...}` or `:(...)` is the one place `{...}` stands without a nexus of its own: it puts data into the host it follows.
+
+- 項目
+
+- 項目
+
+- 項目
+
+= 見出し
+
+= 見出し
+
+= In running text
+
+An `@` with no group after it is prose: me\@example.com, or a mention of \@someone. An empty element is written with its group: a  in a sentence, or a body with content.
+
+= In a list
+
+- 
+- 本文
+- 
+

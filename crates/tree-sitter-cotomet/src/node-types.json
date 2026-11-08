@@ -16,6 +16,10 @@
           "named": true
         },
         {
+          "type": "pair",
+          "named": true
+        },
+        {
           "type": "scalar",
           "named": true
         },
@@ -70,7 +74,7 @@
     "fields": {
       "arguments": {
         "multiple": false,
-        "required": false,
+        "required": true,
         "types": [
           {
             "type": "arguments",

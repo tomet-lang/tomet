@@ -56,10 +56,7 @@ pub fn comment_text(el: ElementView<'_>) -> String {
             Node::Inline(Inline::SoftBreak(_) | Inline::LineBreak(_)) => state.push("\n"),
             Node::Inline(Inline::Interp(interp)) => state.push(&format!("${{{}}}", interp.expr)),
             Node::Inline(Inline::Element(_)) => state.inline_elements += 1,
-            Node::Declaration(_)
-            | Node::Value(_)
-            | Node::Entry(_)
-            | Node::Connect(_) => {}
+            Node::Declaration(_) | Node::Value(_) | Node::Entry(_) | Node::Connect(_) => {}
         }
         Visit::<()>::Descend
     };
@@ -246,12 +243,15 @@ mod tests {
 
     #[test]
     fn a_comment_says_its_text() {
-        assert_eq!(text_of("@comment[ Generated from a.tmt. ]\n"), "Generated from a.tmt.");
+        assert_eq!(
+            text_of("@comment[ Generated from a.tmt. ]\n"),
+            "Generated from a.tmt."
+        );
     }
 
     #[test]
     fn a_comment_with_no_content_says_nothing() {
-        assert_eq!(text_of("@comment\n"), "");
+        assert_eq!(text_of("@comment()\n"), "");
         assert_eq!(text_of("@comment[]\n"), "");
     }
 
@@ -273,7 +273,10 @@ mod tests {
 
     #[test]
     fn a_code_span_keeps_its_backticks() {
-        assert_eq!(text_of("@comment[ run `tomet export .` now ]\n"), "run `tomet export .` now");
+        assert_eq!(
+            text_of("@comment[ run `tomet export .` now ]\n"),
+            "run `tomet export .` now"
+        );
     }
 
     #[test]
@@ -287,7 +290,10 @@ mod tests {
 
     #[test]
     fn an_unevaluated_interpolation_is_written_as_it_was() {
-        assert_eq!(text_of("@comment[ from ${macro.x(1)} ]\n"), "from ${macro.x(1)}");
+        assert_eq!(
+            text_of("@comment[ from ${macro.x(1)} ]\n"),
+            "from ${macro.x(1)}"
+        );
     }
 
     #[test]
@@ -306,11 +312,18 @@ mod tests {
         let Some([Block::Paragraph(p)]) = el.content.as_deref() else {
             panic!("expected one paragraph, got {:?}", el.content);
         };
-        let [Inline::Text(before), Inline::Element(span), Inline::Text(after)] = &p.content[..]
+        let [
+            Inline::Text(before),
+            Inline::Element(span),
+            Inline::Text(after),
+        ] = &p.content[..]
         else {
             panic!("expected text, a code span, text; got {:?}", p.content);
         };
-        assert_eq!((before.value.as_str(), after.value.as_str()), ("run ", " now"));
+        assert_eq!(
+            (before.value.as_str(), after.value.as_str()),
+            ("run ", " now")
+        );
         assert_eq!(span.name, Name::bare("raw"));
         assert_eq!(span.placement, Placement::Inline);
         assert_eq!(comment_text(el.as_view()), "run `tomet export .` now");
@@ -368,6 +381,9 @@ mod tests {
             let el = comment_element(text, Placement::Block);
             assert_eq!(comment_text(el.as_view()), text, "for {text:?}");
         }
-        assert_eq!(comment_element("x", Placement::Inline).placement, Placement::Inline);
+        assert_eq!(
+            comment_element("x", Placement::Inline).placement,
+            Placement::Inline
+        );
     }
 }

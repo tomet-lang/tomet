@@ -93,10 +93,10 @@ mod tests {
     use std::path::PathBuf;
 
     const SETTINGS: &str = "::kind(config)
-::fields{
+::fields(
   tags: { type: list }
   created: { type: datetime }
-}
+)
 ";
 
     fn fixture(name: &str) -> PathBuf {
@@ -106,10 +106,10 @@ mod tests {
         fs::write(root.join(tomet_load_config::VAULT_CONFIG_FILE), SETTINGS).expect("config");
         fs::write(
             root.join("notes/rust.tmt"),
-            "::meta{ tags: list(rust), created: \"2026-01-01\" }\n\n=[ Rust ]#(top)\n",
+            "::meta(tags: list(rust), created: \"2026-01-01\")\n\n=[ Rust ]#(top)\n",
         )
         .expect("rust");
-        fs::write(root.join("notes/deep/go.tmt"), "::meta{ title: Go }\n").expect("go");
+        fs::write(root.join("notes/deep/go.tmt"), "::meta(title: Go)\n").expect("go");
         fs::write(root.join("index.tmt"), "Index\n").expect("index");
         root
     }

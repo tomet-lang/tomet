@@ -49,7 +49,7 @@ export type Group = Entry[];
 export type Entry =
   | { Pair: [string, Value] }
   | { Element: Element }
-  /** A nameless `(marker)[content]` entry, as in `@links{ (1)[...] }`. */
+  /** A nameless `(marker)[content]` entry, as in `@links(){ (1)[...] }`. */
   | { Bare: Bare }
   | { Hole: Hole };
 

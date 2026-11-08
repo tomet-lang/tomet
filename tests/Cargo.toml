@@ -24,6 +24,10 @@ name = "cotomet"
 path = "src/cotomet.rs"
 
 [[test]]
+name = "nexus"
+path = "src/nexus.rs"
+
+[[test]]
 name = "roundtrip"
 path = "src/roundtrip.rs"
 

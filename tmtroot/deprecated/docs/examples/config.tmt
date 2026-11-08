@@ -1,6 +1,6 @@
 ::version(1.0)
 ::kind(config)
-::format{
+::format(
   meta: { always_newline: true, format: yaml }
   heading: { space_inside_brackets: true }
   table: { adjust_width: auto, max_col_width: 20 }
@@ -14,8 +14,8 @@
       style: { content: box }
     }
   }
-}
-::fields{
+)
+::fields(
   id: { type: nanoid, length: 8, prefix: doc-, force: true, overwrite: true }
   aliases: { type: list, always_newline: true }
   created: { type: datetime, format: rfc3339, offset: "+09:00" }
@@ -24,11 +24,11 @@
   url.wiki: { type: list, always_newline: true }
   url.source: { type: list, always_newline: true }
   url.main: { type: list, always_newline: true }
-}
-::workspace{
+)
+::workspace(
   ignore: list("00-09 System/01 Apps/obsidian")
-}
-::migration{
+)
+::migration(
   meta: {
     created: { type: datetime, format: iso8601 }
     updated: { type: datetime, format: iso8601, merge: modified }
@@ -37,4 +37,4 @@
     args: { label: force }
     style: link
   }
-}
+)

@@ -9,7 +9,9 @@
 // (`hello world`) and stops at a `,` `)` `}` or a `//` comment.
 //
 // A file may open with declarations about itself: `::name`, then `(args)`
-// and a `{map}`, either or both, on one line (`::kind(catalog, 2)`). The
+// and optionally a `{map}`, on one line (`::kind(catalog, 2)`,
+// `::meta(title: "x")`). The `(args)` are required, even when empty
+// (`::meta()`); a `{map}` alone (`::meta{ a: 1 }`) is not a declaration. The
 // parser wants them before the first entry; the grammar accepts one wherever
 // an entry may stand.
 //
@@ -41,6 +43,8 @@ module.exports = grammar({
 
     // `::name(args){data}`. The `::` is its own token: where an entry may
     // start it is read as the sigil, and after a key it is two `:` as before.
+    // The `(args)` make the declaration (the primary group); the `{data}` after
+    // them is optional and only a secondary group, so it cannot stand alone.
     // `prec.right`: a `{` right after a declaration is its data, not the
     // start of the next entry.
     declaration: ($) =>
@@ -48,14 +52,20 @@ module.exports = grammar({
         seq(
           "::",
           field("name", alias($.word, $.name)),
-          optional(field("arguments", $.arguments)),
+          field("arguments", $.arguments),
           optional(field("data", $.map)),
         ),
       ),
 
-    // The `(...)` of a declaration, the `(` right after the name.
+    // The `(...)` of a declaration, the `(` right after the name. Its entries
+    // are read as a map's are: `key: value` pairs and bare values, as in
+    // `::meta(title: "x")` and `::kind(catalog, 2)`.
     arguments: ($) =>
-      seq(token.immediate("("), repeat(choice($._value, ",", $._newline)), ")"),
+      seq(
+        token.immediate("("),
+        repeat(choice($.pair, $._bare_value, ",", $._newline)),
+        ")",
+      ),
 
     _newline: (_) => /\n/,
 

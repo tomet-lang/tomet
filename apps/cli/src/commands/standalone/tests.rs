@@ -36,7 +36,7 @@ impl Drop for Dir {
 fn vault(dir: &Dir) {
     dir.write(
         "vault.config.tmt",
-        "::kind(config)\n::macros{\n  gh: \"https://x/issues/${1}\"\n}\n",
+        "::kind(config)\n::macros(\n  gh: \"https://x/issues/${1}\"\n)\n",
     );
 }
 
@@ -106,7 +106,7 @@ fn something_left_is_an_error_but_the_file_is_still_written() {
 fn a_meta_field_is_frozen_only_when_asked() {
     let dir = Dir::new("fields");
     vault(&dir);
-    let file = dir.write("a.tmt", "::meta{ title: Hello }\n\n${self.meta.title}\n");
+    let file = dir.write("a.tmt", "::meta(title: Hello)\n\n${self.meta.title}\n");
 
     let kept = dir.path("kept.tmt");
     assert!(run(&file, Some(&kept), false).is_err());

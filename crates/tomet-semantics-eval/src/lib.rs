@@ -226,10 +226,10 @@ mod tests {
     #[test]
     fn macro_with_positional_and_named_arguments() {
         let src = r#"
-::macros{
+::macros(
   vocab: "vocabularies/${1}/${1}@${2}.vocabulary.tmt"
   named: "hello ${who}"
-}
+)
 pos: ${macro.vocab("writ", "1.0.0")}
 nam: ${macro.named(who: "world")}
 "#;
@@ -262,7 +262,7 @@ nam: ${macro.named(who: "world")}
 
     #[test]
     fn wrong_macro_arity_error() {
-        let src = "::macros{ vocab: \"vocabularies/${1}/${1}@${2}.vocabulary.tmt\" }\na: ${macro.vocab(\"writ\")}\n";
+        let src = "::macros(vocab: \"vocabularies/${1}/${1}@${2}.vocabulary.tmt\")\na: ${macro.vocab(\"writ\")}\n";
         let errs = eval_str(src, &[]).unwrap_err();
         assert_eq!(errs.len(), 1);
         assert_eq!(errs[0].line, 2);
@@ -275,7 +275,7 @@ nam: ${macro.named(who: "world")}
 
     #[test]
     fn uncalled_macro_error() {
-        let src = "::macros{ vocab: \"x\" }\na: ${macro.vocab}\n";
+        let src = "::macros(vocab: \"x\")\na: ${macro.vocab}\n";
         let errs = eval_str(src, &[]).unwrap_err();
         assert_eq!(errs.len(), 1);
         assert_eq!(errs[0].line, 2);
@@ -288,7 +288,7 @@ nam: ${macro.named(who: "world")}
 
     #[test]
     fn bare_word_macro_argument_is_unknown_name() {
-        let src = "::macros{ vocab: \"x/${1}\" }\npath: ${macro.vocab(writ, \"1.0.0\")}\n";
+        let src = "::macros(vocab: \"x/${1}\")\npath: ${macro.vocab(writ, \"1.0.0\")}\n";
         let errs = eval_str(src, &[]).unwrap_err();
         assert_eq!(errs.len(), 1);
         assert_eq!(errs[0].line, 2);
@@ -298,7 +298,7 @@ nam: ${macro.named(who: "world")}
 
     #[test]
     fn var_default() {
-        let src = "::vars{ rev: { type: string, default: \"main\" } }\na: ${var.rev}\n";
+        let src = "::vars(rev: { type: string, default: \"main\" })\na: ${var.rev}\n";
         let file = eval_str(src, &[]).unwrap();
         let Value::Map(entries) = file.body else {
             panic!("expected map");
@@ -311,7 +311,7 @@ nam: ${macro.named(who: "world")}
 
     #[test]
     fn var_that_holds_a_list_giving_a_list() {
-        let src = "::vars{ tags: { type: list, default: list(\"a\", \"b\") } }\na: ${var.tags}\n";
+        let src = "::vars(tags: { type: list, default: list(\"a\", \"b\") })\na: ${var.tags}\n";
         let file = eval_str(src, &[]).unwrap();
         let Value::Map(entries) = file.body else {
             panic!("expected map");
@@ -331,7 +331,7 @@ nam: ${macro.named(who: "world")}
     #[test]
     fn a_map_comes_from_the_caller_not_from_a_declared_default() {
         // `::vars` has no `map` type: a declared default that is a map is refused...
-        let src = "::vars{ cfg: { default: { host: \"localhost\" } } }\na: ${var.cfg}\n";
+        let src = "::vars(cfg: { default: { host: \"localhost\" } })\na: ${var.cfg}\n";
         let errs = eval_str(src, &[]).unwrap_err();
         assert!(
             errs[0].message.starts_with("`cfg` in `::vars`"),
@@ -340,7 +340,7 @@ nam: ${macro.named(who: "world")}
         );
 
         // ...and a value the caller passes for a declared name is used as it is.
-        let src = "::vars{ cfg: { type: string, default: \"none\" } }\na: ${var.cfg}\n";
+        let src = "::vars(cfg: { type: string, default: \"none\" })\na: ${var.cfg}\n";
         let passed = Value::Map(vec![(
             "host".to_string(),
             Value::String("localhost".to_string()),
@@ -354,7 +354,7 @@ nam: ${macro.named(who: "world")}
 
     #[test]
     fn var_given_by_caller() {
-        let src = "::vars{ rev: { type: string, default: \"main\" } }\na: ${var.rev}\n";
+        let src = "::vars(rev: { type: string, default: \"main\" })\na: ${var.rev}\n";
         let file = eval_str(
             src,
             &[("rev".to_string(), Value::String("feature".to_string()))],
@@ -380,7 +380,7 @@ nam: ${macro.named(who: "world")}
         assert!(errs[0].message.contains("no member `undeclared`"));
 
         // Passing undeclared var from caller
-        let src2 = "::vars{ ok: { default: 1 } }\na: 1\n";
+        let src2 = "::vars(ok: { default: 1 })\na: 1\n";
         let errs2 = eval_str(
             src2,
             &[("unknown".to_string(), Value::String("x".to_string()))],
@@ -396,7 +396,7 @@ nam: ${macro.named(who: "world")}
 
     #[test]
     fn unset_var_with_no_default_error() {
-        let src = "::vars{ required: { type: string } }\na: ${var.required}\n";
+        let src = "::vars(required: { type: string })\na: ${var.required}\n";
         let errs = eval_str(src, &[]).unwrap_err();
         assert_eq!(errs.len(), 1);
         assert_eq!(errs[0].line, 2);
@@ -533,7 +533,7 @@ nam: ${macro.named(who: "world")}
 
     #[test]
     fn bad_var_decl_is_reported_with_line_and_col() {
-        let src = "::vars{ bad: 123 }\na: ${add(1, 2)}\n";
+        let src = "::vars(bad: 123)\na: ${add(1, 2)}\n";
         let errs = eval_str(src, &[]).unwrap_err();
         assert_eq!(errs.len(), 1);
         assert_eq!(errs[0].line, 1);

@@ -3,7 +3,7 @@
   version: "1.0.0"
 }
 
-::elements{
+::elements(
   rule: {
     display: block
     singleton: false
@@ -38,4 +38,4 @@
       }
     }
   }
-}
+)

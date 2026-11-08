@@ -23,6 +23,7 @@ shared corpus, or that cross a crate boundary, live here.
 | `src/lib.rs` | Harness: corpus discovery, snapshot compare, tree-sitter helpers |
 | `SYNTAX.md` | Generated inventory of every construct the parser accepts |
 | `src/corpus.rs` | Every fixture parses; tree-sitter grammar drift cases |
+| `src/nexus.rs` | The nexus rule (a primary group is required) held against the `syntax/nexus*` fixtures |
 | `src/syntax_report.rs` | Generates and checks `SYNTAX.md` |
 | `src/roundtrip.rs` | Parser + formatter and parser + printer invariants |
 | `src/snapshot.rs` | `.tmt` -> HTML / CommonMark / Typst / printed `.tmt` |
@@ -61,6 +62,11 @@ TOMET_UPDATE_REF=1 cargo test -p tomet-tests --test syntax_report
 added, so it pins today's output *including any bugs*. A failing snapshot
 means "this changed", not "this broke". Read the diff, decide whether the
 new output is better, and only then accept it.
+
+A `.json` reference is compared as the value it parses to, not as text: the
+repository formatter lays JSON out its own way, and a reference should not
+fail on whitespace. A rewrite with `TOMET_UPDATE_REF=1` leaves a reference
+alone when its value did not change.
 
 Some references are legitimately empty: a config-only document such as
 `test.config.tmt` renders to nothing in HTML/Typst, because `::meta` and
@@ -102,7 +108,9 @@ asserted to match reality exactly, so a fixture that starts *or stops*
 hitting the exception fails the suite rather than silently changing what
 is covered:
 
-- `KNOWN_UNPARSEABLE` (`src/lib.rs`) -- fixtures `tomet-parser` rejects.
+- `KNOWN_UNPARSEABLE` (`src/lib.rs`) -- fixtures `tomet-parser` rejects. The
+  `syntax/nexus-invalid-*` entries are rejected on purpose, one form each;
+  `src/nexus.rs` pins where and why.
 - `KNOWN_FORMAT_CHANGES_DOCUMENT` (`src/roundtrip.rs`) -- fixtures where
   `format_source` changes the parsed document, which it promises not to.
 

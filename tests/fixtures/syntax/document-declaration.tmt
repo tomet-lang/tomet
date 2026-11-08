@@ -5,7 +5,7 @@
 
 ::kind(note)
 ::id(doc-sample)
-::meta{ title: "A note with a preamble" }
+::meta(title: "A note with a preamble")
 
 =[ Declarations ]
 

@@ -35,12 +35,12 @@
 |[ `generate.uuid()` ][ 新しい UUID v4       ]
 
 ```tm
-::meta{
+::meta(
   id: ${generate.uuid()}
   created: ${generate.now()}
   date: ${generate.now().format("YYYY-MM-DD")}
   title: ${var.title}
-}
+)
 ```
 
 - 出力時に `generate.` を使うと、「作成時専用」という専用のエラーになる。出力が再現でき、`tomet export --check` が壊れない。

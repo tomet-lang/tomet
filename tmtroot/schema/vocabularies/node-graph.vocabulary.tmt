@@ -1,7 +1,7 @@
 ::kind(vocabulary)
 ::vocabulary(node-graph){ version: "1.0.0" }
 
-::elements{
+::elements(
   node: {
     display: block
     about: | グラフのノードひとつ。`{x, y}` が座標、`[content]` が中身。
@@ -14,4 +14,4 @@
       }
     }
   }
-}
+)

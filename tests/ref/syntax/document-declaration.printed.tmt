@@ -2,7 +2,7 @@
 
 ::id(doc-sample)
 
-::meta{title: "A note with a preamble"}
+::meta(title: "A note with a preamble")
 
 =[Declarations]
 Rust writes std::vec and mem::swap(a, b); a ::kind(x) in the middle of a line

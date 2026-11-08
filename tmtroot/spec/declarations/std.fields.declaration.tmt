@@ -4,11 +4,11 @@
 =[ 全容 ]
 
 ```tm
-::fields{
+::fields(
   aliases: { type: list, always_newline: true }
   created: { type: datetime, format: rfc3339, offset: "+09:00" }
   url.wiki: { type: list, always_newline: true }
-}
+)
 ```
 
 `::meta` の項目の型と形を宣言する。キーは項目の名前で、`.` を含んでもよい（`url.wiki`）。値は、その項目の宣言。

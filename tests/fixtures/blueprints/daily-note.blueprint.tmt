@@ -1,8 +1,8 @@
 ::kind(blueprint)
 ::blueprint(daily-note)
-::meta{
+::meta(
   uuid: ${generate.uuid()}
-}
+)
 
 =[ TODO ]#(todo)
 

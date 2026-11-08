@@ -7,11 +7,11 @@
   }
 }
 ::id(${uuid()})
-::meta{
+::meta(
   title: ${vars.title}
   author: ${vars.author}
   status: draft
-}
+)
 
 =[ Summary ] {id: summary}
 

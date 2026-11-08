@@ -19,7 +19,7 @@ Section と File は実は同じではないか、という問いから始まっ
 - Folder と Vault も同じ形である。違うのは、見出し部と本文を書く場所が、まだ無いことだけである。
 
 ```tm
-::meta{ id: doc-x, title: "Daily" }
+::meta(id: doc-x, title: "Daily")
 ::kind(config)
 
 =[ 概要 ]:rule(...)
@@ -65,8 +65,8 @@ notes/
 
 ```tm
 ::kind(notebook)
-::vars{ author: { type: string } }
-::macros{ gh: "https://.../${1}" }
+::vars(author: { type: string })
+::macros(gh: "https://.../${1}")
 
 =[ notes について ]
 このフォルダは日々のメモを置く。

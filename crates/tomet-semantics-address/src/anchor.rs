@@ -49,7 +49,7 @@ mod tests {
 
     #[test]
     fn finds_declaration_anchor_in_header() {
-        let doc = parse_doc("::meta#(doc-meta){ id: x }\n\nSome body text.\n");
+        let doc = parse_doc("::meta(id: x)#(doc-meta)\n\nSome body text.\n");
         assert!(has_anchor(&doc, "doc-meta"));
         assert!(find_anchor(&doc, "doc-meta").is_some());
     }
@@ -64,7 +64,7 @@ mod tests {
 
     #[test]
     fn finds_element_anchor() {
-        let doc = parse_doc("@card #(my-card)\n\nParagraph with @badge #(my-badge) inside.\n");
+        let doc = parse_doc("@card() #(my-card)\n\nParagraph with @badge() #(my-badge) inside.\n");
         assert!(has_anchor(&doc, "my-card"));
         assert!(has_anchor(&doc, "my-badge"));
         assert!(!has_anchor(&doc, "other"));
@@ -79,7 +79,7 @@ mod tests {
     #[test]
     fn collects_all_anchors_in_document_order() {
         let doc = parse_doc(
-            "=[ Sec ] #(sec)\n\n@card #(c1)\n\nText with @tag #(t1) in it.\n\n- list item #(l1)\n",
+            "=[ Sec ] #(sec)\n\n@card() #(c1)\n\nText with @tag() #(t1) in it.\n\n- list item #(l1)\n",
         );
         let ids: Vec<String> = collect_anchors(&doc)
             .into_iter()

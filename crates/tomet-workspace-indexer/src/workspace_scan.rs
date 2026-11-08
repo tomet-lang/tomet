@@ -343,7 +343,7 @@ mod tests {
     #[test]
     fn refresh_path_adds_updates_and_removes() {
         let dir = temp_dir("refresh");
-        fs::write(dir.join("existing.tmt"), "::meta{}\n").unwrap();
+        fs::write(dir.join("existing.tmt"), "::meta()\n").unwrap();
         let mut index = WorkspaceIndex::build(&dir, &PrinterConfig::default(), &dir);
         assert_eq!(index.meta_paths().len(), 1);
         assert_eq!(index.migration_candidates().len(), 0);
@@ -370,7 +370,7 @@ mod tests {
         let mut index = WorkspaceIndex::build(&dir, &PrinterConfig::default(), &dir);
         assert_eq!(index.meta_paths().len(), 0);
 
-        fs::write(dir.join("appeared.tmt"), "::meta{}\n").unwrap();
+        fs::write(dir.join("appeared.tmt"), "::meta()\n").unwrap();
         index.rebuild();
         assert_eq!(index.meta_paths().len(), 1);
 
@@ -394,7 +394,7 @@ mod tests {
     #[test]
     fn build_indexes_ctmt_files_in_tree_without_polluting_meta_or_migration() {
         let dir = temp_dir("ctmt_test");
-        fs::write(dir.join("catasto.ctmt"), "::upstreams{}\n").unwrap();
+        fs::write(dir.join("catasto.ctmt"), "::upstreams()\n").unwrap();
         fs::write(dir.join("doc.tmt"), "@kind(note)\n").unwrap();
         fs::write(dir.join("guide.md"), "# Guide\n").unwrap();
 

@@ -1,0 +1,3 @@
+// The horizontal rule is written `@hr()`, never a bare `@hr`.
+
+@hr

@@ -4,7 +4,7 @@
 //!
 //! Constructs with no CommonMark equivalent (`mark`, and any `<T>`/`@`
 //! element the importer never produces but a hand-authored `.tmt` file
-//! might use, e.g. `@links{}` definition containers or arbitrary typed
+//! might use, e.g. `@links(){}` definition containers or arbitrary typed
 //! elements) fall back to raw inline/block HTML passthrough, which is
 //! valid CommonMark. Heading `id`/`cssclass` attrs have no CommonMark
 //! form and are dropped.
@@ -17,9 +17,9 @@ use escape::{escape_attr, escape_text, fence_for};
 
 use tomet_ast::{Block, ElementView, File, Inline, Interpolation, List, Placement, Section, Value};
 use tomet_semantics::{
-    FootnoteRegistry, TargetScheme, classify_std_lenient, comment_text, extract_tags, heading_level,
-    is_attribute_key, is_directive, link_target, normalized_element_args, path_target,
-    target_scheme,
+    FootnoteRegistry, TargetScheme, classify_std_lenient, comment_text, extract_tags,
+    heading_level, is_attribute_key, is_directive, link_target, normalized_element_args,
+    path_target, target_scheme,
 };
 
 struct MarkdownCtx<'a> {

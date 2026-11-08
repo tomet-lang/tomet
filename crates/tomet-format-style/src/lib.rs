@@ -9,8 +9,7 @@
 //! can depend on this without a circular dependency (`tomet-printer`
 //! already depends on `tomet-formatter`). `render_meta_declaration`
 //! specifically covers only `::meta` declarations' actual shape per the
-//! grammar (`args` an optional format map, `value` always
-//! `Group::from_map(Value::Map(...))`) -- not the general
+//! grammar (`args` the map of the document's fields, written `::meta(k: v)`) -- not the general
 //! element-rendering logic for every other sigil/kind, which stays in
 //! `tomet-printer` since it recurses into inline/child content and
 //! is genuinely part of rebuilding a whole file from its AST.
@@ -510,19 +509,28 @@ fn render_meta_field_value(
     render_value_inner_with_config(v, config)
 }
 
-/// Renders a `::meta(...){...}` declaration per `config`'s meta format
-/// settings (multi-line, one field per line with per-field formatting
-/// rules, if `config.meta.always_newline`; else a single `::meta{k: v, ...}`
-/// line). Scoped to `::meta`'s actual shape -- `value` must be
-/// `Group::from_map(Value::Map(...))`, which is all the grammar ever
-/// produces for `::meta`; anything else renders as a bare `::meta` (with
-/// args, if any).
+/// Renders a `::meta(...)` declaration per `config`'s meta format settings: with
+/// `config.meta.always_newline`, one field per line with the per-field formatting rules
+///
+/// ```text
+/// ::meta(
+///   title: T
+///   tags:
+///     - a
+/// )
+/// ```
+///
+/// else a single `::meta(k: v, ...)` line, and `::meta()` for a document with no field. The fields
+/// are the declaration's `(args)`; `{...}` is no part of `::meta`, but a declaration that has one
+/// (`tomet check` reports it) is printed with it rather than losing it.
 pub fn render_meta_declaration(declaration: &Declaration, config: &PrinterConfig) -> String {
     let head = "::meta";
     if config.meta.always_newline
-        && let Some(Value::Map(entries)) = tomet_semantics::data::declaration_data(declaration)
+        && declaration.data.value.is_none()
+        && let Some(Value::Map(entries)) = tomet_semantics::data::declaration_entries(declaration)
+        && !entries.is_empty()
     {
-        let mut out = format!("{head}{{\n");
+        let mut out = format!("{head}(\n");
         for (k, v) in &entries {
             let field_cfg = config.meta.fields.get(k);
             let val_str = render_meta_field_value(v, field_cfg, config);
@@ -536,16 +544,16 @@ pub fn render_meta_declaration(declaration: &Declaration, config: &PrinterConfig
             out.push_str(&val_str);
             out.push('\n');
         }
-        out.push('}');
+        out.push(')');
         return out;
     }
 
     let mut out = String::from(head);
+    out.push('(');
     if let Some(args) = &declaration.data.args {
-        out.push('(');
         out.push_str(&render_args_with_config(args, config));
-        out.push(')');
     }
+    out.push(')');
     if let Some(v) = tomet_semantics::data::declaration_data(declaration) {
         out.push('{');
         out.push_str(&render_value_inner_with_config(&v, config));
@@ -650,43 +658,43 @@ mod tests {
     #[test]
     fn render_meta_declaration_single_line_by_default() {
         let mut el = tomet_tree::declaration_new("meta");
-        el.data.value = Some(Group::from_map(Value::Map(vec![(
+        el.data.args = Some(Value::Map(vec![(
             "id".to_string(),
             Value::String("doc-12345678".to_string()),
-        )])));
+        )]));
         let cfg = PrinterConfig::default();
         assert_eq!(
             render_meta_declaration(&el, &cfg),
-            "::meta{id: doc-12345678}"
+            "::meta(id: doc-12345678)"
         );
     }
 
     #[test]
     fn render_meta_declaration_multiline_with_a_config_that_asks_for_it() {
         let mut el = tomet_tree::declaration_new("meta");
-        el.data.value = Some(Group::from_map(Value::Map(vec![(
+        el.data.args = Some(Value::Map(vec![(
             "id".to_string(),
             Value::String("doc-12345678".to_string()),
-        )])));
+        )]));
         assert_eq!(
             render_meta_declaration(&el, &PrinterConfig::default()),
-            "::meta{id: doc-12345678}"
+            "::meta(id: doc-12345678)"
         );
         let mut cfg = PrinterConfig::default();
         cfg.meta.always_newline = true;
         assert_eq!(
             render_meta_declaration(&el, &cfg),
-            "::meta{\n  id: doc-12345678\n}"
+            "::meta(\n  id: doc-12345678\n)"
         );
     }
 
     #[test]
     fn render_meta_declaration_multiline_when_always_newline_configured() {
         let mut el = tomet_tree::declaration_new("meta");
-        el.data.value = Some(Group::from_map(Value::Map(vec![(
+        el.data.args = Some(Value::Map(vec![(
             "id".to_string(),
             Value::String("doc-12345678".to_string()),
-        )])));
+        )]));
         let cfg = PrinterConfig {
             meta: tomet_config::MetaConfig {
                 always_newline: true,
@@ -696,17 +704,76 @@ mod tests {
         };
         assert_eq!(
             render_meta_declaration(&el, &cfg),
-            "::meta{\n  id: doc-12345678\n}"
+            "::meta(\n  id: doc-12345678\n)"
         );
+    }
+
+    #[test]
+    fn a_meta_with_no_field_is_printed_empty_whatever_the_config_asks() {
+        let el = tomet_tree::declaration_new("meta");
+        let mut cfg = PrinterConfig::default();
+        assert_eq!(render_meta_declaration(&el, &cfg), "::meta()");
+        cfg.meta.always_newline = true;
+        assert_eq!(render_meta_declaration(&el, &cfg), "::meta()");
+
+        let mut empty = tomet_tree::declaration_new("meta");
+        empty.data.args = Some(Value::Map(Vec::new()));
+        assert_eq!(render_meta_declaration(&empty, &cfg), "::meta()");
+    }
+
+    #[test]
+    fn the_fields_of_a_meta_keep_their_per_field_rules_on_separate_lines() {
+        let mut el = tomet_tree::declaration_new("meta");
+        el.data.args = Some(Value::Map(vec![
+            ("title".to_string(), Value::String("T".to_string())),
+            (
+                "tags".to_string(),
+                Value::Seq(vec![
+                    Value::String("a".to_string()),
+                    Value::String("b".to_string()),
+                ]),
+            ),
+        ]));
+        let mut cfg = PrinterConfig::default();
+        cfg.meta.always_newline = true;
+        cfg.meta.fields.insert(
+            "tags".to_string(),
+            tomet_config::FieldConfig {
+                always_newline: true,
+                ..Default::default()
+            },
+        );
+        assert_eq!(
+            render_meta_declaration(&el, &cfg),
+            "::meta(\n  title: T\n  tags:\n    - a\n    - b\n)"
+        );
+        // Without the layout asked for, the same fields are one line.
+        assert_eq!(
+            render_meta_declaration(&el, &PrinterConfig::default()),
+            "::meta(title: T, tags: list(a, b))"
+        );
+    }
+
+    #[test]
+    fn a_brace_body_on_a_meta_is_printed_not_dropped() {
+        let mut el = tomet_tree::declaration_new("meta");
+        el.data.args = Some(Value::Map(vec![("a".to_string(), Value::Int(1))]));
+        el.data.value = Some(Group::from_map(Value::Map(vec![(
+            "b".to_string(),
+            Value::Int(2),
+        )])));
+        let mut cfg = PrinterConfig::default();
+        cfg.meta.always_newline = true;
+        assert_eq!(render_meta_declaration(&el, &cfg), "::meta(a: 1){b: 2}");
     }
 
     #[test]
     fn render_meta_declaration_quotes_keys_that_are_not_identifiers() {
         let mut el = tomet_tree::declaration_new("meta");
-        el.data.value = Some(Group::from_map(Value::Map(vec![
+        el.data.args = Some(Value::Map(vec![
             ("plain.key".to_string(), Value::Int(1)),
             ("tmtroot/a b.tmt".to_string(), Value::Int(2)),
-        ])));
+        ]));
         let cfg = PrinterConfig {
             meta: tomet_config::MetaConfig {
                 always_newline: true,
@@ -716,7 +783,7 @@ mod tests {
         };
         assert_eq!(
             render_meta_declaration(&el, &cfg),
-            "::meta{\n  plain.key: 1\n  \"tmtroot/a b.tmt\": 2\n}"
+            "::meta(\n  plain.key: 1\n  \"tmtroot/a b.tmt\": 2\n)"
         );
     }
 

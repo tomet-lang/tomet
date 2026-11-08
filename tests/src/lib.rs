@@ -98,7 +98,31 @@ pub fn read_fixture(rel: &Path) -> String {
 /// of tags); `syntax/value-element.tmt`'s `icons: [...]` was left as-is,
 /// since embedding `@`-elements in a `[...]` value position is exactly
 /// what that fixture exists to demonstrate.
-pub const KNOWN_UNPARSEABLE: &[&str] = &[];
+///
+/// The `syntax/nexus-invalid-*` fixtures are the standing entries: each is one
+/// form the nexus rule refuses (a `@name`, `::name` or `:name` with no primary
+/// group), kept apart because the parser stops at the first error. `nexus.rs`
+/// holds each to the place and reason it is refused for.
+pub const KNOWN_UNPARSEABLE: &[&str] = &[
+    "syntax/nexus-invalid-bare-block.tmt",
+    "syntax/nexus-invalid-bare-hr.tmt",
+    "syntax/nexus-invalid-combine-data.tmt",
+    "syntax/nexus-invalid-connect-args.tmt",
+    "syntax/nexus-invalid-connect-data.tmt",
+    "syntax/nexus-invalid-connect-name-data.tmt",
+    "syntax/nexus-invalid-connect-named.tmt",
+    "syntax/nexus-invalid-data-and-id.tmt",
+    "syntax/nexus-invalid-data-empty.tmt",
+    "syntax/nexus-invalid-data-only.tmt",
+    "syntax/nexus-invalid-declaration-bare.tmt",
+    "syntax/nexus-invalid-declaration-data.tmt",
+    "syntax/nexus-invalid-declaration-id.tmt",
+    "syntax/nexus-invalid-heading-connect.tmt",
+    "syntax/nexus-invalid-id-only.tmt",
+    "syntax/nexus-invalid-inline-data.tmt",
+    "syntax/nexus-invalid-inline-id.tmt",
+    "syntax/nexus-invalid-list-item-connect.tmt",
+];
 
 /// Fixtures the tree-sitter grammar is known to mis-parse, and the text
 /// of the error nodes it produces for each.
@@ -130,11 +154,14 @@ pub const KNOWN_TS_ERRORS: &[(&str, &[&str])] = &[
     // it; `grammar.js` has not been taught the combine form yet.
     ("syntax/combine.tmt", &[ANY_ERROR]),
     // A block where a `{...}` group's value goes (`card: [ @card[ ${2} ] ]`, the body of a block
-    // macro in `::macros{ ... }`): `grammar.js` reads a `[ ... ]` value in `(args)` but not as the
+    // macro in `::macros(...)`): `grammar.js` reads a `[ ... ]` value in `(args)` but not as the
     // value of a pair in `{...}`, even when it holds a single paragraph. `tomet-parser` reads it
     // (`syntax/block-macro.tmt` is in the corpus for that); highlighting it is the grammar's to
     // catch up on.
-    ("syntax/block-macro.tmt", &["{\n  card: ", "{\n  notice: ", "]"]),
+    (
+        "syntax/block-macro.tmt",
+        &["(\n  card: ", "(\n  notice: ", "]"],
+    ),
     // A box where a value goes (`url: <?(u)>`, `type: <?(kind)>`): `grammar.js` has
     // `hole` only in running text and its content, and leaves a value to the
     // external `scalar` token, which takes `<?(u)` and strands the `>` and the
@@ -271,6 +298,29 @@ pub const KNOWN_TS_ERRORS: &[(&str, &[&str])] = &[
     // cases, and splitting the file to isolate exactly which lines
     // already pass is not worth it for a fixture this size.
     ("syntax/connect.tmt", &[ANY_ERROR]),
+    // ---- the nexus rule, refused on purpose --------------------------
+    //
+    // `syntax/nexus-invalid-*.tmt` are forms `tomet-parser` refuses: a nexus
+    // with no primary group (see `_nexus_groups` in `grammar.js`). Where the
+    // grammar can see the missing group it errors too, which is what these
+    // entries record; the text of the error node is whatever the recovery
+    // lands on, so none of them pins it. The rest read as prose in the
+    // grammar and are not listed: a lone `@name` has no position to be an
+    // error in, so `@name:rule(...)`, `@name:{...}` and `@name:(...)` are text,
+    // a bare `@name`/`@hr` is an element, and `- 項目 :rule{...}` is a
+    // list item with `{...}` attrs.
+    ("syntax/nexus-invalid-combine-data.tmt", &[ANY_ERROR]),
+    ("syntax/nexus-invalid-connect-name-data.tmt", &[ANY_ERROR]),
+    ("syntax/nexus-invalid-data-and-id.tmt", &[ANY_ERROR]),
+    ("syntax/nexus-invalid-data-empty.tmt", &[ANY_ERROR]),
+    ("syntax/nexus-invalid-data-only.tmt", &[ANY_ERROR]),
+    ("syntax/nexus-invalid-declaration-bare.tmt", &[ANY_ERROR]),
+    ("syntax/nexus-invalid-declaration-data.tmt", &[ANY_ERROR]),
+    ("syntax/nexus-invalid-declaration-id.tmt", &[ANY_ERROR]),
+    ("syntax/nexus-invalid-heading-connect.tmt", &[ANY_ERROR]),
+    ("syntax/nexus-invalid-id-only.tmt", &[ANY_ERROR]),
+    ("syntax/nexus-invalid-inline-data.tmt", &[ANY_ERROR]),
+    ("syntax/nexus-invalid-inline-id.tmt", &[ANY_ERROR]),
 ];
 
 /// Records a fixture as drifting wholesale, without pinning the text of
@@ -328,7 +378,14 @@ pub fn assert_snapshot(name: &str, actual: &str) {
     let ref_path = ref_dir().join(name);
 
     if update_mode() {
-        write_out(&ref_path, actual);
+        // A reference that already says the same thing is left as it is, so
+        // a re-run does not undo the repository formatter's layout of a
+        // `.json` reference (see `same_snapshot`).
+        let unchanged = std::fs::read_to_string(&ref_path)
+            .is_ok_and(|expected| same_snapshot(name, &expected, actual));
+        if !unchanged {
+            write_out(&ref_path, actual);
+        }
         return;
     }
 
@@ -346,7 +403,7 @@ pub fn assert_snapshot(name: &str, actual: &str) {
         }
     };
 
-    if expected != actual {
+    if !same_snapshot(name, &expected, actual) {
         let stored = store_dir().join(name);
         write_out(&stored, actual);
         panic!(
@@ -358,6 +415,29 @@ pub fn assert_snapshot(name: &str, actual: &str) {
              \x20   TOMET_UPDATE_REF=1 cargo test -p tomet-tests",
             first_difference(&expected, actual)
         );
+    }
+}
+
+/// Whether `actual` is what the reference `expected` records.
+///
+/// Text is compared as text. A `.json` reference is compared as the value it
+/// parses to: the repository formatter lays a JSON file out its own way
+/// (short arrays on one line), the converters write it another, and layout
+/// is not what a reference pins -- a snapshot that fails on whitespace the
+/// formatter put there cannot be kept green and formatted at once.
+fn same_snapshot(name: &str, expected: &str, actual: &str) -> bool {
+    if expected == actual {
+        return true;
+    }
+    if !name.ends_with(".json") {
+        return false;
+    }
+    match (
+        serde_json::from_str::<serde_json::Value>(expected),
+        serde_json::from_str::<serde_json::Value>(actual),
+    ) {
+        (Ok(expected), Ok(actual)) => expected == actual,
+        _ => false,
     }
 }
 

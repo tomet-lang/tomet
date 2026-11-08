@@ -55,12 +55,14 @@ const CASES: &[Case] = &[
     // ---- block elements ---------------------------------------------
     case(
         Some("ブロック配置の要素"),
-        "行に要素しかなければブロック。グループがなくても行末で要素になる",
-        "@memo\n",
+        "行に要素しかなければブロック。中身が空でも `()` か `[]` を書く。\
+         グループの無い `@memo` だけの行は要素ではなくエラー（下の「主グループの無いネクサス」）",
+        "@memo()\n",
     ),
     case(
         None,
-        "`(args)` `[content]` `{value}` は各1個まで、順不同",
+        "`(args)` `[content]` `{value}` は各1個まで、順不同。\
+         ただし `(args)` か `[content]` のどちらかは要る（下の「ネクサスと主グループ」）",
         "@memo(a: 1)[ 本文 ]{ b: 2 }\n",
     ),
     case(
@@ -105,6 +107,12 @@ const CASES: &[Case] = &[
         "`@` の後にグループが続かなければ文字列",
         "連絡は me@example.com まで\n",
     ),
+    case(
+        None,
+        "行の途中でも、グループの無い `@名前` は地の文。メンションや宛先が\
+         エラーにならないための線引き",
+        "ping @someone about it\n",
+    ),
     case(None, "行中の `#` は普通の文字", "C# と F# の話\n"),
     case(None, "`<` はもうシジルではない", "型は Vec<T> と書く\n"),
     // ---- fenced raw body nested in [content] -------------------------
@@ -125,38 +133,82 @@ const CASES: &[Case] = &[
         "`${...}` は展開されず逐語で残る",
         "::config[\n```\n{\"gh\": \"x/${1}\"}\n```\n]\n",
     ),
+    // ---- the nexus rule ---------------------------------------------
+    case(
+        Some("ネクサスと主グループ"),
+        "`@名前` `:名前` `::名前` はネクサスで、主グループを要る。主グループは \
+         `(args)` と `[content]`。`{value}` `#(id)` `:コネクト` は付加のグループで、\
+         単独では置けない。空でも主グループは書く",
+        "@memo()\n",
+    ),
+    case(None, "`[content]` だけでもよい", "@memo[ 本文 ]\n"),
+    case(
+        None,
+        "付加のグループは主グループのあとに付く",
+        "@memo(){ a: 1 }#(first)\n",
+    ),
+    case(
+        None,
+        "主グループは付加のグループのあとでもよい。要るのは、どこかに一つあること",
+        "@memo{ a: 1 }(b: 2)\n",
+    ),
+    case(
+        None,
+        "`|` の連なりも主グループ。`@table` だけの行でも、次の行の `|` が主グループになる。\
+         `()` `[]` の無い、唯一の要素の書き方",
+        "@table\n|[ a ][ b ]\n|[ 1 ][ 2 ]\n",
+    ),
+    case(
+        None,
+        "リスト項目に付けるときも同じ。`-@名前` は主グループを要る",
+        "-@memo(a: 1)\n-@memo[ 本文 ]\n",
+    ),
+    case(
+        None,
+        "名前のないコネクト `:{...}` `:(...)` は、付いた先（項目・見出し・要素）の\
+         データに入る。`{...}` が単独で置ける唯一の場所",
+        "- 項目 :{ k: v }\n= 見出し :(k: v)\n",
+    ),
+    case(
+        None,
+        "名前つきコネクトも主グループを要る。`:rule(...)` は書けて、`:rule{...}` は書けない（下の「主グループの無いネクサス」）",
+        "- 項目 :rule(allow: list(card))\n",
+    ),
+    case(None, "水平線は `@hr()`。`@hr` だけの行はエラー", "@hr()\n"),
     // ---- value groups -----------------------------------------------
     case(
         Some("`{...}` グループ"),
-        "`key: value` の並び",
-        "@memo{ a: 1, b: two }\n",
+        "`{...}` は付加のグループ。`(...)` か `[...]` を伴う要素に付き、\
+         単独では要素にならない（`@memo{ ... }` は下の「主グループの無いネクサス」）。\
+         中身は `key: value` の並び",
+        "@memo(){ a: 1, b: two }\n",
     ),
     case(
         None,
         "要素の並び",
-        "@memo{\n  (1)[ ひとつ ]\n  (2)[ ふたつ ]\n}\n",
+        "@memo(){\n  (1)[ ひとつ ]\n  (2)[ ふたつ ]\n}\n",
     ),
     case(
         None,
         "対と要素の混在。並び順は保たれる",
-        "@deck.card{ t: x, (a)[ y ], u: z }\n",
+        "@deck.card(){ t: x, (a)[ y ], u: z }\n",
     ),
     case(
         None,
         "裸のエントリも名前つき要素と同じ三つのグループを取る。\
          シジルが無いだけで、読む道は同じ",
-        "@memo{ (1)[ ひとつ ]{ id: a } }\n",
+        "@memo(){ (1)[ ひとつ ]{ id: a } }\n",
     ),
     case(
         None,
         "グループを次の行に置いてもよい。`@name` と同じ",
-        "@memo{\n  (1)\n  [ ひとつ ]\n}\n",
+        "@memo(){\n  (1)\n  [ ひとつ ]\n}\n",
     ),
-    case(None, "空のグループ", "@memo{}\n"),
+    case(None, "空のグループ", "@memo(){}\n"),
     case(
         None,
         "引用符つきのキー。パスや空白を含むキーはこう書く。引用符つきの文字列は、直後に `:` があるときだけキーになる",
-        "@memo{ \"a/b.tmt\": 1, plain: 2 }\n",
+        "@memo(){ \"a/b.tmt\": 1, plain: 2 }\n",
     ),
     // ---- args and the value DSL -------------------------------------
     case(
@@ -410,7 +462,7 @@ const CASES: &[Case] = &[
     case(
         None,
         "クォートすればスペースも入る",
-        "@task#(\"has spaces\")\n",
+        "@task()#(\"has spaces\")\n",
     ),
     case(None, "セクションにも付く", "=[ Intro ]#(intro)\n"),
     case(None, "リスト項目の完全形にも付く", "- (x)[ y ]#(item1)\n"),
@@ -430,7 +482,7 @@ const CASES: &[Case] = &[
         "所有者のidは最初のコネクトより前に書く",
         "@task(a: 1)#(myid):rule(allow: list(card))\n",
     ),
-    case(None, "idを2つ書くとエラー", "@task#(a)#(b)\n"),
+    case(None, "idを2つ書くとエラー", "@task()#(a)#(b)\n"),
     // ---- comments ---------------------------------------------------
     case(Some("コメント"), "行コメント", "// 消える\n本文\n"),
     case(None, "ブロックコメント", "本文 /* 消える */ の続き\n"),
@@ -438,14 +490,33 @@ const CASES: &[Case] = &[
     case(
         Some("文書の宣言"),
         "行頭の `::名前` は、文書自身についての宣言。`@名前` と同じ groups を取り、\
-         先頭の並び（preamble）に置く。名前は構文では選ばない（判定は検証の仕事）",
-        "::kind(note)\n::meta{ id: x }\n",
+         先頭の並び（preamble）に置く。`(args)` か `[content]` が要る。名前は構文では選ばない（判定は検証の仕事）",
+        "::kind(note)\n::meta(id: x)\n",
     ),
     case(
         None,
         "groups の全部（`(args)` `[content]` `{value}` `#(id)`）を取る。本文を取れるかは語彙が決める",
         "::x(a)[ b ]{ c: 1 }#(i)\n",
     ),
+    case(
+        None,
+        "`{...}` だけを取っていた12個の宣言は `(...)` を取る: \
+         `meta` `macros` `format` `fields` `workspace` `export` `blueprints` \
+         `vocabularies` `dictionaries` `migration` `vars` `elements`。\
+         `::meta{ ... }` はもう書けない（下の「主グループの無いネクサス」）",
+        "::meta(title: \"x\")\n::macros(gh: \"https://x/${1}\")\n::vars(a: { type: string })\n\
+         ::format(table: { max_col_width: 50 })\n::fields(created: { type: datetime })\n\
+         ::workspace(ignore: list(\"a\"))\n::export(type: commonmark)\n::blueprints(b: \"b.tmt\")\n\
+         ::vocabularies(v: \"v.tmt\")\n::dictionaries(d: \"d.tmt\")\n::migration(m: 1)\n\
+         ::elements(card: { display: block })\n",
+    ),
+    case(
+        None,
+        "`::vocabulary(ns){ ... }` と `::dictionary(name){ ... }` はもともと `(...)` を持つので、\
+         `{...}` の本体をそのまま取る",
+        "::vocabulary(ns){ version: \"1.0.0\" }\n::dictionary(tomet){ \"vault\": \"a unit\" }\n",
+    ),
+    case(None, "中身が空の宣言も `()` を書く", "::meta()\n"),
     case(
         None,
         "次の行の `::` は、前の宣言のコネクトではなく、次の宣言",
@@ -471,6 +542,82 @@ const CASES: &[Case] = &[
 /// of gap this report exists to surface, so it is listed with whatever it
 /// actually does rather than with what it was meant to do.
 const REJECTED: &[Case] = &[
+    case(
+        Some("主グループの無いネクサス"),
+        "ブロックの `@名前` だけの行は要素ではなくエラー。空の要素は `@名前()` と書く",
+        "@memo\n",
+    ),
+    case(None, "水平線も同じ。`@hr` ではなく `@hr()`", "@hr\n"),
+    case(None, "`{...}` だけでは要素にならない", "@memo{ a: 1 }\n"),
+    case(None, "空の `{}` も同じ", "@memo{}\n"),
+    case(
+        None,
+        "`#(id)` だけでも要素にならない。id は要素に付くもので、要素を作らない",
+        "@memo#(first)\n",
+    ),
+    case(
+        None,
+        "付加のグループを重ねても主グループにはならない",
+        "@memo{}#(first)\n",
+    ),
+    case(
+        None,
+        "名前つきコネクトだけでは要素にならない",
+        "@memo:rule(allow: list(card))\n",
+    ),
+    case(
+        None,
+        "名前のない `:{...}` も、主グループのない `@名前` には付けられない",
+        "@memo:{ a: 1 }\n",
+    ),
+    case(None, "`:(...)` も同じ", "@memo:(a: 1)\n"),
+    case(
+        None,
+        "コネクトも主グループを要る。`:rule{...}` は書けない",
+        "@memo():rule{ allow: list(card) }\n",
+    ),
+    case(
+        None,
+        "リスト項目のコネクトも同じ",
+        "- 項目 :rule{ allow: list(card) }\n",
+    ),
+    case(
+        None,
+        "見出しのコネクトも同じ",
+        "= 見出し :rule{ allow: list(card) }\n",
+    ),
+    case(None, "`-@名前` も主グループを要る", "-@memo{ a: 1 }\n"),
+    case(
+        None,
+        "行の途中の `@名前` は、グループが無ければ地の文（上の「文字列に落ちる場合」）。\
+         しかし付加のグループが続くと、地の文にはならずエラー",
+        "この @memo{ a: 1 } は書きかけ\n",
+    ),
+    case(
+        None,
+        "`#(id)` が続く場合も同じ",
+        "この @memo#(first) は書きかけ\n",
+    ),
+    case(
+        None,
+        "宣言も同じ。`::名前` だけの行は宣言ではなくエラー。空の宣言は `::meta()`",
+        "::kind(note)\n::meta\n",
+    ),
+    case(
+        None,
+        "`{...}` だけを取っていた宣言の旧い書き方。`::meta{ ... }` は `::meta(...)` になった",
+        "::kind(note)\n::meta{ title: \"旧い書き方\" }\n",
+    ),
+    case(
+        None,
+        "12個の宣言のどれも同じ。`::format{ ... }` も受け付けない",
+        "::format{ table: { max_col_width: 50 } }\n",
+    ),
+    case(
+        None,
+        "宣言も `#(id)` だけでは宣言にならない",
+        "::kind(note)\n::meta#(first)\n",
+    ),
     case(
         Some("宣言の制限"),
         "宣言はコネクトを取らない。コネクトは要素に付くもので、宣言は何にも付かない",
@@ -521,8 +668,8 @@ const REJECTED: &[Case] = &[
     ),
     case(
         Some("受け付けない書き方"),
-        "`{...}` に裸のスカラーも書けない",
-        "@memo{hello}\n",
+        "`{...}` に裸のスカラーも書けない（裸の値は `(args)` に書く）",
+        "@memo(){hello}\n",
     ),
     case(None, "閉じない `[`", "@memo[ 閉じない\n"),
     case(

@@ -1,4 +1,4 @@
-::meta{icon: "", icons: list("", ""), mixed: ""}
+::meta(icon: "", icons: list("", ""), mixed: "")
 
 =[値の中の要素と列]
 `@`付きの要素は `(args)`/`{value}` のどこでも値として書ける(上の

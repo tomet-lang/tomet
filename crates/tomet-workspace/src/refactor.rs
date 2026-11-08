@@ -73,7 +73,7 @@ pub fn refactor_file(doc: &mut File, config: &PrinterConfig, options: &RefactorO
 /// the whole file back, and `tomet_ast` has no comment node at all --
 /// `//` and `/* */` exist in the source text and nowhere in the tree, so
 /// anything that round-trips through the AST loses them. Measured, not
-/// assumed: a file carrying `::meta{ type: note }` and a `//` line comes
+/// assumed: a file carrying `::meta(type: note)` and a `//` line comes
 /// back with the comment gone.
 ///
 /// The counting half is sound, because it counts rule hits rather than a

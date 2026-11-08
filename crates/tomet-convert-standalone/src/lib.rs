@@ -36,7 +36,7 @@
 
 use std::path::Path;
 
-use tomet_ast::{Data, Entry, File, Group, Name, Value};
+use tomet_ast::{Data, File, Name, Value};
 use tomet_declaration::{Profile, document_profiles};
 use tomet_expr::{Reach, Resolver};
 use tomet_span::Span;
@@ -312,30 +312,25 @@ fn var_declaration(decl: &tomet_declaration::VarDecl) -> Value {
     Value::Map(fields)
 }
 
-/// Adds `entries` to the document's `::name{ ... }`, writing one if it has none.
+/// Adds `entries` to the document's `::name(...)`, writing one if it has none.
 fn add_entries(document: &mut File, name: &str, entries: Vec<(String, Value)>) {
     if entries.is_empty() {
         return;
     }
-    let entries = entries
-        .into_iter()
-        .map(|(key, value)| Entry::Pair(key, value));
     let existing = document
         .header
         .iter_mut()
         .find(|declaration| declaration.name == Name::bare(name));
     match existing {
-        Some(declaration) => declaration
-            .data
-            .value
-            .get_or_insert_with(Group::default)
-            .0
-            .extend(entries),
+        Some(declaration) => match &mut declaration.data.args {
+            Some(Value::Map(held)) => held.extend(entries),
+            other => *other = Some(Value::Map(entries)),
+        },
         None => document.header.push(tomet_ast::Declaration {
             name: Name::bare(name),
             data: Data {
-                args: None,
-                value: Some(Group(entries.collect())),
+                args: Some(Value::Map(entries)),
+                value: None,
             },
             content: None,
             id: None,

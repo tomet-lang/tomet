@@ -401,7 +401,7 @@ mod tests {
         fs::create_dir_all(root.join("notes")).expect("temp dirs");
         fs::write(
             root.join(tomet_load_config::VAULT_CONFIG_FILE),
-            "::kind(config)\n::fields{ tags: { type: list }, created: { type: datetime } }\n",
+            "::kind(config)\n::fields(tags: { type: list }, created: { type: datetime })\n",
         )
         .expect("config");
         for (file, tags, created) in [
@@ -411,7 +411,7 @@ mod tests {
         ] {
             fs::write(
                 root.join("notes").join(file),
-                format!("::meta{{ tags: {tags}, created: \"{created}\" }}\n\n=[ Note ]\n"),
+                format!("::meta(tags: {tags}, created: \"{created}\")\n\n=[ Note ]\n"),
             )
             .expect("note");
         }
@@ -565,7 +565,7 @@ mod tests {
                 ("bp.blueprint.tmt", "::kind(blueprint)\n::blueprint(note)\n"),
                 (
                     "deck.vocabulary.tmt",
-                    "::kind(vocabulary)\n::vocabulary(deck){ version: \"1.0.0\" }\n\n::elements{ card: {} }\n",
+                    "::kind(vocabulary)\n::vocabulary(deck){ version: \"1.0.0\" }\n\n::elements(card: {})\n",
                 ),
                 (
                     "tomet.dictionary.tmt",
@@ -576,7 +576,7 @@ mod tests {
         let path = root.join(tomet_load_config::VAULT_CONFIG_FILE);
         fs::write(
             &path,
-            "::kind(config)\n::blueprints{ note: @file(bp.blueprint.tmt), wrong: @file(bp.blueprint.tmt) }\n::vocabularies{ deck: @file(deck.vocabulary.tmt), other: @file(deck.vocabulary.tmt) }\n::dictionaries{ tomet: @file(tomet.dictionary.tmt), words: @file(tomet.dictionary.tmt) }\n",
+            "::kind(config)\n::blueprints(note: @file(bp.blueprint.tmt), wrong: @file(bp.blueprint.tmt))\n::vocabularies(deck: @file(deck.vocabulary.tmt), other: @file(deck.vocabulary.tmt))\n::dictionaries(tomet: @file(tomet.dictionary.tmt), words: @file(tomet.dictionary.tmt))\n",
         )
         .unwrap();
         let vault = Vault::discover(&root);
@@ -609,9 +609,9 @@ mod tests {
             &[
                 (
                     "a/self.tmt",
-                    "::kind(config)\n::workspace{ ignore: list(\"x\") }\n\n=[ A ]\n",
+                    "::kind(config)\n::workspace(ignore: list(\"x\"))\n\n=[ A ]\n",
                 ),
-                ("note.tmt", "::workspace{ unswept: list(\"y\") }\n\nbody\n"),
+                ("note.tmt", "::workspace(unswept: list(\"y\"))\n\nbody\n"),
             ],
         );
         let vault = Vault::discover(&root);
@@ -635,14 +635,14 @@ mod tests {
         let sample = root.join("sample.tmt");
         fs::write(
             &sample,
-            "::kind(config)\n::workspace{ ignore: list(\"x\") }\n",
+            "::kind(config)\n::workspace(ignore: list(\"x\"))\n",
         )
         .unwrap();
         assert!(!reported(&findings_of(&sample)));
 
         // The vault config is the one place it belongs.
         let vault_file = root.join(tomet_load_config::VAULT_CONFIG_FILE);
-        fs::write(&vault_file, "::workspace{ ignore: list(\"x\") }\n").unwrap();
+        fs::write(&vault_file, "::workspace(ignore: list(\"x\"))\n").unwrap();
         assert!(!reported(&findings_of(&vault_file)));
     }
 
@@ -653,16 +653,16 @@ mod tests {
             &[
                 (
                     "a/index.tmt",
-                    "::kind(config)\n::workspace{ ignore: list(\"x\") }\n",
+                    "::kind(config)\n::workspace(ignore: list(\"x\"))\n",
                 ),
                 (
                     "a/self.tmt",
-                    "::kind(config)\n::workspace{ ignore: list(\"x\") }\n",
+                    "::kind(config)\n::workspace(ignore: list(\"x\"))\n",
                 ),
             ],
         );
         let vault_file = root.join(tomet_load_config::VAULT_CONFIG_FILE);
-        fs::write(&vault_file, "::workspace{ folder: { entry: index.tmt } }\n").unwrap();
+        fs::write(&vault_file, "::workspace(folder: { entry: index.tmt })\n").unwrap();
         let vault = Vault::discover(&root);
         let reported = |rel: &str| {
             let path = root.join(rel);
@@ -685,7 +685,7 @@ mod tests {
     fn an_entry_name_that_is_not_a_file_name_is_reported_in_the_vault_config() {
         let root = include_vault("tomet_test_load_entry_invalid", &[]);
         let path = root.join(tomet_load_config::VAULT_CONFIG_FILE);
-        fs::write(&path, "::workspace{ folder: { entry: \"a/self.tmt\" } }\n").unwrap();
+        fs::write(&path, "::workspace(folder: { entry: \"a/self.tmt\" })\n").unwrap();
         let vault = Vault::discover(&root);
         let doc = tomet_ast_parser::parse_file(&fs::read_to_string(&path).unwrap()).unwrap();
         let findings = vault.findings(&path, &doc);
@@ -700,7 +700,7 @@ mod tests {
         );
         assert!(findings.has_errors());
 
-        fs::write(&path, "::workspace{ folder: { entry: index.tmt } }\n").unwrap();
+        fs::write(&path, "::workspace(folder: { entry: index.tmt })\n").unwrap();
         let doc = tomet_ast_parser::parse_file(&fs::read_to_string(&path).unwrap()).unwrap();
         assert!(
             Vault::discover(&root)
@@ -749,7 +749,7 @@ mod tests {
         );
         fs::write(
             root.join(tomet_load_config::VAULT_CONFIG_FILE),
-            "::kind(config)\n::workspace{ ignore: list(\"skipped\"), unswept: list(\"frozen\") }\n",
+            "::kind(config)\n::workspace(ignore: list(\"skipped\"), unswept: list(\"frozen\"))\n",
         )
         .unwrap();
 
@@ -799,7 +799,7 @@ mod tests {
         );
         fs::write(
             root.join(tomet_load_config::VAULT_CONFIG_FILE),
-            "::workspace{ folder: { entry: index.tmt } }\n",
+            "::workspace(folder: { entry: index.tmt })\n",
         )
         .unwrap();
 
@@ -849,7 +849,7 @@ mod tests {
                 ),
                 (
                     "parts/a.tmt",
-                    "::meta{ title: A }\n\n=[ A ]\n\nI am ${self.path} (${self.meta.title})\n",
+                    "::meta(title: A)\n\n=[ A ]\n\nI am ${self.path} (${self.meta.title})\n",
                 ),
             ],
         );
@@ -952,8 +952,8 @@ mod tests {
         let root = include_vault(
             "tomet_test_load_evaluate",
             &[
-                ("host.tmt", "::meta{ title: Host }\n\n=[ Intro ]#(intro)\n"),
-                ("other.tmt", "::meta{ title: Saved }\n"),
+                ("host.tmt", "::meta(title: Host)\n\n=[ Intro ]#(intro)\n"),
+                ("other.tmt", "::meta(title: Saved)\n"),
             ],
         );
         let vault = Vault::discover(&root);
@@ -975,7 +975,7 @@ mod tests {
         assert_eq!(eval("#intro.id").unwrap(), text("intro"));
 
         // The other document is open in the editor, edited and not saved.
-        vault.set_buffer(&root.join("other.tmt"), "::meta{ title: Edited }\n");
+        vault.set_buffer(&root.join("other.tmt"), "::meta(title: Edited)\n");
         assert_eq!(
             eval("tmt(\"other.tmt\").meta.title").unwrap(),
             text("Edited")

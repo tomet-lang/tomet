@@ -31,9 +31,9 @@ impl ChildItem {
 /// Target attribute slot or group on a form.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum AttrGroup {
-    /// `{ key: value, ... }` data map (e.g. in `::meta{ ... }`).
+    /// `{ key: value, ... }` data map (e.g. in `::vocabulary(ns){ ... }` or `@card(){ ... }`).
     Data,
-    /// `( key: value, ... )` arguments (e.g. in `@callout(type: "info")`).
+    /// `( key: value, ... )` arguments (e.g. in `@callout(type: "info")` or `::meta(title: T)`).
     Args,
     /// `#(id)` identity attribute slot. The `key` in `SetAttribute` is unused.
     Id,

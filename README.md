@@ -9,11 +9,11 @@ Tomet (`.tmt` / `.tmt`) is a human-readable, strongly-typed markup language and 
 ## Example
 
 ```tm
-::meta{id: doc-asdfadsf}
+::id(doc-asdfadsf)
 
 =[ heading ]
 
-- list #(tag, tag2, tag3, tag4)
+- list #(item)
   -. orderd
 
 @table

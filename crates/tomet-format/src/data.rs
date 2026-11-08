@@ -162,10 +162,10 @@ mod tests {
 
     #[test]
     fn declarations_at_the_top_are_formatted_like_the_rest() {
-        let src = "::kind(catalog, 2)   \r\n\r\n\r\n::meta{ id: x }  \r\n\r\n\"a\": 1   \r\n";
+        let src = "::kind(catalog, 2)   \r\n\r\n\r\n::meta(id: x)  \r\n\r\n\"a\": 1   \r\n";
         assert_eq!(
             format_data_source(src),
-            "::kind(catalog, 2)\n\n::meta{ id: x }\n\n\"a\": 1\n"
+            "::kind(catalog, 2)\n\n::meta(id: x)\n\n\"a\": 1\n"
         );
         // the value is the same, header included
         let before = tomet_ast_parser::parse_data_file(src).unwrap();
@@ -193,10 +193,10 @@ mod tests {
 
     #[test]
     fn file_with_expressions_is_formatted() {
-        let src = "::macros{ vocab: \"x\" }   \r\n\r\n\r\nkey: ${macro.vocab}   \r\n";
+        let src = "::macros(vocab: \"x\")   \r\n\r\n\r\nkey: ${macro.vocab}   \r\n";
         assert_eq!(
             format_data_source(src),
-            "::macros{ vocab: \"x\" }\n\nkey: ${macro.vocab}\n"
+            "::macros(vocab: \"x\")\n\nkey: ${macro.vocab}\n"
         );
         let before = tomet_ast_parser::parse_data_file(src).unwrap();
         let after = tomet_ast_parser::parse_data_file(&format_data_source(src)).unwrap();

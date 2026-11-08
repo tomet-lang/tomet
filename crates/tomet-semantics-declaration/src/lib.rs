@@ -6,13 +6,14 @@
 //! =[ Architecture & Responsibilities ]
 //!
 //! - (Declaration means `::declaration`)
-//!   | A declaration is a `::name(args){data}` at the top of a document, about the document
-//!   | rather than in it. This crate is that and only that: a datetime, a type or an
+//!   | A declaration is a `::name(args)` at the top of a document, about the document
+//!   | rather than in it; only `::vocabulary`, `::blueprint` and `::dictionary` add a `{data}`
+//!   | body to it. This crate is that and only that: a datetime, a type or an
 //!   | expression is another concept and lives elsewhere.
 //! - (Shape here, meaning injected)
 //!   | [`DeclKind`] is the closed list of the standard declarations. Each has a [`Spec`]: its
-//!   | positional slots, whether it may be written once or many times, and where it may be written
-//!   | ([`Scope`]). Reading and checking the ones both hosts have (`kind version meta macros
+//!   | positional slots, whether it may be written once or many times, where it may be written
+//!   | ([`Scope`]), and what its parentheses hold ([`Shape`]). Reading and checking the ones both hosts have (`kind version meta macros
 //!   | vars`) is here. Standard declarations are counted here, in one place for both hosts; the
 //!   | validator's singleton check covers only user-vocabulary elements. What the `.tmt`-only
 //!   | ones *do* -- `use` binds a vocabulary, `blueprint` is instantiated, `config` fills the
@@ -47,7 +48,7 @@ mod vars;
 
 pub use check::{Problem, check_declarations};
 pub use declaration::{Declaration, Found, declarations, declarations_from_header};
-pub use kind::{Cardinality, DeclKind, Host, Scope, Spec};
+pub use kind::{Cardinality, DeclKind, Host, Scope, Shape, Spec};
 pub use macros::{Arity, Placeholder, expressions_in_body, is_ident_placeholder, placeholder_of};
 pub use profile::Profile;
 pub use read::{

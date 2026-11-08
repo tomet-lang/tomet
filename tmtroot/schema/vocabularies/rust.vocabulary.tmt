@@ -3,7 +3,7 @@
   version: "1.0.0"
 }
 
-::elements{
+::elements(
   crate: {
     display: inline
     singleton: false
@@ -17,4 +17,4 @@
       }
     }
   }
-}
+)

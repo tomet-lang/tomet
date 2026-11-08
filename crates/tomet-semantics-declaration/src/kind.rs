@@ -17,37 +17,37 @@ pub enum DeclKind {
     /// `::profile(oneline, standalone)`: the subsets of tomet the document promises to stay inside. A profile
     /// never changes what the document means; see [`Profile`](crate::Profile).
     Profile,
-    /// `::meta{ ... }`: information about the document.
+    /// `::meta(title: T, ...)`: information about the document: its free attributes, as `name: value` entries.
     Meta,
-    /// `::format{ ... }`: how documents are formatted: the rules `tomet format` and the printers follow.
+    /// `::format(...)`: how documents are formatted: the rules `tomet format` and the printers follow.
     Format,
-    /// `::fields{ name: { type, ... } }`: the `::meta` fields this vault or folder declares: their types and shapes.
+    /// `::fields(name: { type, ... })`: the `::meta` fields this vault or folder declares: their types and shapes.
     Fields,
-    /// `::workspace{ ignore, unswept }`: which paths are part of the vault. Only the vault config may write it.
+    /// `::workspace(ignore, unswept)`: which paths are part of the vault. Only the vault config may write it.
     Workspace,
-    /// `::export{ type, path }`: where and in which formats this document is exported.
+    /// `::export(type, path)`: where and in which formats this document is exported.
     Export,
-    /// `::blueprints{ name: @file(path) }`: the blueprints this vault or folder registers.
+    /// `::blueprints(name: @file(path))`: the blueprints this vault or folder registers.
     ///
     /// The key is the name it is registered under and must be the name the file gives itself
     /// (`::blueprint(name)`); `tomet check` reports a key that is not. The value is `@file`, not a
     /// new element: it is a link `tomet` already tracks and can rewrite when the file moves.
     Blueprints,
-    /// `::vocabularies{ name: @file(path) }`: the vocabularies this vault or folder registers.
+    /// `::vocabularies(name: @file(path))`: the vocabularies this vault or folder registers.
     ///
     /// Like [`Blueprints`](DeclKind::Blueprints): the key is the namespace the file gives itself
     /// (`::vocabulary(name)`).
     Vocabularies,
-    /// `::dictionaries{ name: @file(path) }`: the dictionaries of terms this vault or folder registers. Like
+    /// `::dictionaries(name: @file(path))`: the dictionaries of terms this vault or folder registers. Like
     /// [`DeclKind::Vocabularies`], the key is the binding and must be the name the file gives itself
     /// (`::dictionary(name)`), and the path is relative to the vault root.
     Dictionaries,
-    /// `::migration{ ... }`: the settings of the migration tool. `tomet` reads nothing from it; it is
+    /// `::migration(...)`: the settings of the migration tool. `tomet` reads nothing from it; it is
     /// registered so that the vault config may carry it until the tool declares its own vocabulary.
     Migration,
-    /// `::macros{ name: "template" }`: the macros this document or vault defines.
+    /// `::macros(name: "template")`: the macros this document or vault defines.
     Macros,
-    /// `::vars{ name: { type, default, about } }`: the variables this document or vault declares.
+    /// `::vars(name: { type, default, about })`: the variables this document or vault declares.
     Vars,
     /// `::use(ns, 3)`: brings a vocabulary into scope.
     Use,
@@ -59,7 +59,7 @@ pub enum DeclKind {
     /// (its name is the key, quoted, so a word in any language fits) with a description and, optionally, a
     /// stable identifier; a document mentions one with `@term`.
     Dictionary,
-    /// `::elements{ ... }`: the elements a vocabulary declares.
+    /// `::elements(...)`: the elements a vocabulary declares.
     Elements,
 }
 
@@ -103,6 +103,19 @@ impl Scope {
     }
 }
 
+/// What a standard declaration is written with. A nexus stands on `(...)`; `{...}` only ever adds
+/// to it, so which declarations may carry one is fixed here and not left to each reader.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Shape {
+    /// `::kind(config, 2)`: `(args)` bound to the declaration's positional slots, no `{...}`.
+    Args,
+    /// `::meta(title: T)`: `(name: value, ...)`, every argument a named entry of the declaration's
+    /// own map, no `{...}`. `::meta()` is the declaration with no entries.
+    Entries,
+    /// `::vocabulary(ns){ ... }`: `(args)` for the slots, and a `{...}` body read as data.
+    ArgsAndData,
+}
+
 /// What is fixed about one standard declaration.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Spec {
@@ -114,6 +127,8 @@ pub struct Spec {
     pub positional: &'static [&'static str],
     pub cardinality: Cardinality,
     pub scope: Scope,
+    /// What it is written with: whether `(...)` holds entries and whether it takes a `{...}`.
+    pub shape: Shape,
     /// Whether only the vault config may write it. A folder config or a document that writes it is
     /// reported by `tomet check`, and the loader ignores it.
     pub vault_only: bool,
@@ -129,6 +144,7 @@ const SPECS: [Spec; 20] = [
         positional: &["kind", "version"],
         cardinality: Cardinality::Once,
         scope: Scope::Both,
+        shape: Shape::Args,
         vault_only: false,
     },
     Spec {
@@ -139,6 +155,7 @@ const SPECS: [Spec; 20] = [
         positional: &["id"],
         cardinality: Cardinality::Once,
         scope: Scope::Both,
+        shape: Shape::Args,
         vault_only: false,
     },
     Spec {
@@ -147,6 +164,7 @@ const SPECS: [Spec; 20] = [
         positional: &["version"],
         cardinality: Cardinality::Once,
         scope: Scope::Both,
+        shape: Shape::Args,
         vault_only: false,
     },
     Spec {
@@ -159,6 +177,7 @@ const SPECS: [Spec; 20] = [
         // `oneline` and `standalone` mean nothing yet for a `.ctmt` file; opening it is this value and
         // nothing else.
         scope: Scope::Tmt,
+        shape: Shape::Args,
         vault_only: false,
     },
     Spec {
@@ -167,6 +186,7 @@ const SPECS: [Spec; 20] = [
         positional: &[],
         cardinality: Cardinality::Once,
         scope: Scope::Both,
+        shape: Shape::Entries,
         vault_only: false,
     },
     Spec {
@@ -175,6 +195,7 @@ const SPECS: [Spec; 20] = [
         positional: &[],
         cardinality: Cardinality::Once,
         scope: Scope::Tmt,
+        shape: Shape::Entries,
         vault_only: false,
     },
     Spec {
@@ -183,6 +204,7 @@ const SPECS: [Spec; 20] = [
         positional: &[],
         cardinality: Cardinality::Once,
         scope: Scope::Tmt,
+        shape: Shape::Entries,
         vault_only: false,
     },
     Spec {
@@ -191,6 +213,7 @@ const SPECS: [Spec; 20] = [
         positional: &[],
         cardinality: Cardinality::Once,
         scope: Scope::Tmt,
+        shape: Shape::Entries,
         vault_only: true,
     },
     Spec {
@@ -199,6 +222,7 @@ const SPECS: [Spec; 20] = [
         positional: &[],
         cardinality: Cardinality::Once,
         scope: Scope::Tmt,
+        shape: Shape::Entries,
         vault_only: false,
     },
     Spec {
@@ -207,6 +231,7 @@ const SPECS: [Spec; 20] = [
         positional: &[],
         cardinality: Cardinality::Once,
         scope: Scope::Tmt,
+        shape: Shape::Entries,
         vault_only: false,
     },
     Spec {
@@ -215,6 +240,7 @@ const SPECS: [Spec; 20] = [
         positional: &[],
         cardinality: Cardinality::Once,
         scope: Scope::Tmt,
+        shape: Shape::Entries,
         vault_only: false,
     },
     Spec {
@@ -223,6 +249,7 @@ const SPECS: [Spec; 20] = [
         positional: &[],
         cardinality: Cardinality::Once,
         scope: Scope::Tmt,
+        shape: Shape::Entries,
         vault_only: false,
     },
     Spec {
@@ -231,6 +258,7 @@ const SPECS: [Spec; 20] = [
         positional: &[],
         cardinality: Cardinality::Once,
         scope: Scope::Tmt,
+        shape: Shape::Entries,
         vault_only: false,
     },
     Spec {
@@ -239,6 +267,7 @@ const SPECS: [Spec; 20] = [
         positional: &[],
         cardinality: Cardinality::Once,
         scope: Scope::Both,
+        shape: Shape::Entries,
         vault_only: false,
     },
     Spec {
@@ -247,6 +276,7 @@ const SPECS: [Spec; 20] = [
         positional: &[],
         cardinality: Cardinality::Once,
         scope: Scope::Both,
+        shape: Shape::Entries,
         vault_only: false,
     },
     Spec {
@@ -260,6 +290,7 @@ const SPECS: [Spec; 20] = [
         // independent, and this is the proof.
         cardinality: Cardinality::Many,
         scope: Scope::Tmt,
+        shape: Shape::Args,
         vault_only: false,
     },
     Spec {
@@ -271,6 +302,7 @@ const SPECS: [Spec; 20] = [
         positional: &["target"],
         cardinality: Cardinality::Once,
         scope: Scope::Tmt,
+        shape: Shape::ArgsAndData,
         vault_only: false,
     },
     Spec {
@@ -279,6 +311,7 @@ const SPECS: [Spec; 20] = [
         positional: &[],
         cardinality: Cardinality::Once,
         scope: Scope::Tmt,
+        shape: Shape::ArgsAndData,
         vault_only: false,
     },
     Spec {
@@ -288,6 +321,7 @@ const SPECS: [Spec; 20] = [
         positional: &["name"],
         cardinality: Cardinality::Once,
         scope: Scope::Tmt,
+        shape: Shape::ArgsAndData,
         vault_only: false,
     },
     Spec {
@@ -296,6 +330,7 @@ const SPECS: [Spec; 20] = [
         positional: &[],
         cardinality: Cardinality::Once,
         scope: Scope::Tmt,
+        shape: Shape::Entries,
         vault_only: false,
     },
 ];
@@ -356,6 +391,11 @@ impl DeclKind {
         self.spec().cardinality == Cardinality::Once
     }
 
+    /// What it is written with.
+    pub fn shape(self) -> Shape {
+        self.spec().shape
+    }
+
     /// Whether only the vault config may write it.
     pub fn is_vault_only(self) -> bool {
         self.spec().vault_only
@@ -401,6 +441,28 @@ mod tests {
         assert!(DeclKind::Meta.positional_keys().is_empty());
         // Its arguments are names, not slots.
         assert!(DeclKind::Profile.positional_keys().is_empty());
+    }
+
+    #[test]
+    fn only_three_declarations_take_a_brace_body() {
+        let with_body: Vec<DeclKind> = DeclKind::ALL
+            .into_iter()
+            .filter(|k| k.shape() == Shape::ArgsAndData)
+            .collect();
+        assert_eq!(
+            with_body,
+            [
+                DeclKind::Blueprint,
+                DeclKind::Vocabulary,
+                DeclKind::Dictionary
+            ]
+        );
+        // The ones that hold `name: value` entries have no positional slot to bind them to.
+        for kind in DeclKind::ALL {
+            if kind.shape() == Shape::Entries {
+                assert!(kind.positional_keys().is_empty(), "{kind}");
+            }
+        }
     }
 
     #[test]

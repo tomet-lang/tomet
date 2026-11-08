@@ -959,20 +959,16 @@ mod tests {
         assert_eq!(scope_events("a @em[ x ] b\n", Visit::Skip), "<P<E>E>P");
     }
 
-    /// The `[...]` value of `::macros{ m: [ ... ] }` in `src`.
+    /// The `[...]` value of `::macros(m: [ ... ])` in `src`.
     fn macro_body(file: &mut File) -> &mut Value {
-        let Some(Group(entries)) = &mut file.header[0].data.value else {
-            panic!("expected a {{...}} group");
+        let Some(Value::Map(entries)) = &mut file.header[0].data.args else {
+            panic!("expected `(name: template)` entries");
         };
-        let Entry::Pair(_, value) = &mut entries[0] else {
-            panic!("expected a key: value entry");
-        };
-        value
+        &mut entries[0].1
     }
 
     /// Two blocks: an element on a line of its own, then a `${2}` on a line of its own.
-    const BODY: &str =
-        "::macros{ m: [\n@card(title: ${1}, n: ${3})[ hi ${name} ]\n\n${2}\n] }\n";
+    const BODY: &str = "::macros(m: [\n@card(title: ${1}, n: ${3})[ hi ${name} ]\n\n${2}\n])\n";
 
     fn interpolations(value: &Value) -> Vec<String> {
         let mut found = Vec::new();
@@ -984,7 +980,10 @@ mod tests {
     fn the_interpolations_under_a_value_include_arguments_and_entries() {
         let mut file = tomet_ast_parser::parse_file(BODY).unwrap();
         // `(args)` is where a descendant walk does not look; here it is the point.
-        assert_eq!(interpolations(macro_body(&mut file)), ["1", "3", "name", "2"]);
+        assert_eq!(
+            interpolations(macro_body(&mut file)),
+            ["1", "3", "name", "2"]
+        );
     }
 
     #[test]
@@ -998,7 +997,11 @@ mod tests {
             "2" => Some(Value::String("end".to_string())),
             _ => None,
         });
-        assert!(interpolations(body).is_empty(), "{:?}", interpolations(body));
+        assert!(
+            interpolations(body).is_empty(),
+            "{:?}",
+            interpolations(body)
+        );
         let Value::Blocks(blocks) = &*body else {
             panic!("expected blocks");
         };
@@ -1020,7 +1023,10 @@ mod tests {
             p.content
         );
         let Block::Paragraph(last) = &blocks[1] else {
-            panic!("a block of its own becomes a paragraph, got {:?}", blocks[1]);
+            panic!(
+                "a block of its own becomes a paragraph, got {:?}",
+                blocks[1]
+            );
         };
         assert!(matches!(&last.content[..], [Inline::Text(t)] if t.value == "end"));
     }
@@ -1029,7 +1035,9 @@ mod tests {
     fn an_interpolation_nothing_fills_is_left_as_written() {
         let mut file = tomet_ast_parser::parse_file(BODY).unwrap();
         let body = macro_body(&mut file);
-        fill_interpolations(body, |i| (i.expr.to_string() == "2").then_some(Value::Int(1)));
+        fill_interpolations(body, |i| {
+            (i.expr.to_string() == "2").then_some(Value::Int(1))
+        });
         assert_eq!(interpolations(body), ["1", "3", "name"]);
     }
 

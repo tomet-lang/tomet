@@ -17,7 +17,8 @@
 //!
 //! A form (`BLOCK_FORM`, `INLINE_FORM`) is a `SIGIL` followed by
 //! its groups -- `ARGS` `( )`, `VALUE_DATA` `{ }`, `CONTENT` `[ ]`, at most
-//! one of each -- then any `CONNECT` (`:name(...)`).
+//! one of each -- then any `CONNECT` (`:name(...)`). A form is a nexus, which stands on
+//! `ARGS` or `CONTENT`; see the crate docs for the grammar of one, and for what is text.
 //! `${ ... }` is an `INTERP_EXPR`. Inside `ARGS`/`VALUE_DATA` an entry is a
 //! `MAP_ENTRY` (`key: value`) or a `SEQ_ITEM`, and nested groups are
 //! `MAP_LITERAL`, `CONTENT` (a value written `[ ... ]` is blocks, as in the AST
@@ -802,12 +803,16 @@ impl<'a, 't> CstParser<'a, 't> {
 
     /// After a form's name (index `i`): does a group, a `:` connect, or
     /// a `#(id)` follow, so that it is a form and not plain text?
+    ///
+    /// Only what [`CstParser::parse_groups`] would take counts: a `:name` with no group
+    /// after it is not a connect (`@alice:bob`), and a connect where none is allowed is
+    /// text. A bare `@name` is prose, and a form that takes nothing would not be one.
     fn groups_follow(&self, i: usize) -> bool {
         let i = self.skip_ws_from(i);
         match self.kind_at(i) {
             Some(K::L_PAREN | K::L_BRACKET | K::L_BRACE | K::PIPE) => true,
             Some(K::HASH) => self.id_follows(i),
-            Some(K::COLON) => Self::is_opener(self.kind_at(i + 1)) || self.name_at(i + 1),
+            Some(K::COLON) => self.allow_connect && self.connect_follows(i),
             _ => false,
         }
     }
@@ -1044,6 +1049,34 @@ impl<'a, 't> CstParser<'a, 't> {
             || self.kind_at(k) == Some(K::COMMENT)
             || matches!(self.kind_at(k), None | Some(K::NEWLINE))
             || self.block_starts_at(k))
+    }
+
+    /// A line that opens with `@name` and nothing else (`after_name` is the index after the
+    /// name): is it a block of its own rather than the first words of a paragraph?
+    ///
+    /// It is when it is the whole of its line and the next line neither opens a group that the
+    /// name takes (see [`CstParser::parse_groups`]) nor folds into it
+    /// ([`CstParser::next_line_folds`]).
+    fn bare_name_stands_alone(&self, after_name: usize) -> bool {
+        let end = self.past_blanks(after_name);
+        match self.kind_at(end) {
+            None => true,
+            Some(K::NEWLINE) => self.group_opens_after(end) || !self.next_line_folds(end),
+            Some(_) => false,
+        }
+    }
+
+    /// After the `NEWLINE` at `newline`: does the next line open a group that the form above
+    /// it takes across the line break? The ones [`CstParser::parse_groups`] takes there.
+    fn group_opens_after(&self, newline: usize) -> bool {
+        let k = self.skip_ws_from(newline + 1);
+        match self.kind_at(k) {
+            Some(K::L_PAREN | K::L_BRACKET | K::L_BRACE) => true,
+            Some(K::HASH) => self.id_follows(k),
+            Some(K::COLON) => self.allow_connect && self.connect_follows(k),
+            Some(K::PIPE) => self.pipe_follows_line(newline),
+            _ => false,
+        }
     }
 
     /// Index of the first token from `i` that is not white space or a comment.
@@ -1608,6 +1641,8 @@ fn validate_connect(node: &SyntaxNode) -> bool {
         }
         group_count > 0
     } else {
+        // Only what is structurally a connect: whether it stands on a primary group is
+        // lowering's to refuse, so that a bracket-less body and a full-form head agree.
         for child in node.children() {
             match child.kind() {
                 K::NAME | K::SIGIL => {}
@@ -1878,14 +1913,12 @@ impl<'a, 't> CstParser<'a, 't> {
     fn parse_form_line(&mut self) {
         let p = self.pos;
         let form = match self.current_kind() {
-            // A bare `@name` is a form only alone on its line; with a group it is one anywhere.
+            // With a group `@name` is a form anywhere. Bare, it is a form only alone on its
+            // line, and then only as a block (which lowering refuses: a nexus needs a primary
+            // group): a bare `@name` that the next line folds into is running text.
             Some(K::AT) => {
                 let n = self.name_tokens_at(p + 1);
-                n > 0
-                    && (self.groups_follow(p + 1 + n)
-                        || self
-                            .kind_at(self.past_blanks(p + 1 + n))
-                            .is_none_or(|k| k == K::NEWLINE))
+                n > 0 && (self.groups_follow(p + 1 + n) || self.bare_name_stands_alone(p + 1 + n))
             }
             Some(K::LT) => matches!(self.slot_at(p), Some((true, _))),
             _ => false,
@@ -2008,7 +2041,9 @@ impl<'a, 't> CstParser<'a, 't> {
                 && self.kind_at(self.pos - 1) != Some(K::WHITESPACE);
             if combine {
                 self.allow_connect = true;
-                self.try_parse_inline_form();
+                if !self.try_parse_inline_form() {
+                    self.parse_bare_combine_form();
+                }
             }
             self.allow_connect = false;
             if !matches!(self.current_kind(), None | Some(K::NEWLINE)) {
@@ -2446,6 +2481,18 @@ impl<'a, 't> CstParser<'a, 't> {
 
     // --- forms -----------------------------------------------------------
 
+    /// The `@name` of a combine item (`-@name`) that has no group after it. Anywhere else a bare
+    /// `@name` is running text; here the `-` directly against the `@` says it was meant as the
+    /// item's element, so the tree keeps it as a form -- a sigil and no groups -- and lowering
+    /// refuses it for want of a primary group.
+    fn parse_bare_combine_form(&mut self) {
+        if self.current_kind() == Some(K::AT) && self.name_tokens_at(self.pos + 1) > 0 {
+            self.builder.start_node(K::INLINE_FORM.into());
+            self.parse_sigil();
+            self.builder.finish_node();
+        }
+    }
+
     fn parse_sigil(&mut self) {
         self.builder.start_node(K::SIGIL.into());
         match self.current_kind() {
@@ -2517,7 +2564,9 @@ impl<'a, 't> CstParser<'a, 't> {
                 }
                 Some(K::NEWLINE) if cross_newline && !content && self.pipe_follows_line(j) => {
                     content = true;
-                    self.bump_while(K::WHITESPACE);
+                    while self.pos < j {
+                        self.bump(); // white space and comments
+                    }
                     self.bump(); // the newline
                     self.bump_while(K::WHITESPACE); // an outer run's markers
                     self.parse_pipe_content();

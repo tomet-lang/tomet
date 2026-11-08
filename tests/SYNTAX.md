@@ -30,6 +30,7 @@ TOMET_UPDATE_REF=1 cargo test -p tomet-tests --test syntax_report  # 更新
 - [インライン配置の要素](#インライン配置の要素)
 - [文字列に落ちる場合](#文字列に落ちる場合)
 - [`[content]` に入れ子になった backtick フェンス](#content-に入れ子になった-backtick-フェンス)
+- [ネクサスと主グループ](#ネクサスと主グループ)
 - [`{...}` グループ](#-グループ)
 - [`(args)` と値の文法](#args-と値の文法)
 - [`|` で開く内容](#-で開く内容)
@@ -45,6 +46,7 @@ TOMET_UPDATE_REF=1 cargo test -p tomet-tests --test syntax_report  # 更新
 - [コメント](#コメント)
 - [文書の宣言](#文書の宣言)
 - [脚注](#脚注)
+- [主グループの無いネクサス](#主グループの無いネクサス)
 - [宣言の制限](#宣言の制限)
 - [撤去された構文](#撤去された構文)
 - [綴りを失ったまま、代わりが未決のもの](#綴りを失ったまま、代わりが未決のもの)
@@ -78,14 +80,15 @@ Paragraph
 
 ## ブロック配置の要素
 
-### 行に要素しかなければブロック。グループがなくても行末で要素になる
+### 行に要素しかなければブロック。中身が空でも `()` か `[]` を書く。グループの無い `@memo` だけの行は要素ではなくエラー（下の「主グループの無いネクサス」）
 
 ```tmt
-@memo
+@memo()
 ```
 
 ```
 Block  @memo
+  args    {}
 ```
 
 検証:
@@ -94,7 +97,7 @@ Block  @memo
 unknown element `memo`: only `std` and this document's own `::kind` may be written bare; namespace it (`ns.memo`), or declare the vocabulary that has it and bind it with `::use`
 ```
 
-### `(args)` `[content]` `{value}` は各1個まで、順不同
+### `(args)` `[content]` `{value}` は各1個まで、順不同。ただし `(args)` か `[content]` のどちらかは要る（下の「ネクサスと主グループ」）
 
 ```tmt
 @memo(a: 1)[ 本文 ]{ b: 2 }
@@ -285,6 +288,17 @@ Paragraph
   Text "連絡は me@example.com まで"
 ```
 
+### 行の途中でも、グループの無い `@名前` は地の文。メンションや宛先がエラーにならないための線引き
+
+```tmt
+ping @someone about it
+```
+
+```
+Paragraph
+  Text "ping @someone about it"
+```
+
 ### 行中の `#` は普通の文字
 
 ```tmt
@@ -385,16 +399,188 @@ Declaration ::config
 unknown element `config`: only `std` and this document's own `::kind` may be written bare; namespace it (`ns.config`), or declare the vocabulary that has it and bind it with `::use`
 ```
 
-## `{...}` グループ
+## ネクサスと主グループ
 
-### `key: value` の並び
+### `@名前` `:名前` `::名前` はネクサスで、主グループを要る。主グループは `(args)` と `[content]`。`{value}` `#(id)` `:コネクト` は付加のグループで、単独では置けない。空でも主グループは書く
 
 ```tmt
-@memo{ a: 1, b: two }
+@memo()
 ```
 
 ```
 Block  @memo
+  args    {}
+```
+
+検証:
+
+```
+unknown element `memo`: only `std` and this document's own `::kind` may be written bare; namespace it (`ns.memo`), or declare the vocabulary that has it and bind it with `::use`
+```
+
+### `[content]` だけでもよい
+
+```tmt
+@memo[ 本文 ]
+```
+
+```
+Block  @memo
+  content
+    Paragraph
+      Text "本文"
+```
+
+検証:
+
+```
+unknown element `memo`: only `std` and this document's own `::kind` may be written bare; namespace it (`ns.memo`), or declare the vocabulary that has it and bind it with `::use`
+```
+
+### 付加のグループは主グループのあとに付く
+
+```tmt
+@memo(){ a: 1 }#(first)
+```
+
+```
+Block  @memo
+  args    {}
+  group
+    a: 1
+  id      "first"
+```
+
+検証:
+
+```
+unknown element `memo`: only `std` and this document's own `::kind` may be written bare; namespace it (`ns.memo`), or declare the vocabulary that has it and bind it with `::use`
+```
+
+### 主グループは付加のグループのあとでもよい。要るのは、どこかに一つあること
+
+```tmt
+@memo{ a: 1 }(b: 2)
+```
+
+```
+Block  @memo
+  args    {b: 2}
+  group
+    a: 1
+```
+
+検証:
+
+```
+unknown element `memo`: only `std` and this document's own `::kind` may be written bare; namespace it (`ns.memo`), or declare the vocabulary that has it and bind it with `::use`
+```
+
+### `|` の連なりも主グループ。`@table` だけの行でも、次の行の `|` が主グループになる。`()` `[]` の無い、唯一の要素の書き方
+
+```tmt
+@table
+|[ a ][ b ]
+|[ 1 ][ 2 ]
+```
+
+```
+Block  @table
+  content
+    Paragraph
+      Text "[ a ][ b ]"
+      SoftBreak
+      Text "[ 1 ][ 2 ]"
+```
+
+### リスト項目に付けるときも同じ。`-@名前` は主グループを要る
+
+```tmt
+-@memo(a: 1)
+-@memo[ 本文 ]
+```
+
+```
+List ordered=false
+  Items:
+    Block  @memo
+      args    {a: 1}
+      content
+    Block  @memo
+      content
+        Paragraph
+          Text "本文"
+```
+
+検証:
+
+```
+unknown element `memo`: only `std` and this document's own `::kind` may be written bare; namespace it (`ns.memo`), or declare the vocabulary that has it and bind it with `::use`
+unknown element `memo`: only `std` and this document's own `::kind` may be written bare; namespace it (`ns.memo`), or declare the vocabulary that has it and bind it with `::use`
+```
+
+### 名前のないコネクト `:{...}` `:(...)` は、付いた先（項目・見出し・要素）のデータに入る。`{...}` が単独で置ける唯一の場所
+
+```tmt
+- 項目 :{ k: v }
+= 見出し :(k: v)
+```
+
+```
+List ordered=false
+  Items:
+    Bare
+      content
+        Paragraph
+          Text "項目"
+      group
+        k: "v"
+Section level=1
+  Title:
+    Text "見出し"
+  args    {k: "v"}
+```
+
+### 名前つきコネクトも主グループを要る。`:rule(...)` は書けて、`:rule{...}` は書けない（下の「主グループの無いネクサス」）
+
+```tmt
+- 項目 :rule(allow: list(card))
+```
+
+```
+List ordered=false
+  Items:
+    Bare
+      content
+        Paragraph
+          Text "項目"
+      connect
+        Inline @rule
+          args    {allow: list("card")}
+```
+
+### 水平線は `@hr()`。`@hr` だけの行はエラー
+
+```tmt
+@hr()
+```
+
+```
+Block  @hr
+  args    {}
+```
+
+## `{...}` グループ
+
+### `{...}` は付加のグループ。`(...)` か `[...]` を伴う要素に付き、単独では要素にならない（`@memo{ ... }` は下の「主グループの無いネクサス」）。中身は `key: value` の並び
+
+```tmt
+@memo(){ a: 1, b: two }
+```
+
+```
+Block  @memo
+  args    {}
   group
     a: 1
     b: "two"
@@ -409,7 +595,7 @@ unknown element `memo`: only `std` and this document's own `::kind` may be writt
 ### 要素の並び
 
 ```tmt
-@memo{
+@memo(){
   (1)[ ひとつ ]
   (2)[ ふたつ ]
 }
@@ -417,6 +603,7 @@ unknown element `memo`: only `std` and this document's own `::kind` may be writt
 
 ```
 Block  @memo
+  args    {}
   group
     Bare
       args    1
@@ -439,11 +626,12 @@ unknown element `memo`: only `std` and this document's own `::kind` may be writt
 ### 対と要素の混在。並び順は保たれる
 
 ```tmt
-@deck.card{ t: x, (a)[ y ], u: z }
+@deck.card(){ t: x, (a)[ y ], u: z }
 ```
 
 ```
 Block  @deck.card
+  args    {}
   group
     t: "x"
     Bare
@@ -463,11 +651,12 @@ Block  @deck.card
 ### 裸のエントリも名前つき要素と同じ三つのグループを取る。シジルが無いだけで、読む道は同じ
 
 ```tmt
-@memo{ (1)[ ひとつ ]{ id: a } }
+@memo(){ (1)[ ひとつ ]{ id: a } }
 ```
 
 ```
 Block  @memo
+  args    {}
   group
     Bare
       args    1
@@ -487,7 +676,7 @@ unknown element `memo`: only `std` and this document's own `::kind` may be writt
 ### グループを次の行に置いてもよい。`@name` と同じ
 
 ```tmt
-@memo{
+@memo(){
   (1)
   [ ひとつ ]
 }
@@ -495,6 +684,7 @@ unknown element `memo`: only `std` and this document's own `::kind` may be writt
 
 ```
 Block  @memo
+  args    {}
   group
     Bare
       args    1
@@ -512,11 +702,12 @@ unknown element `memo`: only `std` and this document's own `::kind` may be writt
 ### 空のグループ
 
 ```tmt
-@memo{}
+@memo(){}
 ```
 
 ```
 Block  @memo
+  args    {}
   group   (空)
 ```
 
@@ -529,11 +720,12 @@ unknown element `memo`: only `std` and this document's own `::kind` may be writt
 ### 引用符つきのキー。パスや空白を含むキーはこう書く。引用符つきの文字列は、直後に `:` があるときだけキーになる
 
 ```tmt
-@memo{ "a/b.tmt": 1, plain: 2 }
+@memo(){ "a/b.tmt": 1, plain: 2 }
 ```
 
 ```
 Block  @memo
+  args    {}
   group
     a/b.tmt: 1
     plain: 2
@@ -1545,11 +1737,12 @@ Block  @task
 ### クォートすればスペースも入る
 
 ```tmt
-@task#("has spaces")
+@task()#("has spaces")
 ```
 
 ```
 Block  @task
+  args    {}
   id      "has spaces"
 ```
 
@@ -1629,11 +1822,11 @@ Block  @task
 ### idを2つ書くとエラー
 
 ```tmt
-@task#(a)#(b)
+@task()#(a)#(b)
 ```
 
 ```
-parse error: 1:10: a second `#(...)`: an element takes at most one id
+parse error: 1:12: a second `#(...)`: an element takes at most one id
 ```
 
 ## コメント
@@ -1663,19 +1856,18 @@ Paragraph
 
 ## 文書の宣言
 
-### 行頭の `::名前` は、文書自身についての宣言。`@名前` と同じ groups を取り、先頭の並び（preamble）に置く。名前は構文では選ばない（判定は検証の仕事）
+### 行頭の `::名前` は、文書自身についての宣言。`@名前` と同じ groups を取り、先頭の並び（preamble）に置く。`(args)` か `[content]` が要る。名前は構文では選ばない（判定は検証の仕事）
 
 ```tmt
 ::kind(note)
-::meta{ id: x }
+::meta(id: x)
 ```
 
 ```
 Declaration ::kind
   args    "note"
 Declaration ::meta
-  group
-    id: "x"
+  args    {id: "x"}
 ```
 
 検証:
@@ -1705,6 +1897,79 @@ Declaration ::x
 
 ```
 unknown element `x`: only `std` and this document's own `::kind` may be written bare; namespace it (`ns.x`), or declare the vocabulary that has it and bind it with `::use`
+```
+
+### `{...}` だけを取っていた12個の宣言は `(...)` を取る: `meta` `macros` `format` `fields` `workspace` `export` `blueprints` `vocabularies` `dictionaries` `migration` `vars` `elements`。`::meta{ ... }` はもう書けない（下の「主グループの無いネクサス」）
+
+```tmt
+::meta(title: "x")
+::macros(gh: "https://x/${1}")
+::vars(a: { type: string })
+::format(table: { max_col_width: 50 })
+::fields(created: { type: datetime })
+::workspace(ignore: list("a"))
+::export(type: commonmark)
+::blueprints(b: "b.tmt")
+::vocabularies(v: "v.tmt")
+::dictionaries(d: "d.tmt")
+::migration(m: 1)
+::elements(card: { display: block })
+```
+
+```
+Declaration ::meta
+  args    {title: "x"}
+Declaration ::macros
+  args    {gh: "https://x/${1}"}
+Declaration ::vars
+  args    {a: {type: "string"}}
+Declaration ::format
+  args    {table: {max_col_width: 50}}
+Declaration ::fields
+  args    {created: {type: "datetime"}}
+Declaration ::workspace
+  args    {ignore: list("a")}
+Declaration ::export
+  args    {type: "commonmark"}
+Declaration ::blueprints
+  args    {b: "b.tmt"}
+Declaration ::vocabularies
+  args    {v: "v.tmt"}
+Declaration ::dictionaries
+  args    {d: "d.tmt"}
+Declaration ::migration
+  args    {m: 1}
+Declaration ::elements
+  args    {card: {display: "block"}}
+```
+
+### `::vocabulary(ns){ ... }` と `::dictionary(name){ ... }` はもともと `(...)` を持つので、`{...}` の本体をそのまま取る
+
+```tmt
+::vocabulary(ns){ version: "1.0.0" }
+::dictionary(tomet){ "vault": "a unit" }
+```
+
+```
+Declaration ::vocabulary
+  args    "ns"
+  group
+    version: "1.0.0"
+Declaration ::dictionary
+  args    "tomet"
+  group
+    vault: "a unit"
+```
+
+### 中身が空の宣言も `()` を書く
+
+```tmt
+::meta()
+```
+
+```
+Declaration ::meta
+  args    {}
 ```
 
 ### 次の行の `::` は、前の宣言のコネクトではなく、次の宣言
@@ -1761,6 +2026,201 @@ Block  @ftn
   content
     Paragraph
       Text "定義"
+```
+
+## 主グループの無いネクサス
+
+### ブロックの `@名前` だけの行は要素ではなくエラー。空の要素は `@名前()` と書く
+
+```tmt
+@memo
+```
+
+```
+parse error: 1:1: `@memo` needs a primary group, `(...)` or `[...]`: write `@memo()` for an empty one
+```
+
+### 水平線も同じ。`@hr` ではなく `@hr()`
+
+```tmt
+@hr
+```
+
+```
+parse error: 1:1: `@hr` needs a primary group, `(...)` or `[...]`: write `@hr()` for an empty one
+```
+
+### `{...}` だけでは要素にならない
+
+```tmt
+@memo{ a: 1 }
+```
+
+```
+parse error: 1:1: `@memo` needs a primary group, `(...)` or `[...]`: `{...}` cannot stand without one
+```
+
+### 空の `{}` も同じ
+
+```tmt
+@memo{}
+```
+
+```
+parse error: 1:1: `@memo` needs a primary group, `(...)` or `[...]`: `{...}` cannot stand without one
+```
+
+### `#(id)` だけでも要素にならない。id は要素に付くもので、要素を作らない
+
+```tmt
+@memo#(first)
+```
+
+```
+parse error: 1:1: `@memo` needs a primary group, `(...)` or `[...]`: `#(id)` cannot stand without one
+```
+
+### 付加のグループを重ねても主グループにはならない
+
+```tmt
+@memo{}#(first)
+```
+
+```
+parse error: 1:1: `@memo` needs a primary group, `(...)` or `[...]`: `{...}`, `#(id)` cannot stand without one
+```
+
+### 名前つきコネクトだけでは要素にならない
+
+```tmt
+@memo:rule(allow: list(card))
+```
+
+```
+parse error: 1:1: `@memo` needs a primary group, `(...)` or `[...]`: `:connect` cannot stand without one
+```
+
+### 名前のない `:{...}` も、主グループのない `@名前` には付けられない
+
+```tmt
+@memo:{ a: 1 }
+```
+
+```
+parse error: 1:1: `@memo` needs a primary group, `(...)` or `[...]`: `:connect` cannot stand without one
+```
+
+### `:(...)` も同じ
+
+```tmt
+@memo:(a: 1)
+```
+
+```
+parse error: 1:1: `@memo` needs a primary group, `(...)` or `[...]`: `:connect` cannot stand without one
+```
+
+### コネクトも主グループを要る。`:rule{...}` は書けない
+
+```tmt
+@memo():rule{ allow: list(card) }
+```
+
+```
+parse error: 1:8: `:rule` needs a primary group, `(...)` or `[...]`: `{...}` cannot stand without one
+```
+
+### リスト項目のコネクトも同じ
+
+```tmt
+- 項目 :rule{ allow: list(card) }
+```
+
+```
+parse error: 1:6: `:rule` needs a primary group, `(...)` or `[...]`: `{...}` cannot stand without one
+```
+
+### 見出しのコネクトも同じ
+
+```tmt
+= 見出し :rule{ allow: list(card) }
+```
+
+```
+parse error: 1:7: `:rule` needs a primary group, `(...)` or `[...]`: `{...}` cannot stand without one
+```
+
+### `-@名前` も主グループを要る
+
+```tmt
+-@memo{ a: 1 }
+```
+
+```
+parse error: 1:2: `@memo` needs a primary group, `(...)` or `[...]`: `{...}` cannot stand without one
+```
+
+### 行の途中の `@名前` は、グループが無ければ地の文（上の「文字列に落ちる場合」）。しかし付加のグループが続くと、地の文にはならずエラー
+
+```tmt
+この @memo{ a: 1 } は書きかけ
+```
+
+```
+parse error: 1:4: `@memo` needs a primary group, `(...)` or `[...]`: `{...}` cannot stand without one
+```
+
+### `#(id)` が続く場合も同じ
+
+```tmt
+この @memo#(first) は書きかけ
+```
+
+```
+parse error: 1:4: `@memo` needs a primary group, `(...)` or `[...]`: `#(id)` cannot stand without one
+```
+
+### 宣言も同じ。`::名前` だけの行は宣言ではなくエラー。空の宣言は `::meta()`
+
+```tmt
+::kind(note)
+::meta
+```
+
+```
+parse error: 2:1: `::meta` needs a primary group, `(...)` or `[...]`: write `::meta()` for an empty one
+```
+
+### `{...}` だけを取っていた宣言の旧い書き方。`::meta{ ... }` は `::meta(...)` になった
+
+```tmt
+::kind(note)
+::meta{ title: "旧い書き方" }
+```
+
+```
+parse error: 2:1: `::meta` needs a primary group, `(...)` or `[...]`: `{...}` cannot stand without one
+```
+
+### 12個の宣言のどれも同じ。`::format{ ... }` も受け付けない
+
+```tmt
+::format{ table: { max_col_width: 50 } }
+```
+
+```
+parse error: 1:1: `::format` needs a primary group, `(...)` or `[...]`: `{...}` cannot stand without one
+```
+
+### 宣言も `#(id)` だけでは宣言にならない
+
+```tmt
+::kind(note)
+::meta#(first)
+```
+
+```
+parse error: 2:1: `::meta` needs a primary group, `(...)` or `[...]`: `#(id)` cannot stand without one
 ```
 
 ## 宣言の制限
@@ -1926,14 +2386,14 @@ Paragraph
 
 ## 受け付けない書き方
 
-### `{...}` に裸のスカラーも書けない
+### `{...}` に裸のスカラーも書けない（裸の値は `(args)` に書く）
 
 ```tmt
-@memo{hello}
+@memo(){hello}
 ```
 
 ```
-parse error: 1:7: a '{...}' group holds 'key: value' entries or elements; write a bare value in '(args)' instead
+parse error: 1:9: a '{...}' group holds 'key: value' entries or elements; write a bare value in '(args)' instead
 ```
 
 ### 閉じない `[`

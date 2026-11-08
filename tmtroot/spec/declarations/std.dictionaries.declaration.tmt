@@ -4,9 +4,9 @@
 =[ 全容 ]
 
 ```tm
-::dictionaries{
-  tomet: @file(tmtroot/spec/dictionary/tomet.tmt)
-}
+::dictionaries(
+  tomet: @file(tmtroot/dict/tomet.dict.tmt)
+)
 ```
 
 この vault が使う辞書のファイルを、名前をつけて登録する。キーは、ファイルが `::dictionary(tomet)` で名乗る名前。これで文書は、その辞書の語を `@term(tomet#...)` で言及できる。登録の決まりは @file(tmtroot/spec/declarations/std.blueprints.declaration.tmt) と同じ。辞書の書き方は @file(tmtroot/spec/declarations/std.dictionary.declaration.tmt)。

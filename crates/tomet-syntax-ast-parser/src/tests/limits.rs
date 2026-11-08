@@ -19,7 +19,7 @@ fn shapes() -> Vec<(&'static str, usize, fn(usize) -> String)> {
             format!("{}1{}\n", "@a(k: ".repeat(n), ")".repeat(n))
         }),
         ("{value}", 100000, |n| {
-            format!("{}1{}\n", "@a{k: ".repeat(n), "}".repeat(n))
+            format!("{}1{}\n", "@a(){k: ".repeat(n), "}".repeat(n))
         }),
         ("emphasis", 100000, |n| {
             format!("{}x{}\n", "*a ".repeat(n), " a*".repeat(n))
@@ -28,9 +28,11 @@ fn shapes() -> Vec<(&'static str, usize, fn(usize) -> String)> {
             format!("{}x{}\n", "<?(a)>[ ".repeat(n), " ]".repeat(n))
         }),
         ("pipe runs", 2000, |n| {
-            let mut s = String::from("@a\n");
+            let mut s = String::from("@a()\n");
+            // The innermost run holds text: a `()` there would be a level deeper than the runs.
             for i in 1..=n {
-                s.push_str(&format!("{}| @a\n", "| ".repeat(i - 1)));
+                let line = if i == n { "x" } else { "@a()" };
+                s.push_str(&format!("{}| {line}\n", "| ".repeat(i - 1)));
             }
             s
         }),

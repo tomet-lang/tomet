@@ -28,10 +28,7 @@ pub fn render(text: &str) -> String {
 ///
 /// Whitespace around the comment, and between its delimiters and its text, is not part of the text.
 pub fn parse(source: &str) -> Option<String> {
-    let inner = source
-        .trim()
-        .strip_prefix("<!--")?
-        .strip_suffix("-->")?;
+    let inner = source.trim().strip_prefix("<!--")?.strip_suffix("-->")?;
     if inner.contains("-->") {
         return None;
     }
@@ -72,7 +69,10 @@ mod tests {
     #[test]
     fn surrounding_whitespace_is_not_text() {
         assert_eq!(parse("  <!--   note \n-->\n"), Some("note".to_string()));
-        assert_eq!(parse("<!--\n  one\n  two\n-->"), Some("one\n  two".to_string()));
+        assert_eq!(
+            parse("<!--\n  one\n  two\n-->"),
+            Some("one\n  two".to_string())
+        );
     }
 
     #[test]

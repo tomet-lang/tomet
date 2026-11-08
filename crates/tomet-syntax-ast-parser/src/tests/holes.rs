@@ -254,7 +254,7 @@ fn a_hole_is_found_wherever_content_goes() {
         ("@card[\n  line <?(a)>\n\n  line <?(b)>\n]", 2),
         ("@callout\n| <?(a)> text\n| <?(b)>", 2),
         ("@ns.thing(a: [<?(x)>], b: <?(y)>)", 2),
-        ("@meta{ type: <?(kind)> }", 1),
+        ("@meta(type: <?(kind)>)", 1),
         ("*emphasis <?(x)>*", 1),
     ] {
         assert_eq!(holes_in(src), expected, "holes in `{src}`");

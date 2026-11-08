@@ -19,8 +19,8 @@
 //!  | line or EOF only, not at the next line merely *looking* like a new
 //!  | block. `tomet-parser`'s own lazy-continuation check also ends a
 //!  | paragraph early when the next line is an element trigger (`@name`,
-//!  | see `document.rs`'s `Stop::Paragraph`) -- e.g. `::meta{...}`
-//!  | immediately followed by `::settings{...}` with no blank line between
+//!  | see `document.rs`'s `Stop::Paragraph`) -- e.g. `::meta(...)`
+//!  | immediately followed by `::format(...)` with no blank line between
 //!  | them becomes two separate top-level elements in the real parser.
 //!  | This grammar doesn't simulate that either, so it still merges such
 //!  | adjacent elements into one `paragraph` node.
@@ -38,6 +38,19 @@
 //!  | order.** The real grammar allows each group at most once, in any
 //!  | order; here they're just `repeat(choice(...))`, so e.g. two
 //!  | `(args)` groups back to back would (harmlessly) both parse.
+//! -| **The nexus rule is applied, but not everywhere it is checked.** A
+//!  | nexus (`@name`, `::name`, `:name`) needs a primary group -- `(args)`,
+//!  | `[content]` or a `|` run -- and `{value}`, `#(id)` and a `:connect`
+//!  | only add to one (`_nexus_groups` in `grammar.js`). So `::meta(a: 1)` and
+//!  | `@name(){ a: 1 }` are clean and `::meta{ a: 1 }`, `@name{}` and
+//!  | `@name#(id)` are `ERROR`s, as they are in the real parser. What the
+//!  | grammar cannot see is position: a lone `@name` is prose inline and an
+//!  | error as a block, so it is accepted everywhere (`me@example.com`
+//!  | must stay clean), and after it a `:rule(...)` or `:{...}` reads as
+//!  | punctuation and text rather than as the error the real parser
+//!  | reports. A `|` run on the line *after* its element
+//!  | (`@table` then `|[ a ][ b ]`) is not a primary group here either; see
+//!  | `syntax/pipe-table.tmt` in `KNOWN_TS_ERRORS`.
 //! -| **`em`/`strong` don't nest in each other.** `*`/`**`/`_`/`__` all
 //!  | share a delimiter character, and letting them nest is the classic
 //!  | Markdown emphasis/strong ambiguity that needs real flanking-rule
@@ -84,7 +97,7 @@
 //! -| **A bare `list(...)` occupying the *whole* `(args)`/`{value}`
 //!  | doesn't parse as `call`, unlike the same call under a named key
 //!  | (`a: list(...)`, which works fine).** `@id(list(a, b))` and
-//!  | `::meta{list(a, b)}` both land in an `ERROR` even with `$.call`
+//!  | `::meta(list(a, b))` both land in an `ERROR` even with `$.call`
 //!  | added as an alternative to `args_group`/`value_group`'s shared
 //!  | `value` rule -- tried and reverted, since it changed nothing:
 //!  | whatever conflicts an identifier-then-`(` at that exact position
@@ -367,17 +380,17 @@ mod tests {
         // `tomet-parser` reads `"a/b": 1` as a keyed entry wherever it reads
         // `a: 1`: in `{value}`, in `(args)`, nested, and mixed with bare keys.
         for (src, keys) in [
-            ("::meta{ \"a/b\": 1 }\n", vec!["string"]),
+            ("::meta(\"a/b\": 1)\n", vec!["string"]),
             (
-                "::meta{\n  \"a/b\": 1\n  c: 2\n}\n",
+                "::meta(\n  \"a/b\": 1\n  c: 2\n)\n",
                 vec!["string", "identifier"],
             ),
             (
-                "::meta{\n  c: 2\n  \"a/b\": 1\n}\n",
+                "::meta(\n  c: 2\n  \"a/b\": 1\n)\n",
                 vec!["identifier", "string"],
             ),
             ("@x(\"a/b\": 1, c: 2)\n", vec!["string", "identifier"]),
-            ("@x{ k: { \"c d\": 3 } }\n", vec!["identifier", "string"]),
+            ("@x(){ k: { \"c d\": 3 } }\n", vec!["identifier", "string"]),
         ] {
             let tree = parse(src);
             let root = tree.root_node();
@@ -388,7 +401,7 @@ mod tests {
 
     #[test]
     fn a_quoted_string_without_a_colon_is_still_a_value() {
-        for src in ["@x(\"a/b\")\n", "@x{ \"a/b\" }\n"] {
+        for src in ["@x(\"a/b\")\n", "@x(){ \"a/b\" }\n"] {
             let tree = parse(src);
             let root = tree.root_node();
             assert!(!root.has_error(), "expected no errors for {src:?}");
@@ -533,7 +546,7 @@ mod tests {
     /// `text`/`_element_group`/`connect`'s own comments in `grammar.js`.
     #[test]
     fn named_connect_reaches_the_grammar_after_a_closed_group() {
-        for src in ["@x(a: 1):as(y)\n", "@x[ a ]:as(y)\n", "@x:as(y)\n"] {
+        for src in ["@x(a: 1):as(y)\n", "@x[ a ]:as(y)\n", "@x():as(y)\n"] {
             let tree = parse(src);
             let root = tree.root_node();
             assert!(!root.has_error(), "expected no errors for {src:?}");
@@ -657,13 +670,13 @@ mod tests {
     #[test]
     fn interpolation_in_a_value_position_is_one_interpolation() {
         for (src, expected) in [
-            ("::meta{ id: ${f()} }\n", 1),
-            ("::meta{ id: ${f} }\n", 1),
-            ("::meta{ ${f()} }\n", 1),
+            ("::meta(id: ${f()})\n", 1),
+            ("::meta(id: ${f})\n", 1),
+            ("::meta(${f()})\n", 1),
             ("@x(${a.b})\n", 1),
             ("@x(tags: list(${a}, b, ${c(1)}))\n", 2),
             (
-                "::meta{\n  id: ${generate.uuid()}\n  by: ${var.author}\n}\n",
+                "::meta(\n  id: ${generate.uuid()}\n  by: ${var.author}\n)\n",
                 2,
             ),
         ] {
@@ -701,7 +714,7 @@ mod tests {
             "@foo(yaml)\n",
             "@foo(json)\n",
             "@foo(toml)\n",
-            "@input{required}\n",
+            "@input(){required}\n",
         ] {
             let tree = parse(src);
             assert!(
@@ -736,7 +749,7 @@ mod tests {
         // space before `hello` on purpose -- see `scanner.c`'s comment on
         // why this scanner only engages when the identifier-shaped run
         // starts immediately at the current lex position.
-        let src = "@input{hello world}\n";
+        let src = "@input(){hello world}\n";
         let tree = parse(src);
         assert!(!tree.root_node().has_error());
         let scalar = find_kind(tree.root_node(), "scalar").expect("expected a scalar node");
@@ -788,6 +801,89 @@ mod tests {
         assert_eq!(root.child(0).unwrap().kind(), "block_comment");
     }
 
+    /// A nexus (`@name`, `::name`, `:name`) needs a primary group: `(args)`,
+    /// `[content]` or a `|` run. `{value}`, `#(id)` and a `:connect` only add
+    /// to one. The real parser rejects the second list; the grammar shows the
+    /// same by erroring on it, so the highlighter does not paint a
+    /// `@name{ ... }` as if it were an element.
+    ///
+    /// Known gap: `@name:rule(a)`, `@name:{ a: 1 }` and `@name:(a)` are errors
+    /// in the real parser, but here the lone `@name` is a complete (prose)
+    /// element and the `:` after it is punctuation, so they read without an
+    /// error node. Only a group the element would have taken (`{`, `#(`) can
+    /// be refused. The same goes for `- item :rule{}` and `= H :rule{}`: the
+    /// `:rule` is text and the `{}` the item's or heading's own attrs.
+    #[test]
+    fn a_nexus_needs_a_primary_group() {
+        for src in [
+            "@name()\n",
+            "@name[ x ]\n",
+            "@name(){ a: 1 }\n",
+            "@name()#(id)\n",
+            "@name{ a: 1 }(b: 1)\n",
+            "@name#(id)(a)\n",
+            "@name()#(id):rule(a)\n",
+            "@name():{ a: 1 }\n",
+            "@name(a):(b)\n",
+            "-@name(a)\n",
+            "text @name() more\n",
+            "@quote| x\n",
+            "::meta(a: 1)\n",
+            "::meta()\n",
+            "::meta[ x ]\n",
+            "::vocabulary(ns){ version: \"1.0.0\" }\n",
+            "::dictionary(n){ \"a\": @term| x }\n",
+            "- item :rule(a)\n",
+            "- item :{ a: 1 }\n",
+            "- item :( a )\n",
+            "= H :rule(a)\n",
+            "= H :{ a: 1 }\n",
+        ] {
+            let tree = parse(src);
+            assert!(
+                !tree.root_node().has_error(),
+                "expected no errors for {src:?}: {}",
+                tree.root_node().to_sexp()
+            );
+        }
+        for src in [
+            "@name{}\n",
+            "@name{ a: 1 }\n",
+            "@name#(id)\n",
+            "@name{}#(id)\n",
+            "@name():rule{}\n",
+            "-@name{}\n",
+            "text @name{} more\n",
+            "::name{}\n",
+            "::name{ a: 1 }\n",
+            "::name#(id)\n",
+        ] {
+            let tree = parse(src);
+            assert!(
+                tree.root_node().has_error(),
+                "expected an error for {src:?}: {}",
+                tree.root_node().to_sexp()
+            );
+        }
+    }
+
+    /// An `@name` with no group at all is text, not a nexus error: the real
+    /// parser keeps `me@example.com` and a lone `@mention` as prose. (At the
+    /// start of a line the real parser calls a bare `@name` an error; the
+    /// grammar cannot tell position, so it accepts it everywhere -- see
+    /// `_nexus_groups` in `grammar.js`.)
+    #[test]
+    fn a_bare_at_name_is_not_an_error() {
+        for src in ["me@example.com\n", "ping @someone about it\n", "a @hr b\n"] {
+            let tree = parse(src);
+            assert!(
+                !tree.root_node().has_error(),
+                "expected no errors for {src:?}: {}",
+                tree.root_node().to_sexp()
+            );
+        }
+    }
+
     #[test]
     fn parses_a_group_separated_from_its_element_by_whitespace() {
         // Regression test: `token(prec(1, "["))`/`"("`/`"{"` on the
@@ -795,7 +891,7 @@ mod tests {
         // whitespace between an element and its first group caused the
         // element to parse with zero groups and the group's own text to
         // fall out as unrelated paragraph content.
-        let tree = parse("@links {\n  (1)[ note ]\n  (anotation1)[ note2 ]\n}\n");
+        let tree = parse("@links() {\n  (1)[ note ]\n  (anotation1)[ note2 ]\n}\n");
         let root = tree.root_node();
         let element = root.child(0).unwrap().child(0).unwrap();
         assert_eq!(element.kind(), "element");
@@ -804,8 +900,8 @@ mod tests {
             .expect("expected element to wrap an inline_element");
         assert_eq!(inline_element.kind(), "inline_element");
         let value_group = inline_element
-            .named_child(1)
-            .expect("expected a value_group as the element's second named child");
+            .named_child(2)
+            .expect("expected a value_group as the element's third named child");
         assert_eq!(value_group.kind(), "value_group");
         let children = value_group
             .named_child(0)
@@ -901,7 +997,7 @@ mod tests {
     #[test]
     fn highlights_captures_named_connect_as_punctuation() {
         use tree_sitter::StreamingIterator;
-        let src = "@doc:rule(allow)\n";
+        let src = "@doc():rule(allow)\n";
         let tree = parse(src);
         let query_src = include_str!("../queries/highlights.scm");
         let query = tree_sitter::Query::new(&LANGUAGE.into(), query_src).unwrap();
@@ -962,7 +1058,7 @@ mod tests {
 
     #[test]
     fn parses_colon_less_braced_maps() {
-        let src = "::settings {\n  elements {\n    bookmark {\n      title: { type: string }\n    }\n  }\n}\n";
+        let src = "::settings() {\n  elements {\n    bookmark {\n      title: { type: string }\n    }\n  }\n}\n";
         let tree = parse(src);
         assert!(!tree.root_node().has_error());
     }
@@ -975,7 +1071,7 @@ mod tests {
         // grammar's other known-narrow cases -- it derailed the entire
         // enclosing block into an `ERROR` that swallowed everything after
         // it too.
-        let src = "::meta{\nid: doc-1\nflags:\nrating:\nreviewed:\ntype: j.daily\n}\n";
+        let src = "::meta(\nid: doc-1\nflags:\nrating:\nreviewed:\ntype: j.daily\n)\n";
         let tree = parse(src);
         assert!(!tree.root_node().has_error());
     }
@@ -990,9 +1086,9 @@ mod tests {
         // and the broader one found while fixing it (an earlier, non-last
         // `list(...)`-valued entry, still followed by more entries).
         for src in [
-            "::meta{\naliases: list()\n}\n",
-            "::meta{\naliases: list()\nflags: x\n}\n",
-            "::meta{\naliases: list(a, b)\nflags: x\n}\n",
+            "::meta(\naliases: list()\n)\n",
+            "::meta(\naliases: list()\nflags: x\n)\n",
+            "::meta(\naliases: list(a, b)\nflags: x\n)\n",
         ] {
             let tree = parse(src);
             assert!(
@@ -1008,7 +1104,7 @@ mod tests {
         // leading space/tab from `_value_scalar` must not exclude *all*
         // whitespace, or multi-word bare values would break, and the tail
         // must still allow colons (URLs, timestamps).
-        let src = "::meta{\na: hello world\nb: 12:34\nc: https://example.com/x\n}\n";
+        let src = "::meta(\na: hello world\nb: 12:34\nc: https://example.com/x\n)\n";
         let tree = parse(src);
         assert!(!tree.root_node().has_error());
     }
@@ -1048,7 +1144,7 @@ mod tests {
 
     #[test]
     fn a_double_colon_line_is_a_document_declaration() {
-        let src = "::kind(config)\n::meta{ id: x }\n\n=[ T ]\n";
+        let src = "::kind(config)\n::meta(id: x)\n\n=[ T ]\n";
         let tree = parse(src);
         assert!(
             !tree.root_node().has_error(),
@@ -1096,7 +1192,7 @@ mod tests {
 
     #[test]
     fn the_next_declaration_is_not_a_connect_of_the_one_before() {
-        let tree = parse("::kind(config)\n::meta{ id: x }\n");
+        let tree = parse("::kind(config)\n::meta(id: x)\n");
         assert_eq!(nodes_of_kind(&tree, "document_element").len(), 2);
         assert!(nodes_of_kind(&tree, "connect").is_empty());
     }

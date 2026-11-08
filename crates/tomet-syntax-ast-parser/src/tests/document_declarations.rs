@@ -10,14 +10,14 @@ fn element(block: &Block) -> &Element {
 #[test]
 fn a_double_colon_line_is_a_document_declaration() {
     let doc =
-        parse_file("::kind(config, 2)\n::meta{ id: x, title: T }\n\n=[ Title ]\n\nbody\n").unwrap();
+        parse_file("::kind(config, 2)\n::meta(id: x, title: T)\n\n=[ Title ]\n\nbody\n").unwrap();
     assert_eq!(doc.header.len(), 2);
     let kind = &doc.header[0];
     assert_eq!(kind.name, Name::bare("kind"));
     assert!(kind.data.args.is_some());
     let meta = &doc.header[1];
     assert_eq!(meta.name, Name::bare("meta"));
-    assert!(meta.data.value.is_some());
+    assert!(meta.data.args.is_some());
     assert_eq!(doc.body.len(), 1);
     assert!(matches!(doc.body[0], Block::Section(_)));
 }
@@ -53,7 +53,7 @@ fn a_declaration_takes_no_connect() {
 
 #[test]
 fn the_next_double_colon_line_is_not_a_connect_of_the_one_before() {
-    let doc = parse_file("::kind(config)\n::meta{ id: x }\n").unwrap();
+    let doc = parse_file("::kind(config)\n::meta(id: x)\n").unwrap();
     assert_eq!(doc.header.len(), 2);
     assert!(doc.body.is_empty());
 }
@@ -93,7 +93,7 @@ fn a_declaration_inside_a_code_fence_is_code() {
 /// (`WrongSigil`), not the grammar's.
 #[test]
 fn the_parser_does_not_refuse_a_declaration_name_after_an_at_sign() {
-    let doc = parse_file(";@kind(config)\n;@meta{ id: x }\n").unwrap();
+    let doc = parse_file(";@kind(config)\n;@meta(id: x)\n").unwrap();
     assert_eq!(element(&doc.body[0]).name, Name::bare("kind"));
     assert_eq!(element(&doc.body[1]).name, Name::bare("meta"));
 }
@@ -110,7 +110,7 @@ fn the_span_covers_the_double_colon() {
 fn a_broken_declaration_is_an_error_and_not_a_paragraph() {
     for src in [
         "::kind(config\n",
-        "::meta{ a: 1, a: 2 }\n",
+        "::meta(a: 1, a: 2)\n",
         "::kind(config) trailing\n",
     ] {
         assert!(parse_file(src).is_err(), "{src:?}");
@@ -125,7 +125,7 @@ fn a_trailing_comment_may_follow_a_declaration() {
 
 #[test]
 fn a_declaration_with_text_after_it_on_its_line_is_an_error() {
-    let err = parse_file("::meta{a: 1} text\n").expect_err("a declaration stands alone");
+    let err = parse_file("::meta(a: 1) text\n").expect_err("a declaration stands alone");
     assert!(err.message.contains("stands alone"), "{}", err.message);
     // Where the text after the declaration begins.
     assert_eq!(err.offset, 13);
@@ -136,5 +136,5 @@ fn a_double_colon_that_opens_no_declaration_is_not_an_error_either_way() {
     // No group after the name: it is prose, not a declaration with something after it.
     assert!(parse_file("::memo is how a path starts\n").is_ok());
     // Inside a `|` run a line may begin with one.
-    assert!(parse_file("@quote\n| ::meta{a: 1} text\n").is_ok());
+    assert!(parse_file("@quote\n| ::meta(a: 1) text\n").is_ok());
 }

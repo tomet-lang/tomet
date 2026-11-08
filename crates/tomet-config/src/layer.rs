@@ -191,26 +191,32 @@ mod tests {
     #[test]
     fn the_inner_layer_wins_key_by_key() {
         let outer = layer(
-            "::format{ table: { max_col_width: 50 }, link: { no_space: true }, meta: { always_newline: true } }\n::macros{ a: \"outer-a\", b: \"outer-b\" }\n",
+            "::format(table: { max_col_width: 50 }, link: { no_space: true }, meta: { always_newline: true })\n::macros(a: \"outer-a\", b: \"outer-b\")\n",
         );
-        let inner = layer("::format{ table: { max_col_width: 80 } }\n::macros{ b: \"inner-b\" }\n");
+        let inner = layer("::format(table: { max_col_width: 80 })\n::macros(b: \"inner-b\")\n");
         let cfg = Config::from_layers([&outer, &inner]);
         // Replaced where the inner layer says something ...
         assert_eq!(cfg.format.table_max_col_width, Some(80));
         // ... and kept where it does not, down to a sibling key of the same map.
         assert!(cfg.format.link_no_space);
         assert!(cfg.meta.always_newline);
-        assert_eq!(cfg.macros.get("a").and_then(|v| v.as_str()), Some("outer-a"));
-        assert_eq!(cfg.macros.get("b").and_then(|v| v.as_str()), Some("inner-b"));
+        assert_eq!(
+            cfg.macros.get("a").and_then(|v| v.as_str()),
+            Some("outer-a")
+        );
+        assert_eq!(
+            cfg.macros.get("b").and_then(|v| v.as_str()),
+            Some("inner-b")
+        );
     }
 
     #[test]
     fn a_name_table_is_merged_by_name_and_the_later_entry_wins() {
         let outer = layer(
-            "::blueprints{ a: @file(a.tmt), b: @file(b.tmt) }\n::fields{ created: { type: datetime } }\n",
+            "::blueprints(a: @file(a.tmt), b: @file(b.tmt))\n::fields(created: { type: datetime })\n",
         );
         let inner = layer(
-            "::blueprints{ b: @file(b2.tmt), c: @file(c.tmt) }\n::fields{ created: { format: rfc3339 } }\n",
+            "::blueprints(b: @file(b2.tmt), c: @file(c.tmt))\n::fields(created: { format: rfc3339 })\n",
         );
         let cfg = Config::from_layers([&outer, &inner]);
         assert_eq!(
@@ -229,15 +235,15 @@ mod tests {
     #[test]
     fn a_registry_entry_that_is_not_a_file_registers_nothing() {
         let cfg = Config::from_layers([&layer(
-            "::vocabularies{ deck: @file(deck.tmt), odd: 3, link: @link(x) }\n",
+            "::vocabularies(deck: @file(deck.tmt), odd: 3, link: @link(x))\n",
         )]);
         assert_eq!(cfg.registry.vocabularies, vec!["deck.tmt".to_string()]);
     }
 
     #[test]
     fn dictionaries_are_registered_like_vocabularies_and_stacked_by_name() {
-        let outer = layer("::dictionaries{ tomet: @file(a.tmt), user: @file(u.tmt) }\n");
-        let inner = layer("::dictionaries{ tomet: @file(b.tmt) }\n");
+        let outer = layer("::dictionaries(tomet: @file(a.tmt), user: @file(u.tmt))\n");
+        let inner = layer("::dictionaries(tomet: @file(b.tmt))\n");
         let cfg = Config::from_layers([&outer, &inner]);
         assert_eq!(
             cfg.registry.dictionaries,
@@ -248,8 +254,7 @@ mod tests {
 
     #[test]
     fn the_workspace_is_dropped_from_a_layer_that_may_not_declare_it() {
-        let mut l =
-            layer("::workspace{ ignore: list(\"a\") }\n::format{ link: { no_space: true } }\n");
+        let mut l = layer("::workspace(ignore: list(\"a\"))\n::format(link: { no_space: true })\n");
         assert_eq!(l.strip_vault_only(), vec![DeclKind::Workspace]);
         assert!(l.strip_vault_only().is_empty());
         let cfg = Config::from_layers([&l]);

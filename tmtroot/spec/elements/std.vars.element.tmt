@@ -6,13 +6,13 @@
 `::vars` は、この文書が持つ変数を宣言する。`elements` と同じ、名前をキーにした宣言の表。式からは `${var.名前}` で読む（@file(tmtroot/spec/expressions/names.expr.tmt)）。
 
 ```tm
-::vars{
+::vars(
   title: {
     type: string
     about: | 作成するノートの題。
   }
   draft: { type: bool, default: false }
-}
+)
 ```
 
 @table

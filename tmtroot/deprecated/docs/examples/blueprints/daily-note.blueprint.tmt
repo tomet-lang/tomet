@@ -1,10 +1,10 @@
 ::kind(blueprint)
 ::blueprint(daily-note)
 ::id(${uuid()})
-::meta{
+::meta(
   date: ${date("YYYY-MM-DD")}
   title: ${title}
-}
+)
 
 =[ TODO ] {id: todo}
 - ( )

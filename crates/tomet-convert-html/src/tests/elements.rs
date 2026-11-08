@@ -2,7 +2,7 @@ use super::*;
 
 #[test]
 fn meta_element_has_no_visible_output() {
-    let doc = parse_file("::meta{ key: value }\n").unwrap();
+    let doc = parse_file("::meta(key: value)\n").unwrap();
     let body = render_body(&doc);
     assert_eq!(body, "");
 }
@@ -28,10 +28,9 @@ fn adjacent_meta_blocks_have_no_visible_output() {
     // just confirms it still renders each one as empty output rather
     // than leaking a stray whitespace-only `<p>` -- garbage in,
     // harmless out.
-    let doc = parse_file(
-        "::meta{ key: value }\n::meta{ key: value }\n::meta{ key: value }\n\n=[ next ]\n",
-    )
-    .unwrap();
+    let doc =
+        parse_file("::meta(key: value)\n::meta(key: value)\n::meta(key: value)\n\n=[ next ]\n")
+            .unwrap();
     let body = render_body(&doc);
     assert_eq!(body, "<h1>next</h1>\n");
 }

@@ -224,7 +224,7 @@ mod tests {
 
     #[test]
     fn instantiates_blueprint_to_kind_and_resolves_expressions() {
-        let src = "::blueprint(daily-note)\n::id(${generate.uuid()})\n::meta{\n  date: ${generate.now().format(\"YYYY-MM-DD\")}\n  file: ${self.filename}\n  title: ${var.title}\n}\n\n=[ Plan for ${var.title} ]#(plan)\n";
+        let src = "::blueprint(daily-note)\n::id(${generate.uuid()})\n::meta(\n  date: ${generate.now().format(\"YYYY-MM-DD\")}\n  file: ${self.filename}\n  title: ${var.title}\n)\n\n=[ Plan for ${var.title} ]#(plan)\n";
         let vars = EvalValue::Map(vec![(
             "title".to_string(),
             EvalValue::String("Sprint 42".into()),
@@ -255,7 +255,7 @@ mod tests {
             .iter()
             .find(|d| classify_declaration_lenient(d) == ElementKind::Declaration(DeclKind::Meta))
             .expect("expected a ::meta declaration");
-        let Some(Value::Map(entries)) = meta.data.value.as_ref().map(|v| v.as_data()) else {
+        let Some(Value::Map(entries)) = &meta.data.args else {
             panic!("expected meta map");
         };
         let get = |key: &str| entries.iter().find(|(k, _)| k == key).unwrap().1.clone();
@@ -267,7 +267,7 @@ mod tests {
     #[test]
     fn an_expression_with_no_value_is_left_and_reported() {
         let (doc, report) = instantiate(
-            "::blueprint(note)\n::meta{ title: ${var.title} }\n",
+            "::blueprint(note)\n::meta(title: ${var.title})\n",
             EvalValue::Map(vec![]),
         );
         assert_eq!(report.unresolved.len(), 1);

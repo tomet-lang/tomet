@@ -12,7 +12,7 @@ fn element_reads_a_bare_id_after_its_groups() {
 
 #[test]
 fn element_reads_a_quoted_id_with_spaces() {
-    let doc = parse_file("@memo#(\"has spaces\")\n").unwrap();
+    let doc = parse_file("@memo()#(\"has spaces\")\n").unwrap();
     match &doc.body[0] {
         Block::Element(el) => assert_eq!(el.id, Some(Id("has spaces".into()))),
         other => panic!("expected element, got {other:?}"),
@@ -21,7 +21,7 @@ fn element_reads_a_quoted_id_with_spaces() {
 
 #[test]
 fn element_reads_a_non_ascii_id() {
-    let doc = parse_file("@memo#(かなた)\n").unwrap();
+    let doc = parse_file("@memo()#(かなた)\n").unwrap();
     match &doc.body[0] {
         Block::Element(el) => assert_eq!(el.id, Some(Id("かなた".into()))),
         other => panic!("expected element, got {other:?}"),
@@ -69,13 +69,13 @@ fn id_written_after_a_connect_is_a_parse_error() {
 
 #[test]
 fn a_second_id_is_a_parse_error() {
-    let err = parse_file("@memo#(a)#(b)\n").unwrap_err();
+    let err = parse_file("@memo()#(a)#(b)\n").unwrap_err();
     assert!(err.message.contains("at most one"), "got: {}", err.message);
 }
 
 #[test]
 fn empty_id_group_is_a_parse_error() {
-    assert!(parse_file("@memo#()\n").is_err());
+    assert!(parse_file("@memo()#()\n").is_err());
 }
 
 #[test]
@@ -179,12 +179,12 @@ fn list_item_sugar_with_no_trailing_group_has_no_id() {
 
 #[test]
 fn hash_not_followed_by_paren_after_an_element_does_not_error() {
-    // Regression: `#` immediately after `::meta{...}`'s closing `}` used
+    // Regression: `#` immediately after `::meta(...)`'s closing `)` used
     // to be wrongly claimed by `parse_groups`'s id arm (within the same
     // "one newline of gap tolerance" that lets an element's own groups
     // split across lines), erroring on "expected '(' after '#'" instead
     // of leaving an unrelated next line alone.
-    let doc = parse_file("::meta{a: 1}\n#[ Title ]\n").unwrap();
+    let doc = parse_file("::meta(a: 1)\n#[ Title ]\n").unwrap();
     assert_eq!(doc.header.len(), 1);
     assert_eq!(doc.body.len(), 1);
     assert!(matches!(&doc.body[0], Block::Paragraph(_)));

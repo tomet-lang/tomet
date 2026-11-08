@@ -53,7 +53,7 @@ mod tests {
 
     #[test]
     fn detects_duplicate_ids_including_section_data() {
-        let doc = parse_doc("=[ Sec ]{ k: @note[x]#(dup) }\n\n@other#(dup)\n");
+        let doc = parse_doc("=[ Sec ]{ k: @note[x]#(dup) }\n\n@other()#(dup)\n");
         let ids = collect_ids(&doc);
         assert_eq!(ids.len(), 2);
         assert_eq!(ids[0].0, "dup");

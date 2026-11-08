@@ -1,6 +1,6 @@
 ::format(style: structural)
 
-::meta{key: value, type: person}
+::meta(key: value, type: person)
 
 ${some_id}
 

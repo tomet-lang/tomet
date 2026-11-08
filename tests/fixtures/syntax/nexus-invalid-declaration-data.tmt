@@ -1,0 +1,4 @@
+// The `{...}`-only declarations became `::name(...)`: `::meta{...}` is gone.
+
+::kind(fixture)
+::meta{ title: "旧い書き方" }

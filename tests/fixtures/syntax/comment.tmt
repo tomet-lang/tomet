@@ -1,5 +1,5 @@
 ::kind(fixture)
-::meta{ x: 1 }
+::meta(x: 1)
 
 // `@comment[ ... ]` is a note for whoever reads the exported source. Each
 // output writes it in its own comment syntax.

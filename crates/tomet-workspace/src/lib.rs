@@ -26,14 +26,14 @@ mod tests {
     #[test]
     fn test_refactor_source_end_to_end() {
         let src = r#"::version(1.0)
-::meta{
+::meta(
   id: doc-test1234
   type: task
   created: 2026-04-12T18:00:00+09:00
-}
-::macros{
+)
+::macros(
   youtube_ch: "https://www.youtube.com/${1}"
-}
+)
 
 - @link("https://www.youtube.com/@realakibaboyz")[REAL AKIBA BOYZ]
 "#;
@@ -54,8 +54,8 @@ mod tests {
     fn test_structural_apply_action() {
         let mut matches = vec![FileDiff::new(
             "test.tmt".into(),
-            "::meta{author: Charlie}\n".into(),
-            "::meta{author: Charlie}\n".into(),
+            "::meta(author: Charlie)\n".into(),
+            "::meta(author: Charlie)\n".into(),
             1,
         )];
 

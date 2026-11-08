@@ -23,17 +23,17 @@ fn test_blueprint_end_to_end_lifecycle() {
 ::blueprint(daily-note){
   description: "Daily Standup & Plan"
 }
-::vars{
+::vars(
   author: { type: string, default: "Anonymous" }
   title: { type: string, default: "Daily" }
-}
-::meta{
+)
+::meta(
   id: ${generate.uuid()}
   date: ${generate.now().format("YYYY-MM-DD")}
   author: ${var.author}
   title: ${var.title}
   file: ${self.filename}
-}
+)
 
 =[ Goals for ${generate.now().format("YYYY-MM-DD")} ]#(goals)
 - ( ) First goal

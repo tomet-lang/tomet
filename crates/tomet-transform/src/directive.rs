@@ -6,7 +6,7 @@ use tomet_semantics::{ElementKind, classify_declaration_lenient};
 use tomet_tree::{DataExt, declaration_new, for_each_declaration_mut};
 
 /// Promotes a property `prop_key` from a declaration matching `source_filter` into a new top-level
-/// declaration `::target_directive_name(val)` (or `::target_directive_name{...}`), inserting it at `target_index`
+/// declaration `::target_directive_name(val)`, inserting it at `target_index`
 /// (or automatically after any `::version` directive, or at position 0).
 ///
 /// If the property is absent, empty, or null, it is simply removed without creating a directive.

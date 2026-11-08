@@ -126,7 +126,7 @@ pub enum Command {
         body: bool,
     },
     /// Convert a `.tmt` file to CommonMark. Lossy for constructs with no
-    /// Markdown equivalent (`@links{}`, and any `@T` element the importer
+    /// Markdown equivalent (`@links(){}`, and any `@T` element the importer
     /// never produces); `tomet-markdown`'s module docs list what falls
     /// back to HTML passthrough.
     ToMd {

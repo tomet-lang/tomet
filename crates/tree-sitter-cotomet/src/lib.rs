@@ -30,6 +30,11 @@
 //!  | notion of "before", so one after an entry is read as a declaration too.
 //! -| **No block comments.** cotomet has `//` only; `/* */` is a tomet
 //!  | document construct.
+//!
+//! A declaration is `::name(args)`, with an optional `{data}` after the
+//! `(args)`. The `(args)` are the primary group and are required, even empty
+//! (`::meta()`); `::meta{ a: 1 }` and a bare `::meta` are errors in the parser
+//! and in the grammar alike.
 
 use tree_sitter_language::LanguageFn;
 
@@ -202,6 +207,33 @@ mod tests {
                 })
                 .count();
             assert_eq!(n, 1, "{text:?} in {captured:?}");
+        }
+    }
+
+    #[test]
+    fn a_declaration_needs_its_parenthesised_arguments() {
+        for src in [
+            "::kind(catalog, 2)\n",
+            "::meta()\n",
+            "::meta(title: \"Catalog\", tags: list(a, b))\n",
+            "::meta(\n  title: \"x\"\n)\na: 1\n",
+            "::config(format: json){ strict: true }\n",
+            "::macros(gh: \"https://x/${1}\")\n::vars(a: 1)\n",
+        ] {
+            let tree = parse(src);
+            assert!(
+                !tree.root_node().has_error(),
+                "{src:?} -> {}",
+                tree.root_node().to_sexp()
+            );
+        }
+        for src in ["::meta\n", "::meta{ a: 1 }\n", "::meta{}\n"] {
+            let tree = parse(src);
+            assert!(
+                tree.root_node().has_error(),
+                "{src:?} -> {}",
+                tree.root_node().to_sexp()
+            );
         }
     }
 

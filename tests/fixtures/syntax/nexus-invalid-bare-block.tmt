@@ -1,0 +1,3 @@
+// A block-level `@name` alone is not an element; the empty one is `@name()`.
+
+@memo

@@ -17,16 +17,16 @@
   "division"        : @term| File, Folder, Section, Vaultを@term("tome")から見て、まとめた言い方。
   "tome"            : @term| @term("tomet")に対して、Vaultをすべての一つのtometだと考えたときの名前
   "tomed"           : @term| @term("tome")化すること、したもの。
-  "dictionary"      : @term| 
-  "kind"            : @term| 
-  "id"              : @term| 
-  "element"         : @term| 
-  "vocabulary"      : @term| 
-  "blueprint"       : @term| 
-  "schema"          : @term| 
-  "tandr"           : @term| 
-  "twrit"           : @term| 
-  "index"           : @term| 
+  "dictionary"      : @term|
+  "kind"            : @term|
+  "id"              : @term|
+  "element"         : @term|
+  "vocabulary"      : @term|
+  "blueprint"       : @term|
+  "schema"          : @term|
+  "tandr"           : @term|
+  "twrit"           : @term|
+  "index"           : @term|
   "slot"            : @term| `<>`
   "hole"            : @term| ``
 }

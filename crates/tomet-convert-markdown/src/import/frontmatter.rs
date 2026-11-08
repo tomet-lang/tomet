@@ -119,12 +119,12 @@ mod tests {
         let declaration = &doc.header[0];
         assert_eq!(declaration.name, Name::bare("meta"));
         assert_eq!(
-            declaration.data.value,
-            Some(tomet_ast::Group::from_map(Value::Map(vec![
+            declaration.data.args,
+            Some(Value::Map(vec![
                 ("title".to_string(), Value::String("Hello".to_string())),
                 ("author".to_string(), Value::String("Alice".to_string())),
                 ("draft".to_string(), Value::Bool(false)),
-            ])))
+            ]))
         );
     }
 
@@ -137,8 +137,8 @@ mod tests {
         let declaration = &doc.header[0];
         assert_eq!(declaration.name, Name::bare("meta"));
         assert_eq!(
-            declaration.data.value,
-            Some(tomet_ast::Group::from_map(Value::Map(vec![
+            declaration.data.args,
+            Some(Value::Map(vec![
                 ("title".to_string(), Value::String("Doc".to_string())),
                 (
                     "tags".to_string(),
@@ -147,7 +147,7 @@ mod tests {
                         Value::String("tomet".to_string()),
                     ])
                 ),
-            ])))
+            ]))
         );
     }
 
@@ -159,14 +159,14 @@ mod tests {
         assert_eq!(doc.body.len(), 1);
         let declaration = &doc.header[0];
         assert_eq!(
-            declaration.data.value,
-            Some(tomet_ast::Group::from_map(Value::Map(vec![(
+            declaration.data.args,
+            Some(Value::Map(vec![(
                 "topics".to_string(),
                 Value::Seq(vec![
                     Value::String("@link(ref:@Templater)".to_string()),
                     Value::String("@link(ref:@QuickAdd)".to_string()),
                 ])
-            )])))
+            )]))
         );
     }
 }

@@ -1,0 +1,3 @@
+// The same inline: `#(id)` after a bare `@name` is an error, not prose.
+
+この @memo#(first) は要素の書きかけ。

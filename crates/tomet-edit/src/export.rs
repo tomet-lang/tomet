@@ -66,9 +66,26 @@ pub(crate) fn export_node(doc: &EditDoc, id: NodeId, out: &mut String) {
         } => {
             if !node.slots.pieces.is_empty() {
                 let start_len = out.len();
+                // A form stands on `(...)` or `[...]`; one edited down to neither is written `()`.
+                let has_content = node
+                    .slots
+                    .pieces
+                    .iter()
+                    .any(|p| matches!(p, FormPiece::Content { .. }));
+                let has_args = node
+                    .slots
+                    .pieces
+                    .iter()
+                    .any(|p| matches!(p, FormPiece::Args))
+                    && node.slots.args_slot.is_some();
                 for piece in &node.slots.pieces {
                     match piece {
-                        FormPiece::Sigil(s) => out.push_str(s),
+                        FormPiece::Sigil(s) => {
+                            out.push_str(s);
+                            if !has_args && !has_content {
+                                out.push_str("()");
+                            }
+                        }
                         FormPiece::Trivia(t) => out.push_str(t),
                         FormPiece::Id { raw } => {
                             if node.slots.id_edited {
@@ -87,6 +104,8 @@ pub(crate) fn export_node(doc: &EditDoc, id: NodeId, out: &mut String) {
                                     out.push_str(&slot.raw);
                                 } else if !slot.entries.is_empty() {
                                     slot.export_into(out);
+                                } else if !has_content {
+                                    out.push_str("()");
                                 }
                             }
                         }

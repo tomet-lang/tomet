@@ -20,7 +20,7 @@ use crate::ast::{
 /// `::meta` feeds Pandoc's document-level `meta` map rather than being
 /// dropped with the other directives. That map is what becomes YAML
 /// frontmatter, `\title{}`, docx document properties and so on, so
-/// `::meta{title: x}` survives into every output format. The sibling
+/// `::meta(title: x)` survives into every output format. The sibling
 /// writers have nowhere to put `::meta` and drop it; this is deliberately
 /// not symmetric with them.
 pub fn to_pandoc(doc: &File) -> PandocDoc {
@@ -968,7 +968,7 @@ mod tests {
 
     #[test]
     fn the_id_declaration_feeds_the_metadata_id() {
-        let doc = parse_file("::id(doc-1)\n::meta{title: Hello}\n\n本文\n").unwrap();
+        let doc = parse_file("::id(doc-1)\n::meta(title: Hello)\n\n本文\n").unwrap();
         let pandoc = to_pandoc(&doc);
         assert_eq!(
             pandoc.meta.get("id"),
@@ -980,7 +980,7 @@ mod tests {
     #[test]
     fn meta_feeds_the_document_metadata_map() {
         let doc =
-            parse_file("::meta{title: Hello, draft: true, tags: list(a, b)}\n\n本文\n").unwrap();
+            parse_file("::meta(title: Hello, draft: true, tags: list(a, b))\n\n本文\n").unwrap();
         let pandoc = to_pandoc(&doc);
         assert_eq!(
             pandoc.meta.get("title"),
@@ -999,7 +999,7 @@ mod tests {
 
         // list(...) call literal converts identically to [a, b]
         let doc_call =
-            parse_file("::meta{title: Hello, draft: true, tags: list(a, b)}\n\n本文\n").unwrap();
+            parse_file("::meta(title: Hello, draft: true, tags: list(a, b))\n\n本文\n").unwrap();
         let pandoc_call = to_pandoc(&doc_call);
         assert_eq!(
             pandoc_call.meta.get("tags"),
@@ -1014,7 +1014,7 @@ mod tests {
     fn a_meta_number_becomes_a_string() {
         // Pandoc metadata has no numeric type. Recorded rather than
         // hidden: this is the one lossy edge of the meta mapping.
-        let doc = parse_file("::meta{year: 2026}\n").unwrap();
+        let doc = parse_file("::meta(year: 2026)\n").unwrap();
         assert_eq!(
             to_pandoc(&doc).meta.get("year"),
             Some(&MetaValue::MetaString("2026".into()))
@@ -1023,10 +1023,10 @@ mod tests {
 
     #[test]
     fn directives_produce_nothing() {
-        assert!(convert("::meta{type: note}\n").is_empty());
+        assert!(convert("::meta(type: note)\n").is_empty());
         assert!(convert("::export(path:out.md)\n").is_empty());
         // ...and neither do several in a row.
-        assert!(convert("::meta{a: 1}\n::meta{b: 2}\n").is_empty());
+        assert!(convert("::meta(a: 1)\n::meta(b: 2)\n").is_empty());
     }
 
     #[test]
@@ -1069,7 +1069,7 @@ mod tests {
 
     #[test]
     fn an_id_goes_in_the_identifier_slot_not_the_pairs() {
-        let blocks = convert("@deck.card#(c1){ tags: list(a, b) }\n");
+        let blocks = convert("@deck.card()#(c1){ tags: list(a, b) }\n");
         let Block::Div(attr, _) = &blocks[0] else {
             panic!("expected a Div, got {:?}", blocks[0]);
         };
@@ -1079,7 +1079,7 @@ mod tests {
 
     #[test]
     fn a_nested_value_is_carried_by_the_exact_copy() {
-        let blocks = convert("@deck.card{ a: 1, m: { k: v } }\n");
+        let blocks = convert("@deck.card(){ a: 1, m: { k: v } }\n");
         let Block::Div(attr, _) = &blocks[0] else {
             panic!("expected a Div, got {:?}", blocks[0]);
         };

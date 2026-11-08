@@ -121,7 +121,7 @@ mod tests {
 
     #[test]
     fn test_fields_declaration_parsing() {
-        let src = r#"::fields{
+        let src = r#"::fields(
   aliases: {
     type: list
     always_newline: true
@@ -134,7 +134,7 @@ mod tests {
     type: datetime
     format: rfc3339
   }
-}
+)
 "#;
         let cfg = load_config_from_str(src).unwrap();
         assert!(cfg.meta.fields.get("aliases").unwrap().always_newline);
@@ -150,7 +150,7 @@ mod tests {
 
     #[test]
     fn callout_style_is_read_from_format_and_no_longer_from_elements() {
-        let live = r#"::format{ callout: { style: { content: block } } }
+        let live = r#"::format(callout: { style: { content: block } })
 "#;
         assert_eq!(
             load_config_from_str(live)
@@ -160,7 +160,7 @@ mod tests {
             Some("block".to_string())
         );
 
-        let retired = r#"::format{ elements: { callout: { style: { content: block } } } }
+        let retired = r#"::format(elements: { callout: { style: { content: block } } })
 "#;
         assert_eq!(
             load_config_from_str(retired)
@@ -173,9 +173,9 @@ mod tests {
 
     #[test]
     fn test_workspace_ignore_parsing() {
-        let src = r#"::workspace{
+        let src = r#"::workspace(
   ignore: list("00-09 System/01 Apps/obsidian")
-}
+)
 "#;
         let cfg = load_config_from_str(src).expect("failed to parse the workspace");
         assert_eq!(
@@ -252,13 +252,13 @@ mod tests {
 
     #[test]
     fn test_dot_notation_variants() {
-        let src_deep_dot = r#"::format{
+        let src_deep_dot = r#"::format(
   callout.style.content: "quote"
   list.multiline.style.content: "box"
   table.adjust_width: true
   table.max_col_width: 80
   table.align: "center"
-}
+)
 "#;
         let cfg = load_config_from_str(src_deep_dot).expect("failed to parse deep dot format");
         assert_eq!(cfg.format.callout_content_style.as_deref(), Some("quote"));
@@ -270,14 +270,14 @@ mod tests {
         assert_eq!(cfg.format.table_max_col_width, Some(80));
         assert_eq!(cfg.format.table_align.as_deref(), Some("center"));
 
-        let src_mixed = r#"::format{
+        let src_mixed = r#"::format(
   callout: {
     style.content: "custom"
   }
   list.multiline: {
     style.content: "bullet"
   }
-}
+)
 "#;
         let cfg_mixed = load_config_from_str(src_mixed).expect("failed to parse mixed format");
         assert_eq!(
@@ -292,17 +292,17 @@ mod tests {
 
     #[test]
     fn test_dot_notation_meta_and_merge() {
-        let src = r#"::format{
+        let src = r#"::format(
   meta.always_newline: true
-}
-::fields{
+)
+::fields(
   url.wiki: { type: list, always_newline: true }
   title: { length: 70 }
-}
-::workspace{
+)
+::workspace(
   ignore: list("target", "build")
   unswept: list("tests/fixtures")
-}
+)
 "#;
         let cfg = load_config_from_str(src).expect("failed to parse meta and workspace");
         assert!(cfg.meta.always_newline);

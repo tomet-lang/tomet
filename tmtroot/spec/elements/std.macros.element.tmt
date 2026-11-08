@@ -6,11 +6,11 @@
 `::macros` は、この文書で使うマクロの定義を、名前をキーにした表で書く。
 
 ```tm
-::macros{
+::macros(
   gh: "https://github.com/tomet/tomet/issues/${1}"
   done: "✅"
   card: [ @card(title: ${1})[ ${2} ] ]
-}
+)
 ```
 
 - キーが名前、値が本体のテンプレート。本体は文字列（文字列マクロ）か、`[ ... ]`（ブロックマクロ）。呼び方とテンプレートの規則は @file(tmtroot/spec/expressions/macro.expr.tmt)。

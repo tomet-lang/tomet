@@ -103,8 +103,8 @@ const CASES: &[Case] = &[
     Case {
         label: "`#config` sets no document-wide lexing mode \
                 (was element.rs `is_config`, threaded as `running_format`)",
-        known: "::config(format:json){ a: 1 }\n\n@x{ b: 2 }\n",
-        unknown: "::zzz(format:json){ a: 1 }\n\n@x{ b: 2 }\n",
+        known: "::config(format:json){ a: 1 }\n\n@x(){ b: 2 }\n",
+        unknown: "::zzz(format:json){ a: 1 }\n\n@x(){ b: 2 }\n",
         known_ident: "config",
         unknown_ident: "zzz",
         kind: Ident::ElementName,

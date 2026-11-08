@@ -1,0 +1,29 @@
+// The declarations that used to take `{...}` alone take `(...)`:
+// `::meta(...)`, not `::meta{...}`. `::vocabulary(ns){ ... }` and
+// `::dictionary(name){ ... }` already had a `(...)` and keep the `{...}` body
+// after it. The parser reads declarations without knowing what they mean, so
+// one document can carry all of them.
+
+::kind(fixture)
+::meta(title: "nexus declarations", tags: list(a, b))
+::macros(gh: "https://github.com/tomet/tomet/issues/${1}")
+::vars(
+  title: { type: string, default: "Daily" }
+)
+::format(table: { max_col_width: 50 })
+::fields(created: { type: datetime, format: rfc3339 })
+::workspace(ignore: list("tests/fixtures"))
+::export(type: commonmark, path: "README.md")
+::blueprints(daily: "daily.blueprint.tmt")
+::vocabularies(deck: "deck.vocabulary.tmt")
+::dictionaries(tomet: "tomet.dict.tmt")
+::migration(meta: { created: { type: datetime, format: iso8601 } })
+::elements(
+  card: { display: block }
+)
+::vocabulary(ns){ version: "1.0.0" }
+::dictionary(tomet){ "vault": "a unit" }
+
+=[ 本文 ]
+
+宣言のあとの本文。

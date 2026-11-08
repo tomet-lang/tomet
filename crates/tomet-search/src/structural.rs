@@ -136,7 +136,7 @@ mod tests {
 
     #[test]
     fn matches_query_by_tag() {
-        let doc = parse_file("::meta{author: \"Alice\"}\n#[ Title ]\n").unwrap();
+        let doc = parse_file("::meta(author: \"Alice\")\n#[ Title ]\n").unwrap();
         let query = StructuralQuery {
             tag: Some("meta".to_string()),
             ..Default::default()
@@ -149,7 +149,7 @@ mod tests {
 
     #[test]
     fn matches_query_by_key() {
-        let doc = parse_file("::meta{author: \"Alice\", draft: true}\n").unwrap();
+        let doc = parse_file("::meta(author: \"Alice\", draft: true)\n").unwrap();
         let q_author = StructuralQuery {
             key: Some("author".to_string()),
             ..Default::default()
@@ -165,7 +165,7 @@ mod tests {
 
     #[test]
     fn matches_query_by_value_contains() {
-        let doc = parse_file("::meta{author: \"Alice Wonderland\"}\n").unwrap();
+        let doc = parse_file("::meta(author: \"Alice Wonderland\")\n").unwrap();
         let q_val = StructuralQuery {
             value_contains: Some("Wonder".to_string()),
             ..Default::default()
@@ -181,7 +181,7 @@ mod tests {
 
     #[test]
     fn matches_query_by_value_contains_in_call_and_interp() {
-        let doc = parse_file("::meta{rule: allow:list(\"special-item\"), expr: ${vault.name}}\n")
+        let doc = parse_file("::meta(rule: allow:list(\"special-item\"), expr: ${vault.name})\n")
             .unwrap();
         let q_call = StructuralQuery {
             value_contains: Some("special".to_string()),

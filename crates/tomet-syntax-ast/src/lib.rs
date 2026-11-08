@@ -776,7 +776,7 @@ impl Declaration {
 }
 
 /// A nameless entry of a `{...}` group, `(marker)[content]`: the container
-/// already supplies what it is (the `(1)[...]` entries of `@links{ ... }`),
+/// already supplies what it is (the `(1)[...]` entries of `@links(){ ... }`),
 /// so it has no name. It takes the groups an element does and no connect.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Bare {

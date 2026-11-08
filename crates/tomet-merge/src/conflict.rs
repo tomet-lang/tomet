@@ -338,7 +338,7 @@ mod tests {
 
     #[test]
     fn a_value_conflict() {
-        let src = merged("@x{ k: 1 }\n", "@x{ k: 2 }\n", "@x{ k: 3 }\n");
+        let src = merged("@x(){ k: 1 }\n", "@x(){ k: 2 }\n", "@x(){ k: 3 }\n");
         let c = one(&src);
         assert_eq!(
             (c.kind, c.a.as_str(), c.b.as_str()),
@@ -455,7 +455,7 @@ mod tests {
 
     #[test]
     fn a_pipe_run_side_in_a_value() {
-        let src = "@x{\n  about: @conflict(\n    a: | mine\n    b: | yours\n  )\n}\n";
+        let src = "@x(){\n  about: @conflict(\n    a: | mine\n    b: | yours\n  )\n}\n";
         let c = one(src);
         assert_eq!(c.kind, ConflictKind::Value);
         let kept = crate::resolve_single(src, 0, crate::ConflictResolution::A).unwrap();
@@ -481,7 +481,7 @@ mod tests {
 
     #[test]
     fn a_string_value_side_is_shown_without_quotes() {
-        let c = one("@x{ k: @conflict(a: \"one\", b: \"two\") }\n");
+        let c = one("@x(){ k: @conflict(a: \"one\", b: \"two\") }\n");
         assert_eq!((c.a.as_str(), c.b.as_str()), ("one", "two"));
     }
 
@@ -586,7 +586,7 @@ mod positional_tests {
             (c.kind, c.a.as_str(), c.b.as_str()),
             (ConflictKind::Block, "ローカル", "リモート")
         );
-        let c = &find_conflicts("::meta{ x: @conflict(2, 3) }\n").unwrap()[0];
+        let c = &find_conflicts("::meta(x: @conflict(2, 3))\n").unwrap()[0];
         assert_eq!(
             (c.kind, c.a.as_str(), c.b.as_str()),
             (ConflictKind::Value, "2", "3")

@@ -160,7 +160,7 @@
         [
           "",
           ["tomet-ns.thing"],
-          [["tomet-data", "{\"value\":{\"a/b\":{\"c d\":3}}}"]]
+          [["tomet-data", "{\"args\":{},\"value\":{\"a/b\":{\"c d\":3}}}"]]
         ],
         []
       ]

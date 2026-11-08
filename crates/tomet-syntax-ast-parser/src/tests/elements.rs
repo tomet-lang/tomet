@@ -43,7 +43,7 @@ fn parses_link_with_order_free_groups() {
 
 #[test]
 fn parses_links_container_with_bare_children() {
-    let doc = parse_file("@links {\n  (1)[ note ]\n  (anotation1)[ note ]\n}\n").unwrap();
+    let doc = parse_file("@links() {\n  (1)[ note ]\n  (anotation1)[ note ]\n}\n").unwrap();
     match &doc.body[0] {
         Block::Element(el) => {
             assert_eq!(el.name, Name::bare("links"));
@@ -112,7 +112,7 @@ fn a_name_must_be_ascii_to_start_an_element() {
 
 #[test]
 fn a_bare_entry_takes_args_content_and_value_like_a_named_one() {
-    let doc = parse_file("@memo{ (1)[ ひとつ ]{ id: a } }\n").unwrap();
+    let doc = parse_file("@memo(){ (1)[ ひとつ ]{ id: a } }\n").unwrap();
     let Block::Element(el) = &doc.body[0] else {
         panic!()
     };

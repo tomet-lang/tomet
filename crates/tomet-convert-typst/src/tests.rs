@@ -108,7 +108,7 @@ fn renders_embed_as_image_with_alt() {
 
 #[test]
 fn meta_and_config_have_no_visible_output() {
-    assert_eq!(typst("::meta{ key: value }\n"), "");
+    assert_eq!(typst("::meta(key: value)\n"), "");
     assert_eq!(typst("::export(type:commonmark)\n"), "");
 }
 
@@ -174,7 +174,10 @@ fn renders_tag_elements() {
 
 #[test]
 fn a_comment_renders_as_a_typst_block_comment() {
-    assert_eq!(typst("@comment[ A block comment ]\n"), "/* A block comment */\n\n");
+    assert_eq!(
+        typst("@comment[ A block comment ]\n"),
+        "/* A block comment */\n\n"
+    );
     assert_eq!(
         typst("before @comment[ inline ] after\n"),
         "before /* inline */ after\n\n"

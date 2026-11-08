@@ -1,14 +1,15 @@
 //! Validation of a document's declarations apart from any host syntax.
 //!
 //! Checks the positional argument count, version slots, declared versions,
-//! macros, and variable definitions.
+//! macros, and variable definitions, and that a declaration is written in the [`Shape`] it has:
+//! `(...)` alone, or `(...)` with a `{...}` body only for the three that read one.
 
 use tomet_ast::Value;
 use tomet_semantics_core::admits::admits;
 use tomet_type::Type;
 
 use crate::declaration::Declaration;
-use crate::kind::{Cardinality, DeclKind, Host};
+use crate::kind::{Cardinality, DeclKind, Host, Shape};
 use crate::profile::Profile;
 use crate::read::profile_names;
 use crate::vars::{VarDecl, read_var_decls};
@@ -46,9 +47,15 @@ pub enum Problem {
         declaration: &'static str,
         first: usize,
     },
-    /// `id` written in `::meta{ ... }`. `::meta` holds free attributes; what the language itself
+    /// `id` written in `::meta(...)`. `::meta` holds free attributes; what the language itself
     /// reads about a document, its identity, is the declaration `::id(...)`.
     MetaIdMoved,
+    /// A `{...}` written on a declaration that has no body: `::meta(){ a: 1 }`. Its entries go in
+    /// the `(...)`: `::meta(a: 1)`. Only `::vocabulary`, `::blueprint` and `::dictionary` take one.
+    UnexpectedData { declaration: &'static str },
+    /// The `(...)` of a declaration of `name: value` entries is something else: `::macros(gh)`, or
+    /// a bare value among the entries, as in `::meta(a: 1, 2)`.
+    ExpectedEntries { declaration: &'static str },
 }
 
 impl std::fmt::Display for Problem {
@@ -81,6 +88,19 @@ impl std::fmt::Display for Problem {
                 write!(
                     f,
                     "`id` is not written in `::meta`; the identity of a document is `::id(...)`"
+                )
+            }
+            Problem::UnexpectedData { declaration } => {
+                write!(
+                    f,
+                    "`::{declaration}` takes no `{{...}}`; write its entries in the parentheses, \
+                     `::{declaration}(name: value)`"
+                )
+            }
+            Problem::ExpectedEntries { declaration } => {
+                write!(
+                    f,
+                    "`::{declaration}(...)` holds `name: value` entries; found a value without a name"
                 )
             }
         }
@@ -137,6 +157,23 @@ pub fn check_declarations(declarations: &[Declaration], host: Host) -> Vec<(usiz
             }
         }
 
+        if spec.shape != Shape::ArgsAndData && decl.data.is_some() {
+            problems.push((
+                idx,
+                Problem::UnexpectedData {
+                    declaration: spec.name,
+                },
+            ));
+        }
+        if spec.shape == Shape::Entries && !is_entries(decl) {
+            problems.push((
+                idx,
+                Problem::ExpectedEntries {
+                    declaration: spec.name,
+                },
+            ));
+        }
+
         match kind {
             DeclKind::Kind | DeclKind::Use => {
                 check_version_slot(idx, decl, spec.name, &mut problems);
@@ -157,7 +194,7 @@ pub fn check_declarations(declarations: &[Declaration], host: Host) -> Vec<(usiz
                 check_fields(idx, decl, spec.name, &mut problems);
             }
             DeclKind::Meta => {
-                if let Some(Value::Map(entries)) = &decl.data
+                if let Some(Value::Map(entries)) = decl.bound_args()
                     && entries.iter().any(|(key, _)| key == "id")
                 {
                     problems.push((idx, Problem::MetaIdMoved));
@@ -168,6 +205,18 @@ pub fn check_declarations(declarations: &[Declaration], host: Host) -> Vec<(usiz
     }
 
     problems
+}
+
+/// Whether the `(...)` of `decl` is `name: value` entries, none of them a bare value. `::name()` is
+/// entries with none, and so is a declaration built without any `(...)`, which no parse produces.
+fn is_entries(decl: &Declaration) -> bool {
+    match &decl.args {
+        None => true,
+        Some(Value::Map(entries)) => entries
+            .iter()
+            .all(|(key, _)| key != tomet_semantics_core::POSITIONAL_ENTRY_KEY),
+        Some(_) => false,
+    }
 }
 
 fn check_version_slot(
@@ -206,27 +255,23 @@ fn check_version_slot(
 }
 
 /// The version a declaration wrote, where its kind keeps it: `::version(1.10)` takes it as an
-/// argument (or in its data), `::vocabulary` and `::blueprint` as `version:` in their data.
+/// argument, `::vocabulary` and `::blueprint` as `version:` in their `{...}` body.
 fn written_version(decl: &Declaration, kind: DeclKind) -> Option<Value> {
-    let in_data = || match &decl.data {
-        Some(Value::Map(entries)) => entries
-            .iter()
-            .find(|(key, _)| key == "version")
-            .map(|(_, v)| v.clone()),
-        _ => None,
-    };
     match kind {
-        DeclKind::Version => decl
-            .bound_args()
-            .and_then(|args| match args {
-                Value::Map(entries) => entries
-                    .into_iter()
-                    .find(|(key, _)| key == "version")
-                    .map(|(_, v)| v),
-                other => Some(other),
-            })
-            .or_else(in_data),
-        DeclKind::Vocabulary | DeclKind::Blueprint => in_data(),
+        DeclKind::Version => decl.bound_args().and_then(|args| match args {
+            Value::Map(entries) => entries
+                .into_iter()
+                .find(|(key, _)| key == "version")
+                .map(|(_, v)| v),
+            other => Some(other),
+        }),
+        DeclKind::Vocabulary | DeclKind::Blueprint => match &decl.data {
+            Some(Value::Map(entries)) => entries
+                .iter()
+                .find(|(key, _)| key == "version")
+                .map(|(_, v)| v.clone()),
+            _ => None,
+        },
         _ => None,
     }
 }
@@ -296,22 +341,16 @@ fn check_macros(
     name: &'static str,
     problems: &mut Vec<(usize, Problem)>,
 ) {
-    let entries = [decl.bound_args(), decl.data.clone()];
-    for entries in entries.into_iter().flatten() {
-        let Value::Map(entries) = entries else {
-            continue;
-        };
-        for (macro_name, template) in entries {
-            if let Some(reason) = macro_problem(&template) {
-                problems.push((
-                    idx,
-                    Problem::InvalidDefinition {
-                        declaration: name,
-                        name: macro_name,
-                        reason,
-                    },
-                ));
-            }
+    for (macro_name, template) in crate::read::entries(decl) {
+        if let Some(reason) = macro_problem(&template) {
+            problems.push((
+                idx,
+                Problem::InvalidDefinition {
+                    declaration: name,
+                    name: macro_name,
+                    reason,
+                },
+            ));
         }
     }
 }
@@ -380,10 +419,7 @@ fn check_fields(
     name: &'static str,
     problems: &mut Vec<(usize, Problem)>,
 ) {
-    let Some(Value::Map(entries)) = &decl.data else {
-        return;
-    };
-    for (field_name, field_def) in entries {
+    for (field_name, field_def) in &crate::read::entries(decl) {
         let Value::Map(props) = field_def else {
             continue;
         };
@@ -446,7 +482,7 @@ mod tests {
         );
 
         // Naming none is not a promise either.
-        assert_eq!(problems_of("::profile\n").len(), 1);
+        assert_eq!(problems_of("::profile()\n").len(), 1);
     }
 
     #[test]
@@ -620,7 +656,7 @@ mod tests {
     #[test]
     fn a_block_macro_may_hold_only_places_for_arguments() {
         let doc = parse(
-            "::macros{ ok: [ @card(title: ${1})[ ${who} ] ], bad: [ ${a.b} and ${f(1)} ${1} ] }\n",
+            "::macros(ok: [ @card(title: ${1})[ ${who} ] ], bad: [ ${a.b} and ${f(1)} ${1} ])\n",
         );
         let decls: Vec<_> = declarations(&doc)
             .into_iter()
@@ -640,8 +676,8 @@ mod tests {
     fn macros_and_vars_checks() {
         let bad_macro = Declaration::new(
             "macros",
-            None,
             Some(Value::Map(vec![("gh".into(), Value::Int(42))])),
+            None,
         );
         let problems = check_declarations(&[bad_macro], Host::Tmt);
         assert_eq!(problems.len(), 1);
@@ -658,7 +694,6 @@ mod tests {
 
         let bad_var = Declaration::new(
             "vars",
-            None,
             Some(Value::Map(vec![(
                 "n".into(),
                 Value::Map(vec![
@@ -666,6 +701,7 @@ mod tests {
                     ("default".into(), Value::String("3".into())),
                 ]),
             )])),
+            None,
         );
         let problems = check_declarations(&[bad_var], Host::Tmt);
         assert_eq!(problems.len(), 1);
@@ -732,13 +768,13 @@ mod tests {
     fn repeated_singletons_are_reported() {
         let meta1 = Declaration::new(
             "meta",
-            None,
             Some(Value::Map(vec![("a".into(), Value::Int(1))])),
+            None,
         );
         let meta2 = Declaration::new(
             "meta",
-            None,
             Some(Value::Map(vec![("b".into(), Value::Int(2))])),
+            None,
         );
         let problems = check_declarations(&[meta1, meta2], Host::Ctmt);
         assert_eq!(problems.len(), 1);
@@ -780,10 +816,10 @@ mod tests {
 
     #[test]
     fn fields_type_declaration_validation() {
-        let valid = problems_of("::fields{ tags: { type: list(string) } }\n");
+        let valid = problems_of("::fields(tags: { type: list(string) })\n");
         assert!(valid.is_empty(), "{valid:?}");
 
-        let invalid = problems_of("::fields{ owner: { type: person } }\n");
+        let invalid = problems_of("::fields(owner: { type: person })\n");
         assert_eq!(invalid.len(), 1);
         assert!(matches!(
             &invalid[0],
@@ -793,5 +829,68 @@ mod tests {
                 reason,
             } if name == "owner" && reason.contains("`person` is not a type")
         ));
+    }
+
+    #[test]
+    fn a_meta_id_is_reported_wherever_it_is_written_in_the_parentheses() {
+        assert_eq!(problems_of("::meta(id: x)\n"), [Problem::MetaIdMoved]);
+        assert_eq!(
+            problems_of("::meta(title: T, id: x)\n"),
+            [Problem::MetaIdMoved]
+        );
+        assert!(problems_of("::meta(title: T)\n").is_empty());
+        assert!(problems_of("::meta()\n").is_empty());
+    }
+
+    #[test]
+    fn a_brace_body_is_refused_on_every_declaration_that_takes_none() {
+        let src = |name: &str| format!("::{name}(){{ a: 1 }}\n");
+        for kind in DeclKind::ALL {
+            let found = problems_of(&src(kind.name()));
+            let unexpected = Problem::UnexpectedData {
+                declaration: kind.name(),
+            };
+            assert_eq!(
+                found.contains(&unexpected),
+                kind.shape() != Shape::ArgsAndData,
+                "{kind}: {found:?}"
+            );
+        }
+        assert_eq!(
+            Problem::UnexpectedData {
+                declaration: "meta"
+            }
+            .to_string(),
+            "`::meta` takes no `{...}`; write its entries in the parentheses, `::meta(name: value)`"
+        );
+    }
+
+    #[test]
+    fn the_declarations_that_take_a_body_still_take_it() {
+        for src in [
+            "::vocabulary(deck){ version: 1.0 }\n",
+            "::blueprint(note){ version: 1.0 }\n",
+            "::dictionary(tomet){ \"a\": @term[x] }\n",
+        ] {
+            assert!(problems_of(src).is_empty(), "{src}");
+        }
+    }
+
+    #[test]
+    fn the_parentheses_of_an_entries_declaration_hold_entries() {
+        assert!(problems_of("::macros()\n").is_empty());
+        assert!(problems_of("::meta(a: 1, b: 2)\n").is_empty());
+        for src in ["::macros(gh)\n", "::meta(a: 1, 2)\n", "::workspace(x)\n"] {
+            let found = problems_of(src);
+            assert_eq!(found.len(), 1, "{src}: {found:?}");
+            assert!(
+                matches!(found[0], Problem::ExpectedEntries { .. }),
+                "{src}: {found:?}"
+            );
+        }
+        assert_eq!(
+            problems_of("::meta(1)\n")[0].to_string(),
+            "`::meta(...)` holds `name: value` entries; found a value without a name"
+        );
     }
 }

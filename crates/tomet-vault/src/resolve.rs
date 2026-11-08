@@ -120,13 +120,13 @@ mod tests {
         tomet_config::load_config_from_str(settings).expect("valid settings")
     }
 
-    const SETTINGS: &str = "::fields{
+    const SETTINGS: &str = "::fields(
   tags: { type: list }
   created: { type: datetime, format: rfc3339 }
   title: { type: string }
   rev: { type: version }
   note: { always_newline: true }
-}
+)
 ";
 
     fn meta_of(src: &str) -> EvalValue {
@@ -143,18 +143,18 @@ mod tests {
 
     #[test]
     fn a_list_field_the_document_lacks_is_an_empty_list() {
-        let meta = meta_of("::meta{ title: A }\n");
+        let meta = meta_of("::meta(title: A)\n");
         assert_eq!(field(&meta, "tags"), Some(&EvalValue::Seq(vec![])));
     }
 
     #[test]
     fn a_list_field_written_as_one_value_is_a_list_of_one() {
-        let meta = meta_of("::meta{ tags: rust }\n");
+        let meta = meta_of("::meta(tags: rust)\n");
         assert_eq!(
             field(&meta, "tags"),
             Some(&EvalValue::Seq(vec![EvalValue::String("rust".into())]))
         );
-        let meta = meta_of("::meta{ tags: list(a, b) }\n");
+        let meta = meta_of("::meta(tags: list(a, b))\n");
         assert_eq!(
             field(&meta, "tags"),
             Some(&EvalValue::Seq(vec![
@@ -168,14 +168,14 @@ mod tests {
     /// version `1.10`, not the number `1.1`; and a `title` of `2024` is `"2024"`.
     #[test]
     fn a_text_field_is_the_text_it_was_written_as() {
-        let meta = meta_of("::meta{ rev: 1.10, title: 2024 }\n");
+        let meta = meta_of("::meta(rev: 1.10, title: 2024)\n");
         assert_eq!(field(&meta, "rev"), Some(&EvalValue::String("1.10".into())));
         assert_eq!(
             field(&meta, "title"),
             Some(&EvalValue::String("2024".into()))
         );
         // not declared: read as it is, preserving the written number
-        let meta = meta_of("::meta{ other: 1.10 }\n");
+        let meta = meta_of("::meta(other: 1.10)\n");
         assert_eq!(
             field(&meta, "other"),
             Some(&EvalValue::Number("1.10".into()))
@@ -184,7 +184,7 @@ mod tests {
 
     #[test]
     fn a_declared_field_the_document_lacks_is_null() {
-        let meta = meta_of("::meta{ tags: a }\n");
+        let meta = meta_of("::meta(tags: a)\n");
         assert_eq!(field(&meta, "title"), Some(&EvalValue::Null));
         assert_eq!(field(&meta, "created"), Some(&EvalValue::Null));
         assert_eq!(field(&meta, "note"), Some(&EvalValue::Null));
@@ -192,12 +192,12 @@ mod tests {
 
     #[test]
     fn a_datetime_field_becomes_a_datetime_and_bad_text_stays_text() {
-        let meta = meta_of("::meta{ created: \"2026-10-17T09:00:00+09:00\" }\n");
+        let meta = meta_of("::meta(created: \"2026-10-17T09:00:00+09:00\")\n");
         assert!(matches!(
             field(&meta, "created"),
             Some(EvalValue::DateTime(_))
         ));
-        let meta = meta_of("::meta{ created: yesterday }\n");
+        let meta = meta_of("::meta(created: yesterday)\n");
         assert_eq!(
             field(&meta, "created"),
             Some(&EvalValue::String("yesterday".into()))
@@ -209,7 +209,7 @@ mod tests {
     #[test]
     fn the_looser_iso_8601_forms_are_datetimes_too() {
         for text in ["2026-10-17", "2026-10-17T09:00", "2026-10-17 09:00:00"] {
-            let meta = meta_of(&format!("::meta{{ created: \"{text}\" }}\n"));
+            let meta = meta_of(&format!("::meta(created: \"{text}\")\n"));
             assert!(
                 matches!(field(&meta, "created"), Some(EvalValue::DateTime(_))),
                 "{text}"
@@ -219,9 +219,9 @@ mod tests {
 
     #[test]
     fn an_undeclared_key_is_absent_unless_written() {
-        let meta = meta_of("::meta{ title: A }\n");
+        let meta = meta_of("::meta(title: A)\n");
         assert_eq!(field(&meta, "draft"), None);
-        let meta = meta_of("::meta{ draft: true }\n");
+        let meta = meta_of("::meta(draft: true)\n");
         assert_eq!(field(&meta, "draft"), Some(&EvalValue::Bool(true)));
     }
 
@@ -235,11 +235,11 @@ mod tests {
     #[test]
     fn the_overlay_answers_for_its_own_path_and_defers_for_the_rest() {
         let inner = MemoryResolver::new()
-            .with_source("a.tmt", "::meta{ title: from-inner }\n")
+            .with_source("a.tmt", "::meta(title: from-inner)\n")
             .unwrap()
-            .with_source("b.tmt", "::meta{ title: B }\n")
+            .with_source("b.tmt", "::meta(title: B)\n")
             .unwrap();
-        let rewritten = Arc::new(tomet_ast_parser::parse_file("::meta{ title: mine }\n").unwrap());
+        let rewritten = Arc::new(tomet_ast_parser::parse_file("::meta(title: mine)\n").unwrap());
         let overlay = Overlay {
             path: DocRef("a.tmt".into()),
             snapshot: rewritten.clone(),

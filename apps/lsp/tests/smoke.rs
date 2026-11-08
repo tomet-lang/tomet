@@ -293,7 +293,7 @@ fn macro_hover_over_stdio() {
                 "uri": "file:///tmp/macro_test.tmt",
                 "languageId": "tomet",
                 "version": 1,
-                "text": "::macros{\n  gh: \"https://github.com/tomet/tomet/issues/${1}\"\n}\n\n$macro.gh(101)\n",
+                "text": "::macros(\n  gh: \"https://github.com/tomet/tomet/issues/${1}\"\n)\n\n$macro.gh(101)\n",
             }
         }),
     );
@@ -330,7 +330,7 @@ fn macro_hover_with_workspace_auto_config_over_stdio() {
     let config_path = dir.join(tomet_load_config::VAULT_CONFIG_FILE);
     std::fs::write(
         &config_path,
-        "::macros{\n  twitter_post: \"https://x.com/${1}/status/${2}\"\n}\n",
+        "::macros(\n  twitter_post: \"https://x.com/${1}/status/${2}\"\n)\n",
     )
     .unwrap();
 
@@ -388,7 +388,7 @@ fn uuid_vault(name: &str) -> std::path::PathBuf {
     std::fs::create_dir_all(&root).unwrap();
     std::fs::write(
         root.join(tomet_load_config::VAULT_CONFIG_FILE),
-        "::kind(config)\n::fields{ id: { type: uuid } }\n",
+        "::kind(config)\n::fields(id: { type: uuid })\n",
     )
     .unwrap();
     root
@@ -516,7 +516,7 @@ fn a_vault_with_a_missing_vocabulary_says_so_in_the_log() {
     std::fs::create_dir_all(&root).unwrap();
     std::fs::write(
         root.join(tomet_load_config::VAULT_CONFIG_FILE),
-        "::kind(config)\n::vocabularies{ missing: @file(.tomet/vocabularies/missing.vocabulary.tmt) }\n",
+        "::kind(config)\n::vocabularies(missing: @file(.tomet/vocabularies/missing.vocabulary.tmt))\n",
     )
     .unwrap();
     let path = root.join("a.tmt");

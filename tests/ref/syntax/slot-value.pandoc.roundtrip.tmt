@@ -1,6 +1,6 @@
 @link(target: "url:")[`<?(text)>`]
 
-@meta[]{ type: {hole: ""} }
+@meta()[]{ type: {hole: ""} }
 
 @opt[]{ value: <name> }
 

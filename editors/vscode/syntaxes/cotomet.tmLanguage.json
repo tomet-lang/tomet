@@ -16,7 +16,7 @@
       "match": "(?<!:)//.*$"
     },
     "declaration": {
-      "comment": "::name, a declaration about the file, at the start of a line: ::kind(catalog, 2). Its (args) and {data} are scoped by the patterns that follow.",
+      "comment": "::name, a declaration about the file, at the start of a line: ::kind(catalog, 2). Its (args) are required and a {data} may follow them; both are scoped by the patterns that follow.",
       "match": "^(\\s*)(::)([A-Za-z_][A-Za-z0-9_.\\-]*)",
       "captures": {
         "2": { "name": "punctuation.definition.tag.cotomet" },

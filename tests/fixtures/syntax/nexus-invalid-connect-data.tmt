@@ -1,0 +1,3 @@
+// A nameless `:{...}` connect needs a host with a primary group of its own.
+
+@memo:{ a: 1 }

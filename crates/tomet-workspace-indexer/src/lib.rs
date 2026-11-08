@@ -420,15 +420,21 @@ pub fn extract_metadata(src: &str) -> BTreeMap<String, String> {
             }
         });
         tomet_tree::for_each_declaration(&doc, |declaration| {
-            if classify_declaration_lenient(declaration).as_str() == "meta" {
-                collect_meta(&declaration.data, &mut map);
+            if classify_declaration_lenient(declaration).as_str() == "meta"
+                && let Some(Value::Map(entries)) =
+                    tomet_semantics::data::declaration_entries(declaration)
+            {
+                // `::meta(k: v)` holds the fields in its parentheses: `meta.k`.
+                for (k, v) in &entries {
+                    map.insert(format!("meta.{k}"), value_to_string(v));
+                }
             }
         });
     }
     map
 }
 
-/// The fields of one `meta`: the `{value}` group as `meta.key`, the `(args)` as `meta.(args).key`.
+/// The fields of one `@meta` element: the `{value}` group as `meta.key`, the `(args)` as `meta.(args).key`.
 fn collect_meta(data: &tomet_ast::Data, map: &mut BTreeMap<String, String>) {
     if let Some(entries) = data.value.as_ref().map(|v| v.pairs().collect::<Vec<_>>()) {
         for (k, v) in entries {
@@ -493,9 +499,9 @@ mod tests {
 
     #[test]
     fn test_is_path_ignored_with_config_from_settings() {
-        let settings_src = r#"::workspace{
+        let settings_src = r#"::workspace(
   ignore: list("00-09 System/01 Apps/obsidian")
-}
+)
 "#;
         let cfg =
             tomet_config::load_config_from_str(settings_src).expect("failed to parse settings");
@@ -510,7 +516,7 @@ mod tests {
 
     #[test]
     fn test_extract_metadata_collects_meta_fields() {
-        let src = "::meta{author: Alice}\n\n#[Doc]\n";
+        let src = "::meta(author: Alice)\n\n#[Doc]\n";
         let map = extract_metadata(src);
         assert_eq!(map.get("meta.author"), Some(&"Alice".to_string()));
     }
@@ -650,7 +656,7 @@ mod metadata_table_tests {
 
     #[test]
     fn a_list_stays_a_list() {
-        let fields = fields_of("::meta{ tags: list(rust, cli) }\n\n#[ Title ]\n");
+        let fields = fields_of("::meta(tags: list(rust, cli))\n\n#[ Title ]\n");
         // Not the display string "[rust, cli]" that `extract_metadata`
         // produces (a search-index rendering, not `.tmt` syntax, so it
         // is unaffected by `list(...)` replacing the `[...]` literal) --
@@ -666,7 +672,7 @@ mod metadata_table_tests {
 
     #[test]
     fn a_nested_map_is_recorded_at_every_depth() {
-        let fields = fields_of("::meta{ url: { wiki: \"https://example.test\" } }\n\n#[ T ]\n");
+        let fields = fields_of("::meta(url: { wiki: \"https://example.test\" })\n\n#[ T ]\n");
         assert!(matches!(fields.get("meta"), Some(Value::Map(_))));
         assert!(matches!(fields.get("meta.url"), Some(Value::Map(_))));
         assert_eq!(

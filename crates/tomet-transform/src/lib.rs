@@ -56,7 +56,7 @@ mod tests {
         );
 
         let mut doc = parse_doc(
-            "@link(\"https://github.com/tomet/tomet\")[repo]\n@embed{ target: \"https://github.com/tomet/tomet/issues/42\" }\n@note(\"https://github.com/tomet/tomet\")\n",
+            "@link(\"https://github.com/tomet/tomet\")[repo]\n@embed(target: \"https://github.com/tomet/tomet/issues/42\")\n@note(\"https://github.com/tomet/tomet\")\n",
         );
         assert_eq!(transform_link_targets_with_macros(&mut doc, &set), 2);
 
@@ -91,7 +91,7 @@ mod tests {
 
     #[test]
     fn test_promote_meta_type_to_kind() {
-        let mut doc = parse_doc("::version(1.0)\n::meta{\n  type: task\n  id: doc-1\n}\n");
+        let mut doc = parse_doc("::version(1.0)\n::meta(\n  type: task\n  id: doc-1\n)\n");
         assert!(promote_meta_type_to_kind(&mut doc));
 
         let mut names = Vec::new();
@@ -105,7 +105,7 @@ mod tests {
 
     #[test]
     fn test_promote_meta_id_to_id() {
-        let mut doc = parse_doc("::meta{\n  id: doc-1\n  title: T\n}\n");
+        let mut doc = parse_doc("::meta(\n  id: doc-1\n  title: T\n)\n");
         assert!(promote_meta_id_to_id(&mut doc));
 
         let mut id = None;
@@ -116,7 +116,7 @@ mod tests {
             }
             if declaration.name.is_bare_named("meta")
                 && let Some(Value::Map(entries)) =
-                    tomet_semantics::data::declaration_data(declaration)
+                    tomet_semantics::data::declaration_entries(declaration)
             {
                 meta_keys = entries.into_iter().map(|(key, _)| key).collect();
             }
@@ -125,9 +125,7 @@ mod tests {
         assert_eq!(meta_keys, vec!["title".to_string()]);
 
         // Nothing to promote: no change.
-        assert!(!promote_meta_id_to_id(&mut parse_doc(
-            "::meta{ title: T }\n"
-        )));
+        assert!(!promote_meta_id_to_id(&mut parse_doc("::meta(title: T)\n")));
     }
 
     #[test]

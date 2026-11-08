@@ -1,0 +1,3 @@
+// `{...}` is data, not a primary group: it cannot be the only group of `@name`.
+
+@memo{ a: 1 }

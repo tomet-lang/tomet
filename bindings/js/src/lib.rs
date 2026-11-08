@@ -164,7 +164,7 @@ pub fn process_file_internal(mut doc: tomet::ast::File, opts: &ProcessOptions) -
     let html = tomet::html::render_body_with(&doc, &render_opts);
     let is_data_only = html.trim().is_empty();
 
-    // 1. Meta & Title from @meta{title}
+    // 1. Meta & Title from ::meta(title: ...)
     let meta = tomet::declaration::document_meta(&doc);
     let meta_title = meta.as_ref().and_then(|v| match v {
         tomet::ast::Value::Map(m) => m.iter().find_map(|(k, val)| {
@@ -414,7 +414,7 @@ mod tests {
 
     #[test]
     fn test_process_document_with_meta_title() {
-        let src = "::meta{\n  title: \"My Meta Title\"\n}\n\n=[ Document Title ]\n\n==[ Section One ]\n\nContent.\n";
+        let src = "::meta(\n  title: \"My Meta Title\"\n)\n\n=[ Document Title ]\n\n==[ Section One ]\n\nContent.\n";
         let doc = parse_plain(src).unwrap();
         let opts = ProcessOptions {
             advanced: Some(true),
@@ -449,7 +449,7 @@ mod tests {
 
     #[test]
     fn test_process_document_data_only() {
-        let src = "::version(1.0)\n::meta{\n  title: \"Just Config\"\n}\n";
+        let src = "::version(1.0)\n::meta(\n  title: \"Just Config\"\n)\n";
         let doc = parse_plain(src).unwrap();
         let opts = ProcessOptions::default();
         let res = process_file_internal(doc, &opts);

@@ -1,4 +1,5 @@
-//! Root configuration groups corresponding to `::settings{ ... }` / `::config{ ... }` sections.
+//! Root configuration groups, one per concern a config declaration carries (`::format(...)`,
+//! `::fields(...)`, `::workspace(...)`, `::blueprints(...)`, `::vocabularies(...)`, `::dictionaries(...)`).
 //!
 //! Each submodule defines a dedicated strongly-typed configuration struct for a specific domain:
 //! - (`format`) Heading, link, element, callout, list, and table formatting rules ([`FormatConfig`], [`GroupOrder`]).

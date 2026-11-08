@@ -15,8 +15,10 @@ fn vault() -> Vault {
         "gh".to_string(),
         Value::String("https://github.com/x/issues/${1}".to_string()),
     );
-    let note = tomet_ast_parser::parse_file("::macros{ note: [ Note: ${1} ] }\n").expect("parses");
-    config.macros.extend(tomet_declaration::document_macros(&note));
+    let note = tomet_ast_parser::parse_file("::macros(note: [ Note: ${1} ])\n").expect("parses");
+    config
+        .macros
+        .extend(tomet_declaration::document_macros(&note));
     config.vars.push((
         "topic".to_string(),
         tomet_declaration::VarDecl {
@@ -33,7 +35,7 @@ fn convert(source: &str, options: Options) -> Converted {
     let resolver = MemoryResolver::new()
         .with_source(PATH, source)
         .unwrap()
-        .with_source("docs/b.tmt", "::meta{ title: B }\n\nBody of B.\n")
+        .with_source("docs/b.tmt", "::meta(title: B)\n\nBody of B.\n")
         .unwrap();
     make_standalone(&vault(), &doc, Path::new(PATH), &resolver, &options)
 }
@@ -71,7 +73,10 @@ fn a_block_macro_the_vault_defines_is_written_into_the_file_as_blocks() {
     let text = printed(&converted);
     assert!(text.contains("::macros"), "{text}");
     assert!(text.contains("Note: ${1}"), "{text}");
-    assert!(text.contains("${macro.note(\"x\")}"), "the call stays a call: {text}");
+    assert!(
+        text.contains("${macro.note(\"x\")}"),
+        "the call stays a call: {text}"
+    );
     assert_eq!(treatments(&converted), vec![Treatment::Carried]);
     assert!(converted.remaining.is_empty(), "{:?}", converted.remaining);
 }
@@ -162,7 +167,7 @@ fn an_expression_with_no_value_in_the_vault_is_left_as_it_is() {
 
 #[test]
 fn a_meta_field_is_left_unless_asked_to_freeze() {
-    let source = "::meta{ title: Hello }\n\n${self.meta.title}\n";
+    let source = "::meta(title: Hello)\n\n${self.meta.title}\n";
     let left = convert(source, Options::default());
     assert!(matches!(&treatments(&left)[..], [Treatment::Left { .. }]));
     assert_eq!(left.remaining.len(), 1);
@@ -200,7 +205,7 @@ fn standalone_is_added_to_a_profile_that_is_already_declared() {
 
 #[test]
 fn a_file_that_is_already_standalone_is_not_changed() {
-    let source = "::profile(standalone)\n::macros{ gh: \"https://x/${1}\" }\n\n${macro.gh(1)}\n";
+    let source = "::profile(standalone)\n::macros(gh: \"https://x/${1}\")\n\n${macro.gh(1)}\n";
     let converted = convert(source, Options::default());
     assert!(converted.changes.is_empty());
     assert!(converted.remaining.is_empty());
@@ -234,7 +239,7 @@ fn outside_its_vault_the_converted_file_renders_as_the_original_did_inside() {
     // One paragraph under the heading: the printer writes two paragraphs of a section with no
     // blank line between, and reading that back gives one (see the task file).
     let source = "\
-::meta{ title: Hello }
+::meta(title: Hello)
 
 ${include(tmt(\"docs/b.tmt\"))}
 
@@ -248,7 +253,7 @@ See ${macro.gh(7)} about ${var.topic} in ${self.path}.
         let resolver = MemoryResolver::new()
             .with_source(PATH, source)
             .unwrap()
-            .with_source("docs/b.tmt", "::meta{ title: B }\n\nBody of B.\n")
+            .with_source("docs/b.tmt", "::meta(title: B)\n\nBody of B.\n")
             .unwrap();
         let prepared = vault.prepare(&mut doc, Path::new(PATH), &resolver);
         assert!(prepared.unresolved.is_empty(), "{:?}", prepared.unresolved);

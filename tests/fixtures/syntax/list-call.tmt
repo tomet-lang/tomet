@@ -2,11 +2,11 @@
 // この文書では ::meta 自体が検証対象(データの中に要素を埋め込む)なので、
 // 他のfixtureにある ::meta{ id: ... } の型は使わない -- ::meta は
 // singletonで、一文書に一つしか書けない。
-::meta{
+::meta(
   icon: @doc.icon("triangle")
   icons: list(@doc.icon("a"), @doc.icon("b", pkg:"lucide"))
   mixed: @doc.icon(pkg:"lucide", "triangle")
-}
+)
 
 =[ 値の中の要素と列 ]
 

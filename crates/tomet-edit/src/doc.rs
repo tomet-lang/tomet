@@ -3,7 +3,7 @@
 use std::collections::HashMap;
 
 use crate::export::export_item;
-use crate::node::{AttrGroup, ChildItem, Node, NodeId, NodeKind};
+use crate::node::{AttrGroup, AttrSlot, ChildItem, FormPiece, Node, NodeId, NodeKind};
 use crate::op::{EditError, EditOp};
 
 /// An editable tree model of a Tomet document.
@@ -237,7 +237,7 @@ impl EditDoc {
         }
 
         let meta_id = self.alloc_id();
-        let meta_node = Node::block_form(
+        let mut meta_node = Node::block_form(
             meta_id,
             "meta",
             true,
@@ -246,6 +246,9 @@ impl EditDoc {
             Vec::new(),
             None::<String>,
         );
+        // `::meta` stands on its `(...)`, empty until a field is set.
+        meta_node.slots.args_slot = Some(AttrSlot::new_empty("(", ")"));
+        meta_node.slots.pieces.push(FormPiece::Args);
 
         self.insert_node(meta_node);
         self.root_children_mut().insert(0, ChildItem::Node(meta_id));
@@ -266,10 +269,10 @@ impl EditDoc {
     pub fn meta_data(&self, key: &str) -> Option<String> {
         let meta_id = self.meta_node()?;
         let node = self.get(meta_id)?;
-        node.slots.data_slot.as_ref()?.get(key)
+        node.slots.args_slot.as_ref()?.get(key)
     }
 
-    /// Sets, updates, or deletes a key in the top-level `::meta` block's data map.
+    /// Sets, updates, or deletes a key in the top-level `::meta(...)`.
     ///
     /// If no `::meta` block exists and `value` is `Some`, a new `::meta` block is
     /// created at index 0 automatically.
@@ -286,7 +289,7 @@ impl EditDoc {
         }
 
         let meta_id = self.ensure_meta_node();
-        self.set_attribute(meta_id, AttrGroup::Data, key_str, val_opt)
+        self.set_attribute(meta_id, AttrGroup::Args, key_str, val_opt)
     }
 
     /// Finds the parent and child-item index for a given node.

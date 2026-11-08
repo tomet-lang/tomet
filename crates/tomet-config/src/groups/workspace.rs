@@ -82,7 +82,7 @@ mod tests {
     fn the_entry_defaults_to_self_tmt() {
         assert_eq!(WorkspaceConfig::default().folder_entry(), "self.tmt");
         assert_eq!(
-            entry("::format{ link: { no_space: true } }\n").folder_entry(),
+            entry("::format(link: { no_space: true })\n").folder_entry(),
             "self.tmt"
         );
         let spec = WorkspaceConfig::spec();
@@ -96,16 +96,16 @@ mod tests {
 
     #[test]
     fn the_vault_sets_the_entry_name() {
-        let cfg = entry("::workspace{ folder: { entry: index.tmt } }\n");
+        let cfg = entry("::workspace(folder: { entry: index.tmt })\n");
         assert_eq!(cfg.folder_entry(), "index.tmt");
         assert_eq!(cfg.folder_entry_problem(), None);
-        let quoted = entry("::workspace{ folder: { entry: \"my folder.tmt\" } }\n");
+        let quoted = entry("::workspace(folder: { entry: \"my folder.tmt\" })\n");
         assert_eq!(quoted.folder_entry(), "my folder.tmt");
     }
 
     #[test]
     fn the_entry_name_lives_beside_the_other_workspace_settings() {
-        let cfg = entry("::workspace{ ignore: list(\"x\"), folder: { entry: index.tmt } }\n");
+        let cfg = entry("::workspace(ignore: list(\"x\"), folder: { entry: index.tmt })\n");
         assert_eq!(cfg.ignore, vec!["x".to_string()]);
         assert_eq!(cfg.folder_entry(), "index.tmt");
     }
@@ -122,7 +122,7 @@ mod tests {
             "a\\b.tmt",
         ] {
             let cfg = entry(&format!(
-                "::workspace{{ folder: {{ entry: {} }} }}\n",
+                "::workspace(folder: {{ entry: {} }})\n",
                 tomet_literal(bad)
             ));
             assert!(cfg.folder_entry_problem().is_some(), "{bad:?}");

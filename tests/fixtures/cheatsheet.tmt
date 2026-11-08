@@ -9,10 +9,10 @@
   // export_path:/readme.md
 )
 
-::meta{
+::meta(
   key: value
   type: person
-}
+)
 
 /// [ special-casing exists for "import" anywhere. Renders as a generic
 ///   element (`<div class="tm-element tm-import" data-file="...">`), same as

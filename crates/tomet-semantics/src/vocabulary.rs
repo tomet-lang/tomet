@@ -283,10 +283,10 @@ impl Vocabulary {
             {
                 continue;
             }
-            let Some(data) = crate::data::declaration_data(declaration) else {
+            let Some(entries) = crate::data::declaration_entries(declaration) else {
                 continue;
             };
-            for (name, decl) in data.as_map().unwrap_or_default() {
+            for (name, decl) in entries.as_map().unwrap_or_default() {
                 vocab.elements.insert(name.clone(), decl_from_value(decl));
             }
         }
@@ -664,7 +664,7 @@ fn positional_name(declaration: &tomet_ast::Declaration) -> Option<String> {
     None
 }
 
-/// One entry of `::elements{}`: the map of fields an element declares.
+/// One entry of `::elements()`: the map of fields an element declares.
 ///
 /// A value that is not a map declares nothing, the same as an empty one.
 /// `about` is the element's prose and is not read: nothing in the checker
@@ -762,7 +762,7 @@ mod tests {
     const WRIT: &str = r#"::kind(vocabulary)
 ::vocabulary(writ){ version: "1.0.0" }
 
-::elements{
+::elements(
   layers: {
     display: block
     singleton: true
@@ -772,7 +772,7 @@ mod tests {
     display: block
     about: | Purity.
   }
-}
+)
 "#;
 
     #[test]
@@ -797,7 +797,7 @@ mod tests {
             r#"::kind(vocabulary)
 ::vocabulary(deck){ version: "1.0.0" }
 
-::elements{
+::elements(
   card: {
     display: block
     args: {
@@ -814,7 +814,7 @@ mod tests {
     }
     about: | カード一枚。
   }
-}
+)
 "#,
         );
         let card = &v.elements["card"];
@@ -849,13 +849,13 @@ mod tests {
             r#"::kind(vocabulary)
 ::vocabulary(deck){ version: "1.0.0" }
 
-::elements{
+::elements(
   card: {
     display: block
     content: { allow: list(link, em, ns.widget) }
     about: | カード一枚。
   }
-}
+)
 "#,
         );
         let card = &v.elements["card"];
@@ -875,7 +875,7 @@ mod tests {
             r#"::kind(vocabulary)
 ::vocabulary(deck){ version: "1.0.0" }
 
-::elements{
+::elements(
   label: {
     content: { allow: inline }
     about: | 短い説明。
@@ -884,7 +884,7 @@ mod tests {
     content: { allow: any }
     about: | 何でも。
   }
-}
+)
 "#,
         );
         assert_eq!(
@@ -900,12 +900,12 @@ mod tests {
             r#"::kind(vocabulary)
 ::vocabulary(deck){ version: "1.0.0" }
 
-::elements{
+::elements(
   plain: {
     display: block
     about: | 何も宣言しない。
   }
-}
+)
 "#,
         );
         assert_eq!(v.elements["plain"].content_allow, None);
@@ -924,13 +924,13 @@ mod tests {
     /// made, where any `::kind` at all counted as a blueprint.
     #[test]
     fn a_document_without_the_header_is_not_a_vocabulary() {
-        let doc = tomet_ast_parser::parse_file("::kind(note)\n\n::elements{ x: {} }\n").unwrap();
+        let doc = tomet_ast_parser::parse_file("::kind(note)\n\n::elements(x: {})\n").unwrap();
         assert!(Vocabulary::from_file(&doc).is_none());
     }
 
     #[test]
     fn shadowing_a_builtin_is_reported_at_the_declaration() {
-        let v = vocab("::vocabulary(deck)\n\n::elements{ link: {}, ref: {}, item: {} }\n");
+        let v = vocab("::vocabulary(deck)\n\n::elements(link: {}, ref: {}, item: {})\n");
         assert_eq!(v.shadowed_builtins(), ["item", "link"]);
         assert!(vocab(WRIT).shadowed_builtins().is_empty());
     }
@@ -953,7 +953,7 @@ mod tests {
     #[test]
     fn loaded_vocabularies_rejects_reserved_element_name() {
         let doc = tomet_ast_parser::parse_file(
-            "::kind(vocabulary)\n::vocabulary(deck)\n\n::elements{ item: {} }\n",
+            "::kind(vocabulary)\n::vocabulary(deck)\n\n::elements(item: {})\n",
         )
         .unwrap();
         let mut loaded = LoadedVocabularies::default();
@@ -968,7 +968,7 @@ mod tests {
 
     const DECK: &str = "::vocabulary(deck)
 
-::elements{
+::elements(
   entry: {
     args: {
       id: { type: uint, positional: true }
@@ -979,7 +979,7 @@ mod tests {
       note: {}
     }
   }
-}
+)
 ";
 
     #[test]
@@ -1052,7 +1052,7 @@ mod tests {
     /// omitted".
     #[test]
     fn std_wins_and_used_namespaces_are_never_bare() {
-        let deck = vocab("::vocabulary(deck)\n\n::elements{ ref: {} }\n");
+        let deck = vocab("::vocabulary(deck)\n\n::elements(ref: {})\n");
         let b = Bindings {
             kind: Some(vocab(WRIT)),
             used: [("deck".to_string(), deck)].into_iter().collect(),
@@ -1084,7 +1084,7 @@ mod tests {
     /// all along.
     #[test]
     fn a_caller_that_cannot_read_files_can_pass_the_vocabularies_in() {
-        let doc = tomet_ast_parser::parse_file("::kind(writ)\n\n@layers{ 1: list(\"a\") }\n")
+        let doc = tomet_ast_parser::parse_file("::kind(writ)\n\n@layers(){ 1: list(\"a\") }\n")
             .expect("document parses");
 
         // Nothing in scope: `std` only, so the kind's element is unknown.
@@ -1107,7 +1107,7 @@ mod tests {
     /// declared that path, so the document was repeating it.
     #[test]
     fn use_brings_a_namespace_into_scope_by_name() {
-        let deck = vocab("::vocabulary(deck)\n\n::elements{ ref: {} }\n");
+        let deck = vocab("::vocabulary(deck)\n\n::elements(ref: {})\n");
         let doc = tomet_ast_parser::parse_file("::kind(writ)\n::use(deck)\n\n@deck.ref(id:1)\n")
             .expect("document parses");
 
@@ -1126,7 +1126,7 @@ mod tests {
     /// the same with or without it.
     #[test]
     fn a_version_after_the_name_does_not_change_what_binds() {
-        let deck = vocab("::vocabulary(deck)\n\n::elements{ ref: {} }\n");
+        let deck = vocab("::vocabulary(deck)\n\n::elements(ref: {})\n");
         for src in [
             "::kind(writ, 1)\n::use(deck, 3)\n\n@deck.ref(id:1)\n",
             "::kind(writ)\n::use(deck)\n\n@deck.ref(id:1)\n",
@@ -1142,9 +1142,9 @@ mod tests {
     /// scope. Only the document's own kind binds without being written.
     #[test]
     fn an_available_vocabulary_is_not_in_scope_unless_the_document_asks() {
-        let deck = vocab("::vocabulary(deck)\n\n::elements{ ref: {} }\n");
+        let deck = vocab("::vocabulary(deck)\n\n::elements(ref: {})\n");
         let doc =
-            tomet_ast_parser::parse_file("::kind(writ)\n\n@layers{}\n").expect("document parses");
+            tomet_ast_parser::parse_file("::kind(writ)\n\n@layers()\n").expect("document parses");
 
         let bound = Bindings::for_document(&doc, [vocab(WRIT), deck]);
         assert!(bound.classify(&name("layers")).is_ok());
@@ -1214,7 +1214,7 @@ mod tests {
     #[test]
     fn doc_icon_resolves_with_no_use_or_vocabulary_declaration() {
         let doc =
-            tomet_ast_parser::parse_file("::kind(writ)\n\n@layers{}\n").expect("document parses");
+            tomet_ast_parser::parse_file("::kind(writ)\n\n@layers()\n").expect("document parses");
         let bound = Bindings::for_document(&doc, builtin_doc_vocabularies());
         assert_eq!(
             bound.classify(&name("doc.icon")),
@@ -1229,7 +1229,7 @@ mod tests {
     #[test]
     fn doc_rejects_a_name_it_does_not_declare() {
         let doc =
-            tomet_ast_parser::parse_file("::kind(writ)\n\n@layers{}\n").expect("document parses");
+            tomet_ast_parser::parse_file("::kind(writ)\n\n@layers()\n").expect("document parses");
         let bound = Bindings::for_document(&doc, builtin_doc_vocabularies());
         assert!(bound.classify(&name("doc.glyph")).is_err());
     }
@@ -1241,7 +1241,7 @@ mod tests {
     #[test]
     fn doc_icon_declares_name_and_pkg() {
         let doc =
-            tomet_ast_parser::parse_file("::kind(writ)\n\n@layers{}\n").expect("document parses");
+            tomet_ast_parser::parse_file("::kind(writ)\n\n@layers()\n").expect("document parses");
         let bound = Bindings::for_document(&doc, builtin_doc_vocabularies());
         let decl = bound
             .declaration(&name("doc.icon"))

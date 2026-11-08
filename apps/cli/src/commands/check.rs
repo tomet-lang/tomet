@@ -400,12 +400,12 @@ mod tests {
         fs::create_dir_all(dir.join(".tomet/vocabularies")).unwrap();
         fs::write(
             dir.join(tomet_load_config::VAULT_CONFIG_FILE),
-            "::kind(config)\n::vocabularies{ deck: @file(.tomet/vocabularies/deck.vocabulary.tmt) }\n",
+            "::kind(config)\n::vocabularies(deck: @file(.tomet/vocabularies/deck.vocabulary.tmt))\n",
         )
         .unwrap();
         fs::write(
             dir.join(".tomet/vocabularies/deck.vocabulary.tmt"),
-            "::kind(vocabulary)\n::vocabulary(deck)\n\n::elements{ card: {} }\n",
+            "::kind(vocabulary)\n::vocabulary(deck)\n\n::elements(card: {})\n",
         )
         .unwrap();
         dir
@@ -416,11 +416,11 @@ mod tests {
     #[test]
     fn a_directory_is_swept_and_reports_every_failure() {
         let root = vault("sweep");
-        fs::write(root.join("good.tmt"), "::kind(deck)\n\n@card{}\n").unwrap();
-        fs::write(root.join("bad.tmt"), "::kind(deck)\n\n@nonesuch{}\n").unwrap();
+        fs::write(root.join("good.tmt"), "::kind(deck)\n\n@card()\n").unwrap();
+        fs::write(root.join("bad.tmt"), "::kind(deck)\n\n@nonesuch()\n").unwrap();
         fs::write(
             root.join("worse.tmt"),
-            "::kind(deck)\n::meta{a:1}\n::meta{b:2}\n",
+            "::kind(deck)\n::meta(a:1)\n::meta(b:2)\n",
         )
         .unwrap();
 
@@ -441,7 +441,7 @@ mod tests {
     #[test]
     fn a_cotomet_file_is_checked_beside_the_documents() {
         let root = vault("ctmt");
-        fs::write(root.join("good.tmt"), "::kind(deck)\n\n@card{}\n").unwrap();
+        fs::write(root.join("good.tmt"), "::kind(deck)\n\n@card()\n").unwrap();
         fs::write(
             root.join("ok.ctmt"),
             "// header\n\"tmtroot/a.tmt\": \"../a.tmt\"\nm: { x: 1 }\n",
@@ -479,7 +479,7 @@ mod tests {
         let root = vault("ctmt_unswept");
         fs::write(
             root.join(tomet_load_config::VAULT_CONFIG_FILE),
-            "::kind(config)\n::workspace{ unswept: list(\"frozen\") }\n",
+            "::kind(config)\n::workspace(unswept: list(\"frozen\"))\n",
         )
         .unwrap();
         fs::create_dir_all(root.join("frozen")).unwrap();
@@ -497,7 +497,7 @@ mod tests {
         let root = vault("uuid");
         fs::write(
             root.join(tomet_load_config::VAULT_CONFIG_FILE),
-            "::kind(config)\n::fields{ id: { type: uuid } }\n",
+            "::kind(config)\n::fields(id: { type: uuid })\n",
         )
         .unwrap();
         fs::write(
@@ -514,7 +514,7 @@ mod tests {
         // The same document is fine where the settings declare nothing.
         fs::write(
             root.join(tomet_load_config::VAULT_CONFIG_FILE),
-            "::kind(config)\n::format{}\n",
+            "::kind(config)\n::format()\n",
         )
         .unwrap();
         check(&root.join("bad.tmt"), false, true, false).expect("nothing declares `id`");
@@ -573,7 +573,7 @@ mod tests {
     fn the_vocabulary_reaches_every_file_in_the_sweep() {
         let root = vault("shared");
         for name in ["a.tmt", "b.tmt", "c.tmt"] {
-            fs::write(root.join(name), "::kind(deck)\n\n@card{}\n").unwrap();
+            fs::write(root.join(name), "::kind(deck)\n\n@card()\n").unwrap();
         }
         check(&root, false, true, false).expect("all three resolve `card`");
         let _ = fs::remove_dir_all(&root);
@@ -614,26 +614,26 @@ mod tests {
         let root = vault("blueprint_check");
         fs::write(
             root.join(tomet_load_config::VAULT_CONFIG_FILE),
-            "::kind(config)\n::blueprints{ bp: @file(bp.tmt) }\n",
+            "::kind(config)\n::blueprints(bp: @file(bp.tmt))\n",
         )
         .unwrap();
         fs::write(
             root.join("bp.tmt"),
-            "::kind(blueprint)\n::blueprint(note)\n::meta{\n  date: \"2026\"\n}\n\n=[ Items ]#(items):rule(allow: list(task))\n",
+            "::kind(blueprint)\n::blueprint(note)\n::meta(\n  date: \"2026\"\n)\n\n=[ Items ]#(items):rule(allow: list(task))\n",
         )
         .unwrap();
 
         // bad.tmt has a disallowed heading inside the items section
         fs::write(
             root.join("bad.tmt"),
-            "::kind(note)\n::meta{\n  date: \"2026-10-13\"\n}\n\n=[ Items ]#(items)\n@heading[ Disallowed ]\n",
+            "::kind(note)\n::meta(\n  date: \"2026-10-13\"\n)\n\n=[ Items ]#(items)\n@heading[ Disallowed ]\n",
         )
         .unwrap();
 
         // good.tmt adheres to the blueprint
         fs::write(
             root.join("good.tmt"),
-            "::kind(note)\n::meta{\n  date: \"2026-10-13\"\n}\n\n=[ Items ]#(items)\n@task[ Clean room ]\n",
+            "::kind(note)\n::meta(\n  date: \"2026-10-13\"\n)\n\n=[ Items ]#(items)\n@task[ Clean room ]\n",
         )
         .unwrap();
 
@@ -664,14 +664,14 @@ mod tests {
         }
 
         // 1. Valid standard declarations pass
-        let good_src = "::kind(catalog, 1)\n::version(1.0.0)\n::meta{\n  author: \"me\"\n}\n::macros{\n  name: \"val\"\n}\n::vars{\n  n: { type: int, default: 1 }\n}\nkey: 42\n";
+        let good_src = "::kind(catalog, 1)\n::version(1.0.0)\n::meta(\n  author: \"me\"\n)\n::macros(\n  name: \"val\"\n)\n::vars(\n  n: { type: int, default: 1 }\n)\nkey: 42\n";
         let good_file = root.join("good.ctmt");
         fs::write(&good_file, good_src).unwrap();
         assert_eq!(ctmt_messages(&good_file, good_src), Vec::<String>::new());
         check(&good_file, false, true, false).expect("valid ctmt passes");
 
-        // 2. A file that opens with non-standard ::upstreams{ ... } checks clean
-        let upstreams_src = "::upstreams{\n  vocabularies: { git: \"https://github.com/tomet-lang/vocabularies.git\", rev: main, root: vocabularies }\n  commonfiles: { git: \"https://github.com/tomet-lang/commonfiles.git\", rev: main, root: base }\n}\n\"tmtroot/schema/vocabularies/rust@1.0.0.vocabulary.tmt\": { source: { upstream: vocabularies, path: \"...\" } }\n";
+        // 2. A file that opens with non-standard ::upstreams(){ ... } checks clean
+        let upstreams_src = "::upstreams(){\n  vocabularies: { git: \"https://github.com/tomet-lang/vocabularies.git\", rev: main, root: vocabularies }\n  commonfiles: { git: \"https://github.com/tomet-lang/commonfiles.git\", rev: main, root: base }\n}\n\"tmtroot/schema/vocabularies/rust@1.0.0.vocabulary.tmt\": { source: { upstream: vocabularies, path: \"...\" } }\n";
         let upstreams_file = root.join("upstreams.ctmt");
         fs::write(&upstreams_file, upstreams_src).unwrap();
         assert_eq!(
@@ -681,7 +681,7 @@ mod tests {
         check(&upstreams_file, false, true, false).expect("::upstreams checks clean");
 
         // 3. The same file with ::kind(catalog, 1.0) added reports version problem only
-        let bad_kind_src = "::kind(catalog, 1.0)\n::upstreams{\n  vocabularies: { git: \"https://github.com/tomet-lang/vocabularies.git\", rev: main, root: vocabularies }\n}\nkey: 1\n";
+        let bad_kind_src = "::kind(catalog, 1.0)\n::upstreams(){\n  vocabularies: { git: \"https://github.com/tomet-lang/vocabularies.git\", rev: main, root: vocabularies }\n}\nkey: 1\n";
         let bad_kind_file = root.join("upstreams_bad_kind.ctmt");
         fs::write(&bad_kind_file, bad_kind_src).unwrap();
         let msgs = ctmt_messages(&bad_kind_file, bad_kind_src);
@@ -704,7 +704,7 @@ mod tests {
         assert!(err.to_string().contains("1 of 1 file(s) failed"));
 
         // 5. Duplicate singleton (two ::meta) fails
-        let dup_src = "::meta{ a: 1 }\n::meta{ b: 2 }\nkey: 1\n";
+        let dup_src = "::meta(a: 1)\n::meta(b: 2)\nkey: 1\n";
         let dup_file = root.join("duplicate.ctmt");
         fs::write(&dup_file, dup_src).unwrap();
         let msgs = ctmt_messages(&dup_file, dup_src);
@@ -731,7 +731,7 @@ mod tests {
         }
 
         // 1. .ctmt with ${macro.vocab("writ", "1.0.0")} passes check
-        let good_src = "::macros{ vocab: \"vocabularies/${1}/${1}@${2}.vocabulary.tmt\" }\npath: ${macro.vocab(\"writ\", \"1.0.0\")}\n";
+        let good_src = "::macros(vocab: \"vocabularies/${1}/${1}@${2}.vocabulary.tmt\")\npath: ${macro.vocab(\"writ\", \"1.0.0\")}\n";
         let good_file = root.join("good.ctmt");
         fs::write(&good_file, good_src).unwrap();
         assert_eq!(ctmt_errors(&good_file, good_src), Vec::<String>::new());
@@ -752,7 +752,7 @@ mod tests {
         assert!(err.to_string().contains("1 of 1 file(s) failed"));
 
         // 3. .ctmt with ${macro.vocab("writ")} fails check, message contains arity error
-        let bad_arity_src = "::macros{ vocab: \"vocabularies/${1}/${1}@${2}.vocabulary.tmt\" }\npath: ${macro.vocab(\"writ\")}\n";
+        let bad_arity_src = "::macros(vocab: \"vocabularies/${1}/${1}@${2}.vocabulary.tmt\")\npath: ${macro.vocab(\"writ\")}\n";
         let bad_arity_file = root.join("bad_arity.ctmt");
         fs::write(&bad_arity_file, bad_arity_src).unwrap();
         let errs = ctmt_errors(&bad_arity_file, bad_arity_src);
@@ -780,7 +780,7 @@ mod tests {
         assert!(err.to_string().contains("1 of 1 file(s) failed"));
 
         // 5. .ctmt with bad ::vars entry reports exactly 1 message
-        let bad_var_src = "::vars{ bad: 123 }\npath: \"ok\"\n";
+        let bad_var_src = "::vars(bad: 123)\npath: \"ok\"\n";
         let bad_var_file = root.join("bad_var.ctmt");
         fs::write(&bad_var_file, bad_var_src).unwrap();
         let errs = ctmt_errors(&bad_var_file, bad_var_src);

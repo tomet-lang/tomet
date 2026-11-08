@@ -223,7 +223,7 @@ pub enum Diagnostic {
     /// A document that declares `::profile(standalone)` takes something from outside itself.
     /// `what` says what, in words; `span` is the expression, element or mention that takes it.
     NotStandalone { what: String, span: Span },
-    /// `id` written in `::meta{ ... }`: a document's identity is the declaration `::id(...)`.
+    /// `id` written in `::meta(...)`: a document's identity is the declaration `::id(...)`.
     ///
     /// `::meta` keeps the free attributes of a document; what tomet itself reads about it does
     /// not live there. `span` is the `::meta` element.
@@ -254,6 +254,20 @@ pub enum Diagnostic {
     },
     /// A declaration written in a host where it is not permitted.
     NotForThisHost {
+        declaration: &'static str,
+        span: Span,
+    },
+    /// A `{...}` written on a declaration that takes none: `::meta(){ a: 1 }`. Only `::vocabulary`,
+    /// `::blueprint` and `::dictionary` have a body; the others hold their entries in `(...)`.
+    ///
+    /// `span` is the whole declaration: a group has no span of its own.
+    UnexpectedDeclarationData {
+        declaration: &'static str,
+        span: Span,
+    },
+    /// The `(...)` of a declaration of `name: value` entries holds something else, such as
+    /// `::macros(gh)`. `span` is the whole declaration.
+    ExpectedEntries {
         declaration: &'static str,
         span: Span,
     },
@@ -291,6 +305,8 @@ impl Diagnostic {
             Diagnostic::ContentNotInline { span, .. } => *span,
             Diagnostic::DisallowedInContent { span, .. } => *span,
             Diagnostic::NotForThisHost { span, .. } => *span,
+            Diagnostic::UnexpectedDeclarationData { span, .. } => *span,
+            Diagnostic::ExpectedEntries { span, .. } => *span,
         }
     }
 
@@ -583,6 +599,15 @@ impl Diagnostic {
             Diagnostic::NotForThisHost { declaration, .. } => {
                 write!(f, "`::{declaration}` is not permitted in this host")
             }
+            Diagnostic::UnexpectedDeclarationData { declaration, .. } => write!(
+                f,
+                "`::{declaration}` takes no `{{...}}`; write its entries in the parentheses, \
+                 `::{declaration}(name: value)`"
+            ),
+            Diagnostic::ExpectedEntries { declaration, .. } => write!(
+                f,
+                "`::{declaration}(...)` holds `name: value` entries; found a value without a name"
+            ),
         }
     }
 }

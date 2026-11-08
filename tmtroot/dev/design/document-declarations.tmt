@@ -40,7 +40,7 @@ Status: 第1段階（`@kind` 等から `::name` への移行）は実装済み�
 ```tm
 ::kind(config, 2)
 ::use(deck, 3)
-::meta{ id: doc-kWBcIUUz, title: "Daily" }
+::meta(id: doc-kWBcIUUz, title: "Daily")
 ::character(birth: 1990)
 
 =[ 本文 ]
@@ -59,23 +59,23 @@ Status: 第1段階（`@kind` 等から `::name` への移行）は実装済み�
 名前の定義は、設定ではなく宣言として書く。
 
 ```tm
-::macros{
+::macros(
   gh: "https://github.com/tomet/tomet/issues/${1}"
-}
+)
 
-::vars{
+::vars(
   title: {
     type: string
     about: | 作成するノートの題。
   }
   draft: { type: bool, default: false }
-}
+)
 ```
 
 @table
 |[ 項目             ][ 決定 ]
-|[ `::macros{}`     ][ 名前から本体への値の表。呼び出しは `$macro.gh(12)`。`::settings{ macros }` からは出す（マクロは振る舞いの設定ではなく名前の定義で、cotomet 自身のものだから）。文書の定義は vault の同名を上書きする ]
-|[ `::vars{}`       ][ `elements` に近い、宣言のマップ。`名前: { type, default, about }`。参照は `${var.xxx}`。`::macros` と同じく、vault の `default.config.tmt` にも書け、文書が同じ名前を宣言ごとに上書きする ]
+|[ `::macros()`     ][ 名前から本体への値の表。呼び出しは `$macro.gh(12)`。`::settings{ macros }` からは出す（マクロは振る舞いの設定ではなく名前の定義で、cotomet 自身のものだから）。文書の定義は vault の同名を上書きする ]
+|[ `::vars()`       ][ `elements` に近い、宣言のマップ。`名前: { type, default, about }`。参照は `${var.xxx}`。`::macros` と同じく、vault の `default.config.tmt` にも書け、文書が同じ名前を宣言ごとに上書きする ]
 |[ 必須と省略可     ][ `default` が無ければ必須、あれば省略可。値を直接書く形は無い（マップの値は `default:` の中に書く） ]
 |[ `type`           ][ 型の名前（一覧は `tomet_type::Type`。`meta` のフィールドの `type:` と同じ語彙）。省くと string（コマンドラインから渡るのは文字列だから） ]
 |[ `--var` との関係 ][ 場当たりだった作成時専用の `vars` を昇格する。旧 `vars.` の名前空間は `var.` に吸収し、並存させない。`--var` は `::vars` で宣言した名前に絞る（宣言にない名前はエラー）。blueprint の入力と `${var.x}` の参照を `tomet check` で検証できる。「作成時専用」の制限はなくなり、作成時専用に残るのは `generate` だけ ]

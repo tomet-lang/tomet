@@ -1,7 +1,7 @@
 ::kind(vocabulary)
 ::vocabulary(scenario){ version: "1.0.0" }
 
-::elements{
+::elements(
   line: {
     display: block
     about: | 台詞ひとつ。`[content]` が台詞。
@@ -15,4 +15,4 @@
       }
     }
   }
-}
+)

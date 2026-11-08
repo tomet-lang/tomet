@@ -3,9 +3,9 @@
   path: "README.ja.md"
 )
 ::id(doc-gCzNE6yl)
-::meta{
+::meta(
   lang: ja
-}
+)
 
 $macro.generated_by(self.path)
 

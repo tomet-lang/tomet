@@ -3,7 +3,7 @@
   version: "1.0.0"
 }
 
-::elements{
+::elements(
   root: {
     display: block
     singleton: false
@@ -16,7 +16,7 @@
       }
     }
   }
-}
+)
 
 @dir(tmtroot/index/) の索引のための語彙。`::kind(roots)` の文書は、`root` で
 文書の根を並べる。`.roots.tmt` が各 `*.roots.tmt` を指し、そこから索引をたどる。

@@ -16,7 +16,7 @@
 //!   numeric type.
 //! - **A named element inside a `{...}` group returns as body content.**
 //!   Pandoc cannot say "this `Div` was a group entry rather than part of
-//!   the body", so `@deck.card{ title: x, @note[y] }` comes back with the
+//!   the body", so `@deck.card(){ title: x, @note[y] }` comes back with the
 //!   entry in `[content]`. A bare `(a)[y]` entry does not share the loss:
 //!   it has no name to carry, so [`crate::to_pandoc`] marks it under
 //!   [`ENTRY_KEY`] and it returns to the group.
@@ -125,14 +125,14 @@ fn structure_sections(blocks: Vec<TmBlock>) -> Vec<TmBlock> {
     doc_blocks
 }
 
-/// Rebuilds `::meta{...}` from Pandoc's metadata map.
+/// Rebuilds `::meta(...)` from Pandoc's metadata map.
 fn meta_declaration(meta: &crate::ast::Meta) -> Declaration {
     let entries: Vec<(String, Value)> = meta
         .iter()
         .map(|(k, v)| (k.clone(), meta_value_to_value(v)))
         .collect();
     let mut declaration = declaration_new("meta");
-    declaration.data.value = Some(Group::from_map(Value::Map(entries)));
+    declaration.data.args = Some(Value::Map(entries));
     declaration
 }
 
@@ -608,7 +608,7 @@ fn element_from_attr(attr: &Attr, fallback: impl FnOnce() -> String) -> Element 
 ///
 /// A bare entry has no name to carry in a class, so [`crate::to_pandoc`]
 /// records it under [`ENTRY_KEY`] instead. Reading it back is what keeps
-/// `@deck.card{ (a)[ x ] }` from returning as an element named `bare` -- a
+/// `@deck.card(){ (a)[ x ] }` from returning as an element named `bare` -- a
 /// name no vocabulary declares, which made the round-tripped document fail
 /// validation.
 fn is_bare_entry(attr: &Attr) -> bool {
@@ -815,7 +815,10 @@ mod tests {
         let TmBlock::Element(el) = &back.body[0] else {
             panic!("expected an element, got {:?}", back.body[0]);
         };
-        assert_eq!(tomet_semantics::comment_text(el.as_view()), "run `tomet export .` now");
+        assert_eq!(
+            tomet_semantics::comment_text(el.as_view()),
+            "run `tomet export .` now"
+        );
         assert_eq!(
             round_trip("@comment[ run `tomet export .` now ]\n").trim(),
             "@comment[run `tomet export .` now]"
@@ -960,12 +963,12 @@ mod tests {
 
     #[test]
     fn meta_survives_a_round_trip() {
-        let doc = parse_file("::meta{title: Hello, draft: true}\n\n本文\n").unwrap();
+        let doc = parse_file("::meta(title: Hello, draft: true)\n\n本文\n").unwrap();
         let back = from_pandoc(&to_pandoc(&doc));
         let declaration = &back.header[0];
         assert!(declaration.name.is_bare_named("meta"));
         assert_eq!(
-            declaration.data.value.as_ref().map(|v| v.as_data()),
+            declaration.data.args,
             Some(Value::Map(vec![
                 ("draft".to_string(), Value::Bool(true)),
                 ("title".to_string(), Value::String("Hello".to_string())),
@@ -975,7 +978,7 @@ mod tests {
 
     #[test]
     fn the_id_declaration_survives_a_round_trip() {
-        let doc = parse_file("::id(doc-1)\n::meta{title: Hello}\n\n本文\n").unwrap();
+        let doc = parse_file("::id(doc-1)\n::meta(title: Hello)\n\n本文\n").unwrap();
         let back = from_pandoc(&to_pandoc(&doc));
         assert_eq!(
             tomet_declaration::document_id(&back).as_deref(),

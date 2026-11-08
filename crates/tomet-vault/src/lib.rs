@@ -587,8 +587,8 @@ impl Vault {
 mod tests {
     use super::*;
 
-    const BLUEPRINT: &str = "::kind(blueprint)\n::blueprint(note)\n::meta{\n  date: \"2026\"\n}\n\n=[ Items ]#(items):rule(allow: list(task))\n";
-    const UUID_SETTINGS: &str = "::kind(config)\n::fields{ id: { type: uuid } }\n";
+    const BLUEPRINT: &str = "::kind(blueprint)\n::blueprint(note)\n::meta(\n  date: \"2026\"\n)\n\n=[ Items ]#(items):rule(allow: list(task))\n";
+    const UUID_SETTINGS: &str = "::kind(config)\n::fields(id: { type: uuid })\n";
 
     fn texts(items: &[&str]) -> Vec<String> {
         items.iter().map(|s| s.to_string()).collect()
@@ -610,8 +610,8 @@ mod tests {
     /// host passed one, and against none otherwise.
     #[test]
     fn a_blueprint_given_as_text_is_checked_against() {
-        let bad = "::kind(note)\n::meta{ date: \"2026-10-13\" }\n\n=[ Items ]#(items)\n@heading[ Disallowed ]\n";
-        let good = "::kind(note)\n::meta{ date: \"2026-10-13\" }\n\n=[ Items ]#(items)\n@task[ Clean room ]\n";
+        let bad = "::kind(note)\n::meta(date: \"2026-10-13\")\n\n=[ Items ]#(items)\n@heading[ Disallowed ]\n";
+        let good = "::kind(note)\n::meta(date: \"2026-10-13\")\n\n=[ Items ]#(items)\n@task[ Clean room ]\n";
         let blueprints = texts(&[BLUEPRINT]);
 
         assert!(
@@ -657,7 +657,7 @@ mod tests {
                 .is_empty()
         );
         assert!(
-            !validate_sources("@nonesuch{}\n", &[], None, &[])
+            !validate_sources("@nonesuch()\n", &[], None, &[])
                 .unwrap()
                 .is_empty()
         );
@@ -867,13 +867,13 @@ mod tests {
     #[test]
     fn a_document_reads_its_own_meta_typed_by_the_settings() {
         let config =
-            tomet_config::load_config_from_str("::fields{ tags: { type: list } }\n").unwrap();
+            tomet_config::load_config_from_str("::fields(tags: { type: list })\n").unwrap();
         let vault = Vault::from_sources(config, "/v", &[]);
         // No `tags` written: still a list, so `.contains` answers instead of failing.
         let (doc, prepared) = prepared(
             &vault,
             "/v/a.tmt",
-            "::meta{ title: A }\n\nrust? ${self.meta.tags.contains(\"rust\")}\n",
+            "::meta(title: A)\n\nrust? ${self.meta.tags.contains(\"rust\")}\n",
         );
         assert!(prepared.unresolved.is_empty(), "{:?}", prepared.unresolved);
         assert_eq!(text_of(&doc), "rust? false");
@@ -882,14 +882,14 @@ mod tests {
     #[test]
     fn macros_from_the_vault_and_the_document_are_both_in_scope() {
         let config = tomet_config::load_config_from_str(
-            "::macros{ gh: \"https://gh/${1}\", site: \"vault\" }\n",
+            "::macros(gh: \"https://gh/${1}\", site: \"vault\")\n",
         )
         .unwrap();
         let vault = Vault::from_sources(config, "/v", &[]);
         let (doc, prepared) = prepared(
             &vault,
             "/v/a.tmt",
-            "::macros{ site: \"doc\" }\n\n${macro.gh(1)} ${macro.site()}\n",
+            "::macros(site: \"doc\")\n\n${macro.gh(1)} ${macro.site()}\n",
         );
         assert!(prepared.unresolved.is_empty(), "{:?}", prepared.unresolved);
         // The document wins a collision.
@@ -915,7 +915,7 @@ mod tests {
 
     fn vault_with_a_macro() -> Vault {
         let config = tomet_config::load_config_from_str(
-            "::macros{ gh: \"https://gh/${1}\" }\n::fields{ n: { type: uuid } }\n",
+            "::macros(gh: \"https://gh/${1}\")\n::fields(n: { type: uuid })\n",
         )
         .unwrap();
         Vault::from_sources(config, "/v", &[("acme.tmt", ACME)])
@@ -938,7 +938,7 @@ mod tests {
         let (doc, own) = prepared(
             &vault,
             "/v/a.tmt",
-            &format!("{PROMISE}::macros{{ gh: \"mine/${{1}}\" }}\n\n${{macro.gh(1)}}\n"),
+            &format!("{PROMISE}::macros(gh: \"mine/${{1}}\")\n\n${{macro.gh(1)}}\n"),
         );
         assert!(own.unresolved.is_empty(), "{:?}", own.unresolved);
         assert_eq!(text_of(&doc), "mine/1");

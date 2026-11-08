@@ -1,0 +1,3 @@
+// Inline, a bare `@name` is prose, but once a `{...}` follows it is a nexus without a primary group, and an error rather than text.
+
+この @memo{ a: 1 } は要素の書きかけ。

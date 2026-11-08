@@ -501,11 +501,11 @@
     },
 
     "document-element": {
-      "comment": "`::name`, a declaration about the document. It is only a block: the `::` has to open a line, so `std::vec` and a `::` in the middle of a sentence stay text. What follows the name is read as after an `@`.",
+      "comment": "`::name`, a declaration about the document. It is only a block: the `::` has to open a line, so `std::vec` and a `::` in the middle of a sentence stay text. What follows the name is read as after an `@`: a declaration needs a primary group, `(...)` or `[...]`, so `::meta(...)` is one and `::meta{ ... }` or a bare `::meta` is not.",
       "patterns": [
         {
-          "comment": "`::name` with groups: ::kind(config) / ::meta{ ... }",
-          "begin": "^[ \\t]*(::)([A-Za-z_][A-Za-z0-9_-]*(?:\\.[A-Za-z_][A-Za-z0-9_-]*)*)(?=[ \\t]*[(\\[{])",
+          "comment": "`::name` with a primary group: ::kind(config) / ::meta(...) / ::vocabulary(ns){ ... }. The `{...}` is secondary: it follows a primary group, so the lookahead does not take it.",
+          "begin": "^[ \\t]*(::)([A-Za-z_][A-Za-z0-9_-]*(?:\\.[A-Za-z_][A-Za-z0-9_-]*)*)(?=[ \\t]*[(\\[])",
           "beginCaptures": {
             "1": {
               "name": "entity.name.tag.sigil.tomet entity.name.tag.tomet"
@@ -518,25 +518,15 @@
             { "include": "#element-square-group" },
             { "include": "#element-curly-group" }
           ]
-        },
-        {
-          "comment": "A bare `::name` that starts and ends its own line.",
-          "match": "^[ \\t]*(::)([A-Za-z_][A-Za-z0-9_-]*(?:\\.[A-Za-z_][A-Za-z0-9_-]*)*)[ \\t]*$",
-          "captures": {
-            "1": {
-              "name": "entity.name.tag.sigil.tomet entity.name.tag.tomet"
-            },
-            "2": { "name": "entity.name.tag.tomet" }
-          }
         }
       ]
     },
     "element": {
-      "comment": "`@name` is the only element sigil; `#` carries no syntax at all and is free. Shape comes from position rather than spelling. The name is required -- a name-less `@(...)` stopped forming an element. Names are ASCII, `.`-separated for namespaces (`@deck.ref`). The alternative refuses a `@` preceded by a word character, which is the half that keeps an email address prose.",
+      "comment": "`@name` is the only element sigil; `#` carries no syntax at all and is free. Shape comes from position rather than spelling. The name is required -- a name-less `@(...)` stopped forming an element. Names are ASCII, `.`-separated for namespaces (`@deck.ref`). The alternative refuses a `@` preceded by a word character, which is the half that keeps an email address prose. An element needs a primary group, `(...)`, `[...]` or a `|` run: `{...}`, `#(id)` and `:connect` only add to one, so `@name{ ... }` and a bare `@name` are not elements (a bare one is prose inline and an error as a block; a line-oriented grammar cannot tell which).",
       "patterns": [
         {
-          "comment": "Element with attached groups: @name(...) / @name[...] / @name{...}. Captures brackets with tag scope so the element shell is unified.",
-          "begin": "(?<![A-Za-z0-9_])(@)([A-Za-z_][A-Za-z0-9_-]*(?:\\.[A-Za-z_][A-Za-z0-9_-]*)*)(?=[ \\t]*[(\\[{])",
+          "comment": "Element with a primary group: @name(...) / @name[...], then any `{...}` after it. Captures brackets with tag scope so the element shell is unified.",
+          "begin": "(?<![A-Za-z0-9_])(@)([A-Za-z_][A-Za-z0-9_-]*(?:\\.[A-Za-z_][A-Za-z0-9_-]*)*)(?=[ \\t]*[(\\[])",
           "beginCaptures": {
             "1": {
               "name": "entity.name.tag.sigil.tomet entity.name.tag.tomet"
@@ -551,18 +541,8 @@
           ]
         },
         {
-          "comment": "Mid-line: an element needs one of `( [ { :` after the name. Without one it is text -- `連絡は me@example.com まで` is a paragraph. The whitespace in the lookahead is what spec/syntax.tmt's `@name () [] {}` spelling needs; the group does not have to be flush against the name.",
-          "match": "(?<![A-Za-z0-9_])(@)([A-Za-z_][A-Za-z0-9_-]*(?:\\.[A-Za-z_][A-Za-z0-9_-]*)*)(?=[ \\t]*[(\\[{:|])",
-          "captures": {
-            "1": {
-              "name": "entity.name.tag.sigil.tomet entity.name.tag.tomet"
-            },
-            "2": { "name": "entity.name.tag.tomet" }
-          }
-        },
-        {
-          "comment": "A bare `@name` that starts and ends its own line. This is where the block rule's end-of-line allowance lands; the real parser also requires block context, which a line-oriented grammar cannot see.",
-          "match": "^[ \\t]*(@)([A-Za-z_][A-Za-z0-9_-]*(?:\\.[A-Za-z_][A-Za-z0-9_-]*)*)[ \\t]*$",
+          "comment": "Mid-line: an element needs a primary group, `(`, `[` or `|`, after the name. Without one it is text -- `連絡は me@example.com まで` is a paragraph. The whitespace in the lookahead is what spec/syntax.tmt's `@name () []` spelling needs; the group does not have to be flush against the name.",
+          "match": "(?<![A-Za-z0-9_])(@)([A-Za-z_][A-Za-z0-9_-]*(?:\\.[A-Za-z_][A-Za-z0-9_-]*)*)(?=[ \\t]*[(\\[|])",
           "captures": {
             "1": {
               "name": "entity.name.tag.sigil.tomet entity.name.tag.tomet"

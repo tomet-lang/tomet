@@ -13,6 +13,7 @@ mod inline;
 mod interpolation;
 mod limits;
 mod lists;
+mod nexus;
 mod paragraphs;
 mod sections;
 mod slots;

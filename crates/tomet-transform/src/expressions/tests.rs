@@ -7,10 +7,10 @@ use tomet_expr::{
 
 use super::*;
 
-const NOTE: &str = "::meta{
+const NOTE: &str = "::meta(
   title: Note
   tags: list(a, b)
-}
+)
 
 =[ Heading ]#(top)
 
@@ -23,23 +23,20 @@ fn vault() -> MemoryResolver {
     MemoryResolver::new()
         .with_source("here.tmt", NOTE)
         .unwrap()
-        .with_source("docs/a.tmt", "::meta{ title: A }\n")
+        .with_source("docs/a.tmt", "::meta(title: A)\n")
         .unwrap()
-        .with_source("docs/b.tmt", "::meta{ title: B }\n")
+        .with_source("docs/b.tmt", "::meta(title: B)\n")
         .unwrap()
 }
 
-/// The block macro `name` whose body is `body`, as `::macros{ name: [ body ] }` defines it.
+/// The block macro `name` whose body is `body`, as `::macros(name: [ body ])` defines it.
 fn block_macro(name: &str, body: &str) -> Value {
-    let src = format!("::macros{{ {name}: [{body}] }}\n");
+    let src = format!("::macros({name}: [{body}])\n");
     let file = tomet_ast_parser::parse_file(&src).expect("the macro parses");
-    let Some(Group(entries)) = &file.header[0].data.value else {
-        panic!("expected a {{...}} group");
+    let Some(Value::Map(entries)) = &file.header[0].data.args else {
+        panic!("expected `(name: template)` entries");
     };
-    let tomet_ast::Entry::Pair(_, value) = &entries[0] else {
-        panic!("expected a key: value entry");
-    };
-    value.clone()
+    entries[0].1.clone()
 }
 
 /// Resolves `src` as the document `here.tmt` of the small vault above.
@@ -55,10 +52,19 @@ fn run_in(
     vars: &EvalValue,
 ) -> (File, Vec<Unresolved>) {
     let mut macros = HashMap::new();
-    macros.insert("gh".to_string(), Value::String("https://x/issues/${1}".to_string()));
+    macros.insert(
+        "gh".to_string(),
+        Value::String("https://x/issues/${1}".to_string()),
+    );
     macros.insert("note".to_string(), block_macro("note", "Note: ${1}"));
-    macros.insert("card".to_string(), block_macro("card", "\n@card(title: ${1})[ ${2} ]\n"));
-    macros.insert("pair".to_string(), block_macro("pair", "\none ${1}\n\ntwo ${1}\n"));
+    macros.insert(
+        "card".to_string(),
+        block_macro("card", "\n@card(title: ${1})[ ${2} ]\n"),
+    );
+    macros.insert(
+        "pair".to_string(),
+        block_macro("pair", "\none ${1}\n\ntwo ${1}\n"),
+    );
     let cx = EvalContext {
         phase,
         resolver,
@@ -265,7 +271,10 @@ fn a_macro_is_called_through_its_namespace() {
 #[test]
 fn macro_table_cases() {
     let mut macros = HashMap::new();
-    macros.insert("gh".to_string(), Value::String("https://x/${1}".to_string()));
+    macros.insert(
+        "gh".to_string(),
+        Value::String("https://x/${1}".to_string()),
+    );
     macros.insert("two".to_string(), Value::String("${1}-${2}".to_string()));
     macros.insert("named".to_string(), Value::String("hi ${who}".to_string()));
     macros.insert("none".to_string(), Value::String("const".to_string()));
@@ -348,17 +357,17 @@ fn a_value_in_an_element_argument_keeps_its_type() {
 #[test]
 fn a_value_in_a_value_group_keeps_its_type_and_a_list_stays_a_list() {
     let (doc, unresolved) =
-        run("::meta{ n: ${add(1, 1)}, names: ${addr(dir:docs).docs.map(d => d.path)} }\n");
+        run("::meta(n: ${add(1, 1)}, names: ${addr(dir:docs).docs.map(d => d.path)})\n");
     assert!(unresolved.is_empty(), "{unresolved:?}");
     let declaration = &doc.header[0];
-    let Some(Group(entries)) = &declaration.data.value else {
-        panic!("a group");
+    let Some(Value::Map(entries)) = &declaration.data.args else {
+        panic!("the entries of `::meta(...)`");
     };
     assert_eq!(
         entries,
         &vec![
-            tomet_ast::Entry::Pair("n".into(), Value::Int(2)),
-            tomet_ast::Entry::Pair(
+            ("n".into(), Value::Int(2)),
+            (
                 "names".into(),
                 Value::Seq(vec![
                     Value::String("docs/a.tmt".into()),
@@ -412,39 +421,33 @@ fn a_reference_is_answered_from_the_document_the_resolver_holds() {
 fn creating_a_document_reads_var_and_generates() {
     let vars = EvalValue::Map(vec![("title".into(), EvalValue::String("Plan".into()))]);
     let (doc, unresolved) = run_with(
-        "::meta{ id: ${generate.uuid()}, title: ${var.title} }\n\nPlan for ${var.title}\n",
+        "::meta(id: ${generate.uuid()}, title: ${var.title})\n\nPlan for ${var.title}\n",
         Phase::Create,
         &vars,
     );
     assert!(unresolved.is_empty(), "{unresolved:?}");
     let declaration = &doc.header[0];
-    let Some(Group(entries)) = &declaration.data.value else {
-        panic!("a group");
+    let Some(Value::Map(entries)) = &declaration.data.args else {
+        panic!("the entries of `::meta(...)`");
     };
-    let tomet_ast::Entry::Pair(_, Value::String(id)) = &entries[0] else {
+    let (_, Value::String(id)) = &entries[0] else {
         panic!("a string id, got {entries:?}");
     };
     assert_eq!(id.len(), 36, "a UUID: {id}");
-    assert_eq!(
-        entries[1],
-        tomet_ast::Entry::Pair("title".into(), Value::String("Plan".into()))
-    );
+    assert_eq!(entries[1], ("title".into(), Value::String("Plan".into())));
     assert_eq!(text_of(&doc), "Plan for Plan");
 }
 
 #[test]
 fn creation_only_names_are_refused_when_rendering() {
-    let (doc, unresolved) = run("::meta{ id: ${generate.uuid()} }\n");
+    let (doc, unresolved) = run("::meta(id: ${generate.uuid()})\n");
     assert!(reasons(&unresolved)[0].contains("when a document is being created"));
     let declaration = &doc.header[0];
     // The expression is still there.
-    let Some(Group(entries)) = &declaration.data.value else {
-        panic!("a group");
+    let Some(Value::Map(entries)) = &declaration.data.args else {
+        panic!("the entries of `::meta(...)`");
     };
-    assert!(matches!(
-        &entries[0],
-        tomet_ast::Entry::Pair(_, Value::Interp(_))
-    ));
+    assert!(matches!(&entries[0], (_, Value::Interp(_))));
 }
 
 #[test]
@@ -624,7 +627,7 @@ fn written_number_in_metadata_interpolates_as_written() {
     let resolver = MemoryResolver::new()
         .with_source(
             "doc.tmt",
-            "::meta{ rev: 1.10 }\n\nVersion is ${self.meta.rev}.\n",
+            "::meta(rev: 1.10)\n\nVersion is ${self.meta.rev}.\n",
         )
         .unwrap();
     let cx = EvalContext {
@@ -640,7 +643,7 @@ fn written_number_in_metadata_interpolates_as_written() {
         notes: Default::default(),
     };
     let mut doc =
-        tomet_ast_parser::parse_file("::meta{ rev: 1.10 }\n\nVersion is ${self.meta.rev}.\n")
+        tomet_ast_parser::parse_file("::meta(rev: 1.10)\n\nVersion is ${self.meta.rev}.\n")
             .unwrap();
     let unresolved = resolve_expressions(&mut doc, &cx);
     assert!(unresolved.is_empty());

@@ -110,7 +110,7 @@ mod tests {
 
     #[test]
     fn valid_expression_produces_no_diagnostics() {
-        let text = "::macros{ vocab: \"x/${1}\" }\npath: ${macro.vocab(\"writ\")}\n";
+        let text = "::macros(vocab: \"x/${1}\")\npath: ${macro.vocab(\"writ\")}\n";
         let diags = data_diagnostics_for(text);
         assert!(diags.is_empty());
     }
@@ -140,7 +140,7 @@ mod tests {
 
     #[test]
     fn bad_vars_entry_produces_one_diagnostic() {
-        let text = "::vars{ bad: 123 }\nkey: 1\n";
+        let text = "::vars(bad: 123)\nkey: 1\n";
         let diags = data_diagnostics_for(text);
         assert_eq!(diags.len(), 1);
         assert!(diags[0].message.contains("bad"));

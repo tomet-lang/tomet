@@ -1,0 +1,9 @@
+// A declaration with nothing to say still writes its `()`; the group is what
+// makes it a declaration. `[content]` is the other primary group.
+
+::kind(fixture)
+::meta()
+::macros()
+::elements[ 説明 ]
+
+=[ 本文 ]

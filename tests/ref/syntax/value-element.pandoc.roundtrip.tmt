@@ -1,4 +1,4 @@
-::meta{icon: "", icons: "", mixed: ""}
+::meta(icon: "", icons: "", mixed: "")
 
 =[値の中の要素]
 `@`付きの要素は `(args)`/`{value}`/`[...]` のどこでも値として書ける(上の

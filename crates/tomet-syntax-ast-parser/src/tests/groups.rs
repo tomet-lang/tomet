@@ -13,12 +13,13 @@ use super::*;
 /// was an item and `-[ x ]` was a paragraph, and nothing said so.
 #[test]
 fn every_sigil_takes_every_group_opener() {
-    // The sigil as written, and the element the construct produces.
-    const SIGILS: &[(&str, &str)] = &[
-        ("@memo", "memo"),
-        ("=", "section"),
-        ("-", "ul"),
-        ("-.", "ol"),
+    // The sigil as written, the element the construct produces, and whether it is a nexus --
+    // which stands on `(...)` or `[...]` and refuses a `{...}` for a group of its own.
+    const SIGILS: &[(&str, &str, bool)] = &[
+        ("@memo", "memo", true),
+        ("=", "section", false),
+        ("-", "ul", false),
+        ("-.", "ol", false),
     ];
     // One opener each, written so the construct closes on its line.
     const OPENERS: &[(char, &str)] = &[
@@ -49,9 +50,16 @@ fn every_sigil_takes_every_group_opener() {
     let mut unexpected_failures = Vec::new();
     let mut closed_gaps = Vec::new();
 
-    for (sigil, expected) in SIGILS {
+    for (sigil, expected, nexus) in SIGILS {
         for (opener, group) in OPENERS {
             let src = format!("{sigil}{group}\n");
+            if *nexus && *opener == '{' {
+                assert!(
+                    parse_file(&src).is_err(),
+                    "{sigil} must not stand on a lone {{...}}: {src:?}"
+                );
+                continue;
+            }
             let got = produced(&src);
             let takes_it = got.as_deref() == Some(*expected);
             let is_gap = KNOWN_GAPS.contains(&(sigil, *opener));
@@ -111,7 +119,7 @@ fn an_unbalanced_bracket_inside_a_content_still_errors() {
 fn empty_paren_and_brace_groups_are_a_deliberately_empty_map() {
     // `()`/`{}` written out (as opposed to the group being omitted
     // entirely, which leaves `args`/`value` as `None`) is a valid,
-    // deliberately-empty map -- matches the spec's own `::meta{}` etc.
+    // deliberately-empty map. `()` is also what a nexus with nothing to say is written as.
     let doc = parse_file("@T()\n").unwrap();
     match &doc.body[0] {
         Block::Element(el) => {
@@ -121,10 +129,20 @@ fn empty_paren_and_brace_groups_are_a_deliberately_empty_map() {
         other => panic!("expected an element, got {other:?}"),
     }
 
-    let doc = parse_file("::meta{}\n").unwrap();
+    let doc = parse_file("::meta()\n").unwrap();
     assert_eq!(doc.header.len(), 1);
     let d = &doc.header[0];
-    assert_eq!(d.data.value, Some(Group::from_map(Value::Map(vec![]))));
+    assert_eq!(d.data.args, Some(Value::Map(vec![])));
+
+    // `{}` is a group of its own, and empty, behind a primary group.
+    let doc = parse_file("@T(){}\n").unwrap();
+    match &doc.body[0] {
+        Block::Element(el) => {
+            assert_eq!(el.data.args, Some(Value::Map(vec![])));
+            assert_eq!(el.data.value, Some(Group::from_map(Value::Map(vec![]))));
+        }
+        other => panic!("expected an element, got {other:?}"),
+    }
 }
 
 #[test]
@@ -147,10 +165,10 @@ fn every_kind_of_group_written_twice_against_itself_is_an_error() {
     for (src, kind, at) in [
         ("@T(a:1)(b:2)\n", "a second `(args)` group", 7),
         ("@T[a][b]\n", "a second `[content]` group", 5),
-        ("@T{a:1}{b:2}\n", "a second `{value}` group", 7),
-        ("::meta{a:1}{b:2}\n", "a second `{value}` group", 11),
+        ("@T(){a:1}{b:2}\n", "a second `{value}` group", 9),
+        ("::meta(){a:1}{b:2}\n", "a second `{value}` group", 13),
         ("a @T(a:1)(b:2) b\n", "a second `(args)` group", 9),
-        ("@T#(a)#(b)\n", "a second `#(...)`", 6),
+        ("@T()#(a)#(b)\n", "a second `#(...)`", 8),
     ] {
         let err = parse_file(src).expect_err(src);
         assert!(err.message.contains(kind), "`{src}`: {}", err.message);

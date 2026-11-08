@@ -1,7 +1,7 @@
 ::kind(vocabulary)
 ::vocabulary(bookmark){ version: "1.0.0" }
 
-::elements{
+::elements(
   bookmark: {
     display: block
     about: | ブックマークひとつ。
@@ -15,4 +15,4 @@
       }
     }
   }
-}
+)

@@ -7,7 +7,8 @@ use crate::kind::DeclKind;
 ///
 /// Owned, because a tomet declaration's data is built from its group, not stored. A `.tmt`
 /// document gives one through [`Declaration::from_ast`]; a `.ctmt` file's header is the same
-/// three things.
+/// three things. A standard declaration is written on its `(args)`; `{data}` is the body of
+/// `::vocabulary`, `::blueprint` and `::dictionary` alone (see [`Shape`](crate::Shape)).
 #[derive(Debug, Clone, PartialEq)]
 pub struct Declaration {
     /// The name after `::`.
@@ -15,7 +16,8 @@ pub struct Declaration {
     /// `(args)` as written: a positional argument is still unnamed
     /// ([`bound_args`](Declaration::bound_args) names it).
     pub args: Option<Value>,
-    /// `{data}`, the group read as a map.
+    /// `{data}`, the group read as a map. Only a declaration of shape
+    /// [`Shape::ArgsAndData`](crate::Shape::ArgsAndData) has one.
     pub data: Option<Value>,
 }
 
@@ -98,7 +100,7 @@ mod tests {
 
     #[test]
     fn a_double_colon_element_is_a_declaration() {
-        let doc = parse("::kind(config, 2)\n::meta{ id: x }\n\nBody.\n");
+        let doc = parse("::kind(config, 2)\n::meta(id: x)\n\nBody.\n");
         let found = declarations(&doc);
         assert_eq!(
             found.iter().map(|f| f.kind).collect::<Vec<_>>(),
@@ -114,14 +116,15 @@ mod tests {
             ]))
         );
         assert_eq!(
-            found[1].declaration.data,
+            found[1].declaration.bound_args(),
             Some(Value::Map(vec![("id".into(), Value::String("x".into()))]))
         );
+        assert_eq!(found[1].declaration.data, None);
     }
 
     #[test]
     fn an_at_element_is_not_a_declaration_whatever_its_name() {
-        let doc = parse("@meta{ id: x }\n");
+        let doc = parse("@meta(id: x)\n");
         assert!(declarations(&doc).is_empty());
     }
 

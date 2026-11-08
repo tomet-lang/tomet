@@ -1,0 +1,4 @@
+// `{...}` alone is not a declaration. `::meta{ ... }` became `::meta(...)`.
+::meta{ title: "Catalog" }
+
+"tmtroot/a.tmt": "../a.tmt"

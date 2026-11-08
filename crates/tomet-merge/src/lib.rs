@@ -133,71 +133,71 @@ mod tests {
 
     #[test]
     fn edits_to_different_data_keys_merge_cleanly() {
-        let base = "::meta{\n  title: \"Old\"\n  status: \"draft\"\n}\n\nBody.\n";
-        let local = "::meta{\n  title: \"New\"\n  status: \"draft\"\n}\n\nBody.\n";
+        let base = "::meta(\n  title: \"Old\"\n  status: \"draft\"\n)\n\nBody.\n";
+        let local = "::meta(\n  title: \"New\"\n  status: \"draft\"\n)\n\nBody.\n";
         let remote =
-            "::meta{\n  title: \"Old\"\n  status: \"published\"\n  tag: \"v1\"\n}\n\nBody.\n";
+            "::meta(\n  title: \"Old\"\n  status: \"published\"\n  tag: \"v1\"\n)\n\nBody.\n";
 
         let out = merge(base, local, remote);
         assert!(out.clean);
         assert!(!has_conflicts(&out.text));
         assert_eq!(
             out.text,
-            "::meta{\n  title: \"New\"\n  status: \"published\"\n  tag: \"v1\"\n}\n\nBody.\n"
+            "::meta(\n  title: \"New\"\n  status: \"published\"\n  tag: \"v1\"\n)\n\nBody.\n"
         );
     }
 
     #[test]
     fn a_key_deleted_on_one_side_and_untouched_on_the_other_is_dropped() {
-        let base = "::meta{\n  keep: 1\n  drop_me: 2\n}\n";
-        let local = "::meta{\n  keep: 1\n}\n";
-        let remote = "::meta{\n  keep: 10\n  drop_me: 2\n}\n";
+        let base = "::meta(\n  keep: 1\n  drop_me: 2\n)\n";
+        let local = "::meta(\n  keep: 1\n)\n";
+        let remote = "::meta(\n  keep: 10\n  drop_me: 2\n)\n";
 
         let out = merge(base, local, remote);
         assert!(out.clean);
-        assert_eq!(out.text, "::meta{\n  keep: 10\n}\n");
+        assert_eq!(out.text, "::meta(\n  keep: 10\n)\n");
     }
 
     #[test]
     fn a_key_deleted_on_one_side_and_modified_on_the_other_keeps_the_edit() {
-        let base = "::meta{\n  k: \"v0\"\n}\n";
-        let local = "::meta{\n  other: 1\n}\n";
-        let remote = "::meta{\n  k: \"v1\"\n  other: 1\n}\n";
+        let base = "::meta(\n  k: \"v0\"\n)\n";
+        let local = "::meta(\n  other: 1\n)\n";
+        let remote = "::meta(\n  k: \"v1\"\n  other: 1\n)\n";
 
         let out = merge(base, local, remote);
         assert!(out.clean);
-        assert_eq!(out.text, "::meta{\n  other: 1\n  k: \"v1\"\n}\n");
+        assert_eq!(out.text, "::meta(\n  other: 1\n  k: \"v1\"\n)\n");
     }
 
     #[test]
     fn editing_the_same_data_key_produces_a_value_conflict() {
-        let base = "::meta{\n  title: \"Base\"\n  keep: 1\n}\n";
-        let local = "::meta{\n  title: \"Local\"\n  keep: 1\n}\n";
-        let remote = "::meta{\n  title: \"Remote\"\n  keep: 1\n}\n";
+        let base = "::meta(\n  title: \"Base\"\n  keep: 1\n)\n";
+        let local = "::meta(\n  title: \"Local\"\n  keep: 1\n)\n";
+        let remote = "::meta(\n  title: \"Remote\"\n  keep: 1\n)\n";
 
         let out = merge(base, local, remote);
         assert!(!out.clean);
         assert!(has_conflicts(&out.text));
         assert_eq!(
             out.text,
-            "::meta{\n  title: @conflict(a: \"Local\", b: \"Remote\")\n  keep: 1\n}\n"
+            "::meta(\n  title: @conflict(a: \"Local\", b: \"Remote\")\n  keep: 1\n)\n"
         );
     }
 
     #[test]
     fn resolving_a_data_key_conflict_leaves_a_plain_value() {
-        let base = "::meta{\n  title: \"Base\"\n}\n";
-        let local = "::meta{\n  title: \"Local\"\n}\n";
-        let remote = "::meta{\n  title: \"Remote\"\n}\n";
+        let base = "::meta(\n  title: \"Base\"\n)\n";
+        let local = "::meta(\n  title: \"Local\"\n)\n";
+        let remote = "::meta(\n  title: \"Remote\"\n)\n";
         let merged = merge(base, local, remote);
 
         let picked_a = resolve(&merged.text, &[ConflictResolution::A]).unwrap();
         assert!(!has_conflicts(&picked_a));
-        assert_eq!(picked_a, "::meta{\n  title: \"Local\"\n}\n");
+        assert_eq!(picked_a, "::meta(\n  title: \"Local\"\n)\n");
 
         let picked_b = resolve(&merged.text, &[ConflictResolution::B]).unwrap();
         assert!(!has_conflicts(&picked_b));
-        assert_eq!(picked_b, "::meta{\n  title: \"Remote\"\n}\n");
+        assert_eq!(picked_b, "::meta(\n  title: \"Remote\"\n)\n");
 
         let rewritten = resolve(
             &merged.text,
@@ -205,7 +205,7 @@ mod tests {
         )
         .unwrap();
         assert!(!has_conflicts(&rewritten));
-        assert_eq!(rewritten, "::meta{\n  title: \"Both\"\n}\n");
+        assert_eq!(rewritten, "::meta(\n  title: \"Both\"\n)\n");
     }
 
     #[test]
@@ -287,9 +287,9 @@ mod tests {
 
     #[test]
     fn find_conflicts_and_resolve_single_and_both() {
-        let base = "::meta{\n  title: \"Base\"\n}\n\nHello world.\n";
-        let local = "::meta{\n  title: \"Local\"\n}\n\nHello there.\n";
-        let remote = "::meta{\n  title: \"Remote\"\n}\n\nHello friend.\n";
+        let base = "::meta(\n  title: \"Base\"\n)\n\nHello world.\n";
+        let local = "::meta(\n  title: \"Local\"\n)\n\nHello there.\n";
+        let remote = "::meta(\n  title: \"Remote\"\n)\n\nHello friend.\n";
         let merged = merge(base, local, remote);
 
         let items = find_conflicts(&merged.text).unwrap();
@@ -310,7 +310,7 @@ mod tests {
         assert!(!has_conflicts(&step2));
         assert_eq!(
             step2,
-            "::meta{\n  title: \"Local / Remote\"\n}\n\nHello there friend.\n"
+            "::meta(\n  title: \"Local / Remote\"\n)\n\nHello there friend.\n"
         );
     }
 
@@ -321,7 +321,7 @@ mod tests {
     #[test]
     fn source_merge_identity_invariants_hold_byte_for_byte() {
         let base = concat!(
-            "::meta{ title: \"Base\", count: 1 }\n\n",
+            "::meta(title: \"Base\", count: 1)\n\n",
             "=[ Main Heading ]\n\n",
             "// Leading comment\n",
             "First paragraph with *italic* and **bold** and `code`.\n\n",
@@ -434,15 +434,15 @@ mod tests {
 
     #[test]
     fn case_5_meta_brace_padding_and_key_merge_preserved() {
-        let base = "::meta{ title: \"A\", count: 1 }\n\nBody text.\n";
-        let local = "::meta{ title: \"B\", count: 1 }\n\nBody text.\n";
-        let remote = "::meta{ title: \"A\", count: 2 }\n\nBody text.\n";
+        let base = "::meta(title: \"A\", count: 1)\n\nBody text.\n";
+        let local = "::meta(title: \"B\", count: 1)\n\nBody text.\n";
+        let remote = "::meta(title: \"A\", count: 2)\n\nBody text.\n";
 
         let merged = merge(base, local, remote);
         assert!(merged.clean);
         assert_eq!(
             merged.text,
-            "::meta{ title: \"B\", count: 2 }\n\nBody text.\n"
+            "::meta(title: \"B\", count: 2)\n\nBody text.\n"
         );
     }
 
@@ -477,7 +477,7 @@ mod tests {
     #[test]
     fn full_tomet_cms_regression_preserves_all_untouched_constructs() {
         let base = concat!(
-            "::meta{ title: \"Test\", count: 1 }\n\n",
+            "::meta(title: \"Test\", count: 1)\n\n",
             "=[ Main Heading ]\n\n",
             "First paragraph with *italic* and **bold**.\n\n",
             "// A comment that must survive\n",
@@ -497,7 +497,7 @@ mod tests {
         let merged = merge(base, &local, &remote);
         assert!(merged.clean);
         let expected = concat!(
-            "::meta{ title: \"Test\", count: 2 }\n\n",
+            "::meta(title: \"Test\", count: 2)\n\n",
             "=[ Main Heading ]\n\n",
             "First paragraph with *italic* and **bold**.\n\n",
             "// A comment that must survive\n",
@@ -517,21 +517,21 @@ mod tests {
     #[test]
     fn resolving_conflicts_preserves_surrounding_formatting_byte_for_byte() {
         let base = concat!(
-            "::meta{ title: \"Test\", count: 1 }\n\n",
+            "::meta(title: \"Test\", count: 1)\n\n",
             "=[ Main Heading ]\n\n",
             "// Comment before paragraph\n",
             "The quick *brown* fox jumps.\n\n",
             "Original block.\n",
         );
         let local = concat!(
-            "::meta{ title: \"Test\", count: 2 }\n\n",
+            "::meta(title: \"Test\", count: 2)\n\n",
             "=[ Main Heading ]\n\n",
             "// Comment before paragraph\n",
             "The slow *brown* fox jumps.\n\n",
             "::kind(note)\n",
         );
         let remote = concat!(
-            "::meta{ title: \"Test\", count: 3 }\n\n",
+            "::meta(title: \"Test\", count: 3)\n\n",
             "=[ Main Heading ]\n\n",
             "// Comment before paragraph\n",
             "The lazy *brown* fox jumps.\n\n",
@@ -554,7 +554,7 @@ mod tests {
 
         let step1 = resolve_single(&merged.text, 0, ConflictResolution::B).unwrap();
         assert_eq!(find_conflicts(&step1).unwrap().len(), 2);
-        assert!(step1.starts_with("::meta{ title: \"Test\", count: 3 }\n\n"));
+        assert!(step1.starts_with("::meta(title: \"Test\", count: 3)\n\n"));
     }
 }
 

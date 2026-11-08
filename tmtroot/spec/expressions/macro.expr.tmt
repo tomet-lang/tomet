@@ -25,10 +25,10 @@ ${macro.gh("tomet/tomet")}
 文書の先頭の `::macros` に、名前とテンプレートを書く（@file(tmtroot/spec/elements/std.macros.element.tmt)）。
 
 ```tm
-::macros{
+::macros(
   gh: "https://github.com/tomet/tomet/issues/${1}"
   card: [ @card(title: ${1})[ ${2} ] ]
-}
+)
 ```
 
 - テンプレートの中の `${1}`、`${2}` は引数の位置、`${key}` は名前付き引数の差し込み位置。式ではない。
@@ -39,10 +39,10 @@ ${macro.gh("tomet/tomet")}
 本体を `[ ... ]` で書くと、呼び出しは文字列でなくブロックになる。
 
 ```tm
-::macros{
+::macros(
   card: [ @card(title: ${1})[ ${2} ] ]
   notice: [ Notice: ${msg} ]
-}
+)
 
 ${macro.card("Welcome", "Hello")}
 文章の中の ${macro.notice(msg: "ここ")} にも置ける。

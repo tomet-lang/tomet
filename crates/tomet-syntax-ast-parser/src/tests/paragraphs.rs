@@ -7,7 +7,7 @@ fn an_element_on_a_continuation_line_stays_in_the_paragraph() {
     // line happened to start with one. A continuation line is not
     // block context, so the element belongs to the running text; a
     // blank line is what opens a block.
-    let doc = parse_file("text\n@note{key:value}\n").unwrap();
+    let doc = parse_file("text\n@note(key:value)\n").unwrap();
     assert_eq!(doc.body.len(), 1);
     match &doc.body[0] {
         Block::Paragraph(p) => {
@@ -28,7 +28,7 @@ fn an_element_on_a_continuation_line_stays_in_the_paragraph() {
     }
 
     // With the blank line, it is a block.
-    let doc = parse_file("text\n\n@note{key:value}\n").unwrap();
+    let doc = parse_file("text\n\n@note(key:value)\n").unwrap();
     assert_eq!(doc.body.len(), 2);
     match &doc.body[1] {
         Block::Element(el) => {
@@ -44,7 +44,7 @@ fn adjacent_element_lines_are_one_paragraph() {
     // An element is running text like any other: `@note{...}` then
     // `@memo{...}` on consecutive lines fold into one paragraph, with a soft
     // break between them. A blank line or a `;` is what makes them blocks.
-    let doc = parse_file("@note{ type:#settings }\n@memo{ key:value }\n").unwrap();
+    let doc = parse_file("@note(type:#settings)\n@memo(key:value)\n").unwrap();
     assert_eq!(doc.body.len(), 1);
     match &doc.body[0] {
         Block::Paragraph(p) => {
@@ -57,8 +57,8 @@ fn adjacent_element_lines_are_one_paragraph() {
     }
 
     for src in [
-        "@note{ type:#settings }\n\n@memo{ key:value }\n",
-        "@note{ type:#settings }\n;@memo{ key:value }\n",
+        "@note(type:#settings)\n\n@memo(key:value)\n",
+        "@note(type:#settings)\n;@memo(key:value)\n",
     ] {
         let doc = parse_file(src).unwrap();
         assert_eq!(doc.body.len(), 2, "{src:?}");
@@ -69,11 +69,11 @@ fn adjacent_element_lines_are_one_paragraph() {
 
 #[test]
 fn text_after_an_element_line_folds_into_it_unless_a_semicolon_breaks() {
-    let doc = parse_file("@note{ a: 1 }\ntext\n").unwrap();
+    let doc = parse_file("@note(a: 1)\ntext\n").unwrap();
     assert_eq!(doc.body.len(), 1);
     assert!(matches!(&doc.body[0], Block::Paragraph(p) if p.content.len() == 3));
 
-    let doc = parse_file("@note{ a: 1 }\n;text\n").unwrap();
+    let doc = parse_file("@note(a: 1)\n;text\n").unwrap();
     assert_eq!(doc.body.len(), 2);
     assert!(matches!(&doc.body[0], Block::Element(_)));
     assert!(matches!(&doc.body[1], Block::Paragraph(_)));
@@ -99,7 +99,7 @@ fn an_interpolation_is_a_block_only_when_it_stands_alone_on_its_line() {
 
 #[test]
 fn a_declaration_after_an_element_line_is_an_error() {
-    let err = parse_file("@note{ a: 1 }\n::kind(config)\n").unwrap_err();
+    let err = parse_file("@note(a: 1)\n::kind(config)\n").unwrap_err();
     assert!(
         err.message
             .contains("a declaration belongs at the top of the file")
@@ -162,7 +162,7 @@ fn a_semicolon_at_the_start_of_a_line_breaks_the_paragraph() {
 
 #[test]
 fn semicolons_stand_blocks_of_elements_side_by_side() {
-    let doc = parse_file(";@note{ a: 1 }\n;@memo{ b: 2 }\n").unwrap();
+    let doc = parse_file(";@note(a: 1)\n;@memo(b: 2)\n").unwrap();
     assert_eq!(doc.body.len(), 2);
     for (block, name) in doc.body.iter().zip(["note", "memo"]) {
         match block {
@@ -209,24 +209,44 @@ fn a_semicolon_breaks_a_pipe_run_paragraph_too() {
 }
 
 #[test]
-fn a_bare_name_alone_on_its_line_is_an_element_whatever_follows() {
-    // `@memo` with no group is an element when it is the whole of its line
-    // (`is_element_start`). The check used to run after the gap before the next
-    // group was skipped, so it held only at the end of the file.
+fn a_bare_name_alone_on_its_block_line_is_refused_whatever_follows() {
+    // `@memo` with no group is a nexus without its primary group when it is the whole of its
+    // line and nothing folds into it. However far the blank line or the comment after it, it is
+    // refused, and refused where the name begins.
     for src in [
         "@memo\n",
+        "@memo",
         "@memo\n\ntext\n",
-        "@memo\n\n@other\n",
+        "@memo\n\n@other()\n",
         "@memo // note\n\ntext\n",
+        "@memo\n;text\n",
+        "@memo\n- item\n",
     ] {
-        let doc = parse_file(src).unwrap();
+        let err = parse_file(src).expect_err(src);
         assert!(
-            matches!(&doc.body[0], Block::Element(el) if el.name == Name::bare("memo")),
+            err.message.contains("needs a primary group"),
+            "{src:?}: {}",
+            err.message
+        );
+        assert_eq!(err.offset, 0, "{src:?}");
+    }
+}
+
+#[test]
+fn a_bare_name_with_more_around_it_is_text() {
+    // On a line with something else, or with the next line folding into it, it is running text.
+    for src in [
+        "@memo and more\n",
+        "@memo\ntext\n",
+        "text\n@memo\n",
+        "@memo\n@other\n",
+    ] {
+        let doc = parse_file(src).unwrap_or_else(|e| panic!("{src:?}: {e}"));
+        assert!(
+            matches!(doc.body.as_slice(), [Block::Paragraph(p)]
+                if p.content.iter().all(|i| !matches!(i, Inline::Element(_)))),
             "{src:?}: {:?}",
-            doc.body[0]
+            doc.body
         );
     }
-    // On a line with something else it is text, as before.
-    let doc = parse_file("@memo and more\n").unwrap();
-    assert!(matches!(&doc.body[0], Block::Paragraph(_)));
 }

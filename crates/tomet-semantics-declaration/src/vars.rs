@@ -1,4 +1,4 @@
-//! `::vars{ name: { type, default, about } }` -- the variables a document or
+//! `::vars(name: { type, default, about })` -- the variables a document or
 //! a vault declares. See `tmtroot/spec/elements/std.vars.element.tmt`.
 //!
 //! Every entry is a declaration, a map of fields; there is no spelling that
@@ -94,10 +94,8 @@ fn plain_text(value: &Value) -> Option<String> {
     }
 }
 
-/// The entries of one `::vars` declaration, each read, or the reason it cannot be.
-///
-/// The args form (`::vars(a: {...})`) and the data form (`::vars{ a: {...} }`)
-/// are both read, as for `::macros`.
+/// The entries of one `::vars` declaration, each read, or the reason it cannot be: the entries of
+/// its `(...)`, `::vars(a: { type: int })`, as for `::macros`.
 pub fn read_var_decls(declaration: &Declaration) -> Vec<(String, Result<VarDecl, String>)> {
     crate::read::entries(declaration)
         .into_iter()
@@ -125,7 +123,7 @@ mod tests {
     #[test]
     fn a_declaration_has_a_type_a_default_and_an_about() {
         let found = decls(
-            "::vars{\n  title: {\n    type: string\n    about: | 題。\n  }\n  n: { type: int, default: 3 }\n}\n",
+            "::vars(\n  title: {\n    type: string\n    about: | 題。\n  }\n  n: { type: int, default: 3 }\n)\n",
         );
         let title = found[0].1.as_ref().unwrap();
         assert_eq!(title.ty, Type::String);
@@ -139,13 +137,13 @@ mod tests {
 
     #[test]
     fn the_type_is_a_string_when_it_is_left_out() {
-        let found = decls("::vars{\n  who: { default: \"me\" }\n}\n");
+        let found = decls("::vars(\n  who: { default: \"me\" }\n)\n");
         assert_eq!(found[0].1.as_ref().unwrap().ty, Type::String);
     }
 
     #[test]
     fn a_type_that_is_not_one_is_refused_with_the_types_there_are() {
-        let found = decls("::vars{\n  title: { type: date }\n}\n");
+        let found = decls("::vars(\n  title: { type: date }\n)\n");
         let reason = found[0].1.as_ref().unwrap_err();
         assert!(
             reason.contains("`date`") && reason.contains("`datetime`"),
@@ -155,13 +153,13 @@ mod tests {
 
     #[test]
     fn a_value_written_directly_is_not_a_declaration() {
-        let found = decls("::vars{\n  title: \"x\"\n}\n");
+        let found = decls("::vars(\n  title: \"x\"\n)\n");
         assert!(found[0].1.is_err());
     }
 
     #[test]
     fn an_unknown_key_is_refused_with_the_keys_there_are() {
-        let found = decls("::vars{\n  title: { kind: string }\n}\n");
+        let found = decls("::vars(\n  title: { kind: string }\n)\n");
         let reason = found[0].1.as_ref().unwrap_err();
         assert!(
             reason.contains("`kind`") && reason.contains("`default`"),

@@ -13,10 +13,10 @@
 - `path`: 書き出す先。一つの道（すべての形式に同じ）か、形式から道へのマップ。
 
 ```tm
-::export{
+::export(
   type: list(commonmark, html)
   path: { commonmark: "README.md", html: "index.html" }
-}
+)
 ```
 
 コマンドの `--type` と `--out` で上書きできる。

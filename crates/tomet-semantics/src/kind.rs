@@ -22,7 +22,7 @@ pub enum ElementKind {
     /// the `DeclKind`. Eleven variants used to stand here, one per declaration; they were a second
     /// table of the same names.
     Declaration(DeclKind),
-    /// `@data{...}` -- the description of an element's `{...}` slot.
+    /// `@data(){...}` -- the description of an element's `{...}` slot.
     /// Declared by no vocabulary yet.
     Data,
     /// `@draft[ what is missing ]` -- there is no text here yet, and the

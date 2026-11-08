@@ -1,7 +1,7 @@
 ::kind(guide)
-::meta{
+::meta(
   title: "ブループリント"
-}
+)
 
 ブループリントは、文書の雛形であると同時にその型でもある。`tomet new` が実体化し、`tomet-validator` と LSP が同じものに対して構造を検証する。
 
@@ -14,17 +14,17 @@
 ```tm
 ::kind(blueprint)
 ::blueprint(daily-note)
-::vars{
+::vars(
   title: {
     type: string
     about: | 日記の題。
   }
-}
-::meta{
+)
+::meta(
   id: ${generate.uuid()}
   date: ${generate.now().format("YYYY-MM-DD")}
   title: ${var.title}
-}
+)
 
 #[ TODO ] {id: todo}
 - ( ) 

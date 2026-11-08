@@ -1,0 +1,4 @@
+// A declaration takes no `#(id)` without a primary group either.
+
+::kind(fixture)
+::meta#(first)

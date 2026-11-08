@@ -9,7 +9,7 @@ use tomet_ast::{Block, Entry, File, Inline, Value};
 use tomet_tree::*;
 
 const SRC: &str = "\
-::meta{ k: @s_decl_value() }
+::meta(k: @s_decl_value())
 
 ::kind(@s_decl_args())#(i_decl)
 

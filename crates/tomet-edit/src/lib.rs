@@ -194,7 +194,7 @@ mod tests {
 
     #[test]
     fn set_attribute_data_adds_or_updates_key() {
-        let src = "::meta{ x: 1 }\n\nBody text.\n";
+        let src = "::meta(x: 1)\n\nBody text.\n";
         let mut doc = import_source(src);
 
         let meta_id = doc
@@ -206,7 +206,7 @@ mod tests {
 
         doc.set_attribute(
             meta_id,
-            AttrGroup::Data,
+            AttrGroup::Args,
             "icon",
             Some("@doc.icon(star, pkg: tabler)"),
         )
@@ -215,13 +215,13 @@ mod tests {
         let exported = export_doc(&doc);
         assert_eq!(
             exported,
-            "::meta{ x: 1, icon: @doc.icon(star, pkg: tabler) }\n\nBody text.\n"
+            "::meta(x: 1, icon: @doc.icon(star, pkg: tabler))\n\nBody text.\n"
         );
     }
 
     #[test]
     fn set_attribute_replaces_existing_key() {
-        let src = "::meta{ icon: @doc.icon(old) }\n\nBody.\n";
+        let src = "::meta(icon: @doc.icon(old))\n\nBody.\n";
         let mut doc = import_source(src);
 
         let meta_id = doc
@@ -231,16 +231,16 @@ mod tests {
             .next()
             .unwrap();
 
-        doc.set_attribute(meta_id, AttrGroup::Data, "icon", Some("@doc.icon(new)"))
+        doc.set_attribute(meta_id, AttrGroup::Args, "icon", Some("@doc.icon(new)"))
             .unwrap();
 
         let exported = export_doc(&doc);
-        assert_eq!(exported, "::meta{ icon: @doc.icon(new) }\n\nBody.\n");
+        assert_eq!(exported, "::meta(icon: @doc.icon(new))\n\nBody.\n");
     }
 
     #[test]
     fn set_attribute_deletes_key_when_value_is_none() {
-        let src = "::meta{ x: 1, y: 2 }\n\nBody.\n";
+        let src = "::meta(x: 1, y: 2)\n\nBody.\n";
         let mut doc = import_source(src);
 
         let meta_id = doc
@@ -250,11 +250,11 @@ mod tests {
             .next()
             .unwrap();
 
-        doc.set_attribute(meta_id, AttrGroup::Data, "x", None::<String>)
+        doc.set_attribute(meta_id, AttrGroup::Args, "x", None::<String>)
             .unwrap();
 
         let exported = export_doc(&doc);
-        assert_eq!(exported, "::meta{ y: 2 }\n\nBody.\n");
+        assert_eq!(exported, "::meta(y: 2)\n\nBody.\n");
     }
 
     #[test]
@@ -328,7 +328,7 @@ mod tests {
 
         doc.set_attribute(
             meta_id,
-            AttrGroup::Data,
+            AttrGroup::Args,
             "icon",
             Some("@doc.icon(star, pkg: tabler)"),
         )
@@ -337,7 +337,7 @@ mod tests {
         let exported = export_doc(&doc);
         assert_eq!(
             exported,
-            "::meta{icon: @doc.icon(star, pkg: tabler)}\n\nJust a note.\n"
+            "::meta(icon: @doc.icon(star, pkg: tabler))\n\nJust a note.\n"
         );
     }
 
@@ -382,7 +382,7 @@ mod tests {
 
     #[test]
     fn address_text_and_property_queries() {
-        let src = "::meta#(main-meta){ icon: @doc.icon(star), title: \"Doc\" }\n\n@callout#(warn)(type: \"warning\")[ Be careful! ]\n";
+        let src = "::meta(icon: @doc.icon(star), title: \"Doc\")#(main-meta)\n\n@callout#(warn)(type: \"warning\")[ Be careful! ]\n";
         let doc = import_source(src);
 
         // Query element properties
@@ -423,7 +423,7 @@ mod tests {
         );
 
         // Mutate meta property via address
-        let src_meta = "::meta#(cfg){ version: 1 }\n\nText.\n";
+        let src_meta = "::meta(version: 1)#(cfg)\n\nText.\n";
         let mut doc_meta = import_source(src_meta);
         doc_meta.set_prop_at("#cfg.version", Some("2")).unwrap();
         doc_meta
@@ -432,7 +432,7 @@ mod tests {
         let exported_meta = export_doc(&doc_meta);
         assert_eq!(
             exported_meta,
-            "::meta#(cfg){ version: 2, author: \"Tomet\" }\n\nText.\n"
+            "::meta(version: 2, author: \"Tomet\")#(cfg)\n\nText.\n"
         );
     }
 
@@ -493,7 +493,7 @@ mod tests {
 
     #[test]
     fn find_block_form_and_meta_helpers() {
-        let src = "::meta{ version: 1 }\n\n// comment\n@callout(info)[ Notice ]\n";
+        let src = "::meta(version: 1)\n\n// comment\n@callout(info)[ Notice ]\n";
         let doc = import_source(src);
 
         // Find forms by sigil/name
@@ -516,7 +516,7 @@ mod tests {
     #[test]
     fn ensure_meta_node_and_set_meta_data_on_existing_and_missing() {
         // 1. Existing ::meta: updates and adds keys
-        let src_existing = "::meta{ a: 1 }\n\nBody text.\n";
+        let src_existing = "::meta(a: 1)\n\nBody text.\n";
         let mut doc = import_source(src_existing);
         let orig_meta_id = doc.meta_node().unwrap();
 
@@ -525,12 +525,12 @@ mod tests {
         assert_eq!(doc.meta_node(), Some(orig_meta_id));
 
         let exported = export_doc(&doc);
-        assert_eq!(exported, "::meta{ a: 10, b: 2 }\n\nBody text.\n");
+        assert_eq!(exported, "::meta(a: 10, b: 2)\n\nBody text.\n");
 
         // Delete a key
         doc.set_meta_data("b", None::<String>).unwrap();
         let exported_del = export_doc(&doc);
-        assert_eq!(exported_del, "::meta{ a: 10 }\n\nBody text.\n");
+        assert_eq!(exported_del, "::meta(a: 10)\n\nBody text.\n");
 
         // 2. Missing ::meta: automatically creates ::meta at top with spacing trivia
         let src_none = "Just a note.\n";
@@ -545,14 +545,14 @@ mod tests {
         let exported_none = export_doc(&doc_none);
         assert_eq!(
             exported_none,
-            "::meta{icon: @doc.icon(star, pkg: tabler)}\n\nJust a note.\n"
+            "::meta(icon: @doc.icon(star, pkg: tabler))\n\nJust a note.\n"
         );
 
         // 3. ensure_meta_node on empty document
         let mut doc_empty = EditDoc::new();
         let empty_meta_id = doc_empty.ensure_meta_node();
         assert_eq!(doc_empty.ensure_meta_node(), empty_meta_id); // idempotent
-        assert_eq!(export_doc(&doc_empty), "::meta\n");
+        assert_eq!(export_doc(&doc_empty), "::meta()\n");
     }
 
     #[test]
@@ -809,29 +809,29 @@ Second paragraph.
 
     #[test]
     fn set_attribute_preserves_brace_padding_and_untouched_keys() {
-        let src = "::meta{ title: \"A\", count: 42 }\n\nBody.\n";
+        let src = "::meta(title: \"A\", count: 42)\n\nBody.\n";
         let mut doc = import_source(src);
         let meta_id = doc.meta_node().unwrap();
 
-        doc.set_attribute(meta_id, AttrGroup::Data, "count", Some("99"))
+        doc.set_attribute(meta_id, AttrGroup::Args, "count", Some("99"))
             .unwrap();
 
         assert_eq!(
             export_doc(&doc),
-            "::meta{ title: \"A\", count: 99 }\n\nBody.\n"
+            "::meta(title: \"A\", count: 99)\n\nBody.\n"
         );
 
         // Multi-line data block with comments and indentation
         let multiline_src =
-            "::meta{\n  // Primary title\n  title: \"A\",\n  count: 42,\n}\n\nBody.\n";
+            "::meta(\n  // Primary title\n  title: \"A\",\n  count: 42,\n)\n\nBody.\n";
         let mut doc_ml = import_source(multiline_src);
         let ml_id = doc_ml.meta_node().unwrap();
         doc_ml
-            .set_attribute(ml_id, AttrGroup::Data, "count", Some("100"))
+            .set_attribute(ml_id, AttrGroup::Args, "count", Some("100"))
             .unwrap();
         assert_eq!(
             export_doc(&doc_ml),
-            "::meta{\n  // Primary title\n  title: \"A\",\n  count: 100,\n}\n\nBody.\n"
+            "::meta(\n  // Primary title\n  title: \"A\",\n  count: 100,\n)\n\nBody.\n"
         );
     }
 
@@ -858,15 +858,15 @@ Second paragraph.
 
     #[test]
     fn nested_edit_value_and_inline_items_import_and_roundtrip() {
-        let src = "::meta{ nested: { a: list(1, 2), icon: @doc.icon(star) } }\n\n=[ *Styled* Heading ]\n\nHello *italic*, **bold**, `code`, and @badge(ok)[green].\n";
+        let src = "::meta(nested: { a: list(1, 2), icon: @doc.icon(star) })\n\n=[ *Styled* Heading ]\n\nHello *italic*, **bold**, `code`, and @badge(ok)[green].\n";
         let doc = import_source(src);
         assert_eq!(export_doc(&doc), src);
 
         let meta_id = doc.meta_node().unwrap();
         let meta_node = doc.get(meta_id).unwrap();
-        let data_slot = meta_node.slots.data_slot.as_ref().unwrap();
-        assert_eq!(data_slot.entries.len(), 1);
-        match &data_slot.entries[0].value.kind {
+        let args_slot = meta_node.slots.args_slot.as_ref().unwrap();
+        assert_eq!(args_slot.entries.len(), 1);
+        match &args_slot.entries[0].value.kind {
             EditValueKind::Map(inner_slot) => {
                 assert_eq!(inner_slot.entries.len(), 2);
                 // `list(1, 2)` is a call: kept whole, as text.

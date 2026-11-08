@@ -56,21 +56,11 @@ pub fn extract_blueprint_schema(blueprint: &File) -> Option<BlueprintSchema> {
                 required_meta_keys.push(("id".to_string(), span));
             }
             ElementKind::Declaration(DeclKind::Meta) => {
-                if let Some(entries) = declaration
-                    .data
-                    .value
-                    .as_ref()
-                    .map(|v| v.pairs().collect::<Vec<_>>())
+                if let Some(Value::Map(entries)) =
+                    tomet_semantics::data::declaration_entries(declaration)
                 {
                     for (k, _) in entries {
-                        required_meta_keys.push((k.clone(), span));
-                    }
-                }
-                if let Some(Value::Map(entries)) = &declaration.data.args {
-                    for (k, _) in entries {
-                        if k != "format" {
-                            required_meta_keys.push((k.clone(), span));
-                        }
+                        required_meta_keys.push((k, span));
                     }
                 }
             }
@@ -144,21 +134,11 @@ pub fn validate_against_schema(
             == ElementKind::Declaration(DeclKind::Meta)
         {
             doc_meta_span = declaration.span;
-            if let Some(entries) = declaration
-                .data
-                .value
-                .as_ref()
-                .map(|v| v.pairs().collect::<Vec<_>>())
+            if let Some(Value::Map(entries)) =
+                tomet_semantics::data::declaration_entries(declaration)
             {
                 for (k, _) in entries {
-                    doc_meta_keys.push(k.clone());
-                }
-            }
-            if let Some(Value::Map(entries)) = &declaration.data.args {
-                for (k, _) in entries {
-                    if k != "format" {
-                        doc_meta_keys.push(k.clone());
-                    }
+                    doc_meta_keys.push(k);
                 }
             }
         }
@@ -325,10 +305,10 @@ mod tests {
     #[test]
     fn validates_matching_document_successfully() {
         let blueprint = parse(
-            "::blueprint(daily-note)\n::id(${uuid()})\n::meta{\n  date: ${date()}\n}\n\n=[ Plan ] {id: plan}\n\n=[ Review ] {id: review}\n",
+            "::blueprint(daily-note)\n::id(${uuid()})\n::meta(\n  date: ${date()}\n)\n\n=[ Plan ] {id: plan}\n\n=[ Review ] {id: review}\n",
         );
         let doc = parse(
-            "::kind(daily-note)\n::id(doc-123)\n::meta{\n  date: 2026-09-01\n}\n\n=[ Plan ] {id: plan}\n- ( ) My task\n\n=[ Review ] {id: review}\nGood day.\n",
+            "::kind(daily-note)\n::id(doc-123)\n::meta(\n  date: 2026-09-01\n)\n\n=[ Plan ] {id: plan}\n- ( ) My task\n\n=[ Review ] {id: review}\nGood day.\n",
         );
 
         let errors = validate_against_blueprint(&doc, &blueprint);
@@ -355,7 +335,7 @@ mod tests {
     #[test]
     fn reports_missing_meta_key_and_missing_section() {
         let blueprint = parse(
-            "::blueprint(daily-note)\n::id(${uuid()})\n::meta{\n  date: ${date()}\n}\n\n=[ Plan ]#(plan)\n\n=[ Review ]#(review)\n",
+            "::blueprint(daily-note)\n::id(${uuid()})\n::meta(\n  date: ${date()}\n)\n\n=[ Plan ]#(plan)\n\n=[ Review ]#(review)\n",
         );
         let doc = parse("::kind(daily-note)\n::id(doc-123)\n\n=[ Plan ]#(plan)\n- ( ) My task\n");
 

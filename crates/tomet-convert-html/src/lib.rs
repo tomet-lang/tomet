@@ -18,7 +18,7 @@
 //!
 //! This is a generic, data-driven mapping: most `<T>`/`@name` elements become `<div>`/`<span>`
 //! tags carrying `args` as `data-*` attributes. Built-in elements like `@link`, `::meta`, and
-//! `@links{}` containers receive dedicated HTML representations.
+//! `@links(){}` containers receive dedicated HTML representations.
 
 mod block;
 pub mod comment;

@@ -236,15 +236,15 @@ fn own_line_comment_works_inside_a_paren_group() {
 
 #[test]
 fn own_line_comment_works_inside_a_lightweight_value_group() {
-    let doc = parse_file("::meta{\n  key: value\n  // a note\n}\n").unwrap();
+    let doc = parse_file("::meta(\n  key: value\n  // a note\n)\n").unwrap();
     assert_eq!(doc.header.len(), 1);
     let d = &doc.header[0];
     assert_eq!(
-        d.data.value,
-        Some(Group::from_map(Value::Map(vec![(
+        d.data.args,
+        Some(Value::Map(vec![(
             "key".into(),
             Value::String("value".into())
-        )])))
+        )]))
     );
 }
 

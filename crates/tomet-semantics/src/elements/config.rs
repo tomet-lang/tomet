@@ -160,7 +160,7 @@ mod tests {
     #[test]
     fn parses_the_export_declaration_data_with_sequence_and_map_paths() {
         let doc = parse_file(
-            "::export{\n  type: list(commonmark, html)\n  path: {\n    commonmark: \"README.md\"\n    html: \"index.html\"\n  }\n}\n",
+            "::export(\n  type: list(commonmark, html)\n  path: {\n    commonmark: \"README.md\"\n    html: \"index.html\"\n  }\n)\n",
         )
         .unwrap();
 
@@ -188,7 +188,7 @@ mod tests {
 
     #[test]
     fn parses_the_macros_declaration() {
-        let doc = parse_file("::macros{\n  gh: \"https://github.com/org/repo/issues/$1\"\n  jira: \"https://jira.org/browse/$1\"\n}\n").unwrap();
+        let doc = parse_file("::macros(\n  gh: \"https://github.com/org/repo/issues/$1\"\n  jira: \"https://jira.org/browse/$1\"\n)\n").unwrap();
         let config = document_config(&doc);
         assert_eq!(
             config.macros.get("gh").and_then(|v| v.as_str()),
@@ -202,7 +202,7 @@ mod tests {
 
     #[test]
     fn the_macros_declaration_reads_every_entry() {
-        let doc = parse_file("::macros{\n  a: \"1\"\n  b: \"2\"\n}\n").unwrap();
+        let doc = parse_file("::macros(\n  a: \"1\"\n  b: \"2\"\n)\n").unwrap();
         let config = document_config(&doc);
         assert_eq!(config.macros.len(), 2);
     }

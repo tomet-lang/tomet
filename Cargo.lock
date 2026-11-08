@@ -2130,6 +2130,7 @@ version = "0.5.0"
 dependencies = [
  "tomet-ast",
  "tomet-cst",
+ "tomet-cst-parser",
  "tomet-lexer",
  "tomet-position",
  "tomet-span",
