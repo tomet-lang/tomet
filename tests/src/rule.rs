@@ -1,4 +1,4 @@
-//! Cross-crate coverage for `:rule(allow:list(...), direct:@bool)`: the
+//! Cross-crate coverage for `:rule(allow:(...), direct:@bool)`: the
 //! `tests/fixtures/rule/*.tmt` fixtures are already exercised for parsing
 //! and rendering by `corpus`/`snapshot` (`:rule` renders invisibly
 //! everywhere, so those targets alone cannot tell a passing document
@@ -114,7 +114,7 @@ fn heading_descendants_fixture_reports_the_disallowed_one() {
 #[test]
 fn rule_allows_plain_items_and_tasks_when_specified() {
     let doc = tomet_ast_parser::parse_file(
-        "=[ Tasks ]:rule(allow:list(item, task))\n- plain item\n-@task[ task item ]\n",
+        "=[ Tasks ]:rule(allow:(item, task))\n- plain item\n-@task[ task item ]\n",
     )
     .expect("parses");
     let errors = validate_document(&doc);
@@ -128,7 +128,7 @@ fn rule_allows_plain_items_and_tasks_when_specified() {
 #[test]
 fn rule_reports_disallowed_plain_item_when_only_task_is_allowed() {
     let doc = tomet_ast_parser::parse_file(
-        "=[ Tasks ]:rule(allow:list(task))\n- plain item\n-@task[ task item ]\n",
+        "=[ Tasks ]:rule(allow:(task))\n- plain item\n-@task[ task item ]\n",
     )
     .expect("parses");
     let errors = validate_document(&doc);

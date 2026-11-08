@@ -4,8 +4,8 @@
 // `tomet-tests` package) for how drift from the parser is caught.
 //
 // A standalone cotomet file (`.ctmt`) is `key: value` lines. Entries end at a
-// newline or a `,`; a value is a quoted string, a `{...}` map, a `name(...)`
-// call (`list(...)` among them), or a bare scalar, which may hold spaces
+// newline or a `,`; a value is a quoted string, a `{...}` map, a `(...)`
+// sequence, a `name(...)` call (`list(string)` among them), or a bare scalar, which may hold spaces
 // (`hello world`) and stops at a `,` `)` `}` or a `//` comment.
 //
 // A file may open with declarations about itself: `::name`, then `(args)`
@@ -85,13 +85,23 @@ module.exports = grammar({
 
     // A value after a `:` or inside a call's parentheses: its scalar may
     // hold a `:` of its own (`note: see: this`, as the parser reads it).
-    _value: ($) => choice($.string, $.map, $.call, $.scalar),
+    _value: ($) => choice($.string, $.map, $.sequence, $.call, $.scalar),
 
     // A value where an entry could start instead, in a file or a `{...}`.
     // There the first word and the `:` after it make a key, so a bare
     // scalar holds no `:` of its own.
     _bare_value: ($) =>
-      choice($.string, $.map, $.call, alias($._bare_scalar, $.scalar)),
+      choice(
+        $.string,
+        $.map,
+        $.sequence,
+        $.call,
+        alias($._bare_scalar, $.scalar),
+      ),
+
+    // `(a, b)`: a `(` where a value goes. `()` is empty, `(x)` has one
+    // element. Elements may run over several lines.
+    sequence: ($) => seq("(", repeat(choice($._value, ",", $._newline)), ")"),
 
     map: ($) => seq("{", repeat($._item), "}"),
 

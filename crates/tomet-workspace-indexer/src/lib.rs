@@ -500,7 +500,7 @@ mod tests {
     #[test]
     fn test_is_path_ignored_with_config_from_settings() {
         let settings_src = r#"::workspace(
-  ignore: list("00-09 System/01 Apps/obsidian")
+  ignore: ("00-09 System/01 Apps/obsidian")
 )
 "#;
         let cfg =
@@ -656,10 +656,10 @@ mod metadata_table_tests {
 
     #[test]
     fn a_list_stays_a_list() {
-        let fields = fields_of("::meta(tags: list(rust, cli))\n\n#[ Title ]\n");
+        let fields = fields_of("::meta(tags: (rust, cli))\n\n#[ Title ]\n");
         // Not the display string "[rust, cli]" that `extract_metadata`
         // produces (a search-index rendering, not `.tmt` syntax, so it
-        // is unaffected by `list(...)` replacing the `[...]` literal) --
+        // is unaffected by `(...)` replacing the `[...]` literal) --
         // `contains` has to be able to look inside the real `Value`.
         assert_eq!(
             fields.get("meta.tags"),

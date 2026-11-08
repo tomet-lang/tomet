@@ -311,7 +311,7 @@ nam: ${macro.named(who: "world")}
 
     #[test]
     fn var_that_holds_a_list_giving_a_list() {
-        let src = "::vars(tags: { type: list, default: list(\"a\", \"b\") })\na: ${var.tags}\n";
+        let src = "::vars(tags: { type: list, default: (\"a\", \"b\") })\na: ${var.tags}\n";
         let file = eval_str(src, &[]).unwrap();
         let Value::Map(entries) = file.body else {
             panic!("expected map");
@@ -438,7 +438,7 @@ nam: ${macro.named(who: "world")}
 
     #[test]
     fn expression_nested_in_map_in_list() {
-        let src = "items: list({ num: ${add(10, 20)} })\n";
+        let src = "items: ({ num: ${add(10, 20)} })\n";
         let file = eval_str(src, &[]).unwrap();
         let Value::Map(entries) = file.body else {
             panic!("expected map");

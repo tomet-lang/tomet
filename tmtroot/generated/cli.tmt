@@ -119,7 +119,7 @@ Options:
 
 ==[ tomet to-md ]
 
-Convert a `.tmt` file to CommonMark. Lossy for constructs with no Markdown equivalent (`@links{}`, and any `@T` element the importer never produces); `tomet-markdown`'s module docs list what falls back to HTML passthrough
+Convert a `.tmt` file to CommonMark. Lossy for constructs with no Markdown equivalent (`@links(){}`, and any `@T` element the importer never produces); `tomet-markdown`'s module docs list what falls back to HTML passthrough
 
 ```text
 tomet to-md [OPTIONS] <PATH>

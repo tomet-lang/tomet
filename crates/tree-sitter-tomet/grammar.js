@@ -797,7 +797,7 @@ module.exports = grammar({
         choice($.args_group, $.content_group, $.marked_content, $.value_group),
       ),
     // `:name(...)` -- one member of a closed family attached after an
-    // element (`@x(...):as(y):rule(...)`), e.g. `:rule(allow:list(card))`.
+    // element (`@x(...):as(y):rule(...)`), e.g. `:rule(allow:(card))`.
     // Structurally an element in its own right (its own `args`/
     // `content`/`value`), just introduced by `:` instead of `@` --
     // mirrors `tomet-parser::element::parse_groups`'s named-connect
@@ -937,7 +937,8 @@ module.exports = grammar({
     // `$.scalar`, the same node `_value_scalar` already produces, so
     // this is invisible in the tree either way.
     // `name(arg, arg, ...)` -- an immediately-resolved literal
-    // (`list(card, ns.mycard)`), mirroring `tomet_ast::Value::Call`.
+    // (`string(a)`) or a type (`list(string)`), mirroring
+    // `tomet_ast::Value::Call`. A sequence is not a call: see `sequence`.
     // Deliberately a *plain*, unprecedented regex -- not `_element_name`
     // (which is `token(prec(1, ...))`, aliased to `$.identifier`, this
     // grammar's declared `word` token) and not wrapped in `token(prec(...))`
@@ -951,7 +952,7 @@ module.exports = grammar({
     // with tree-sitter's `word`/keyword-extraction fast path, not
     // fully root-caused -- this plain-token form is the confirmed
     // workaround, not a chosen design). Confirmed clean now: a bare
-    // scheme URI still parses as one scalar, and `list(card)` still
+    // scheme URI still parses as one scalar, and `list(string)` still
     // reaches this rule -- see this crate's own tests and
     // `.agents/tasks/rule-connect-mvp.md` for what was actually tried.
     //
@@ -982,13 +983,24 @@ module.exports = grammar({
     // read as *this* or as the start of `call` is then an ordinary,
     // unambiguous one-token-lookahead decision: shift `(` to continue
     // into a call, or reduce on anything else.
+    // `(a, b)` -- a bare `(` where a value goes is a sequence
+    // (`tomet_ast::Value::Seq`): a value has no infix arithmetic, so no
+    // parenthesis there can group anything. `()` is empty and `(x)` has
+    // one element. Its elements are values, never `key: value` entries.
+    sequence: ($) =>
+      seq(
+        "(",
+        optional(seq($._entry_value, repeat(seq(",", $._entry_value)))),
+        ")",
+      ),
     // `[a, b]` (a `$.seq` rule) used to be a third alternative here.
     // Retired in `tomet-parser`: `[`/`]` already mean `[content]` at
-    // the element level, and `list(...)` (already `$.call`) is the
-    // sole surviving list-value spelling.
+    // the element level, and `(a, b)` (`$.sequence`) is the sole
+    // list-value spelling.
     _entry_value: ($) =>
       choice(
         $.call,
+        $.sequence,
         $.string,
         $.braced_map,
         $.interpolation,

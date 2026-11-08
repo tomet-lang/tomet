@@ -589,7 +589,7 @@ fn named_arguments_outside_a_call_are_rejected() {
 const HERE: &str = "::kind(note)
 ::meta(
   title: Here
-  tags: list(a, b)
+  tags: (a, b)
 )
 
 @card(n: 0)
@@ -598,7 +598,7 @@ const HERE: &str = "::kind(note)
 
 Some body.
 
-@card(n: 1, tags: list(x, y, z)){ extra: yes }#(c1)
+@card(n: 1, tags: (x, y, z)){ extra: yes }#(c1)
 ";
 
 const DOC_A: &str = "::meta(

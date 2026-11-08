@@ -168,7 +168,7 @@ pub enum Diagnostic {
     /// own diagnostic rather than a special case of that one.
     UnknownConnect { name: String, span: Span },
     /// A descendant found inside an element carrying an active
-    /// `:rule(allow:list(...))` whose classified name is not in that
+    /// `:rule(allow:(...))` whose classified name is not in that
     /// rule's `allow` list. `span` is the offending descendant's own
     /// span; `rule_span` is where the `:rule(...)` itself was written,
     /// so a reader can see both "found here" and "restricted here".
@@ -185,7 +185,7 @@ pub enum Diagnostic {
     /// inline }` -- only permits one.
     ContentNotInline { name: String, span: Span },
     /// A descendant found inside `[content]`/`|content` whose classified
-    /// name is not in the `content: { allow: list(...) }` that `element`'s
+    /// name is not in the `content: { allow: (...) }` that `element`'s
     /// vocabulary declares. `span` is the offending descendant's own
     /// span; `element_span` is the enclosing element's, so a reader can
     /// see both "found here" and "restricted here" -- same split

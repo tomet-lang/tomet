@@ -304,7 +304,7 @@ fn full_form_list_item_supports_a_named_connect() {
     // `@name`'s or a heading's -- `element_list_item` carries `connects`
     // too, so `:rule(...)` attaches to the item instead of becoming
     // literal trailing text.
-    let doc = parse_file("- [ content ]:rule(allow: list(card))\n").unwrap();
+    let doc = parse_file("- [ content ]:rule(allow: (card))\n").unwrap();
     match &doc.body[0] {
         Block::List(list) => {
             let items = &list.items;
@@ -366,7 +366,7 @@ fn combine_notation_reads_a_named_item_with_content_and_connects() {
     // would produce, with its own `[content]`, bare `:(){}` merge, and
     // named `:rule(...)` connect all landing on it directly -- no
     // marker, no second grammar.
-    let doc = parse_file("-@task()[content]:rule(allow:list(card))\n").unwrap();
+    let doc = parse_file("-@task()[content]:rule(allow:(card))\n").unwrap();
     match &doc.body[0] {
         Block::List(list) => {
             let items = &list.items;

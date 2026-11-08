@@ -254,7 +254,7 @@ mod tests {
 
     #[test]
     fn the_workspace_is_dropped_from_a_layer_that_may_not_declare_it() {
-        let mut l = layer("::workspace(ignore: list(\"a\"))\n::format(link: { no_space: true })\n");
+        let mut l = layer("::workspace(ignore: (\"a\"))\n::format(link: { no_space: true })\n");
         assert_eq!(l.strip_vault_only(), vec![DeclKind::Workspace]);
         assert!(l.strip_vault_only().is_empty());
         let cfg = Config::from_layers([&l]);

@@ -5,14 +5,14 @@
 // one document can carry all of them.
 
 ::kind(fixture)
-::meta(title: "nexus declarations", tags: list(a, b))
+::meta(title: "nexus declarations", tags: (a, b))
 ::macros(gh: "https://github.com/tomet/tomet/issues/${1}")
 ::vars(
   title: { type: string, default: "Daily" }
 )
 ::format(table: { max_col_width: 50 })
 ::fields(created: { type: datetime, format: rfc3339 })
-::workspace(ignore: list("tests/fixtures"))
+::workspace(ignore: ("tests/fixtures"))
 ::export(type: commonmark, path: "README.md")
 ::blueprints(daily: "daily.blueprint.tmt")
 ::vocabularies(deck: "deck.vocabulary.tmt")

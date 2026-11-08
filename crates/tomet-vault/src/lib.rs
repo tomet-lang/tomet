@@ -587,7 +587,7 @@ impl Vault {
 mod tests {
     use super::*;
 
-    const BLUEPRINT: &str = "::kind(blueprint)\n::blueprint(note)\n::meta(\n  date: \"2026\"\n)\n\n=[ Items ]#(items):rule(allow: list(task))\n";
+    const BLUEPRINT: &str = "::kind(blueprint)\n::blueprint(note)\n::meta(\n  date: \"2026\"\n)\n\n=[ Items ]#(items):rule(allow: (task))\n";
     const UUID_SETTINGS: &str = "::kind(config)\n::fields(id: { type: uuid })\n";
 
     fn texts(items: &[&str]) -> Vec<String> {
@@ -628,7 +628,7 @@ mod tests {
         assert!(validate_sources(bad, &[], None, &[]).unwrap().is_empty());
         // A blueprint for another kind does not apply.
         let other = texts(&[
-            "::kind(blueprint)\n::blueprint(memo)\n\n=[ Items ]#(items):rule(allow: list(task))\n",
+            "::kind(blueprint)\n::blueprint(memo)\n\n=[ Items ]#(items):rule(allow: (task))\n",
         ]);
         assert!(validate_sources(bad, &[], None, &other).unwrap().is_empty());
     }

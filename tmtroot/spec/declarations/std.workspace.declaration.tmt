@@ -5,8 +5,8 @@
 
 ```tm
 ::workspace(
-  ignore: list( "00-09 System/01 Apps/obsidian" )
-  unswept: list( "tests/fixtures", "tests/ref" )
+  ignore: ( "00-09 System/01 Apps/obsidian" )
+  unswept: ( "tests/fixtures", "tests/ref" )
 )
 ```
 

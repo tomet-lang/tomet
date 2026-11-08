@@ -50,6 +50,6 @@
   tomet: @file(tmtroot/dict/tomet.dict.tmt)
 )
 ::workspace(
-  ignore: list( "00-09 System/01 Apps/obsidian" )
-  unswept: list( "tests/fixtures", "tests/ref", "tests/store" )
+  ignore: ( "00-09 System/01 Apps/obsidian" )
+  unswept: ( "tests/fixtures", "tests/ref", "tests/store" )
 )

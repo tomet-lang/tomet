@@ -36,32 +36,26 @@ fn nested_inline_heading_does_not_reserialize_as_hash_sugar() {
 
 #[test]
 fn a_named_connect_round_trips_on_a_plain_element() {
-    let doc = tomet_ast_parser::parse_file("@section[ x ]:rule(allow: list(card))\n").unwrap();
+    let doc = tomet_ast_parser::parse_file("@section[ x ]:rule(allow: (card))\n").unwrap();
     let printed = document_to_tm(&doc);
-    assert!(
-        printed.contains(":rule(allow: list(card))"),
-        "got: {printed:?}"
-    );
+    assert!(printed.contains(":rule(allow: (card))"), "got: {printed:?}");
 }
 
 #[test]
 fn stacked_connects_round_trip_in_order() {
-    let doc = tomet_ast_parser::parse_file("@x(a: 1):as(y):rule(allow: list(card))\n").unwrap();
+    let doc = tomet_ast_parser::parse_file("@x(a: 1):as(y):rule(allow: (card))\n").unwrap();
     let printed = document_to_tm(&doc);
     assert!(
-        printed.contains(":as(y):rule(allow: list(card))"),
+        printed.contains(":as(y):rule(allow: (card))"),
         "got: {printed:?}"
     );
 }
 
 #[test]
 fn a_named_connect_round_trips_on_a_heading() {
-    let doc = tomet_ast_parser::parse_file("=[ h ]:rule(allow: list(card))\n").unwrap();
+    let doc = tomet_ast_parser::parse_file("=[ h ]:rule(allow: (card))\n").unwrap();
     let printed = document_to_tm(&doc);
-    assert!(
-        printed.contains(":rule(allow: list(card))"),
-        "got: {printed:?}"
-    );
+    assert!(printed.contains(":rule(allow: (card))"), "got: {printed:?}");
 }
 
 /// Defensive coverage for the early-returning special cases in
@@ -73,8 +67,8 @@ fn a_named_connect_round_trips_on_a_heading() {
 #[test]
 fn connects_survive_the_specially_printed_kinds() {
     for src in [
-        "@hr():rule(allow: list(card))\n",
-        "@raw[x]:rule(allow: list(card))\n",
+        "@hr():rule(allow: (card))\n",
+        "@raw[x]:rule(allow: (card))\n",
     ] {
         let doc = tomet_ast_parser::parse_file(src).unwrap();
         let el = match &doc.body[0] {
@@ -84,7 +78,7 @@ fn connects_survive_the_specially_printed_kinds() {
         assert_eq!(el.connects.len(), 1, "source: {src:?}, doc: {doc:?}");
         let printed = document_to_tm(&doc);
         assert!(
-            printed.contains(":rule(allow: list(card))"),
+            printed.contains(":rule(allow: (card))"),
             "source: {src:?}, got: {printed:?}"
         );
     }
@@ -92,7 +86,7 @@ fn connects_survive_the_specially_printed_kinds() {
 
 #[test]
 fn connects_survive_a_specially_styled_callout() {
-    let doc = tomet_ast_parser::parse_file("@callout(info)[x]:rule(allow: list(card))\n").unwrap();
+    let doc = tomet_ast_parser::parse_file("@callout(info)[x]:rule(allow: (card))\n").unwrap();
     let cfg = PrinterConfig {
         format: FormatConfig {
             callout_content_style: Some("block".to_string()),
@@ -101,10 +95,7 @@ fn connects_survive_a_specially_styled_callout() {
         ..Default::default()
     };
     let printed = document_to_tm_with_config(&doc, &cfg);
-    assert!(
-        printed.contains(":rule(allow: list(card))"),
-        "got: {printed:?}"
-    );
+    assert!(printed.contains(":rule(allow: (card))"), "got: {printed:?}");
 }
 
 #[test]
@@ -182,9 +173,9 @@ fn test_rfc3339_and_aliases_always_newline_meta_field_formatting() {
     let printed_empty = document_to_tm_with_config(&doc_empty, &cfg);
     // "aliases" has its own `always_newline` field config, which
     // special-cases an empty list to `[]`. "flags" has no field config, so
-    // it falls through to the native `list(...)` seq spelling.
+    // it falls through to the native `(...)` seq spelling.
     assert!(printed_empty.contains("aliases: []"));
-    assert!(printed_empty.contains("flags: list()"));
+    assert!(printed_empty.contains("flags: ()"));
 }
 
 #[test]
@@ -934,7 +925,7 @@ fn a_declaration_of_entries_is_printed_in_parentheses_and_reads_back() {
         "::vars(n: {type: int, default: 3})\n",
         "::format(link: {no_space: true})\n",
         "::fields(tags: {type: list(string)})\n",
-        "::workspace(ignore: list(a, b))\n",
+        "::workspace(ignore: (a, b))\n",
         "::export(type: html)\n",
         "::blueprints(daily: @file(b.tmt))\n",
         "::vocabularies(deck: @file(deck.tmt))\n",

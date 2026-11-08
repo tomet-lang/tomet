@@ -72,6 +72,7 @@ pub enum Value {
     /// scalar, is [`scalar_text`](Value::scalar_text).
     Number(String),
     String(String),
+    /// `(a, b, c)` -- a sequence. `()` is empty and `(x)` has one element.
     Seq(Vec<Value>),
     /// Insertion-ordered key/value pairs (a `.tmt` map has no inherent
     /// sort order, so preserve whatever order the source used).
@@ -81,12 +82,12 @@ pub enum Value {
     /// ordered sequence is enough for what this exists to express.
     ///
     /// The parser resolves exactly the literal constructors
-    /// (`list`, `string`, `int`, `float`) to
-    /// the plain value they stand for, so `list(card)` is a [`Value::Seq`]
-    /// and never a `Call`. Every other callee -- `enum`, a typo -- is kept
-    /// here as an uninterpreted `String`, the same way the parser never
+    /// (`string`, `int`, `float`) to the plain value they stand for. Every
+    /// other callee -- `list` (a type: `list(string)`), `enum`, a typo -- is
+    /// kept here as an uninterpreted `String`, the same way the parser never
     /// judges a `:name(...)` connect's name; only `tomet-semantics` knows
-    /// which of those are real.
+    /// which of those are real. `list(a, b)` is not a sequence: write
+    /// `(a, b)`.
     ///
     /// Deliberately not the same mechanism as `${func(args)}`'s
     /// `InterpExprKind::Call`: that callee can itself be a path
@@ -125,10 +126,10 @@ pub enum Value {
     /// an element's own `[content]`/`|content` slot, see
     /// `tmtroot/docs/spec/feature/content-shape.tmt`) sitting as a named
     /// value inside `(args)`/`{data}`, e.g. `@conflict(a: [ ... ], b: [
-    /// ... ])`. `[a, b]` array literals were retired in favor of
-    /// `list(...)` specifically to free `[...]` for this -- it already
-    /// meant "block content" at the element level, and now means it
-    /// uniformly at any value position.
+    /// ... ])`. `[a, b]` array literals are retired (a sequence is
+    /// `(a, b)`) to free `[...]` for this -- it already meant "block
+    /// content" at the element level, and now means it uniformly at any
+    /// value position.
     Blocks(Vec<Block>),
 }
 
@@ -378,7 +379,7 @@ impl Section {
 /// add one later if a real want surfaces, with the use case stated
 /// alongside the field. `id`/`connects` were kept: `id` mirrors `Section`'s
 /// own anchor-reference use (`#(id)` on the whole list), and `connects` is
-/// what a `:rule(allow:list(...))` attached to the list itself (restricting
+/// what a `:rule(allow:(...))` attached to the list itself (restricting
 /// what its own items may be) needs to live on.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct List {

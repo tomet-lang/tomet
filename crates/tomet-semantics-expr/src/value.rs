@@ -167,8 +167,8 @@ pub enum EvalValue {
     Seq(Vec<EvalValue>),
     /// Insertion-ordered, like [`Value::Map`].
     Map(Vec<(String, EvalValue)>),
-    /// A call literal other than `list(...)`, kept as written
-    /// (`enum(a, b)`). `list(...)` becomes a [`EvalValue::Seq`].
+    /// A call literal, kept as written (`list(string)`, `enum(a, b)`).
+    /// A sequence `(a, b)` is an [`EvalValue::Seq`], not a call.
     Call(String, Vec<EvalValue>),
     /// A structured part of a document: an element, a section, a list, a connect,
     /// a declaration, or a list item, with the document it came from.

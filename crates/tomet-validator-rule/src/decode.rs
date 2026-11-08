@@ -1,4 +1,4 @@
-//! Decodes a `:rule(allow:list(...), direct:@bool)` connect's own
+//! Decodes a `:rule(allow:(...), direct:@bool)` connect's own
 //! `args` into a usable [`RuleArgs`].
 
 use tomet_ast::{Connect, Name, Value};
@@ -6,7 +6,7 @@ use tomet_ast::{Connect, Name, Value};
 /// The decoded arguments of one `:rule(...)` connect.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RuleArgs {
-    /// The names `allow:list(...)` named, in source order. Never checked
+    /// The names `allow:(...)` named, in source order. Never checked
     /// against declared vocabulary here -- only compared against what a
     /// descendant actually classifies as.
     pub allow: Vec<Name>,
@@ -74,7 +74,7 @@ mod tests {
 
     #[test]
     fn decodes_allow_and_defaults_direct_to_false() {
-        let connect = parse_connect("@x[a]:rule(allow: list(card))\n");
+        let connect = parse_connect("@x[a]:rule(allow: (card))\n");
         assert_eq!(
             decode_rule_args(&connect),
             Some(RuleArgs {
@@ -86,7 +86,7 @@ mod tests {
 
     #[test]
     fn decodes_multiple_allow_entries_including_namespaced_ones() {
-        let connect = parse_connect("@x[a]:rule(allow: list(card, ns.mycard), direct: true)\n");
+        let connect = parse_connect("@x[a]:rule(allow: (card, ns.mycard), direct: true)\n");
         assert_eq!(
             decode_rule_args(&connect),
             Some(RuleArgs {

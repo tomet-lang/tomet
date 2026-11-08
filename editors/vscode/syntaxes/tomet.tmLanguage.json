@@ -739,7 +739,7 @@
     },
 
     "call": {
-      "comment": "`name(arg, ...)` call literal (such as `list(...)`) in values",
+      "comment": "`name(arg, ...)` call literal (such as `enum(...)`) in values",
       "begin": "(?<![A-Za-z0-9_.-])([A-Za-z_][A-Za-z0-9_-]*(?:\\.[A-Za-z_][A-Za-z0-9_-]*)*)\\s*(\\()",
       "beginCaptures": {
         "1": { "name": "support.function.tomet entity.name.function.tomet" },

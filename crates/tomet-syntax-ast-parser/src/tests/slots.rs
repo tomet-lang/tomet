@@ -93,7 +93,7 @@ fn only_a_marked_box_takes_content() {
 fn a_closer_inside_a_group_or_a_string_closes_nothing() {
     for src in [
         r#"<?regex("a>b")>"#,
-        "<?alt(a, list([x>y]))>",
+        "<?alt(a, ([x>y]))>",
         "<?(n){min: 1}>",
         "<?(n){gt: 1 > 0}>",
     ] {

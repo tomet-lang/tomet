@@ -1,7 +1,7 @@
 // A file may open with declarations about itself.
 ::kind(catalog, 2)
 ::use(deck)
-::meta(title: "Catalog", tags: list(a, b))
+::meta(title: "Catalog", tags: (a, b))
 ::config(format: json){ strict: true }
 
 "tmtroot/a.tmt": "../a.tmt"

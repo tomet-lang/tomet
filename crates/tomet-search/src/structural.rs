@@ -181,8 +181,8 @@ mod tests {
 
     #[test]
     fn matches_query_by_value_contains_in_call_and_interp() {
-        let doc = parse_file("::meta(rule: allow:list(\"special-item\"), expr: ${vault.name})\n")
-            .unwrap();
+        let doc =
+            parse_file("::meta(rule: allow:(\"special-item\"), expr: ${vault.name})\n").unwrap();
         let q_call = StructuralQuery {
             value_contains: Some("special".to_string()),
             ..Default::default()

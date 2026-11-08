@@ -1,6 +1,6 @@
 -@task()[]
 
--@task()[content]:rule(allow: list(card))
+-@task()[content]:rule(allow: (card))
 -@task(x: 1)[]{ y: 2 }
 
 -.@task()[]

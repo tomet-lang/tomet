@@ -858,7 +858,7 @@ Second paragraph.
 
     #[test]
     fn nested_edit_value_and_inline_items_import_and_roundtrip() {
-        let src = "::meta(nested: { a: list(1, 2), icon: @doc.icon(star) })\n\n=[ *Styled* Heading ]\n\nHello *italic*, **bold**, `code`, and @badge(ok)[green].\n";
+        let src = "::meta(nested: { a: (1, 2), icon: @doc.icon(star) })\n\n=[ *Styled* Heading ]\n\nHello *italic*, **bold**, `code`, and @badge(ok)[green].\n";
         let doc = import_source(src);
         assert_eq!(export_doc(&doc), src);
 
@@ -869,7 +869,7 @@ Second paragraph.
         match &args_slot.entries[0].value.kind {
             EditValueKind::Map(inner_slot) => {
                 assert_eq!(inner_slot.entries.len(), 2);
-                // `list(1, 2)` is a call: kept whole, as text.
+                // `(1, 2)` is kept whole, as text.
                 assert!(matches!(
                     inner_slot.entries[0].value.kind,
                     EditValueKind::Scalar(_)

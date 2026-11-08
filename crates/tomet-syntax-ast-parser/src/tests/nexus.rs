@@ -248,7 +248,7 @@ fn a_declaration_takes_no_connect_of_either_kind() {
             ("::name(a):rule(b)\n", 0),
             ("::name:rule(a)\n", 0),
             ("::name[x]:rule[y]\n", 0),
-            ("::kind(config)\n:rule(allow:list(k))\n", 0),
+            ("::kind(config)\n:rule(allow:(k))\n", 0),
         ],
     );
 }

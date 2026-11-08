@@ -24,7 +24,7 @@
 
 @memo(a: 1){ k: v }#(third)
 
-@memo(){ k: v }#(fourth):rule(allow: list(card))
+@memo(){ k: v }#(fourth):rule(allow: (card))
 
 =[ Connects ]
 
@@ -35,17 +35,17 @@ a nexus of its own: it puts data into the host it follows.
 
 @memo():(b: 2)
 
-@memo(a: 1):rule(allow: list(card)):{ b: 2 }
+@memo(a: 1):rule(allow: (card)):{ b: 2 }
 
 - 項目 :{ k: v }
 
 - 項目 :(k: v)
 
-- 項目 :rule(allow: list(card))
+- 項目 :rule(allow: (card))
 
 = 見出し :{ k: v }
 
-= 見出し :rule(allow: list(card))
+= 見出し :rule(allow: (card))
 
 =[ In running text ]
 

@@ -148,7 +148,7 @@ mod tests {
     #[test]
     fn never_changes_the_value() {
         for src in [
-            "a: 1  \n\n\n  b: list(1,  2)   \n",
+            "a: 1  \n\n\n  b: (1,  2)   \n",
             "m: {\n  x: 1   \n\n\n  y: \"s  \n  t\"  \n}\n",
             "// only a comment   \n\n\n",
             "\"k  \": \"v \r\n w\"\r\n",

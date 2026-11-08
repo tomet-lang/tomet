@@ -733,7 +733,7 @@ fn value_to_plain(v: &Value) -> String {
             .collect::<Vec<_>>()
             .join(", "),
         Value::Map(_) => String::new(),
-        // A call is validation-only (e.g. `:rule`'s `allow:list(...)`)
+        // A call is validation-only (e.g. a `type: list(string)`)
         // and has no rendered form.
         Value::Call(..) => String::new(),
         // An embedded element has no scalar form either -- same as `Map`.

@@ -44,7 +44,7 @@ vocabulary は、ある kind の文書が使える要素の名前と、その要
 |[ `content`   ][ なし  ][ `{ allow: }`。`[content]` に何を許すか ]
 |[ `about`     ][ なし  ][ 要素の散文。検査は読まない ]
 
-`content` の `allow:` は、`list(a, b)`（この名前だけ）、`inline`（段落一つだけ）、
+`content` の `allow:` は、`(a, b)`（この名前だけ）、`inline`（段落一つだけ）、
 `any` のいずれか。詳細は @link[`content-shape.tmt`](file:spec/features/content-shape.tmt)。
 
 #[ 引数のフィールド ]

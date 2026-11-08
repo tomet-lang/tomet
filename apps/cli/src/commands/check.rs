@@ -479,7 +479,7 @@ mod tests {
         let root = vault("ctmt_unswept");
         fs::write(
             root.join(tomet_load_config::VAULT_CONFIG_FILE),
-            "::kind(config)\n::workspace(unswept: list(\"frozen\"))\n",
+            "::kind(config)\n::workspace(unswept: (\"frozen\"))\n",
         )
         .unwrap();
         fs::create_dir_all(root.join("frozen")).unwrap();
@@ -619,7 +619,7 @@ mod tests {
         .unwrap();
         fs::write(
             root.join("bp.tmt"),
-            "::kind(blueprint)\n::blueprint(note)\n::meta(\n  date: \"2026\"\n)\n\n=[ Items ]#(items):rule(allow: list(task))\n",
+            "::kind(blueprint)\n::blueprint(note)\n::meta(\n  date: \"2026\"\n)\n\n=[ Items ]#(items):rule(allow: (task))\n",
         )
         .unwrap();
 

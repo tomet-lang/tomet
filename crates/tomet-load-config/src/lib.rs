@@ -370,10 +370,10 @@ mod tests {
     #[test]
     fn a_folder_config_cannot_set_what_only_the_vault_sets() {
         let dir = Dir::new("vaultonly");
-        dir.write(VAULT_CONFIG_FILE, "::workspace(ignore: list(\"target\"))\n");
+        dir.write(VAULT_CONFIG_FILE, "::workspace(ignore: (\"target\"))\n");
         dir.write(
             "a/self.tmt",
-            "::workspace(ignore: list(\"elsewhere\"))\n::format(link: { no_space: true })\n",
+            "::workspace(ignore: (\"elsewhere\"))\n::format(link: { no_space: true })\n",
         );
         let note = dir.write("a/note.tmt", "");
         let (cfg, _, _) = find_config_file(&note).unwrap();

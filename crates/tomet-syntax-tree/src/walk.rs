@@ -43,7 +43,7 @@ pub enum Place {
     Entry,
     /// The value of a `key: value` entry.
     PairValue,
-    /// An item of a `list(...)`, a map's value or a call's argument.
+    /// An item of a `(...)`, a map's value or a call's argument.
     Part,
     /// A block of a `[content]`, or of a `[...]` value.
     Content,
@@ -1058,7 +1058,7 @@ mod tests {
                    \n\
                    text ${inline} more\n\
                    \n\
-                   @x(a: ${arg}, b: list(${nested})){ k: ${val} }[ ${content} ]:as(${connect})\n\
+                   @x(a: ${arg}, b: (${nested})){ k: ${val} }[ ${content} ]:as(${connect})\n\
                    \n\
                    - item ${item}\n";
         let file = tomet_ast_parser::parse_file(src).unwrap();

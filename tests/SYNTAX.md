@@ -544,7 +544,7 @@ Section level=1
 ### 名前つきコネクトも主グループを要る。`:rule(...)` は書けて、`:rule{...}` は書けない（下の「主グループの無いネクサス」）
 
 ```tmt
-- 項目 :rule(allow: list(card))
+- 項目 :rule(allow: (card))
 ```
 
 ```
@@ -556,7 +556,7 @@ List ordered=false
           Text "項目"
       connect
         Inline @rule
-          args    {allow: list("card")}
+          args    {allow: ("card")}
 ```
 
 ### 水平線は `@hr()`。`@hr` だけの行はエラー
@@ -767,21 +767,66 @@ Block  @raw
   args    "rust"
 ```
 
-### 列。`list(...)` の一つの綴りしかない -- `[...]` は撤去された
+### 列。`(a, b)` の一つの綴りしかない -- `[...]` は撤去された
 
 ```tmt
-@memo(xs: list(1, 2, 3))
+@memo(xs: (1, 2, 3))
 ```
 
 ```
 Block  @memo
-  args    {xs: list(1, 2, 3)}
+  args    {xs: (1, 2, 3)}
 ```
 
 検証:
 
 ```
 unknown element `memo`: only `std` and this document's own `::kind` may be written bare; namespace it (`ns.memo`), or declare the vocabulary that has it and bind it with `::use`
+```
+
+### 空の列と一要素の列。値に中置演算はないので、括弧は何もまとめない。`(x)` はカンマがなくても一要素の列
+
+```tmt
+@memo(a: (), b: (x))
+```
+
+```
+Block  @memo
+  args    {a: (), b: ("x")}
+```
+
+検証:
+
+```
+unknown element `memo`: only `std` and this document's own `::kind` may be written bare; namespace it (`ns.memo`), or declare the vocabulary that has it and bind it with `::use`
+```
+
+### 入れ子の列
+
+```tmt
+@memo(xs: ((a), (b, c), ()))
+```
+
+```
+Block  @memo
+  args    {xs: (("a"), ("b", "c"), ())}
+```
+
+検証:
+
+```
+unknown element `memo`: only `std` and this document's own `::kind` may be written bare; namespace it (`ns.memo`), or declare the vocabulary that has it and bind it with `::use`
+```
+
+### 型の `list(string)` は列ではなく呼び出しのまま残る
+
+```tmt
+::fields(tags: { type: list(string) })
+```
+
+```
+Declaration ::fields
+  args    {tags: {type: list("string")}}
 ```
 
 ### 入れ子のマップ
@@ -1558,7 +1603,7 @@ Block  @task
 ### `:` の直後に名前があれば、マージではなく別の要素として `connects` に積まれる。現時点で唯一のメンバーは `rule`
 
 ```tmt
-@section[ x ]:rule(allow: list(card))
+@section[ x ]:rule(allow: (card))
 ```
 
 ```
@@ -1568,7 +1613,7 @@ Block  @section
       Text "x"
   connect
     Inline @rule
-      args    {allow: list("card")}
+      args    {allow: ("card")}
 ```
 
 検証:
@@ -1580,7 +1625,7 @@ unknown element `section`: only `std` and this document's own `::kind` may be wr
 ### 複数のコネクトを重ねられる。それぞれ独立した `connects` の要素になる
 
 ```tmt
-@x(a: 1):as(y):rule(allow: list(card))
+@x(a: 1):as(y):rule(allow: (card))
 ```
 
 ```
@@ -1591,7 +1636,7 @@ Block  @x
       args    "y"
   connect
     Inline @rule
-      args    {allow: list("card")}
+      args    {allow: ("card")}
 ```
 
 検証:
@@ -1601,15 +1646,15 @@ unknown element `x`: only `std` and this document's own `::kind` may be written 
 unknown connect `:as`; only a closed set may follow `:` (currently: rule)
 ```
 
-### `list(...)` は即座に確定するリテラル呼び出しで、パーサが列に解決する。`list`/`string`/`int`/`float` 以外の呼び出し名は、コネクトの名前と同じくパーサは判断せず、そのまま残す
+### `string`/`int`/`float` は即座に確定するリテラル呼び出しで、パーサが値に解決する。それ以外の呼び出し名(型の `list(string)` を含む)は、コネクトの名前と同じくパーサは判断せず、そのまま残す。列は呼び出しではなく裸の `(a, b)`
 
 ```tmt
-@x(a: list(card, ns.mycard))
+@x(a: (card, ns.mycard))
 ```
 
 ```
 Block  @x
-  args    {a: list("card", "ns.mycard")}
+  args    {a: ("card", "ns.mycard")}
 ```
 
 検証:
@@ -1672,7 +1717,7 @@ List ordered=false
 ### リスト項目は named connect も直接持てる。完全形・糖衣形のどちらでも、要素自身ではなく項目自身の `connects` に積まれる
 
 ```tmt
-- [ x ]:rule(allow: list(card))
+- [ x ]:rule(allow: (card))
 ```
 
 ```
@@ -1684,13 +1729,13 @@ List ordered=false
           Text "x"
       connect
         Inline @rule
-          args    {allow: list("card")}
+          args    {allow: ("card")}
 ```
 
 ### 見出しの糖衣形の named connect も、完全形(`=[ h ]:rule(...)`)と同じ扱い
 
 ```tmt
-= h :rule(allow: list(card))
+= h :rule(allow: (card))
 ```
 
 ```
@@ -1699,7 +1744,7 @@ Section level=1
     Text "h"
   connect
     Inline @rule
-      args    {allow: list("card")}
+      args    {allow: ("card")}
 ```
 
 ## id `#(...)`
@@ -1797,7 +1842,7 @@ List ordered=false
 ### コネクトは`#(id)`を取らない。コネクトの直後に書くとエラー(idは所有者のものなので、最初のコネクトより前に書く)
 
 ```tmt
-@task(a: 1):rule(allow: list(card))#(myid)
+@task(a: 1):rule(allow: (card))#(myid)
 ```
 
 ```
@@ -1807,7 +1852,7 @@ parse error: 1:12: a `:connect` takes no `#(id)`: write the id of its owner befo
 ### 所有者のidは最初のコネクトより前に書く
 
 ```tmt
-@task(a: 1)#(myid):rule(allow: list(card))
+@task(a: 1)#(myid):rule(allow: (card))
 ```
 
 ```
@@ -1816,7 +1861,7 @@ Block  @task
   id      "myid"
   connect
     Inline @rule
-      args    {allow: list("card")}
+      args    {allow: ("card")}
 ```
 
 ### idを2つ書くとエラー
@@ -1907,7 +1952,7 @@ unknown element `x`: only `std` and this document's own `::kind` may be written 
 ::vars(a: { type: string })
 ::format(table: { max_col_width: 50 })
 ::fields(created: { type: datetime })
-::workspace(ignore: list("a"))
+::workspace(ignore: ("a"))
 ::export(type: commonmark)
 ::blueprints(b: "b.tmt")
 ::vocabularies(v: "v.tmt")
@@ -1928,7 +1973,7 @@ Declaration ::format
 Declaration ::fields
   args    {created: {type: "datetime"}}
 Declaration ::workspace
-  args    {ignore: list("a")}
+  args    {ignore: ("a")}
 Declaration ::export
   args    {type: "commonmark"}
 Declaration ::blueprints
@@ -2093,7 +2138,7 @@ parse error: 1:1: `@memo` needs a primary group, `(...)` or `[...]`: `{...}`, `#
 ### 名前つきコネクトだけでは要素にならない
 
 ```tmt
-@memo:rule(allow: list(card))
+@memo:rule(allow: (card))
 ```
 
 ```
@@ -2123,7 +2168,7 @@ parse error: 1:1: `@memo` needs a primary group, `(...)` or `[...]`: `:connect` 
 ### コネクトも主グループを要る。`:rule{...}` は書けない
 
 ```tmt
-@memo():rule{ allow: list(card) }
+@memo():rule{ allow: (card) }
 ```
 
 ```
@@ -2133,7 +2178,7 @@ parse error: 1:8: `:rule` needs a primary group, `(...)` or `[...]`: `{...}` can
 ### リスト項目のコネクトも同じ
 
 ```tmt
-- 項目 :rule{ allow: list(card) }
+- 項目 :rule{ allow: (card) }
 ```
 
 ```
@@ -2143,7 +2188,7 @@ parse error: 1:6: `:rule` needs a primary group, `(...)` or `[...]`: `{...}` can
 ### 見出しのコネクトも同じ
 
 ```tmt
-= 見出し :rule{ allow: list(card) }
+= 見出し :rule{ allow: (card) }
 ```
 
 ```
@@ -2228,7 +2273,7 @@ parse error: 2:1: `::meta` needs a primary group, `(...)` or `[...]`: `#(id)` ca
 ### 宣言はコネクトを取らない。コネクトは要素に付くもので、宣言は何にも付かない
 
 ```tmt
-::kind(note):rule(allow:list(k))
+::kind(note):rule(allow:(k))
 ```
 
 ```
@@ -2278,7 +2323,7 @@ Paragraph
 
 > **パースは通る。** 上が実際の結果。
 
-### `[a, b]` 列リテラルも撤去。`[`/`]` は既に `[content]` の意味を持つので、値の中の列は `list(...)` の一つの綴りしかない
+### `[a, b]` 列リテラルも撤去。`[`/`]` は既に `[content]` の意味を持つので、値の中の列は `(a, b)` の一つの綴りしかない
 
 ```tmt
 @memo(xs: [1, 2, 3])
@@ -2294,6 +2339,29 @@ Block  @memo
 
 ```
 unknown element `memo`: only `std` and this document's own `::kind` may be written bare; namespace it (`ns.memo`), or declare the vocabulary that has it and bind it with `::use`
+```
+
+> **パースは通る。** 上が実際の結果。
+
+### 列は値だけを持ち、`key: value` の項目は持てない。マップは `{...}`
+
+```tmt
+@memo(xs: (a: 1))
+```
+
+```
+parse error: 1:12: a sequence '(...)' holds values, not 'key: value' entries; write a map as '{...}'
+```
+
+### データの列を `list(...)` とは書かない。呼び出しとして残り、列として読む側（`ignore:` など）が受け付けない
+
+```tmt
+::workspace(ignore: list("a"))
+```
+
+```
+Declaration ::workspace
+  args    {ignore: list("a")}
 ```
 
 > **パースは通る。** 上が実際の結果。

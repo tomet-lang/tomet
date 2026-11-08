@@ -1,6 +1,6 @@
 //! Renders a `Value` back into cotomet data text:
 //! a top-level map is written as bare `key: value` lines (no enclosing braces);
-//! nested maps use `{ ... }`, and a sequence prints as `list(...)`.
+//! nested maps use `{ ... }`, and a sequence prints as `(a, b)`.
 
 use tomet_ast::Value;
 
@@ -14,7 +14,7 @@ fn write_value(value: &Value, out: &mut String, top_level: bool) {
     match value {
         Value::Map(entries) => write_map(entries, out, top_level),
         Value::Seq(items) => {
-            out.push_str("list(");
+            out.push('(');
             for (i, item) in items.iter().enumerate() {
                 if i > 0 {
                     out.push_str(", ");

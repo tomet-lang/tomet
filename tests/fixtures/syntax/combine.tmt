@@ -9,7 +9,7 @@
 
 // `[content]`, a bare trailing connect, and a named connect, same as a
 // standalone element's own groups.
--@task()[content]:rule(allow:list(card))
+-@task()[content]:rule(allow:(card))
 -@task():(x: 1){y: 2}
 
 // Ordered list marker, same combine support.

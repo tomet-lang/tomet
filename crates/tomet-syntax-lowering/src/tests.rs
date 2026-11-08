@@ -88,7 +88,7 @@ fn a_nexus_inside_a_value_is_held_to_it_too() {
         ("k: @name:rule(a)\n", 3),
         ("k: @name:{a: 1}\n", 3),
         ("a: [ x @name{} ]\n", 7),
-        ("k: list(@name{})\n", 8),
+        ("k: (@name{})\n", 4),
     ] {
         let e = refusal(value(src), src);
         assert!(

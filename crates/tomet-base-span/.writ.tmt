@@ -6,7 +6,7 @@
        | It holds zero dependencies on other workspace members.
   guard: { twrit: dependencies }
   crate: @crate(tomet-span)
-  dependencies: list()
+  dependencies: ()
 }
 
 @rule(tomet-span-purity){
@@ -15,8 +15,8 @@
   guard: { twrit: pure }
   crate: @crate(tomet-span)
   pure: {
-    forbid: list("std::fs", "std::net", "std::process", "std::env")
-    allow-external: list(
+    forbid: ("std::fs", "std::net", "std::process", "std::env")
+    allow-external: (
       "serde", "serde_core", "serde_derive",
       "proc-macro2", "quote", "syn", "unicode-ident"
     )

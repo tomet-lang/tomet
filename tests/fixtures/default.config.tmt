@@ -70,7 +70,7 @@
   }
 )
 ::workspace(
-  ignore: list("00-09 System/01 Apps/obsidian")
+  ignore: ("00-09 System/01 Apps/obsidian")
 )
 ::migration(
   meta: {

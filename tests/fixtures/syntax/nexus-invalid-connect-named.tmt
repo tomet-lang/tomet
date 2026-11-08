@@ -1,3 +1,3 @@
 // A named connect cannot be the only thing after `@name`.
 
-@memo:rule(allow: list(card))
+@memo:rule(allow: (card))

@@ -31,14 +31,14 @@
 (declaration "::" @tag)
 (declaration name: (name) @tag)
 
-; `list(...)`, `string(...)`, `int(...)`, `float(...)` are resolved by the
-; parser; any other callee is left for a later pass.
+; `string(...)`, `int(...)`, `float(...)` are resolved by the parser; any
+; other callee (`list(string)`, a type, among them) is left for a later pass.
 (call
   function: (name) @function.builtin
-  (#match? @function.builtin "^(list|string|int|float)$"))
+  (#match? @function.builtin "^(string|int|float)$"))
 (call
   function: (name) @function
-  (#not-match? @function "^(list|string|int|float)$"))
+  (#not-match? @function "^(string|int|float)$"))
 
 ((scalar) @constant.builtin
   (#match? @constant.builtin "^(null|true|false)$"))

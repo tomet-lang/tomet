@@ -242,7 +242,7 @@ fn a_hole_survives_print_and_parse() {
         "<?int>",
         "<?(id)>[adr-<?int(n)>-<?(slug)>]",
         "<?int(n, \"x\"){min: 1}>",
-        "<?alt(doc, list([adr-<?int(n)>], [rfc-<?int(n)>]))>",
+        "<?alt(doc, ([adr-<?int(n)>], [rfc-<?int(n)>]))>",
         "@link(url: <?(u)>)[<?(text)>]",
         "<?tandr.heading(h)>",
         "@meta(){ type: <?(kind)> }",

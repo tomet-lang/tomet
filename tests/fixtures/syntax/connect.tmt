@@ -26,12 +26,12 @@
 
 // Named connect on a list item, sugar and full form -- `element_list_item`
 // carries `connects` now, matching a heading's own long-standing support.
-- content :rule(allow:list(card))
-- [ content ]:rule(allow:list(card))
+- content :rule(allow:(card))
+- [ content ]:rule(allow:(card))
 
 // Heading sugar form gains the same named-connect support its bracketed
 // form already had.
-= title :rule(allow:list(card))
+= title :rule(allow:(card))
 
 // Heading sugar form: bare connect, combined, matching the list-item
 // sugar body above (shared implementation, `parse_sugar_body`).

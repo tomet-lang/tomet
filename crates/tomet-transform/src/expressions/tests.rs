@@ -9,7 +9,7 @@ use super::*;
 
 const NOTE: &str = "::meta(
   title: Note
-  tags: list(a, b)
+  tags: (a, b)
 )
 
 =[ Heading ]#(top)

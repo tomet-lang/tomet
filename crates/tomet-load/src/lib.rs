@@ -405,9 +405,9 @@ mod tests {
         )
         .expect("config");
         for (file, tags, created) in [
-            ("rust.tmt", "list(rust)", "2026-01-01"),
-            ("cli.tmt", "list(rust, cli)", "2026-05-01"),
-            ("go.tmt", "list(go)", "2026-09-01"),
+            ("rust.tmt", "(rust)", "2026-01-01"),
+            ("cli.tmt", "(rust, cli)", "2026-05-01"),
+            ("go.tmt", "(go)", "2026-09-01"),
         ] {
             fs::write(
                 root.join("notes").join(file),
@@ -609,9 +609,9 @@ mod tests {
             &[
                 (
                     "a/self.tmt",
-                    "::kind(config)\n::workspace(ignore: list(\"x\"))\n\n=[ A ]\n",
+                    "::kind(config)\n::workspace(ignore: (\"x\"))\n\n=[ A ]\n",
                 ),
-                ("note.tmt", "::workspace(unswept: list(\"y\"))\n\nbody\n"),
+                ("note.tmt", "::workspace(unswept: (\"y\"))\n\nbody\n"),
             ],
         );
         let vault = Vault::discover(&root);
@@ -633,16 +633,12 @@ mod tests {
 
         // A config document that is no layer of the stack is a sample: nothing reads it.
         let sample = root.join("sample.tmt");
-        fs::write(
-            &sample,
-            "::kind(config)\n::workspace(ignore: list(\"x\"))\n",
-        )
-        .unwrap();
+        fs::write(&sample, "::kind(config)\n::workspace(ignore: (\"x\"))\n").unwrap();
         assert!(!reported(&findings_of(&sample)));
 
         // The vault config is the one place it belongs.
         let vault_file = root.join(tomet_load_config::VAULT_CONFIG_FILE);
-        fs::write(&vault_file, "::workspace(ignore: list(\"x\"))\n").unwrap();
+        fs::write(&vault_file, "::workspace(ignore: (\"x\"))\n").unwrap();
         assert!(!reported(&findings_of(&vault_file)));
     }
 
@@ -653,11 +649,11 @@ mod tests {
             &[
                 (
                     "a/index.tmt",
-                    "::kind(config)\n::workspace(ignore: list(\"x\"))\n",
+                    "::kind(config)\n::workspace(ignore: (\"x\"))\n",
                 ),
                 (
                     "a/self.tmt",
-                    "::kind(config)\n::workspace(ignore: list(\"x\"))\n",
+                    "::kind(config)\n::workspace(ignore: (\"x\"))\n",
                 ),
             ],
         );
@@ -749,7 +745,7 @@ mod tests {
         );
         fs::write(
             root.join(tomet_load_config::VAULT_CONFIG_FILE),
-            "::kind(config)\n::workspace(ignore: list(\"skipped\"), unswept: list(\"frozen\"))\n",
+            "::kind(config)\n::workspace(ignore: (\"skipped\"), unswept: (\"frozen\"))\n",
         )
         .unwrap();
 

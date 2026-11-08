@@ -56,7 +56,7 @@ fn remote_id_target_element_supports_colon_connection() {
 
 #[test]
 fn named_connect_reads_into_connects() {
-    let doc = parse_file("@section[ x ]:rule(allow: list(card))\n").unwrap();
+    let doc = parse_file("@section[ x ]:rule(allow: (card))\n").unwrap();
     match &doc.body[0] {
         Block::Element(el) => {
             assert_eq!(el.name, Name::bare("section"));
@@ -77,7 +77,7 @@ fn named_connect_reads_into_connects() {
 
 #[test]
 fn multiple_named_connects_stack_flat_not_nested() {
-    let doc = parse_file("@x(a: 1):as(y):rule(allow: list(card))\n").unwrap();
+    let doc = parse_file("@x(a: 1):as(y):rule(allow: (card))\n").unwrap();
     match &doc.body[0] {
         Block::Element(el) => {
             assert_eq!(el.connects.len(), 2);
@@ -110,7 +110,7 @@ fn bare_colon_merge_is_unaffected_by_named_connect_support() {
 
 #[test]
 fn section_supports_named_connect() {
-    let doc = parse_file("=[ h ]:rule(allow: list(card))\n").unwrap();
+    let doc = parse_file("=[ h ]:rule(allow: (card))\n").unwrap();
     match &doc.body[0] {
         Block::Section(s) => {
             assert_eq!(s.connects.len(), 1);
@@ -188,7 +188,7 @@ fn sugar_heading_supports_a_named_connect_matching_its_bracketed_form() {
     // because `parse_sugar_body` had no colon handling of any kind
     // before -- `ConnectMode::Full` closes that gap rather than leaving
     // the sugar form one step behind the bracketed one.
-    let doc = parse_file("= h :rule(allow: list(card))\n").unwrap();
+    let doc = parse_file("= h :rule(allow: (card))\n").unwrap();
     match &doc.body[0] {
         Block::Section(s) => {
             assert_eq!(s.connects.len(), 1);
@@ -203,7 +203,7 @@ fn sugar_list_item_supports_a_named_connect_matching_its_bracketed_form() {
     // A list item's sugar body now supports `:name(...)` too -- matching
     // both its own full-bracketed form (just above) and a heading's sugar
     // form, now that `element_list_item` carries `connects`.
-    let doc = parse_file("- content :rule(allow: list(card))\n").unwrap();
+    let doc = parse_file("- content :rule(allow: (card))\n").unwrap();
     match &doc.body[0] {
         Block::List(list) => {
             let items = &list.items;

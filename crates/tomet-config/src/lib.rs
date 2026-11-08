@@ -174,7 +174,7 @@ mod tests {
     #[test]
     fn test_workspace_ignore_parsing() {
         let src = r#"::workspace(
-  ignore: list("00-09 System/01 Apps/obsidian")
+  ignore: ("00-09 System/01 Apps/obsidian")
 )
 "#;
         let cfg = load_config_from_str(src).expect("failed to parse the workspace");
@@ -300,8 +300,8 @@ mod tests {
   title: { length: 70 }
 )
 ::workspace(
-  ignore: list("target", "build")
-  unswept: list("tests/fixtures")
+  ignore: ("target", "build")
+  unswept: ("tests/fixtures")
 )
 "#;
         let cfg = load_config_from_str(src).expect("failed to parse meta and workspace");

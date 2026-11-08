@@ -2,7 +2,7 @@ use super::*;
 
 #[test]
 fn parses_flat_map() {
-    let v = parse_value("title: value\ntags: list(a, b)").unwrap();
+    let v = parse_value("title: value\ntags: (a, b)").unwrap();
     assert_eq!(
         v,
         Value::Map(vec![
@@ -15,8 +15,8 @@ fn parses_flat_map() {
     );
 }
 
-/// The `[a, b]` list literal was retired -- `list(...)` is the sole
-/// spelling for a list. `[`/`]` in a value position isn't a parse error
+/// The `[a, b]` list literal was retired -- `(a, b)` is the sole
+/// spelling for a sequence. `[`/`]` in a value position isn't a parse error
 /// either, though: it means block content (`Value::Blocks`, the same
 /// grammar as an element's own `[content]`), so `[a, b]` parses, but as
 /// one paragraph of plain text `"a, b"`, not a two-item list.
@@ -108,35 +108,87 @@ fn parses_scalars() {
 }
 
 #[test]
-fn a_list_call_is_a_sequence() {
+fn a_bare_paren_group_is_a_sequence() {
+    let s = |t: &str| Value::String(t.into());
+    // Empty, one element (no trailing comma needed), several.
+    assert_eq!(parse_value("()").unwrap(), Value::Seq(vec![]));
+    assert_eq!(parse_value("(card)").unwrap(), Value::Seq(vec![s("card")]));
+    assert_eq!(
+        parse_value("(card, ns.mycard)").unwrap(),
+        Value::Seq(vec![s("card"), s("ns.mycard")])
+    );
+    // Nested, and a map or a scalar of another type as an element.
+    assert_eq!(
+        parse_value("(a, (b))").unwrap(),
+        Value::Seq(vec![s("a"), Value::Seq(vec![s("b")])])
+    );
+    assert_eq!(
+        parse_value("((a), (b, c), ())").unwrap(),
+        Value::Seq(vec![
+            Value::Seq(vec![s("a")]),
+            Value::Seq(vec![s("b"), s("c")]),
+            Value::Seq(vec![]),
+        ])
+    );
+    assert_eq!(
+        parse_value("({k: 1}, 2, \"q\")").unwrap(),
+        Value::Seq(vec![
+            Value::Map(vec![("k".into(), Value::Int(1))]),
+            Value::Int(2),
+            s("q"),
+        ])
+    );
+    // As the value of a key.
+    assert_eq!(
+        parse_value("allow: (card)").unwrap(),
+        Value::Map(vec![("allow".into(), Value::Seq(vec![s("card")]))])
+    );
+    assert_eq!(
+        parse_value("a: ()\nb: (1,\n  2)").unwrap(),
+        Value::Map(vec![
+            ("a".into(), Value::Seq(vec![])),
+            ("b".into(), Value::Seq(vec![Value::Int(1), Value::Int(2)])),
+        ])
+    );
+}
+
+/// `list(...)` is a type (`type: list(string)`), not a value: it stays a
+/// `Call` for the type reader, and no sequence reader takes it.
+#[test]
+fn a_list_call_is_not_a_sequence() {
     assert_eq!(
         parse_value("list(card)").unwrap(),
-        Value::Seq(vec![Value::String("card".into())])
+        Value::Call("list".into(), vec![Value::String("card".into())])
     );
     assert_eq!(
-        parse_value("list(card, ns.mycard)").unwrap(),
-        Value::Seq(vec![
-            Value::String("card".into()),
-            Value::String("ns.mycard".into())
-        ])
-    );
-    assert_eq!(
-        parse_value("list(a, list(b))").unwrap(),
-        Value::Seq(vec![
-            Value::String("a".into()),
-            Value::Seq(vec![Value::String("b".into())])
-        ])
-    );
-    assert_eq!(
-        parse_value("allow: list(card)").unwrap(),
+        parse_value("type: list(string)").unwrap(),
         Value::Map(vec![(
-            "allow".into(),
-            Value::Seq(vec![Value::String("card".into())])
+            "type".into(),
+            Value::Call("list".into(), vec![Value::String("string".into())])
         )])
     );
 }
 
-/// The parser resolves exactly the literal constructors (`list`, `string`,
+#[test]
+fn a_sequence_holds_values_not_entries() {
+    for src in ["k: (a: 1)", "k: (a, b: 2)", "(x: 1)"] {
+        let err = parse_value(src).unwrap_err();
+        assert!(
+            err.message.contains("holds values"),
+            "{src:?}: {}",
+            err.message
+        );
+    }
+}
+
+#[test]
+fn a_sequence_is_a_whole_value() {
+    for src in ["k: (a) b", "k: (a)(b)", "k: (a) (b)"] {
+        assert!(parse_value(src).is_err(), "{src:?}");
+    }
+}
+
+/// The parser resolves exactly the literal constructors (`string`,
 /// `int`, `float`); any other callee is left as an inert `Value::Call` for
 /// `tomet-semantics` to judge.
 #[test]

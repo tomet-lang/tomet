@@ -24,6 +24,10 @@
           "named": true
         },
         {
+          "type": "sequence",
+          "named": true
+        },
+        {
           "type": "string",
           "named": true
         }
@@ -59,6 +63,10 @@
         },
         {
           "type": "scalar",
+          "named": true
+        },
+        {
+          "type": "sequence",
           "named": true
         },
         {
@@ -133,6 +141,10 @@
           "named": true
         },
         {
+          "type": "sequence",
+          "named": true
+        },
+        {
           "type": "string",
           "named": true
         }
@@ -174,6 +186,10 @@
             "named": true
           },
           {
+            "type": "sequence",
+            "named": true
+          },
+          {
             "type": "string",
             "named": true
           }
@@ -212,6 +228,37 @@
     }
   },
   {
+    "type": "sequence",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "call",
+          "named": true
+        },
+        {
+          "type": "map",
+          "named": true
+        },
+        {
+          "type": "scalar",
+          "named": true
+        },
+        {
+          "type": "sequence",
+          "named": true
+        },
+        {
+          "type": "string",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
     "type": "source_file",
     "named": true,
     "root": true,
@@ -238,6 +285,10 @@
         },
         {
           "type": "scalar",
+          "named": true
+        },
+        {
+          "type": "sequence",
           "named": true
         },
         {

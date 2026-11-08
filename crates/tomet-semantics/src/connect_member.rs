@@ -22,7 +22,7 @@ use tomet_ast::Name;
 /// (semantics).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ConnectMember {
-    /// `:rule(allow:list(...), direct:@bool)` -- restricts what element
+    /// `:rule(allow:(...), direct:@bool)` -- restricts what element
     /// kinds may appear among an element's descendants (or, with
     /// `direct:true`, its immediate children only).
     Rule,

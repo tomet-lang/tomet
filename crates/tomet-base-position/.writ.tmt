@@ -6,7 +6,7 @@
        | It holds zero dependencies on other workspace members.
   guard: { twrit: dependencies }
   crate: @crate(tomet-position)
-  dependencies: list()
+  dependencies: ()
 }
 
 @rule(tomet-position-purity){
@@ -14,7 +14,7 @@
   guard: { twrit: pure }
   crate: @crate(tomet-position)
   pure: {
-    forbid: list("std::fs", "std::net", "std::process", "std::env")
-    allow-external: list()
+    forbid: ("std::fs", "std::net", "std::process", "std::env")
+    allow-external: ()
   }
 }

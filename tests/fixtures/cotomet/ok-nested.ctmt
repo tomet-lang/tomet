@@ -1,13 +1,13 @@
-map: { a: 1, b: { c: 2, d: list(x, y) } }
+map: { a: 1, b: { c: 2, d: (x, y) } }
 multi: {
   x: 1
   y: 2
 }
 empty-map: {}
-empty-list: list()
-names: list(a, b, c)
-numbers: list(1, 2.5, -3)
-spread: list(
+empty-list: ()
+names: (a, b, c)
+numbers: (1, 2.5, -3)
+spread: (
   alpha,
   beta, // second
   gamma

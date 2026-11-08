@@ -94,19 +94,17 @@
 //!  | correctly accepts any run of 3+. See
 //!  | `more_than_three_dashes_are_only_partially_consumed_by_thematic_break`
 //!  | below for the pinned exact shape.
-//! -| **A bare `list(...)` occupying the *whole* `(args)`/`{value}`
-//!  | doesn't parse as `call`, unlike the same call under a named key
-//!  | (`a: list(...)`, which works fine).** `@id(list(a, b))` and
-//!  | `::meta(list(a, b))` both land in an `ERROR` even with `$.call`
-//!  | added as an alternative to `args_group`/`value_group`'s shared
-//!  | `value` rule -- tried and reverted, since it changed nothing:
-//!  | whatever conflicts an identifier-then-`(` at that exact position
-//!  | with, it isn't decided by `value`'s own alternatives. Not
-//!  | root-caused. `tomet-parser` accepts it (`value.rs::try_parse_call`
-//!  | runs before `parse_value_at`'s map/scalar fallback); the DSL/list
-//!  | retirement (`[a, b]` -> `list(...)`) is what exposed this, since
-//!  | `[a, b]` in that same bare position used to reach the now-removed
-//!  | `$.seq` alternative just fine.
+//! -| **A bare call or sequence occupying the *whole* `(args)`/`{value}`
+//!  | doesn't parse, unlike the same value under a named key (`a: (b, c)`,
+//!  | `a: list(string)`, which work fine).** `@id(list(a, b))` and
+//!  | `::meta((a, b))` both land in an `ERROR` even with `$.call` added as an
+//!  | alternative to `args_group`/`value_group`'s shared `value` rule -- tried
+//!  | and reverted, since it changed nothing: whatever conflicts an
+//!  | identifier-then-`(` at that exact position with, it isn't decided by
+//!  | `value`'s own alternatives. Not root-caused. `tomet-parser` accepts
+//!  | both (`lower_single_value_from_children` reads a lone call or `(...)`
+//!  | before its scalar fallback); `$.sequence` is reached through
+//!  | `_entry_value` only, so a named key is the form this grammar covers.
 //!
 //! `scanner.c` (see its own module doc) resolves what used to be listed
 //! here as a known limitation: a bare, colon-less, identifier-shaped
@@ -114,12 +112,12 @@
 //! or `{required}`) now parses as a clean `scalar` instead of an `ERROR`.
 //!
 //! `_value_scalar`'s regex (see its own comment in `grammar.js`) resolves
-//! another former limitation: a `key: list(...)` map entry (e.g.
-//! `tags: list(a, b)`) used to get GLR-merged with a second, spurious
+//! another former limitation: a `key: (...)` map entry (e.g.
+//! `tags: (a, b)`) used to get GLR-merged with a second, spurious
 //! top-level reading of the same text, wrapping the whole map in an
 //! `ERROR` -- not just when that entry was last in the map with no
 //! trailing comma (the case originally found), but for an earlier,
-//! non-last `key: list(...)` entry too. Root cause: the regex never
+//! non-last `key: (...)` entry too. Root cause: the regex never
 //! excluded space/tab from its character class, so it could match a lone
 //! leading space (between `:` and the value) as a complete one-character
 //! token in its own right, and tree-sitter's lexer took that real, if
@@ -481,16 +479,16 @@ mod tests {
             "=[ Title ]:{ id: intro, tag: main }\n",
             "@task[ Task A ]:{ id: taskA, priority: high }\n",
             "@id(taskA):{ priority: high, tag: dev }\n",
-            // A bare positional `list(...)` occupying the whole
-            // `(args)` value -- as opposed to `a: list(...)` under a
-            // named key, which already works (see
-            // `parses_call_syntax_in_values`) -- doesn't reach `call`
-            // in this grammar yet (`args_group`'s own `value` rule,
-            // unlike `_entry_value`, still trips over it). Genuine
-            // `tomet-parser` syntax, not covered here: named-key form
-            // exercises the same `list(...)` + colon-connect
-            // interaction without hitting that gap.
-            "@id(ids: list(taskA, taskB)):{ tag: house }\n",
+            // A bare positional `(...)` occupying the whole `(args)`
+            // value -- as opposed to `a: (...)` under a named key,
+            // which already works (see `parses_sequence_syntax_in_values`)
+            // -- doesn't reach `sequence` in this grammar yet
+            // (`args_group`'s own `value` rule, unlike `_entry_value`,
+            // still trips over it). Genuine `tomet-parser` syntax, not
+            // covered here: named-key form exercises the same
+            // sequence + colon-connect interaction without hitting
+            // that gap.
+            "@id(ids: (taskA, taskB)):{ tag: house }\n",
         ] {
             let tree = parse(src);
             assert!(
@@ -613,11 +611,41 @@ mod tests {
     /// identifier match preempt `_value_scalar`'s otherwise-longer match
     /// for the same text. See `call`'s own comment in `grammar.js`.
     #[test]
+    fn parses_sequence_syntax_in_values() {
+        for src in [
+            "@x(a: ())\n",
+            "@x(a: (card))\n",
+            "@x(a: (card, ns.mycard))\n",
+            "@x(a: (b, (c)))\n",
+            "@x(a: ((b), (c, d), ()))\n",
+            "@x(a: ({ k: 1 }, \"s\", 2))\n",
+            "::workspace(ignore: (\"a\", \"b\"), unswept: (\"c\"))\n",
+        ] {
+            let tree = parse(src);
+            let root = tree.root_node();
+            assert!(
+                !root.has_error(),
+                "expected no errors for {src:?}: {}",
+                root.to_sexp()
+            );
+            assert!(
+                tree_contains_kind(root, "sequence"),
+                "expected a sequence node for {src:?}"
+            );
+            assert!(
+                !tree_contains_kind(root, "call"),
+                "a bare `(...)` is not a call for {src:?}"
+            );
+        }
+    }
+
+    #[test]
     fn parses_call_syntax_in_values() {
         for src in [
             "@x(a: list(card))\n",
             "@x(a: list(card, ns.mycard))\n",
             "@x(a: list(b, list(c)))\n",
+            "@x(a: string(b))\n",
         ] {
             let tree = parse(src);
             let root = tree.root_node();

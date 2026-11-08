@@ -353,8 +353,7 @@ mod tests {
 
     #[test]
     fn enforces_blueprint_section_rule_constraint() {
-        let blueprint =
-            parse("::blueprint(task-list)\n\n=[ Tasks ]#(tasks):rule(allow: list(task))\n");
+        let blueprint = parse("::blueprint(task-list)\n\n=[ Tasks ]#(tasks):rule(allow: (task))\n");
         // doc has a section with a heading that is not allowed
         let doc_bad =
             parse("::kind(task-list)\n\n=[ Tasks ]#(tasks)\n@heading[ Not allowed here ]\n");

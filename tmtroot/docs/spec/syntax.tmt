@@ -115,8 +115,8 @@ a
 - content :(x:1){y:2}              // bare connect は (args)/{value} どちらも、どちらが先でもよい
 - content
   :{y:2}                          // 空行1つまでなら次の行に置いてもよい
-- content :rule(allow:list(card)) // named connect は list item にも直接付けられる
-= title :rule(allow:list(card))   // 見出しの sugar form も同様
+- content :rule(allow:(card)) // named connect は list item にも直接付けられる
+= title :rule(allow:(card))   // 見出しの sugar form も同様
 ```
 
 `:name(...)`（named connect）の集合は閉じている。現在のメンバーは

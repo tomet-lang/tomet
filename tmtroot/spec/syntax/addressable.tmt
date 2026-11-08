@@ -65,9 +65,9 @@ tmt:docs/spec/syntax.tmt#intro
 配列やリストの値の中は、`prop.key` の後ろに `item(n)` をつないで指す。添字は 0 始まり。
 
 ```
-@card(tags: list(a, b, c)) #(intro)
+@card(tags: (a, b, c)) #(intro)
 
-${#intro.prop.tags}                 list(a, b, c) を指す
+${#intro.prop.tags}                 (a, b, c) を指す
 ${#intro.prop.tags.item(2)}         c を指す
 ${#intro.prop(tags).item(2)}        関数呼び出し記法（等価）
 ```

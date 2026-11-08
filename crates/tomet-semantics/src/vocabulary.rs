@@ -101,7 +101,7 @@ pub struct ElementDecl {
 /// feature/content-shape.tmt`).
 #[derive(Debug, Clone, PartialEq)]
 pub enum ContentAllow {
-    /// `allow: list(a, b)` -- only these names, at any depth.
+    /// `allow: (a, b)` -- only these names, at any depth.
     Names(Vec<Name>),
     /// `allow: inline` -- at most one plain paragraph, no nested blocks.
     Inline,
@@ -174,7 +174,7 @@ pub const RESERVED_NAMESPACES: [&str; 1] = ["doc"];
 
 /// Element names no vocabulary may declare, because tomet reserves them
 /// for syntax and structural rules (e.g. `item` for plain list items in
-/// `:rule(allow: list(item, ...))`).
+/// `:rule(allow: (item, ...))`).
 pub const RESERVED_ELEMENT_NAMES: [&str; 1] = ["item"];
 
 /// Whether `name` is a reserved element name that no vocabulary may declare.
@@ -694,7 +694,7 @@ fn content_allow_from_value(content: &Value) -> Option<ContentAllow> {
     match content.get("allow")? {
         Value::String(s) if s == "inline" => Some(ContentAllow::Inline),
         Value::String(s) if s == "any" => Some(ContentAllow::Any),
-        // `list(...)` -- the parser resolves it to a `Value::Seq`.
+        // `(a, b)` -- a `Value::Seq`.
         Value::Seq(items) => {
             let mut names = Vec::with_capacity(items.len());
             for item in items {
@@ -708,7 +708,7 @@ fn content_allow_from_value(content: &Value) -> Option<ContentAllow> {
 
 /// `"ns.mycard"` -> a namespaced [`Name`]; `"card"` -> a bare one. Same
 /// split `tomet-semantics-validator::rule`'s own copy uses for
-/// `:rule(allow:list(...))` -- duplicated rather than shared, since that
+/// `:rule(allow:(...))` -- duplicated rather than shared, since that
 /// crate depends on this one, not the other way around.
 fn name_from_dotted(s: &str) -> Name {
     match s.split_once('.') {
@@ -852,7 +852,7 @@ mod tests {
 ::elements(
   card: {
     display: block
-    content: { allow: list(link, em, ns.widget) }
+    content: { allow: (link, em, ns.widget) }
     about: | カード一枚。
   }
 )
@@ -1084,7 +1084,7 @@ mod tests {
     /// all along.
     #[test]
     fn a_caller_that_cannot_read_files_can_pass_the_vocabularies_in() {
-        let doc = tomet_ast_parser::parse_file("::kind(writ)\n\n@layers(){ 1: list(\"a\") }\n")
+        let doc = tomet_ast_parser::parse_file("::kind(writ)\n\n@layers(){ 1: (\"a\") }\n")
             .expect("document parses");
 
         // Nothing in scope: `std` only, so the kind's element is unknown.

@@ -38,7 +38,7 @@ pub fn classify_in(
     tomet_semantics::refuse_declaration_as_element(el.name, bindings.classify(el.name)?)
 }
 
-/// What a `:rule(allow: list(...))` calls a plain `- item`, which has no name
+/// What a `:rule(allow: (...))` calls a plain `- item`, which has no name
 /// to be called by.
 pub const PLAIN_ITEM_KIND_NAME: &str = "item";
 

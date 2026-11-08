@@ -264,15 +264,14 @@ pub fn render_value_inner_with_blocks(
         // As written: formatting must not turn `1.10` into `1.1`.
         Value::Number(text) => text.clone(),
         Value::String(s) => quote_scalar_string(s),
-        // `list(...)` is the only surviving list-value spelling -- `[...]`
-        // was retired since it already means `[content]` at the element
-        // level.
+        // `(a, b)` is the sequence spelling -- `[...]` already means
+        // `[content]`, and `list(...)` is a type.
         Value::Seq(items) => {
             let rendered: Vec<_> = items
                 .iter()
                 .map(|item| render_nested_with_blocks(item, config, render_blocks))
                 .collect();
-            format!("list({})", rendered.join(", "))
+            format!("({})", rendered.join(", "))
         }
         Value::Map(entries) => {
             if entries.len() == 1 {
@@ -597,7 +596,7 @@ mod tests {
                 map(&[("k", Value::Int(1))]),
                 Value::Int(2),
             ])),
-            "list({k: 1}, 2)"
+            "({k: 1}, 2)"
         );
     }
 
@@ -750,7 +749,7 @@ mod tests {
         // Without the layout asked for, the same fields are one line.
         assert_eq!(
             render_meta_declaration(&el, &PrinterConfig::default()),
-            "::meta(title: T, tags: list(a, b))"
+            "::meta(title: T, tags: (a, b))"
         );
     }
 

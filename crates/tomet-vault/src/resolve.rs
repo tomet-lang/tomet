@@ -154,7 +154,7 @@ mod tests {
             field(&meta, "tags"),
             Some(&EvalValue::Seq(vec![EvalValue::String("rust".into())]))
         );
-        let meta = meta_of("::meta(tags: list(a, b))\n");
+        let meta = meta_of("::meta(tags: (a, b))\n");
         assert_eq!(
             field(&meta, "tags"),
             Some(&EvalValue::Seq(vec![

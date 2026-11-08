@@ -23,12 +23,12 @@
 宣言する：
 
 ```tm
-content: { allow: list(link, em, strong, mark) }  // この名前だけ許す
+content: { allow: (link, em, strong, mark) }  // この名前だけ許す
 content: { allow: inline }                        // display: inline のもの全部
 content: { allow: any }
 ```
 
-`allow:`の値は`list(...)`——`:rule(allow:list(...))`が既に使っている
+`allow:`の値は`(...)`——`:rule(allow:(...))`が既に使っている
 `Value::Call`そのもので、新しい値構文は要らない。
 
 組み込み36(+1)要素については、vocabulary宣言が無いので、`required_shape`/

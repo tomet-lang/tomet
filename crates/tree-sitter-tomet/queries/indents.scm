@@ -20,5 +20,8 @@
 (call
   ")" @end) @indent
 
+(sequence
+  ")" @end) @indent
+
 (unordered_list) @indent
 (ordered_list) @indent

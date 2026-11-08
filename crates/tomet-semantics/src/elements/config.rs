@@ -160,7 +160,7 @@ mod tests {
     #[test]
     fn parses_the_export_declaration_data_with_sequence_and_map_paths() {
         let doc = parse_file(
-            "::export(\n  type: list(commonmark, html)\n  path: {\n    commonmark: \"README.md\"\n    html: \"index.html\"\n  }\n)\n",
+            "::export(\n  type: (commonmark, html)\n  path: {\n    commonmark: \"README.md\"\n    html: \"index.html\"\n  }\n)\n",
         )
         .unwrap();
 

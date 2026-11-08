@@ -84,6 +84,10 @@
           "named": true
         },
         {
+          "type": "sequence",
+          "named": true
+        },
+        {
           "type": "string",
           "named": true
         }
@@ -1128,6 +1132,10 @@
             "named": true
           },
           {
+            "type": "sequence",
+            "named": true
+          },
+          {
             "type": "string",
             "named": true
           }
@@ -1500,6 +1508,41 @@
     "type": "semi_break",
     "named": true,
     "fields": {}
+  },
+  {
+    "type": "sequence",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "braced_map",
+          "named": true
+        },
+        {
+          "type": "call",
+          "named": true
+        },
+        {
+          "type": "interpolation",
+          "named": true
+        },
+        {
+          "type": "scalar",
+          "named": true
+        },
+        {
+          "type": "sequence",
+          "named": true
+        },
+        {
+          "type": "string",
+          "named": true
+        }
+      ]
+    }
   },
   {
     "type": "strikeout",

@@ -6,22 +6,12 @@ use tomet_type::{Type, TypeError};
 /// Reads a `type:` specification as it is written in an AST [`Value`].
 ///
 /// Accepts a bare name (`string`, `list`, `datetime`) as a string, a parameterized
-/// call in AST form (`list(...)` which the parser resolves to [`Value::Seq`] or
-/// leaves as [`Value::Call`]), or a string representation of a parameterized type
-/// (such as `"list(string)"`).
+/// call in AST form (`list(...)`, a [`Value::Call`]), or a string representation of
+/// a parameterized type (such as `"list(string)"`). A sequence `(string)` is a
+/// value, not a type.
 pub fn parse_type_spec(spec: &Value) -> Result<Type, TypeError> {
     match spec {
         Value::String(name) => Type::parse_str(name),
-        Value::Seq(items) => {
-            if items.is_empty() {
-                Ok(Type::List(None))
-            } else if items.len() == 1 {
-                let inner = parse_type_spec(&items[0])?;
-                Ok(Type::List(Some(Box::new(inner))))
-            } else {
-                Err(TypeError::NotAName)
-            }
-        }
         Value::Call(name, args) if name == "list" => {
             if args.is_empty() {
                 Ok(Type::List(None))
@@ -56,19 +46,29 @@ mod tests {
             Ok(Type::List(Some(Box::new(Type::String))))
         );
 
-        let list_seq = Value::Seq(vec![Value::String("int".to_string())]);
+        let list_call = Value::Call("list".to_string(), vec![Value::String("int".to_string())]);
         assert_eq!(
-            parse_type_spec(&list_seq),
+            parse_type_spec(&list_call),
             Ok(Type::List(Some(Box::new(Type::Int))))
         );
 
-        let nested = Value::Seq(vec![Value::Seq(vec![Value::String("bool".to_string())])]);
+        let nested = Value::Call(
+            "list".to_string(),
+            vec![Value::Call(
+                "list".to_string(),
+                vec![Value::String("bool".to_string())],
+            )],
+        );
         assert_eq!(
             parse_type_spec(&nested),
             Ok(Type::List(Some(Box::new(Type::List(Some(Box::new(
                 Type::Bool
             )))))))
         );
+
+        // A sequence is a value, not a type.
+        let seq = Value::Seq(vec![Value::String("int".to_string())]);
+        assert_eq!(parse_type_spec(&seq), Err(TypeError::NotAName));
     }
 
     #[test]

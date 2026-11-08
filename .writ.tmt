@@ -18,9 +18,9 @@ does not relax the rule to fit the change it wanted to make.
   guard: { twrit: layers }
 
   layers: {
-    8: list( "crates/tomet", "apps/*", "bindings/*", "editors/*", "tests", "benches" )
-    7: list( "crates/tomet-workspace*", "crates/tomet-load*" )
-    6: list(
+    8: ( "crates/tomet", "apps/*", "bindings/*", "editors/*", "tests", "benches" )
+    7: ( "crates/tomet-workspace*", "crates/tomet-load*" )
+    6: (
       "crates/tomet-format*",
       "crates/tomet-convert*",
       "crates/tomet-extract*",
@@ -34,12 +34,12 @@ does not relax the rule to fit the change it wanted to make.
       "crates/tomet-vault",
       "crates/tomet-tome"
       )
-    5: list( "crates/tomet-config*", "crates/tomet-spec-derive" )
-    4: list( "crates/tomet-validator*" )
-    3: list( "crates/tomet-semantics*", "crates/cotomet" )
-    2: list( "crates/tomet-syntax-*", "crates/serde_cotomet" )
-    1: list( "crates/tomet-base-*" )
-    0: list( @crate(tree-sitter-tomet), @crate(tree-sitter-cotomet) )
+    5: ( "crates/tomet-config*", "crates/tomet-spec-derive" )
+    4: ( "crates/tomet-validator*" )
+    3: ( "crates/tomet-semantics*", "crates/cotomet" )
+    2: ( "crates/tomet-syntax-*", "crates/serde_cotomet" )
+    1: ( "crates/tomet-base-*" )
+    0: ( @crate(tree-sitter-tomet), @crate(tree-sitter-cotomet) )
   }
 }
 
@@ -413,9 +413,9 @@ failing the run, so a broken file is also an unguarded one.
   guard: { twrit: door }
 
   door: {
-    names: list( "std::fs" )
-    within: list( "crates/*" )
-    allowed: list(
+    names: ( "std::fs" )
+    within: ( "crates/*" )
+    allowed: (
       "crates/tomet-load",
       "crates/tomet-load-config",
       "crates/tomet-workspace",

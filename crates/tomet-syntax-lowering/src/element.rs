@@ -607,6 +607,7 @@ fn lower_single_value_from_children(
                     | K::BLOCK_FORM
                     | K::INTERP_EXPR
                     | K::MAP_LITERAL
+                    | K::ARGS
             ),
         };
         if is_standalone {
@@ -653,6 +654,9 @@ fn lower_single_value_from_children(
                     let entries = lower_map_entries(n, false, false)?;
                     return Ok(Value::Map(entries));
                 }
+                // A bare `(a, b)` is a sequence: a value has no infix
+                // arithmetic, so no parenthesis here can group anything.
+                K::ARGS => return Ok(Value::Seq(lower_call_args(n, false)?)),
                 _ => {}
             },
             SyntaxElement::Token(t) if t.kind() == K::STRING_LITERAL => {
@@ -749,6 +753,13 @@ fn lower_call_args(args_node: &SyntaxNode, raw_args: bool) -> Result<Vec<Value>>
     for item in items {
         if item.kind() == K::ERROR {
             return Err(crate::lower::lower_error(&item));
+        }
+        if item.kind() == K::MAP_ENTRY {
+            return Err(err(
+                usize::from(item.text_range().start()),
+                "a sequence '(...)' holds values, not 'key: value' entries; \
+                 write a map as '{...}'",
+            ));
         }
         let offset = usize::from(item.text_range().start());
         let val = lower_single_value_from_children(item.children_with_tokens(), raw_args, offset)?;
@@ -900,7 +911,6 @@ pub fn scalar_from_text(s: &str) -> std::result::Result<Value, String> {
 
 pub fn resolve_call(name: &str, args: Vec<Value>) -> std::result::Result<Value, String> {
     match name {
-        "list" => Ok(Value::Seq(args)),
         "string" => construct_string(args),
         "int" => construct_int(args),
         "float" => construct_float(args),

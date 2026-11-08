@@ -21,9 +21,9 @@ text @s_para_inline[x] more
 
 text <?(h2)>[@s_hole_inline_content()]
 
-@s_host(a: @s_args(), b: [@s_args_blocks()], c: list(@s_seq())){ d: @s_pair(), @s_entry(id){} }[ @s_content(x: @s_nested_args())[ @s_deep()#(i_deep) ] ]#(i_host):rule(allow: list(@s_connect()))
+@s_host(a: @s_args(), b: [@s_args_blocks()], c: (@s_seq())){ d: @s_pair(), @s_entry(id){} }[ @s_content(x: @s_nested_args())[ @s_deep()#(i_deep) ] ]#(i_host):rule(allow: (@s_connect()))
 
-=[ title @s_title() ]{ k: @s_sec_data() }#(i_sec):rule(allow: list(@s_sec_connect()))
+=[ title @s_title() ]{ k: @s_sec_data() }#(i_sec):rule(allow: (@s_sec_connect()))
 
 @s_sec_block()
 

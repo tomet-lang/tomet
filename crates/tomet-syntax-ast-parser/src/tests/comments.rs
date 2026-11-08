@@ -249,8 +249,8 @@ fn own_line_comment_works_inside_a_lightweight_value_group() {
 }
 
 #[test]
-fn own_line_comment_works_inside_a_call() {
-    let v = parse_value("list(\n  a,\n  // a note\n  b,\n)").unwrap();
+fn own_line_comment_works_inside_a_sequence() {
+    let v = parse_value("(\n  a,\n  // a note\n  b,\n)").unwrap();
     assert_eq!(
         v,
         Value::Seq(vec![Value::String("a".into()), Value::String("b".into())])

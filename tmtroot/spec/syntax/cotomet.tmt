@@ -2,7 +2,7 @@
 |[ literal         ][ sugar  ]
 |[ `string()`      ][ ""     ]
 |[ `int()`         ][ 1, ... ]
-|[ `list()`        ][        ]
+|[ `(a, b)`        ][        ]
 |[ `enum()`        ][        ]
 |[ `true`, `false` ][        ]
 |[ `@name`         ][        ]

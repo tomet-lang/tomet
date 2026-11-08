@@ -19,9 +19,9 @@
 //! -| **A bare scalar is not typed here.** `null`, `true`, `false` and a
 //!  | number are the highlight query's business, decided from the node's
 //!  | text, so the tree has one `scalar` node for all of them.
-//! -| **Call arguments are values only.** `list(a: 1)` is an error here as it
-//!  | is for the parser, but `list(a: b)` reads as the scalar `a: b`, which
-//!  | the parser also does.
+//! -| **Call and sequence elements are values only.** `list(a: 1)` and
+//!  | `(a: 1)` are errors here as they are for the parser, but `(a: b)` reads
+//!  | as the scalar `a: b`, which the parser also does.
 //! -| **A top-level bare value is accepted.** A `.ctmt` file is `key: value`
 //!  | entries only (`cotomet_syntax::parse_file`); the grammar reads a stray
 //!  | value as the value it is.
@@ -95,9 +95,11 @@ mod tests {
             "\"tmtroot/a.tmt\": \"../a.tmt\"\n",
             "m: { x: 1, y: { z: 2 } }\n",
             "m: {\n  x: 1\n  y: 2\n}\n",
-            "l: list(1, 2, 3)\n",
-            "l: list(\n  a,\n  b\n)\n",
-            "n: list()\nname: string(abc)\n",
+            "l: (1, 2, 3)\n",
+            "l: (\n  a,\n  b\n)\n",
+            "n: ()\none: (x)\nnested: ((a), (b, c), ())\nname: string(abc)\n",
+            "t: list(string)\n",
+            "m: { l: (1), n: ({ k: v }, \"s\") }\n",
             "url: https://example.com/a//b\n",
             "path: ../vocab/x.tmt\nabs: /usr/bin\n",
             "k:\n  v\n",
@@ -133,6 +135,14 @@ mod tests {
         assert_eq!(
             sexp("l: list(a)\n"),
             "(source_file (pair key: (key) value: (call function: (name) (scalar (word)))))"
+        );
+        assert_eq!(
+            sexp("l: (a)\n"),
+            "(source_file (pair key: (key) value: (sequence (scalar (word)))))"
+        );
+        assert_eq!(
+            sexp("l: ()\n"),
+            "(source_file (pair key: (key) value: (sequence)))"
         );
         // a word with nothing after it is a value, not a key
         assert_eq!(sexp("x\n"), "(source_file (scalar (word)))");
@@ -215,7 +225,7 @@ mod tests {
         for src in [
             "::kind(catalog, 2)\n",
             "::meta()\n",
-            "::meta(title: \"Catalog\", tags: list(a, b))\n",
+            "::meta(title: \"Catalog\", tags: (a, b))\n",
             "::meta(\n  title: \"x\"\n)\na: 1\n",
             "::config(format: json){ strict: true }\n",
             "::macros(gh: \"https://x/${1}\")\n::vars(a: 1)\n",
@@ -239,10 +249,12 @@ mod tests {
 
     #[test]
     fn highlights_name_the_resolved_constructors_as_builtin() {
-        let captured = highlights("l: list(1)\nx: custom(1)\n");
-        assert!(captured.contains(&("function.builtin".into(), "list".into())));
+        let captured = highlights("l: string(1)\nx: custom(1)\nt: list(string)\n");
+        assert!(captured.contains(&("function.builtin".into(), "string".into())));
         assert!(captured.contains(&("function".into(), "custom".into())));
-        assert!(!captured.contains(&("function".into(), "list".into())));
+        // `list` is a type, not a resolved constructor.
+        assert!(captured.contains(&("function".into(), "list".into())));
+        assert!(!captured.contains(&("function.builtin".into(), "list".into())));
     }
 
     #[test]

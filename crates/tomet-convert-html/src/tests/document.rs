@@ -16,7 +16,7 @@ fn a_nested_map_survives_as_an_exact_copy() {
 
 #[test]
 fn flat_args_need_no_exact_copy() {
-    let doc = parse_file("@deck.x(a: 1, tags: list(p, q))[ 本文 ]\n").unwrap();
+    let doc = parse_file("@deck.x(a: 1, tags: (p, q))[ 本文 ]\n").unwrap();
     let html = render_body(&doc);
     assert!(html.contains(r#"data-tags="p, q""#), "got {html}");
     assert!(!html.contains("data-tomet-data="), "got {html}");

@@ -255,9 +255,7 @@ mod tests {
     #[test]
     fn a_file_is_a_map_of_keyed_entries() {
         assert_eq!(
-            parse_file("a: 1\n// note\n\"b/c\": list(x)\n")
-                .unwrap()
-                .body,
+            parse_file("a: 1\n// note\n\"b/c\": (x)\n").unwrap().body,
             map(&[("a", Value::Int(1)), ("b/c", Value::Seq(vec![text("x")]))])
         );
         assert_eq!(parse_file("").unwrap().body, Value::Map(vec![]));

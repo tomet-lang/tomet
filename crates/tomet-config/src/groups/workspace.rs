@@ -105,7 +105,7 @@ mod tests {
 
     #[test]
     fn the_entry_name_lives_beside_the_other_workspace_settings() {
-        let cfg = entry("::workspace(ignore: list(\"x\"), folder: { entry: index.tmt })\n");
+        let cfg = entry("::workspace(ignore: (\"x\"), folder: { entry: index.tmt })\n");
         assert_eq!(cfg.ignore, vec!["x".to_string()]);
         assert_eq!(cfg.folder_entry(), "index.tmt");
     }

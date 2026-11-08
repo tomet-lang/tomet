@@ -207,10 +207,13 @@ mod tests {
 
     #[test]
     fn a_list_reads_into_a_vec() {
-        assert_eq!(
-            from_str::<Vec<i32>>("list(1, 2, 3)").unwrap(),
-            vec![1, 2, 3]
-        );
+        assert_eq!(from_str::<Vec<i32>>("(1, 2, 3)").unwrap(), vec![1, 2, 3]);
+    }
+
+    #[test]
+    fn a_list_call_is_not_a_sequence() {
+        let err = failure::<Vec<i32>>("list(1, 2)");
+        assert!(err.contains("call syntax `list(...)`"), "{err}");
     }
 
     #[test]
@@ -230,17 +233,17 @@ mod tests {
 
     #[test]
     fn a_data_error_names_the_key_path_to_the_value() {
-        let err = failure::<Settings>("bookmarks: list({label: a, path: list(1)})");
+        let err = failure::<Settings>("bookmarks: ({label: a, path: (1)})");
         assert!(err.starts_with("bookmarks[0].path: "), "{err}");
         assert!(err.contains("invalid type"), "{err}");
 
-        let err = failure::<Settings>("refresh_ms: x\nbookmarks: list()");
+        let err = failure::<Settings>("refresh_ms: x\nbookmarks: ()");
         assert!(err.starts_with("refresh_ms: "), "{err}");
     }
 
     #[test]
     fn a_missing_field_is_reported_at_the_map_that_lacks_it() {
-        let err = failure::<Settings>("bookmarks: list({label: a, path: p}, {label: b})");
+        let err = failure::<Settings>("bookmarks: ({label: a, path: p}, {label: b})");
         assert!(err.starts_with("bookmarks[1]: "), "{err}");
         assert!(err.contains("missing field `path`"), "{err}");
 
@@ -252,7 +255,7 @@ mod tests {
     #[test]
     fn a_key_that_needs_quotes_is_quoted_in_the_path() {
         use std::collections::BTreeMap;
-        let err = failure::<BTreeMap<String, Vec<i32>>>(r#""a/b": list(1, x)"#);
+        let err = failure::<BTreeMap<String, Vec<i32>>>(r#""a/b": (1, x)"#);
         assert!(err.starts_with("\"a/b\"[1]: "), "{err}");
     }
 
@@ -264,11 +267,11 @@ mod tests {
         assert!(err.starts_with("\"a.tmt\": "), "{err}");
         assert!(err.contains("missing field `path`"), "{err}");
 
-        let err = failure::<BTreeMap<String, Bookmark>>("a.tmt: { label: x, path: list(1) }");
+        let err = failure::<BTreeMap<String, Bookmark>>("a.tmt: { label: x, path: (1) }");
         assert!(err.starts_with("\"a.tmt\".path: "), "{err}");
 
         // a key without a dot stays bare
-        let err = failure::<BTreeMap<String, Bookmark>>("a-b: { label: x, path: list(1) }");
+        let err = failure::<BTreeMap<String, Bookmark>>("a-b: { label: x, path: (1) }");
         assert!(err.starts_with("a-b.path: "), "{err}");
     }
 
@@ -291,7 +294,7 @@ mod tests {
     #[test]
     fn the_path_is_data_not_just_text() {
         let Error::Data { path, .. } =
-            from_str::<Settings>("bookmarks: list({label: a, path: list(1)})").unwrap_err()
+            from_str::<Settings>("bookmarks: ({label: a, path: (1)})").unwrap_err()
         else {
             panic!("expected a data error");
         };

@@ -22,7 +22,8 @@
 //! `${ ... }` is an `INTERP_EXPR`. Inside `ARGS`/`VALUE_DATA` an entry is a
 //! `MAP_ENTRY` (`key: value`) or a `SEQ_ITEM`, and nested groups are
 //! `MAP_LITERAL`, `CONTENT` (a value written `[ ... ]` is blocks, as in the AST
-//! parser; the list literal is gone) or (a call such as `list(...)`) `ARGS`.
+//! parser; the list literal is gone) or `ARGS` -- a bare `(a, b)` is a sequence,
+//! and `name(a, b)` a call.
 //! `CONTENT` recurses into the same block grammar `ROOT`/`SECTION` use
 //! (`SECTION`, `LIST`, `BLOCK_FORM`, `CODE_BLOCK`, `THEMATIC_BREAK`,
 //! `PARAGRAPH`), bounded by the group's own closing `]` instead of EOF or
@@ -3099,21 +3100,24 @@ mod tests {
 
     #[test]
     fn groups_are_structured() {
-        let root = parse_cst("@x(a: 1, list(p, q), \"k\": { n: [1, 2] })\n");
+        let root = parse_cst("@x(a: 1, (p, q), name(r), \"k\": { n: [1, 2] })\n");
         let args = find(&root, K::ARGS).unwrap();
         assert_eq!(
             child_kinds(&args),
-            [K::MAP_ENTRY, K::SEQ_ITEM, K::MAP_ENTRY]
+            [K::MAP_ENTRY, K::SEQ_ITEM, K::SEQ_ITEM, K::MAP_ENTRY]
         );
-        // `list(p, q)` is a call: an ARGS inside the second entry.
+        // `(p, q)` is a sequence, `name(r)` a call: each an ARGS inside its entry.
         let item = args.children().nth(1).unwrap();
-        assert_eq!(item.text().to_string(), "list(p, q)");
+        assert_eq!(item.text().to_string(), "(p, q)");
         assert_eq!(count(&item, K::ARGS), 1);
+        let call = args.children().nth(2).unwrap();
+        assert_eq!(call.text().to_string(), "name(r)");
+        assert_eq!(count(&call, K::ARGS), 1);
         assert_eq!(count(&root, K::MAP_LITERAL), 1);
         // `[1, 2]` as a value is blocks: a content, not a list.
         assert_eq!(count(&root, K::CONTENT), 1);
-        // `list(p, q)` and its `p` and `q`.
-        assert_eq!(count(&root, K::SEQ_ITEM), 3);
+        // `(p, q)` and its `p` and `q`, `name(r)` and its `r`.
+        assert_eq!(count(&root, K::SEQ_ITEM), 5);
     }
 
     #[test]
@@ -3126,7 +3130,7 @@ mod tests {
 
     #[test]
     fn connect_joins_the_form() {
-        let root = parse_cst("@link[x](ref:y):rule(allow: list(a))\n");
+        let root = parse_cst("@link[x](ref:y):rule(allow: (a))\n");
         let el = find(&root, K::BLOCK_FORM).unwrap();
         assert_eq!(
             child_kinds(&el),
@@ -3134,7 +3138,7 @@ mod tests {
         );
         assert_eq!(
             find(&el, K::CONNECT).unwrap().text().to_string(),
-            ":rule(allow: list(a))"
+            ":rule(allow: (a))"
         );
         // A list item's own trailing group is not claimed by its form.
         let root = parse_cst("- @link(ref:x) :{ id: b }\n");
@@ -3150,12 +3154,12 @@ mod tests {
         // `parse_list_item` only disables `allow_connect` for the rest
         // of the line (the sugar/trailing-text scan), not for the item's
         // own groups.
-        let root = parse_cst("- [ x ]:rule(allow: list(a))\n");
+        let root = parse_cst("- [ x ]:rule(allow: (a))\n");
         let item = find(&root, K::LIST_ITEM).unwrap();
         assert_eq!(count(&item, K::CONNECT), 1);
         assert_eq!(
             find(&item, K::CONNECT).unwrap().text().to_string(),
-            ":rule(allow: list(a))"
+            ":rule(allow: (a))"
         );
     }
 
@@ -3240,11 +3244,7 @@ mod tests {
 
     #[test]
     fn a_connect_can_carry_its_own_id_group() {
-        let el = find(
-            &parse_cst("@memo:rule(allow: list(card))#(myid)\n"),
-            K::CONNECT,
-        )
-        .unwrap();
+        let el = find(&parse_cst("@memo:rule(allow: (card))#(myid)\n"), K::CONNECT).unwrap();
         assert_eq!(child_kinds(&el), [K::NAME, K::ARGS, K::ID_GROUP]);
     }
 
@@ -3282,7 +3282,7 @@ mod tests {
 
     #[test]
     fn a_declaration_takes_groups_and_connects_like_an_at_form() {
-        let src = "::x(a)[ b ]{ c: 1 }#(i):rule(allow:list(k))\n";
+        let src = "::x(a)[ b ]{ c: 1 }#(i):rule(allow:(k))\n";
         let root = parse_cst(src);
         assert_eq!(root.text().to_string(), src);
         let el = find(&root, K::BLOCK_FORM).unwrap();

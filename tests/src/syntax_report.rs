@@ -172,7 +172,7 @@ const CASES: &[Case] = &[
     case(
         None,
         "名前つきコネクトも主グループを要る。`:rule(...)` は書けて、`:rule{...}` は書けない（下の「主グループの無いネクサス」）",
-        "- 項目 :rule(allow: list(card))\n",
+        "- 項目 :rule(allow: (card))\n",
     ),
     case(None, "水平線は `@hr()`。`@hr` だけの行はエラー", "@hr()\n"),
     // ---- value groups -----------------------------------------------
@@ -219,8 +219,20 @@ const CASES: &[Case] = &[
     case(None, "位置引数（キーなし）", "@raw(rust)\n"),
     case(
         None,
-        "列。`list(...)` の一つの綴りしかない -- `[...]` は撤去された",
-        "@memo(xs: list(1, 2, 3))\n",
+        "列。`(a, b)` の一つの綴りしかない -- `[...]` は撤去された",
+        "@memo(xs: (1, 2, 3))\n",
+    ),
+    case(
+        None,
+        "空の列と一要素の列。値に中置演算はないので、括弧は何もまとめない。\
+         `(x)` はカンマがなくても一要素の列",
+        "@memo(a: (), b: (x))\n",
+    ),
+    case(None, "入れ子の列", "@memo(xs: ((a), (b, c), ()))\n"),
+    case(
+        None,
+        "型の `list(string)` は列ではなく呼び出しのまま残る",
+        "::fields(tags: { type: list(string) })\n",
     ),
     case(None, "入れ子のマップ", "@memo(m: { x: 1 })\n"),
     case(
@@ -410,19 +422,19 @@ const CASES: &[Case] = &[
         Some("名前付きコネクト `:name(...)`"),
         "`:` の直後に名前があれば、マージではなく別の要素として `connects` に積まれる。\
          現時点で唯一のメンバーは `rule`",
-        "@section[ x ]:rule(allow: list(card))\n",
+        "@section[ x ]:rule(allow: (card))\n",
     ),
     case(
         None,
         "複数のコネクトを重ねられる。それぞれ独立した `connects` の要素になる",
-        "@x(a: 1):as(y):rule(allow: list(card))\n",
+        "@x(a: 1):as(y):rule(allow: (card))\n",
     ),
     case(
         None,
-        "`list(...)` は即座に確定するリテラル呼び出しで、パーサが列に解決する。\
-         `list`/`string`/`int`/`float` 以外の呼び出し名は、コネクトの名前と同じく\
-         パーサは判断せず、そのまま残す",
-        "@x(a: list(card, ns.mycard))\n",
+        "`string`/`int`/`float` は即座に確定するリテラル呼び出しで、パーサが値に解決する。\
+         それ以外の呼び出し名(型の `list(string)` を含む)は、コネクトの名前と同じく\
+         パーサは判断せず、そのまま残す。列は呼び出しではなく裸の `(a, b)`",
+        "@x(a: (card, ns.mycard))\n",
     ),
     case(
         None,
@@ -441,12 +453,12 @@ const CASES: &[Case] = &[
         None,
         "リスト項目は named connect も直接持てる。完全形・糖衣形のどちらでも、\
          要素自身ではなく項目自身の `connects` に積まれる",
-        "- [ x ]:rule(allow: list(card))\n",
+        "- [ x ]:rule(allow: (card))\n",
     ),
     case(
         None,
         "見出しの糖衣形の named connect も、完全形(`=[ h ]:rule(...)`)と同じ扱い",
-        "= h :rule(allow: list(card))\n",
+        "= h :rule(allow: (card))\n",
     ),
     // ---- id `#(...)` --------------------------------------------------
     case(
@@ -475,12 +487,12 @@ const CASES: &[Case] = &[
         None,
         "コネクトは`#(id)`を取らない。コネクトの直後に書くとエラー\
          (idは所有者のものなので、最初のコネクトより前に書く)",
-        "@task(a: 1):rule(allow: list(card))#(myid)\n",
+        "@task(a: 1):rule(allow: (card))#(myid)\n",
     ),
     case(
         None,
         "所有者のidは最初のコネクトより前に書く",
-        "@task(a: 1)#(myid):rule(allow: list(card))\n",
+        "@task(a: 1)#(myid):rule(allow: (card))\n",
     ),
     case(None, "idを2つ書くとエラー", "@task()#(a)#(b)\n"),
     // ---- comments ---------------------------------------------------
@@ -506,7 +518,7 @@ const CASES: &[Case] = &[
          `::meta{ ... }` はもう書けない（下の「主グループの無いネクサス」）",
         "::meta(title: \"x\")\n::macros(gh: \"https://x/${1}\")\n::vars(a: { type: string })\n\
          ::format(table: { max_col_width: 50 })\n::fields(created: { type: datetime })\n\
-         ::workspace(ignore: list(\"a\"))\n::export(type: commonmark)\n::blueprints(b: \"b.tmt\")\n\
+         ::workspace(ignore: (\"a\"))\n::export(type: commonmark)\n::blueprints(b: \"b.tmt\")\n\
          ::vocabularies(v: \"v.tmt\")\n::dictionaries(d: \"d.tmt\")\n::migration(m: 1)\n\
          ::elements(card: { display: block })\n",
     ),
@@ -563,7 +575,7 @@ const REJECTED: &[Case] = &[
     case(
         None,
         "名前つきコネクトだけでは要素にならない",
-        "@memo:rule(allow: list(card))\n",
+        "@memo:rule(allow: (card))\n",
     ),
     case(
         None,
@@ -574,17 +586,17 @@ const REJECTED: &[Case] = &[
     case(
         None,
         "コネクトも主グループを要る。`:rule{...}` は書けない",
-        "@memo():rule{ allow: list(card) }\n",
+        "@memo():rule{ allow: (card) }\n",
     ),
     case(
         None,
         "リスト項目のコネクトも同じ",
-        "- 項目 :rule{ allow: list(card) }\n",
+        "- 項目 :rule{ allow: (card) }\n",
     ),
     case(
         None,
         "見出しのコネクトも同じ",
-        "= 見出し :rule{ allow: list(card) }\n",
+        "= 見出し :rule{ allow: (card) }\n",
     ),
     case(None, "`-@名前` も主グループを要る", "-@memo{ a: 1 }\n"),
     case(
@@ -621,7 +633,7 @@ const REJECTED: &[Case] = &[
     case(
         Some("宣言の制限"),
         "宣言はコネクトを取らない。コネクトは要素に付くもので、宣言は何にも付かない",
-        "::kind(note):rule(allow:list(k))\n",
+        "::kind(note):rule(allow:(k))\n",
     ),
     case(
         Some("撤去された構文"),
@@ -639,8 +651,19 @@ const REJECTED: &[Case] = &[
     case(
         None,
         "`[a, b]` 列リテラルも撤去。`[`/`]` は既に `[content]` の意味を\
-         持つので、値の中の列は `list(...)` の一つの綴りしかない",
+         持つので、値の中の列は `(a, b)` の一つの綴りしかない",
         "@memo(xs: [1, 2, 3])\n",
+    ),
+    case(
+        None,
+        "列は値だけを持ち、`key: value` の項目は持てない。マップは `{...}`",
+        "@memo(xs: (a: 1))\n",
+    ),
+    case(
+        None,
+        "データの列を `list(...)` とは書かない。呼び出しとして残り、\
+         列として読む側（`ignore:` など）が受け付けない",
+        "::workspace(ignore: list(\"a\"))\n",
     ),
     case(
         None,
@@ -1082,7 +1105,7 @@ fn value_str(v: &Value) -> String {
         // (`Value::Blocks` below), not a list.
         Value::Seq(items) => {
             let inner: Vec<String> = items.iter().map(value_str).collect();
-            format!("list({})", inner.join(", "))
+            format!("({})", inner.join(", "))
         }
         Value::Map(entries) => {
             let inner: Vec<String> = entries

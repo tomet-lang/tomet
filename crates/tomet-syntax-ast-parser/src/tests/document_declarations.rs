@@ -39,8 +39,8 @@ fn a_declaration_takes_no_connect() {
     // A connect is metadata of an element; a declaration is attached to
     // nothing. Written on the same line or on the next, it is refused.
     for src in [
-        "::x(a):rule(allow:list(k))\n",
-        "::kind(config)\n:rule(allow:list(k))\n",
+        "::x(a):rule(allow:(k))\n",
+        "::kind(config)\n:rule(allow:(k))\n",
     ] {
         let err = parse_file(src).unwrap_err();
         assert!(

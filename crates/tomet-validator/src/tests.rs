@@ -92,15 +92,14 @@ fn rule_errors(doc: &File, bindings: &Bindings) -> Vec<Diagnostic> {
 
 #[test]
 fn a_rule_with_only_allowed_descendants_is_clean() {
-    let doc = parse(
-        "@section[ @card(title:\"a\")[ x ] @card(title:\"b\")[ y ] ]:rule(allow:list(card))\n",
-    );
+    let doc =
+        parse("@section[ @card(title:\"a\")[ x ] @card(title:\"b\")[ y ] ]:rule(allow:(card))\n");
     assert_eq!(rule_errors(&doc, &Bindings::default()), vec![]);
 }
 
 #[test]
 fn a_disallowed_descendant_is_reported() {
-    let doc = parse("@section[ @card(title:\"a\")[ x ] @heading[ y ] ]:rule(allow:list(card))\n");
+    let doc = parse("@section[ @card(title:\"a\")[ x ] @heading[ y ] ]:rule(allow:(card))\n");
     let errors = rule_errors(&doc, &Bindings::default());
     assert_eq!(errors.len(), 1, "{errors:?}");
     assert!(matches!(
@@ -111,7 +110,7 @@ fn a_disallowed_descendant_is_reported() {
 
 #[test]
 fn direct_true_does_not_recurse_past_the_first_level() {
-    let doc = parse("@section[ @card[ @heading[ z ] ] ]:rule(allow:list(card), direct:true)\n");
+    let doc = parse("@section[ @card[ @heading[ z ] ] ]:rule(allow:(card), direct:true)\n");
     let errors = rule_errors(&doc, &Bindings::default());
     assert_eq!(
         errors,
@@ -122,7 +121,7 @@ fn direct_true_does_not_recurse_past_the_first_level() {
 
 #[test]
 fn without_direct_the_same_nested_heading_is_reported() {
-    let doc = parse("@section[ @card[ @heading[ z ] ] ]:rule(allow:list(card))\n");
+    let doc = parse("@section[ @card[ @heading[ z ] ] ]:rule(allow:(card))\n");
     let errors = rule_errors(&doc, &Bindings::default());
     assert_eq!(errors.len(), 1, "{errors:?}");
     assert!(matches!(
@@ -133,7 +132,7 @@ fn without_direct_the_same_nested_heading_is_reported() {
 
 #[test]
 fn a_typoed_connect_name_is_reported() {
-    let doc = parse("@section[ x ]:rulle(allow:list(card))\n");
+    let doc = parse("@section[ x ]:rulle(allow:(card))\n");
     let errors = rule_errors(&doc, &Bindings::default());
     assert_eq!(errors.len(), 1, "{errors:?}");
     assert!(matches!(
@@ -160,7 +159,7 @@ fn allow_list_resolves_a_namespaced_custom_element_via_bindings() {
         ..Bindings::default()
     };
 
-    let doc = parse("@section[ @ns.mycard() @card[a] ]:rule(allow:list(card, ns.mycard))\n");
+    let doc = parse("@section[ @ns.mycard() @card[a] ]:rule(allow:(card, ns.mycard))\n");
     assert_eq!(rule_errors(&doc, &bindings), vec![]);
 }
 
@@ -171,13 +170,13 @@ fn allow_list_resolves_a_namespaced_custom_element_via_bindings() {
 /// against anything underneath the heading.
 #[test]
 fn a_heading_rule_with_only_allowed_descendants_is_clean() {
-    let doc = parse("=[ Notes ]:rule(allow:list(card))\n@card(title:\"a\")[ x ]\n");
+    let doc = parse("=[ Notes ]:rule(allow:(card))\n@card(title:\"a\")[ x ]\n");
     assert_eq!(rule_errors(&doc, &Bindings::default()), vec![]);
 }
 
 #[test]
 fn a_disallowed_descendant_under_a_heading_rule_is_reported() {
-    let doc = parse("=[ Notes ]:rule(allow:list(card))\n@heading[ not allowed ]\n");
+    let doc = parse("=[ Notes ]:rule(allow:(card))\n@heading[ not allowed ]\n");
     let errors = rule_errors(&doc, &Bindings::default());
     assert_eq!(errors.len(), 1, "{errors:?}");
     assert!(matches!(
@@ -188,7 +187,7 @@ fn a_disallowed_descendant_under_a_heading_rule_is_reported() {
 
 #[test]
 fn a_typoed_connect_name_on_a_heading_is_reported() {
-    let doc = parse("=[ Notes ]:rulle(allow:list(card))\n");
+    let doc = parse("=[ Notes ]:rulle(allow:(card))\n");
     let errors = rule_errors(&doc, &Bindings::default());
     assert_eq!(errors.len(), 1, "{errors:?}");
     assert!(matches!(
@@ -207,7 +206,7 @@ fn a_typoed_connect_name_on_a_heading_is_reported() {
 /// and the one `check_rule_connects`'s own tests cannot see.
 #[test]
 fn a_heading_rule_connect_is_not_misclassified_as_an_unknown_element() {
-    let doc = parse("=[ Notes ]:rule(allow:list(card))\n@card(title:\"a\")[ x ]\n");
+    let doc = parse("=[ Notes ]:rule(allow:(card))\n@card(title:\"a\")[ x ]\n");
     let errors = validate_document(&doc);
     assert!(
         !errors
@@ -219,15 +218,14 @@ fn a_heading_rule_connect_is_not_misclassified_as_an_unknown_element() {
 
 #[test]
 fn a_rule_allowing_item_and_task_accepts_plain_and_task_list_items() {
-    let doc =
-        parse("=[ Todo ]:rule(allow:list(item, task))\n- a plain item\n-@task[ a task item ]\n");
+    let doc = parse("=[ Todo ]:rule(allow:(item, task))\n- a plain item\n-@task[ a task item ]\n");
     let errors = rule_errors(&doc, &Bindings::default());
     assert_eq!(errors, vec![]);
 }
 
 #[test]
 fn a_rule_allowing_only_task_rejects_plain_list_item() {
-    let doc = parse("=[ Todo ]:rule(allow:list(task))\n- a plain item\n-@task[ a task item ]\n");
+    let doc = parse("=[ Todo ]:rule(allow:(task))\n- a plain item\n-@task[ a task item ]\n");
     let errors = rule_errors(&doc, &Bindings::default());
     assert_eq!(errors.len(), 1, "{errors:?}");
     assert!(matches!(
@@ -238,7 +236,7 @@ fn a_rule_allowing_only_task_rejects_plain_list_item() {
 
 #[test]
 fn a_rule_allowing_only_item_rejects_task_list_item() {
-    let doc = parse("=[ Todo ]:rule(allow:list(item))\n- a plain item\n-@task[ a task item ]\n");
+    let doc = parse("=[ Todo ]:rule(allow:(item))\n- a plain item\n-@task[ a task item ]\n");
     let errors = rule_errors(&doc, &Bindings::default());
     assert_eq!(errors.len(), 1, "{errors:?}");
     assert!(matches!(
@@ -444,7 +442,7 @@ fn deck_with_content_allow() -> Bindings {
     // written bare -- same pre-existing quirk `check_one_rule`'s own doc
     // comment notes for `:rule(allow:...)`, so the allow-list has to name
     // it the same way.
-    content: { allow: list(deck.entry) }
+    content: { allow: (deck.entry) }
     about: | カードの一覧。
   }
   entry: {
@@ -692,7 +690,7 @@ fn a_macro_that_is_not_a_string_is_reported() {
 
 #[test]
 fn a_variable_is_a_declaration_with_a_type_it_can_have_and_a_default_that_fits() {
-    let good = "::vars(\n  title: {\n    type: string\n    about: | 題。\n  }\n  n: { type: int, default: 3 }\n  at: { type: datetime, default: \"2026-10-25T09:00:00+09:00\" }\n  tags: { type: list, default: list(a, b) }\n)\n";
+    let good = "::vars(\n  title: {\n    type: string\n    about: | 題。\n  }\n  n: { type: int, default: 3 }\n  at: { type: datetime, default: \"2026-10-25T09:00:00+09:00\" }\n  tags: { type: list, default: (a, b) }\n)\n";
     assert!(
         definition_problems(good).is_empty(),
         "{:?}",
@@ -729,7 +727,7 @@ fn the_config_declarations_are_clean() {
          ::fields(created: { type: datetime })\n\
          ::blueprints(a: @file(a.blueprint.tmt))\n\
          ::vocabularies(deck: @file(deck.vocabulary.tmt))\n\
-         ::workspace(ignore: list(\"x\"))\n\
+         ::workspace(ignore: (\"x\"))\n\
          ::export(type: commonmark)\n",
     );
     let errors = validate_document(&doc);
@@ -1283,7 +1281,7 @@ fn an_argument_is_held_to_the_type_its_parameter_declares() {
         // not known until evaluated
         "@entry(id: ${vars.n})",
         // `type: person` names no type: not checked
-        "@entry(owner: anyone, tags: list(a, b))",
+        "@entry(owner: anyone, tags: (a, b))",
     ] {
         assert!(
             argument_problems(ok).is_empty(),
@@ -1297,7 +1295,7 @@ fn an_argument_is_held_to_the_type_its_parameter_declares() {
         ("@entry(id: \"3\")", "`3` is not a non-negative integer"),
         ("@entry(rev: 1.0.0_beta)", "`1.0.0_beta` is not a version"),
         ("@entry(done: yes)", "`yes` is not `true` or `false`"),
-        ("@entry(label: list(a))", "a list is not a string"),
+        ("@entry(label: (a))", "a list is not a string"),
         ("@entry(tags: 5)", "is not a list"),
     ] {
         let found = argument_problems(bad);

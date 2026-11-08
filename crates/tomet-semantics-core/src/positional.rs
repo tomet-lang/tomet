@@ -20,7 +20,7 @@ pub const POSITIONAL_ENTRY_KEY: &str = "";
 ///   a real key, left to right on both sides. A slot with no positional entry left, and a positional
 ///   entry past the last slot, are both left as they are -- nothing is dropped, and an unassigned
 ///   entry keeps its empty key.
-/// - A sequence (`(list(a, b))`): zipped against the slots by position; items past the last slot
+/// - A sequence (`((a, b))`): zipped against the slots by position; items past the last slot
 ///   are dropped.
 /// - Any other value: the lone argument, under the first slot.
 ///

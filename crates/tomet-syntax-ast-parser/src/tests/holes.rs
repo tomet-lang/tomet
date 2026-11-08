@@ -130,13 +130,13 @@ fn options_are_the_value_group() {
 
 #[test]
 fn a_content_literal_is_a_value() {
-    let hole = hole("<?alt(doc, list([adr-<?int(n)>], [rfc-<?int(n)>]))>");
+    let hole = hole("<?alt(doc, ([adr-<?int(n)>], [rfc-<?int(n)>]))>");
     let Some(Value::Map(entries)) = &hole.data.args else {
         panic!("expected a map, got {:?}", hole.data.args);
     };
     assert_eq!(entries[0].1, string("doc"));
     let Value::Seq(branches) = &entries[1].1 else {
-        panic!("expected list(...), got {:?}", entries[1].1);
+        panic!("expected a sequence, got {:?}", entries[1].1);
     };
     assert_eq!(branches.len(), 2);
     assert!(branches.iter().all(|b| matches!(b, Value::Blocks(_))));

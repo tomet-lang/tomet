@@ -311,7 +311,7 @@ fn table_hover(
     let start_line = positions.line(el.span.start) as usize;
     let end_line = (positions.line(el.span.end) as usize).min(lines.len().saturating_sub(1));
 
-    // `normalized_element_args`, not raw `el.args`: `align: list(...)` is
+    // `normalized_element_args`, not raw `el.args`: `align: (...)` is
     // a `Value::Call` until normalized, and `extract_table_aligns_from_args`
     // only recognizes `Value::Seq`.
     let normalized_args = normalized_element_args(el.as_view());

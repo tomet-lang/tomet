@@ -87,14 +87,14 @@ pub fn read_fixture(rel: &Path) -> String {
 /// parses, and the entry was gone for a while.
 ///
 /// `examples/bookmark.tmt` and `syntax/value-element.tmt` then used the
-/// retired `[a, b]` list literal (`list(...)` is the sole surviving
-/// spelling for a *list*) and landed here, rejected outright. `key:
+/// retired `[a, b]` list literal (`(a, b)` is the sole surviving
+/// spelling for a *sequence*) and landed here, rejected outright. `key:
 /// [...]` stopped being a hard rejection once it gained its own meaning
 /// -- block content (`Value::Blocks`), the same grammar as an element's
 /// own `[content]` -- so both fixtures parse again, but to a different
 /// AST than the `[a, b]`-as-list spelling would have produced (one
 /// paragraph, not a sequence). `examples/bookmark.tmt`'s `tags:` was
-/// edited to `list(a, a)` to keep meaning what it always meant (a list
+/// edited to `(a, a)` to keep meaning what it always meant (a list
 /// of tags); `syntax/value-element.tmt`'s `icons: [...]` was left as-is,
 /// since embedding `@`-elements in a `[...]` value position is exactly
 /// what that fixture exists to demonstrate.
@@ -260,7 +260,7 @@ pub const KNOWN_TS_ERRORS: &[(&str, &[&str])] = &[
     ("syntax/value-element.tmt", &[ANY_ERROR]),
     // Same underlying gap as `syntax/value-element.tmt` just above
     // (`Value::Element` has no `grammar.js` counterpart) -- this fixture
-    // is its `list(...)`-based replacement, so it inherits the same
+    // is its `(...)`-based replacement, so it inherits the same
     // drift rather than a new one.
     ("syntax/list-call.tmt", &[ANY_ERROR]),
     // `key: [...]` (`Value::Blocks`, block content as a value -- see

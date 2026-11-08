@@ -4,17 +4,17 @@
 =[ 全容 ]
 
 ```tm
-::export(type: list(commonmark, html), path: "README.md")
+::export(type: (commonmark, html), path: "README.md")
 ```
 
 この文書を、どの形式で、どこへ書き出すか。`tomet export` が読む。`(...)` の引数と、`{...}` の中の同じキーの、どちらでも書ける。
 
-- `type`: 形式。一つか、`list(...)` で複数。`commonmark`（`markdown` `md`）、`html`、`typst`、`pandoc`（`json`）。ほかの名前も書けるが、その形式の書き出しはない。省けば `commonmark`。
+- `type`: 形式。一つか、`(...)` で複数。`commonmark`（`markdown` `md`）、`html`、`typst`、`pandoc`（`json`）。ほかの名前も書けるが、その形式の書き出しはない。省けば `commonmark`。
 - `path`: 書き出す先。一つの道（すべての形式に同じ）か、形式から道へのマップ。
 
 ```tm
 ::export(
-  type: list(commonmark, html)
+  type: (commonmark, html)
   path: { commonmark: "README.md", html: "index.html" }
 )
 ```
