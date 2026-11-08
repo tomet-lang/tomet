@@ -1,7 +1,7 @@
 //! Guard: `|content` is `[content]` spelled without brackets, and nothing
 //! more.
 //!
-//! `|` was added so a body could be written with a visible left edge
+//! `|` lets a body be written with a visible left edge
 //! instead of a pair of brackets far apart. What keeps it from becoming a
 //! second construct is that the parser gives it no rules of its own: a
 //! run's markers are folded away with the newlines they follow, so the
@@ -204,7 +204,7 @@ fn the_printer_expands_a_marked_run_into_brackets() {
 
 /// The column is what says which content a marker belongs to. Once lists
 /// nest there is nothing else to go on, and ending the run quietly would
-/// drop the line into prose -- the failure that used to break a wrapped
+/// drop the line into prose -- the failure that breaks a wrapped
 /// list item in every export.
 #[test]
 fn a_marker_standing_in_the_wrong_column_is_rejected() {

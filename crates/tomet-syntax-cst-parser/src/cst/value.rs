@@ -175,8 +175,8 @@ impl<'a, 't> CstParser<'a, 't> {
                     self.builder.finish_node();
                 }
                 // `[ ... ]` as a value is blocks, the same `[content]` a
-                // form takes; the list literal it once was is gone. Read as
-                // a list it closed at the first `]`, even one inside `` `code` ``.
+                // form takes, and not a list: read as a list it would close at
+                // the first `]`, even one inside `` `code` ``.
                 K::L_BRACKET => self.parse_content_group(),
                 K::L_PAREN => self.parse_args_group(),
                 // The `#(id)` of a bare entry, `(1)[text]#(a)`.

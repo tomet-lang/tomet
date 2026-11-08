@@ -397,7 +397,7 @@ mod tests {
         assert_eq!(doc.text_at("#main-meta::id").as_deref(), Some("main-meta"));
         assert_eq!(doc.text_at("#main-meta::name").as_deref(), Some("meta"));
         assert_eq!(doc.text_at("#warn::name").as_deref(), Some("callout"));
-        // The old `.prop` level, and a dot for what the node is, name nothing.
+        // The retired `.prop` level, and a dot for what the node is, name nothing.
         assert_eq!(doc.text_at("#main-meta.prop.title"), None);
         assert_eq!(doc.text_at("#main-meta.id"), None);
 

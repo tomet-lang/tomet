@@ -13,11 +13,10 @@ use tomet_semantics::{
 /// Strips `target`'s scheme prefix the same way `render_link_element`
 /// does -- e.g. `<embed>(ref:name)` (recovered from the parser's
 /// `identifier:` key split, see `normalized_element_args`) must render
-/// `src="name"`, not the literal `"ref:name"`. Under the old per-scheme-key
-/// design this stripping was implicit (the scheme was a separate key,
-/// never part of the value string); now that both `@link` and `<embed>`
-/// share one `target` key with the scheme embedded in the string, `<embed>`
-/// needs the same treatment `@link` gets, not just a raw passthrough.
+/// `src="name"`, not the literal `"ref:name"`. Both `@link` and `<embed>`
+/// share one `target` key with the scheme embedded in the string, so
+/// `<embed>` needs the same treatment `@link` gets, not just a raw
+/// passthrough.
 pub(crate) fn render_embed_element(el: ElementView<'_>, out: &mut String) {
     let raw_target = link_target(el, &classify_std_lenient(el)).unwrap_or_default();
     let (scheme, src) = target_scheme(&raw_target);
@@ -40,7 +39,7 @@ pub(crate) fn render_embed_element(el: ElementView<'_>, out: &mut String) {
 /// `@file(x)`/`@dir(x)` -- a path named, not navigated to.
 ///
 /// A `<code>`, not an `<a>`, and that is the whole difference from
-/// `render_link_element`. Prose saying "read `raw.rs`" is not
+/// `render_link_element`. Prose saying "read `docs/spec/`" is not
 /// offering to take the reader there, and before these elements existed
 /// it was written in backticks -- which is exactly what this renders back
 /// to, so moving a mention onto `@file` changes what a checker can see

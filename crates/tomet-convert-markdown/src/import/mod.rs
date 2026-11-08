@@ -67,10 +67,10 @@ enum Frame {
         items: Vec<ListItem>,
     },
     Emphasis(Vec<Inline>),
-    /// GFM's `~~x~~`. Tomet spells it the same way, so the tildes used to
-    /// reach the output verbatim and be re-read by Tomet's own parser --
-    /// which produced the right file and the wrong `File`, since
-    /// `from_markdown`'s own result held text rather than an element.
+    /// GFM's `~~x~~`. Tomet spells it the same way, but the tildes are not
+    /// passed through verbatim to be re-read by Tomet's own parser --
+    /// that would produce the right file and the wrong `File`, since
+    /// `from_markdown`'s own result would hold text rather than an element.
     Strikeout(Vec<Inline>),
     Strong(Vec<Inline>),
     Link {
@@ -118,7 +118,7 @@ pub struct ImportOptions {
     pub table_align: Option<String>,
 }
 
-/// Wraps a flat inline sequence as `Element.content` (`Vec<Block>` now):
+/// Wraps a flat inline sequence as `Element.content` (`Vec<Block>`):
 /// one `Paragraph`, or nothing for an empty sequence. Every `Frame`
 /// accumulates `Vec<Inline>` internally (unchanged -- see the module doc's
 /// note on block quotes/list items flattening to one inline run on
@@ -184,7 +184,7 @@ pub fn from_markdown_with_options(src: &str, options: &ImportOptions) -> File {
             Event::Start(tag) => stack.push(start_frame(tag)),
             Event::End(tag_end) => end_frame(&mut stack, tag_end, options),
             Event::TaskListMarker(is_checked) => {
-                // Tomet has no checkbox construct anymore -- fall back
+                // Tomet has no checkbox construct -- fall back
                 // to the same "not a recognized construct, keep it as
                 // literal text" treatment `[...]`/unrecognized brackets get
                 // everywhere else in this crate and in `tomet-parser`,
@@ -366,11 +366,11 @@ fn end_frame(stack: &mut Vec<Frame>, tag_end: TagEnd, options: &ImportOptions) {
             let mut variant = String::new();
             let mut title = None;
 
-            // `[!type] title` is a whole line: with a source line break now
+            // `[!type] title` is a whole line: with a source line break
             // its own `SoftBreak` node rather than a `'\n'` embedded in
             // this `Text` (see `Inline::SoftBreak`), the entire title line
-            // lives in this one first `Text` -- nothing to split on `\n`
-            // for any more. The title line itself, and the `SoftBreak`
+            // lives in this one first `Text` -- nothing to split on `\n`.
+            // The title line itself, and the `SoftBreak`
             // right after it if there is one, get dropped below rather
             // than truncated in place.
             if let Some(Inline::Text(t)) = content.first() {
@@ -586,7 +586,7 @@ fn end_frame(stack: &mut Vec<Frame>, tag_end: TagEnd, options: &ImportOptions) {
             // `target_scheme` (downstream, in `tomet-semantics`)
             // classifies `dest` by its own shape (`scheme://...` -> url,
             // otherwise -> file) once this is rendered/queried -- no key
-            // choice needed here, unlike the old per-kind key scheme.
+            // choice needed here.
             let el = Element {
                 name: Name::bare("link"),
 
@@ -768,11 +768,11 @@ fn push_block(stack: &mut [Frame], block: Block) {
     }
 }
 
-/// Flattens an `Element.content` (`Vec<Block>` now) down to one inline
+/// Flattens an `Element.content` (`Vec<Block>`) down to one inline
 /// run, by folding each block in with [`merge_block_into`] -- used where
 /// this importer already flattens surrounding structure to a single
-/// inline run (blockquotes, a heading/list merged into one) and now needs
-/// to do the same to a nested element's own content, which is no longer
+/// inline run (blockquotes, a heading/list merged into one) and needs
+/// to do the same to a nested element's own content, which is not
 /// `Vec<Inline>` by construction.
 fn blocks_to_flat_inlines(blocks: Vec<Block>) -> Vec<Inline> {
     let mut out = Vec::new();

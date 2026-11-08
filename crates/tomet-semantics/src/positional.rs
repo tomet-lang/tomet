@@ -5,12 +5,9 @@ use crate::vocabulary::{Bindings, ElementDecl};
 
 /// One table, keyed on the bare name alone.
 ///
-/// This used to be two parallel tables, one per sigil, and they had
-/// silently drifted: `raw`, `embed` and `callout` had entries only
-/// under `<T>`, so `@embed(x)` and `<embed>(x)` disagreed about whether
-/// `x` meant `target`. Both of those sigils are gone -- `@name` is the
-/// only one, and shape comes from position -- so keying on anything but
-/// the name would have preserved that bug as a feature. `callout` is kept even though it is not in `BUILTIN_KINDS`;
+/// `@name` is the only sigil, and shape comes from position, so keying on
+/// anything but the name would let two spellings of one element disagree
+/// about whether `x` means `target`. `callout` is kept even though it is not in `BUILTIN_KINDS`;
 /// it is a widely used custom element in the docs and dropping its
 /// positional key would silently change how `(warning)` reads.
 ///
@@ -69,8 +66,8 @@ pub fn normalized_list_marker(marker: &Value) -> Value {
     )])
 }
 
-/// The old per-scheme argument keys (`url`/`file`/`tm`/`id`/`ref`), from
-/// before `@link`/`@embed` were unified onto one `target` key -- a bare
+/// The per-scheme argument keys (`url`/`file`/`tm`/`id`/`ref`), which
+/// `@link`/`@embed` do not have (they have the one `target` key) -- a bare
 /// `tm:foo/bar` (no `target:` wrapper) still parses as a map entry
 /// `("tm", "foo/bar")`, since the parser's `identifier:` rule has no
 /// notion of "target" being the only real key these two elements have (it
@@ -84,9 +81,9 @@ fn is_recoverable_target_scheme(key: &str) -> bool {
 }
 
 /// Scoped to elements whose *first* positional slot is `"target"`
-/// (`@link`/`@embed`'s builtin default; a custom element could once be
-/// given that slot through `::settings`, which is a `::vocabulary` question
-/// now and unread either way) -- when that's the only legitimate
+/// (`@link`/`@embed`'s builtin default; a custom element is not given
+/// that slot through `::settings`, which is a `::vocabulary` question and
+/// unread either way) -- when that's the only legitimate
 /// key defined, any *other* single key present is unambiguously an
 /// artifact of the parser's `identifier:` rule splitting a bare
 /// `scheme:value` positional argument, not a real intentional field.
@@ -156,8 +153,7 @@ fn positional_keys(name: Option<&Name>, bindings: &Bindings) -> Vec<String> {
 /// - `Value::Seq`: an explicit `[...]`-bracketed positional list
 ///   (`@task([a, b])`) -- independent of the parser's bare-comma-list
 ///   sentinel mechanism, zipped against the slot list positionally.
-/// - anything else (a bare scalar): wrapped under the first slot, same as
-///   before this was generalized.
+/// - anything else (a bare scalar): wrapped under the first slot.
 ///
 /// An element with no positional slots defined at all (empty list) is
 /// returned untouched in every case.
@@ -168,10 +164,10 @@ fn positional_keys(name: Option<&Name>, bindings: &Bindings) -> Vec<String> {
 /// `validate_document_with`, and for the same reason: most callers here
 /// (HTML, Typst, `::meta` reading) have no vault to resolve against.
 ///
-/// This is deliberately *not* the `_with_schema` twin that used to sit
-/// here. That one took a `SettingsSchema` no caller ever built, so its
-/// second source was dead on arrival; this one exists because the
-/// validator passes real bindings through it.
+/// This is deliberately *not* a `_with_schema` twin: one taking a
+/// `SettingsSchema` no caller builds would have a second source dead on
+/// arrival; this one exists because the validator passes real bindings
+/// through it.
 pub fn normalized_element_args(el: ElementView<'_>) -> Option<Value> {
     normalized_element_args_in(el, &Bindings::default())
 }
@@ -438,13 +434,11 @@ mod tests {
     /// A custom element's positional args are left as the parser produced
     /// them, sentinel keys and all.
     ///
-    /// Two tests used to sit here giving `link` a second `predicate` slot
-    /// and `task` a `title`/`priority` pair through an `::settings`
-    /// `elements: { <name>: { positional: [...] } }` map. That surface is
-    /// gone -- it was a second source for a fact the parameter
-    /// declarations already order, and nothing outside those tests ever
-    /// built a `SettingsSchema`. Until `@param` is read, `std`'s table is
-    /// the only source, and it has no entry for a custom name.
+    /// Nothing gives a name a slot list through an `::settings`
+    /// `elements: { <name>: { positional: [...] } }` map: that would be a
+    /// second source for a fact the parameter declarations already order.
+    /// Until `@param` is read, `std`'s table is the only source, and it
+    /// has no entry for a custom name.
     ///
     /// A consequence worth stating: every builtin has at most one
     /// positional slot, so `bind_positional`'s multi-slot loop is

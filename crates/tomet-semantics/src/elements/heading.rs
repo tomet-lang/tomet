@@ -1,6 +1,6 @@
 //! Extracts the `level` of a heading-shaped element (`Heading`, per
 //! [`crate::classify_std`]) from its `args`, centralizing the `1..=6` clamp
-//! that `tomet-html`/`tomet-markdown`/`tomet-printer` each used to apply separately.
+//! that `tomet-html`/`tomet-markdown`/`tomet-printer` would otherwise each apply separately.
 
 use tomet_ast::ElementView;
 use tomet_tree::ValueExt;

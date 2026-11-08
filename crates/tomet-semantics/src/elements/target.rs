@@ -1,10 +1,10 @@
 //! Extracts the raw target string of a link-shaped element (`Link`/`Embed`,
 //! per [`crate::classify_std`]) under their one canonical `target` key, and
 //! classifies *what kind* of target that string is (`TargetScheme`) by its
-//! own scheme prefix -- `url`/`file`/`tm`/`id`/`ref` are no longer carried
-//! by which argument key was used (there's only ever `target:` now); they
+//! own scheme prefix -- `url`/`file`/`tm`/`id`/`ref` are not carried
+//! by which argument key was used (there's only ever `target:`); they
 //! live entirely in the target string itself. This is the canonical
-//! extraction, adopted by `tomet-html`/`tomet-markdown`/`tomet-links`
+//! extraction, used by `tomet-html`/`tomet-markdown`/`tomet-links`
 //! instead of each reading `el.args` raw.
 
 use tomet_ast::ElementView;

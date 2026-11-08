@@ -75,7 +75,7 @@ pub(crate) fn split_attrs(attrs: Option<&Value>) -> (Option<String>, Vec<(String
 
 /// The HTML `id` attribute sourced from an element/section/list-item's
 /// own `#(id)`, not from any attribute key -- a literal `id:` key in
-/// `(args)`/`{value}` is ordinary data now, not this.
+/// `(args)`/`{value}` is ordinary data, not this.
 pub(crate) fn id_attr(id: Option<&Id>) -> Option<String> {
     id.map(|id| id.0.clone())
 }
@@ -114,20 +114,15 @@ pub(crate) fn push_data_attr(out: &mut String, key: &str, value: &str) {
 /// scalar or a sequence of scalars gets its own readable attribute, and
 /// when that projection would lose something -- a nested map -- the whole
 /// group is added as JSON under `data-tomet-data`.
-///
-/// Before that, a nested map rendered as `data-m=""`: the key survived
-/// and its contents did not.
 /// A `{...}` group's pairs, as `data-*` beside the ones `(args)` gives.
 ///
-/// `{}` has been "always data" since the uniform-group change, and this
+/// `{}` is always data, and this
 /// is where data goes in HTML -- the same shelf `(args)` already uses,
 /// invisible to the reader.
 ///
-/// They used to be dropped in silence. `render_element_value` asked
-/// `value_to_plain` for a string to show in a `tm-value` span, and
-/// `as_data` returns a `Value::Map` for every group while `value_to_plain`
-/// answers `""` for every map, so the span's guard was never true. It
-/// appears nowhere in `tests/ref/`.
+/// They are not dropped in silence: `as_data` returns a `Value::Map` for
+/// every group, and `value_to_plain` answers `""` for every map, so a
+/// `tm-value` span built from it would never be written.
 ///
 /// A key `(args)` already spent is skipped rather than written twice,
 /// which would be invalid HTML. `(args)` wins because it is the group the

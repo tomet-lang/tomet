@@ -525,7 +525,7 @@ fn an_id_used_twice_after_an_include_keeps_the_first_and_reports_the_later() {
 #[test]
 fn an_id_used_again_in_args_or_in_a_holes_content_is_reported_too() {
     // Every node that can carry an id is claimed, in document order: an element in `(args)` and
-    // one in a hole's content count, which a walk over the blocks alone used to miss.
+    // one in a hole's content count, which a walk over the blocks alone would miss.
     let (_, unresolved) = run("@a()#(x)\n\n@b(icon: @c()#(x))\n\n<?(h)>[@d()#(x)]\n");
     assert_eq!(unresolved.len(), 2, "{unresolved:?}");
     assert!(

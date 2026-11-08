@@ -738,8 +738,8 @@ fn inline_raw_with_backtick_falls_back_to_at_raw() {
 
 #[test]
 fn a_block_value_in_a_group_keeps_every_block_it_holds() {
-    // `::macro(name: [ ... ])` is a `{...}` group, whose `key: [...]` values used to be printed
-    // as paragraph inlines only: an element in one came out as `[]`.
+    // `::macro(name: [ ... ])` is a `{...}` group, whose `key: [...]` values are printed with
+    // every block they hold, not as paragraph inlines only (an element in one would come out as `[]`).
     for src in [
         "::macro(card: [ @card(title: ${1})[ ${2} ] ])\n",
         "::macro(two: [\none ${1}\n\n@card[ x ]\n])\n",

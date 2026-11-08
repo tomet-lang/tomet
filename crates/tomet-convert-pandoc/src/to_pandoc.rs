@@ -337,7 +337,7 @@ fn content_of(el: ElementView<'_>) -> &[TmBlock] {
 /// A flat inline run (`Paragraph.content`, still `Vec<Inline>`) as Pandoc
 /// blocks: an element written at a line start inside it -- the join/isolate
 /// rule the parser applies when an `@`-element is glued into a paragraph
-/// (`document.rs`'s `continue_into_paragraph`) -- is an `Inline::Element`
+/// -- is an `Inline::Element`
 /// carrying `Placement::Block`, which is read here: a block-placed element
 /// becomes its own Pandoc block, and the true inlines around it are
 /// gathered into `Para`.
@@ -376,8 +376,8 @@ fn flush_run(run: &mut Vec<Inline>, blocks: &mut Vec<Block>) {
     }
 }
 
-/// An `Element.content` group (`Vec<Block>` now) as Pandoc blocks: a
-/// direct, mostly 1:1 mapping, now that a block-placed element is a real
+/// An `Element.content` group (`Vec<Block>`) as Pandoc blocks: a
+/// direct, mostly 1:1 mapping, since a block-placed element is a real
 /// `TmBlock::Element` rather than an `Inline::Element` carrying
 /// `Placement::Block` within a flat inline run (the trick
 /// [`content_to_blocks`] below still is, for `Paragraph.content`, which
@@ -788,7 +788,7 @@ fn table_alignment(el: ElementView<'_>) -> Alignment {
 ///
 /// Putting one in the `tomet-<name>` class anyway would make `from_pandoc`
 /// rebuild it as an element *named* `bare`, and `@bare` is not a builtin, so
-/// a round-tripped document stopped validating.
+/// a round-tripped document would stop validating.
 ///
 /// A key rather than another class, because a class collides: a document
 /// whose `::kind` names a vocabulary declaring `bare` writes `@bare`
@@ -882,8 +882,8 @@ mod tests {
     #[test]
     fn a_wrapped_line_becomes_a_softbreak() {
         // `tomet_ast::Inline::SoftBreak` maps 1:1 to Pandoc's own
-        // `SoftBreak` (`content_to_blocks`) -- no longer `Space`, now that
-        // the parser keeps a source line break as its own node instead of
+        // `SoftBreak` (`content_to_blocks`) -- not `Space`, since the
+        // parser keeps a source line break as its own node instead of
         // folding it away before the AST is even built.
         let blocks = convert("one\ntwo\n");
         assert_eq!(
@@ -1054,7 +1054,7 @@ mod tests {
 
     #[test]
     fn a_block_placed_element_inside_content_becomes_its_own_block() {
-        // The case `Placement` was introduced for: `content` is a
+        // The case `Placement` exists for: `content` is a
         // `Vec<Inline>`, so only placement can say this is a block.
         let blocks = convert("@deck.list[\n  @deck.item(1)[ one ]\n]\n");
         let Block::Div(_, body) = &blocks[0] else {

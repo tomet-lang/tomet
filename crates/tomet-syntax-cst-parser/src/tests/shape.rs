@@ -51,7 +51,7 @@ fn test_cst_node_hierarchy() {
 
 #[test]
 fn old_hash_heading_is_plain_paragraph() {
-    // `#` is free: it was an ATX-style heading marker once, and is plain text now.
+    // `#` is free: it is plain text, not an ATX-style heading marker.
     let root = parse_cst("#[ Title ]\n\nParagraph\n");
     assert_eq!(child_kinds(&root), [K::PARAGRAPH, K::PARAGRAPH]);
 }
@@ -69,9 +69,9 @@ fn sections_nest_by_level() {
     let a1 = a.children().nth(2).unwrap();
     assert_eq!(child_kinds(&a1), [K::SECTION_HEADING, K::PARAGRAPH]);
     // 3 real bodies ("text"/"inner"/"last") + 4 section titles ("A"/
-    // "A1"/"A2"/"B"), each title's own `[...]` now wrapping its bare
+    // "A1"/"A2"/"B"), each title's own `[...]` wrapping its bare
     // inline content in a `PARAGRAPH` the same way any other content
-    // group does -- see `parse_content_group`'s doc comment.
+    // group does.
     assert_eq!(count(&root, K::PARAGRAPH), 7);
 }
 
@@ -202,11 +202,9 @@ fn a_literal_bracket_in_content_prose_does_not_end_it_early() {
 
 #[test]
 fn bare_paragraph_content_spanning_lines_does_not_swallow_the_close() {
-    // No blank line, no new block starting the second line -- under
-    // the old inline-only `parse_content_group`, nothing stopped a
-    // paragraph at `]` at all; under the block grammar, the
-    // paragraph's own bracket-depth tracking has to catch it even
-    // after crossing a newline.
+    // No blank line, no new block starting the second line -- the
+    // paragraph's own bracket-depth tracking has to stop it at `]`,
+    // even after crossing a newline.
     let root = parse_cst("@card[ hello\nworld ]\nafter\n");
     let content = find(&root, K::CONTENT).unwrap();
     assert_eq!(content.text().to_string(), "[ hello\nworld ]");
@@ -277,12 +275,11 @@ fn connect_joins_the_form() {
 
 #[test]
 fn full_form_list_item_claims_its_own_trailing_connect() {
-    // A full-form item's own groups reach `parse_groups`'s `COLON`
-    // arm directly (nothing else sits between the closing `]` and
-    // the `:`), so this now mirrors a plain form's own connect --
-    // `parse_list_item` only disables `allow_connect` for the rest
-    // of the line (the sugar/trailing-text scan), not for the item's
-    // own groups.
+    // A full-form item's own groups reach the connect arm directly
+    // (nothing else sits between the closing `]` and the `:`), so this
+    // mirrors a plain form's own connect -- the list item only
+    // disables connects for the rest of the line (the sugar/trailing-
+    // text scan), not for the item's own groups.
     let root = parse_cst("- [ x ]::rule(allow: (a))\n");
     let item = find(&root, K::LIST_ITEM).unwrap();
     assert_eq!(count(&item, K::CONNECT), 1);

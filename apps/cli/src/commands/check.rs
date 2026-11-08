@@ -28,11 +28,10 @@ enum CheckFileResult {
 /// cotomet and must be a map of `key: value` entries, with its header
 /// declarations validated against [`tomet_declaration::Host::Ctmt`].
 ///
-/// Checking is not parsing. This used to return OK the moment a document
-/// parsed, so two `::meta`, or an element name that exists nowhere, passed
-/// -- while the js/java/python bindings and `apps/web` all ran the
-/// validator. Vocabularies have to be read from disk, which is why the
-/// resolving lives here and not in the validator.
+/// Checking is not parsing: a document that parses is not thereby OK --
+/// two `::meta`, or an element name that exists nowhere, fail.
+/// Vocabularies have to be read from disk, which is why the resolving
+/// lives here and not in the validator.
 ///
 /// Multi-file checking runs in parallel across rayon worker threads governed
 /// by the jobserver gate, and produces all output (stderr diagnostics, summary,

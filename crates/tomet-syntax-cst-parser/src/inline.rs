@@ -41,9 +41,8 @@ pub fn escaped_run_len(bytes: &[u8], at: usize) -> Option<usize> {
 
 /// Where a delimiter could close a span, and where a paragraph ends, found once for a text.
 ///
-/// Whether an opener has a closer is then a lookup. It used to be a scan to the end of the paragraph
-/// for every opener, so a long paragraph with many unmatched `*word`s took time quadratic in its
-/// length.
+/// Whether an opener has a closer is then a lookup, not a scan to the end of the paragraph for every
+/// opener, which would take time quadratic in the length of a paragraph with many unmatched `*word`s.
 pub struct DelimiterIndex {
     /// The byte offset of every `\n` that is followed by nothing but blanks up to another `\n` or the
     /// end: the line break that ends a paragraph.

@@ -1,7 +1,8 @@
-//! What a long line costs. The groups a bracket-less body ends in used to be found by trying the
-//! grammar at each `:` and `{` in turn, each trial reading the rest of the line: a line of `a: a:
-//! a: ...` took a time proportional to the square of its length, and list items nested in
-//! each other doubled it again per level. Each case below is long enough to take minutes that way.
+//! What a long line costs. The groups a bracket-less body ends in are found without trying the
+//! grammar at each `:` and `{` in turn, each trial reading the rest of the line: that would take a
+//! time proportional to the square of the length of a line of `a: a: a: ...`, and list items nested
+//! in each other would double it again per level. Each case below is long enough to take minutes
+//! that way.
 
 use super::*;
 use std::time::{Duration, Instant};

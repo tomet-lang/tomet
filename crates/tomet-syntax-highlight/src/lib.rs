@@ -416,7 +416,7 @@ mod tests {
 
     #[test]
     fn the_old_hash_is_not_a_heading() {
-        // `#(id)` is an id now, and the old `#[` heading is prose.
+        // `#(id)` is an id, and a `#[` heading is prose.
         assert!(!has("#[ Title ]\n", "#", "heading"));
         assert!(punct_at("@x(a)#(id)\n", 5), "the # of the id");
     }

@@ -2,9 +2,9 @@
 //! do not silently flatten `Value::Blocks` args into lossy placeholder strings
 //! like `<N block(s)>`.
 //!
-//! When `@conflict(a: [...], b: [...])` was introduced, generic fallbacks in each
-//! converter flattened arguments into scalar data attributes, replacing the block
-//! contents with `<N block(s)>` while all tests stayed green.
+//! A generic fallback in a converter could flatten the block arguments of
+//! `@conflict(a: [...], b: [...])` into scalar data attributes, replacing the
+//! block contents with `<N block(s)>` while all tests stayed green.
 //! This test ensures any builtin element with block-content arguments renders
 //! its contents faithfully across all converters without lossy placeholders.
 

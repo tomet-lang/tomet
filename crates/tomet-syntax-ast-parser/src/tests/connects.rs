@@ -90,7 +90,7 @@ fn multiple_named_connects_stack_flat_not_nested() {
 
 #[test]
 fn bare_colon_merge_is_unaffected_by_named_connect_support() {
-    // No name after the colon -- must still take the old bare-merge
+    // No name after the colon -- must take the bare-merge
     // path, not be misread as a nameless connect.
     let doc = parse_file("@memo(a:1)::{b:2}\n").unwrap();
     match &doc.body[0] {
@@ -122,9 +122,8 @@ fn section_supports_named_connect() {
 
 #[test]
 fn sugar_list_item_and_heading_support_a_bare_connect() {
-    // `::()`, `::{}` and the combined `::(){}` now attach to a bracket-less
-    // sugar body's own owner the same way they already did for a
-    // bracketed one -- see `ConnectMode::Bare`/`find_trailing_connect`.
+    // `::()`, `::{}` and the combined `::(){}` attach to a bracket-less
+    // sugar body's own owner the same way they do for a bracketed one.
     for (src, expect_args, expect_value) in [
         ("- content ::(x: 1)\n", Some(Value::Int(1)), None),
         ("- content ::{y: 2}\n", None, Some(Value::Int(2))),
@@ -200,9 +199,9 @@ fn sugar_heading_supports_a_named_connect_matching_its_bracketed_form() {
 
 #[test]
 fn sugar_list_item_supports_a_named_connect_matching_its_bracketed_form() {
-    // A list item's sugar body now supports `::name(...)` too -- matching
+    // A list item's sugar body supports `::name(...)` too -- matching
     // both its own full-bracketed form (just above) and a heading's sugar
-    // form, now that `element_list_item` carries `connects`.
+    // form, since the item carries `connects`.
     let doc = parse_file("- content ::rule(allow: (card))\n").unwrap();
     match &doc.body[0] {
         Block::List(list) => {

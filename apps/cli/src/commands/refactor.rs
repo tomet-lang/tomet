@@ -107,9 +107,8 @@ mod tests {
     use std::fs;
 
     /// A file that does not parse is a file the sweep did not check, and
-    /// `--check` has to say so by failing. It used to warn on stderr and
-    /// exit 0, which reported a clean tree containing a file nobody had
-    /// looked at.
+    /// `--check` has to say so by failing: warning on stderr and exiting 0
+    /// would report a clean tree containing a file nobody had looked at.
     #[test]
     fn check_fails_on_a_file_it_could_not_parse() {
         let temp_dir = std::env::temp_dir().join("tomet_test_refactor_unparseable");

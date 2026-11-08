@@ -16,8 +16,7 @@
 
 use tomet_ast::{Block, Declaration, Entry, Group, Inline, Value};
 
-/// Renders one `Block` of a value-embedded element's `[content]` (now
-/// `Vec<Block>`) the way the old inline-only loop rendered an `Inline` --
+/// Renders one `Block` of a value-embedded element's `[content]` (`Vec<Block>`):
 /// a value-embedded element's content is inline in practice, so this only
 /// descends into a `Paragraph`'s own inlines, not into nested structure.
 #[deny(clippy::wildcard_enum_match_arm)]

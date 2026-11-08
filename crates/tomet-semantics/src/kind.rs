@@ -1,9 +1,9 @@
 use tomet_ast::{ElementView, Name, Placement};
 use tomet_declaration::DeclKind;
 
-/// What a parsed `Element` officially means, replacing the ad-hoc
-/// stringly-typed `kind: String` that `tomet-html` and
-/// `tomet-markdown/export.rs` each used to compute independently.
+/// What a parsed `Element` officially means, in one place, and not an
+/// ad-hoc stringly-typed `kind: String` that each writer computes
+/// independently.
 ///
 /// This only expresses *recognition* ("this element is `::meta`"), not
 /// *action* ("`::meta` produces no output") -- consumers still decide for
@@ -19,7 +19,7 @@ pub enum ElementKind {
     /// What each one *is* -- its positional slots, how often it may be written, whether a `.ctmt`
     /// may have it, what reading it gives -- is `tomet-declaration`'s. What `use`, `blueprint`,
     /// `config` and the vocabulary pair *do* is this crate's and `tomet-config`'s, which match on
-    /// the `DeclKind`. Eleven variants used to stand here, one per declaration; they were a second
+    /// the `DeclKind`. A variant per declaration would be a second
     /// table of the same names.
     Declaration(DeclKind),
     /// `@data(){...}` -- the description of an element's `{...}` slot.
@@ -72,7 +72,7 @@ pub enum ElementKind {
     /// (or the positional `@link(...)` shorthand -- see
     /// `crate::positional::builtin_positional_arg_key`). What kind of
     /// target it is (url/file/tm/id/ref) is not carried by the element or
-    /// its key anymore -- it's derived from the `target` string's own
+    /// its key -- it's derived from the `target` string's own
     /// scheme prefix via `crate::target::target_scheme`, once the target
     /// has been extracted with `crate::target::link_target`.
     Link,
@@ -80,11 +80,9 @@ pub enum ElementKind {
     ///
     /// Separate from [`Link`](ElementKind::Link) because the two differ
     /// in what they produce: `@link` is an `<a>`, and this is a mention.
-    /// Prose that says "read `raw.rs`" is not offering to take the
-    /// reader there. Before this, such a mention was written in
-    /// backticks, which no checker can tell from a sentence that happens
-    /// to look like a path -- 453 of them here, and of the 164 distinct
-    /// ones only 64 name something that exists.
+    /// Prose that says "read `docs/spec/`" is not offering to take the
+    /// reader there. Written in backticks, such a mention cannot be told
+    /// by any checker from a sentence that happens to look like a path.
     ///
     /// Checked like `@link(file:...)`: the path has to exist and be a
     /// file. Not a duplicate of it -- one navigates, one names.
@@ -128,8 +126,7 @@ pub enum ElementKind {
     ///
     /// This records that the name exists and stands as a block. What its
     /// variants are, and whether it ever gets styling of its own, is
-    /// still undecided -- `docs/spec/builtin-elements.tmt` used to say it
-    /// was not built in at all, which was the part that was false.
+    /// still undecided.
     Callout,
     /// `Name::bare("card")` -- a plain title + content box, with no
     /// admonition semantics (no `variant`, no color/icon). Exists
@@ -304,11 +301,10 @@ fn builtin_kind(name: &str) -> Option<ElementKind> {
 /// silent `Custom`. `Bindings::classify` reads `std.` the same way.
 ///
 /// That silent fallback -- `builtin_kind(name).unwrap_or_else(|| Custom(name))`
-/// -- is where the old sigil ambiguity actually lived. `<T>` and `@name`
-/// were meant to separate official from user-defined elements, but both
-/// classified through this one arm, so the distinction never reached the
-/// tree. Namespaces carry it now, and this returns an error instead of
-/// inventing a kind.
+/// -- is where a sigil ambiguity would live: a sigil meant to separate
+/// official from user-defined elements would still classify through this
+/// one arm, so the distinction would never reach the tree. Namespaces
+/// carry it, and this returns an error instead of inventing a kind.
 pub fn classify_std_name(name: &Name) -> Result<ElementKind, UnknownName> {
     if !is_written_in_std(name) {
         return Ok(ElementKind::Custom(name.to_string()));
@@ -355,9 +351,9 @@ fn is_written_in_std(name: &Name) -> bool {
 pub struct UnknownName {
     /// The name as written, namespace included -- `deck.ref`, not `ref`.
     ///
-    /// It used to hold only the local part, so writing `@deck.ref` with
-    /// `deck` out of scope was reported as "unknown element `ref`",
-    /// naming something the author had not written.
+    /// It holds the whole name and not only the local part, which would
+    /// report `@deck.ref` with `deck` out of scope as "unknown element
+    /// `ref`", naming something the author had not written.
     pub name: String,
     /// Set when the name is namespaced and that namespace is not in
     /// scope at all. The distinction matters to whoever has to fix it:
@@ -420,7 +416,7 @@ impl std::error::Error for UnknownName {}
 /// definition is reported separately by [`shape_mismatch`].
 ///
 /// No inference from `args` happens here -- `@(url:...)`-style key-based
-/// guessing was retired; the only way to get `ElementKind::Link` is to
+/// guessing does not exist; the only way to get `ElementKind::Link` is to
 /// write `@link` explicitly.
 pub fn classify_std(el: ElementView<'_>) -> Result<ElementKind, UnknownName> {
     // A name that is a declaration's is refused when written `@name`:
@@ -466,10 +462,9 @@ pub fn classify_declaration_lenient(declaration: &tomet_ast::Declaration) -> Ele
 /// Whether a kind is a directive -- an element that configures or
 /// annotates the document and has no rendering of its own.
 ///
-/// Every writer needs this and each used to keep its own copy of the
-/// list, which is how `settings` and `import` came to be missing from all
-/// three of them: they joined [`builtin_kinds`] after those lists were
-/// written, so `::settings(file:...)` exported as a stray `<div>`.
+/// Every writer needs this, so it is kept once: a copy of the list in each
+/// writer would miss the kinds that join [`builtin_kinds`] later, and
+/// `::settings(file:...)` would export as a stray `<div>`.
 pub fn is_directive(kind: &ElementKind) -> bool {
     matches!(kind, ElementKind::Declaration(_))
 }
@@ -545,8 +540,8 @@ impl From<Placement> for Shape {
 pub enum ContentShape {
     /// At most one plain paragraph -- no nested blocks, no multiple
     /// paragraphs. What every inline-only built-in (`em`, `link`, a
-    /// heading's title, ...) has always meant by "content", now that the
-    /// parser itself no longer enforces it by construction.
+    /// heading's title, ...) has always meant by "content", although the
+    /// parser itself does not enforce it by construction.
     Inline,
     /// Any blocks -- multiple paragraphs, headings, lists, nested
     /// elements.
@@ -569,11 +564,11 @@ pub fn builtin_content_shape(kind: &ElementKind) -> Option<ContentShape> {
         // `(args)` only, no `[content]`.
         Declaration(_) | Data => None,
         // Self-closing; a fenced/backtick code body's `[content]` is
-        // synthesized by the parser itself (`raw.rs`), not shaped
+        // synthesized by the parser itself, not shaped
         // by an author, so there is nothing here for a shape check to
         // classify. No observed `@tag[...]` usage to classify yet.
-        // Lists are no longer `Element`s at all (see `tomet_ast::List`),
-        // so there is nothing list-shaped left to classify here.
+        // Lists are not `Element`s at all (see `tomet_ast::List`),
+        // so there is nothing list-shaped to classify here.
         Hr | Raw | Tag => None,
         // `@conflict`'s payload (`a`/`b`) lives in `(args)`, via
         // `Value::Blocks` -- it never uses `[content]`/`|content` at all,
@@ -615,8 +610,8 @@ pub fn builtin_region(kind: &ElementKind) -> crate::vocabulary::Region {
 /// middle of a paragraph, or a `heading` standing as a block inside one.
 ///
 /// The comparison is between the element's *placement*, which the parser
-/// derived from position, and [`required_shape`]. It used to compare the
-/// author's sigil against the same table, which made the report about
+/// derived from position, and [`required_shape`]; comparing the
+/// author's sigil against the same table would make the report about
 /// spelling (`#em`) rather than about the document.
 ///
 /// `Placement::Inline` on a `Block`-required kind is always a mismatch,
@@ -661,7 +656,7 @@ mod tests {
     #[test]
     fn unknown_bare_name_is_an_error() {
         // Bare names are reserved for the built-in vocabulary, so this is
-        // the diagnostic that replaces the old silent `Custom` fallback.
+        // the diagnostic that stands where a silent `Custom` fallback would.
         let el = element_new(Name::bare("caution"));
         assert_eq!(
             classify_std(el.as_view()),

@@ -102,7 +102,7 @@ pub fn instantiate_blueprint(doc: &mut File, cx: &EvalContext) -> Instantiated {
     changed |= dropped_own_kind;
 
     // The blueprint's `::var` are its inputs. They have been given their values
-    // by now (see `tomet-workspace`), and a document made from it has none to ask for.
+    // (by `tomet-workspace`), and a document made from it has none to ask for.
     let mut dropped_vars = false;
     doc.header.retain(|declaration| {
         let is_vars =
@@ -119,9 +119,8 @@ pub fn instantiate_blueprint(doc: &mut File, cx: &EvalContext) -> Instantiated {
         {
             // The target is `::blueprint`'s positional argument, which
             // `tomet-semantics::positional` normalizes to `target`.
-            // This used to also accept a spelled-out `target:` and a
-            // `kind:`, three spellings for one thing that nobody had
-            // chosen between -- see the root writ's `blueprint-shape`.
+            // That is the one spelling: a spelled-out `target:` and a
+            // `kind:` would be three spellings for one thing.
             let target_kind = normalized_declaration_args(declaration)
                 .as_ref()
                 .and_then(|args| args.get("target"))

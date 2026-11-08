@@ -10,7 +10,7 @@
 //! the parser is not allowed to recognize. Both are parsed, the identifier is
 //! normalized to a common placeholder in each tree, and the two trees are
 //! compared. `Span`'s `PartialEq` is unconditionally `true`
-//! (`tomet-syntax-ast/src/lib.rs`), so `assert_eq!` on a `Document` compares
+//! (in `tomet-syntax-ast`), so `assert_eq!` on a `Document` compares
 //! shape rather than source locations -- which is exactly what this guard
 //! wants.
 //!
@@ -20,8 +20,8 @@
 //! text; the rewrite would change the text content and the trees would differ
 //! for reasons that have nothing to do with vocabulary. Targeted pairs say the
 //! same thing without that noise, and each one names the branch it pins
-//! down -- a branch the parser used to have, and would fail again the
-//! moment one was reintroduced.
+//! down -- a branch the parser must not have, and the test fails the
+//! moment one is introduced.
 
 use tomet_ast::{Data, File, Name, Value};
 use tomet_ast_parser::parse_file;

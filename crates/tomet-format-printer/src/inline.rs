@@ -65,7 +65,7 @@ pub(crate) fn render_inlines(inlines: &[Inline], config: &PrinterConfig) -> Stri
                 escape_and_push_text(&mut s, &t.value, prev_was_form, &inlines[idx + 1..]);
             }
             // `Inline::Raw` inside a backtick span or fence is handled via
-            // `raw_content_text` in `element.rs`. Any `Inline::Raw` that reaches
+            // `raw_content_text`. Any `Inline::Raw` that reaches
             // `render_inlines` is inside a bracketed `@raw[...]` fallback, where
             // normal inline parsing applies.
             Inline::Raw(t) => {
@@ -86,9 +86,7 @@ pub(crate) fn render_inlines(inlines: &[Inline], config: &PrinterConfig) -> Stri
             // `list_multiline_style_content`, `render_callout`'s
             // `callout_content_style`) split this function's output on
             // `'\n'` to lay wrapped content out across multiple indented
-            // lines -- a feature that used to ride on markdown import
-            // embedding a literal `'\n'` straight into `Text.value` for a
-            // softbreak. Folding to a space here would silently turn that
+            // lines. Folding to a space here would silently turn that
             // into always-one-line output.
             Inline::SoftBreak(_) | Inline::LineBreak(_) => s.push('\n'),
             Inline::Interp(interp) => s.push_str(&crate::element::render_interp(interp)),

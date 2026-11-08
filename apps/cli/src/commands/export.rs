@@ -192,13 +192,11 @@ fn export_one(
         } else if let Some(cfg_path) = config.export_path_for(target) {
             // A path a document declares means the same thing here as it
             // does in a link: bare is measured from the project root,
-            // `./`/`../` from the document's own directory. This used to
-            // hand the string straight to `fs::write`, which measured it
-            // from the process's working directory instead -- so
-            // `tmtroot/readme.tmt` declaring `README.ja.md` landed at the
-            // repository root or under `docs/` depending on where you
-            // stood, and `--check` only agreed with itself from one of
-            // them.
+            // `./`/`../` from the document's own directory. Never from
+            // the process's working directory: `tmtroot/readme.tmt`
+            // declaring `README.ja.md` would land at the repository root
+            // or under `docs/` depending on where you stood, and
+            // `--check` would only agree with itself from one of them.
             Some(tomet_indexer::resolve_document_relative(
                 file_path,
                 cfg_path,
@@ -392,7 +390,7 @@ mod tests {
     ///
     /// The source sits in a subdirectory and declares plain `out.md`.
     /// Landing beside the source, or in the test runner's own working
-    /// directory, are the two ways this used to go wrong; both are
+    /// directory, are the two ways this can go wrong; both are
     /// asserted against. `tmtroot/` depends on this: its whole point is
     /// that a source in one place produces a file in another.
     #[test]

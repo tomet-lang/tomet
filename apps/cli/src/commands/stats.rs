@@ -527,7 +527,7 @@ mod tests {
         let stats = measure_src("@note[ ${meta.title} ]\n\n- あ\n- い\n");
         assert_eq!(stats.dollar, 1);
         assert_eq!(stats.bare, 2);
-        // Just `@note` -- the list itself is `Block::List` now, not a
+        // Just `@note` -- the list itself is `Block::List`, not a
         // named `@ul` element, so it contributes nothing here.
         assert_eq!(stats.named, 1);
         assert_eq!(stats.elements(), 4);

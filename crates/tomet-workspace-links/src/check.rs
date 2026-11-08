@@ -7,7 +7,7 @@
 //! OS-absolute path; anything else (a bare relative-looking string, e.g.
 //! `docs/asdf`) is relative to the *project root*. One combination is
 //! explicitly undecided: a `file:` value starting with `/` -- this code
-//! applies the general `/`-means-OS-absolute rule to it for now, but
+//! applies the general `/`-means-OS-absolute rule to it, but
 //! that's a placeholder, not a confirmed-correct behavior for that
 //! specific case, pending a decision.
 //!
@@ -71,9 +71,9 @@ fn resolve_file_target(source: &Path, target: &str, project_root: &Path) -> Path
 /// `existing` is built by walking `project_root`, so its entries carry
 /// whatever form that path has. A target resolved through the referencing
 /// file's own directory carries the form of *that* path instead, and the
-/// two stop matching the moment they differ -- which is why
-/// `tomet check-links docs/README.tmt` used to call `../tests/SYNTAX.md`
-/// broken while the same link resolved when the whole repository was
+/// two stop matching the moment they differ -- which would make
+/// `tomet check-links docs/README.tmt` call `../tests/SYNTAX.md`
+/// broken while the same link resolves when the whole repository is
 /// scanned. `Path::join` leaves an already-absolute path alone, so this is
 /// a no-op when both sides are absolute.
 fn rebase_on_project_root(resolved: PathBuf, project_root: &Path) -> PathBuf {
@@ -145,9 +145,9 @@ pub fn check_vault(
 ) -> CheckReport {
     let files = tomet_indexer::collect_tm_files_with_config(root, config, config_root);
     // Built from `project_root`, not `root`: what exists on disk does not
-    // depend on what was asked to be checked. Building it from `root` made
-    // single-file mode report every link as broken, since the set then held
-    // exactly the one file being checked.
+    // depend on what was asked to be checked. Building it from `root` would make
+    // single-file mode report every link as broken, since the set would then
+    // hold exactly the one file being checked.
     let existing = tomet_indexer::collect_all_paths_with_config(project_root, config, config_root);
 
     let mut report = CheckReport {
@@ -306,9 +306,9 @@ mod kind_tests {
 
     #[test]
     fn file_does_not_accept_a_directory() {
-        // The whole reason `dir:` exists. This used to resolve, and the
-        // checker then reported a file where there was a directory --
-        // `.exists()` proves neither.
+        // The whole reason `dir:` exists: a directory must not resolve
+        // as a file, or the checker would report a file where there is
+        // a directory -- `.exists()` proves neither.
         let (root, existing) = vault();
         let source = root.join("README.tmt");
         assert!(!exists_as(

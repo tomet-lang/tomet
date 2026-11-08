@@ -9,8 +9,7 @@ use tomet_ast::Name;
 /// Not to be confused with one other, unrelated thing this codebase also
 /// calls "connect": the bare `::(...)`/`::{...}` *value-merge* mechanism
 /// (`@memo(a:1)::(b:2)`), which has nothing to do with names at all. That
-/// one is parser-level, not semantic -- `tomet-syntax-parser/src/
-/// section.rs` folds it into the owning group's data as it parses,
+/// one is parser-level, not semantic -- the parser folds it into the owning group's data as it parses,
 /// because this crate sits a layer above the parser and cannot be the
 /// one doing it.
 ///

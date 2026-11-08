@@ -1,7 +1,6 @@
 use super::*;
 
-/// Wraps a flat inline sequence as `Element.content` (`Vec<Block>`
-/// now) -- every fixture below is still just one paragraph's worth.
+/// Wraps a flat inline sequence as `Element.content` (`Vec<Block>`) -- every fixture below is just one paragraph's worth.
 fn wrap(inlines: Vec<Inline>) -> Option<Vec<Block>> {
     Some(vec![Block::Paragraph(Paragraph::new(
         inlines,
@@ -10,8 +9,8 @@ fn wrap(inlines: Vec<Inline>) -> Option<Vec<Block>> {
 }
 
 /// The single paragraph's own `Vec<Inline>` inside `Element.content`
-/// (`Vec<Block>` now) -- several fixtures below build up content as a
-/// flat inline run (table cells) and still index into it that way.
+/// (`Vec<Block>`) -- several fixtures below build up content as a
+/// flat inline run (table cells) and index into it that way.
 fn para_inlines(blocks: &[Block]) -> &[Inline] {
     match blocks {
         [Block::Paragraph(p)] => &p.content,
@@ -539,7 +538,7 @@ fn text_with_sigil_chars_encloses_them_in_backticks() {
     assert_eq!(
         p.content,
         vec![Inline::Text(Text::new(
-            // `<` is no longer a Tomet sigil, so it passes through.
+            // `<` is not a Tomet sigil, so it passes through.
             "Contact `@`user at <foo> or `$`100 and <> with 2 * 3 `^` 2 and **.",
             Span::dummy()
         ))]
@@ -660,13 +659,12 @@ fn test_wikilink_with_at_prefix_not_enclosed_in_backticks() {
 
 #[test]
 fn test_multiline_paragraph_linebreaks_preserved() {
-    // "Preserved" now means kept as their own `SoftBreak` nodes rather
-    // than folded into a space -- not, as before `SoftBreak` existed,
-    // merged into one `Text` with a literal `'\n'` character. The
-    // latter was already a small lie: a real softbreak is whitespace,
+    // "Preserved" means kept as their own `SoftBreak` nodes rather
+    // than folded into a space, and not merged into one `Text` with a
+    // literal `'\n'` character: a real softbreak is whitespace,
     // renderers are free to realize it as a space instead of a newline
     // (see `Inline::SoftBreak`'s doc comment), so baking one spelling
-    // into `Text.value` overclaimed what was actually preserved.
+    // into `Text.value` would overclaim what is preserved.
     let md = "Line 1\nLine 2\nLine 3\n";
     let doc = from_markdown(md);
     assert_eq!(doc.body.len(), 1);

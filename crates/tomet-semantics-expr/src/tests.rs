@@ -650,7 +650,7 @@ fn in_resolver(resolver: &MemoryResolver, src: &str) -> Result<EvalValue, EvalEr
 #[test]
 fn an_id_is_found_wherever_the_node_sits() {
     // In a section's title, in `(args)` and in a hole's content: places a search over the blocks
-    // and the `{value}` entries alone used to miss.
+    // and the `{value}` entries alone would miss.
     let resolver = MemoryResolver::new()
         .with_source(
             "here.tmt",
@@ -686,8 +686,8 @@ fn a_dot_reads_the_args_and_the_value_of_a_node_and_item_walks_a_list() {
     assert_eq!(in_vault("#c1.tags.len()").unwrap(), int(3));
 }
 
-/// `.prop` was a level between a node and its data. It is gone, and what it used to be asked for says
-/// where to write it now.
+/// `.prop` is a retired level between a node and its data; reading it says where to write what it
+/// asked for.
 #[test]
 fn prop_is_retired_and_says_where_its_replacement_is() {
     for src in ["#c1.prop.n", "#c1.prop", "#c1.prop(\"n\")", "#intro.prop.n"] {

@@ -2,9 +2,9 @@ use super::*;
 
 #[test]
 fn an_element_on_a_continuation_line_stays_in_the_paragraph() {
-    // An element trigger used to end a paragraph early, so a sentence
-    // wrapped across lines was torn into separate blocks the moment a
-    // line happened to start with one. A continuation line is not
+    // An element trigger does not end a paragraph early: a sentence
+    // wrapped across lines is not torn into separate blocks because a
+    // line happens to start with one. A continuation line is not
     // block context, so the element belongs to the running text; a
     // blank line is what opens a block.
     let doc = parse_file("text\n@note(key:value)\n").unwrap();
@@ -13,7 +13,7 @@ fn an_element_on_a_continuation_line_stays_in_the_paragraph() {
         Block::Paragraph(p) => {
             assert_eq!(p.content.len(), 3);
             // The newline is a `SoftBreak`, the way any wrapped line is
-            // now -- not folded into the text as a space.
+            // -- not folded into the text as a space.
             assert_eq!(&p.content[0], &Inline::Text("text".into()));
             assert_eq!(&p.content[1], &sb());
             match &p.content[2] {
@@ -109,9 +109,9 @@ fn a_declaration_after_an_element_line_is_an_error() {
 #[test]
 fn a_paragraph_does_not_swallow_a_following_fenced_code_block() {
     // Regression: a fenced code block (or thematic break) directly
-    // after a paragraph line, with no blank line between them, used to
-    // be absorbed as lazy-continuation paragraph text instead of
-    // starting its own block.
+    // after a paragraph line, with no blank line between them, is not
+    // absorbed as lazy-continuation paragraph text; it starts its own
+    // block.
     let doc = parse_file("text\n```js\ncode\n```\n").unwrap();
     assert_eq!(doc.body.len(), 2);
     match (&doc.body[0], &doc.body[1]) {

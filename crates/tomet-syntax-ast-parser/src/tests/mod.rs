@@ -37,10 +37,9 @@ fn sb() -> Inline {
     })
 }
 
-/// Wraps a flat inline sequence as `Element.content` (`Vec<Block>` now,
-/// see `tmtroot/docs/spec/feature/content-shape.tmt`) -- every fixture
-/// across these tests is still just one paragraph's worth. Replaces the
-/// old `Some(vec![Inline::...])` shape as `wrap(vec![Inline::...])`.
+/// Wraps a flat inline sequence as `Element.content` (`Vec<Block>`) --
+/// every fixture across these tests is just one paragraph's worth.
+/// `wrap(vec![Inline::...])` stands for that one paragraph.
 fn wrap(inlines: Vec<Inline>) -> Option<Vec<Block>> {
     Some(vec![Block::Paragraph(tomet_ast::Paragraph::new(
         inlines,
@@ -49,7 +48,7 @@ fn wrap(inlines: Vec<Inline>) -> Option<Vec<Block>> {
 }
 
 /// The single paragraph's own `Vec<Inline>` inside `Element.content`
-/// (`Vec<Block>` now) -- for fixtures that still want to assert on a flat
+/// (`Vec<Block>`) -- for fixtures that want to assert on a flat
 /// inline run.
 fn first_para(blocks: &[Block]) -> &[Inline] {
     match blocks {

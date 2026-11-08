@@ -4,13 +4,12 @@
 //! each blueprint names itself with `::blueprint(X)`. Nothing is derived
 //! from a filename and nothing is searched for by convention.
 //!
-//! That is a change from what this did, and the reason is in this
-//! feature's own history. Lookup used to try `templates/`,
-//! `.tomet/templates/` and `docs/examples/blueprints/`, times three
-//! filename spellings -- which is how `docs/docs.settings.tmt` came to
-//! point at a file that does not exist and still resolve: the misses
-//! were invisible and one hit. Folding that to a single convention made
-//! the surface smaller but kept the silence. A declared list moves the
+//! The reason is the silence a search has. A lookup that tries
+//! `templates/`, `.tomet/templates/` and `docs/examples/blueprints/`,
+//! times three filename spellings, lets a settings file point at a file
+//! that does not exist and still resolve: the misses are invisible and
+//! one hits. Folding that to a single convention would make the surface
+//! smaller but keep the silence. A declared list moves the
 //! error to the declaration: a path that is not there is reported once,
 //! where it is written, instead of at every document that wanted it.
 //!
@@ -342,8 +341,8 @@ mod tests {
         let _ = fs::remove_dir_all(&root);
     }
 
-    /// The file is on disk and spelled the way the convention used to
-    /// expect. Nothing declares it, so nothing finds it -- which is the
+    /// The file is on disk and spelled the way a search by convention
+    /// would expect. Nothing declares it, so nothing finds it -- which is the
     /// point: what exists is what was declared, not what was dropped in a
     /// directory.
     #[test]

@@ -5,18 +5,18 @@
 //! (this crate's own `vocabulary` and `dictionary` modules), parse the source, and bind
 //! the names. A caller that skips the middle two gets a
 //! `File` whose element names resolve against `std` alone, which
-//! silently drops every user-vocabulary element. `twrit` shipped exactly
-//! that against this workspace's own writs: `@layers` was found and the
-//! equally legal `@writ.layers` was not, so the rule it was written to
-//! enforce stopped being enforced without anything reporting it.
+//! silently drops every user-vocabulary element. That is silent: a rule
+//! written with `@layers` is found and the equally legal `@writ.layers`
+//! is not, so the rule it was written to enforce is not enforced,
+//! without anything reporting it.
 //!
-//! The pieces were public and correct before this crate existed; only the
-//! assembly was private, living inside `apps/cli`'s `check` command. That
-//! is why this is a crate rather than a function on `tomet-config`: the
-//! defect was that nobody could find the front door, and a door inside a
-//! crate named after one of its four steps is not findable. `tomet-config`
-//! already carried three of the four dependencies, so the cheaper change
-//! was available and was not taken for that reason.
+//! The pieces are public and correct on their own; this crate is the
+//! assembly. That is why it is a crate rather than a function on
+//! `tomet-config`: the defect it answers is that nobody could find the
+//! front door, and a door inside a crate named after one of its four steps
+//! is not findable. `tomet-config` already carries three of the four
+//! dependencies, so the cheaper change is available and is not taken for
+//! that reason.
 //!
 //! =[ Two levels, because vocabularies belong to a vault ]
 //!

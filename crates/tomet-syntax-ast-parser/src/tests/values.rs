@@ -15,7 +15,7 @@ fn parses_flat_map() {
     );
 }
 
-/// The `[a, b]` list literal was retired -- `(a, b)` is the sole
+/// There is no `[a, b]` list literal -- `(a, b)` is the sole
 /// spelling for a sequence. `[`/`]` in a value position isn't a parse error
 /// either, though: it means block content (`Value::Blocks`, the same
 /// grammar as an element's own `[content]`), so `[a, b]` parses, but as
@@ -73,13 +73,11 @@ fn an_embedded_element_with_content_is_accepted() {
     assert!(el.content.is_some());
 }
 
-/// A quoted positional value used to parse correctly only when it was
-/// the group's sole value (`parse_value_at`'s old fast path for a
-/// leading `"`). Anywhere else -- first among several entries, or
-/// after a `key:` entry -- it either failed outright (leading quote,
-/// `expected ')'` on the following `,`) or came back with its quote
-/// marks baked into the string (`eat_scalar_raw` does not know about
-/// quoting). `@doc.icon("star", pkg:"lucide")` is exactly this shape.
+/// A quoted positional value parses as the string it quotes wherever it
+/// stands in the group: as its sole value, first among several entries,
+/// or after a `key:` entry, without the quote marks baked into the
+/// string and without failing on the following `,`.
+/// `@doc.icon("star", pkg:"lucide")` is exactly this shape.
 #[test]
 fn quoted_positional_value_parses_the_same_regardless_of_position() {
     assert_eq!(

@@ -4,8 +4,7 @@ use tomet_ast::{
 };
 use tomet_span::Span;
 
-/// Wraps a flat inline sequence as `Element.content` (`Vec<Block>`
-/// now) -- every fixture below is still just one paragraph's worth.
+/// Wraps a flat inline sequence as `Element.content` (`Vec<Block>`) -- every fixture below is just one paragraph's worth.
 fn wrap_content(inlines: Vec<Inline>) -> Vec<Block> {
     vec![Block::Paragraph(Paragraph::new(inlines, Span::dummy()))]
 }
@@ -43,7 +42,7 @@ fn ruby_exports_as_raw_html() {
 #[test]
 fn an_unpaired_backtick_is_still_escaped() {
     // No closing backtick on the line -- not a span, so it stays an
-    // escaped literal, exactly as before.
+    // escaped literal.
     let doc = tomet_ast_parser::parse_file("値段は 100` です\n").unwrap();
     assert_eq!(to_markdown(&doc).trim(), "値段は 100\\` です");
 }
@@ -62,13 +61,12 @@ fn a_backtick_span_is_not_escaped_inside_a_table_cell() {
 
 #[test]
 fn directives_have_no_markdown_output() {
-    // `settings` and the binding element joined `BUILTIN_KINDS` after
-    // this list was written, so they used to fall through to the
-    // generic passthrough and emit a `<div data-tm-kind="settings">`.
+    // Every directive kind is listed: one missing falls through to the
+    // generic passthrough and emits a `<div data-tm-kind="settings">`,
+    // as `settings` and the binding element would.
     //
-    // This list is also what caught `@import` splitting up: dropping
-    // `import` from `BUILTIN_KINDS` made it a `Custom` kind again, and the
-    // div came straight back.
+    // Dropping `import` from `BUILTIN_KINDS` would make it a `Custom`
+    // kind, and the div would come straight back.
     for src in [
         "::export(path:out.md)\n",
         "::use(deck)\n",
@@ -407,9 +405,8 @@ fn a_declaration_exports_as_nothing() {
 }
 
 /// The pair this asserts is the point: a bold line, a blank line, then
-/// the rule. `Title\n---` -- what this used to produce, and what this
-/// test used to lock in -- is a setext heading, so the divider came out
-/// as an `<h2>`.
+/// the rule. `Title\n---` is a setext heading, so the divider would come
+/// out as an `<h2>`.
 #[test]
 fn titled_thematic_break_is_not_a_setext_heading() {
     let mut el = tomet_tree::element_new(Name::bare("hr"));
@@ -470,9 +467,9 @@ fn link_doc(target: &str, label: Option<&str>) -> File {
     ))])
 }
 
-/// A path with no label used to come out bare, which is text and not a link
-/// -- HTML makes an anchor of the same thing. The target is the path as
-/// written, as it is in HTML.
+/// A path with no label is a link and not bare text -- HTML makes an
+/// anchor of the same thing. The target is the path as written, as it is
+/// in HTML.
 #[test]
 fn an_unlabeled_path_link_is_a_link() {
     assert_eq!(
@@ -517,24 +514,22 @@ fn table_exports_to_markdown() {
     );
 }
 
-/// This crate does not evaluate `${...}` any more, and this test is
-/// what is left of the one that said it did.
+/// This crate does not evaluate `${...}`, and this test is what is
+/// left of the one that said it did.
 ///
-/// It used to assert the expanded macro. That expansion now happens in
+/// The expanded macro is asserted where the expansion happens, in
 /// `tomet-transform`'s `resolve_expressions`, before any converter
-/// sees the tree, and is pinned there -- because four converters each
-/// deciding it produced three different answers for the same document.
+/// sees the tree -- because converters each deciding it would produce
+/// different answers for the same document.
 ///
 /// What reaches here is a document nobody prepared, and the only
 /// honest rendering of that is what was written.
 #[test]
 fn an_unprepared_interpolation_renders_as_its_own_source() {
     // The source's own line wrapping survives to the markdown output
-    // now (`inline_to_md` renders a `SoftBreak` as a literal newline,
+    // (`inline_to_md` renders a `SoftBreak` as a literal newline,
     // not a space -- see its own comment) rather than being folded
-    // into one long line, which is what happened while `tomet-parser`
-    // still folded a wrapped line into a space before this crate ever
-    // saw it.
+    // into one long line.
     let doc =
         tomet_ast_parser::parse_file("Issue: $gh(42)\nFooter: ${copyright}\nMath: ${add(10, 5)}\n")
             .unwrap();

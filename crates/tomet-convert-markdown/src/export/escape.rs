@@ -5,13 +5,13 @@
 /// A backtick-delimited span is the exception: it is passed through
 /// verbatim, backticks included. Tomet does not turn `` `x` `` into an
 /// element -- the parser keeps the backticks as literal text and only
-/// shields the run from further markup (`inline.rs`'s backtick probe) --
+/// shields the run from further markup --
 /// so by the time it reaches here it looks like ordinary text. Escaping
 /// it would turn the author's inline code into a literal ``\`x\``, which
-/// is what every `` `spec/` `` in the docs used to export as.
+/// is what every `` `spec/` `` in the docs would export as.
 ///
 /// The rule matches the parser's: an opening backtick pairs with the next
-/// backtick on the same line. An unpaired one is escaped as before.
+/// backtick on the same line. An unpaired one is escaped.
 pub(super) fn escape_text(s: &str) -> String {
     let mut out = String::with_capacity(s.len());
     let mut chars = s.chars().peekable();

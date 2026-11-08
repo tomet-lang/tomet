@@ -133,12 +133,12 @@ fn list_item_ending_in_an_element_does_not_error_on_a_trailing_brace() {
 
 #[test]
 fn list_item_colon_connect_supports_an_empty_braced_value() {
-    // The `docs/spec/syntax.tmt` `##[ コネクト ]` example this
-    // feature implements (`- () xxxxxx ::{}`) uses an *empty* `{}` for
-    // its item-level attrs -- `element.rs::parse_value_group` (the same
-    // reader a trailing sugar connect's `{value}` now goes through)
-    // already special-cases an empty body into an empty map rather than
-    // erroring, so this just confirms the sugar path inherits that.
+    // The spec's connect example this feature implements
+    // (`- () xxxxxx ::{}`) uses an *empty* `{}` for its item-level
+    // attrs -- the value-group reader (the same one a trailing sugar
+    // connect's `{value}` goes through) special-cases an empty body
+    // into an empty map rather than erroring, so this just confirms the
+    // sugar path inherits that.
     let doc = parse_file("- () xxxxxx ::{}\n").unwrap();
     match &doc.body[0] {
         Block::List(list) => {
@@ -248,11 +248,10 @@ fn parses_ordered_list() {
 
 #[test]
 fn full_form_list_item_supports_a_bare_trailing_connect() {
-    // `ConnectMode::Bare`: a full-form item's own `::(...)`/`::{...}` now
-    // merges into its own `args`/`value`, the same arms `@name` already
-    // uses for this -- previously `allow_colon_connect` was hardcoded
-    // `false` for the item's own groups, so none of these forms attached
-    // anywhere; the trailing `:...` became literal text instead.
+    // `ConnectMode::Bare`: a full-form item's own `::(...)`/`::{...}`
+    // merges into its own `args`/`value`, the same arms `@name` uses
+    // for this, so the trailing connect attaches to the item and is not
+    // literal text.
     let doc = parse_file("- [ content ]::(x: 1)\n").unwrap();
     match &doc.body[0] {
         Block::List(list) => {
@@ -300,8 +299,8 @@ fn full_form_list_item_supports_a_bare_trailing_connect() {
 
 #[test]
 fn full_form_list_item_supports_a_named_connect() {
-    // A list item's own groups now take the full connect branch, same as
-    // `@name`'s or a heading's -- `element_list_item` carries `connects`
+    // A list item's own groups take the full connect branch, same as
+    // `@name`'s or a heading's -- the item carries `connects`
     // too, so `::rule(...)` attaches to the item instead of becoming
     // literal trailing text.
     let doc = parse_file("- [ content ]::rule(allow: (card))\n").unwrap();

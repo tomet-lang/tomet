@@ -17,15 +17,13 @@ fn config_element_has_no_visible_output() {
 #[test]
 fn adjacent_meta_blocks_have_no_visible_output() {
     // `::meta` is documented as `placement: head` / `singleton: true`
-    // (see `docs/spec/builtin-settings.tmt`) -- three of
-    // them in one file, as used below, is not actually valid Tomet
-    // and would eventually be rejected by `tomet-validator`. But
-    // `tomet-parser` itself no longer folds them into one
+    // -- three of them in one file, as used below, is not actually
+    // valid Tomet and would eventually be rejected by
+    // `tomet-validator`. But the parser does not fold them into one
     // `Block::Paragraph` (each `::meta(...)` on its own line, with no
-    // blank line before the next, now parses as its own
-    // `Block::Element` -- see `document.rs`'s `Stop::Paragraph`), and
-    // `tomet-html` has no validation layer of its own, so this
-    // just confirms it still renders each one as empty output rather
+    // blank line before the next, parses as its own `Block::Element`),
+    // and `tomet-html` has no validation layer of its own, so this
+    // just confirms it renders each one as empty output rather
     // than leaking a stray whitespace-only `<p>` -- garbage in,
     // harmless out.
     let doc =
@@ -100,17 +98,15 @@ fn custom_element_hook_falling_through_matches_generic_rendering() {
     assert_eq!(with_declining_hook, without_hook);
 }
 
-/// This crate does not evaluate `${...}` any more, and this test is
-/// what is left of the one that said it did.
+/// This crate does not evaluate `${...}`, and this test is what is
+/// left of the one that said it did.
 ///
-/// It used to assert that `$gh(42)` came out as the expanded URL. Four
-/// converters each decided that for themselves and three of them
-/// decided differently -- this one evaluated without an
-/// `EvaluationContext` or the vault's config, so `${self::path}`
-/// resolved in CommonMark and not here. Evaluation moved to
-/// `tomet-transform`'s `resolve_expressions`, which runs before any
-/// converter sees the tree; the expansion those assertions were about
-/// is pinned there now.
+/// Evaluation is `tomet-transform`'s `resolve_expressions`, which runs
+/// before any converter sees the tree. A converter that evaluated for
+/// itself would differ from the others: without an `EvaluationContext`
+/// or the vault's config, `${self::path}` would resolve in CommonMark
+/// and not here. The expansion of `$gh(42)` is asserted where the
+/// evaluation happens.
 ///
 /// What reaches here is a document nobody prepared, and the only
 /// honest rendering of that is what was written.

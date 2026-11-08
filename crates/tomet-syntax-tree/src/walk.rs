@@ -14,7 +14,7 @@
 //!
 //! The one exception to "one recursion" is the mutable walk ([`for_each_element_mut`],
 //! [`for_each_id_mut`], [`fill_interpolations`]): a mutable walk cannot share the borrow with
-//! [`children`], so it lists the children again, and `tests/walk_coverage.rs` holds the two to the
+//! [`children`], so it lists the children again, and a test holds the two to the
 //! same reach.
 
 use std::ops::ControlFlow;
@@ -601,7 +601,7 @@ pub fn for_each_item_descendant(items: &[ListItem], direct_only: bool, f: impl F
 }
 
 /// What a mutable walk hands over. A mutable walk cannot share the borrow with [`children`], so it
-/// lists the children again, in the same order; `tests/walk_coverage.rs` holds the two to the
+/// lists the children again, in the same order; a test holds the two to the
 /// same reach.
 trait Sink {
     fn element(&mut self, _el: &mut Element) {}

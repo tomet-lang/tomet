@@ -380,8 +380,7 @@ impl Vault {
     ///
     /// Call this and not the underlying pass directly. A caller reaching
     /// past it for one rewrite is how a rewrite ends up applied in three
-    /// commands and missing from the fourth -- which is the state
-    /// interpolation was in before this existed.
+    /// commands and missing from the fourth.
     pub fn prepare(&self, doc: &mut File, path: &Path, resolver: &dyn Resolver) -> Prepared {
         let (vault, resolver) = self.reading(doc, resolver);
         let scope = vault.scope(doc, path, resolver);
@@ -558,8 +557,8 @@ impl Vault {
     /// `::var`, then the vault's for every name it did not claim.
     ///
     /// The document wins a collision, which is the direction every other
-    /// scope in this format runs. Before this lived here it lived in the
-    /// CLI, so a macro reached CommonMark and nothing else.
+    /// scope in this format runs. It lives here and not in a command, so
+    /// that every command sees the same macros.
     fn evaluation_config(&self, doc: &File) -> tomet_semantics::DocumentConfig {
         let mut config = tomet_semantics::document_config(doc);
         for (name, template) in &self.config.macros {

@@ -164,7 +164,7 @@ pub struct Vocabulary {
 }
 
 /// Namespaces no vault vocabulary may claim, because tomet already gives
-/// them a hardcoded meaning -- `std` conceptually, and now `doc`.
+/// them a hardcoded meaning -- `std` conceptually, and `doc`.
 ///
 /// `std` is not actually checked here today (nothing ever compared a
 /// vocabulary's own namespace string against `"std"`; only individual
@@ -184,9 +184,8 @@ pub fn is_reserved_element_name(name: &str) -> bool {
 
 /// The vocabularies tomet ships hardcoded in Rust rather than as a vault's
 /// `::vocabulary.ns()` document -- the same reason `std`'s elements are a
-/// Rust table (`builtin_kinds`) rather than a `::vocabulary.std()` document:
-/// see `kind.rs`'s doc comment on why that is a limit of the vocabulary
-/// format, not a permanent design.
+/// Rust table (`builtin_kinds`) rather than a `::vocabulary.std()` document,
+/// which is a limit of the vocabulary format, not a permanent design.
 ///
 /// `doc.index` declares no elements: an index document's body is `std`
 /// (`ul`/`ol`/`@link`) plus `${filter(...)}`/`${by(...)}`, which are neither
@@ -197,12 +196,11 @@ pub fn is_reserved_element_name(name: &str) -> bool {
 ///
 /// `doc` (bare namespace, not `doc.index`) is the opposite case: it
 /// declares exactly one element, `icon`, and exists so `@doc.icon(...)`
-/// resolves as running text. `std` used to have its own `icon`, recognized
-/// but never drawing anything (`docs/spec/builtin-elements.tmt`'s old
-/// "recognized, does nothing" table) -- worse than not having it, the same
-/// way `::config(style:)` is worse than unimplemented, because a bare
-/// `@icon` looked like the real spelling while doing nothing. `doc.icon`
-/// replaces it under a namespace that says the opposite by construction:
+/// resolves as running text. A recognized `icon` in `std` that never drew
+/// anything would be worse than not having it, the same way
+/// `::config(style:)` is worse than unimplemented, because a bare
+/// `@icon` would look like the real spelling while doing nothing. `doc.icon`
+/// sits under a namespace that says the opposite by construction:
 /// Tomet resolves and draws nothing here, on purpose, forever -- an
 /// external renderer implements this notation to make it into a picture.
 /// `params` exists so `check_arguments` still catches a typo'd key; it is
@@ -600,10 +598,10 @@ impl Bindings {
 /// the thing being identified anyway.
 ///
 /// It also makes the two ways into scope use one currency: `::kind(writ)`
-/// binds by name, and so does `::use(deck)`. The earlier path form forced
+/// binds by name, and so does `::use(deck)`. A path form would force
 /// a step between them (path -> file -> namespace) that nothing could
-/// take without carrying paths through this layer, which is why it had
-/// been trimming a filename stem and hoping.
+/// take without carrying paths through this layer, which would mean
+/// trimming a filename stem and hoping.
 fn used_namespaces<B>(doc: &File<B>) -> Vec<String> {
     let mut names = Vec::new();
     for declaration in &doc.header {
@@ -1097,9 +1095,9 @@ mod tests {
 
     /// `::use` names the namespace, and that is what puts it in scope.
     ///
-    /// It used to name a file, which meant this had to guess the
-    /// namespace from a filename stem -- and the vault had already
-    /// declared that path, so the document was repeating it.
+    /// Naming a file would mean guessing the namespace from a filename
+    /// stem -- and the vault already declares that path, so the document
+    /// would be repeating it.
     #[test]
     fn use_brings_a_namespace_into_scope_by_name() {
         let deck = vocab("::vocabulary.deck()\n\n::element(ref: {})\n");

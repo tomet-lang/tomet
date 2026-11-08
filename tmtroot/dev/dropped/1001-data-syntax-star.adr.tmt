@@ -1,3 +1,6 @@
+::kind(adr)
+::id(adr-1001)
+
 ```(tmt)
 ::kind(config)
 ::id(config-vault)

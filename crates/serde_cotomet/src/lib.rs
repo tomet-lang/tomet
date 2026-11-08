@@ -184,7 +184,7 @@ mod tests {
 
     #[test]
     fn a_string_target_takes_a_bare_scalar_as_the_text_it_was_written_as() {
-        // the revision that used to need quotes: `rev: 1.10` was read as 1.1
+        // the revision that needs no quotes: `rev: 1.10` is not read as 1.1
         #[derive(Debug, PartialEq, serde::Deserialize)]
         struct Rev {
             rev: String,

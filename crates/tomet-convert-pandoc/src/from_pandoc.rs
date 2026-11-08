@@ -182,11 +182,9 @@ fn block_from_pandoc(block: &Block) -> Option<TmBlock> {
             Span::dummy(),
         ))),
         // No tomet spelling is decided yet for a term/definition pair --
-        // the `@definition` element is still on hold. This used to land
-        // in `@links`, which had the right shape by accident; `@links`
-        // was a different, now-removed feature (reference-link
-        // definitions) and is not a stand-in for a real definition list,
-        // so this is dropped rather than forced into it.
+        // the `@definition` element is still on hold. No existing
+        // element has the shape of a definition list, so this is dropped
+        // rather than forced into one.
         Block::DefinitionList(_) => None,
         Block::BulletList(items) => Some(TmBlock::List(list_element(items, false))),
         Block::OrderedList(_, items) => Some(TmBlock::List(list_element(items, true))),
@@ -246,7 +244,7 @@ fn block_element(block: &Block) -> Element {
             el.content = Some(pandoc_blocks_to_content(blocks));
             el
         }
-        // A `List` is not an `Element` at all any more (see
+        // A `List` is not an `Element` at all (see
         // `tomet_ast::List`), so it can't be produced here -- both
         // callers (`block_from_pandoc`, `blocks_to_content`) handle
         // `BulletList`/`OrderedList` themselves before ever reaching
@@ -372,7 +370,7 @@ fn alignment_name(align: &crate::ast::Alignment) -> Option<&'static str> {
     }
 }
 
-/// Wraps a flat inline sequence as `Element.content` (`Vec<Block>` now):
+/// Wraps a flat inline sequence as `Element.content` (`Vec<Block>`):
 /// one `Paragraph`, or nothing for an empty sequence. Every pandoc import
 /// path here builds `[content]` as plain inlines first (the loss notes at
 /// the top of this module are about that shape, pinned by
@@ -387,11 +385,11 @@ fn wrap_inline_content(inlines: Vec<TmInline>) -> Vec<TmBlock> {
     }
 }
 
-/// Pandoc blocks as `Element.content` (`Vec<Block>` now): each one through
+/// Pandoc blocks as `Element.content` (`Vec<Block>`): each one through
 /// [`block_from_pandoc`], same as the document's own top level, dropping
 /// anything that drops there too (a `DefinitionList`). This is what a
-/// `Div`/`BlockQuote`/`Figure`/list item/footnote's body should use now
-/// that content can hold real blocks -- [`blocks_to_content`] below is
+/// `Div`/`BlockQuote`/`Figure`/list item/footnote's body should use, since
+/// content can hold real blocks -- [`blocks_to_content`] below is
 /// the older flatten-to-one-inline-run shape, kept for the few positions
 /// that are still genuinely inline (a table cell).
 fn pandoc_blocks_to_content(blocks: &[Block]) -> Vec<TmBlock> {
@@ -501,10 +499,9 @@ fn inline_from_pandoc(inline: &Inline) -> TmInline {
         Inline::Superscript(inner) | Inline::Subscript(inner) => {
             inline_element("mark", &Attr::empty(), inner)
         }
-        // A quotation is not a highlight. It used to become one: there
-        // was no inline quote element to give it, so it went to the
-        // nearest builtin, and `mark` is a builtin so the document
-        // validated and nobody saw it.
+        // A quotation is not a highlight: it is a `quote`, not the
+        // nearest builtin (`mark`), which would validate and pass
+        // unseen.
         Inline::Quoted(_, inner) => inline_element("quote", &Attr::empty(), inner),
         Inline::Link(attr, text, target) => {
             let mut el = named_element("link", attr);

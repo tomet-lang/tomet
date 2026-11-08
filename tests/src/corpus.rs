@@ -9,15 +9,13 @@
 //! **every** fixture through both and holds the difference against
 //! `KNOWN_TS_ERRORS`.
 //!
-//! It used to read two hard-coded filenames instead, which meant most of
-//! the corpus was never shown to the grammar at all, and one of the two
-//! carried an empty marker -- `text.contains("")` is always true, so that
-//! check could not fail. Widening the sweep immediately turned up five
-//! fixtures that had been drifting unseen, and one entry that had been
-//! recording errors the grammar stopped making.
+//! The sweep reads every fixture, and not two hard-coded filenames, which
+//! would leave most of the corpus never shown to the grammar at all. An
+//! empty marker is rejected outright: `text.contains("")` is always true,
+//! so such a check could not fail.
 //!
-//! Moved here from `tomet-syntax-parser` and `tree-sitter-tomet`, which
-//! were reaching up to the repo root for these fixtures.
+//! The fixtures are read from this package, so that neither the parser
+//! nor the grammar crate has to reach up to the repo root for them.
 
 use std::path::Path;
 use tomet_tests::{
@@ -140,8 +138,7 @@ fn tree_sitter_has_no_unexpected_errors_anywhere_in_the_corpus() {
 }
 
 /// A marker of `""` matches every string, which would make the sweep above
-/// pass no matter what the grammar did. One was in the list until the
-/// sweep was written, and it had made the readme check vacuous.
+/// pass no matter what the grammar did.
 #[test]
 fn known_ts_error_markers_are_not_vacuous() {
     for (name, markers) in KNOWN_TS_ERRORS {
@@ -164,10 +161,9 @@ fn known_ts_error_markers_are_not_vacuous() {
 
 #[test]
 fn tree_sitter_image_meta_fixture_parses_cleanly() {
-    // Used to have one remaining error wrapping `tags: [a, b]` -- the
-    // `key: [seq]`-map-entry-value misparse `tree-sitter-tomet`'s module
-    // doc comment used to document as a known gap, fixed by excluding a
-    // leading space/tab from `_value_scalar`'s character class.
+    // `tags: [a, b]`, a `key: [seq]` map-entry value, parses without
+    // error: a leading space/tab is excluded from `_value_scalar`'s
+    // character class.
     let src = read_fixture(Path::new("examples/image.meta.tmt"));
     let tree = ts_parse(&src);
     assert!(!tree.root_node().has_error());

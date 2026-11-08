@@ -18,7 +18,7 @@ pub enum EvalError {
         expected: String,
         got: usize,
     },
-    /// A spelling the expression language no longer reads. `instead` says what to write.
+    /// A retired spelling, which the expression language does not read. `instead` says what to write.
     Retired {
         written: String,
         instead: String,

@@ -22,7 +22,7 @@
 //! `${ ... }` is an `INTERP_EXPR`. Inside `ARGS`/`VALUE_DATA` an entry is a
 //! `MAP_ENTRY` (`key: value`) or a `SEQ_ITEM`, and nested groups are
 //! `MAP_LITERAL`, `CONTENT` (a value written `[ ... ]` is blocks, as in the AST
-//! parser; the list literal is gone) or `ARGS` -- a bare `(a, b)` is a sequence,
+//! parser; there is no list literal) or `ARGS` -- a bare `(a, b)` is a sequence,
 //! and `name(a, b)` a call.
 //! `CONTENT` recurses into the same block grammar `ROOT`/`SECTION` use
 //! (`SECTION`, `LIST`, `BLOCK_FORM`, `CODE_BLOCK`, `THEMATIC_BREAK`,
@@ -36,7 +36,7 @@
 //! Running text carries `EMPHASIS`, `STRONG`, `STRIKEOUT`, `CODE_SPAN` and
 //! `AUTOLINK` nodes where the AST has an `em`, `strong`, `strikeout`,
 //! `raw` or `link` element. What opens a span, and where an address ends, is
-//! decided by the same functions in `inline.rs`, so the two cannot drift.
+//! decided by the same functions, so the two cannot drift.
 //! The tokenizer is context-free and emits tokens finely enough that delimiters
 //! and structural boundaries are already token boundaries. The parser never cuts
 //! tokens; it assembles compound structures (such as string literals in value
@@ -108,12 +108,12 @@ pub fn parse_cst_value(src: &str) -> SyntaxNode {
 /// How deep constructs may nest: a `[content]` in a form in a `[content]`, a group in a group, an
 /// emphasis in an emphasis, a list under a list, a section under a section. Past it the parser stops
 /// reading structure and keeps the text flat in a `TOO_DEEP` node, so no recursion here, or in what
-/// reads the tree, goes deeper than this (a deeper document used to abort the process with a stack
+/// reads the tree, goes deeper than this (a deeper document would abort the process with a stack
 /// overflow).
 pub const MAX_DEPTH: usize = tomet_cst::MAX_DEPTH;
 
 /// The parser state. Its methods live next to the construct they read, one file each (see the
-/// `//!` of every file in this directory); `tokens.rs` holds the ones all of them share.
+/// `//!` of every file module); the `tokens` module holds the ones all of them share.
 struct CstParser<'a, 't> {
     src: &'a str,
     tokens: &'t [(SyntaxKind, &'a str)],

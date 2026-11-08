@@ -1,7 +1,7 @@
 //! The cotomet corpus (`fixtures/cotomet/*.ctmt`), read by the two independent
 //! implementations of the language: `cotomet` (the source of truth) and
 //! `tree-sitter-cotomet` (a hand-maintained approximation for editor
-//! highlighting). Same arrangement as `corpus.rs` has for `.tmt`.
+//! highlighting). Same arrangement as the `.tmt` corpus.
 //!
 //! A fixture is named for what the parser must say of it: `ok-*` is a cotomet
 //! file, `err-*` is not. The grammar must read every `ok-*` without an

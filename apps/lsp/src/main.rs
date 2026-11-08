@@ -247,7 +247,7 @@ fn main_loop(connection: Connection) -> anyhow::Result<()> {
                             workspace.set_buffer(path, change.text.clone());
                             debounce.touch(Instant::now());
                         }
-                        // The text alone is checked now; the vault, once the
+                        // The text alone is checked at once; the vault, once the
                         // typing pauses. Until then the vault's last answer
                         // stands.
                         publish(&connection, uri.clone(), &change.text, from_vault.get(&uri))?;
@@ -263,7 +263,7 @@ fn main_loop(connection: Connection) -> anyhow::Result<()> {
                         && let Some(path) = tomet_lsp::uri_to_file_path(&uri)
                     {
                         workspace.close(&path);
-                        // What was open and read it may read the disk's now.
+                        // Once closed, what was open is read from the disk.
                         debounce.touch(Instant::now());
                     }
                     publish_diagnostics(&connection, uri, Vec::new())?;

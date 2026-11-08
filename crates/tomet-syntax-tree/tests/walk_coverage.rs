@@ -48,7 +48,7 @@ fn names(f: impl FnOnce(&mut Vec<String>)) -> Vec<String> {
 
 /// The positions an element sits in, in the order the element walkers meet them: a node's
 /// `(args)`, `{value}`, `[content]`. Not reached on purpose: a `::connect` (metadata about its
-/// owner, not a part of the document: see `descendants` in `walk.rs`).
+/// owner, not a part of the document: see `descendants`).
 const ELEMENT_WALK: [&str; 20] = [
     "s_decl_value",
     "s_decl_args",
@@ -161,7 +161,7 @@ fn for_each_inline_reaches_the_inline_elements_and_holes_the_element_walkers_do(
 fn descendants_are_the_entries_and_the_content_not_the_args_nor_a_pairs_value() {
     // `s_args` and `s_seq` sit in `(args)`, `s_pair` is the value of a `key: value` entry, and
     // `s_nested_args` sits in the `(args)` of a nested element. A descendant walk leaves all of
-    // them out, at every depth (it used to leave out only the starting element's own `(args)`).
+    // them out, at every depth, not only the starting element's own `(args)`.
     // `s_connect` is in a connect.
     let doc = doc();
     let mut got = Vec::new();

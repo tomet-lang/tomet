@@ -112,7 +112,7 @@ pub fn lower_file(root: &SyntaxNode) -> Result<File> {
     ))
 }
 
-/// The error for a tree that holds a `TOO_DEEP` node: the parser stopped reading structure there, so
+/// The error for a tree that holds a `TOO_DEEP` node: the parser stops reading structure there, so
 /// nothing below it is meaningful. One walk of the tree, once.
 pub(crate) fn reject_too_deep(root: &SyntaxNode) -> Result<()> {
     match root.descendants().find(|n| n.kind() == K::TOO_DEEP) {

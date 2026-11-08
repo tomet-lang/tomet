@@ -223,8 +223,8 @@ fn part_data(doc: &DocRef, part: &Part) -> EvalValue {
 /// `part.key`: a key of the data the part holds, in its `(...)` or `{...}`.
 ///
 /// The keys are the author's, so `@user(id: "u123")` has an `id` that is not the node's own
-/// (`part::id`). A key the part does not have is an error, with the way to what was probably meant
-/// for the spellings that used to read the node's own properties.
+/// (`part::id`). A key the part does not have is an error, which for the retired spellings that read
+/// the node's own properties gives the way to what was probably meant.
 pub(crate) fn part_member(doc: &DocRef, part: &Part, member: &str) -> Result<EvalValue, EvalError> {
     if let EvalValue::Map(entries) = part_data(doc, part)
         && let Some((_, value)) = entries.into_iter().find(|(key, _)| key == member)
@@ -244,7 +244,7 @@ pub(crate) fn part_member(doc: &DocRef, part: &Part, member: &str) -> Result<Eva
     }
 }
 
-/// The error for `.prop` and `.prop(key)`: the level between a node and its data is gone.
+/// The error for `.prop` and `.prop(key)`, a retired level between a node and its data.
 fn retired_prop() -> EvalError {
     EvalError::Retired {
         written: ".prop".to_string(),
@@ -362,8 +362,8 @@ pub(crate) fn part_method(
 
 // ---- members of a document and a directory -----------------------------------
 
-/// `doc.member`: a document holds no data of its own to read with a dot. What used to be read this
-/// way is reached with `::`, and the error says so.
+/// `doc.member`: a document holds no data of its own to read with a dot. Its path, filename, meta
+/// and kind are reached with `::`, and the error says so.
 pub(crate) fn document_member(doc: &DocRef, member: &str) -> Result<EvalValue, EvalError> {
     let _ = doc;
     match member {
@@ -375,7 +375,7 @@ pub(crate) fn document_member(doc: &DocRef, member: &str) -> Result<EvalValue, E
     }
 }
 
-/// The error for a member that used to be read with a dot and is reached with `::` now.
+/// The error for a member that is reached with `::` and not with a dot.
 fn moved_to_connect(member: &str) -> EvalError {
     EvalError::Retired {
         written: format!(".{member}"),

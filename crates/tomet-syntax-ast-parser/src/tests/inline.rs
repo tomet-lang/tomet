@@ -61,7 +61,7 @@ fn unmatched_delimiter_falls_back_to_literal_text() {
 /// The document's first paragraph, rendered as plain text -- folding
 /// each `SoftBreak` the way a renderer (e.g. the printer) does, via
 /// `softbreak_join`, rather than asserting the paragraph parses to a
-/// single merged `Text` (it no longer does; see `Inline::SoftBreak`).
+/// single merged `Text` (it does not; see `Inline::SoftBreak`).
 fn paragraph_text(src: &str) -> String {
     let doc = parse_file(src).unwrap();
     match &doc.body[0] {
@@ -114,10 +114,6 @@ fn ambiguous_width_counts_as_narrow_at_a_fold() {
     // space.
     assert_eq!(paragraph_text("矢印→\nあ\n"), "矢印→ あ");
 }
-
-// `parses_the_repo_spec_examples` lives in the `tomet-tests` package
-// now -- it reads the shared corpus, which this crate no longer
-// reaches out of its own directory for.
 
 #[test]
 fn bare_at_is_plain_text_when_not_an_element() {

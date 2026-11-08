@@ -330,7 +330,7 @@ mod tests {
                 anchor: None,
             }
         );
-        // tm: is no longer a document scheme (falls back to File)
+        // tm: is not a document scheme (falls back to File)
         assert_eq!(
             Address::parse("tm:docs/spec.tmt"),
             Address::File("tm:docs/spec.tmt".to_string())

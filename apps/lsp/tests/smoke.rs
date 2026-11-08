@@ -1,6 +1,6 @@
 //! Protocol-level smoke test: drives the actual `tomet-lsp` binary
-//! over stdio with real LSP framing, since the harness this was built in
-//! can't launch an editor to test against (see `AGENTS.md`). Exercises
+//! over stdio with real LSP framing, since an editor cannot be launched
+//! to test against. Exercises
 //! the full initialize -> didOpen -> didChange -> didClose -> shutdown
 //! sequence and checks the diagnostics that come back at each step.
 

@@ -28,10 +28,10 @@ pub fn completions_for_with_uri(
 
     let mut items = Vec::new();
 
-    // Driven by `BUILTIN_KINDS` rather than a hand-kept list. The old
-    // list had drifted badly -- it offered `callout`/`warning`/`connect`,
-    // which are not built-in at all, and omitted `link`/`embed`/`table`.
-    // Bare names are reserved for exactly this set now, so offering a
+    // Driven by `BUILTIN_KINDS` rather than a hand-kept list, which
+    // drifts -- it would offer `callout`/`warning`/`connect`, which are
+    // not built-in at all, and omit `link`/`embed`/`table`.
+    // Bare names are reserved for exactly this set, so offering a
     // non-builtin one would suggest something that fails to validate.
     //
     // The spelling follows the element's `Region`, not its shape: a

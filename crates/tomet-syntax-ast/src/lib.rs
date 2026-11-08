@@ -126,10 +126,9 @@ pub enum Value {
     /// an element's own `[content]`/`|content` slot, see
     /// `tmtroot/docs/spec/feature/content-shape.tmt`) sitting as a named
     /// value inside `(args)`/`{data}`, e.g. `@conflict(a: [ ... ], b: [
-    /// ... ])`. `[a, b]` array literals are retired (a sequence is
-    /// `(a, b)`) to free `[...]` for this -- it already meant "block
-    /// content" at the element level, and now means it uniformly at any
-    /// value position.
+    /// ... ])`. `[...]` means block content uniformly at any
+    /// value position, as it does at the element level; a sequence is
+    /// `(a, b)`, and `[a, b]` is not an array literal.
     Blocks(Vec<Block>),
 }
 
@@ -473,8 +472,8 @@ pub enum Inline {
     Interp(Interpolation),
     /// A `<?matcher(...)>` hole inside running text. See [`Hole`].
     Hole(Hole),
-    /// A source line break that is semantically whitespace. Unlike the old
-    /// behavior of folding it into a literal `' '` (or nothing, between two
+    /// A source line break that is semantically whitespace. Unlike
+    /// folding it into a literal `' '` (or nothing, between two
     /// East-Asian-wide characters) at parse time, this keeps the break's
     /// existence in the tree instead of destroying it -- there is no way to
     /// recover "the author wrapped a line" from a plain space once it has
@@ -498,8 +497,8 @@ impl Inline {
     /// Used by renderers reproducing [`softbreak_join`]'s wide-character
     /// check against whatever inline follows a `SoftBreak`: only the
     /// immediate next item is consulted, deliberately not skipping past an
-    /// `Element` to find text beyond it, matching the fold's old behavior of
-    /// only ever seeing characters within its own text run.
+    /// `Element` to find text beyond it, the same as the fold, which only
+    /// ever sees characters within its own text run.
     pub fn first_char(&self) -> Option<char> {
         match self {
             Inline::Text(t) => t.value.chars().next(),
@@ -536,8 +535,7 @@ pub struct SoftBreak {
 /// This is the fold rule tomet has always applied when joining a wrapped
 /// line: a space, except between two East-Asian-wide characters, where a
 /// space would open a visible gap in the middle of a sentence. It lives
-/// here, shared, because it used to be baked into the parser and is now
-/// needed by several independent call sites instead: HTML, Typst, and
+/// here, shared, because several independent call sites need it: HTML, Typst, and
 /// Pandoc export always fold this way, and so do the plain-text-only
 /// corners of the printer and Markdown export (an image's `alt`, a
 /// codeblock's extracted text) that cannot themselves contain a literal
@@ -876,7 +874,7 @@ pub struct Data {
 /// The one element sigil is `@`; it says "an element starts here" and nothing
 /// else. Whether the element stands as a block or belongs to a paragraph is
 /// [`Placement`], which the parser derives from position, and origin is
-/// carried by [`Name`]'s namespace. Two earlier axes were tried and carried no
+/// carried by [`Name`]'s namespace. Two other axes would carry no
 /// information: `<T>` vs `@name` (official vs user-defined, but both
 /// classified through the same arm) and `#name` vs `@name` (shape, which
 /// `tomet-semantics`' `required_shape` already knew). `#(id)` is not a second
@@ -896,9 +894,8 @@ pub struct Data {
 /// [`Connect`]. Order-preserving, empty when nothing follows.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Element {
-    /// The name after `@`. It is mandatory: a nameless `@(url:...)` used to
-    /// infer its kind from a key in its args, that inference was retired,
-    /// and the syntax is gone with it.
+    /// The name after `@`. It is mandatory: a nameless `@(url:...)` is not an element,
+    /// because a kind is not inferred from a key in the args.
     pub name: Name,
     pub placement: Placement,
     pub data: Data,
@@ -1045,7 +1042,7 @@ pub enum Entry {
 ///
 /// `{...}` is always data: it parses uniformly into [`Entry`] items in
 /// source order, whatever the element is called. "Is this a data map or a
-/// list of children?" is no longer a parse-time branch -- it is a view
+/// list of children?" is not a parse-time branch -- it is a view
 /// computed downstream in `tomet-semantics`, which is what lets the parser
 /// build the tree without consulting any element vocabulary.
 ///

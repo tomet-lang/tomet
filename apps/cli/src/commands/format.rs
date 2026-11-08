@@ -13,11 +13,11 @@ enum FormatWriteResult {
 
 /// Formats one file's source through the config that governs it.
 ///
-/// `tomet format` used to call `format_source`, which takes no config at
-/// all, while the LSP formatted with the vault's. So a document the
-/// editor wrote on save was a document `format --check` called
-/// unformatted -- a guard rejecting what the tool everyone uses
-/// produces. Both go through `tomet_load_config::config_for` now.
+/// `tomet format` formats through the config that governs the file, the
+/// same as the LSP does with the vault's: without it, a document the
+/// editor wrote on save would be one `format --check` calls unformatted
+/// -- a guard rejecting what the tool everyone uses produces. Both go
+/// through `tomet_load_config::config_for`.
 ///
 /// A `.ctmt` is formatted by whitespace alone, whatever the config says: it is
 /// data with no tables or element groups, and reprinting it from its value
@@ -33,8 +33,8 @@ fn format_file(path: &Path, src: &str) -> String {
 /// Whether the config governing `path` leaves it alone
 /// (`workspace.ignore` / `workspace.unswept`).
 ///
-/// A directory sweep already skips such files, but a path named on the
-/// command line used to be taken as-is. That made `tomet format -i` over an
+/// A directory sweep skips such files, and so does a path named on the
+/// command line: taken as-is, it would make `tomet format -i` over an
 /// explicit file list -- `git ls-files`, a shell glob -- rewrite the frozen
 /// corpus and its references, which exist to be left exactly as they are.
 fn is_excluded_by_config(path: &Path) -> bool {
@@ -67,10 +67,10 @@ fn collect_dir(dir: &Path, force: bool) -> Vec<PathBuf> {
 /// aborting on the first unreadable file in file order.
 ///
 /// Under `-i` (write), files are formatted and written in parallel across worker
-/// threads governed by the jobserver gate. Before this change, a failed write to
-/// standard output (for example piped to `head`) stopped the loop at that file and
-/// left subsequent files unformatted. Now every file is written first, and the
-/// file listing is printed afterwards.
+/// threads governed by the jobserver gate. Every file is written first, and the
+/// file listing is printed afterwards, so a failed write to standard output (for
+/// example piped to `head`) does not stop the loop at that file and leave
+/// subsequent files unformatted.
 pub(crate) fn format_cmd(
     paths: &[PathBuf],
     write: bool,

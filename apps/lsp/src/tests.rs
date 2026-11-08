@@ -147,10 +147,9 @@ fn completions_returns_items() {
     // an accepted completion is one that validates.
     assert!(items.iter().any(|i| i.label == "::meta"));
     assert!(items.iter().any(|i| i.label == "@link"));
-    // `callout` joined `BUILTIN_KINDS`, so it is offered again. It
-    // had been special-cased in eight places while the list did not
-    // know about it -- including the Markdown reader, which produced
-    // an element validation then called unknown.
+    // `callout` is in `BUILTIN_KINDS`, so it is offered. A name
+    // special-cased elsewhere while the list did not know about it
+    // would produce an element validation then calls unknown.
     assert!(items.iter().any(|i| i.label == "@callout"));
     // `memo` really is not built in -- nothing special-cases it --
     // so it is still not offered.
@@ -214,13 +213,13 @@ fn an_expression_is_offered_every_function_and_reserved_name_the_evaluator_has()
             "{name} is not offered"
         );
     }
-    // The two the editor used to leave out.
+    // `include(...)` and `addr(...)` are offered too.
     assert!(items.iter().any(|i| i.label == "include(...)"));
     assert!(items.iter().any(|i| i.label == "addr(...)"));
 }
 
 /// An address starts with one of the schemes the address parser reads, under
-/// the spelling it reads (`tmt:`, not the `tm:` it used to be), and a
+/// the spelling it reads (`tmt:`, not `tm:`), and a
 /// function is offered inside `${...}` only: outside it, one cannot be written.
 #[test]
 fn outside_an_expression_the_address_schemes_are_offered_and_no_functions() {

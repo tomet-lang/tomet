@@ -1,5 +1,5 @@
-//! How deep constructs may nest. A document nested past `MAX_DEPTH` used to abort the process with a
-//! stack overflow; now the parser keeps the text flat in a `TOO_DEEP` node and lowering reports it.
+//! How deep constructs may nest. A document nested past `MAX_DEPTH` does not abort the process with a
+//! stack overflow: the parser keeps the text flat in a `TOO_DEEP` node and lowering reports it.
 //! Each case runs on a 2 MB stack, the smallest a test thread gets: the limit is chosen so that the
 //! whole path (reading, lowering, dropping) fits there in a debug build.
 

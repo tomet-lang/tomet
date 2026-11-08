@@ -52,9 +52,9 @@ pub enum Diagnostic {
     /// An element written with a bare name that is not one of Tomet's own.
     ///
     /// Bare names are reserved for the built-in vocabulary; a user-defined
-    /// element must be namespaced. This is the diagnostic that replaces the
-    /// old silent fall-back to `ElementKind::Custom`, which is where the
-    /// official-vs-user-defined ambiguity actually lived.
+    /// element must be namespaced. This is the diagnostic that stands where a
+    /// silent fall-back to `ElementKind::Custom` would, which is where an
+    /// official-vs-user-defined ambiguity would live.
     UnknownElement {
         name: String,
         /// Set when the name is namespaced and that namespace is not in
@@ -413,10 +413,8 @@ impl Diagnostic {
                 unbound_namespace,
                 ..
             } => {
-                // One wording, in `tomet_semantics::UnknownName`. This arm
-                // used to carry its own copy and the two drifted -- it was
-                // still advising `@import(file:..., as:ns)` after that
-                // element had split into `::use` and the `include` expression.
+                // One wording, in `tomet_semantics::UnknownName`: a copy of
+                // it here would drift from it.
                 write!(
                     f,
                     "{}",
@@ -475,9 +473,8 @@ impl Diagnostic {
                 expected,
                 ..
             } => {
-                // Not "use `#name`" any more. `#` stopped being the block
-                // sigil when the shape axis was retracted, so the old
-                // advice named an edit that cannot be made: `@` is the
+                // Not "use `#name`": `#` is not a block sigil, so that
+                // advice would name an edit that cannot be made: `@` is the
                 // only element sigil and shape comes from position.
                 write!(
                     f,

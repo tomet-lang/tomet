@@ -153,8 +153,8 @@ fn bare_absolute_path_parses_as_a_plain_scalar() {
 #[test]
 fn bare_scheme_uri_parses_as_one_scalar_not_a_map() {
     // Group B: `scheme://...` at a "fresh value" position (no `key:`
-    // wrapper) used to be misread as `Map([(scheme, "//...")])` --
-    // `://` immediately after the identifier now forces the whole
+    // wrapper) is not read as `Map([(scheme, "//...")])` --
+    // `://` immediately after the identifier forces the whole
     // thing to be read as one scalar instead.
     assert_eq!(
         parse_value("https://example.com/path").unwrap(),

@@ -21,9 +21,9 @@
 //!   | `node::id`, `node::name`, `node::meta` and `doc::path` go from a node to
 //!   | what hangs off it ([`InterpExprKind::Connect`]). `node.key` reads a key of
 //!   | the data the node holds, whatever the author called it (`@user(id: "u123")`
-//!   | has an `id` that `node::id` is not), and `node.link()` calls a method. The
-//!   | old `.prop` level between a node and its data is gone and reports where to
-//!   | write what it meant ([`EvalError::Retired`]).
+//!   | has an `id` that `node::id` is not), and `node.link()` calls a method.
+//!   | `.prop` is a retired spelling, and reports where to write what it meant
+//!   | ([`EvalError::Retired`]).
 //! - (Names by position)
 //!   | A name is looked up in the one table its position selects: a call in
 //!   | the builtin functions, a bare name in the lambda parameters and then

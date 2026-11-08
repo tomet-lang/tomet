@@ -2,8 +2,7 @@ use super::*;
 
 /// Every sigil takes every group opener.
 ///
-/// "Does a group start here?" has one answer now
-/// (`element::opens_group`), but each sigil still asks it twice --
+/// "Does a group start here?" has one answer, but each sigil still asks it twice --
 /// once in a recognizer that decides dispatch, once in the parser
 /// that consumes -- and nothing in the types forces the two to
 /// agree. This table is what forces it.
@@ -88,10 +87,9 @@ fn every_sigil_takes_every_group_opener() {
 
 #[test]
 fn a_bare_bracket_pair_inside_a_content_no_longer_truncates_it() {
-    // Regression for the memo-content-fidelity fix: `Stop::Bracket`
-    // used to break at the *first* literal `]`, corrupting the rest
-    // of the content as stray trailing text. Applies to every ordinary
-    // (non-raw) `[content]`, not just an opt-in one.
+    // Regression: the content does not break at the *first* literal `]`,
+    // which would corrupt the rest of it as stray trailing text. Applies
+    // to every ordinary (non-raw) `[content]`, not just an opt-in one.
     let doc =
         parse_file("@caution[\nline one\nline two with * and [brackets] inside\n]\n").unwrap();
     assert_eq!(doc.body.len(), 1);
@@ -147,10 +145,10 @@ fn empty_paren_and_brace_groups_are_a_deliberately_empty_map() {
 
 #[test]
 fn a_second_group_written_against_the_first_is_an_error() {
-    // `docs/spec/syntax.tmt` calls a repeated group an error. It used
-    // to fall through instead: the group stayed where it stood and was
-    // read as prose, which also cost the element its block placement,
-    // so `@T(a:1)(b:2)` quietly became a paragraph.
+    // A repeated group is an error. It must not fall through: the
+    // group would stay where it stood and be read as prose, which would
+    // also cost the element its block placement, so `@T(a:1)(b:2)`
+    // would quietly become a paragraph.
     let err = parse_file("@T(a:1)(b:2)\n").expect_err("a second (args) group should not parse");
     assert!(
         err.message.contains("a second `(args)` group"),
@@ -216,8 +214,8 @@ fn a_parenthesis_after_an_element_is_prose() {
 #[test]
 fn a_comment_between_groups_does_not_detach_the_next_group() {
     // Regression: a `//`/`/* */` comment between an element's groups
-    // used to fall outside the whitespace/newline gap tolerance,
-    // ending the element early and leaving the next group as
+    // is inside the whitespace/newline gap tolerance, so it does not
+    // end the element early and leave the next group as
     // unrelated trailing text.
     let doc = parse_file("@T(a:1) // note\n[content]\n").unwrap();
     assert_eq!(doc.body.len(), 1);

@@ -9,8 +9,8 @@
 //!   file because the parser stops at the first error. `KNOWN_UNPARSEABLE`
 //!   lists them, and [`REJECTED`] says where each is refused and why.
 //! - `syntax/nexus.tmt` and `syntax/nexus-declarations*.tmt` are the forms
-//!   that stay valid, among them the twelve declarations that used to take
-//!   `{...}` alone and now take `(...)`.
+//!   that stay valid, among them the twelve declarations whose primary
+//!   group is `(...)`.
 //!
 //! What a bare `@name` is depends on where it stands, and that is the part
 //! most easily lost: in running text it is prose (`me@example.com`), as a
@@ -24,7 +24,7 @@ use tomet_tests::{KNOWN_UNPARSEABLE, corpus, read_fixture};
 /// The prefix of every fixture that is a form the parser refuses.
 const INVALID: &str = "syntax/nexus-invalid-";
 
-/// The declarations that took `{...}` alone, and take `(...)` now.
+/// The declarations whose primary group is `(...)`.
 const PAREN_DECLARATIONS: [&str; 12] = [
     "meta",
     "macro",

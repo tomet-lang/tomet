@@ -103,7 +103,7 @@ fn inline_block_comment_is_removed_from_paragraph_text() {
         Block::Paragraph(p) => {
             // The comment's source is excluded entirely, and the text
             // flushed before it and after it are merged back into one
-            // `Text` (`push_text` in `inline.rs`) -- two adjacent
+            // `Text` (`push_text`) -- two adjacent
             // `Text`s with nothing between them would otherwise be
             // indistinguishable from a genuine `SoftBreak`, which
             // deliberately does not rely on bare adjacency to mean
@@ -176,10 +176,7 @@ fn inline_double_slash_comment_works_inside_content() {
             // its own `SoftBreak`, which `trim_edges` then drops as
             // trailing whitespace -- exposing "keep "'s own trailing
             // space as the new true edge, which gets trimmed too. No
-            // trailing space survives, unlike before `SoftBreak`
-            // existed: back then that lone newline folded straight
-            // into a literal `" "` `Text`, and `trim_edges` only ever
-            // trimmed `Text`, so it stopped one node short.
+            // trailing space survives.
             assert_eq!(el.content, wrap(vec![Inline::Text("keep".into())]));
         }
         other => panic!("expected element, got {other:?}"),
@@ -188,12 +185,11 @@ fn inline_double_slash_comment_works_inside_content() {
 
 #[test]
 fn a_double_slash_line_inside_a_multiline_content_is_a_comment() {
-    // `[content]` is parsed as a real block sequence now (the same
+    // `[content]` is parsed as a real block sequence (the same
     // grammar `File.body`/`Section.blocks` use), so a `//` line
     // inside it ends the current paragraph exactly the way it does at
-    // the top level (`paragraph_breaks_here`) -- a comment is no longer
-    // specially transparent glue inside content the way it was when
-    // content had no block-level dispatch of its own. "keep"/"keep2"
+    // the top level (`paragraph_breaks_here`) -- a comment is not
+    // transparent glue inside content. "keep"/"keep2"
     // land in two separate `Paragraph`s, not one inline run joined by a
     // `SoftBreak`.
     let doc = parse_file("@caution[\n  keep\n  // drop this line\n  keep2\n]\n").unwrap();
@@ -285,7 +281,7 @@ fn bare_url_values_are_unaffected_by_trailing_comment_support() {
 fn a_bare_scalar_starting_with_double_slash_needs_quoting() {
     // A bare scalar meant to start with a literal `//` (e.g. a
     // protocol-relative URL) is indistinguishable from a comment at
-    // that position -- it's read as a (now-empty) value followed by a
+    // that position -- it's read as an (empty) value followed by a
     // comment, so it must be quoted instead.
     let quoted = parse_value(r#"path: "//example.com/x""#).unwrap();
     assert_eq!(

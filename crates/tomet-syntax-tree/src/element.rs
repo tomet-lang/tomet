@@ -319,8 +319,8 @@ pub fn list(ordered: bool, items: Vec<ListItem>, span: Span) -> List {
 ///
 /// `id` is a real parameter, not hardcoded to `None` -- list items are a
 /// first-class consumer of `#(id)` like everything else `parse_groups`
-/// reads for, and silently dropping it here would repeat the exact bug
-/// `connects` used to have (a full-form list item's parsed connects were
+/// reads for, and silently dropping it here would lose it, as dropping
+/// `connects` would (a full-form list item's parsed connects would be
 /// read and then thrown away at this exact spot).
 #[allow(clippy::too_many_arguments)]
 pub fn list_item(

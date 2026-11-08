@@ -1,3 +1,6 @@
+::kind(adr)
+::id(adr-1000)
+
 ```(tmt)
 ``::upstreams{
 ``  origiri: { git: "https://github.com/kakusika/commonfiles.git", rev: main, root: origiri }

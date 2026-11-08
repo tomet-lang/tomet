@@ -74,13 +74,12 @@ fn heading_connect_fixture_has_no_rule_diagnostics() {
                     | Diagnostic::UnknownConnect { .. }
                     // Closes the blind spot that let a heading's own
                     // `::rule(...)` report a false `unknown element
-                    // \`rule\`` go unnoticed: `Section.connects` used to
-                    // reach the generic "is this name bound" check via
-                    // `walk.rs`'s `walk_block`, same as an ordinary
-                    // element's `connects` never does. This filter did
-                    // not check for that diagnostic before, so this
-                    // fixture staying green never meant this case was
-                    // actually clean.
+                    // \`rule\`` go unnoticed: `Section.connects` must not
+                    // reach the generic "is this name bound" check, as an
+                    // ordinary element's `connects` never does. This
+                    // filter includes that diagnostic; without it, this
+                    // fixture staying green would not mean this case is
+                    // clean.
                     | Diagnostic::UnknownElement { .. }
             )
         })
@@ -91,13 +90,11 @@ fn heading_connect_fixture_has_no_rule_diagnostics() {
 #[test]
 fn heading_descendants_fixture_reports_the_disallowed_one() {
     // Unlike `heading-connect.tmt` (the connect alone, nothing under the
-    // heading to check -- a vacuous pass even before the fix below), this
-    // fixture has real descendants, so it actually exercises the rule's
-    // allow-list against a heading's own `section.blocks` --
-    // `check_rule_connects` used to only ever reach an `Element`'s own
-    // `connects`, and a `Section` is not an `Element`, so a heading's
-    // `::rule(...)` never checked anything at all before this fixture's
-    // task fixed that.
+    // heading to check -- a vacuous pass), this fixture has real
+    // descendants, so it actually exercises the rule's allow-list against
+    // a heading's own `section.blocks`: the rule check reaches a
+    // heading's own `::rule(...)`, though a `Section` is not an
+    // `Element`.
     let doc = parse_fixture("heading-descendants.tmt");
     let errors = validate_document(&doc);
     let rule_errors: Vec<_> = errors

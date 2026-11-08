@@ -2,7 +2,7 @@ use super::*;
 
 /// The `Inline::Raw` text of `doc`'s first block, which must be a `@name`
 /// element whose `[content]` is a single nested backtick-fenced `@raw`
-/// element -- the replacement for the old `+++` raw-body fence: `[...]`
+/// element -- `[...]`
 /// holds the same blocks the document root does, so a fenced code block
 /// nests inside it exactly as it would at the top level.
 fn nested_raw_body(doc: &tomet_ast::File) -> &str {
@@ -62,9 +62,9 @@ fn interpolation_does_not_expand_inside_a_fenced_raw_body_in_content() {
 
 #[test]
 fn content_raw_is_now_just_an_ordinary_argument() {
-    // `(content:raw)` no longer changes how `[...]` is lexed -- that
-    // was one of the four places the parser consulted an element's
-    // own arguments. Line breaks collapse per the usual rule.
+    // `(content:raw)` does not change how `[...]` is lexed -- the parser
+    // does not consult an element's own arguments for that. Line breaks
+    // collapse per the usual rule.
     let doc = parse_file("@memo(content:raw)[\nline one\nline two\n]\n").unwrap();
     match &doc.body[0] {
         Block::Element(el) => {
@@ -115,18 +115,17 @@ fn parses_a_fenced_code_block_without_lang() {
 
 #[test]
 fn fenced_code_block_and_bracket_raw_produce_the_same_ast() {
-    // No longer *identical* content: the fenced spelling is always
+    // Not *identical* content: the fenced spelling is always
     // captured verbatim (`Inline::Raw`, can hold real newlines), while
     // `@raw(...)[...]` is ordinary `[content]` -- the parser
     // does not special-case lexing by element name (see
-    // `content_raw_is_now_just_an_ordinary_argument`), so it still goes
+    // `content_raw_is_now_just_an_ordinary_argument`), so it goes
     // through the usual inline grammar and comes back as `Inline::Text`.
-    // The two happened to produce byte-identical `Inline::Text` before
-    // `Inline::Raw` existed only because this example has no markup
-    // characters and fits on one line; a multi-line bracket body would
-    // already have shown the gap (its line breaks fold/`SoftBreak`
-    // like any other prose, not staying verbatim). What still matches
-    // is sigil/args/value and the rendered text.
+    // The rendered text matches here only because this example has no
+    // markup characters and fits on one line; a multi-line bracket body
+    // shows the gap (its line breaks fold/`SoftBreak` like any other
+    // prose, not staying verbatim). What matches is sigil/args/value
+    // and the rendered text.
     let fenced = parse_file("```rust\nfn main() {}\n```\n").unwrap();
     let bracket = parse_file("@raw(lang:rust)[fn main() {}]\n").unwrap();
     match (&fenced.body[0], &bracket.body[0]) {
@@ -202,10 +201,10 @@ fn unterminated_fenced_code_block_runs_to_eof_without_error() {
 
 #[test]
 fn unterminated_inline_backtick_falls_back_to_literal_text() {
-    // Regression: a single unterminated '`' used to swallow everything
+    // Regression: a single unterminated '`' must not swallow everything
     // up to the next stray backtick anywhere later in the source,
     // across paragraph boundaries, collapsing newlines to spaces along
-    // the way. It must now fall back to a literal '`' and let the
+    // the way. It falls back to a literal '`' and lets the
     // paragraph end normally at the blank line.
     let doc = parse_file("keep `this open\n\nnext paragraph\n").unwrap();
     assert_eq!(doc.body.len(), 2);

@@ -89,7 +89,7 @@ fn printed_source_parses() {
     // `PrinterConfig` defaults, so e.g. a bare `::meta(...)` may come back
     // multi-line (`meta.always_newline`) -- a different AST shape for the
     // same meaning. What the printer actually emits is pinned by
-    // `snapshot.rs`'s `printed_source_matches_reference` instead.
+    // the snapshot test instead.
     for (rel, src) in parseable_corpus() {
         let doc = tomet_ast_parser::parse_file(&src)
             .unwrap_or_else(|e| panic!("{} failed to parse: {e}", rel.display()));
@@ -105,8 +105,7 @@ fn printed_source_parses() {
 
 #[test]
 fn config_fixtures_load() {
-    // Was a `.parent().unwrap()` walk up to the repo root inside
-    // `tomet-config`; the fixtures are local to this package now.
+    // The fixtures are local to this package.
     let cfg = tomet_load_config::load_config_from_file(&fixtures_dir().join("test.config.tmt"))
         .expect("failed to load test.config.tmt");
     assert!(cfg.meta.always_newline);

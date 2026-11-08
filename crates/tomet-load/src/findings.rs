@@ -1,9 +1,9 @@
 //! What checking finds in one document: the one place `tomet check`,
 //! `tomet stats` and the language server get it from.
 //!
-//! It used to be assembled inside `apps/cli`, which left every other caller
-//! to put the same four steps together again -- or not to, and silently
-//! report less. A check added here reaches all of them.
+//! It is assembled here, once, so that no caller has to put the same four
+//! steps together again -- or not to, and silently report less. A check
+//! added here reaches all of them.
 
 use std::path::Path;
 

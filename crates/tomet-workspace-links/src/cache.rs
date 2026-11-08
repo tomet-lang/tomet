@@ -110,9 +110,9 @@ fn collector_signature() -> String {
     format!("v{COLLECTOR_VERSION}:{}", kinds.join(","))
 }
 
-/// One DDL, used by both the on-disk and the in-memory constructor. The
-/// two used to be separate copies of the same text, and the `kind` CHECK
-/// in each was a hand-written third copy of `LinkKind`'s own names.
+/// One DDL, used by both the on-disk and the in-memory constructor, so
+/// the two are not separate copies of the same text; the `kind` CHECK is
+/// built from `LinkKind`'s own names and is not a hand-written copy of them.
 fn schema() -> String {
     let kinds: Vec<String> = LinkKind::ALL
         .iter()

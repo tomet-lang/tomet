@@ -284,16 +284,16 @@ fn render_element_value(cx: &RenderCtx, value: &Group, out: &mut String) {
 /// Reaching here at all means the document was not prepared -- a
 /// caller that went straight to this crate rather than through
 /// `tomet_load::Vault`. Rendering nothing would hide it, and
-/// evaluating it here is what this crate stopped doing: what a
+/// evaluating it here is not this crate's job: what a
 /// `${...}` means is settled by `tomet-transform`'s
 /// `resolve_expressions` before any converter sees the tree.
 ///
-/// This used to evaluate with `evaluate_with_config` -- no
-/// `EvaluationContext` and no vault config, so `${self::path}`
-/// resolved in CommonMark and not here, and `default.config.tmt`'s
-/// macros expanded in neither. No wrapper element is emitted now
-/// that the text is plain: `<span class="tm-interp">` carried no
-/// style and marked a distinction that no longer survives to here.
+/// Evaluating here would differ from the other converters: without an
+/// `EvaluationContext` or the vault config, `${self::path}` would
+/// resolve in CommonMark and not here, and `default.config.tmt`'s
+/// macros would expand in neither. No wrapper element is emitted for
+/// the plain text: a `<span class="tm-interp">` would carry no style
+/// and mark a distinction that does not survive to here.
 pub(crate) fn render_interp(interp: &Interpolation, out: &mut String) {
     out.push_str(&escape_html(&format!("${{{}}}", interp.expr)));
 }

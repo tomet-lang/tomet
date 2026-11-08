@@ -10,15 +10,14 @@
 //! `tomet-tests` package asserts this across the whole shared corpus, and
 //! its `KNOWN_FORMAT_CHANGES_DOCUMENT` exception list is empty.
 //!
-//! The list held one entry until `(content:raw)[...]` was retired. A raw
-//! body used to be delimited by matched brackets, so a source that wrote
-//! full-width `｛｝` where the grammar wants ASCII `{}` did not opt into
-//! raw at all, left no raw span to protect, and had the trailing-
-//! whitespace rule run over content meant to be verbatim. A backtick
-//! fence is delimited by a *line*, so no character inside the body can
-//! end it early or make the formatter disagree with the parser about
-//! where verbatim content begins. The bug class is gone by construction
-//! rather than by exception.
+//! The list is empty because a raw body is a backtick fence, which is
+//! delimited by a *line*: no character inside the body can end it early
+//! or make the formatter disagree with the parser about where verbatim
+//! content begins. Were a raw body delimited by matched brackets, a
+//! source that wrote full-width `｛｝` where the grammar wants ASCII `{}`
+//! would not opt into raw at all, leave no raw span to protect, and have
+//! the trailing-whitespace rule run over content meant to be verbatim.
+//! The bug class is excluded by construction rather than by exception.
 //!
 //! [`format_source_with_config`] formats tables according to `PrinterConfig`
 //! (e.g. `table.adjust_width`, `table.max_col_width`, `table.align`) and

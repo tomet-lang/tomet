@@ -36,7 +36,7 @@ pub(crate) fn render_block(
             // Elements with no visible output (`::meta`, ...) placed on
             // adjacent lines with no blank line between them lazily
             // continue into one paragraph together with the inter-element
-            // whitespace text (see `document.rs::parse_paragraph`) -- if
+            // whitespace text -- if
             // every one of them is invisible, skip the wrapper entirely
             // rather than emitting a stray whitespace-only `<p>`.
             let mut inner = String::new();
@@ -281,8 +281,8 @@ fn render_list(cx: &RenderCtx, list: &List, out: &mut String) {
 /// `Element.content` (`Vec<Block>`) to HTML. The common case -- exactly
 /// one plain paragraph, what ordinary inline usage always parses to --
 /// delegates straight to `render_inlines` on that paragraph's own content
-/// (no wrapping `<p>`, matching what this always produced for `content`
-/// before it became `Vec<Block>`); anything else falls back to
+/// (no wrapping `<p>`, the plain inline rendering of `content`);
+/// anything else falls back to
 /// `render_block` per block, with a fresh `HeadingState` -- nested headings
 /// inside a block-permitting element's content don't continue the
 /// document's own heading numbering.

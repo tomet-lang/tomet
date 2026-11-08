@@ -11,7 +11,7 @@ use tomet_ast::{ElementView, Value};
 use tomet_semantics::normalized_element_args;
 
 /// A bare `---` break is a plain `<hr>`; a titled one (`---[ Title ]---`,
-/// `document.rs::parse_titled_thematic_break`'s `content`) wraps two `<hr>`s
+/// the break's `content`) wraps two `<hr>`s
 /// around the title, visually reproducing the source's symmetric
 /// dashes-title-dashes shape (styled via `.tmt-hr-titled` in `DEFAULT_STYLE`).
 pub(crate) fn render_hr_element(cx: &RenderCtx, el: ElementView<'_>, out: &mut String) {

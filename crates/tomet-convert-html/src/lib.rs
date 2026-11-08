@@ -47,9 +47,9 @@ body { font-family: sans-serif; line-height: 1.6; max-width: 48rem; margin: 2rem
 
 /// Output shape choices for [`render_page_with`]/[`render_body_with`]. The
 /// zero-value (`Default`) is the plain, unnumbered rendering `render_page`/
-/// `render_body` already produced before this existed -- opting into
-/// anything here is always an explicit choice, never a behavior change for
-/// existing callers of those two functions.
+/// `render_body` produce -- opting into anything here is always an
+/// explicit choice, never a behavior change for callers of those two
+/// functions.
 #[derive(Debug, Clone, Default)]
 pub struct RenderOptions {
     /// Number headings by nesting level (`1`, `1.1`, `1.2`, `2`, ...),
@@ -111,12 +111,12 @@ pub struct CustomElementCtx<'a> {
     /// The dotted or bare name [`classify_std_lenient`] fell back to
     /// (`"doc.icon"`, `"my-widget"`, ...).
     pub kind: &'a str,
-    /// The element's bracketed `[content]`, as parsed blocks (`Vec<Block>`
-    /// now -- see `tmtroot/docs/spec/feature/content-shape.tmt`). Ordinary
+    /// The element's bracketed `[content]`, as parsed blocks (`Vec<Block>`).
+    /// Ordinary
     /// inline usage is still exactly one `Block::Paragraph`; a hook that
     /// only ever handled plain inline content can match that one case and
     /// read `Block::Paragraph(p) => &p.content` for the same `&[Inline]`
-    /// it used to get directly.
+    /// as the plain inline content itself.
     pub content: Option<&'a [Block]>,
     /// Whether this element sits inline in running text (`span`) or as a
     /// block (`div`) -- the same distinction `render_generic_element` uses.

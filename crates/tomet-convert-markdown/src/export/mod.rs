@@ -28,14 +28,11 @@ struct MarkdownCtx<'a> {
 
 /// Renders `doc` as CommonMark.
 ///
-/// Takes no evaluation context. It used to -- `to_markdown_with_context`
-/// carried a `DocumentConfig` and an `EvaluationContext` for one purpose,
-/// evaluating `${...}`, and no converter does that any more. What a
+/// Takes no evaluation context: no converter evaluates `${...}`. What a
 /// `${...}` means is settled before any of them sees the tree, by
 /// `tomet-transform`'s `resolve_expressions` (reached through
-/// `tomet_load::Vault::prepare`), because four converters deciding it
-/// independently is how the same document came to produce three different
-/// answers.
+/// `tomet_load::Vault::prepare`), because converters deciding it
+/// independently would produce different answers for the same document.
 pub fn to_markdown(doc: &File) -> String {
     let footnotes = FootnoteRegistry::from_file(doc);
     let cx = MarkdownCtx {
@@ -289,7 +286,7 @@ fn render_table(cx: &MarkdownCtx, el: ElementView<'_>) -> String {
 /// that went straight to this crate rather than through
 /// `tomet_load::Vault`. The honest output for that is the source
 /// spelling: rendering nothing would hide it, and evaluating it here is
-/// what this crate stopped doing.
+/// not this crate's job.
 fn render_interp(interp: &Interpolation) -> String {
     format!("${{{}}}", interp.expr)
 }
@@ -318,8 +315,7 @@ fn content_to_md(cx: &MarkdownCtx, el: ElementView<'_>) -> String {
 /// no CommonMark equivalent, so it's lossy: a bold line followed by a
 /// plain rule.
 /// `id`/`cssclass` attrs (`el.value`) have no CommonMark form and are
-/// dropped, same as before this was folded into the generic `Element`
-/// dispatch (see the module doc).
+/// dropped (see the module doc).
 fn render_heading(cx: &MarkdownCtx, el: ElementView<'_>) -> String {
     let level = heading_level(el).unwrap_or(1) as usize;
     let content = el.content.unwrap_or(&[]);
@@ -454,8 +450,8 @@ fn render_callout(cx: &MarkdownCtx, el: ElementView<'_>) -> String {
 /// or a plain `[text](target)`/bare-target link (everything else). The
 /// scheme prefix itself is stripped before rendering -- it's addressing
 /// metadata, not part of the visible target.
-/// `@file(x)`/`@dir(x)` -> a code span, which is what these mentions
-/// were written as before the elements existed.
+/// `@file(x)`/`@dir(x)` -> a code span, the plain Markdown form of such a
+/// mention.
 ///
 /// Lossless in the direction that matters here: moving a backticked path
 /// onto `@file` changes what `tomet check-links` can see and leaves the

@@ -310,7 +310,7 @@ mod tests {
             Some("doc-kWBcIUUz")
         );
         assert_eq!(document_id(&parse("::kind(x)\n")), None);
-        // `::meta(id: ...)` is not an identity any more.
+        // `::meta(id: ...)` is not an identity.
         assert_eq!(document_id(&parse("::meta(id: a)\n")), None);
     }
 

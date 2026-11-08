@@ -51,8 +51,8 @@ fn typst_output_matches_reference() {
 
 #[test]
 fn printed_source_matches_reference() {
-    // The printer rebuilds `.tmt` source from the AST. `roundtrip.rs`
-    // checks that the result reparses to the same document; this pins
+    // The printer rebuilds `.tmt` source from the AST. The roundtrip
+    // test checks that the result reparses to the same document; this pins
     // what it actually looks like, which reparsing alone does not.
     for (rel, src) in parseable_corpus() {
         let doc = tomet_ast_parser::parse_file(&src)

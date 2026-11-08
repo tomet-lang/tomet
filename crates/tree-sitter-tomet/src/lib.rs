@@ -2,7 +2,7 @@
 //!
 //! Rust binding for the Tomet tree-sitter grammar (`grammar.js` at
 //! the crate root; `src/parser.c` etc. are generated from it via
-//! `npx tree-sitter-cli@0.26.12 generate`, then compiled by `build.rs`).
+//! `npx tree-sitter-cli@0.26.12 generate`, then compiled by the crate's build script).
 //!
 //! This grammar exists for editor syntax highlighting (Zed and other
 //! tree-sitter-based editors), not as a source of truth -- that's
@@ -18,8 +18,8 @@
 //! -| **No lazy paragraph continuation.** A paragraph ends at a blank
 //!  | line or EOF only, not at the next line merely *looking* like a new
 //!  | block. `tomet-parser`'s own lazy-continuation check also ends a
-//!  | paragraph early when the next line is an element trigger (`@name`,
-//!  | see `document.rs`'s `Stop::Paragraph`) -- e.g. `::meta(...)`
+//!  | paragraph early when the next line is an element trigger (`@name`)
+//!  | -- e.g. `::meta(...)`
 //!  | immediately followed by `::format(...)` with no blank line between
 //!  | them becomes two separate top-level elements in the real parser.
 //!  | This grammar doesn't simulate that either, so it still merges such
@@ -28,7 +28,7 @@
 //!  | more with the closer tracking the opener's length.** Same
 //!  | "known-narrow" simplification as `thematic_break`'s fixed dash-run
 //!  | handling. The real parser
-//!  | (`document.rs::parse_fenced_code_block`) accepts any run of 3+ and
+//!  | accepts any run of 3+ and
 //!  | requires the closer to have at least as many backticks as the
 //!  | opener; matching that here would need a stateful external scanner
 //!  | to remember the opening run's length across the body, which this
@@ -57,8 +57,7 @@
 //!  | lookahead (or an external scanner) to resolve properly.
 //! -| **`//`/`/* */` comments aren't understood inside a `(...)`/`{...}`
 //!  | group's value content at all.** `tomet-parser` does support
-//!  | them there (`value.rs::skip_line_comment`, used from
-//!  | `parse_map`/`parse_flat_map`), e.g. `::config(...)`'s several-line
+//!  | them there, e.g. `::config(...)`'s several-line
 //!  | body in `tests/fixtures/cheatsheet.tmt` uses `///`/`//`-prefixed lines as a
 //!  | doc-comment convention -- but `map`/`children`/`_entry_sep` have no
 //!  | rule admitting a bare comment line at all, so a comment anywhere in
@@ -79,7 +78,7 @@
 //!  | box (`a < b`, `x<=1`, `<->`, `</x>`, `<x/>`) is `text` and
 //!  | `punctuation`, never an `ERROR`.
 //! -| **Unterminated `/* ... */` doesn't produce an `ERROR`.** The real
-//!  | parser (`document.rs::skip_block_comment`) hard-errors on a missing
+//!  | parser hard-errors on a missing
 //!  | `*/` -- silently swallowing the rest of the document is a much
 //!  | worse failure mode for a comment than for e.g. a code span. Here an
 //!  | unmatched `/*` just fails to lex as `block_comment` and falls back
@@ -90,7 +89,7 @@
 //!  | `paragraph`) -- discovered while adding `titled_thematic_break`
 //!  | (`---[ Title ]---`, which shares its dash-run token with the plain
 //!  | break), but present before that addition too. Not an `ERROR`, just a
-//!  | shape mismatch: the real parser (`document.rs::is_thematic_break`)
+//!  | shape mismatch: the real parser
 //!  | correctly accepts any run of 3+. See
 //!  | `more_than_three_dashes_are_only_partially_consumed_by_thematic_break`
 //!  | below for the pinned exact shape. The same goes for the closing run
@@ -105,47 +104,44 @@
 //! -| **A bare call or sequence occupying the *whole* `(args)`/`{value}`
 //!  | doesn't parse, unlike the same value under a named key (`a: (b, c)`,
 //!  | `a: list(string)`, which work fine).** `@id(list(a, b))` and
-//!  | `::meta((a, b))` both land in an `ERROR` even with `$.call` added as an
-//!  | alternative to `args_group`/`value_group`'s shared `value` rule -- tried
-//!  | and reverted, since it changed nothing: whatever conflicts an
+//!  | `::meta((a, b))` both land in an `ERROR` even with `$.call` as an
+//!  | alternative to `args_group`/`value_group`'s shared `value` rule -- that
+//!  | changes nothing: whatever conflicts an
 //!  | identifier-then-`(` at that exact position with, it isn't decided by
 //!  | `value`'s own alternatives. Not root-caused. `tomet-parser` accepts
 //!  | both (`lower_single_value_from_children` reads a lone call or `(...)`
 //!  | before its scalar fallback); `$.sequence` is reached through
 //!  | `_entry_value` only, so a named key is the form this grammar covers.
 //!
-//! `scanner.c` (see its own module doc) resolves what used to be listed
-//! here as a known limitation: a bare, colon-less, identifier-shaped
-//! scalar directly inside `(...)`/`{...}` (e.g. a bare tag like `@foo(yaml)`,
-//! or `{required}`) now parses as a clean `scalar` instead of an `ERROR`.
+//! `scanner.c` (see its own module doc) makes a bare, colon-less,
+//! identifier-shaped scalar directly inside `(...)`/`{...}` (e.g. a bare
+//! tag like `@foo(yaml)`, or `{required}`) parse as a clean `scalar`
+//! instead of an `ERROR`.
 //!
-//! `_value_scalar`'s regex (see its own comment in `grammar.js`) resolves
-//! another former limitation: a `key: (...)` map entry (e.g.
-//! `tags: (a, b)`) used to get GLR-merged with a second, spurious
-//! top-level reading of the same text, wrapping the whole map in an
-//! `ERROR` -- not just when that entry was last in the map with no
-//! trailing comma (the case originally found), but for an earlier,
-//! non-last `key: (...)` entry too. Root cause: the regex never
-//! excluded space/tab from its character class, so it could match a lone
-//! leading space (between `:` and the value) as a complete one-character
-//! token in its own right, and tree-sitter's lexer took that real, if
-//! useless, token match over skipping the space as `extras` first --
-//! same class of bug `SCALAR`/`LIST_MARKER_GAP` already existed to route
-//! around, just never applied to this token too.
+//! `_value_scalar`'s regex (see its own comment in `grammar.js`) keeps a
+//! `key: (...)` map entry (e.g. `tags: (a, b)`) from being GLR-merged
+//! with a second, spurious top-level reading of the same text, which
+//! would wrap the whole map in an `ERROR` -- not just when that entry is
+//! last in the map with no trailing comma, but for an earlier, non-last
+//! `key: (...)` entry too. The regex excludes space/tab from its
+//! character class: otherwise it could match a lone leading space
+//! (between `:` and the value) as a complete one-character token in its
+//! own right, and tree-sitter's lexer would take that real, if useless,
+//! token match over skipping the space as `extras` first -- the same
+//! class of bug `SCALAR`/`LIST_MARKER_GAP` exist to route around.
 //!
 //! `conflicts: [$.map, $.children]` (both declared with no `prec.right`
-//! of their own, unlike an earlier revision) resolves another former
-//! limitation: a bare newline right before a `map`/`children`-holding
-//! group's `}`/`)`, with nothing else after it, used to be genuinely
-//! ambiguous with only one token of lookahead ("is this newline the
-//! start of another entry, or the group's own trailing gap?") and always
-//! guessed "another entry" -- a dead end whenever nothing valid actually
-//! followed. GLR now tries both and keeps whichever one doesn't dead-end.
-//! Also fixed `-`-vs-`punctuation` the same class of way: `punctuation`'s
-//! `-` (see its own comment in `grammar.js`) is now the exact same shared
-//! token as the list markers', rather than a second, competing
-//! definition that always won tree-sitter's lexer-level tie regardless
-//! of what (if anything) validly followed.
+//! of their own) resolves another ambiguity: a bare newline right before
+//! a `map`/`children`-holding group's `}`/`)`, with nothing else after
+//! it, is genuinely ambiguous with only one token of lookahead ("is this
+//! newline the start of another entry, or the group's own trailing
+//! gap?"), and always guessing "another entry" is a dead end whenever
+//! nothing valid actually follows. GLR tries both and keeps whichever one
+//! doesn't dead-end. `-` vs `punctuation` is handled the same class of
+//! way: `punctuation`'s `-` (see its own comment in `grammar.js`) is the
+//! exact same shared token as the list markers', not a second, competing
+//! definition that would always win tree-sitter's lexer-level tie
+//! regardless of what (if anything) validly followed.
 //!
 //! Verified against real content: `cargo test` in this crate parses
 //! `tests/fixtures/readme.tmt` and `tests/fixtures/examples/image.meta.tmt` and checks that
@@ -366,32 +362,27 @@ mod tests {
 
     #[test]
     fn more_than_three_dashes_are_only_partially_consumed_by_thematic_break() {
-        // Pre-existing, discovered while adding `titled_thematic_break`
-        // (confirmed present before that change too, by testing against
-        // the grammar without it): `thematic_break`'s `-{3,}` token only
-        // ever consumes exactly 3 dashes here, even though the real parser
-        // (`tomet-parser::document.rs::is_thematic_break`) happily
-        // accepts any run of 3+ (see `parses_thematic_break_with_more_than_three_dashes`
-        // in that crate). The leftover dashes fall back to `punctuation`
+        // `thematic_break`'s `-{3,}` token only ever consumes exactly 3
+        // dashes here, even though the real parser happily accepts any
+        // run of 3+. The leftover dashes fall back to `punctuation`
         // inside a `paragraph`, same as any other unmatched `-` -- not an
         // `ERROR`, just a shape mismatch with the real grammar.
         //
-        // `list_marker` briefly turned this into a genuine `ERROR`
-        // instead: `unordered_list_item`'s `"-"` had to become its own
-        // standalone lexer token (rather than staying fused with its
+        // This is not an `ERROR`, though `unordered_list_item`'s `"-"` is
+        // its own standalone lexer token (rather than fused with its
         // trailing whitespace into one atomic `token(seq("-", /[ \t]/))`)
-        // so an optional marker could sit after it, and a bare `-` with
-        // nothing valid after it then won tree-sitter's lexer tie against
-        // `punctuation`'s own `-` unconditionally, dead-ending instead of
-        // falling back. Fixed by making `punctuation`'s `-` a bare string
-        // literal alternative (see its own comment) instead of folding it
-        // into a character-class regex -- an identical string literal
-        // anywhere in the grammar is one shared token, so this `-` and
-        // `unordered_list_item`'s marker `-` stopped being two different
-        // token definitions competing for the same text, and became one
-        // shared token whose eventual reduction (list item vs bare
-        // `punctuation`) ordinary LALR lookahead can decide once it's
-        // clear no valid marker/gap follows.
+        // so an optional marker can sit after it: a bare `-` with
+        // nothing valid after it must not win tree-sitter's lexer tie
+        // against `punctuation`'s own `-` unconditionally, dead-ending
+        // instead of falling back. `punctuation`'s `-` is a bare string
+        // literal alternative (see its own comment), not folded into a
+        // character-class regex -- an identical string literal anywhere in
+        // the grammar is one shared token, so this `-` and
+        // `unordered_list_item`'s marker `-` are not two different token
+        // definitions competing for the same text, but one shared token
+        // whose eventual reduction (list item vs bare `punctuation`)
+        // ordinary LALR lookahead can decide once it's clear no valid
+        // marker/gap follows.
         let tree = parse("-----\n");
         let root = tree.root_node();
         assert!(!root.has_error());
@@ -593,11 +584,11 @@ mod tests {
     /// error-free too -- a `::name(...)` that fell through to plain text
     /// would still pass it), so this also confirms a `connect` node
     /// genuinely exists as a *child of the element*, not just that the
-    /// line parsed somehow. Regression coverage for the bug this feature
-    /// hit during development: a `:` right after a *closed* group
-    /// (`(a: 1)`/`[ a ]`) used to lose the lexer's tie against plain
-    /// `text` and never reach `_element_group`/`connect` at all -- see
-    /// `text`/`_element_group`/`connect`'s own comments in `grammar.js`.
+    /// line parsed somehow. Regression coverage: a `:` right after a
+    /// *closed* group (`(a: 1)`/`[ a ]`) must not lose the lexer's tie
+    /// against plain `text` and never reach `_element_group`/`connect` at
+    /// all -- see `text`/`_element_group`/`connect`'s own comments in
+    /// `grammar.js`.
     #[test]
     fn named_connect_reaches_the_grammar_after_a_closed_group() {
         for src in ["@x(a: 1)::as(y)\n", "@x[ a ]::as(y)\n", "@x()::as(y)\n"] {
@@ -659,12 +650,11 @@ mod tests {
     }
 
     /// `list(...)`/`enum(...)` -- an immediately-resolved call literal,
-    /// mirroring `tomet_ast::Value::Call`. Also regression coverage: an
-    /// earlier version of this rule broke `url:https://example.com`
-    /// (a scheme URI, real and common in `.tmt` fixtures) by giving the
-    /// call's callee token a precedence boost / reusing `_element_name`
-    /// (this grammar's `word` token) -- either let a short, high-priority
-    /// identifier match preempt `_value_scalar`'s otherwise-longer match
+    /// mirroring `tomet_ast::Value::Call`. Also regression coverage: giving
+    /// the call's callee token a precedence boost / reusing `_element_name`
+    /// (this grammar's `word` token) would break `url:https://example.com`
+    /// (a scheme URI, real and common in `.tmt` fixtures) -- either lets a
+    /// short, high-priority identifier match preempt `_value_scalar`'s otherwise-longer match
     /// for the same text. See `call`'s own comment in `grammar.js`.
     #[test]
     fn parses_sequence_syntax_in_values() {
@@ -818,12 +808,11 @@ mod tests {
 
     #[test]
     fn bare_non_colon_scalar_parses_cleanly() {
-        // Used to be a known limitation (see `scanner.c`'s module doc for
-        // the mechanism `$._bare_word_no_colon` fixes): `scalar`/
-        // `map_entry`'s key are equal-length, identifier-shaped matches at
-        // this position, and precedence alone can't disambiguate without
-        // knowing whether a `:` follows. The external scanner supplies that
-        // one token of lookahead.
+        // `scalar`/`map_entry`'s key are equal-length, identifier-shaped
+        // matches at this position, and precedence alone can't
+        // disambiguate without knowing whether a `:` follows. The external
+        // scanner supplies that one token of lookahead (see `scanner.c`'s
+        // module doc for the mechanism `$._bare_word_no_colon`).
         for src in [
             "@foo(yaml)\n",
             "@foo(json)\n",
@@ -1024,16 +1013,6 @@ mod tests {
         assert_eq!(children.named_child_count(), 2);
     }
 
-    // The fixture-corpus tests that used to live here --
-    // `tomet_tm_fixture_has_only_known_error_cases`,
-    // `image_meta_tm_fixture_parses_cleanly`,
-    // `cheatsheet_tm_fixture_has_only_known_error_cases`, and
-    // `all_tmt_docs_parse_without_unexpected_errors` -- are in the
-    // `tomet-tests` package now (`tests/src/corpus.rs`). They read the
-    // shared corpus, which this crate was reaching up to the repo root
-    // for. Verify a grammar change with `cargo test -p tomet-tests`
-    // alongside `cargo test -p tree-sitter-tomet`.
-
     #[test]
     fn highlights_query_is_valid() {
         let query_src = include_str!("../queries/highlights.scm");
@@ -1180,11 +1159,10 @@ mod tests {
     #[test]
     fn map_entry_value_is_optional_for_null_shorthand() {
         // `key:` with nothing after it is a legal map entry with no
-        // value. Before `_entry_value` became `optional`, a *mandatory*
-        // value meant this shape didn't just mismatch locally like the
-        // grammar's other known-narrow cases -- it derailed the entire
-        // enclosing block into an `ERROR` that swallowed everything after
-        // it too.
+        // value. Were `_entry_value` *mandatory*, this
+        // shape would not just mismatch locally like the grammar's other
+        // known-narrow cases -- it would derail the entire enclosing
+        // block into an `ERROR` that swallowed everything after it too.
         let src = "::meta(\nid: doc-1\nflags:\nrating:\nreviewed:\ntype: j.daily\n)\n";
         let tree = parse(src);
         assert!(!tree.root_node().has_error());
@@ -1192,13 +1170,13 @@ mod tests {
 
     #[test]
     fn map_entry_call_value_parses_cleanly_last_or_not() {
-        // `_value_scalar`'s regex used to be able to match a lone leading
-        // space as a bogus one-character `scalar`, which won out over
+        // `_value_scalar`'s regex must not match a lone leading space as
+        // a bogus one-character `scalar`, which would win out over
         // skipping that space as `extras` first -- see that rule's own
-        // comment in `grammar.js`. Covers both the originally-found shape
+        // comment in `grammar.js`. Covers both the shape found first
         // (a `list(...)`-valued entry last in the map, no trailing comma)
-        // and the broader one found while fixing it (an earlier, non-last
-        // `list(...)`-valued entry, still followed by more entries).
+        // and the broader one (an earlier, non-last `list(...)`-valued
+        // entry, still followed by more entries).
         for src in [
             "::meta(\naliases: list()\n)\n",
             "::meta(\naliases: list()\nflags: x\n)\n",

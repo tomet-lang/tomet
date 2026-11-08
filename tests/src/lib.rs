@@ -76,32 +76,20 @@ pub fn read_fixture(rel: &Path) -> String {
 
 /// Corpus entries that `tomet-parser` is currently expected to reject.
 ///
-/// This is an allow-list, not a skip-list: `corpus.rs` asserts it matches
+/// This is an allow-list, not a skip-list: the corpus sweep asserts it matches
 /// reality exactly, so a fixture that starts or stops parsing shows up as
 /// a failure rather than silently changing which files get covered.
 ///
-/// `cheatsheet.tmt` used to be the sole entry: it is a frozen copy of
-/// `docs/guide/cheatsheet.tmt` and exercised constructs the parser did not
-/// accept. The sigil rework fixed the last of them -- the `(format:...)`
-/// brace scanner that ended a body early at an unquoted `}` -- so it now
-/// parses, and the entry was gone for a while.
-///
-/// `examples/bookmark.tmt` and `syntax/value-element.tmt` then used the
-/// retired `[a, b]` list literal (`(a, b)` is the sole surviving
-/// spelling for a *sequence*) and landed here, rejected outright. `key:
-/// [...]` stopped being a hard rejection once it gained its own meaning
-/// -- block content (`Value::Blocks`), the same grammar as an element's
-/// own `[content]` -- so both fixtures parse again, but to a different
-/// AST than the `[a, b]`-as-list spelling would have produced (one
-/// paragraph, not a sequence). `examples/bookmark.tmt`'s `tags:` was
-/// edited to `(a, a)` to keep meaning what it always meant (a list
-/// of tags); `syntax/value-element.tmt`'s `icons: [...]` was left as-is,
-/// since embedding `@`-elements in a `[...]` value position is exactly
-/// what that fixture exists to demonstrate.
+/// `key: [...]` is block content (`Value::Blocks`), the same grammar as an
+/// element's own `[content]`: a fixture that writes `[a, b]` as a list
+/// parses, but to one paragraph, not a sequence. `(a, b)` is the sole
+/// spelling for a *sequence*. `syntax/value-element.tmt`'s `icons: [...]`
+/// embeds `@`-elements in a `[...]` value position, which is exactly what
+/// that fixture exists to demonstrate.
 ///
 /// The `syntax/nexus-invalid-*` fixtures are the standing entries: each is one
 /// form the nexus rule refuses (a `@name`, `::name` or `::name` with no primary
-/// group), kept apart because the parser stops at the first error. `nexus.rs`
+/// group), kept apart because the parser stops at the first error. A nexus test
 /// holds each to the place and reason it is refused for.
 pub const KNOWN_UNPARSEABLE: &[&str] = &[
     "syntax/nexus-invalid-bare-block.tmt",
@@ -140,8 +128,8 @@ pub const KNOWN_TS_ERRORS: &[(&str, &[&str])] = &[
     // `----[💫]----`: `[` has more competing token definitions than `(`
     // does -- `heading`'s content-opening `[`, `area_group`'s, and
     // `punctuation`'s all coexist unshared. The `MISSING_NODE`/`` ` ``
-    // entries are the `@memo[``` ... ``` ]` fenced-raw-body replacement
-    // for the retired `+++` fence -- see `syntax/fences.tmt`'s own entry.
+    // entries are the `@memo[``` ... ``` ]` fenced-raw-body form --
+    // see `syntax/fences.tmt`'s own entry.
     (
         "cheatsheet.tmt",
         &["(\n  style: structural", "や", "]", MISSING_NODE, "`"],
@@ -150,7 +138,7 @@ pub const KNOWN_TS_ERRORS: &[(&str, &[&str])] = &[
     // `ordered_list_item`/`unordered_list_item` only ever produce a
     // `list_marker`/`content_group`/`marked_content` shape, with no
     // production for `@name`'s own groups following the marker
-    // directly. `tomet-parser`'s `list.rs::eat_list_marker` recognizes
+    // directly. `tomet-parser` recognizes
     // it; `grammar.js` has not been taught the combine form yet.
     ("syntax/combine.tmt", &[ANY_ERROR]),
     // Positional arguments in a declaration's `(...)`: `grammar.js` reads one scalar or one string
@@ -183,10 +171,9 @@ pub const KNOWN_TS_ERRORS: &[(&str, &[&str])] = &[
     // the corpus for that); highlighting a hole in a value is not worth a second
     // scanner state. A name tag there is text, so it is not the cause.
     ("syntax/slot-value.tmt", &[ANY_ERROR]),
-    // A fenced code block nested inside `[content]` -- the replacement
-    // for the retired `+++` raw-body fence (see `raw.rs` and
-    // `document.rs::parse_block_seq`, which `[content]` shares with the
-    // document root in the real parser). `grammar.js`'s own content rule,
+    // A fenced code block nested inside `[content]`, which shares the
+    // block grammar with the document root in the real parser.
+    // `grammar.js`'s own content rule,
     // `_bracket_item: choice($._line_item, $._newline)`, is inline-only
     // and has no production for a nested `fenced_code_block` (a
     // `_block`), so the backticks and the body's own `]`/`` ` `` land as
@@ -195,12 +182,10 @@ pub const KNOWN_TS_ERRORS: &[(&str, &[&str])] = &[
     ("syntax/fences.tmt", &["]", "`", MISSING_NODE]),
     // ---- drift the grammar has not caught up with -------------------
     //
-    // Everything below was already drifting and nobody could see it: the
-    // only tree-sitter error checks read two hard-coded filenames, so
-    // five of these six files were never shown to the grammar at all.
-    // Recorded rather than fixed, so the tree is honest while
-    // `grammar.js` is brought up to date; the sweep's "listed but now
-    // clean" half will force each entry out again as it is fixed.
+    // Everything below drifts from the real parser. It is recorded
+    // rather than fixed, so the tree is honest while `grammar.js` is
+    // brought up to date; the sweep's "listed but now clean" half forces
+    // each entry out again as it is fixed.
     //
     // A group on the line *after* its element: `@file(readme.md)` then
     // `[ 説明 ]`. `skip_element_gap` continues while `newlines <= 1`, and
@@ -211,7 +196,7 @@ pub const KNOWN_TS_ERRORS: &[(&str, &[&str])] = &[
     // or without an explicit `prec.right` on the gap: `paragraph` is
     // `repeat1(seq(repeat1($._line_item), $._newline))`, so the newline is
     // taken as the paragraph's line separator before the element can
-    // consider it. Both were tried and reverted.
+    // consider it.
     //
     // Deciding needs lookahead *past* the newline and its indentation for
     // a `(`/`[`/`{`, which tree-sitter's internal lexer cannot do -- the
@@ -253,8 +238,8 @@ pub const KNOWN_TS_ERRORS: &[(&str, &[&str])] = &[
     // Named elements inside a group do parse -- that is what `children`
     // gained when the real parser learned `@element(c){ @args{ ... } }`.
     ("syntax/groups.tmt", &[ANY_ERROR]),
-    // Two unrelated gaps, both new to `tomet-parser` and neither ported to
-    // `grammar.js` yet:
+    // Two unrelated gaps, both in `tomet-parser` and neither in
+    // `grammar.js`:
     //
     // 1. `Value::Element` (`@name(...)` sitting where a value goes,
     //    e.g. `::meta(icon: @doc.icon("triangle"))`) has no grammar.js
@@ -262,15 +247,12 @@ pub const KNOWN_TS_ERRORS: &[(&str, &[&str])] = &[
     //    "element" alternative, so even the single-`@doc.icon` case
     //    errors.
     // 2. A positional entry mixed with named ones inside `(args)`
-    //    (`@ns.thing(a, pkg:"lucide")`) -- pre-existing and unrelated to
-    //    `Value::Element`, just never exercised against the grammar
-    //    before this fixture: `tomet-parser`'s `(a, key:value)` support
-    //    predates it, but nothing in the corpus used that shape until
-    //    now.
+    //    (`@ns.thing(a, pkg:"lucide")`) -- unrelated to
+    //    `Value::Element`: `tomet-parser` supports `(a, key:value)`, but
+    //    no other fixture in the corpus uses that shape.
     //
     // Fixing either needs `tree-sitter generate` to turn a `grammar.js`
-    // edit into `src/parser.c`, and that CLI was not available where this
-    // was written -- recorded rather than guessed at.
+    // edit into `src/parser.c`.
     ("syntax/value-element.tmt", &[ANY_ERROR]),
     // Same underlying gap as `syntax/value-element.tmt` just above
     // (`Value::Element` has no `grammar.js` counterpart) -- this fixture

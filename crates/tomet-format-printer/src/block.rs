@@ -53,12 +53,11 @@ pub(crate) fn render_block(block: &Block, config: &PrinterConfig, out: &mut Stri
         // would otherwise fall back to the full `@heading(...)` form for
         // exactly this case.
         //
-        // A list cannot join a paragraph this way any more: `List` is a
-        // first-class `Block` variant now, with no `Inline` form at all
+        // A list cannot join a paragraph this way: `List` is a
+        // first-class `Block` variant, with no `Inline` form at all
         // (see `tomet_ast::List`'s own doc comment), so it can never sit
         // as `p.content.first()` in the first place -- a list is always
-        // block-level, by construction, the same way a `Section` already
-        // was.
+        // block-level, by construction, the same way a `Section` is.
         Block::Paragraph(p)
             if matches!(
                 p.content.first(),

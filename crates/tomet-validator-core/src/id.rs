@@ -12,7 +12,7 @@ pub fn collect_ids(doc: &File) -> Vec<(String, Span)> {
 /// of each id's value, in document order.
 ///
 /// Mirrors [`collect_ids`]. No owner-kind allowlist or `@link` exclusion
-/// is needed the way the old `MAP_ENTRY`-scanning version needed both:
+/// is needed, as a `MAP_ENTRY`-scanning version would need both:
 /// an `ID_GROUP` node can only ever appear where `parse_groups`/
 /// `parse_connect` put one, so there is nothing else it could be mistaken
 /// for, and no attribute-key collision with `@link`'s own `id` argument

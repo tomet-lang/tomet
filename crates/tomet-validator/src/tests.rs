@@ -164,10 +164,8 @@ fn allow_list_resolves_a_namespaced_custom_element_via_bindings() {
 }
 
 /// A heading's own `::rule(...)` (`Section.connects`, not an
-/// `Element`'s) used to do nothing at all: `check_rule_connects` only
-/// ever looked at `el.connects` via `for_each_element`, and a
-/// `Section` is not an `Element`, so its connect was never checked
-/// against anything underneath the heading.
+/// `Element`'s) is checked against everything underneath the heading,
+/// though a `Section` is not an `Element`.
 #[test]
 fn a_heading_rule_with_only_allowed_descendants_is_clean() {
     let doc = parse("=[ Notes ]::rule(allow:(card))\n@card(title:\"a\")[ x ]\n");
@@ -198,12 +196,10 @@ fn a_typoed_connect_name_on_a_heading_is_reported() {
 
 /// The regression this whole group guards against: `rule` itself
 /// must never be classified as if it were an ordinary document
-/// element (`walk.rs`'s `walk_block` used to feed `Section.connects`
-/// through the generic element walker, which is what let `classify_in`
-/// -- a completely different check -- see `rule` and report it as an
-/// unbound name). Goes through `validate_document`, not
-/// `check_rule_connects` directly: that is the check this regresses,
-/// and the one `check_rule_connects`'s own tests cannot see.
+/// element, which would let the unbound-name check -- a completely
+/// different check -- see `rule` and report it. Goes through
+/// `validate_document`, not the rule-connect check directly: that
+/// check's own tests cannot see this.
 #[test]
 fn a_heading_rule_connect_is_not_misclassified_as_an_unknown_element() {
     let doc = parse("=[ Notes ]::rule(allow:(card))\n@card(title:\"a\")[ x ]\n");
@@ -332,7 +328,6 @@ fn a_run_of_double_colon_declarations_at_the_top_is_the_preamble() {
 
 #[test]
 fn the_two_spellings_share_one_preamble_and_one_singleton_count() {
-    // transitional: the old spelling still reads, and counts as the same element
     let errors = validate_document(&parse("::kind(note)\n::kind(note)\n"));
     assert!(
         errors
@@ -537,7 +532,7 @@ fn a_missing_required_argument_is_reported() {
 /// The whole point of `Value::Element`/`doc.icon`: an element embedded
 /// as another element's *argument value* (not its own `(args)`/
 /// `[content]`) still gets classified and checked, because
-/// `tomet_tree::for_each_element` now descends into `el.args` too.
+/// `tomet_tree::for_each_element` descends into `el.args` too.
 /// `validate_document` (no vault, `Bindings::default()`) is the exact
 /// path that motivated `doc` resolving unconditionally in
 /// `Bindings::classify`.
@@ -734,7 +729,7 @@ fn the_config_declarations_are_clean() {
     assert!(errors.is_empty(), "{errors:?}");
 }
 
-/// `::config` and `::settings` are gone: what they held is split into the declarations above.
+/// `::config` and `::settings` are not declarations: what they held is split into the declarations above.
 #[test]
 fn the_dissolved_config_and_settings_are_unknown_declarations() {
     for name in ["config", "settings"] {
@@ -754,11 +749,9 @@ fn the_dissolved_config_and_settings_are_unknown_declarations() {
 
 /// A document with `deck` in scope.
 ///
-/// These cases used to rely on a namespaced name passing
-/// unconditionally -- `classify_std_name` returned `Custom` for anything
-/// with a namespace, bound or not. That was the hole `Bindings`
-/// closed, so the namespace has to actually be in scope now, and
-/// saying so here is what keeps these tests about duplicate ids.
+/// A namespaced name passes only when its namespace is bound
+/// (`Bindings`), so the namespace has to actually be in scope here, and
+/// saying so is what keeps these tests about duplicate ids.
 fn with_deck() -> Bindings {
     let vocab = tomet_ast_parser::parse_file(
         "::kind(vocabulary)\n::vocabulary.deck()\n\n::element(task: {}, ref: {})\n",
@@ -875,7 +868,7 @@ fn test_validate_cst_exact_range() {
 #[test]
 fn validate_cst_counts_only_the_id_group_not_any_attribute_named_id() {
     // A literal `id:` key -- nested in a map, or `@link`'s own -- is
-    // ordinary data now, never this slot, so none of these count.
+    // ordinary data, never this slot, so none of these count.
     let src = "@a(){id: x}\n@b(){meta: {id: x}}\n@link[t](id: x)\n";
     let cst = tomet_cst_parser::parse_cst(src);
     assert!(validate_cst(&cst).is_empty());
@@ -1222,7 +1215,7 @@ fn a_declared_version_is_held_to_the_version_type() {
 }
 
 /// A `::meta` field declared `type: version` holds a bare `1.10` as the text it was
-/// written as; the other forms it checks are as before.
+/// written as.
 #[test]
 fn a_version_field_in_meta_reads_a_bare_number_as_text() {
     use std::collections::BTreeMap;

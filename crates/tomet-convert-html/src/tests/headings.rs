@@ -13,8 +13,8 @@ fn nested_inline_heading_falls_back_to_generic_rendering() {
     // inside a blockquote's content here) never renders as a real
     // An element nested inside another element's content falls to
     // `render_element`'s generic rendering, keyed on its kind name.
-    // (This used to be demonstrated with a nested `@heading`; headings
-    // are block-shaped now, so an inline one is not expressible.)
+    // (A nested `@heading` would not demonstrate this: headings are
+    // block-shaped, so an inline one is not expressible.)
     let doc = parse_file("@quote[ @deck.badge(2)[Nested] ]\n").unwrap();
     let body = render_body(&doc);
     assert_eq!(
@@ -189,7 +189,7 @@ fn a_document_without_headings_has_an_empty_outline() {
 
 #[test]
 fn the_outline_does_not_change_the_html() {
-    // render_body_with is now a thin wrapper; guard against it drifting.
+    // render_body_with is a thin wrapper; guard against it drifting.
     let doc = parse_file("=[ One ]\n\n==[ Two ]\n\ntext\n").unwrap();
     let options = RenderOptions {
         number_headings: true,

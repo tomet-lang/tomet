@@ -2,11 +2,11 @@
 //!
 //! Rust binding for the cotomet tree-sitter grammar (`grammar.js` at the crate
 //! root; `src/parser.c` etc. are generated from it by
-//! `npx tree-sitter-cli@0.26.12 generate`, then compiled by `build.rs`).
+//! `npx tree-sitter-cli@0.26.12 generate`, then compiled by the crate's build script).
 //!
 //! This grammar exists for editor syntax highlighting of a standalone cotomet
 //! file (`.ctmt`), not as a source of truth -- that is `cotomet`'s job. It
-//! is an approximation, and `tests/src/cotomet.rs` in the `tomet-tests` package
+//! is an approximation, and a test in the `tomet-tests` package
 //! runs a corpus through both to catch the two drifting apart. What it
 //! simplifies:
 //!

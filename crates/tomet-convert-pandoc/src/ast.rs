@@ -29,8 +29,7 @@ pub struct PandocDoc {
 /// compatible with.
 ///
 /// Pandoc compares major and minor and refuses input that disagrees, so
-/// this needs to follow Pandoc releases. The check lives in
-/// `tests/api_version.rs`, which runs only where a `pandoc` binary is
+/// this needs to follow Pandoc releases. The check is a test that runs only where a `pandoc` binary is
 /// actually installed.
 pub const PANDOC_API_VERSION: [u32; 3] = [1, 23, 1];
 

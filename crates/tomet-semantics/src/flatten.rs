@@ -257,7 +257,7 @@ mod tests {
 
     #[test]
     fn a_nested_map_adds_an_exact_copy_and_is_left_out_of_the_projection() {
-        // The bug this exists for: the HTML writer used to emit
+        // The bug this exists for: the HTML writer must not emit
         // `data-m=""` and lose `{ k: v }` entirely.
         let el = el_with(
             Some(map(&[

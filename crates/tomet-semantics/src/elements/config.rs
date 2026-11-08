@@ -132,7 +132,7 @@ fn process_export_path(v: &Value, config: &mut DocumentConfig) {
     }
 }
 
-/// Trims a plain path string. Non-string values (and the old
+/// Trims a plain path string. Non-string values (and the retired
 /// `file(...)`/`path(...)`/`{ file: ... }` wrapper forms) aren't
 /// meaningful here and return `None`.
 fn clean_path_value(v: &Value) -> Option<String> {

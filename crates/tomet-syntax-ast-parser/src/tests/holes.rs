@@ -200,7 +200,7 @@ fn a_box_that_does_not_close_is_text() {
 
 #[test]
 fn the_old_spelling_is_text() {
-    // `?name(...)` is gone; a `?` is an ordinary character again.
+    // `?name(...)` is not a spelling; a `?` is an ordinary character.
     for src in ["?(x)", "adr-?int(n)", "本当に?(はい)", "?()", "?int(n)"] {
         let doc = parse_file(src).unwrap();
         let [Block::Paragraph(p)] = doc.body.as_slice() else {

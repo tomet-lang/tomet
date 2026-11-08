@@ -12,8 +12,8 @@ pub struct TableRow {
     pub cells: Vec<TableCell>,
 }
 
-/// Parses table rows and cells from `@table`'s `[content]` (`Vec<Block>`
-/// now). The row/cell syntax (`[cell][cell]`) is literal text scanned
+/// Parses table rows and cells from `@table`'s `[content]` (`Vec<Block>`).
+/// The row/cell syntax (`[cell][cell]`) is literal text scanned
 /// character-by-character below, not real nested elements, so this just
 /// flattens every `Paragraph`'s own inline content into one sequence first
 /// -- there is realistically only ever one (no blank line inside a
@@ -65,7 +65,7 @@ fn parse_table_rows_inline(inlines: &[Inline]) -> Vec<TableRow> {
                 // characters) inside a cell, or a cell/row separator outside
                 // one, the same as any other whitespace character. Only the
                 // immediate next item is consulted for the wide-character
-                // check, matching the old fold, which only ever saw the
+                // check, the same as the fold, which only ever sees the
                 // characters within its own text run.
                 if in_cell {
                     let before = current_text_buf.chars().last();
