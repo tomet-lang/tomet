@@ -30,7 +30,7 @@
 //!
 //! =[ Not here ]
 //!
-//! - `::rule(...)`, a document-level rule: it exists as a name in a design memo only. `:rule`,
+//! - `::rule(...)`, a document-level rule: it exists as a name in a design memo only. `::rule`,
 //!   the connect on an element, is another concept.
 //! - A user vocabulary's preamble elements (`::character`): the vocabulary declares them.
 //! - AST-anchored diagnostics with source spans: they live in `tomet-validator-core`, which

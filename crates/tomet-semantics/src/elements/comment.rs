@@ -22,7 +22,7 @@ use tomet_tree::{Node, Place, Visit, element_new, walk_node_scoped};
 /// - A code span keeps its backticks, with a fence long enough for what is in it.
 /// - An `${...}` nobody evaluated is written as it was, the way a reader of the source would
 ///   find it. A hole is left out: it has no text until it is filled.
-/// - Markup around text (`@em[x]`) contributes its text. `(args)`, `{value}` and `:connect`s are
+/// - Markup around text (`@em[x]`) contributes its text. `(args)`, `{value}` and `::connect`s are
 ///   not part of what the content says, and are not read.
 ///
 /// An element with no content has no text: the empty string.
@@ -30,7 +30,7 @@ pub fn comment_text(el: ElementView<'_>) -> String {
     let state = RefCell::new(State::default());
     let mut enter = |node: Node<'_>, place: Place| {
         // Only the places where an element's content sits. Anything else (`(args)`, a `{value}`
-        // entry, a `:connect`) describes the element and is not text of it.
+        // entry, a `::connect`) describes the element and is not text of it.
         if !matches!(
             place,
             Place::Top

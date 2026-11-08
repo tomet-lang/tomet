@@ -264,7 +264,7 @@ fn test_format_element_group_order_nested() {
 
 #[test]
 fn test_format_element_group_order_with_value_and_connects() {
-    let src = "@link(\"https://example.com\")[Example]{rel: \"nofollow\"}:as(button)\n";
+    let src = "@link(\"https://example.com\")[Example]{rel: \"nofollow\"}::as(button)\n";
     let config = PrinterConfig {
         format: FormatConfig {
             group_order: Some(GroupOrder::ContentFirst),
@@ -275,7 +275,7 @@ fn test_format_element_group_order_with_value_and_connects() {
     let out = format_source_with_config(src, &config);
     assert_eq!(
         out,
-        "@link[Example](\"https://example.com\"){rel: \"nofollow\"}:as(button)\n"
+        "@link[Example](\"https://example.com\"){rel: \"nofollow\"}::as(button)\n"
     );
 }
 

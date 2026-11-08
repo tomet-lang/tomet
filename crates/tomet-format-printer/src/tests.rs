@@ -36,24 +36,24 @@ fn nested_inline_heading_does_not_reserialize_as_hash_sugar() {
 
 #[test]
 fn a_named_connect_round_trips_on_a_plain_element() {
-    let doc = tomet_ast_parser::parse_file("@section[ x ]:rule(allow: (card))\n").unwrap();
+    let doc = tomet_ast_parser::parse_file("@section[ x ]::rule(allow: (card))\n").unwrap();
     let printed = document_to_tm(&doc);
     assert!(printed.contains(":rule(allow: (card))"), "got: {printed:?}");
 }
 
 #[test]
 fn stacked_connects_round_trip_in_order() {
-    let doc = tomet_ast_parser::parse_file("@x(a: 1):as(y):rule(allow: (card))\n").unwrap();
+    let doc = tomet_ast_parser::parse_file("@x(a: 1)::as(y)::rule(allow: (card))\n").unwrap();
     let printed = document_to_tm(&doc);
     assert!(
-        printed.contains(":as(y):rule(allow: (card))"),
+        printed.contains(":as(y)::rule(allow: (card))"),
         "got: {printed:?}"
     );
 }
 
 #[test]
 fn a_named_connect_round_trips_on_a_heading() {
-    let doc = tomet_ast_parser::parse_file("=[ h ]:rule(allow: (card))\n").unwrap();
+    let doc = tomet_ast_parser::parse_file("=[ h ]::rule(allow: (card))\n").unwrap();
     let printed = document_to_tm(&doc);
     assert!(printed.contains(":rule(allow: (card))"), "got: {printed:?}");
 }
@@ -61,14 +61,14 @@ fn a_named_connect_round_trips_on_a_heading() {
 /// Defensive coverage for the early-returning special cases in
 /// `render_element` (`hr`/`raw`/`callout`), which would otherwise
 /// silently drop a `connects` field the parser never actually attaches
-/// to them in practice today -- a `:rule(...)` after e.g. a raw block is
+/// to them in practice today -- a `::rule(...)` after e.g. a raw block is
 /// syntactically legal even if unlikely. (`::meta` is a declaration, which
 /// takes no connect.)
 #[test]
 fn connects_survive_the_specially_printed_kinds() {
     for src in [
-        "@hr():rule(allow: (card))\n",
-        "@raw[x]:rule(allow: (card))\n",
+        "@hr()::rule(allow: (card))\n",
+        "@raw[x]::rule(allow: (card))\n",
     ] {
         let doc = tomet_ast_parser::parse_file(src).unwrap();
         let el = match &doc.body[0] {
@@ -86,7 +86,7 @@ fn connects_survive_the_specially_printed_kinds() {
 
 #[test]
 fn connects_survive_a_specially_styled_callout() {
-    let doc = tomet_ast_parser::parse_file("@callout(info)[x]:rule(allow: (card))\n").unwrap();
+    let doc = tomet_ast_parser::parse_file("@callout(info)[x]::rule(allow: (card))\n").unwrap();
     let cfg = PrinterConfig {
         format: FormatConfig {
             callout_content_style: Some("block".to_string()),
@@ -761,7 +761,7 @@ fn a_block_value_in_a_group_keeps_every_block_it_holds() {
 // --- a nexus is always printed on a primary group --------------------------
 
 /// An element with neither `(args)` nor `[content]` is printed `@name()`: bare, or with only its
-/// `{value}`, `#(id)` or a `:connect`, it would not read back.
+/// `{value}`, `#(id)` or a `::connect`, it would not read back.
 #[test]
 fn an_element_without_a_primary_group_is_printed_with_an_empty_one() {
     let value = Group::from_map(Value::Map(vec![("a".to_string(), Value::Int(1))]));
@@ -786,7 +786,7 @@ fn an_element_without_a_primary_group_is_printed_with_an_empty_one() {
         (bare, "@memo()"),
         (with_value, "@memo(){ a: 1 }"),
         (with_id, "@memo()#(x)"),
-        (with_connect, "@memo():rule(k: 1)"),
+        (with_connect, "@memo()::rule(k: 1)"),
     ] {
         let doc = File::new(Vec::new(), vec![Block::Element(el)], Span::dummy());
         let printed = document_to_tm(&doc);
@@ -822,7 +822,7 @@ fn a_named_connect_is_printed_on_a_primary_group() {
     });
     let doc = File::new(Vec::new(), vec![Block::Element(el)], Span::dummy());
     let printed = document_to_tm(&doc);
-    assert_eq!(printed.trim(), "@memo(a: 1):rule(){ k: 1 }");
+    assert_eq!(printed.trim(), "@memo(a: 1)::rule(){ k: 1 }");
     let again = tomet_ast_parser::parse_file(&printed).unwrap();
     let Block::Element(back) = &again.body[0] else {
         panic!("expected an element")
@@ -897,8 +897,8 @@ fn a_thematic_break_is_printed_as_dashes_and_never_as_a_bare_hr() {
 fn the_forms_that_stay_valid_round_trip() {
     for src in [
         "@table\n| a | b\n",
-        "@el(a: 1):{b: 2}\n",
-        "- item :{a: 1}\n",
+        "@el(a: 1)::{b: 2}\n",
+        "- item ::{a: 1}\n",
         "= heading {a: 1}\n",
         "- #(id)\n",
         "==#(id)\n",

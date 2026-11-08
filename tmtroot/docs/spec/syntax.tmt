@@ -111,15 +111,15 @@ a
 
 ```tmt
 - @link(ref:x) {id:breakfast}      // {id:breakfast} は @link 自身の value
-- @link(ref:x) :{id:breakfast}     // list item 自身の attrs
-- content :(x:1){y:2}              // bare connect は (args)/{value} どちらも、どちらが先でもよい
+- @link(ref:x) ::{id:breakfast}     // list item 自身の attrs
+- content ::(x:1){y:2}              // bare connect は (args)/{value} どちらも、どちらが先でもよい
 - content
-  :{y:2}                          // 空行1つまでなら次の行に置いてもよい
-- content :rule(allow:(card)) // named connect は list item にも直接付けられる
-= title :rule(allow:(card))   // 見出しの sugar form も同様
+  ::{y:2}                          // 空行1つまでなら次の行に置いてもよい
+- content ::rule(allow:(card)) // named connect は list item にも直接付けられる
+= title ::rule(allow:(card))   // 見出しの sugar form も同様
 ```
 
-`:name(...)`（named connect）の集合は閉じている。現在のメンバーは
+`::name(...)`（named connect）の集合は閉じている。現在のメンバーは
 `rule` のみ（`connects.index.tmt`参照）。`:[...]`（content への
 bare connect）は未実装（`roadmap`参照）。
 

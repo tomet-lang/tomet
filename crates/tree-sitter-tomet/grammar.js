@@ -128,7 +128,7 @@ module.exports = grammar({
               optional($._blank_gap),
               choice(
                 seq(
-                  optional(token(prec(1, ":"))),
+                  optional(token(prec(1, "::"))),
                   field("attrs", $.value_group),
                 ),
                 repeat1($.connect),
@@ -370,14 +370,14 @@ module.exports = grammar({
     // same as the other excluded characters -- it has no syntax at
     // all on its own, only `#(` does.
     // `:` is excluded for the same longest-match reason as the rest of
-    // this list: `:name(...)` (`connect`) and the bare `:(`/`:{` merge
-    // both start with a single-character `":"` token, but right after
+    // this list: `::name(...)` (`connect`) and the bare `::(`/`::{` merge
+    // both start with a two-character `"::"` token, but right after
     // an element, `text`'s regex is free to keep matching straight
-    // through a `:` into whatever ordinary words follow it (`:as`,
-    // `:rule`, ...) -- unlike the *bracket* characters above, `:` has
+    // through a `:` into whatever ordinary words follow it (`::as`,
+    // `::rule`, ...) -- unlike the *bracket* characters above, `:` has
     // no excluded character stopping that run early, so without this,
-    // the longer `text` match always won and no `:name(...)` (or even
-    // a bare `:{`/`:(` right after certain groups) was ever reachable.
+    // the longer `text` match always won and no `::name(...)` (or even
+    // a bare `::{`/`::(` right after certain groups) was ever reachable.
     // A bare `:` with nothing to attach to falls back to `punctuation`,
     // same as the other excluded characters.
     // `<` is excluded for the same longest-match reason: a box (`label`, `hole`) opens with it
@@ -645,18 +645,18 @@ module.exports = grammar({
       ),
     // ---- the nexus rule ---------------------------------------------
     //
-    // `@name`, `::name` and `:name` are nexus points: they take groups, and the
+    // `@name`, a `::name` declaration and a `::name` connect are nexus points: they take groups, and the
     // groups are not equal. `(args)`, `[content]` and a `|` run are the
     // *primary* groups; `{value}`, `#(id)` and a `:connect` only add to one
     // and cannot stand as the first group on their own. So `@name(...)` and
-    // `@name[...]` are elements, `@name{}`, `@name#(id)`, `@name:rule(...)`
+    // `@name[...]` are elements, `@name{}`, `@name#(id)`, `@name::rule(...)`
     // are errors, and a primary group may follow the secondary ones
     // (`@name{...}(...)`) as in the real parser. `tomet-parser`'s
     // `tomet-syntax-cst-parser` doc has the same rule in prose.
     //
     // Two shapes are exempt, both of the *inline* `@name` alone and neither a
     // nexus error in the real parser: no group at all is prose, and a nameless
-    // `:{...}` / `:(...)` connect is a plain group. This rule is the
+    // `::{...}` / `::(...)` connect is a plain group. This rule is the
     // only place the grammar says "primary first"; the three element-shaped
     // rules call it instead of repeating the groups.
     //
@@ -778,13 +778,13 @@ module.exports = grammar({
     // exactly as it was (a flat `seq`, not nested inside a further
     // `choice`) because `inline_element`'s own `prec.right(3, ...)`
     // was tuned against this exact shape; wrapping it changed which
-    // LALR states got merged and silently broke the bare `:{...}`/
-    // `:(...)` merge even after a preceding group (verified: it did,
+    // LALR states got merged and silently broke the bare `::{...}`/
+    // `::(...)` merge even after a preceding group (verified: it did,
     // empirically, during this feature's own development -- see
     // `.agents/tasks/rule-connect-mvp.md`). `connect` (below) is
     // therefore added as a *sibling* choice at each `repeat(...)`
     // call site instead of being folded into this rule.
-    // `token(prec(1, ":"))`, not a bare `":"`: the same reason
+    // `token(prec(1, "::"))`, not a bare `"::"`: the same reason
     // `args_group`'s opening `(` is wrapped the same way -- `:` is
     // now excluded from `text` (see that rule's comment) so it can
     // start a group/connect at all, but `punctuation` accepts a bare
@@ -793,11 +793,11 @@ module.exports = grammar({
     // tie to it.
     _element_group: ($) =>
       seq(
-        optional(token(prec(1, ":"))),
+        optional(token(prec(1, "::"))),
         choice($.args_group, $.content_group, $.marked_content, $.value_group),
       ),
-    // `:name(...)` -- one member of a closed family attached after an
-    // element (`@x(...):as(y):rule(...)`), e.g. `:rule(allow:(card))`.
+    // `::name(...)` -- one member of a closed family attached after an
+    // element (`@x(...)::as(y)::rule(...)`), e.g. `::rule(allow:(card))`.
     // Structurally an element in its own right (its own `args`/
     // `content`/`value`), just introduced by `:` instead of `@` --
     // mirrors `tomet-parser::element::parse_groups`'s named-connect
@@ -817,8 +817,8 @@ module.exports = grammar({
     // `#(...)` for itself the same way its own group-reading does.
     //
     // `prec.right(4, ...)` (higher than `inline_element`'s own
-    // `prec.right(3, ...)`): a bare group right after `:name` --
-    // `:rule(1)` -- is otherwise genuinely ambiguous between "the
+    // `prec.right(3, ...)`): a bare group right after `::name` --
+    // `::rule(1)` -- is otherwise genuinely ambiguous between "the
     // connect's own group" and "a fresh, colon-less group the
     // *outer* element's repeat happens to also accept" (both are
     // valid parses of the same text, differing only in which node
@@ -833,7 +833,7 @@ module.exports = grammar({
       prec.right(
         4,
         seq(
-          token(prec(1, ":")),
+          token(prec(1, "::")),
           field("name", $._element_name),
           repeat(choice($.value_group, $.id_group)),
           $._primary_group,

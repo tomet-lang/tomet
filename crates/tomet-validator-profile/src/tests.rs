@@ -69,7 +69,7 @@ fn an_expression_is_found_wherever_it_is_written() {
         ("an element's argument", "@note(k: ${self.path})\n"),
         ("a declaration's data", "::meta(k: ${self.path})\n"),
         ("a section's value", "=[ T ]{ k: ${self.path} }\n"),
-        ("a connect", "@note[ x ]:rule(k: ${self.path})\n"),
+        ("a connect", "@note[ x ]::rule(k: ${self.path})\n"),
     ];
     for (place, body) in positions {
         let source = format!("::profile(standalone)\n\n{body}");

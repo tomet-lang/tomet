@@ -232,7 +232,10 @@ fn every_level_has_its_heading_part() {
     let tome = build(&[
         ("self.tmt", "::kind(root)\n::meta(title: R)\n"),
         ("d/self.tmt", "::kind(dir)\n"),
-        ("d/f.tmt", "::kind(file)\n\n=[ Sec ]#(s1):meta(k: v)\n"),
+        (
+            "d/f.tmt",
+            "::kind(file)\n\n=[ Sec ]#(s1)::rule(allow: (x))\n",
+        ),
     ]);
     assert_eq!(declared(tome.node().heading()), Vec::<&str>::new());
     assert_eq!(

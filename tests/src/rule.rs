@@ -1,6 +1,6 @@
-//! Cross-crate coverage for `:rule(allow:(...), direct:@bool)`: the
+//! Cross-crate coverage for `::rule(allow:(...), direct:@bool)`: the
 //! `tests/fixtures/rule/*.tmt` fixtures are already exercised for parsing
-//! and rendering by `corpus`/`snapshot` (`:rule` renders invisibly
+//! and rendering by `corpus`/`snapshot` (`::rule` renders invisibly
 //! everywhere, so those targets alone cannot tell a passing document
 //! from a violating one) -- this is where the actual validator
 //! diagnostics get asserted.
@@ -73,7 +73,7 @@ fn heading_connect_fixture_has_no_rule_diagnostics() {
                 Diagnostic::DisallowedByRule { .. }
                     | Diagnostic::UnknownConnect { .. }
                     // Closes the blind spot that let a heading's own
-                    // `:rule(...)` report a false `unknown element
+                    // `::rule(...)` report a false `unknown element
                     // \`rule\`` go unnoticed: `Section.connects` used to
                     // reach the generic "is this name bound" check via
                     // `walk.rs`'s `walk_block`, same as an ordinary
@@ -96,7 +96,7 @@ fn heading_descendants_fixture_reports_the_disallowed_one() {
     // allow-list against a heading's own `section.blocks` --
     // `check_rule_connects` used to only ever reach an `Element`'s own
     // `connects`, and a `Section` is not an `Element`, so a heading's
-    // `:rule(...)` never checked anything at all before this fixture's
+    // `::rule(...)` never checked anything at all before this fixture's
     // task fixed that.
     let doc = parse_fixture("heading-descendants.tmt");
     let errors = validate_document(&doc);
@@ -114,7 +114,7 @@ fn heading_descendants_fixture_reports_the_disallowed_one() {
 #[test]
 fn rule_allows_plain_items_and_tasks_when_specified() {
     let doc = tomet_ast_parser::parse_file(
-        "=[ Tasks ]:rule(allow:(item, task))\n- plain item\n-@task[ task item ]\n",
+        "=[ Tasks ]::rule(allow:(item, task))\n- plain item\n-@task[ task item ]\n",
     )
     .expect("parses");
     let errors = validate_document(&doc);
@@ -128,7 +128,7 @@ fn rule_allows_plain_items_and_tasks_when_specified() {
 #[test]
 fn rule_reports_disallowed_plain_item_when_only_task_is_allowed() {
     let doc = tomet_ast_parser::parse_file(
-        "=[ Tasks ]:rule(allow:(task))\n- plain item\n-@task[ task item ]\n",
+        "=[ Tasks ]::rule(allow:(task))\n- plain item\n-@task[ task item ]\n",
     )
     .expect("parses");
     let errors = validate_document(&doc);

@@ -70,7 +70,7 @@ fn list_item_ending_in_an_element_does_not_error_on_a_trailing_brace() {
     // `docs/spec/syntax.tmt`'s `##[ コネクト ]`): a
     // *bare* `{...}` still always belongs to the element (matches
     // how the same input already behaves with no list item involved
-    // at all), but a *colon-prefixed* `:{...}` is reserved for the
+    // at all), but a *colon-prefixed* `::{...}` is reserved for the
     // item itself, specifically so `id:breakfast` here can be the
     // item's own metadata rather than forced onto `@link`.
     let bare = "- @link(ref:x) {id:breakfast}\n";
@@ -99,8 +99,8 @@ fn list_item_ending_in_an_element_does_not_error_on_a_trailing_brace() {
     }
 
     for src in [
-        "- @link(ref:x) :{id:breakfast}\n",
-        "- @link(ref:@other) :{id:breakfast}\n",
+        "- @link(ref:x) ::{id:breakfast}\n",
+        "- @link(ref:@other) ::{id:breakfast}\n",
     ] {
         let doc = parse_file(src).unwrap_or_else(|e| panic!("{src:?} failed: {e}"));
         match &doc.body[0] {
@@ -134,12 +134,12 @@ fn list_item_ending_in_an_element_does_not_error_on_a_trailing_brace() {
 #[test]
 fn list_item_colon_connect_supports_an_empty_braced_value() {
     // The `docs/spec/syntax.tmt` `##[ コネクト ]` example this
-    // feature implements (`- () xxxxxx :{}`) uses an *empty* `{}` for
+    // feature implements (`- () xxxxxx ::{}`) uses an *empty* `{}` for
     // its item-level attrs -- `element.rs::parse_value_group` (the same
     // reader a trailing sugar connect's `{value}` now goes through)
     // already special-cases an empty body into an empty map rather than
     // erroring, so this just confirms the sugar path inherits that.
-    let doc = parse_file("- () xxxxxx :{}\n").unwrap();
+    let doc = parse_file("- () xxxxxx ::{}\n").unwrap();
     match &doc.body[0] {
         Block::List(list) => {
             let items = &list.items;
@@ -248,12 +248,12 @@ fn parses_ordered_list() {
 
 #[test]
 fn full_form_list_item_supports_a_bare_trailing_connect() {
-    // `ConnectMode::Bare`: a full-form item's own `:(...)`/`:{...}` now
+    // `ConnectMode::Bare`: a full-form item's own `::(...)`/`::{...}` now
     // merges into its own `args`/`value`, the same arms `@name` already
     // uses for this -- previously `allow_colon_connect` was hardcoded
     // `false` for the item's own groups, so none of these forms attached
     // anywhere; the trailing `:...` became literal text instead.
-    let doc = parse_file("- [ content ]:(x: 1)\n").unwrap();
+    let doc = parse_file("- [ content ]::(x: 1)\n").unwrap();
     match &doc.body[0] {
         Block::List(list) => {
             let items = &list.items;
@@ -265,7 +265,7 @@ fn full_form_list_item_supports_a_bare_trailing_connect() {
         other => panic!("expected list, got {other:?}"),
     }
 
-    let doc = parse_file("- [ content ]:{y: 2}\n").unwrap();
+    let doc = parse_file("- [ content ]::{y: 2}\n").unwrap();
     match &doc.body[0] {
         Block::List(list) => {
             let items = &list.items;
@@ -277,11 +277,11 @@ fn full_form_list_item_supports_a_bare_trailing_connect() {
         other => panic!("expected list, got {other:?}"),
     }
 
-    // Combined `:(){}`: the colon only has to precede the first group --
+    // Combined `::(){}`: the colon only has to precede the first group --
     // the second is claimed by the item's own, still-empty slot the same
     // way it would be with no colon at all (see `parse_groups_with_pipe_stack`'s
     // colon branch).
-    let doc = parse_file("- [ content ]:(x: 1){y: 2}\n").unwrap();
+    let doc = parse_file("- [ content ]::(x: 1){y: 2}\n").unwrap();
     match &doc.body[0] {
         Block::List(list) => {
             let items = &list.items;
@@ -302,9 +302,9 @@ fn full_form_list_item_supports_a_bare_trailing_connect() {
 fn full_form_list_item_supports_a_named_connect() {
     // A list item's own groups now take the full connect branch, same as
     // `@name`'s or a heading's -- `element_list_item` carries `connects`
-    // too, so `:rule(...)` attaches to the item instead of becoming
+    // too, so `::rule(...)` attaches to the item instead of becoming
     // literal trailing text.
-    let doc = parse_file("- [ content ]:rule(allow: (card))\n").unwrap();
+    let doc = parse_file("- [ content ]::rule(allow: (card))\n").unwrap();
     match &doc.body[0] {
         Block::List(list) => {
             let items = &list.items;
@@ -325,11 +325,11 @@ fn full_form_list_item_supports_a_named_connect() {
 
 #[test]
 fn a_trailing_connect_may_hold_a_pipe_run_on_the_same_line() {
-    // `:note| text` is `[content]` spelled without brackets: the connect `note` holds `text`, whether
+    // `::note| text` is `[content]` spelled without brackets: the connect `note` holds `text`, whether
     // the item's own text is bracket-less (`- item`) or the connect follows a group.
     for src in [
-        "- item :note| the note text\n",
-        "- item :rule(allow: x)| the note text\n",
+        "- item ::note| the note text\n",
+        "- item ::rule(allow: x)| the note text\n",
     ] {
         let doc = parse_file(src).unwrap();
         let Block::List(list) = &doc.body[0] else {
@@ -363,10 +363,10 @@ fn mixed_list_markers_split_into_separate_lists() {
 fn combine_notation_reads_a_named_item_with_content_and_connects() {
     // `-@name(...)` -- the combine notation. `item.element` ends up a
     // real, named `Element`, exactly like a standalone `@task(...)`
-    // would produce, with its own `[content]`, bare `:(){}` merge, and
-    // named `:rule(...)` connect all landing on it directly -- no
+    // would produce, with its own `[content]`, bare `::(){}` merge, and
+    // named `::rule(...)` connect all landing on it directly -- no
     // marker, no second grammar.
-    let doc = parse_file("-@task()[content]:rule(allow:(card))\n").unwrap();
+    let doc = parse_file("-@task()[content]::rule(allow:(card))\n").unwrap();
     match &doc.body[0] {
         Block::List(list) => {
             let items = &list.items;
@@ -387,9 +387,9 @@ fn combine_notation_reads_a_named_item_with_content_and_connects() {
 
 #[test]
 fn combine_notation_supports_a_bare_trailing_connect() {
-    // `:(){}` merges into the combine item's own `args`/`value`, the same
-    // slot a standalone `@task():(x: 1){y: 2}` would use.
-    let doc = parse_file("-@task():(x: 1){y: 2}\n").unwrap();
+    // `::(){}` merges into the combine item's own `args`/`value`, the same
+    // slot a standalone `@task()::(x: 1){y: 2}` would use.
+    let doc = parse_file("-@task()::(x: 1){y: 2}\n").unwrap();
     match &doc.body[0] {
         Block::List(list) => {
             let item = &list.items[0];

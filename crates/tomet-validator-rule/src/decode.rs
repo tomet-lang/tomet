@@ -1,9 +1,9 @@
-//! Decodes a `:rule(allow:(...), direct:@bool)` connect's own
+//! Decodes a `::rule(allow:(...), direct:@bool)` connect's own
 //! `args` into a usable [`RuleArgs`].
 
 use tomet_ast::{Connect, Name, Value};
 
-/// The decoded arguments of one `:rule(...)` connect.
+/// The decoded arguments of one `::rule(...)` connect.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RuleArgs {
     /// The names `allow:(...)` named, in source order. Never checked
@@ -15,7 +15,7 @@ pub struct RuleArgs {
     pub direct: bool,
 }
 
-/// Reads `connect.data.args` for a `:rule(...)` connect, or `None` if the
+/// Reads `connect.data.args` for a `::rule(...)` connect, or `None` if the
 /// shape isn't recognized.
 pub fn decode_rule_args(connect: &Connect) -> Option<RuleArgs> {
     let Some(Value::Map(entries)) = &connect.data.args else {
@@ -74,7 +74,7 @@ mod tests {
 
     #[test]
     fn decodes_allow_and_defaults_direct_to_false() {
-        let connect = parse_connect("@x[a]:rule(allow: (card))\n");
+        let connect = parse_connect("@x[a]::rule(allow: (card))\n");
         assert_eq!(
             decode_rule_args(&connect),
             Some(RuleArgs {
@@ -86,7 +86,7 @@ mod tests {
 
     #[test]
     fn decodes_multiple_allow_entries_including_namespaced_ones() {
-        let connect = parse_connect("@x[a]:rule(allow: (card, ns.mycard), direct: true)\n");
+        let connect = parse_connect("@x[a]::rule(allow: (card, ns.mycard), direct: true)\n");
         assert_eq!(
             decode_rule_args(&connect),
             Some(RuleArgs {
@@ -98,7 +98,7 @@ mod tests {
 
     #[test]
     fn missing_allow_is_none() {
-        let connect = parse_connect("@x[a]:rule(direct: true)\n");
+        let connect = parse_connect("@x[a]::rule(direct: true)\n");
         assert_eq!(decode_rule_args(&connect), None);
     }
 
@@ -115,7 +115,7 @@ mod tests {
 
     #[test]
     fn enum_is_written_the_same_way_as_list() {
-        let connect = parse_connect("@x[a]:rule(allow: enum(card))\n");
+        let connect = parse_connect("@x[a]::rule(allow: enum(card))\n");
         assert_eq!(
             decode_rule_args(&connect),
             Some(RuleArgs {
@@ -127,13 +127,13 @@ mod tests {
 
     #[test]
     fn allow_with_another_callee_is_none() {
-        let connect = parse_connect("@x[a]:rule(allow: lst(card))\n");
+        let connect = parse_connect("@x[a]::rule(allow: lst(card))\n");
         assert_eq!(decode_rule_args(&connect), None);
     }
 
     #[test]
     fn allow_not_a_call_is_none() {
-        let connect = parse_connect("@x[a]:rule(allow: card)\n");
+        let connect = parse_connect("@x[a]::rule(allow: card)\n");
         assert_eq!(decode_rule_args(&connect), None);
     }
 }

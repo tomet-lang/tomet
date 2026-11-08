@@ -411,15 +411,26 @@ fn form_attachment_offset(text: &str) -> Option<usize> {
     if trimmed.starts_with(['(', '[', '{', '|']) || trimmed.starts_with("#(") {
         return Some(indent);
     }
-    if indent == 0
-        && let Some(after_colon) = trimmed.strip_prefix(':')
-    {
-        let after_name = skip_tomet_name(after_colon).unwrap_or(after_colon);
-        if after_name.starts_with(['(', '[', '{', '|']) {
-            return Some(0);
-        }
+    if indent == 0 && opens_connect(trimmed, false) {
+        return Some(0);
     }
     None
+}
+
+/// Whether `s` starts a connect: `::name(...)`, `::{...}`, or the retired `:name(...)`, which
+/// the parser still reads as one (to refuse it). On the line after its owner only the retired
+/// one is: a `::` at the start of a line is a declaration.
+fn opens_connect(s: &str, next_line: bool) -> bool {
+    let Some(after_colon) = s.strip_prefix(':') else {
+        return false;
+    };
+    let after_colon = match after_colon.strip_prefix(':') {
+        Some(_) if next_line => return false,
+        Some(rest) => rest,
+        None => after_colon,
+    };
+    let after_name = skip_tomet_name(after_colon).unwrap_or(after_colon);
+    after_name.starts_with(['(', '[', '{', '|'])
 }
 
 fn is_at_form_trigger(after_at: &str, has_next_on_line: bool) -> bool {
@@ -430,7 +441,7 @@ fn is_at_form_trigger(after_at: &str, has_next_on_line: bool) -> bool {
     if after_ws.is_empty() {
         return has_next_on_line;
     }
-    if starts_with_form_group_or_connect(after_ws) {
+    if starts_with_form_group_or_connect(after_ws, false) {
         return true;
     }
     if let Some(next_line) = after_ws
@@ -438,24 +449,18 @@ fn is_at_form_trigger(after_at: &str, has_next_on_line: bool) -> bool {
         .or_else(|| after_ws.strip_prefix('\n'))
     {
         let nl = next_line.trim_start_matches([' ', '\t']);
-        if starts_with_form_group_or_connect(nl) {
+        if starts_with_form_group_or_connect(nl, true) {
             return true;
         }
     }
     false
 }
 
-fn starts_with_form_group_or_connect(s: &str) -> bool {
+fn starts_with_form_group_or_connect(s: &str, next_line: bool) -> bool {
     if s.starts_with(['(', '[', '{', '|']) || s.starts_with("#(") {
         return true;
     }
-    if let Some(after_colon) = s.strip_prefix(':') {
-        let after_name = skip_tomet_name(after_colon).unwrap_or(after_colon);
-        if after_name.starts_with(['(', '[', '{', '|']) {
-            return true;
-        }
-    }
-    false
+    opens_connect(s, next_line)
 }
 
 fn is_dollar_interp_trigger(after_dollar: &str) -> bool {

@@ -17,7 +17,7 @@
 //!
 //! A form (`BLOCK_FORM`, `INLINE_FORM`) is a `SIGIL` followed by
 //! its groups -- `ARGS` `( )`, `VALUE_DATA` `{ }`, `CONTENT` `[ ]`, at most
-//! one of each -- then any `CONNECT` (`:name(...)`). A form is a nexus, which stands on
+//! one of each -- then any `CONNECT` (`::name(...)`). A form is a nexus, which stands on
 //! `ARGS` or `CONTENT`; see the crate docs for the grammar of one, and for what is text.
 //! `${ ... }` is an `INTERP_EXPR`. Inside `ARGS`/`VALUE_DATA` an entry is a
 //! `MAP_ENTRY` (`key: value`) or a `SEQ_ITEM`, and nested groups are
@@ -137,7 +137,7 @@ struct CstParser<'a, 't> {
     tokens: &'t [(SyntaxKind, &'a str)],
     pos: usize,
     builder: GreenNodeBuilder<'static>,
-    /// Whether a form may claim a `:name(...)` group that follows it.
+    /// Whether a form may claim a `::name(...)` group that follows it.
     /// A list item's own top-level form may not: the group is the item's.
     allow_connect: bool,
     /// Whether the block grammar currently being parsed (via
@@ -805,7 +805,7 @@ impl<'a, 't> CstParser<'a, 't> {
     /// After a form's name (index `i`): does a group, a `:` connect, or
     /// a `#(id)` follow, so that it is a form and not plain text?
     ///
-    /// Only what [`CstParser::parse_groups`] would take counts: a `:name` with no group
+    /// Only what [`CstParser::parse_groups`] would take counts: a `::name` with no group
     /// after it is not a connect (`@alice:bob`), and a connect where none is allowed is
     /// text. A bare `@name` is prose, and a form that takes nothing would not be one.
     fn groups_follow(&self, i: usize) -> bool {
@@ -945,7 +945,7 @@ impl<'a, 't> CstParser<'a, 't> {
                     Some(K::L_BRACKET) => !seen[1],
                     Some(K::L_BRACE) => !seen[2],
                     Some(K::HASH) => !seen_id && self.id_follows(k),
-                    Some(K::COLON) => self.connect_follows(k),
+                    Some(K::COLON) => self.connect_follows_on_next_line(k),
                     _ => false,
                 };
                 if free {
@@ -976,7 +976,7 @@ impl<'a, 't> CstParser<'a, 't> {
                     }
                 }
                 Some(K::COLON) => {
-                    let mut e = j + 1;
+                    let mut e = j + self.connect_colons(j).unwrap_or(1);
                     if self.name_at(e) {
                         e += self.name_tokens_at(e);
                     }
@@ -1074,7 +1074,7 @@ impl<'a, 't> CstParser<'a, 't> {
         match self.kind_at(k) {
             Some(K::L_PAREN | K::L_BRACKET | K::L_BRACE) => true,
             Some(K::HASH) => self.id_follows(k),
-            Some(K::COLON) => self.allow_connect && self.connect_follows(k),
+            Some(K::COLON) => self.allow_connect && self.connect_follows_on_next_line(k),
             Some(K::PIPE) => self.pipe_follows_line(newline),
             _ => false,
         }
@@ -1285,7 +1285,7 @@ impl<'a, 't> CstParser<'a, 't> {
         }
         if sugar {
             self.parse_sugar_tail();
-            // A `:connect` on the line after the heading is the heading's own.
+            // A `::connect` on the line after the heading is the heading's own.
             let k = self.skip_ws_from(self.pos);
             if self.kind_at(k) == Some(K::COLON) && self.connect_follows(k) {
                 self.bump_while(K::WHITESPACE);
@@ -1307,7 +1307,7 @@ impl<'a, 't> CstParser<'a, 't> {
     }
 
     /// The rest of a bracket-less body (`= text`, `- text`): the text, and the
-    /// groups it ends in -- `#(id)`, `{value}`, `:connect` -- which are the owner's,
+    /// groups it ends in -- `#(id)`, `{value}`, `::connect` -- which are the owner's,
     /// not the text's.
     ///
     /// Where they begin is the leftmost place from which the groups read to the end
@@ -2018,7 +2018,7 @@ impl<'a, 't> CstParser<'a, 't> {
         // which may span lines, inside one node. `allow_connect` is left
         // as whatever the caller already had (true unless we are nested
         // inside something that disabled it), so a full-form item's own
-        // trailing `:name(...)`/`:(...)`/`:{...}` -- immediately after
+        // trailing `::name(...)`/`::(...)`/`::{...}` -- immediately after
         // its closing bracket, nothing else there to claim it -- attaches
         // to the item itself, the same as any other sigil's groups do.
         let sugar = self.list_item_is_sugar();
@@ -2031,7 +2031,7 @@ impl<'a, 't> CstParser<'a, 't> {
         } else {
             // The rest of the line -- plain trailing text for a full-form
             // item -- must not let an inner form (`@link` in
-            // `- @link(ref:x) :{ id: b }`) steal a colon connect meant for
+            // `- @link(ref:x) ::{ id: b }`) steal a colon connect meant for
             // the item: `connect_joins_the_form` depends on this staying
             // `false` here.
             let outer = self.allow_connect;
@@ -2055,7 +2055,7 @@ impl<'a, 't> CstParser<'a, 't> {
             self.parse_inline(InlineStop::Line);
             self.allow_connect = outer;
         }
-        // A `:connect` on the line after the item is the item's own, with the
+        // A `::connect` on the line after the item is the item's own, with the
         // groups that follow it on that line.
         let k = self.skip_ws_from(self.pos);
         if self.allow_connect && self.kind_at(k) == Some(K::COLON) && self.connect_follows(k) {
@@ -2515,7 +2515,7 @@ impl<'a, 't> CstParser<'a, 't> {
     }
 
     /// A form's `(args)`, `{value}` and `[content]` (at most one of each,
-    /// in any order), then its `#(id)` slot, then its `:name(...)` connects.
+    /// in any order), then its `#(id)` slot, then its `::name(...)` connects.
     ///
     /// No ordering is enforced between `#(id)` and the other three groups,
     /// mirroring the AST-path parser's `parse_groups` -- only "before any
@@ -2545,7 +2545,7 @@ impl<'a, 't> CstParser<'a, 't> {
                     Some(K::L_BRACKET) => !content,
                     Some(K::L_BRACE) => !value,
                     Some(K::HASH) => !id && self.id_follows(k),
-                    Some(K::COLON) => self.allow_connect && self.connect_follows(k),
+                    Some(K::COLON) => self.allow_connect && self.connect_follows_on_next_line(k),
                     _ => false,
                 };
                 if free {
@@ -2688,22 +2688,54 @@ impl<'a, 't> CstParser<'a, 't> {
         self.builder.finish_node();
     }
 
-    fn connect_follows(&self, colon: usize) -> bool {
-        let mut e = colon + 1;
+    /// How many `:` open the connect that starts at `colon` -- 2 for `::name(...)` and `::{...}`,
+    /// 1 for the retired `:name(...)` -- if a connect starts there: a name, if there is one, and
+    /// then a group.
+    ///
+    /// The single colon is still read as a connect, so that lowering can refuse it and say what
+    /// to write; it is not text.
+    fn connect_colons(&self, colon: usize) -> Option<usize> {
+        if self.kind_at(colon) != Some(K::COLON) {
+            return None;
+        }
+        let colons = if self.kind_at(colon + 1) == Some(K::COLON) {
+            2
+        } else {
+            1
+        };
+        let mut e = colon + colons;
         if self.name_at(e) {
             e += self.name_tokens_at(e);
         }
-        Self::is_opener(self.kind_at(e))
+        Self::is_opener(self.kind_at(e)).then_some(colons)
+    }
+
+    fn connect_follows(&self, colon: usize) -> bool {
+        self.connect_colons(colon).is_some()
+    }
+
+    /// Whether the connect at `colon` may stand on the line after its owner: the retired
+    /// `::name(...)`, and a nameless `::{...}` / `::(...)`. A `::name` at the start of a line is
+    /// a declaration, and says so by its name.
+    fn connect_follows_on_next_line(&self, colon: usize) -> bool {
+        match self.connect_colons(colon) {
+            Some(1) => true,
+            Some(_) => !self.name_at(colon + 2),
+            None => false,
+        }
     }
 
     fn parse_connect(&mut self, strict: bool) {
         self.builder.start_node(K::CONNECT.into());
         self.bump(); // ':'
+        if self.current_kind() == Some(K::COLON) {
+            self.bump(); // the second ':' of '::'
+        }
         if self.name_at(self.pos) {
             self.parse_name_node();
         }
         // The groups of a connect are a form's: `(args)`, `{value}` and
-        // `[content]` in any order, each once -- but not a sibling `:connect`,
+        // `[content]` in any order, each once -- but not a sibling `::connect`,
         // which stays for the loop this was called from.
         let outer = std::mem::replace(&mut self.allow_connect, false);
         self.parse_groups(false, strict);
@@ -2912,7 +2944,7 @@ mod tests {
             "::config{ format: json }\n",
             "- item 1\n- item 2\n-. ordered 1\n\n```rust\nfn main() {}\n```\n",
             "// Comment line\n@card(id: 123){ priority: high }[ Note ]\n",
-            "=[ A ]=\n== B ==\n=\n---\n---[ x ]---\n\ntext ${a.b} $f(x) @l[t](ref:y):rule(a)\n",
+            "=[ A ]=\n== B ==\n=\n---\n---[ x ]---\n\ntext ${a.b} $f(x) @l[t](ref:y)::rule(a)\n",
             // Unterminated everything: still lossless.
             "@a(b: {c: [1, 2\n=[ open\n${ x\n@f[ never closed",
             "",
@@ -3130,7 +3162,7 @@ mod tests {
 
     #[test]
     fn connect_joins_the_form() {
-        let root = parse_cst("@link[x](ref:y):rule(allow: (a))\n");
+        let root = parse_cst("@link[x](ref:y)::rule(allow: (a))\n");
         let el = find(&root, K::BLOCK_FORM).unwrap();
         assert_eq!(
             child_kinds(&el),
@@ -3138,10 +3170,10 @@ mod tests {
         );
         assert_eq!(
             find(&el, K::CONNECT).unwrap().text().to_string(),
-            ":rule(allow: (a))"
+            "::rule(allow: (a))"
         );
         // A list item's own trailing group is not claimed by its form.
-        let root = parse_cst("- @link(ref:x) :{ id: b }\n");
+        let root = parse_cst("- @link(ref:x) ::{ id: b }\n");
         let el = find(&root, K::INLINE_FORM).unwrap();
         assert_eq!(count(&el, K::CONNECT), 0);
     }
@@ -3154,13 +3186,43 @@ mod tests {
         // `parse_list_item` only disables `allow_connect` for the rest
         // of the line (the sugar/trailing-text scan), not for the item's
         // own groups.
-        let root = parse_cst("- [ x ]:rule(allow: (a))\n");
+        let root = parse_cst("- [ x ]::rule(allow: (a))\n");
         let item = find(&root, K::LIST_ITEM).unwrap();
         assert_eq!(count(&item, K::CONNECT), 1);
         assert_eq!(
             find(&item, K::CONNECT).unwrap().text().to_string(),
-            ":rule(allow: (a))"
+            "::rule(allow: (a))"
         );
+    }
+
+    #[test]
+    fn a_connect_opens_with_two_colons() {
+        let root = parse_cst("@x(a)::rule(b)::{c: 1}\n");
+        let el = find(&root, K::BLOCK_FORM).unwrap();
+        assert_eq!(
+            child_kinds(&el),
+            [K::SIGIL, K::ARGS, K::CONNECT, K::CONNECT]
+        );
+        let connects: Vec<_> = el
+            .children()
+            .filter(|n| n.kind() == K::CONNECT)
+            .map(|n| n.text().to_string())
+            .collect();
+        assert_eq!(connects, ["::rule(b)", "::{c: 1}"]);
+        // The retired single colon is still a connect in the tree, for lowering to refuse.
+        let root = parse_cst("@x(a):rule(b)\n");
+        let connect = find(&root, K::CONNECT).unwrap();
+        assert_eq!(connect.text().to_string(), ":rule(b)");
+    }
+
+    #[test]
+    fn a_double_colon_name_on_the_next_line_is_a_declaration_not_a_connect() {
+        let root = parse_cst("@x(a)\n::rule(b)\n");
+        assert_eq!(count(&root, K::CONNECT), 0);
+        assert_eq!(child_kinds(&root), [K::BLOCK_FORM, K::BLOCK_FORM]);
+        // Nameless, it cannot be one, so it is the connect of the line above.
+        let root = parse_cst("@x(a)\n::{b: 1}\n");
+        assert_eq!(count(&root, K::CONNECT), 1);
     }
 
     #[test]
@@ -3244,7 +3306,11 @@ mod tests {
 
     #[test]
     fn a_connect_can_carry_its_own_id_group() {
-        let el = find(&parse_cst("@memo:rule(allow: (card))#(myid)\n"), K::CONNECT).unwrap();
+        let el = find(
+            &parse_cst("@memo::rule(allow: (card))#(myid)\n"),
+            K::CONNECT,
+        )
+        .unwrap();
         assert_eq!(child_kinds(&el), [K::NAME, K::ARGS, K::ID_GROUP]);
     }
 
@@ -3282,7 +3348,7 @@ mod tests {
 
     #[test]
     fn a_declaration_takes_groups_and_connects_like_an_at_form() {
-        let src = "::x(a)[ b ]{ c: 1 }#(i):rule(allow:(k))\n";
+        let src = "::x(a)[ b ]{ c: 1 }#(i)::rule(allow:(k))\n";
         let root = parse_cst(src);
         assert_eq!(root.text().to_string(), src);
         let el = find(&root, K::BLOCK_FORM).unwrap();

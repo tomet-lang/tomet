@@ -1,7 +1,7 @@
 //! The nexus rule, held against the shared corpus.
 //!
-//! A nexus -- `@name`, `:name`, `::name` -- needs a primary group: `(args)`,
-//! `[content]`, or a `|` run. `{value}`, `#(id)` and a `:connect` only add to
+//! A nexus -- `@name`, a `::name` declaration or connect -- needs a primary group: `(args)`,
+//! `[content]`, or a `|` run. `{value}`, `#(id)` and a `::connect` only add to
 //! one and cannot stand alone. The grammar lives in `tomet-cst-parser` and
 //! `tomet-ast-parser`; this target pins it from the outside, with the corpus:
 //!
@@ -60,22 +60,22 @@ const REJECTED: &[(&str, &str, &str)] = &[
     (
         "syntax/nexus-invalid-connect-args.tmt",
         "3:1",
-        "`:connect` cannot stand without one",
+        "`::connect` cannot stand without one",
     ),
     (
         "syntax/nexus-invalid-connect-data.tmt",
         "3:1",
-        "`:connect` cannot stand without one",
+        "`::connect` cannot stand without one",
     ),
     (
         "syntax/nexus-invalid-connect-name-data.tmt",
         "3:8",
-        "`:rule` needs a primary group",
+        "`::rule` needs a primary group",
     ),
     (
         "syntax/nexus-invalid-connect-named.tmt",
         "3:1",
-        "`:connect` cannot stand without one",
+        "`::connect` cannot stand without one",
     ),
     (
         "syntax/nexus-invalid-data-and-id.tmt",
@@ -110,7 +110,7 @@ const REJECTED: &[(&str, &str, &str)] = &[
     (
         "syntax/nexus-invalid-heading-connect.tmt",
         "3:",
-        "`:rule` needs a primary group",
+        "`::rule` needs a primary group",
     ),
     (
         "syntax/nexus-invalid-id-only.tmt",
@@ -130,7 +130,7 @@ const REJECTED: &[(&str, &str, &str)] = &[
     (
         "syntax/nexus-invalid-list-item-connect.tmt",
         "3:",
-        "`:rule` needs a primary group",
+        "`::rule` needs a primary group",
     ),
 ];
 
@@ -217,16 +217,16 @@ fn an_inline_at_name_with_a_secondary_group_is_an_error() {
         ("text @name{} more\n", "`{...}` cannot stand without one"),
         ("text @name#(id) more\n", "`#(id)` cannot stand without one"),
         (
-            "text @name:rule(a) more\n",
-            "`:connect` cannot stand without one",
+            "text @name::rule(a) more\n",
+            "`::connect` cannot stand without one",
         ),
         (
-            "text @name:{ a: 1 } more\n",
-            "`:connect` cannot stand without one",
+            "text @name::{ a: 1 } more\n",
+            "`::connect` cannot stand without one",
         ),
         (
-            "text @name:(a) more\n",
-            "`:connect` cannot stand without one",
+            "text @name::(a) more\n",
+            "`::connect` cannot stand without one",
         ),
     ] {
         let err = parse_file(src)
@@ -243,12 +243,12 @@ fn an_inline_at_name_with_a_secondary_group_is_an_error() {
 fn the_exceptions_still_parse() {
     for src in [
         // A nameless connect puts data into the host it follows.
-        "- 項目 :{ k: v }\n",
-        "- 項目 :(k: v)\n",
-        "= 見出し :{ k: v }\n",
-        "= 見出し :(k: v)\n",
-        "@el(a):{ b: 1 }\n",
-        "@el(a):(b: 1)\n",
+        "- 項目 ::{ k: v }\n",
+        "- 項目 ::(k: v)\n",
+        "= 見出し ::{ k: v }\n",
+        "= 見出し ::(k: v)\n",
+        "@el(a)::{ b: 1 }\n",
+        "@el(a)::(b: 1)\n",
         // A `|` run is the primary group of the line before it.
         "@table\n|[ a ][ b ]\n|[ 1 ][ 2 ]\n",
         "@quote(A)\n| 一行目\n| 二行目\n",

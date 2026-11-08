@@ -40,8 +40,8 @@ TOMET_UPDATE_REF=1 cargo test -p tomet-tests --test syntax_report  # 更新
 - [区切りとコードブロック](#区切りとコードブロック)
 - [補間 `${...}`](#補間-)
 - [式の部品](#式の部品)
-- [コネクト `:`](#コネクト-)
-- [名前付きコネクト `:name(...)`](#名前付きコネクト-name)
+- [コネクト `::`](#コネクト-)
+- [名前付きコネクト `::name(...)`](#名前付きコネクト-name)
 - [id `#(...)`](#id-)
 - [コメント](#コメント)
 - [文書の宣言](#文書の宣言)
@@ -49,6 +49,7 @@ TOMET_UPDATE_REF=1 cargo test -p tomet-tests --test syntax_report  # 更新
 - [主グループの無いネクサス](#主グループの無いネクサス)
 - [宣言の制限](#宣言の制限)
 - [撤去された構文](#撤去された構文)
+- [単一コロンのコネクト](#単一コロンのコネクト)
 - [綴りを失ったまま、代わりが未決のもの](#綴りを失ったまま、代わりが未決のもの)
 - [紛らわしいが、これが正しい](#紛らわしいが、これが正しい)
 - [受け付けない書き方](#受け付けない書き方)
@@ -401,7 +402,7 @@ unknown element `config`: only `std` and this document's own `::kind` may be wri
 
 ## ネクサスと主グループ
 
-### `@名前` `:名前` `::名前` はネクサスで、主グループを要る。主グループは `(args)` と `[content]`。`{value}` `#(id)` `:コネクト` は付加のグループで、単独では置けない。空でも主グループは書く
+### `@名前` `::名前` はネクサスで、主グループを要る。主グループは `(args)` と `[content]`。`{value}` `#(id)` `::コネクト` は付加のグループで、単独では置けない。空でも主グループは書く
 
 ```tmt
 @memo()
@@ -519,11 +520,11 @@ unknown element `memo`: only `std` and this document's own `::kind` may be writt
 unknown element `memo`: only `std` and this document's own `::kind` may be written bare; namespace it (`ns.memo`), or declare the vocabulary that has it and bind it with `::use`
 ```
 
-### 名前のないコネクト `:{...}` `:(...)` は、付いた先（項目・見出し・要素）のデータに入る。`{...}` が単独で置ける唯一の場所
+### 名前のないコネクト `::{...}` `::(...)` は、付いた先（項目・見出し・要素）のデータに入る。`{...}` が単独で置ける唯一の場所
 
 ```tmt
-- 項目 :{ k: v }
-= 見出し :(k: v)
+- 項目 ::{ k: v }
+= 見出し ::(k: v)
 ```
 
 ```
@@ -541,10 +542,10 @@ Section level=1
   args    {k: "v"}
 ```
 
-### 名前つきコネクトも主グループを要る。`:rule(...)` は書けて、`:rule{...}` は書けない（下の「主グループの無いネクサス」）
+### 名前つきコネクトも主グループを要る。`::rule(...)` は書けて、`::rule{...}` は書けない（下の「主グループの無いネクサス」）
 
 ```tmt
-- 項目 :rule(allow: (card))
+- 項目 ::rule(allow: (card))
 ```
 
 ```
@@ -1570,12 +1571,12 @@ Interp $
   interp  addr(tmt:docs/a.tmt#intro)
 ```
 
-## コネクト `:`
+## コネクト `::`
 
-### `:{...}` は値をマージ
+### `::{...}` は値をマージ
 
 ```tmt
-@task[ A ]:{ id: t1 }
+@task[ A ]::{ id: t1 }
 ```
 
 ```
@@ -1587,10 +1588,10 @@ Block  @task
     id: "t1"
 ```
 
-### `:(...)` は args をマージ
+### `::(...)` は args をマージ
 
 ```tmt
-@task(a: 1):(b: 2)
+@task(a: 1)::(b: 2)
 ```
 
 ```
@@ -1598,12 +1599,12 @@ Block  @task
   args    {b: 2, a: 1}
 ```
 
-## 名前付きコネクト `:name(...)`
+## 名前付きコネクト `::name(...)`
 
-### `:` の直後に名前があれば、マージではなく別の要素として `connects` に積まれる。現時点で唯一のメンバーは `rule`
+### `::` の直後に名前があれば、マージではなく別の要素として `connects` に積まれる。現時点で唯一のメンバーは `rule`
 
 ```tmt
-@section[ x ]:rule(allow: (card))
+@section[ x ]::rule(allow: (card))
 ```
 
 ```
@@ -1622,10 +1623,30 @@ Block  @section
 unknown element `section`: only `std` and this document's own `::kind` may be written bare; namespace it (`ns.section`), or declare the vocabulary that has it and bind it with `::use`
 ```
 
+### `::id(x)` は所有者の `#(x)`、`::meta(a: 1)` は `{a: 1}` を、そのまま書き下した形。どちらも `connects` には積まれず、所有者のidと値になる
+
+```tmt
+@x(a: 1)::id(i1)::meta(k: v)
+```
+
+```
+Block  @x
+  args    {a: 1}
+  group
+    k: "v"
+  id      "i1"
+```
+
+検証:
+
+```
+unknown element `x`: only `std` and this document's own `::kind` may be written bare; namespace it (`ns.x`), or declare the vocabulary that has it and bind it with `::use`
+```
+
 ### 複数のコネクトを重ねられる。それぞれ独立した `connects` の要素になる
 
 ```tmt
-@x(a: 1):as(y):rule(allow: (card))
+@x(a: 1)::as(y)::rule(allow: (card))
 ```
 
 ```
@@ -1663,10 +1684,10 @@ Block  @x
 unknown element `x`: only `std` and this document's own `::kind` may be written bare; namespace it (`ns.x`), or declare the vocabulary that has it and bind it with `::use`
 ```
 
-### リスト項目・見出しの糖衣形でも bare connect が使える。`:()`/`:{}`はどちらが先でもよく、両方書いても一つの `:` で足りる
+### リスト項目・見出しの糖衣形でも bare connect が使える。`::()`/`::{}`はどちらが先でもよく、両方書いても一つの `:` で足りる
 
 ```tmt
-- content :(x: 1){y: 2}
+- content ::(x: 1){y: 2}
 ```
 
 ```
@@ -1684,7 +1705,7 @@ List ordered=false
 ### 見出しの糖衣形も同様
 
 ```tmt
-= title :(x: 1){y: 2}
+= title ::(x: 1){y: 2}
 ```
 
 ```
@@ -1700,7 +1721,7 @@ Section level=1
 
 ```tmt
 - content
-:{y: 2}
+::{y: 2}
 ```
 
 ```
@@ -1717,7 +1738,7 @@ List ordered=false
 ### リスト項目は named connect も直接持てる。完全形・糖衣形のどちらでも、要素自身ではなく項目自身の `connects` に積まれる
 
 ```tmt
-- [ x ]:rule(allow: (card))
+- [ x ]::rule(allow: (card))
 ```
 
 ```
@@ -1732,10 +1753,10 @@ List ordered=false
           args    {allow: ("card")}
 ```
 
-### 見出しの糖衣形の named connect も、完全形(`=[ h ]:rule(...)`)と同じ扱い
+### 見出しの糖衣形の named connect も、完全形(`=[ h ]::rule(...)`)と同じ扱い
 
 ```tmt
-= h :rule(allow: (card))
+= h ::rule(allow: (card))
 ```
 
 ```
@@ -1842,17 +1863,17 @@ List ordered=false
 ### コネクトは`#(id)`を取らない。コネクトの直後に書くとエラー(idは所有者のものなので、最初のコネクトより前に書く)
 
 ```tmt
-@task(a: 1):rule(allow: (card))#(myid)
+@task(a: 1)::rule(allow: (card))#(myid)
 ```
 
 ```
-parse error: 1:12: a `:connect` takes no `#(id)`: write the id of its owner before the first `:connect`
+parse error: 1:12: a `::connect` takes no `#(id)`: write the id of its owner before the first `::connect`
 ```
 
 ### 所有者のidは最初のコネクトより前に書く
 
 ```tmt
-@task(a: 1)#(myid):rule(allow: (card))
+@task(a: 1)#(myid)::rule(allow: (card))
 ```
 
 ```
@@ -2138,61 +2159,61 @@ parse error: 1:1: `@memo` needs a primary group, `(...)` or `[...]`: `{...}`, `#
 ### 名前つきコネクトだけでは要素にならない
 
 ```tmt
-@memo:rule(allow: (card))
+@memo::rule(allow: (card))
 ```
 
 ```
-parse error: 1:1: `@memo` needs a primary group, `(...)` or `[...]`: `:connect` cannot stand without one
+parse error: 1:1: `@memo` needs a primary group, `(...)` or `[...]`: `::connect` cannot stand without one
 ```
 
-### 名前のない `:{...}` も、主グループのない `@名前` には付けられない
-
-```tmt
-@memo:{ a: 1 }
-```
-
-```
-parse error: 1:1: `@memo` needs a primary group, `(...)` or `[...]`: `:connect` cannot stand without one
-```
-
-### `:(...)` も同じ
+### 名前のない `::{...}` も、主グループのない `@名前` には付けられない
 
 ```tmt
-@memo:(a: 1)
+@memo::{ a: 1 }
 ```
 
 ```
-parse error: 1:1: `@memo` needs a primary group, `(...)` or `[...]`: `:connect` cannot stand without one
+parse error: 1:1: `@memo` needs a primary group, `(...)` or `[...]`: `::connect` cannot stand without one
 ```
 
-### コネクトも主グループを要る。`:rule{...}` は書けない
+### `::(...)` も同じ
 
 ```tmt
-@memo():rule{ allow: (card) }
+@memo::(a: 1)
 ```
 
 ```
-parse error: 1:8: `:rule` needs a primary group, `(...)` or `[...]`: `{...}` cannot stand without one
+parse error: 1:1: `@memo` needs a primary group, `(...)` or `[...]`: `::connect` cannot stand without one
+```
+
+### コネクトも主グループを要る。`::rule{...}` は書けない
+
+```tmt
+@memo()::rule{ allow: (card) }
+```
+
+```
+parse error: 1:8: `::rule` needs a primary group, `(...)` or `[...]`: `{...}` cannot stand without one
 ```
 
 ### リスト項目のコネクトも同じ
 
 ```tmt
-- 項目 :rule{ allow: (card) }
+- 項目 ::rule{ allow: (card) }
 ```
 
 ```
-parse error: 1:6: `:rule` needs a primary group, `(...)` or `[...]`: `{...}` cannot stand without one
+parse error: 1:6: `::rule` needs a primary group, `(...)` or `[...]`: `{...}` cannot stand without one
 ```
 
 ### 見出しのコネクトも同じ
 
 ```tmt
-= 見出し :rule{ allow: (card) }
+= 見出し ::rule{ allow: (card) }
 ```
 
 ```
-parse error: 1:7: `:rule` needs a primary group, `(...)` or `[...]`: `{...}` cannot stand without one
+parse error: 1:7: `::rule` needs a primary group, `(...)` or `[...]`: `{...}` cannot stand without one
 ```
 
 ### `-@名前` も主グループを要る
@@ -2273,11 +2294,11 @@ parse error: 2:1: `::meta` needs a primary group, `(...)` or `[...]`: `#(id)` ca
 ### 宣言はコネクトを取らない。コネクトは要素に付くもので、宣言は何にも付かない
 
 ```tmt
-::kind(note):rule(allow:(k))
+::kind(note)::rule(allow:(k))
 ```
 
 ```
-parse error: 1:1: a `::` declaration takes no `:connect`: a connect belongs to an element
+parse error: 1:1: a `::` declaration takes no `::connect`: a connect belongs to an element
 ```
 
 ## 撤去された構文
@@ -2343,6 +2364,39 @@ unknown element `memo`: only `std` and this document's own `::kind` may be writt
 
 > **パースは通る。** 上が実際の結果。
 
+## 単一コロンのコネクト
+
+### `:name(...)` は撤去された。`:` は `key: value` の区切りだけを担い、コネクトは `::name(...)`。エラーは書くべき形を示す
+
+```tmt
+@x(a):rule(allow: (card))
+```
+
+```
+parse error: 1:6: a connect is written `::rule(...)`, not `:rule(...)`: `:` only separates `key: value`
+```
+
+### 名前のないコネクトも同じ。`::{...}` と書く
+
+```tmt
+@x(a):{ b: 1 }
+```
+
+```
+parse error: 1:6: a nameless connect is written `::{...}` or `::(...)`, not `:{...}` or `:(...)`: `:` only separates `key: value`
+```
+
+### 行頭の `::name` は前の行の要素のコネクトではなく、宣言。要素のあとに宣言を書くと、宣言は文書の先頭に置くものというエラー
+
+```tmt
+@x(a)
+::rule(allow: (card))
+```
+
+```
+parse error: 2:1: a declaration belongs at the top of the file
+```
+
 ### 列は値だけを持ち、`key: value` の項目は持てない。マップは `{...}`
 
 ```tmt
@@ -2384,7 +2438,7 @@ Paragraph
 ### リモート接続。`<id:taskA>:{...}` と書いていたが `<T>` と共に 失われた。代わりの書き方は決まっていないので、実装も 受け付けない
 
 ```tmt
-@id(taskA):{ priority: high }
+@id(taskA)::{ priority: high }
 ```
 
 ```
@@ -2431,12 +2485,12 @@ unknown element `memo`: only `std` and this document's own `::kind` may be writt
 
 > **パースは通る。** 上が実際の結果。
 
-### sugar bodyのtrailing connectは改行1つまで。空行(改行2つ)を挟むと要素につながらず、`:{...}`はただの地の文になる
+### sugar bodyのtrailing connectは改行1つまで。空行(改行2つ)を挟むと要素につながらず、`::{...}`はただの地の文になる
 
 ```tmt
 - content
 
-:{ y: 2 }
+::{ y: 2 }
 ```
 
 ```
@@ -2447,7 +2501,7 @@ List ordered=false
         Paragraph
           Text "content"
 Paragraph
-  Text ":{ y: 2 }"
+  Text "::{ y: 2 }"
 ```
 
 > **パースは通る。** 上が実際の結果。

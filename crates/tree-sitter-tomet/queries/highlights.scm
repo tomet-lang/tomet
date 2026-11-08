@@ -120,8 +120,8 @@
 (document_element (value_group "{" @tag))
 (document_element (value_group "}" @tag))
 
-; Connect framing: named connects (:rule()) use subdued punctuation gray
-(connect ":" @punctuation.special)
+; Connect framing: named connects (::rule()) use subdued punctuation gray
+(connect "::" @punctuation.special)
 (connect name: (identifier) @punctuation.special)
 (connect (args_group "(" @punctuation.special))
 (connect (args_group ")" @punctuation.special))
@@ -144,10 +144,10 @@
 (hole_open) @keyword.operator @keyword
 (hole_close) @keyword.operator @keyword
 
-; Bare colons on inline elements and sections (:(), :{}) use distinct keyword color
-(inline_element ":" @keyword.control)
-(document_element ":" @keyword.control)
-(section ":" @keyword.control)
+; Bare double colons on inline elements and sections (::(), ::{}) use distinct keyword color.
+; A declaration's own `::` is its sigil, coloured as a tag above, and it takes no connect.
+(inline_element "::" @keyword.control)
+(section "::" @keyword.control)
 
 ; well-known `@(url:..)`/`@(file:..)`/`@(ref:..)` link-shaped elements
 ; render as links even though the grammar doesn't special-case them

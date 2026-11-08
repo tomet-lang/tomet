@@ -156,7 +156,7 @@ fn element_or_span_inside_quotes_in_prose_is_read_as_element_or_span() {
 
 #[test]
 fn delimiters_and_names_read_as_before() {
-    let doc = parse_file("__strong__ snake_case_name @my_name(1) :a-b(2)\n").unwrap();
+    let doc = parse_file("__strong__ snake_case_name @my_name(1) ::a-b(2)\n").unwrap();
     let Block::Paragraph(p) = &doc.body[0] else {
         panic!("expected paragraph");
     };

@@ -722,11 +722,11 @@ pub fn lower_declaration(node: &SyntaxNode) -> Result<Declaration> {
         .ok_or_else(|| unsupported("a declaration without a sigil"))?;
     let (start, _) = range_of(&sigil);
     let name = name_of(&sigil)?;
-    // Before any group is read: a nameless `:(...)` would otherwise merge into the args.
+    // Before any group is read: a nameless `::(...)` would otherwise merge into the args.
     if node.children().any(|n| n.kind() == K::CONNECT) {
         return Err(err(
             start,
-            "a `::` declaration takes no `:connect`: a connect belongs to an element",
+            "a `::` declaration takes no `::connect`: a connect belongs to an element",
         ));
     }
     require_primary_group(node, &sigil.text().to_string(), start)?;
@@ -755,7 +755,7 @@ pub(crate) fn lower_element(node: &SyntaxNode) -> Result<Element> {
         return Err(unsupported("a sigil that is not `@`"));
     }
     let name = name_of(&sigil)?;
-    // Before any group is read: a nameless `:(...)` would otherwise merge into the args.
+    // Before any group is read: a nameless `::(...)` would otherwise merge into the args.
     require_primary_group(node, &sigil.text().to_string(), sigil_start)?;
     let read = lower_groups(node)?;
     // The element ends with its last group; the white space and comments the
@@ -776,11 +776,11 @@ pub(crate) fn lower_element(node: &SyntaxNode) -> Result<Element> {
     })
 }
 
-/// A nexus -- `@name`, `::name`, `:name` -- stands on a primary group: `(args)` or `[content]`
-/// (a `|` run is the latter). `{value}`, `#(id)` and a `:connect` only add to one, so none of
+/// A nexus -- `@name`, a `::name` declaration, a `::name` connect -- stands on a primary group: `(args)` or `[content]`
+/// (a `|` run is the latter). `{value}`, `#(id)` and a `::connect` only add to one, so none of
 /// them can be all a nexus has. `head` is how the nexus is written, `at` where it starts.
 ///
-/// Only the groups written on `node` itself count: those of a nameless `:` connect merge into the
+/// Only the groups written on `node` itself count: those of a nameless `::` connect merge into the
 /// owner's after the fact, and a nexus does not stand on a group it borrows.
 fn require_primary_group(node: &SyntaxNode, head: &str, at: usize) -> Result<()> {
     if node
@@ -794,7 +794,7 @@ fn require_primary_group(node: &SyntaxNode, head: &str, at: usize) -> Result<()>
         let group = match child.kind() {
             K::VALUE_DATA | K::MAP_LITERAL => "`{...}`",
             K::ID_GROUP => "`#(id)`",
-            K::CONNECT => "`:connect`",
+            K::CONNECT => "`::connect`",
             _ => continue,
         };
         if !lone.contains(&group) {
@@ -815,7 +815,7 @@ fn require_primary_group(node: &SyntaxNode, head: &str, at: usize) -> Result<()>
 }
 
 /// The groups of `node`: `(args)`, `{value}`, `[content]`, `#(id)` and the
-/// `:connect`s, whatever order they were written in.
+/// `::connect`s, whatever order they were written in.
 fn lower_groups(node: &SyntaxNode) -> Result<Groups> {
     lower_group_list(node.children())
 }
@@ -847,8 +847,14 @@ pub(crate) fn lower_group_list(nodes: impl IntoIterator<Item = SyntaxNode>) -> R
             K::ID_GROUP => {
                 read.id = Some(crate::element::lower_hash_id(&child)?);
             }
-            K::CONNECT if is_merge_connect(&child) => merge_connect(&child, &mut read)?,
-            K::CONNECT => read.connects.push(lower_connect(&child)?),
+            K::CONNECT => {
+                refuse_single_colon(&child)?;
+                if is_merge_connect(&child) {
+                    merge_connect(&child, &mut read)?;
+                } else if !desugar_connect(&child, &mut read)? {
+                    read.connects.push(lower_connect(&child)?);
+                }
+            }
             K::ERROR => return Err(lower_error(&child)),
             other => return Err(unsupported(format!("{other:?} in an element's groups"))),
         }
@@ -889,14 +895,41 @@ pub(crate) fn lower_content(node: &SyntaxNode) -> Result<Vec<Block>> {
     lower_blocks(node)
 }
 
-/// `:name(args){value}[content]`.
+/// A connect is `::name(...)`, and the nameless one `::{...}` / `::(...)`: `:name(...)` and
+/// `:{...}` are retired, because `:` only separates `key: value`. The CST still keeps one as
+/// a connect so that this can say what to write instead.
+fn refuse_single_colon(node: &SyntaxNode) -> Result<()> {
+    let colons = node
+        .children_with_tokens()
+        .take_while(|e| e.kind() == K::COLON)
+        .count();
+    if colons >= 2 {
+        return Ok(());
+    }
+    let (start, _) = range_of(node);
+    let written = node
+        .children()
+        .find(|n| n.kind() == K::NAME)
+        .map(|n| n.text().to_string());
+    let message = match written {
+        Some(name) => format!(
+            "a connect is written `::{name}(...)`, not `:{name}(...)`: `:` only separates `key: value`"
+        ),
+        None => "a nameless connect is written `::{...}` or `::(...)`, not `:{...}` or `:(...)`: \
+                 `:` only separates `key: value`"
+            .to_string(),
+    };
+    Err(err(start, message))
+}
+
+/// `::name(args){value}[content]`.
 fn lower_connect(node: &SyntaxNode) -> Result<Connect> {
     let (start, _) = range_of(node);
     let name = name_of(node).map_err(|_| unsupported("a connect without a name"))?;
     if node.children().any(|n| n.kind() == K::ID_GROUP) {
         return Err(err(
             start,
-            "a `:connect` takes no `#(id)`: write the id of its owner before the first `:connect`",
+            "a `::connect` takes no `#(id)`: write the id of its owner before the first `::connect`",
         ));
     }
     let written = node
@@ -904,7 +937,7 @@ fn lower_connect(node: &SyntaxNode) -> Result<Connect> {
         .find(|n| n.kind() == K::NAME)
         .map(|n| n.text().to_string())
         .unwrap_or_default();
-    require_primary_group(node, &format!(":{written}"), start)?;
+    require_primary_group(node, &format!("::{written}"), start)?;
     let read = lower_groups(node)?;
     let end = node
         .children()
@@ -1224,13 +1257,13 @@ fn sublist_start(node: &SyntaxNode) -> Option<usize> {
         .map(|sub| range_of(&sub).0)
 }
 
-/// `:(args)` or `:{value}`: no name, so it is not a connect of its own but more
+/// `::(args)` or `::{value}`: no name, so it is not a connect of its own but more
 /// of the owner's args or value.
 fn is_merge_connect(node: &SyntaxNode) -> bool {
     !node.children().any(|c| c.kind() == K::NAME)
 }
 
-/// Merges the groups of a nameless `:` connect into `read`, as the AST parser does.
+/// Merges the groups of a nameless `::` connect into `read`, as the AST parser does.
 fn merge_connect(node: &SyntaxNode, read: &mut Groups) -> Result<()> {
     for child in node.children() {
         match child.kind() {
@@ -1240,29 +1273,86 @@ fn merge_connect(node: &SyntaxNode, read: &mut Groups) -> Result<()> {
             }
             K::VALUE_DATA | K::MAP_LITERAL => {
                 let value = crate::element::lower_value_group(&child)?;
-                let merged = match &read.data.value {
-                    Some(existing)
-                        if existing.0.iter().all(|e| matches!(e, Entry::Pair(..)))
-                            && value.0.iter().all(|e| matches!(e, Entry::Pair(..))) =>
-                    {
-                        merge_values(Some(&existing.as_data()), Some(&value.as_data()))
-                            .map(tomet_ast::Group::from_map)
-                    }
-                    _ => None,
-                };
-                read.data.value = Some(merged.unwrap_or(value));
+                merge_value_group(read, value);
             }
             K::CONTENT => {
                 return Err(err(
                     range_of(&child).0,
-                    "a nameless `:` connect merges `(args)` or `{value}` into its owner; \
-                     `[content]` needs a name: write `:name[...]`",
+                    "a nameless `::` connect merges `(args)` or `{value}` into its owner; \
+                     `[content]` needs a name: write `::name[...]`",
                 ));
             }
             other => return Err(unsupported(format!("{other:?} in a nameless connect"))),
         }
     }
     Ok(())
+}
+
+/// Merges `value` into the `{value}` group `read` already has, if both hold only pairs.
+fn merge_value_group(read: &mut Groups, value: tomet_ast::Group) {
+    let merged = match &read.data.value {
+        Some(existing)
+            if existing.0.iter().all(|e| matches!(e, Entry::Pair(..)))
+                && value.0.iter().all(|e| matches!(e, Entry::Pair(..))) =>
+        {
+            merge_values(Some(&existing.as_data()), Some(&value.as_data()))
+                .map(tomet_ast::Group::from_map)
+        }
+        _ => None,
+    };
+    read.data.value = Some(merged.unwrap_or(value));
+}
+
+/// `::id(x)` is the `#(x)` of its owner and `::meta(a: 1)` its `{a: 1}`, written out: the
+/// sugars stand for these two connects (see the design in
+/// `tmtroot/dev/design/nexus-brackets-and-singular-declarations.tmt`). Whether `node` was one
+/// of them, and so read into `read` instead of being a connect of its own.
+fn desugar_connect(node: &SyntaxNode, read: &mut Groups) -> Result<bool> {
+    let written = node
+        .children()
+        .find(|n| n.kind() == K::NAME)
+        .map(|n| n.text().to_string())
+        .unwrap_or_default();
+    if written != "id" && written != "meta" {
+        return Ok(false);
+    }
+    let connect = lower_connect(node)?;
+    let (at, _) = range_of(node);
+    if connect.content.is_some() || connect.data.value.is_some() {
+        return Err(err(
+            at,
+            format!("`::{written}` takes its `(...)` only: write `::{written}(...)`"),
+        ));
+    }
+    let args = connect.data.args.unwrap_or(Value::Map(Vec::new()));
+    if written == "id" {
+        let id = match &args {
+            Value::Map(_) | Value::Seq(_) => None,
+            scalar => scalar.scalar_text(),
+        };
+        let Some(id) = id.filter(|id| !id.is_empty()) else {
+            return Err(err(at, "`::id` takes one id: write `::id(x)`"));
+        };
+        if read.id.is_some() {
+            return Err(err(at, "an id is already written for this owner"));
+        }
+        read.id = Some(tomet_ast::Id(id.into_owned()));
+    } else {
+        let Value::Map(entries) = args else {
+            return Err(err(
+                at,
+                "`::meta` takes `key: value` pairs: write `::meta(a: 1)`",
+            ));
+        };
+        if entries.iter().any(|(k, _)| k.is_empty()) {
+            return Err(err(
+                at,
+                "`::meta` takes `key: value` pairs: write `::meta(a: 1)`",
+            ));
+        }
+        merge_value_group(read, tomet_ast::Group::from_map(Value::Map(entries)));
+    }
+    Ok(true)
 }
 
 /// How many `|` runs `node` stands inside: each one folds the marker at the start

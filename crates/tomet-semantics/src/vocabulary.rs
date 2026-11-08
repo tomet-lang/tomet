@@ -174,7 +174,7 @@ pub const RESERVED_NAMESPACES: [&str; 1] = ["doc"];
 
 /// Element names no vocabulary may declare, because tomet reserves them
 /// for syntax and structural rules (e.g. `item` for plain list items in
-/// `:rule(allow: (item, ...))`).
+/// `::rule(allow: (item, ...))`).
 pub const RESERVED_ELEMENT_NAMES: [&str; 1] = ["item"];
 
 /// Whether `name` is a reserved element name that no vocabulary may declare.
@@ -708,7 +708,7 @@ fn content_allow_from_value(content: &Value) -> Option<ContentAllow> {
 
 /// `"ns.mycard"` -> a namespaced [`Name`]; `"card"` -> a bare one. Same
 /// split `tomet-semantics-validator::rule`'s own copy uses for
-/// `:rule(allow:(...))` -- duplicated rather than shared, since that
+/// `::rule(allow:(...))` -- duplicated rather than shared, since that
 /// crate depends on this one, not the other way around.
 fn name_from_dotted(s: &str) -> Name {
     match s.split_once('.') {

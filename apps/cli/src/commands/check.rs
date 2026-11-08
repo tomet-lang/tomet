@@ -619,7 +619,7 @@ mod tests {
         .unwrap();
         fs::write(
             root.join("bp.tmt"),
-            "::kind(blueprint)\n::blueprint(note)\n::meta(\n  date: \"2026\"\n)\n\n=[ Items ]#(items):rule(allow: (task))\n",
+            "::kind(blueprint)\n::blueprint(note)\n::meta(\n  date: \"2026\"\n)\n\n=[ Items ]#(items)::rule(allow: (task))\n",
         )
         .unwrap();
 

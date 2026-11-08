@@ -1,7 +1,7 @@
 //! Blueprint structural validation against a target document.
 //!
 //! Extracts structural schemas (required meta keys, required sections, and section-level
-//! `:rule` constraints) from blueprint documents (`::kind(blueprint)`), and validates
+//! `::rule` constraints) from blueprint documents (`::kind(blueprint)`), and validates
 //! target documents for conformance.
 
 use tomet_ast::{Block, Connect, ElementView, File, Inline, Section, Value};
@@ -27,7 +27,7 @@ pub struct RequiredSection {
     pub title: String,
     pub id: Option<String>,
     pub span: Span,
-    /// `:rule(...)` constraints attached to this section in the blueprint.
+    /// `::rule(...)` constraints attached to this section in the blueprint.
     pub rules: Vec<RuleArgs>,
 }
 
@@ -353,7 +353,8 @@ mod tests {
 
     #[test]
     fn enforces_blueprint_section_rule_constraint() {
-        let blueprint = parse("::blueprint(task-list)\n\n=[ Tasks ]#(tasks):rule(allow: (task))\n");
+        let blueprint =
+            parse("::blueprint(task-list)\n\n=[ Tasks ]#(tasks)::rule(allow: (task))\n");
         // doc has a section with a heading that is not allowed
         let doc_bad =
             parse("::kind(task-list)\n\n=[ Tasks ]#(tasks)\n@heading[ Not allowed here ]\n");

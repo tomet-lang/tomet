@@ -21,9 +21,9 @@ text @s_para_inline[x] more
 
 text <?(h2)>[@s_hole_inline_content()]
 
-@s_host(a: @s_args(), b: [@s_args_blocks()], c: (@s_seq())){ d: @s_pair(), @s_entry(id){} }[ @s_content(x: @s_nested_args())[ @s_deep()#(i_deep) ] ]#(i_host):rule(allow: (@s_connect()))
+@s_host(a: @s_args(), b: [@s_args_blocks()], c: (@s_seq())){ d: @s_pair(), @s_entry(id){} }[ @s_content(x: @s_nested_args())[ @s_deep()#(i_deep) ] ]#(i_host)::rule(allow: (@s_connect()))
 
-=[ title @s_title() ]{ k: @s_sec_data() }#(i_sec):rule(allow: (@s_sec_connect()))
+=[ title @s_title() ]{ k: @s_sec_data() }#(i_sec)::rule(allow: (@s_sec_connect()))
 
 @s_sec_block()
 
@@ -47,7 +47,7 @@ fn names(f: impl FnOnce(&mut Vec<String>)) -> Vec<String> {
 }
 
 /// The positions an element sits in, in the order the element walkers meet them: a node's
-/// `(args)`, `{value}`, `[content]`. Not reached on purpose: a `:connect` (metadata about its
+/// `(args)`, `{value}`, `[content]`. Not reached on purpose: a `::connect` (metadata about its
 /// owner, not a part of the document: see `descendants` in `walk.rs`).
 const ELEMENT_WALK: [&str; 20] = [
     "s_decl_value",

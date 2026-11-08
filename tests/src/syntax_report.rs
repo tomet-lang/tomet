@@ -136,8 +136,8 @@ const CASES: &[Case] = &[
     // ---- the nexus rule ---------------------------------------------
     case(
         Some("ネクサスと主グループ"),
-        "`@名前` `:名前` `::名前` はネクサスで、主グループを要る。主グループは \
-         `(args)` と `[content]`。`{value}` `#(id)` `:コネクト` は付加のグループで、\
+        "`@名前` `::名前` はネクサスで、主グループを要る。主グループは \
+         `(args)` と `[content]`。`{value}` `#(id)` `::コネクト` は付加のグループで、\
          単独では置けない。空でも主グループは書く",
         "@memo()\n",
     ),
@@ -165,14 +165,14 @@ const CASES: &[Case] = &[
     ),
     case(
         None,
-        "名前のないコネクト `:{...}` `:(...)` は、付いた先（項目・見出し・要素）の\
+        "名前のないコネクト `::{...}` `::(...)` は、付いた先（項目・見出し・要素）の\
          データに入る。`{...}` が単独で置ける唯一の場所",
-        "- 項目 :{ k: v }\n= 見出し :(k: v)\n",
+        "- 項目 ::{ k: v }\n= 見出し ::(k: v)\n",
     ),
     case(
         None,
-        "名前つきコネクトも主グループを要る。`:rule(...)` は書けて、`:rule{...}` は書けない（下の「主グループの無いネクサス」）",
-        "- 項目 :rule(allow: (card))\n",
+        "名前つきコネクトも主グループを要る。`::rule(...)` は書けて、`::rule{...}` は書けない（下の「主グループの無いネクサス」）",
+        "- 項目 ::rule(allow: (card))\n",
     ),
     case(None, "水平線は `@hr()`。`@hr` だけの行はエラー", "@hr()\n"),
     // ---- value groups -----------------------------------------------
@@ -413,21 +413,27 @@ const CASES: &[Case] = &[
     ),
     // ---- connect ----------------------------------------------------
     case(
-        Some("コネクト `:`"),
-        "`:{...}` は値をマージ",
-        "@task[ A ]:{ id: t1 }\n",
+        Some("コネクト `::`"),
+        "`::{...}` は値をマージ",
+        "@task[ A ]::{ id: t1 }\n",
     ),
-    case(None, "`:(...)` は args をマージ", "@task(a: 1):(b: 2)\n"),
+    case(None, "`::(...)` は args をマージ", "@task(a: 1)::(b: 2)\n"),
     case(
-        Some("名前付きコネクト `:name(...)`"),
-        "`:` の直後に名前があれば、マージではなく別の要素として `connects` に積まれる。\
+        Some("名前付きコネクト `::name(...)`"),
+        "`::` の直後に名前があれば、マージではなく別の要素として `connects` に積まれる。\
          現時点で唯一のメンバーは `rule`",
-        "@section[ x ]:rule(allow: (card))\n",
+        "@section[ x ]::rule(allow: (card))\n",
+    ),
+    case(
+        None,
+        "`::id(x)` は所有者の `#(x)`、`::meta(a: 1)` は `{a: 1}` を、そのまま書き下した形。\
+         どちらも `connects` には積まれず、所有者のidと値になる",
+        "@x(a: 1)::id(i1)::meta(k: v)\n",
     ),
     case(
         None,
         "複数のコネクトを重ねられる。それぞれ独立した `connects` の要素になる",
-        "@x(a: 1):as(y):rule(allow: (card))\n",
+        "@x(a: 1)::as(y)::rule(allow: (card))\n",
     ),
     case(
         None,
@@ -438,27 +444,27 @@ const CASES: &[Case] = &[
     ),
     case(
         None,
-        "リスト項目・見出しの糖衣形でも bare connect が使える。`:()`/`:{}`は\
+        "リスト項目・見出しの糖衣形でも bare connect が使える。`::()`/`::{}`は\
          どちらが先でもよく、両方書いても一つの `:` で足りる",
-        "- content :(x: 1){y: 2}\n",
+        "- content ::(x: 1){y: 2}\n",
     ),
-    case(None, "見出しの糖衣形も同様", "= title :(x: 1){y: 2}\n"),
+    case(None, "見出しの糖衣形も同様", "= title ::(x: 1){y: 2}\n"),
     case(
         None,
         "改行1つまでなら次の行に置いてもよい(他のsigilの groups と同じ gap)。\
          空行を挟む(改行2つ)とつながらない -- REJECTEDの同じ例を参照",
-        "- content\n:{y: 2}\n",
+        "- content\n::{y: 2}\n",
     ),
     case(
         None,
         "リスト項目は named connect も直接持てる。完全形・糖衣形のどちらでも、\
          要素自身ではなく項目自身の `connects` に積まれる",
-        "- [ x ]:rule(allow: (card))\n",
+        "- [ x ]::rule(allow: (card))\n",
     ),
     case(
         None,
-        "見出しの糖衣形の named connect も、完全形(`=[ h ]:rule(...)`)と同じ扱い",
-        "= h :rule(allow: (card))\n",
+        "見出しの糖衣形の named connect も、完全形(`=[ h ]::rule(...)`)と同じ扱い",
+        "= h ::rule(allow: (card))\n",
     ),
     // ---- id `#(...)` --------------------------------------------------
     case(
@@ -487,12 +493,12 @@ const CASES: &[Case] = &[
         None,
         "コネクトは`#(id)`を取らない。コネクトの直後に書くとエラー\
          (idは所有者のものなので、最初のコネクトより前に書く)",
-        "@task(a: 1):rule(allow: (card))#(myid)\n",
+        "@task(a: 1)::rule(allow: (card))#(myid)\n",
     ),
     case(
         None,
         "所有者のidは最初のコネクトより前に書く",
-        "@task(a: 1)#(myid):rule(allow: (card))\n",
+        "@task(a: 1)#(myid)::rule(allow: (card))\n",
     ),
     case(None, "idを2つ書くとエラー", "@task()#(a)#(b)\n"),
     // ---- comments ---------------------------------------------------
@@ -575,28 +581,28 @@ const REJECTED: &[Case] = &[
     case(
         None,
         "名前つきコネクトだけでは要素にならない",
-        "@memo:rule(allow: (card))\n",
+        "@memo::rule(allow: (card))\n",
     ),
     case(
         None,
-        "名前のない `:{...}` も、主グループのない `@名前` には付けられない",
-        "@memo:{ a: 1 }\n",
+        "名前のない `::{...}` も、主グループのない `@名前` には付けられない",
+        "@memo::{ a: 1 }\n",
     ),
-    case(None, "`:(...)` も同じ", "@memo:(a: 1)\n"),
+    case(None, "`::(...)` も同じ", "@memo::(a: 1)\n"),
     case(
         None,
-        "コネクトも主グループを要る。`:rule{...}` は書けない",
-        "@memo():rule{ allow: (card) }\n",
+        "コネクトも主グループを要る。`::rule{...}` は書けない",
+        "@memo()::rule{ allow: (card) }\n",
     ),
     case(
         None,
         "リスト項目のコネクトも同じ",
-        "- 項目 :rule{ allow: (card) }\n",
+        "- 項目 ::rule{ allow: (card) }\n",
     ),
     case(
         None,
         "見出しのコネクトも同じ",
-        "= 見出し :rule{ allow: (card) }\n",
+        "= 見出し ::rule{ allow: (card) }\n",
     ),
     case(None, "`-@名前` も主グループを要る", "-@memo{ a: 1 }\n"),
     case(
@@ -633,7 +639,7 @@ const REJECTED: &[Case] = &[
     case(
         Some("宣言の制限"),
         "宣言はコネクトを取らない。コネクトは要素に付くもので、宣言は何にも付かない",
-        "::kind(note):rule(allow:(k))\n",
+        "::kind(note)::rule(allow:(k))\n",
     ),
     case(
         Some("撤去された構文"),
@@ -653,6 +659,23 @@ const REJECTED: &[Case] = &[
         "`[a, b]` 列リテラルも撤去。`[`/`]` は既に `[content]` の意味を\
          持つので、値の中の列は `(a, b)` の一つの綴りしかない",
         "@memo(xs: [1, 2, 3])\n",
+    ),
+    case(
+        Some("単一コロンのコネクト"),
+        "`:name(...)` は撤去された。`:` は `key: value` の区切りだけを担い、\
+         コネクトは `::name(...)`。エラーは書くべき形を示す",
+        "@x(a):rule(allow: (card))\n",
+    ),
+    case(
+        None,
+        "名前のないコネクトも同じ。`::{...}` と書く",
+        "@x(a):{ b: 1 }\n",
+    ),
+    case(
+        None,
+        "行頭の `::name` は前の行の要素のコネクトではなく、宣言。\
+         要素のあとに宣言を書くと、宣言は文書の先頭に置くものというエラー",
+        "@x(a)\n::rule(allow: (card))\n",
     ),
     case(
         None,
@@ -676,7 +699,7 @@ const REJECTED: &[Case] = &[
         "リモート接続。`<id:taskA>:{...}` と書いていたが `<T>` と共に \
          失われた。代わりの書き方は決まっていないので、実装も \
          受け付けない",
-        "@id(taskA):{ priority: high }\n",
+        "@id(taskA)::{ priority: high }\n",
     ),
     case(
         Some("紛らわしいが、これが正しい"),
@@ -686,8 +709,8 @@ const REJECTED: &[Case] = &[
     case(
         None,
         "sugar bodyのtrailing connectは改行1つまで。空行(改行2つ)を挟むと\
-         要素につながらず、`:{...}`はただの地の文になる",
-        "- content\n\n:{ y: 2 }\n",
+         要素につながらず、`::{...}`はただの地の文になる",
+        "- content\n\n::{ y: 2 }\n",
     ),
     case(
         Some("受け付けない書き方"),

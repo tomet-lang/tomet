@@ -50,14 +50,14 @@ fn id_written_after_a_connect_is_a_parse_error() {
     // group reader would hand the id to the connect, so it is refused there
     // rather than quietly attached to either; the owner's id is written
     // before the first connect.
-    let err = parse_file("@memo(a: 1):rule(allow: (card))#(myid)\n").unwrap_err();
+    let err = parse_file("@memo(a: 1)::rule(allow: (card))#(myid)\n").unwrap_err();
     assert!(
-        err.message.contains("`:connect` takes no"),
+        err.message.contains("`::connect` takes no"),
         "got: {}",
         err.message
     );
 
-    let doc = parse_file("@memo(a: 1)#(myid):rule(allow: (card))\n").unwrap();
+    let doc = parse_file("@memo(a: 1)#(myid)::rule(allow: (card))\n").unwrap();
     match &doc.body[0] {
         Block::Element(el) => {
             assert_eq!(el.id, Some(Id("myid".into())));

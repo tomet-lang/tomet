@@ -299,7 +299,7 @@
                                   "value": 1,
                                   "content": {
                                     "type": "STRING",
-                                    "value": ":"
+                                    "value": "::"
                                   }
                                 }
                               },
@@ -2412,7 +2412,7 @@
                 "value": 1,
                 "content": {
                   "type": "STRING",
-                  "value": ":"
+                  "value": "::"
                 }
               }
             },
@@ -2457,7 +2457,7 @@
               "value": 1,
               "content": {
                 "type": "STRING",
-                "value": ":"
+                "value": "::"
               }
             }
           },

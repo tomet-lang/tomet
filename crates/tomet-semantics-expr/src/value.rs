@@ -51,7 +51,7 @@ pub enum Part {
     Element(Box<Element>),
     Section(Box<Section>),
     List(Box<List>),
-    /// A `:name(...)` stacked after one of the others. It has no id, so no
+    /// A `::name(...)` stacked after one of the others. It has no id, so no
     /// `#id` finds it; it is reached through its owner's `.connects`.
     Connect(Box<Connect>),
     /// A `::name(...)` declaration, when it was given an id.

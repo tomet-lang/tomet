@@ -1,5 +1,5 @@
-//! A nexus -- `@name`, `::name`, `:name` -- stands on a primary group, `(args)` or `[content]`
-//! (a `|` run is the latter). `{value}`, `#(id)` and a `:connect` only add to one.
+//! A nexus -- `@name`, a `::name` declaration or connect -- stands on a primary group, `(args)` or `[content]`
+//! (a `|` run is the latter). `{value}`, `#(id)` and a `::connect` only add to one.
 //!
 //! Every shape here is one of: refused where the nexus begins, kept as running text, or valid.
 
@@ -7,8 +7,8 @@ use super::*;
 
 /// The message every nexus without a primary group is refused with.
 const NEEDS_PRIMARY: &str = "needs a primary group";
-/// What a `::` declaration says to any `:connect`.
-const NO_CONNECT: &str = "takes no `:connect`";
+/// What a `::` declaration says to any `::connect`.
+const NO_CONNECT: &str = "takes no `::connect`";
 
 /// Each source is refused with `message`, at the byte offset beside it.
 fn refused(message: &str, cases: &[(&str, usize)]) {
@@ -52,7 +52,7 @@ fn a_block_name_alone_or_with_only_secondary_groups_is_refused() {
             // Groups on the lines after it are its groups all the same.
             ("@name\n{a: 1}\n", 0),
             ("@name\n#(id)\n", 0),
-            ("@name\n:rule(a)\n", 0),
+            ("@name\n::{a: 1}\n", 0),
         ],
     );
 }
@@ -64,15 +64,15 @@ fn a_connect_is_not_a_primary_group() {
     refused(
         NEEDS_PRIMARY,
         &[
-            ("@name:rule(a: 1)\n", 0),
-            ("@name:rule[x]\n", 0),
-            ("@name:rule(a: 1):other[x]\n", 0),
-            ("@name:{a: 1}\n", 0),
-            ("@name:{}\n", 0),
-            ("@name:(a: 1)\n", 0),
-            ("@name:()\n", 0),
-            ("@name{}:(a: 1)\n", 0),
-            ("@name #(id) :{a: 1}\n", 0),
+            ("@name::rule(a: 1)\n", 0),
+            ("@name::rule[x]\n", 0),
+            ("@name::rule(a: 1)::other[x]\n", 0),
+            ("@name::{a: 1}\n", 0),
+            ("@name::{}\n", 0),
+            ("@name::(a: 1)\n", 0),
+            ("@name::()\n", 0),
+            ("@name{}::(a: 1)\n", 0),
+            ("@name #(id) ::{a: 1}\n", 0),
         ],
     );
 }
@@ -98,10 +98,10 @@ fn an_inline_name_with_a_secondary_group_is_refused_and_not_text() {
             ("a @name{k: 1} b\n", 2),
             ("a @name#(id) b\n", 2),
             ("a @name{}#(id) b\n", 2),
-            ("a @name:rule(a: 1) b\n", 2),
-            ("a @name:{k: 1} b\n", 2),
-            ("a @name:() b\n", 2),
-            ("a @name:(k: 1) b\n", 2),
+            ("a @name::rule(a: 1) b\n", 2),
+            ("a @name::{k: 1} b\n", 2),
+            ("a @name::() b\n", 2),
+            ("a @name::(k: 1) b\n", 2),
             // Wherever running text goes.
             ("*em @name{}*\n", 4),
             ("- a @name{}\n", 4),
@@ -123,7 +123,7 @@ fn a_bare_inline_name_is_running_text() {
         "said hello\n@alice\n",
         "@alice and @bob\n",
         "@alice: hello\n",
-        // A `:name` with no group after it is not a connect, so the name has nothing.
+        // A `::name` with no group after it is not a connect, so the name has nothing.
         "cc @alice:bob\n",
         "user@host:22\n",
         "@alice // note\nsaid\n",
@@ -168,7 +168,7 @@ fn a_name_with_only_a_secondary_group_in_a_value_is_refused() {
             ("@el(a: @name{})\n", 7),
             ("@el(){ @name{} }\n", 7),
             ("@el(){ k: @name#(id) }\n", 10),
-            ("@el(a: @name:rule(b))\n", 7),
+            ("@el(a: @name::rule(b))\n", 7),
         ],
     );
 }
@@ -184,8 +184,8 @@ fn a_combine_item_needs_a_primary_group_too() {
             ("-@name text\n", 1),
             ("-@name{}\n", 1),
             ("-@name#(id)\n", 1),
-            ("-@name:rule(a)\n", 1),
-            ("-@name:{k: 1}\n", 1),
+            ("-@name::rule(a)\n", 1),
+            ("-@name::{k: 1}\n", 1),
             ("-.@name{}\n", 2),
             ("- @name{}\n", 2),
         ],
@@ -243,11 +243,11 @@ fn a_declaration_takes_no_connect_of_either_kind() {
             ("::name:{a: 1}\n", 0),
             ("::name:{}\n", 0),
             ("::name:()\n", 0),
-            ("::name(a):{b: 1}\n", 0),
-            ("::name(a):(b: 1)\n", 0),
-            ("::name(a):rule(b)\n", 0),
+            ("::name(a)::{b: 1}\n", 0),
+            ("::name(a)::(b: 1)\n", 0),
+            ("::name(a)::rule(b)\n", 0),
             ("::name:rule(a)\n", 0),
-            ("::name[x]:rule[y]\n", 0),
+            ("::name[x]::rule[y]\n", 0),
             ("::kind(config)\n:rule(allow:(k))\n", 0),
         ],
     );
@@ -284,7 +284,7 @@ fn a_data_file_header_is_held_to_the_same_rule() {
         ("::meta{}\n", NEEDS_PRIMARY, 0),
         ("::kind(x)\n::vars{ a: 1 }\nk: v\n", NEEDS_PRIMARY, 10),
         ("::meta:(a: 1)\nk: v\n", NO_CONNECT, 0),
-        ("::meta(a: 1):{b: 2}\nk: v\n", NO_CONNECT, 0),
+        ("::meta(a: 1)::{b: 2}\nk: v\n", NO_CONNECT, 0),
     ] {
         let err = parse_data_file(src).expect_err(src);
         assert!(err.message.contains(message), "{src:?}: {}", err.message);
@@ -312,16 +312,16 @@ fn a_named_connect_needs_a_primary_group() {
     refused(
         NEEDS_PRIMARY,
         &[
-            ("@el(a):rule{x: 1}\n", 6),
-            ("@el(a):rule{}\n", 6),
-            ("@el[x]:rule{x: 1}\n", 6),
-            ("@el(a):ok(b):rule{}\n", 12),
+            ("@el(a)::rule{x: 1}\n", 6),
+            ("@el(a)::rule{}\n", 6),
+            ("@el[x]::rule{x: 1}\n", 6),
+            ("@el(a)::ok(b)::rule{}\n", 13),
             // The full form of an item or a heading claims its connect outright.
-            ("-#(id) :rule{}\n", 7),
-            ("- {a: 1} :rule{}\n", 9),
-            ("=#(id) :rule{}\n", 7),
-            ("=[ T ]:rule{x: 1}\n", 6),
-            ("- [ x ]:rule{x: 1}\n", 7),
+            ("-#(id) ::rule{}\n", 7),
+            ("- {a: 1} ::rule{}\n", 9),
+            ("=#(id) ::rule{}\n", 7),
+            ("=[ T ]::rule{x: 1}\n", 6),
+            ("- [ x ]::rule{x: 1}\n", 7),
         ],
     );
 }
@@ -329,52 +329,52 @@ fn a_named_connect_needs_a_primary_group() {
 #[test]
 fn a_named_connect_with_a_primary_group_is_valid() {
     for src in [
-        "@el(a):rule(b)\n",
-        "@el(a):rule[x]\n",
-        "@el(a):rule(b){c: 1}\n",
-        "@el(a):rule(b):other[x]\n",
-        "- {a: 1} :rule(b)\n",
-        "=[ T ]:rule(b)\n",
+        "@el(a)::rule(b)\n",
+        "@el(a)::rule[x]\n",
+        "@el(a)::rule(b){c: 1}\n",
+        "@el(a)::rule(b)::other[x]\n",
+        "- {a: 1} ::rule(b)\n",
+        "=[ T ]::rule(b)\n",
     ] {
         ok(src);
     }
-    let doc = ok("@el(a):rule[x]:other(b)\n");
+    let doc = ok("@el(a)::rule[x]::other(b)\n");
     assert_eq!(element(&doc.body[0]).connects.len(), 2);
 }
 
 #[test]
 fn a_named_connect_on_a_bracket_less_line_is_refused_like_one_on_a_full_form_head() {
     // A bracket-less body claims a trailing connect that is structurally one, so the shorthand
-    // and the full form (`-#(id) :rule{}`) agree: neither downgrades to text.
+    // and the full form (`-#(id) ::rule{}`) agree: neither downgrades to text.
     refused(
         NEEDS_PRIMARY,
         &[
-            ("- item :rule{a: 1}\n", 7),
-            ("- item :rule{}\n", 7),
-            ("= H :rule{a: 1}\n", 4),
-            ("= H :rule{}\n", 4),
-            ("-. item :rule{a: 1}\n", 8),
-            ("- item {a: 1} :rule{}\n", 14),
-            ("- item {a: 1}:rule{b: 2}\n", 13),
-            ("- item :ok(a) :rule{b: 2}\n", 14),
+            ("- item ::rule{a: 1}\n", 7),
+            ("- item ::rule{}\n", 7),
+            ("= H ::rule{a: 1}\n", 4),
+            ("= H ::rule{}\n", 4),
+            ("-. item ::rule{a: 1}\n", 8),
+            ("- item {a: 1} ::rule{}\n", 14),
+            ("- item {a: 1}::rule{b: 2}\n", 13),
+            ("- item ::ok(a) ::rule{b: 2}\n", 15),
             // The full forms, for the same answer.
-            ("-#(id) :rule{a: 1}\n", 7),
-            ("=#(id) :rule{a: 1}\n", 7),
+            ("-#(id) ::rule{a: 1}\n", 7),
+            ("=#(id) ::rule{a: 1}\n", 7),
         ],
     );
-    let err = parse_file("- item :rule{a: 1}\n").unwrap_err();
-    assert!(err.message.contains("`:rule`"), "{}", err.message);
+    let err = parse_file("- item ::rule{a: 1}\n").unwrap_err();
+    assert!(err.message.contains("`::rule`"), "{}", err.message);
 }
 
 #[test]
 fn a_named_connect_with_a_primary_group_on_a_bracket_less_line_is_a_connect() {
     for (src, connects) in [
-        ("- item :rule(a: 1)\n", 1),
-        ("- item :rule(a: 1){b: 2}\n", 1),
-        ("- item :rule(a: 1) :other(b)\n", 2),
-        ("= H :rule(a: 1)\n", 1),
-        ("- item :{a: 1}\n", 0),
-        ("= H :(a)\n", 0),
+        ("- item ::rule(a: 1)\n", 1),
+        ("- item ::rule(a: 1){b: 2}\n", 1),
+        ("- item ::rule(a: 1) ::other(b)\n", 2),
+        ("= H ::rule(a: 1)\n", 1),
+        ("- item ::{a: 1}\n", 0),
+        ("= H ::(a)\n", 0),
     ] {
         let doc = ok(src);
         let got = match &doc.body[0] {
@@ -395,7 +395,7 @@ fn prose_that_looks_a_little_like_a_connect_stays_prose() {
         "- Note: {a: 1}\n",
         "- note: a:b\n",
         "- foo:bar{not a map}\n",
-        "- a :b{c}\n",
+        "- a ::b{c}\n",
         "= Note: {a: 1}\n",
         "= note: a:b\n",
         "= foo:bar{not a map}\n",
@@ -426,9 +426,9 @@ fn prose_that_looks_a_little_like_a_connect_stays_prose() {
 
 #[test]
 fn a_nameless_connect_is_refused_when_it_holds_content() {
-    let err = parse_file("@el(a):[x]\n").unwrap_err();
+    let err = parse_file("@el(a)::[x]\n").unwrap_err();
     assert!(err.message.contains("nameless"), "{}", err.message);
-    assert_eq!(err.offset, 7, "at the `[`");
+    assert_eq!(err.offset, 8, "at the `[`");
 }
 
 #[test]
@@ -451,7 +451,7 @@ fn a_named_connect_alone_is_not_a_connect() {
 
 #[test]
 fn nameless_connects_keep_working_on_a_valid_owner() {
-    let doc = ok("@el(a: 1):{b: 2}\n");
+    let doc = ok("@el(a: 1)::{b: 2}\n");
     let el = element(&doc.body[0]);
     assert!(el.data.args.is_some());
     assert_eq!(
@@ -463,7 +463,7 @@ fn nameless_connects_keep_working_on_a_valid_owner() {
     );
     assert!(el.connects.is_empty());
 
-    let doc = ok("@el(a: 1):(b: 2)\n");
+    let doc = ok("@el(a: 1)::(b: 2)\n");
     // The merged-in args come first, then the owner's own.
     let Some(Value::Map(mut args)) = element(&doc.body[0]).data.args.clone() else {
         panic!("expected merged args")
@@ -475,13 +475,13 @@ fn nameless_connects_keep_working_on_a_valid_owner() {
     );
 
     for src in [
-        "- item :{a: 1}\n",
-        "- item :(a)\n",
-        "= heading :{a: 1}\n",
-        "= heading :(a)\n",
-        "= heading\n:(a)\n",
-        "@el[x]:{a: 1}\n",
-        "@el()\n:{a: 1}\n",
+        "- item ::{a: 1}\n",
+        "- item ::(a)\n",
+        "= heading ::{a: 1}\n",
+        "= heading ::(a)\n",
+        "= heading\n::(a)\n",
+        "@el[x]::{a: 1}\n",
+        "@el()\n::{a: 1}\n",
     ] {
         ok(src);
     }
@@ -543,7 +543,7 @@ fn a_nexus_with_a_primary_group_takes_any_secondary_ones() {
         "@name(){a: 1}#(id)\n",
         "@name{a: 1}()\n",
         "@name#(id)[ x ]\n",
-        "@name(a)[x]{k: 1}#(id):rule(b)\n",
+        "@name(a)[x]{k: 1}#(id)::rule(b)\n",
         "a @name() b\n",
         "a @name[ x ] b\n",
         "@el(a: @name())\n",

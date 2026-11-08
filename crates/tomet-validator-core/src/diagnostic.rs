@@ -160,7 +160,7 @@ pub enum Diagnostic {
     /// someone else to find rather than resolving it under pressure
     /// just to make `tomet check` pass.
     Conflict { span: Span },
-    /// A `:name(...)` connect whose name is not in the closed set
+    /// A `::name(...)` connect whose name is not in the closed set
     /// `tomet_semantics::CONNECT_MEMBERS` declares (`rule` is the only
     /// member so far). Distinct from [`Diagnostic::UnknownElement`]: a
     /// connect is never fed through vocabulary resolution at all (see
@@ -168,9 +168,9 @@ pub enum Diagnostic {
     /// own diagnostic rather than a special case of that one.
     UnknownConnect { name: String, span: Span },
     /// A descendant found inside an element carrying an active
-    /// `:rule(allow:(...))` whose classified name is not in that
+    /// `::rule(allow:(...))` whose classified name is not in that
     /// rule's `allow` list. `span` is the offending descendant's own
-    /// span; `rule_span` is where the `:rule(...)` itself was written,
+    /// span; `rule_span` is where the `::rule(...)` itself was written,
     /// so a reader can see both "found here" and "restricted here".
     DisallowedByRule {
         name: String,
@@ -189,7 +189,7 @@ pub enum Diagnostic {
     /// vocabulary declares. `span` is the offending descendant's own
     /// span; `element_span` is the enclosing element's, so a reader can
     /// see both "found here" and "restricted here" -- same split
-    /// [`Diagnostic::DisallowedByRule`] makes for `:rule(...)`.
+    /// [`Diagnostic::DisallowedByRule`] makes for `::rule(...)`.
     DisallowedInContent {
         name: String,
         element: String,
@@ -322,7 +322,7 @@ impl Diagnostic {
 }
 
 /// `Display` has no source text, so it cannot say where a *related* span (the first
-/// occurrence of a duplicate, the `:rule` that forbids something) is, and leaves
+/// occurrence of a duplicate, the `::rule` that forbids something) is, and leaves
 /// that clause out. A renderer that holds the source asks for the full message
 /// with [`Diagnostic::message_in`].
 impl fmt::Display for Diagnostic {

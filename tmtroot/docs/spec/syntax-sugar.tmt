@@ -4,8 +4,8 @@
 |[ `@strikeout[label]`                ][ `~~label~~`                               ][ from markdown ]
 |[ `@mark[label]`                     ][ `==label==`                               ][ from markdown ]
 |[ `@fence[label]`                    ][ `\`label\``                               ][ from markdown ]
-|[ `@heading(level:<int>)[ label ]{}` ][ `#[ label ]{}`, `# label :{}`             ][ from markdown ]
-|[ `@list()[ content ]{}`             ][ `- [ content ]{}`, `- content :{}`        ][ from markdown ]
+|[ `@heading(level:<int>)[ label ]{}` ][ `#[ label ]{}`, `# label ::{}`            ][ from markdown ]
+|[ `@list()[ content ]{}`             ][ `- [ content ]{}`, `- content ::{}`       ][ from markdown ]
 |[ `@codeblock`                       ][ `\`\`\`(lang:<string>)`, `\`\`\`<string>` ][ from markdown ]
 
 =[ draft ]

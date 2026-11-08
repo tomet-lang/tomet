@@ -18,7 +18,7 @@
 //!   | interpolation of a file through `tomet_tree::for_each_interpolation`.
 //!   | A `::name(...)` is a [`Declaration`]: sits in the file preamble header ([`File::header`]),
 //!   | about the file and attached to nothing, so it has no placement and takes no connect.
-//!   | A `:name(...)` is a [`Connect`]: metadata about its owner, with no id, no connects of its own
+//!   | A `::name(...)` is a [`Connect`]: metadata about its owner, with no id, no connects of its own
 //!   | and no placement. A `<?matcher(...)>` is a [`Hole`] (a matcher, optional, in place of a name).
 //!   | `<...>` is one family in the *syntax* (the CST has one `SLOT` node, whatever the mark inside); the
 //!   | AST has no node for the family. It names nodes by role, never by spelling, and has a node only
@@ -85,7 +85,7 @@ pub enum Value {
     /// (`string`, `int`, `float`) to the plain value they stand for. Every
     /// other callee -- `list` (a type: `list(string)`), `enum`, a typo -- is
     /// kept here as an uninterpreted `String`, the same way the parser never
-    /// judges a `:name(...)` connect's name; only `tomet-semantics` knows
+    /// judges a `::name(...)` connect's name; only `tomet-semantics` knows
     /// which of those are real. `list(a, b)` is not a sequence: write
     /// `(a, b)`.
     ///
@@ -117,7 +117,7 @@ pub enum Value {
     /// positions share.
     ///
     /// Parsed with `allow_colon_connect: false`, same as
-    /// [`crate::Entry::Element`] -- `:name(...)` stays unavailable inside
+    /// [`crate::Entry::Element`] -- `::name(...)` stays unavailable inside
     /// any value position, deliberately: a `{...}`/`(...)` group is data,
     /// and a connect changes what the *enclosing* element means, which
     /// has no sense for an element that is itself sitting inside a value.
@@ -343,7 +343,7 @@ impl Block {
 ///
 /// Contains its nesting level (`=` is 1, `==` is 2, etc.), title inlines,
 /// optional arguments (`(id: intro)`), optional value group (`{attrs}`),
-/// connects (`:as(...)`), and child blocks (paragraphs, lists, sub-sections)
+/// connects (`::as(...)`), and child blocks (paragraphs, lists, sub-sections)
 /// scoped to this section.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Section {
@@ -379,7 +379,7 @@ impl Section {
 /// add one later if a real want surfaces, with the use case stated
 /// alongside the field. `id`/`connects` were kept: `id` mirrors `Section`'s
 /// own anchor-reference use (`#(id)` on the whole list), and `connects` is
-/// what a `:rule(allow:(...))` attached to the list itself (restricting
+/// what a `::rule(allow:(...))` attached to the list itself (restricting
 /// what its own items may be) needs to live on.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct List {
@@ -406,7 +406,7 @@ impl List {
 /// (the combine notation), which is the item *and* an element of that name.
 ///
 /// It takes the groups an element does -- `(args)` is the item's marker,
-/// `{value}` its attributes, `#(id)` and `:connect`s -- and its `content` is
+/// `{value}` its attributes, `#(id)` and `::connect`s -- and its `content` is
 /// always there (possibly empty). It has no placement: an item is always a
 /// block of its own list. `name` is `None` for a plain item and the element's
 /// name for the combine notation.
@@ -707,7 +707,7 @@ impl fmt::Display for Name {
 }
 
 /// An element's own id, written `#(foobar)` right after its own
-/// `(args)[content]{value}` groups and before any `:name(...)` connect.
+/// `(args)[content]{value}` groups and before any `::name(...)` connect.
 ///
 /// A plain `String`, not [`Value`]: `#(...)` is parsed with a narrower,
 /// scalar-only grammar (a bare identifier-like token or a quoted
@@ -755,7 +755,7 @@ pub enum Placement {
 ///
 /// It sits in [`File::header`]: a `::` has to open its line and stand alone on it,
 /// and so has no [`Placement`]. And it is attached to nothing, so unlike an
-/// [`Element`] it takes no `:connect`.
+/// [`Element`] it takes no `::connect`.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Declaration {
     pub name: Name,
@@ -804,7 +804,7 @@ impl Bare {
 /// It is a box, `<...>`, whose head (the `?` mark, the matcher and the `(args)` and `{options}`
 /// groups) is inside and whose `[content]` follows the `>`. Its groups are read by the
 /// same code as an element's. Differences: its head is a *matcher*, not an element name, and it is
-/// optional (`<?>` and `<?(n)>` have none); and it takes no `:connect`. A box that does not close
+/// optional (`<?>` and `<?(n)>` have none); and it takes no `::connect`. A box that does not close
 /// or does not fit is text, so ordinary prose such as `本当に?(はい)` or `a < b` is never a hole.
 ///
 /// A hole sits where an element sits, so it is a variant of [`Block`], [`Inline`], [`Entry`]
@@ -834,8 +834,8 @@ impl Hole {
     }
 }
 
-/// A `:name(...)` connect stacked after an element, a section or a list
-/// (`@x(...):as(y):rule(...)`): metadata about its owner, not content of the
+/// A `::name(...)` connect stacked after an element, a section or a list
+/// (`@x(...)::as(y)::rule(...)`): metadata about its owner, not content of the
 /// document. It takes `(args)`, `[content]` and `{value}` like an element does,
 /// and nothing else: no `#(id)` (an id belongs to the owner, written before the
 /// first connect), no connects of its own, and no placement.
@@ -891,8 +891,8 @@ pub struct Data {
 /// `id` is a single slot, written `#(foobar)`, read after those three
 /// groups but strictly before any connect -- see [`Id`].
 ///
-/// `connects` is unrelated to those three: it is the `:name(...)` family
-/// stacked after them (`@x(...):as(y):rule(...)`), zero or more, each a
+/// `connects` is unrelated to those three: it is the `::name(...)` family
+/// stacked after them (`@x(...)::as(y)::rule(...)`), zero or more, each a
 /// [`Connect`]. Order-preserving, empty when nothing follows.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Element {
@@ -1140,7 +1140,7 @@ impl Group {
 /// where it stands.
 ///
 /// It is not an [`Element`]: it has no name, no `(args)` / `[content]` and no
-/// `#(id)`, and it never takes a `:connect`. It holds an expression and the
+/// `#(id)`, and it never takes a `::connect`. It holds an expression and the
 /// span of the whole `$`-form, and nothing else. It sits in three places, as
 /// [`Block::Interp`], [`Inline::Interp`] and [`Value::Interp`].
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

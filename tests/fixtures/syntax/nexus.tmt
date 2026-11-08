@@ -1,5 +1,5 @@
-// A nexus -- `@name`, `:name` or `::name` -- needs a primary group: `(args)`,
-// `[content]` or a `|` run. `{value}`, `#(id)` and a `:connect` only add to
+// A nexus -- `@name`, `::name` or `::name` -- needs a primary group: `(args)`,
+// `[content]` or a `|` run. `{value}`, `#(id)` and a `::connect` only add to
 // one of them and cannot stand alone. Every line here is a valid nexus; the
 // ones that are not live in `nexus-invalid-*.tmt`, one to a file because the
 // parser stops at the first error.
@@ -24,28 +24,28 @@
 
 @memo(a: 1){ k: v }#(third)
 
-@memo(){ k: v }#(fourth):rule(allow: (card))
+@memo(){ k: v }#(fourth)::rule(allow: (card))
 
 =[ Connects ]
 
-A nameless connect `:{...}` or `:(...)` is the one place `{...}` stands without
+A nameless connect `::{...}` or `::(...)` is the one place `{...}` stands without
 a nexus of its own: it puts data into the host it follows.
 
-@memo(a: 1):{ b: 2 }
+@memo(a: 1)::{ b: 2 }
 
-@memo():(b: 2)
+@memo()::(b: 2)
 
-@memo(a: 1):rule(allow: (card)):{ b: 2 }
+@memo(a: 1)::rule(allow: (card))::{ b: 2 }
 
-- 項目 :{ k: v }
+- 項目 ::{ k: v }
 
-- 項目 :(k: v)
+- 項目 ::(k: v)
 
-- 項目 :rule(allow: (card))
+- 項目 ::rule(allow: (card))
 
-= 見出し :{ k: v }
+= 見出し ::{ k: v }
 
-= 見出し :rule(allow: (card))
+= 見出し ::rule(allow: (card))
 
 =[ In running text ]
 

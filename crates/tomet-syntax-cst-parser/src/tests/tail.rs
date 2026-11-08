@@ -2,7 +2,7 @@ use crate::tail::TailScan;
 
 #[test]
 fn tail_scan_finds_candidates_and_chains() {
-    let src = "- text :name(arg) {key: val}\n";
+    let src = "- text ::name(arg) {key: val}\n";
     let mut scan = TailScan::new(src, 2);
     let cand = scan.next_candidate(2);
     assert_eq!(cand, Some(7)); // at ':'

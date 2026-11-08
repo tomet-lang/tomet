@@ -39,14 +39,14 @@
 //!  | order; here they're just `repeat(choice(...))`, so e.g. two
 //!  | `(args)` groups back to back would (harmlessly) both parse.
 //! -| **The nexus rule is applied, but not everywhere it is checked.** A
-//!  | nexus (`@name`, `::name`, `:name`) needs a primary group -- `(args)`,
-//!  | `[content]` or a `|` run -- and `{value}`, `#(id)` and a `:connect`
+//!  | nexus (`@name`, `::name`) needs a primary group -- `(args)`,
+//!  | `[content]` or a `|` run -- and `{value}`, `#(id)` and a `::connect`
 //!  | only add to one (`_nexus_groups` in `grammar.js`). So `::meta(a: 1)` and
 //!  | `@name(){ a: 1 }` are clean and `::meta{ a: 1 }`, `@name{}` and
 //!  | `@name#(id)` are `ERROR`s, as they are in the real parser. What the
 //!  | grammar cannot see is position: a lone `@name` is prose inline and an
 //!  | error as a block, so it is accepted everywhere (`me@example.com`
-//!  | must stay clean), and after it a `:rule(...)` or `:{...}` reads as
+//!  | must stay clean), and after it a `::rule(...)` or `::{...}` reads as
 //!  | punctuation and text rather than as the error the real parser
 //!  | reports. A `|` run on the line *after* its element
 //!  | (`@table` then `|[ a ][ b ]`) is not a primary group here either; see
@@ -476,9 +476,9 @@ mod tests {
     #[test]
     fn parses_colon_connect_syntax() {
         for src in [
-            "=[ Title ]:{ id: intro, tag: main }\n",
-            "@task[ Task A ]:{ id: taskA, priority: high }\n",
-            "@id(taskA):{ priority: high, tag: dev }\n",
+            "=[ Title ]::{ id: intro, tag: main }\n",
+            "@task[ Task A ]::{ id: taskA, priority: high }\n",
+            "@id(taskA)::{ priority: high, tag: dev }\n",
             // A bare positional `(...)` occupying the whole `(args)`
             // value -- as opposed to `a: (...)` under a named key,
             // which already works (see `parses_sequence_syntax_in_values`)
@@ -488,7 +488,7 @@ mod tests {
             // covered here: named-key form exercises the same
             // sequence + colon-connect interaction without hitting
             // that gap.
-            "@id(ids: (taskA, taskB)):{ tag: house }\n",
+            "@id(ids: (taskA, taskB))::{ tag: house }\n",
         ] {
             let tree = parse(src);
             assert!(
@@ -504,7 +504,7 @@ mod tests {
             "@memo(a: 1)[ x ]#(myid)\n",
             "@memo#(myid)(a: 1)\n",
             "=[ Title ]#(intro)\n",
-            "@task(a: 1):rule(allow: list(card))#(myid)\n",
+            "@task(a: 1)::rule(allow: (card))#(myid)\n",
         ] {
             let tree = parse(src);
             assert!(
@@ -534,7 +534,7 @@ mod tests {
     }
 
     /// `has_error()` alone is a weak check here (arbitrary prose parses
-    /// error-free too -- a `:name(...)` that fell through to plain text
+    /// error-free too -- a `::name(...)` that fell through to plain text
     /// would still pass it), so this also confirms a `connect` node
     /// genuinely exists as a *child of the element*, not just that the
     /// line parsed somehow. Regression coverage for the bug this feature
@@ -544,7 +544,7 @@ mod tests {
     /// `text`/`_element_group`/`connect`'s own comments in `grammar.js`.
     #[test]
     fn named_connect_reaches_the_grammar_after_a_closed_group() {
-        for src in ["@x(a: 1):as(y)\n", "@x[ a ]:as(y)\n", "@x():as(y)\n"] {
+        for src in ["@x(a: 1)::as(y)\n", "@x[ a ]::as(y)\n", "@x()::as(y)\n"] {
             let tree = parse(src);
             let root = tree.root_node();
             assert!(!root.has_error(), "expected no errors for {src:?}");
@@ -562,13 +562,13 @@ mod tests {
         }
     }
 
-    /// `@x():as(y):rule(z)` must produce *two* `connect` nodes as
+    /// `@x()::as(y)::rule(z)` must produce *two* `connect` nodes as
     /// siblings, not one nested inside the other -- matching the real
     /// parser's `parse_groups(cur, &mut connect_el, false)`, which stops
     /// a connect's own repeat before it can swallow a sibling connect.
     #[test]
     fn stacked_connects_are_flat_siblings_not_nested() {
-        let tree = parse("@x(a: 1):as(y):rule(z)\n");
+        let tree = parse("@x(a: 1)::as(y)::rule(z)\n");
         let root = tree.root_node();
         assert!(!root.has_error());
         let element = root
@@ -592,7 +592,7 @@ mod tests {
 
     #[test]
     fn section_supports_named_connect() {
-        let tree = parse("=[ h ]:rule(allow: list(card))\n");
+        let tree = parse("=[ h ]::rule(allow: (card))\n");
         let root = tree.root_node();
         assert!(!root.has_error());
         let section = root.named_child(0).unwrap();
@@ -829,18 +829,18 @@ mod tests {
         assert_eq!(root.child(0).unwrap().kind(), "block_comment");
     }
 
-    /// A nexus (`@name`, `::name`, `:name`) needs a primary group: `(args)`,
-    /// `[content]` or a `|` run. `{value}`, `#(id)` and a `:connect` only add
+    /// A nexus (`@name`, `::name`) needs a primary group: `(args)`,
+    /// `[content]` or a `|` run. `{value}`, `#(id)` and a `::connect` only add
     /// to one. The real parser rejects the second list; the grammar shows the
     /// same by erroring on it, so the highlighter does not paint a
     /// `@name{ ... }` as if it were an element.
     ///
-    /// Known gap: `@name:rule(a)`, `@name:{ a: 1 }` and `@name:(a)` are errors
+    /// Known gap: `@name::rule(a)`, `@name::{ a: 1 }` and `@name::(a)` are errors
     /// in the real parser, but here the lone `@name` is a complete (prose)
     /// element and the `:` after it is punctuation, so they read without an
     /// error node. Only a group the element would have taken (`{`, `#(`) can
-    /// be refused. The same goes for `- item :rule{}` and `= H :rule{}`: the
-    /// `:rule` is text and the `{}` the item's or heading's own attrs.
+    /// be refused. The same goes for `- item ::rule{}` and `= H ::rule{}`: the
+    /// `::rule` is text and the `{}` the item's or heading's own attrs.
     #[test]
     fn a_nexus_needs_a_primary_group() {
         for src in [
@@ -850,9 +850,9 @@ mod tests {
             "@name()#(id)\n",
             "@name{ a: 1 }(b: 1)\n",
             "@name#(id)(a)\n",
-            "@name()#(id):rule(a)\n",
-            "@name():{ a: 1 }\n",
-            "@name(a):(b)\n",
+            "@name()#(id)::rule(a)\n",
+            "@name()::{ a: 1 }\n",
+            "@name(a)::(b)\n",
             "-@name(a)\n",
             "text @name() more\n",
             "@quote| x\n",
@@ -861,11 +861,11 @@ mod tests {
             "::meta[ x ]\n",
             "::vocabulary(ns){ version: \"1.0.0\" }\n",
             "::dictionary(n){ \"a\": @term| x }\n",
-            "- item :rule(a)\n",
-            "- item :{ a: 1 }\n",
-            "- item :( a )\n",
-            "= H :rule(a)\n",
-            "= H :{ a: 1 }\n",
+            "- item ::rule(a)\n",
+            "- item ::{ a: 1 }\n",
+            "- item ::( a )\n",
+            "= H ::rule(a)\n",
+            "= H ::{ a: 1 }\n",
         ] {
             let tree = parse(src);
             assert!(
@@ -879,7 +879,7 @@ mod tests {
             "@name{ a: 1 }\n",
             "@name#(id)\n",
             "@name{}#(id)\n",
-            "@name():rule{}\n",
+            "@name()::rule{}\n",
             "-@name{}\n",
             "text @name{} more\n",
             "::name{}\n",
@@ -1025,7 +1025,7 @@ mod tests {
     #[test]
     fn highlights_captures_named_connect_as_punctuation() {
         use tree_sitter::StreamingIterator;
-        let src = "@doc():rule(allow)\n";
+        let src = "@doc()::rule(allow)\n";
         let tree = parse(src);
         let query_src = include_str!("../queries/highlights.scm");
         let query = tree_sitter::Query::new(&LANGUAGE.into(), query_src).unwrap();
@@ -1041,8 +1041,8 @@ mod tests {
             }
         }
 
-        // Verify that ":", "rule", "(", and ")" in :rule() are captured as "punctuation.special"
-        assert!(captured.contains(&("punctuation.special".into(), ":".into())));
+        // Verify that "::", "rule", "(", and ")" in ::rule() are captured as "punctuation.special"
+        assert!(captured.contains(&("punctuation.special".into(), "::".into())));
         assert!(captured.contains(&("punctuation.special".into(), "rule".into())));
         assert!(captured.contains(&("punctuation.special".into(), "(".into())));
         assert!(captured.contains(&("punctuation.special".into(), ")".into())));
@@ -1190,16 +1190,20 @@ mod tests {
     }
 
     #[test]
-    fn a_declaration_takes_groups_an_id_and_a_connect() {
-        let tree = parse("::x(a)[ b ]{ c: 1 }#(i):rule(allow:list(k))\n");
+    fn a_declaration_takes_groups_and_an_id_but_no_connect() {
+        let tree = parse("::x(a)[ b ]{ c: 1 }#(i)\n");
         assert!(
             !tree.root_node().has_error(),
             "{}",
             tree.root_node().to_sexp()
         );
         assert_eq!(nodes_of_kind(&tree, "document_element").len(), 1);
-        assert_eq!(nodes_of_kind(&tree, "connect").len(), 1);
         assert_eq!(nodes_of_kind(&tree, "id_group").len(), 1);
+        // The real parser refuses a connect on a declaration. Here a `::name(...)` after one
+        // reads as a declaration of its own, never as a `connect`.
+        let tree = parse("::x(a)::rule(b)\n");
+        assert_eq!(nodes_of_kind(&tree, "document_element").len(), 2);
+        assert_eq!(nodes_of_kind(&tree, "connect").len(), 0);
     }
 
     #[test]

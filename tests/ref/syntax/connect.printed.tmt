@@ -9,9 +9,9 @@
 - content {y: 2}
 - (x: 1) content {y: 2}
 
-- content:rule(allow: (card))
-- content:rule(allow: (card))
+- content::rule(allow: (card))
+- content::rule(allow: (card))
 
-=[title]:rule(allow: (card))
+=[title]::rule(allow: (card))
 
 =[title](x: 1) {y: 2}

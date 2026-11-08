@@ -17,9 +17,9 @@
 1. sorted
 
 - outline
-- outline :{}
+- outline ::{}
 - (x) checked
-- (x) checked :{}
+- (x) checked ::{}
 -. sorted
 ```
 

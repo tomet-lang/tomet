@@ -16,27 +16,27 @@
 
 @memo(a: 1){ k: v }#(third)
 
-@memo(){ k: v }#(fourth):rule(allow: (card))
+@memo(){ k: v }#(fourth)::rule(allow: (card))
 
 =[Connects]
-A nameless connect `:{...}` or `:(...)` is the one place `{...}` stands without
+A nameless connect `::{...}` or `::(...)` is the one place `{...}` stands without
 a nexus of its own: it puts data into the host it follows.
 
 @memo(a: 1){ b: 2 }
 
 @memo(b: 2)
 
-@memo(a: 1){ b: 2 }:rule(allow: (card))
+@memo(a: 1){ b: 2 }::rule(allow: (card))
 
 - 項目 {k: v}
 
 - (k: v) 項目
 
-- 項目:rule(allow: (card))
+- 項目::rule(allow: (card))
 
 =[見出し] {k: v}
 
-=[見出し]:rule(allow: (card))
+=[見出し]::rule(allow: (card))
 
 =[In running text]
 An `@` with no group after it is prose: me@example.com, or a mention of @someone.

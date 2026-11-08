@@ -9,13 +9,18 @@
 //!   -| Provides text-to-AST entry points: [`parse_file`], [`parse_value`], [`parse_data_file`].
 //!   -| Bridges lossless CST parsing and typed AST representations.
 //! - (Nexus Errors)
-//!   -| Every entry point refuses a nexus (`@name`, `::name`, `:name`) that has no primary group,
-//!    | `(args)` or `[content]`, with an error at the nexus: `@name`, `@name{}`, `@name#(id)`,
-//!    | `@name:rule(a)`, `@name:{a: 1}`, `::name{}`, `:name{}` on an owner. A `::` declaration
-//!    | takes no connect. This holds for blocks, inline text, values, `-@name` combine items and
-//!    | the `::` header of a data file ([`parse_data_file`]). A bare `@name` inside running text
-//!    | is text, and `:{...}` / `:(...)` on an owner that has a primary group stay valid. The
-//!    | grammar is in the `tomet-cst-parser` crate docs; the refusal is `tomet-lowering`'s.
+//!   -| Every entry point refuses a nexus (`@name`, a `::name` declaration, a `::name` connect)
+//!    | that has no primary group, `(args)` or `[content]`, with an error at the nexus: `@name`,
+//!    | `@name{}`, `@name#(id)`, `@name::rule(a)`, `@name::{a: 1}`, `::name{}`, `::name{}` on an
+//!    | owner. A `::` declaration takes no connect. This holds for blocks, inline text, values,
+//!    | `-@name` combine items and the `::` header of a data file ([`parse_data_file`]). A bare
+//!    | `@name` inside running text is text, and `::{...}` / `::(...)` on an owner that has a
+//!    | primary group stay valid. The grammar is in the `tomet-cst-parser` crate docs; the
+//!    | refusal is `tomet-lowering`'s.
+//! - (Connects)
+//!   -| A connect is `::name(...)` / `::{...}`. The single-colon `:name(...)` / `:{...}` is
+//!    | refused with the spelling to write instead, for `:` only separates `key: value`.
+//!    | `::id(x)` and `::meta(a: 1)` read as the `#(x)` and `{a: 1}` of their owner.
 
 pub use tomet_lowering::{Error, Result};
 

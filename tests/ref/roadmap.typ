@@ -55,7 +55,7 @@ CLI/Library機能を強化する
 #line(length: 100%)
 
 - x 要素設定 (.settings.tmt, json, yaml)
-- x コネクト構文 (`:(){}`)
+- x コネクト構文 (`::(){}`)
 - x `args`推論 (基本要素対応, カスタム要素対応, positional: \[ title, priority \])
 - x `@`推論
 - x 代入、関数構文 (`${var}` `compute`,`resolve`)

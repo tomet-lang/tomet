@@ -19,7 +19,7 @@
 @memo[]{ k: v }#(fourth)
 
 =[Connects]
-A nameless connect `:{...}` or `:(...)` is the one place `{...}` stands without
+A nameless connect `::{...}` or `::(...)` is the one place `{...}` stands without
 a nexus of its own: it puts data into the host it follows.
 
 @memo[]{ a: "1", b: "2" }

@@ -1,4 +1,4 @@
-//! What the tree says of a nexus -- `@name`, `::name`, `:name` -- and its groups. The tree never
+//! What the tree says of a nexus -- `@name`, a `::name` declaration or connect -- and its groups. The tree never
 //! fails: a nexus without a primary group is a form with no `ARGS`/`CONTENT` in it, for lowering
 //! to refuse; what is running text is not a form at all.
 
@@ -49,7 +49,7 @@ fn a_bare_name_the_next_line_folds_into_is_text() {
         "ping @name now\n",
         "foo@bar.com\n",
         "@name: hello\n",
-        // `:name` with no group is not a connect.
+        // `::name` with no group is not a connect.
         "@name:other\n",
         "@name :other\n",
         "user@host:22\n",
@@ -137,11 +137,11 @@ fn an_inline_name_with_a_group_is_a_form_and_without_one_is_not() {
         [(K::INLINE_FORM, vec![K::SIGIL, K::ID_GROUP])]
     );
     assert_eq!(
-        forms("a @name:rule(x) b\n"),
+        forms("a @name::rule(x) b\n"),
         [(K::INLINE_FORM, vec![K::SIGIL, K::CONNECT])]
     );
     assert_eq!(
-        forms("a @name:{x: 1} b\n"),
+        forms("a @name::{x: 1} b\n"),
         [(K::INLINE_FORM, vec![K::SIGIL, K::CONNECT])]
     );
     assert!(forms("a @name b\n").is_empty());
@@ -149,9 +149,9 @@ fn an_inline_name_with_a_group_is_a_form_and_without_one_is_not() {
 
 #[test]
 fn a_connect_where_none_is_taken_does_not_make_the_name_a_form() {
-    // In the text of a full-form item no connect is taken, so `@name:rule(a)` is a bare name
+    // In the text of a full-form item no connect is taken, so `@name::rule(a)` is a bare name
     // and text; claiming it as a form would only leave a form with nothing in it.
-    assert!(forms("- {a: 1} see @name:rule(a)\n").is_empty());
+    assert!(forms("- {a: 1} see @name::rule(a)\n").is_empty());
 }
 
 #[test]
@@ -176,7 +176,7 @@ fn a_declaration_keeps_a_connect_in_the_tree() {
         [(K::BLOCK_FORM, vec![K::SIGIL, K::CONNECT])]
     );
     assert_eq!(
-        forms("::name(a):{b: 1}\n"),
+        forms("::name(a)::{b: 1}\n"),
         [(K::BLOCK_FORM, vec![K::SIGIL, K::ARGS, K::CONNECT])]
     );
 }
@@ -184,16 +184,16 @@ fn a_declaration_keeps_a_connect_in_the_tree() {
 #[test]
 fn a_bracket_less_line_claims_a_trailing_connect_that_is_structurally_one() {
     // Whether the connect has a primary group is lowering's to judge, as for a full-form head.
-    assert_eq!(count("- item :rule(a)\n", K::CONNECT), 1);
-    assert_eq!(count("- item :rule(a):other(b)\n", K::CONNECT), 2);
-    assert_eq!(count("- item :rule{a: 1}\n", K::CONNECT), 1);
-    assert_eq!(count("- item :rule{}\n", K::CONNECT), 1);
-    assert_eq!(count("= title :rule{a: 1}\n", K::CONNECT), 1);
-    assert_eq!(count("- item {a: 1} :rule{}\n", K::CONNECT), 1);
+    assert_eq!(count("- item ::rule(a)\n", K::CONNECT), 1);
+    assert_eq!(count("- item ::rule(a)::other(b)\n", K::CONNECT), 2);
+    assert_eq!(count("- item ::rule{a: 1}\n", K::CONNECT), 1);
+    assert_eq!(count("- item ::rule{}\n", K::CONNECT), 1);
+    assert_eq!(count("= title ::rule{a: 1}\n", K::CONNECT), 1);
+    assert_eq!(count("- item {a: 1} ::rule{}\n", K::CONNECT), 1);
     // A nameless connect holds no name to need a group for.
-    assert_eq!(count("- item :{a: 1}\n", K::CONNECT), 1);
-    assert_eq!(count("- item :(a)\n", K::CONNECT), 1);
-    assert_eq!(count("= title :{a: 1}\n", K::CONNECT), 1);
+    assert_eq!(count("- item ::{a: 1}\n", K::CONNECT), 1);
+    assert_eq!(count("- item ::(a)\n", K::CONNECT), 1);
+    assert_eq!(count("= title ::{a: 1}\n", K::CONNECT), 1);
 }
 
 #[test]
@@ -206,8 +206,8 @@ fn text_that_is_not_structurally_a_connect_is_not_claimed() {
         // No group at all, or a group that does not read.
         "- note: a:b\n",
         "- foo:bar{not a map}\n",
-        "- a :b{c}\n",
-        "- item :rule[x]\n",
+        "- a ::b{c}\n",
+        "- item ::rule[x]\n",
     ] {
         assert_eq!(count(src, K::CONNECT), 0, "{src:?}");
     }
@@ -216,7 +216,7 @@ fn text_that_is_not_structurally_a_connect_is_not_claimed() {
 #[test]
 fn a_full_form_item_or_heading_claims_its_named_connect_whatever_it_holds() {
     // No doubt about what these are, so the tree keeps the connect for lowering to judge.
-    assert_eq!(count("-#(id) :rule{}\n", K::CONNECT), 1);
-    assert_eq!(count("=#(id) :rule{}\n", K::CONNECT), 1);
-    assert_eq!(count("=[ T ]:rule{x: 1}\n", K::CONNECT), 1);
+    assert_eq!(count("-#(id) ::rule{}\n", K::CONNECT), 1);
+    assert_eq!(count("=#(id) ::rule{}\n", K::CONNECT), 1);
+    assert_eq!(count("=[ T ]::rule{x: 1}\n", K::CONNECT), 1);
 }

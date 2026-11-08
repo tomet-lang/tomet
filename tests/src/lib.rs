@@ -100,7 +100,7 @@ pub fn read_fixture(rel: &Path) -> String {
 /// what that fixture exists to demonstrate.
 ///
 /// The `syntax/nexus-invalid-*` fixtures are the standing entries: each is one
-/// form the nexus rule refuses (a `@name`, `::name` or `:name` with no primary
+/// form the nexus rule refuses (a `@name`, `::name` or `::name` with no primary
 /// group), kept apart because the parser stops at the first error. `nexus.rs`
 /// holds each to the place and reason it is refused for.
 pub const KNOWN_UNPARSEABLE: &[&str] = &[
@@ -284,13 +284,13 @@ pub const KNOWN_TS_ERRORS: &[(&str, &[&str])] = &[
     // `@conflict`'s own positional shorthand (`@conflict([...], [...])`).
     ("syntax/conflict.tmt", &[ANY_ERROR]),
     // All new to `tomet-parser`, none ported to `grammar.js`: a
-    // bracket-less sugar body's own bare `:(...)`/`:{...}` connect (the
+    // bracket-less sugar body's own bare `::(...)`/`::{...}` connect (the
     // grammar never read past the sugar text at all before), the same
     // connect appearing after the single-blank-line gap `skip_element_gap`
     // grants every sigil's own groups (the exact wall
     // `examples/dirs.tmt`'s entry above already names -- tree-sitter's
     // internal lexer cannot look past a newline for an opener without an
-    // external scanner token), and a list item's own `:name(...)` (no
+    // external scanner token), and a list item's own `::name(...)` (no
     // grammar.js rule ever routed a connect to the item rather than to
     // whatever element sits inside it). The full-form (bracketed) cases
     // in this fixture may well already parse cleanly; recorded coarsely
@@ -306,8 +306,8 @@ pub const KNOWN_TS_ERRORS: &[(&str, &[&str])] = &[
     // entries record; the text of the error node is whatever the recovery
     // lands on, so none of them pins it. The rest read as prose in the
     // grammar and are not listed: a lone `@name` has no position to be an
-    // error in, so `@name:rule(...)`, `@name:{...}` and `@name:(...)` are text,
-    // a bare `@name`/`@hr` is an element, and `- 項目 :rule{...}` is a
+    // error in, so `@name::rule(...)`, `@name::{...}` and `@name::(...)` are text,
+    // a bare `@name`/`@hr` is an element, and `- 項目 ::rule{...}` is a
     // list item with `{...}` attrs.
     ("syntax/nexus-invalid-combine-data.tmt", &[ANY_ERROR]),
     ("syntax/nexus-invalid-connect-name-data.tmt", &[ANY_ERROR]),

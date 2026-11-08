@@ -23,7 +23,7 @@
 //!   | Not a type of this crate. A [`Node::Section`] borrows the section out of the AST of the
 //!   | document that holds it, and its children are the sections nested in it. A section has no
 //!   | declarations, so its heading part is its title, `(args)`, `{value}`, `#(id)` and
-//!   | `:connect`s.
+//!   | `::connect`s.
 //!
 //! =[ What this crate does not do ]
 //!

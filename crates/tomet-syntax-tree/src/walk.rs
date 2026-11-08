@@ -10,7 +10,7 @@
 //! All structural walks across the workspace route through [`children`] and [`walk`].
 //!
 //! The groups of a node come in one order: `(args)`, `{value}`, `[content]`, then its
-//! `:connect`s. The AST keeps no order of groups, so this is the order of every walker.
+//! `::connect`s. The AST keeps no order of groups, so this is the order of every walker.
 //!
 //! The one exception to "one recursion" is the mutable walk ([`for_each_element_mut`],
 //! [`for_each_id_mut`], [`fill_interpolations`]): a mutable walk cannot share the borrow with
@@ -47,7 +47,7 @@ pub enum Place {
     Part,
     /// A block of a `[content]`, or of a `[...]` value.
     Content,
-    /// A `:connect`.
+    /// A `::connect`.
     Connect,
     /// An item of a list.
     Item,
@@ -376,7 +376,7 @@ pub fn walk_node_scoped<'a, B>(
 }
 
 /// Visits every node of `file` in document order, each before what it holds, wherever it sits:
-/// running text, section titles, `:connect`s, and inside a [`Value`] (`Seq`, `Map`, `Call`, a
+/// running text, section titles, `::connect`s, and inside a [`Value`] (`Seq`, `Map`, `Call`, a
 /// nested element, `[...]` blocks). It is the walk that skips nothing.
 pub fn for_each_node(file: &File, mut f: impl FnMut(Node<'_>)) {
     let _ = walk(file, &mut |node, _| {
@@ -386,7 +386,7 @@ pub fn for_each_node(file: &File, mut f: impl FnMut(Node<'_>)) {
 }
 
 /// Every node of `file` that is part of what the document says: [`for_each_node`] without the
-/// `:connect`s, which are metadata about their owner and not a part of the document (see
+/// `::connect`s, which are metadata about their owner and not a part of the document (see
 /// [`for_each_descendant`]). The element, list and section walkers are filters over this.
 fn for_each_part(file: &File, mut f: impl FnMut(Node<'_>)) {
     let _ = walk(file, &mut |node, place| {
@@ -400,7 +400,7 @@ fn for_each_part(file: &File, mut f: impl FnMut(Node<'_>)) {
 
 /// Traverses all elements in `file` in document order and executes `f` for each.
 ///
-/// An element in a `:connect` is not reached.
+/// An element in a `::connect` is not reached.
 pub fn for_each_element(file: &File, mut f: impl FnMut(&Element)) {
     for_each_part(file, |node| {
         if let Some(el) = node.element() {
@@ -440,7 +440,7 @@ pub fn for_each_list(file: &File, mut f: impl FnMut(&List)) {
 }
 
 /// Visits every [`Section`] in `file`, in document order, including ones nested under another
-/// section's body or in an element's content: a heading's own `:name(...)` connect is checked
+/// section's body or in an element's content: a heading's own `::name(...)` connect is checked
 /// against its `blocks` ([`for_each_descendant_in_blocks`]) the way an element's connect is
 /// checked against its own content.
 pub fn for_each_section(file: &File, mut f: impl FnMut(&Section)) {
@@ -514,10 +514,10 @@ pub fn for_each_top_level_element(file: &File, mut f: impl FnMut(&Element)) {
 ///   `@thing(icon: @doc.icon("x"))` -- describes `thing`, it is not part of what `thing` holds.
 /// - the value of a `key: value` entry, for the same reason; only an element that is an entry of
 ///   `{value}` itself counts.
-/// - a `:connect`: it is metadata about its owner, consumed only by the dedicated check that
+/// - a `::connect`: it is metadata about its owner, consumed only by the dedicated check that
 ///   understands the closed set of connect names. Feeding it through here would let `rule` in
-///   `=[ h ]:rule(...)` reach the same classification a real element gets, which is the confusion
-///   an element in a `:rule(...)` being reported as a disallowed *descendant* would be.
+///   `=[ h ]::rule(...)` reach the same classification a real element gets, which is the confusion
+///   an element in a `::rule(...)` being reported as a disallowed *descendant* would be.
 ///
 /// With `direct_only`, only the first level counts: an element is shown and not entered, a
 /// paragraph is entered (its inline elements are direct), and nothing else is.
@@ -573,7 +573,7 @@ pub fn for_each_descendant_of_item(item: &ListItem, direct_only: bool, f: impl F
 
 /// Every descendant reachable from `blocks`, in document order: [`for_each_descendant`]'s own
 /// `content` handling for any block sequence (a [`Section`]'s `blocks` has the same shape), so a
-/// heading's own `:rule(...)` can check what sits *under* the heading.
+/// heading's own `::rule(...)` can check what sits *under* the heading.
 pub fn for_each_descendant_in_blocks(blocks: &[Block], direct_only: bool, f: impl FnMut(Node<'_>)) {
     descendants(
         |g| {
@@ -586,7 +586,7 @@ pub fn for_each_descendant_in_blocks(blocks: &[Block], direct_only: bool, f: imp
     );
 }
 
-/// [`for_each_descendant_in_blocks`] for a list's own items: what a list's own `:rule(allow:...)`
+/// [`for_each_descendant_in_blocks`] for a list's own items: what a list's own `::rule(allow:...)`
 /// checks against. `direct_only` means just the items themselves, not what is inside each one.
 pub fn for_each_item_descendant(items: &[ListItem], direct_only: bool, f: impl FnMut(Node<'_>)) {
     descendants(
@@ -616,7 +616,7 @@ trait Sink {
 
 struct MutWalk<'s, S: Sink> {
     sink: &'s mut S,
-    /// Whether to go into `:connect`s.
+    /// Whether to go into `::connect`s.
     connects: bool,
 }
 
@@ -761,7 +761,7 @@ fn walk_mut(file: &mut File, sink: &mut impl Sink, connects: bool) {
 }
 
 /// Traverses all elements in `file` mutably in document order and executes `f` for each in place.
-/// It reaches what [`for_each_element`] reaches, in the same order: an element in a `:connect` is
+/// It reaches what [`for_each_element`] reaches, in the same order: an element in a `::connect` is
 /// not reached.
 pub fn for_each_element_mut(file: &mut File, f: impl FnMut(&mut Element)) {
     struct Elements<F>(F);
@@ -782,7 +782,7 @@ pub fn for_each_declaration_mut(file: &mut File, mut f: impl FnMut(&mut Declarat
 
 /// Hands `f` the `#(id)` of every node of `file` that can carry one (an element, a declaration, a
 /// section, a list, a list item, a bare entry), with the node's span, in document order, each node
-/// before what it holds. It goes into `:connect`s too, as [`for_each_node`] does; the nodes it
+/// before what it holds. It goes into `::connect`s too, as [`for_each_node`] does; the nodes it
 /// reaches are those for which [`Node::id`] answers.
 pub fn for_each_id_mut(file: &mut File, f: impl FnMut(&mut Option<Id>, Span)) {
     struct Ids<F>(F);
@@ -799,7 +799,7 @@ pub fn for_each_id_mut(file: &mut File, f: impl FnMut(&mut Option<Id>, Span)) {
 ///
 /// Unlike [`for_each_descendant_in_blocks`] this goes into `(args)` and the values of
 /// `key: value` entries, because here the question is "what is written anywhere in this value", and
-/// not "what does this element hold". `:connect`s are reached, as [`for_each_node`] reaches them.
+/// not "what does this element hold". `::connect`s are reached, as [`for_each_node`] reaches them.
 pub fn for_each_interpolation_in_value(value: &Value, mut f: impl FnMut(&Interpolation)) {
     let _ = walk_node(Node::Value(value), Place::Part, &mut |node, _| {
         if let Some(interp) = node.interpolation() {
@@ -1052,13 +1052,13 @@ mod tests {
 
     #[test]
     fn every_interpolation_is_found_wherever_it_sits() {
-        let src = "=[ ${title} ]:rule(allow: ${conn})\n\
+        let src = "=[ ${title} ]::rule(allow: ${conn})\n\
                    \n\
                    ${block}\n\
                    \n\
                    text ${inline} more\n\
                    \n\
-                   @x(a: ${arg}, b: (${nested})){ k: ${val} }[ ${content} ]:as(${connect})\n\
+                   @x(a: ${arg}, b: (${nested})){ k: ${val} }[ ${content} ]::as(${connect})\n\
                    \n\
                    - item ${item}\n";
         let file = tomet_ast_parser::parse_file(src).unwrap();

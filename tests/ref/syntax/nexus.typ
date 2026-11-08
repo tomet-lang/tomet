@@ -13,7 +13,7 @@
 
 = Connects
 
-A nameless connect `:{...}` or `:(...)` is the one place `{...}` stands without a nexus of its own: it puts data into the host it follows.
+A nameless connect `::{...}` or `::(...)` is the one place `{...}` stands without a nexus of its own: it puts data into the host it follows.
 
 - 項目
 

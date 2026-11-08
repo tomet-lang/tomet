@@ -13,10 +13,14 @@
 //!   -| Past [`tomet_cst::MAX_DEPTH`] levels the CST keeps the text flat in a `TOO_DEEP` node,
 //!    | and lowering refuses it with an error.
 //! - (Nexus Primary Group)
-//!   -| Lowering refuses a nexus (`@name`, `::name`, `:name`) without a primary group, `(args)`
-//!    | or `[content]`, at the nexus, before it reads any group: a nameless `:(...)` connect would
-//!    | otherwise merge into the args and pass for them. A `::` declaration takes no connect.
-//!    | The grammar is in the `tomet-cst-parser` crate docs.
+//!   -| Lowering refuses a nexus (`@name`, a `::name` declaration, a `::name` connect) without a
+//!    | primary group, `(args)` or `[content]`, at the nexus, before it reads any group: a
+//!    | nameless `::(...)` connect would otherwise merge into the args and pass for them. A `::`
+//!    | declaration takes no connect. The grammar is in the `tomet-cst-parser` crate docs.
+//! - (Connects)
+//!   -| A connect is `::name(...)` or the nameless `::{...}` / `::(...)`. The retired single-colon
+//!    | form is kept in the CST as a connect and refused here, with the spelling to write.
+//!    | `::id(x)` and `::meta(a: 1)` are the `#(x)` and `{a: 1}` of their owner, written out.
 
 pub mod element;
 pub mod error;

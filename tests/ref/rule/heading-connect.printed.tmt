@@ -1,1 +1,1 @@
-=[Notes]:rule(allow: (card))
+=[Notes]::rule(allow: (card))

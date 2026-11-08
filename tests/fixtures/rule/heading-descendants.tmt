@@ -1,4 +1,4 @@
-=[ Notes ]:rule(allow:(card))
+=[ Notes ]::rule(allow:(card))
 
 @card(title:"Alpha")[ First entry. ]
 ;@heading[ This is disallowed. ]

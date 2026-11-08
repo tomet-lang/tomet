@@ -38,7 +38,7 @@ pub fn classify_in(
     tomet_semantics::refuse_declaration_as_element(el.name, bindings.classify(el.name)?)
 }
 
-/// What a `:rule(allow: (...))` calls a plain `- item`, which has no name
+/// What a `::rule(allow: (...))` calls a plain `- item`, which has no name
 /// to be called by.
 pub const PLAIN_ITEM_KIND_NAME: &str = "item";
 
@@ -240,7 +240,7 @@ pub fn check_singletons_and_regions(doc: &File, bindings: &Bindings, errors: &mu
 
 /// Everything written in `node` and under it: an element, and a list item that names one.
 ///
-/// `(args)`, the value of a `key: value` entry and a `:connect` are left out, as a descendant walk
+/// `(args)`, the value of a `key: value` entry and a `::connect` are left out, as a descendant walk
 /// leaves them out: they describe their owner and are not part of what it holds.
 fn visit_all(node: Node<'_>, place: Place, visit: &mut impl FnMut(Node<'_>)) {
     let _ = tomet_tree::walk_node(node, place, &mut |node, place| {

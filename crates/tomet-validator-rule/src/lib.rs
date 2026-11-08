@@ -1,6 +1,6 @@
-//! Node-level constraint and `:rule` connect validation engine.
+//! Node-level constraint and `::rule` connect validation engine.
 //!
-//! Enforces `:rule(allow:(...), direct:@bool)` connect elements, verifying that
+//! Enforces `::rule(allow:(...), direct:@bool)` connect elements, verifying that
 //! descendants of elements, sections, or lists comply with allowed kind specifications.
 
 pub mod decode;
@@ -13,7 +13,7 @@ use tomet_span::Span;
 use tomet_tree::Node;
 use tomet_validator_core::{Diagnostic, child_kind_name};
 
-/// Enforces every `:rule(allow:(...))` connect found anywhere in the
+/// Enforces every `::rule(allow:(...))` connect found anywhere in the
 /// document -- on an ordinary element's own `connects`, on a heading's
 /// (`Section.connects`), and on a list's own (`List.connects`).
 pub fn check_rule_connects(doc: &File, bindings: &Bindings, errors: &mut Vec<Diagnostic>) {
@@ -65,7 +65,7 @@ pub fn check_one_connect(
     }
 }
 
-/// `:rule(...)`'s own semantics: decode its args, then walk its owner's
+/// `::rule(...)`'s own semantics: decode its args, then walk its owner's
 /// descendants via `walk_descendants`, checking each one's classified name
 /// against the rule's `allow` list.
 pub fn check_one_rule(

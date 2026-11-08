@@ -286,8 +286,8 @@ pub fn render_declaration(declaration: &Declaration, config: &PrinterConfig) -> 
     out
 }
 
-/// The `()` a nexus (`@name`, `::name`, `:name`) is written with when it has neither `(args)`
-/// nor `[content]`: it stands on a primary group, and `{value}`, `#(id)` and a `:connect` only add
+/// The `()` a nexus (`@name`, a `::name` declaration or connect) is written with when it has neither `(args)`
+/// nor `[content]`: it stands on a primary group, and `{value}`, `#(id)` and a `::connect` only add
 /// to one, so without it the head would not read back. Empty, when it already has one.
 fn empty_primary_group(has_args: bool, has_content: bool) -> &'static str {
     if has_args || has_content { "" } else { "()" }
@@ -403,10 +403,10 @@ pub(crate) fn render_group_entries(entries: &[Entry], config: &PrinterConfig) ->
     }
 }
 
-/// Prints each of `connects` as `:name(...)`/`:name[...]`/`:name{...}`,
+/// Prints each of `connects` as `::name(...)`/`::name[...]`/`::name{...}`,
 /// stacked in source order right after whatever comes before it -- a
 /// connect takes the same `(args)`/`[content]`/`{value}` groups an
-/// element does, introduced by `:` instead of `@`, so this reuses the
+/// element does, introduced by `::` instead of `@`, so this reuses the
 /// same group renderers [`render_element`]'s own generic tail does. A
 /// connect has no `#(id)` and no connects of its own.
 ///
@@ -416,7 +416,7 @@ pub(crate) fn render_group_entries(entries: &[Entry], config: &PrinterConfig) ->
 pub(crate) fn render_connects(connects: &[Connect], config: &PrinterConfig) -> String {
     let mut out = String::new();
     for connect in connects {
-        out.push(':');
+        out.push_str("::");
         out.push_str(&connect.name.to_string());
         out.push_str(empty_primary_group(
             connect.data.args.is_some(),

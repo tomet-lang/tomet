@@ -80,7 +80,7 @@ pub enum SyntaxKind {
     CODE_BLOCK,
     CALLOUT,
     SIGIL,
-    /// `@a.b-c`, `::name`, `:name`, `<?name>`: an identifier or dot-separated
+    /// `@a.b-c`, `::name`, `<?name>`: an identifier or dot-separated
     /// name assembled from name tokens.
     NAME,
     /// A run of fence characters (`BACKTICK` for code blocks, `MINUS` for thematic breaks).
@@ -96,7 +96,7 @@ pub enum SyntaxKind {
     /// `#(foobar)` -- a single id slot, read after `ARGS`/`CONTENT`/
     /// `VALUE_DATA` but before any `CONNECT`.
     ID_GROUP,
-    /// `:name(...)`, `:(...)`, `:{...}` -- a group joined to the preceding form.
+    /// `::name(...)`, `::(...)`, `::{...}` -- a group joined to the preceding form.
     CONNECT,
     VALUE_DATA,
     VALUE_CHILDREN,

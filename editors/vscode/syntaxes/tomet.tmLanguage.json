@@ -276,8 +276,8 @@
     },
 
     "named-connect": {
-      "comment": "Named connect syntax: `:name(...)`, `:name[...]`, `:name{...}`. Subdued punctuation gray styling.",
-      "begin": "(?<![A-Za-z0-9_.-])(:)([A-Za-z_][A-Za-z0-9_-]*(?:\\.[A-Za-z_][A-Za-z0-9_-]*)*)(?=[ \\t]*[(\\[{])",
+      "comment": "Named connect syntax: `::name(...)`, `::name[...]`, `::name{...}`. Subdued punctuation gray styling.",
+      "begin": "(?<![A-Za-z0-9_.-])(::)([A-Za-z_][A-Za-z0-9_-]*(?:\\.[A-Za-z_][A-Za-z0-9_-]*)*)(?=[ \\t]*[(\\[{])",
       "beginCaptures": {
         "1": {
           "name": "punctuation.definition.connect.sigil.tomet punctuation.definition.tag.tomet"
@@ -295,8 +295,8 @@
     },
 
     "bare-connect": {
-      "comment": "Bare (nameless) connect syntax: `:()`, `:{...}`, `:(){...}`. Highlighted with distinct keyword/operator/storage color.",
-      "begin": "(?<![A-Za-z0-9_.-])(:)(?=[ \\t]*[(\\[{])",
+      "comment": "Bare (nameless) connect syntax: `::()`, `::{...}`, `::(){...}`. Highlighted with distinct keyword/operator/storage color.",
+      "begin": "(?<![A-Za-z0-9_.-])(::)(?=[ \\t]*[(\\[{])",
       "beginCaptures": {
         "1": {
           "name": "keyword.operator.connect.bare.tomet keyword.control.connect.tomet storage.type.connect.tomet"

@@ -1,4 +1,4 @@
-//! Lowering refuses a nexus -- `@name`, `::name`, `:name` -- that has no primary group, `(args)`
+//! Lowering refuses a nexus -- `@name`, a `::name` declaration or connect -- that has no primary group, `(args)`
 //! or `[content]`, at the offset where the nexus begins; the tree it reads is the CST's, whole.
 
 use crate::{Error, lower_data_file, lower_declaration, lower_file, lower_value};
@@ -27,9 +27,9 @@ fn a_block_nexus_without_a_primary_group_is_refused_where_it_begins() {
         ("@name{}\n", 0),
         ("@name#(id)\n", 0),
         ("@name{}#(id)\n", 0),
-        ("@name:rule(a)\n", 0),
-        ("@name:{a: 1}\n", 0),
-        ("@name:(a: 1)\n", 0),
+        ("@name::rule(a)\n", 0),
+        ("@name::{a: 1}\n", 0),
+        ("@name::(a: 1)\n", 0),
         ("a\n\n@name{}\n", 3),
         ("::name\n", 0),
         ("::name{}\n", 0),
@@ -46,16 +46,16 @@ fn a_block_nexus_without_a_primary_group_is_refused_where_it_begins() {
 
 #[test]
 fn a_declaration_refuses_a_connect_before_it_reads_any_group() {
-    // A nameless `:(...)` would otherwise be read as the declaration's own args.
+    // A nameless `::(...)` would otherwise be read as the declaration's own args.
     for src in [
-        "::name:(a: 1)\n",
-        "::name:{a: 1}\n",
-        "::name(a):{b: 1}\n",
-        "::name():rule(a)\n",
+        "::name::(a: 1)\n",
+        "::name::{a: 1}\n",
+        "::name(a)::{b: 1}\n",
+        "::name()::rule(a)\n",
     ] {
         let e = refusal(file(src), src);
         assert!(
-            e.message.contains("takes no `:connect`"),
+            e.message.contains("takes no `::connect`"),
             "{src:?}: {}",
             e.message
         );
@@ -68,7 +68,7 @@ fn lower_declaration_holds_to_the_same_rule() {
     for (src, message) in [
         ("::meta{ a: 1 }\n", "needs a primary group"),
         ("::meta\n", "needs a primary group"),
-        ("::meta:(a: 1)\n", "takes no `:connect`"),
+        ("::meta:(a: 1)\n", "takes no `::connect`"),
     ] {
         let root = parse_cst(src);
         let node = root.children().next().expect("a declaration");
@@ -85,8 +85,8 @@ fn a_nexus_inside_a_value_is_held_to_it_too() {
     for (src, at) in [
         ("k: @name{}\n", 3),
         ("k: @name#(id)\n", 3),
-        ("k: @name:rule(a)\n", 3),
-        ("k: @name:{a: 1}\n", 3),
+        ("k: @name::rule(a)\n", 3),
+        ("k: @name::{a: 1}\n", 3),
         ("a: [ x @name{} ]\n", 7),
         ("k: (@name{})\n", 4),
     ] {
@@ -118,17 +118,17 @@ fn a_data_file_body_is_held_to_it_too() {
 #[test]
 fn a_named_connect_without_a_primary_group_is_refused_at_the_colon() {
     for (src, at) in [
-        ("@el(a):rule{x: 1}\n", 6),
-        ("@el(a):rule{}\n", 6),
-        ("-#(id) :rule{}\n", 7),
-        ("=#(id) :rule{}\n", 7),
+        ("@el(a)::rule{x: 1}\n", 6),
+        ("@el(a)::rule{}\n", 6),
+        ("-#(id) ::rule{}\n", 7),
+        ("=#(id) ::rule{}\n", 7),
         // A bracket-less body claims the connect all the same.
-        ("- item :rule{a: 1}\n", 7),
-        ("= H :rule{a: 1}\n", 4),
+        ("- item ::rule{a: 1}\n", 7),
+        ("= H ::rule{a: 1}\n", 4),
     ] {
         let e = refusal(file(src), src);
         assert!(
-            e.message.contains("`:rule` needs a primary group"),
+            e.message.contains("`::rule` needs a primary group"),
             "{src:?}: {}",
             e.message
         );
@@ -138,9 +138,9 @@ fn a_named_connect_without_a_primary_group_is_refused_at_the_colon() {
 
 #[test]
 fn a_nameless_connect_cannot_hold_content() {
-    let e = refusal(file("@el(a):[x]\n"), "@el(a):[x]");
+    let e = refusal(file("@el(a)::[x]\n"), "@el(a)::[x]");
     assert!(e.message.contains("nameless"), "{}", e.message);
-    assert_eq!(e.offset, 7);
+    assert_eq!(e.offset, 8);
 }
 
 #[test]
@@ -149,11 +149,11 @@ fn what_has_a_primary_group_lowers() {
         "@name()\n",
         "@name[ x ]\n",
         "@name\n| a\n",
-        "@name(a)[x]{k: 1}#(id):rule(b)\n",
-        "@el(a):{b: 1}\n",
-        "@el(a):(b: 1)\n",
+        "@name(a)[x]{k: 1}#(id)::rule(b)\n",
+        "@el(a)::{b: 1}\n",
+        "@el(a)::(b: 1)\n",
         "ping @alice\n",
-        "- item :{a: 1}\n",
+        "- item ::{a: 1}\n",
         "= heading {a: 1}\n",
         "- #(id)\n",
         "::kind(x)\n",

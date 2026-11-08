@@ -82,7 +82,7 @@ pub(crate) fn is_raw_element(el: ElementView<'_>) -> bool {
 }
 
 /// The spans of the text inside every raw element of `doc`, an element written as `-@raw ...` in
-/// a list item included. A raw element can sit anywhere an element can: in a `:connect` too, and
+/// a list item included. A raw element can sit anywhere an element can: in a `::connect` too, and
 /// in a hole's content. What is in `(args)` or is the value of a `key: value` entry is not text of
 /// the document, and is not looked at.
 pub(crate) fn collect_raw_spans(doc: &File, out: &mut Vec<(usize, usize)>) {

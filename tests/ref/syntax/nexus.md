@@ -22,7 +22,7 @@
 
 # Connects
 
-A nameless connect `:{...}` or `:(...)` is the one place `{...}` stands without
+A nameless connect `::{...}` or `::(...)` is the one place `{...}` stands without
 a nexus of its own: it puts data into the host it follows.
 
 <div data-tm-kind="memo" data-a="1"></div>

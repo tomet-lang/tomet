@@ -79,7 +79,7 @@ fn a_vocabularys_singleton_is_enforced_too() {
 }
 
 /// These test `check_rule_connects` directly rather than through
-/// `validate_document`, so the assertions stay about `:rule` alone --
+/// `validate_document`, so the assertions stay about `::rule` alone --
 /// nesting a block-shaped element (`@card`/`@heading`) inside another
 /// element's `[content]` also trips the unrelated, pre-existing
 /// `ShapeMismatch` check (inline position vs. block-required kind),
@@ -93,13 +93,13 @@ fn rule_errors(doc: &File, bindings: &Bindings) -> Vec<Diagnostic> {
 #[test]
 fn a_rule_with_only_allowed_descendants_is_clean() {
     let doc =
-        parse("@section[ @card(title:\"a\")[ x ] @card(title:\"b\")[ y ] ]:rule(allow:(card))\n");
+        parse("@section[ @card(title:\"a\")[ x ] @card(title:\"b\")[ y ] ]::rule(allow:(card))\n");
     assert_eq!(rule_errors(&doc, &Bindings::default()), vec![]);
 }
 
 #[test]
 fn a_disallowed_descendant_is_reported() {
-    let doc = parse("@section[ @card(title:\"a\")[ x ] @heading[ y ] ]:rule(allow:(card))\n");
+    let doc = parse("@section[ @card(title:\"a\")[ x ] @heading[ y ] ]::rule(allow:(card))\n");
     let errors = rule_errors(&doc, &Bindings::default());
     assert_eq!(errors.len(), 1, "{errors:?}");
     assert!(matches!(
@@ -110,7 +110,7 @@ fn a_disallowed_descendant_is_reported() {
 
 #[test]
 fn direct_true_does_not_recurse_past_the_first_level() {
-    let doc = parse("@section[ @card[ @heading[ z ] ] ]:rule(allow:(card), direct:true)\n");
+    let doc = parse("@section[ @card[ @heading[ z ] ] ]::rule(allow:(card), direct:true)\n");
     let errors = rule_errors(&doc, &Bindings::default());
     assert_eq!(
         errors,
@@ -121,7 +121,7 @@ fn direct_true_does_not_recurse_past_the_first_level() {
 
 #[test]
 fn without_direct_the_same_nested_heading_is_reported() {
-    let doc = parse("@section[ @card[ @heading[ z ] ] ]:rule(allow:(card))\n");
+    let doc = parse("@section[ @card[ @heading[ z ] ] ]::rule(allow:(card))\n");
     let errors = rule_errors(&doc, &Bindings::default());
     assert_eq!(errors.len(), 1, "{errors:?}");
     assert!(matches!(
@@ -132,7 +132,7 @@ fn without_direct_the_same_nested_heading_is_reported() {
 
 #[test]
 fn a_typoed_connect_name_is_reported() {
-    let doc = parse("@section[ x ]:rulle(allow:(card))\n");
+    let doc = parse("@section[ x ]::rulle(allow:(card))\n");
     let errors = rule_errors(&doc, &Bindings::default());
     assert_eq!(errors.len(), 1, "{errors:?}");
     assert!(matches!(
@@ -159,24 +159,24 @@ fn allow_list_resolves_a_namespaced_custom_element_via_bindings() {
         ..Bindings::default()
     };
 
-    let doc = parse("@section[ @ns.mycard() @card[a] ]:rule(allow:(card, ns.mycard))\n");
+    let doc = parse("@section[ @ns.mycard() @card[a] ]::rule(allow:(card, ns.mycard))\n");
     assert_eq!(rule_errors(&doc, &bindings), vec![]);
 }
 
-/// A heading's own `:rule(...)` (`Section.connects`, not an
+/// A heading's own `::rule(...)` (`Section.connects`, not an
 /// `Element`'s) used to do nothing at all: `check_rule_connects` only
 /// ever looked at `el.connects` via `for_each_element`, and a
 /// `Section` is not an `Element`, so its connect was never checked
 /// against anything underneath the heading.
 #[test]
 fn a_heading_rule_with_only_allowed_descendants_is_clean() {
-    let doc = parse("=[ Notes ]:rule(allow:(card))\n@card(title:\"a\")[ x ]\n");
+    let doc = parse("=[ Notes ]::rule(allow:(card))\n@card(title:\"a\")[ x ]\n");
     assert_eq!(rule_errors(&doc, &Bindings::default()), vec![]);
 }
 
 #[test]
 fn a_disallowed_descendant_under_a_heading_rule_is_reported() {
-    let doc = parse("=[ Notes ]:rule(allow:(card))\n@heading[ not allowed ]\n");
+    let doc = parse("=[ Notes ]::rule(allow:(card))\n@heading[ not allowed ]\n");
     let errors = rule_errors(&doc, &Bindings::default());
     assert_eq!(errors.len(), 1, "{errors:?}");
     assert!(matches!(
@@ -187,7 +187,7 @@ fn a_disallowed_descendant_under_a_heading_rule_is_reported() {
 
 #[test]
 fn a_typoed_connect_name_on_a_heading_is_reported() {
-    let doc = parse("=[ Notes ]:rulle(allow:(card))\n");
+    let doc = parse("=[ Notes ]::rulle(allow:(card))\n");
     let errors = rule_errors(&doc, &Bindings::default());
     assert_eq!(errors.len(), 1, "{errors:?}");
     assert!(matches!(
@@ -206,7 +206,7 @@ fn a_typoed_connect_name_on_a_heading_is_reported() {
 /// and the one `check_rule_connects`'s own tests cannot see.
 #[test]
 fn a_heading_rule_connect_is_not_misclassified_as_an_unknown_element() {
-    let doc = parse("=[ Notes ]:rule(allow:(card))\n@card(title:\"a\")[ x ]\n");
+    let doc = parse("=[ Notes ]::rule(allow:(card))\n@card(title:\"a\")[ x ]\n");
     let errors = validate_document(&doc);
     assert!(
         !errors
@@ -218,14 +218,14 @@ fn a_heading_rule_connect_is_not_misclassified_as_an_unknown_element() {
 
 #[test]
 fn a_rule_allowing_item_and_task_accepts_plain_and_task_list_items() {
-    let doc = parse("=[ Todo ]:rule(allow:(item, task))\n- a plain item\n-@task[ a task item ]\n");
+    let doc = parse("=[ Todo ]::rule(allow:(item, task))\n- a plain item\n-@task[ a task item ]\n");
     let errors = rule_errors(&doc, &Bindings::default());
     assert_eq!(errors, vec![]);
 }
 
 #[test]
 fn a_rule_allowing_only_task_rejects_plain_list_item() {
-    let doc = parse("=[ Todo ]:rule(allow:(task))\n- a plain item\n-@task[ a task item ]\n");
+    let doc = parse("=[ Todo ]::rule(allow:(task))\n- a plain item\n-@task[ a task item ]\n");
     let errors = rule_errors(&doc, &Bindings::default());
     assert_eq!(errors.len(), 1, "{errors:?}");
     assert!(matches!(
@@ -236,7 +236,7 @@ fn a_rule_allowing_only_task_rejects_plain_list_item() {
 
 #[test]
 fn a_rule_allowing_only_item_rejects_task_list_item() {
-    let doc = parse("=[ Todo ]:rule(allow:(item))\n- a plain item\n-@task[ a task item ]\n");
+    let doc = parse("=[ Todo ]::rule(allow:(item))\n- a plain item\n-@task[ a task item ]\n");
     let errors = rule_errors(&doc, &Bindings::default());
     assert_eq!(errors.len(), 1, "{errors:?}");
     assert!(matches!(
@@ -440,7 +440,7 @@ fn deck_with_content_allow() -> Bindings {
     // `entry` resolves bare here (the document's own `::kind(deck)`), which
     // `Bindings::classify` normalizes to `deck.entry` even though it's
     // written bare -- same pre-existing quirk `check_one_rule`'s own doc
-    // comment notes for `:rule(allow:...)`, so the allow-list has to name
+    // comment notes for `::rule(allow:...)`, so the allow-list has to name
     // it the same way.
     content: { allow: (deck.entry) }
     about: | カードの一覧。

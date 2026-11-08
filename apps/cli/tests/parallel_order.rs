@@ -76,7 +76,7 @@ fn setup_vault(guard: &mut TempVaultGuard) -> bool {
         fs::write(
             root.join(format!("03-val-err-{suffix}.tmt")),
             format!(
-                "@section(id:\"entries_{suffix}\")[\n  @heading[ Disallowed {suffix} ]\n]:rule(allow:(card))\n"
+                "@section(id:\"entries_{suffix}\")[\n  @heading[ Disallowed {suffix} ]\n]::rule(allow:(card))\n"
             ),
         )
         .unwrap();

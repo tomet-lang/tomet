@@ -1,6 +1,6 @@
 //! Where a bracket-less body's trailing groups can be: the lexical half of finding them.
 //!
-//! `- text {value}`, `= text #(id)`, `- text :connect(...)`: the groups at the end of a body's
+//! `- text {value}`, `= text #(id)`, `- text ::connect(...)`: the groups at the end of a body's
 //! line are the owner's, not the text's, but only if they are groups -- `- note: see (the
 //! manual)` ends in something that looks like one and is prose. Telling the two apart needs the
 //! real grammar (the groups are lowered and have to be valid), and the real grammar is not cheap:
@@ -98,7 +98,7 @@ impl<'a> TailScan<'a> {
 
     /// The first place at or after `from`, on the same line, where a body's trailing groups may
     /// begin: every `:`, and every `{` and `#(` that is not part of a connect (`:{...}`,
-    /// `:name(...)`) that starts earlier. A `(` alone is not one -- a parenthetical remark is
+    /// `::name(...)`) that starts earlier. A `(` alone is not one -- a parenthetical remark is
     /// prose -- and only reaches here through a `:`.
     pub(crate) fn next_candidate(&self, from: usize) -> Option<usize> {
         self.candidates
@@ -107,7 +107,7 @@ impl<'a> TailScan<'a> {
     }
 
     /// Where the groups that begin at `at` end the line, if they do and hold a group: the chain of
-    /// `{...}`, `(...)`, `#(...)`, `:name` and a closing `|` run from `at` on, with nothing else between
+    /// `{...}`, `(...)`, `#(...)`, `::name` and a closing `|` run from `at` on, with nothing else between
     /// them, up to a newline. The offset of that newline (or of the end of the text).
     pub(crate) fn chain(&mut self, at: usize) -> Option<usize> {
         let bytes = self.src.as_bytes();

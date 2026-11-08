@@ -62,7 +62,7 @@ fn directory_docs(
 // ---- finding a part by id ----------------------------------------------------
 
 /// The part with unique id `id`: an element, a declaration, a section, a list or a list item,
-/// wherever it sits in the document, in a `:connect` too.
+/// wherever it sits in the document, in a `::connect` too.
 pub(crate) fn find_part(doc: &File, id: &str) -> Option<Part> {
     let found = tomet_tree::walk(doc, &mut |node, _| {
         if node.id().is_some_and(|i| i.0 == id)

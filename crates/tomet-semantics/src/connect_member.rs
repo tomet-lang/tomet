@@ -1,14 +1,14 @@
 use tomet_ast::Name;
 
-/// The closed vocabulary of `:name(...)` connect identifiers
-/// (`@x(...):as(y):rule(...)`), parallel to but distinct from
+/// The closed vocabulary of `::name(...)` connect identifiers
+/// (`@x(...)::as(y)::rule(...)`), parallel to but distinct from
 /// [`crate::kind::ElementKind`]/[`crate::kind::builtin_kinds`] -- a
 /// connect name lives in its own namespace, not the element-name one, so
-/// `:rule` and a hypothetical `@rule` element do not collide.
+/// `::rule` and a hypothetical `@rule` element do not collide.
 ///
 /// Not to be confused with one other, unrelated thing this codebase also
-/// calls "connect": the bare `:(...)`/`:{...}` *value-merge* mechanism
-/// (`@memo(a:1):(b:2)`), which has nothing to do with names at all. That
+/// calls "connect": the bare `::(...)`/`::{...}` *value-merge* mechanism
+/// (`@memo(a:1)::(b:2)`), which has nothing to do with names at all. That
 /// one is parser-level, not semantic -- `tomet-syntax-parser/src/
 /// section.rs` folds it into the owning group's data as it parses,
 /// because this crate sits a layer above the parser and cannot be the
@@ -22,7 +22,7 @@ use tomet_ast::Name;
 /// (semantics).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ConnectMember {
-    /// `:rule(allow:(...), direct:@bool)` -- restricts what element
+    /// `::rule(allow:(...), direct:@bool)` -- restricts what element
     /// kinds may appear among an element's descendants (or, with
     /// `direct:true`, its immediate children only).
     Rule,
@@ -41,7 +41,7 @@ impl ConnectMember {
 /// keeps for element names.
 pub const CONNECT_MEMBERS: [(&str, ConnectMember); 1] = [("rule", ConnectMember::Rule)];
 
-/// A `:name(...)` whose name is not in [`CONNECT_MEMBERS`].
+/// A `::name(...)` whose name is not in [`CONNECT_MEMBERS`].
 ///
 /// Simpler than [`crate::kind::UnknownName`]: a connect name is never
 /// namespaced (see [`classify_connect_member`]'s first check), so there
@@ -66,12 +66,12 @@ impl std::fmt::Display for UnknownConnectMember {
 
 impl std::error::Error for UnknownConnectMember {}
 
-/// Classifies a connect's name (`:name(...)`'s `name`) against the closed
+/// Classifies a connect's name (`::name(...)`'s `name`) against the closed
 /// [`CONNECT_MEMBERS`] table.
 ///
 /// `name` is never namespaced -- a connect name is Tomet's own closed
 /// syntax, not something a document's vocabulary can extend, so
-/// `:ns.rule(...)` is unknown unconditionally rather than "namespace not
+/// `::ns.rule(...)` is unknown unconditionally rather than "namespace not
 /// in scope".
 pub fn classify_connect_member(name: &Name) -> Result<ConnectMember, UnknownConnectMember> {
     if !name.is_bare() {

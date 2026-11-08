@@ -11,7 +11,7 @@
 //! - (Facade Architecture)
 //!   | Re-exports and unifies:
 //!   | - `tomet-validator-core`: Base semantic element, ID duplicate, and argument checks.
-//!   | - `tomet-validator-rule`: Node constraint and `:rule` connect validation engine.
+//!   | - `tomet-validator-rule`: Node constraint and `::rule` connect validation engine.
 //!   | - `tomet-validator-blueprint`: Document structural blueprint extraction and conformance.
 //!   | - `tomet-validator-profile`: Whether a document keeps the promise of its `::profile(...)`.
 
