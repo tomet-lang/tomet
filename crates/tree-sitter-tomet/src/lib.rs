@@ -673,6 +673,36 @@ mod tests {
             .any(|i| tree_contains_kind(node.named_child(i).unwrap(), kind))
     }
 
+    /// `::` goes from a node to what hangs off it, and a dot reads inside the node: both
+    /// chain, and a call may follow either.
+    #[test]
+    fn parses_interpolation_connect() {
+        for src in [
+            "${self::path}\n",
+            "${u1::id}\n",
+            "${self::doc::meta}\n",
+            "${self::meta.tags}\n",
+            "${self::meta.tags.join(\", \")}\n",
+            "${#u1::meta.tag}\n",
+            "${tmt(\"a.tmt\")::meta.title}\n",
+            "${vault::docs.filter(d => d::meta.draft == false).map(d => d.link())}\n",
+            "${addr(dir:docs)::docs.item(0)}\n",
+            "${a :: b}\n",
+        ] {
+            let tree = parse(src);
+            assert!(
+                !tree.root_node().has_error(),
+                "expected no errors for {src:?}: {}",
+                tree.root_node().to_sexp()
+            );
+            assert!(find_kind(tree.root_node(), "interp_connect").is_some());
+        }
+        // A named argument is still `name: value`.
+        let tree = parse("${f(a: b::c)}\n");
+        assert!(!tree.root_node().has_error());
+        assert!(find_kind(tree.root_node(), "interp_named_arg").is_some());
+    }
+
     #[test]
     fn parses_interpolation_path_and_call() {
         for src in [

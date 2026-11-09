@@ -20,7 +20,7 @@
 受け手に対する操作（`contains`、日時の整形など）は関数ではなくメソッド（@file(tmtroot/spec/expressions/types.expr.tmt)）。関数は、二つの対等な値の関係と、受け手を持たない操作だけ。
 
 - 比較と論理積・論理和は演算子（@file(tmtroot/spec/expressions/operators.expr.tmt)）。`eq`、`ne`、`gt`、`gte`、`lt`、`lte`、`and`、`or` の関数はない。
-- `not(x)` は真偽値だけを受け取る。`Null`、`0`、空の文字列などを偽として扱うことはしない。`draft` が宣言されたフィールドなら、`not(d.meta.draft == true)` のように書く。
+- `not(x)` は真偽値だけを受け取る。`Null`、`0`、空の文字列などを偽として扱うことはしない。`draft` が宣言されたフィールドなら、`not(d::meta.draft == true)` のように書く。
 - `exists(x)` は、`x` が Null でなければ真。`x != null` と同じ意味で、読みやすさのために残している。
 - `emoji` は名前から絵文字を返す。知らない名前はエラー。`unicode` はコードポイントから文字を返す。
 - 比較できるのは、数同士、文字列同士、日時同士。それ以外の組み合わせはエラー。

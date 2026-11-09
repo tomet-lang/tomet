@@ -289,7 +289,7 @@ fn render_element_value(cx: &RenderCtx, value: &Group, out: &mut String) {
 /// `resolve_expressions` before any converter sees the tree.
 ///
 /// This used to evaluate with `evaluate_with_config` -- no
-/// `EvaluationContext` and no vault config, so `${self.path}`
+/// `EvaluationContext` and no vault config, so `${self::path}`
 /// resolved in CommonMark and not here, and `default.config.tmt`'s
 /// macros expanded in neither. No wrapper element is emitted now
 /// that the text is plain: `<span class="tm-interp">` carried no

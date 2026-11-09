@@ -659,7 +659,7 @@ fn an_id_is_found_wherever_the_node_sits() {
         .unwrap();
     for (id, name) in [("in_title", "a"), ("in_args", "c"), ("in_hole", "d")] {
         assert_eq!(
-            in_resolver(&resolver, &format!("#{id}.name")).unwrap(),
+            in_resolver(&resolver, &format!("#{id}::name")).unwrap(),
             text(name),
             "#{id}"
         );
@@ -668,46 +668,141 @@ fn an_id_is_found_wherever_the_node_sits() {
 
 #[test]
 fn a_leading_hash_picks_an_element_of_the_current_document() {
-    assert_eq!(in_vault("#c1.prop.n").unwrap(), int(1));
-    assert_eq!(in_vault("#c1.id").unwrap(), text("c1"));
-    assert_eq!(in_vault("#c1.name").unwrap(), text("card"));
+    assert_eq!(in_vault("#c1.n").unwrap(), int(1));
+    assert_eq!(in_vault("#c1::id").unwrap(), text("c1"));
+    assert_eq!(in_vault("#c1::name").unwrap(), text("card"));
 }
 
 #[test]
 fn the_leading_hash_is_self_hash() {
-    assert_eq!(
-        in_vault("self#c1.prop.n").unwrap(),
-        in_vault("#c1.prop.n").unwrap()
-    );
+    assert_eq!(in_vault("self#c1.n").unwrap(), in_vault("#c1.n").unwrap());
     assert_eq!(in_vault("#c1 == self#c1").unwrap(), EvalValue::Bool(true));
 }
 
 #[test]
-fn prop_merges_args_and_value_and_item_walks_a_list() {
-    assert_eq!(in_vault("#c1.prop.extra").unwrap(), text("yes"));
-    assert_eq!(in_vault("#c1.prop.tags.item(2)").unwrap(), text("z"));
-    assert_eq!(in_vault("#c1.prop.tags.len()").unwrap(), int(3));
-    // The call form of `prop` takes the key as a string.
-    assert_eq!(in_vault("#c1.prop(\"n\")").unwrap(), int(1));
+fn a_dot_reads_the_args_and_the_value_of_a_node_and_item_walks_a_list() {
+    assert_eq!(in_vault("#c1.extra").unwrap(), text("yes"));
+    assert_eq!(in_vault("#c1.tags.item(2)").unwrap(), text("z"));
+    assert_eq!(in_vault("#c1.tags.len()").unwrap(), int(3));
+}
+
+/// `.prop` was a level between a node and its data. It is gone, and what it used to be asked for says
+/// where to write it now.
+#[test]
+fn prop_is_retired_and_says_where_its_replacement_is() {
+    for src in ["#c1.prop.n", "#c1.prop", "#c1.prop(\"n\")", "#intro.prop.n"] {
+        let error = in_vault(src).unwrap_err();
+        assert!(
+            matches!(&error, EvalError::Retired { written, .. } if written == ".prop"),
+            "{src}: {error:?}"
+        );
+        let message = error.to_string();
+        assert!(
+            message.contains("`.prop` is retired")
+                && message.contains("`.key`")
+                && message.contains("`::`"),
+            "{message}"
+        );
+    }
+}
+
+/// `@user(id: "u123", name: "Alice")`: the author's keys are the author's, and the node's own `id` and
+/// `name` are a double colon away.
+#[test]
+fn a_key_called_id_or_name_is_the_authors_and_the_nodes_own_is_reached_with_a_double_colon() {
+    let resolver = MemoryResolver::new()
+        .with_source(
+            "here.tmt",
+            "@user(id: \"u123\", name: \"Alice\"){ tag: vip, level: 3 }#(u1)::rule(allow: (card))\n\n@user(age: 3)#(u2)\n",
+        )
+        .unwrap();
+    let eval = |src: &str| in_resolver(&resolver, src);
+    assert_eq!(eval("#u1.id").unwrap(), text("u123"));
+    assert_eq!(eval("#u1.name").unwrap(), text("Alice"));
+    assert_eq!(eval("#u1::id").unwrap(), text("u1"));
+    assert_eq!(eval("#u1::name").unwrap(), text("user"));
+    // The `{...}` is the node's `meta`, and its data is read with a dot.
+    assert_eq!(eval("#u1::meta.tag").unwrap(), text("vip"));
+    assert_eq!(eval("#u1::meta.level").unwrap(), int(3));
+    assert!(matches!(
+        eval("#u1::meta").unwrap(),
+        EvalValue::Map(entries) if entries.len() == 2
+    ));
+    assert_eq!(eval("#u2::meta").unwrap(), EvalValue::Map(Vec::new()));
+    // A connect stacked after the node hangs off it by its name.
+    assert_eq!(eval("#u1::rule.allow.item(0)").unwrap(), text("card"));
+    assert!(matches!(
+        eval("#u1::connects.len()").unwrap(),
+        EvalValue::Int(1)
+    ));
+    assert_eq!(eval("#u1::doc::path").unwrap(), text("here.tmt"));
+    // A node without that connect, or that key, is a mistake and says which.
+    assert_eq!(
+        eval("#u2::rule"),
+        Err(EvalError::UnknownMember {
+            on: "element",
+            member: "rule".to_string()
+        })
+    );
+    let no_key = eval("#u2.id").unwrap_err().to_string();
+    assert!(
+        no_key.contains("no data key `id`") && no_key.contains("`::id`"),
+        "{no_key}"
+    );
+    // The dot is not for a map's node attributes, and the colons are not for a map's keys.
+    let not_a_node = eval("#u1::meta::tag").unwrap_err().to_string();
+    assert!(
+        not_a_node.contains("not a node") && not_a_node.contains(".tag"),
+        "{not_a_node}"
+    );
+    // A method is called with a dot.
+    let not_a_method = eval("#u1::link()").unwrap_err().to_string();
+    assert!(not_a_method.contains("not a method"), "{not_a_method}");
+}
+
+/// A document and a directory hold no data of their own; what they have hangs off them.
+#[test]
+fn the_members_a_document_and_a_directory_had_with_a_dot_are_retired_to_the_double_colon() {
+    for (src, member) in [
+        ("self.path", ".path"),
+        ("self.meta", ".meta"),
+        ("tmt(\"docs/a.tmt\").kind", ".kind"),
+        ("tmt(\"docs/a.tmt\").filename", ".filename"),
+        ("vault.docs", ".docs"),
+        ("addr(dir:docs).children", ".children"),
+    ] {
+        let error = in_vault(src).unwrap_err();
+        assert!(
+            matches!(&error, EvalError::Retired { written, .. } if written == member),
+            "{src}: {error:?}"
+        );
+        assert!(
+            error.to_string().contains(&format!("`::{}`", &member[1..])),
+            "{error}"
+        );
+    }
+    assert_eq!(in_vault("self::id").unwrap(), EvalValue::Null);
+    assert_eq!(
+        in_vault("tmt(\"docs/a.tmt\")::doc::path").unwrap(),
+        text("docs/a.tmt")
+    );
+    assert_eq!(in_vault("self::doc::meta.title").unwrap(), text("Here"));
 }
 
 #[test]
 fn a_heading_is_found_by_its_id_and_is_a_section() {
-    assert_eq!(in_vault("#intro.id").unwrap(), text("intro"));
-    assert_eq!(in_vault("#intro.name").unwrap(), text("section"));
+    assert_eq!(in_vault("#intro::id").unwrap(), text("intro"));
+    assert_eq!(in_vault("#intro::name").unwrap(), text("section"));
     // The element that follows the heading is under it.
-    assert!(matches!(in_vault("#intro.content").unwrap(), EvalValue::Fragment(b) if b.len() == 2));
+    assert!(matches!(in_vault("#intro::content").unwrap(), EvalValue::Fragment(b) if b.len() == 2));
 }
 
 #[test]
 fn a_document_on_the_left_picks_an_element_of_that_document() {
-    assert_eq!(in_vault("tmt(\"docs/a.tmt\")#top.prop.x").unwrap(), int(7));
-    assert_eq!(in_vault("ref(\"a\")#top.prop.x").unwrap(), int(7));
+    assert_eq!(in_vault("tmt(\"docs/a.tmt\")#top.x").unwrap(), int(7));
+    assert_eq!(in_vault("ref(\"a\")#top.x").unwrap(), int(7));
     // A leading `./` names the same document.
-    assert_eq!(
-        in_vault("tmt(\"./docs/a.tmt\")#top.prop.x").unwrap(),
-        int(7)
-    );
+    assert_eq!(in_vault("tmt(\"./docs/a.tmt\")#top.x").unwrap(), int(7));
 }
 
 #[test]
@@ -738,20 +833,20 @@ fn a_hash_needs_a_document_on_its_left() {
 
 #[test]
 fn document_members() {
-    assert_eq!(in_vault("self.path").unwrap(), text("here.tmt"));
-    assert_eq!(in_vault("self.filename").unwrap(), text("here.tmt"));
+    assert_eq!(in_vault("self::path").unwrap(), text("here.tmt"));
+    assert_eq!(in_vault("self::filename").unwrap(), text("here.tmt"));
     assert_eq!(
-        in_vault("tmt(\"docs/sub/b.tmt\").filename").unwrap(),
+        in_vault("tmt(\"docs/sub/b.tmt\")::filename").unwrap(),
         text("b.tmt")
     );
     assert_eq!(
-        in_vault("tmt(\"./docs/a.tmt\").path").unwrap(),
+        in_vault("tmt(\"./docs/a.tmt\")::path").unwrap(),
         text("docs/a.tmt")
     );
-    assert_eq!(in_vault("self.meta.title").unwrap(), text("Here"));
-    assert_eq!(in_vault("self.kind").unwrap(), text("note"));
+    assert_eq!(in_vault("self::meta.title").unwrap(), text("Here"));
+    assert_eq!(in_vault("self::kind").unwrap(), text("note"));
     assert_eq!(
-        in_vault("tmt(\"docs/a.tmt\").kind").unwrap(),
+        in_vault("tmt(\"docs/a.tmt\")::kind").unwrap(),
         EvalValue::Null
     );
     assert_eq!(
@@ -768,16 +863,16 @@ fn the_meta_a_resolver_gives_is_what_is_read() {
     // The in-memory resolver applies no settings, so a field the document
     // lacks is absent; the vault's resolver makes it `Null` or `[]`.
     assert!(matches!(
-        in_vault("tmt(\"docs/sub/b.tmt\").meta.tags"),
+        in_vault("tmt(\"docs/sub/b.tmt\")::meta.tags"),
         Err(EvalError::UnknownMember { on: "map", .. })
     ));
 }
 
 #[test]
 fn root_items_are_numbered_from_zero_and_a_section_is_a_node() {
-    assert_eq!(in_vault("#item(0).name").unwrap(), text("card"));
-    assert_eq!(in_vault("self#item(1).id").unwrap(), text("intro"));
-    assert_eq!(in_vault("self.item(1).name").unwrap(), text("section"));
+    assert_eq!(in_vault("#item(0)::name").unwrap(), text("card"));
+    assert_eq!(in_vault("self#item(1)::id").unwrap(), text("intro"));
+    assert_eq!(in_vault("self.item(1)::name").unwrap(), text("section"));
     assert!(in_vault("#item(99)").is_err());
 }
 
@@ -790,68 +885,67 @@ fn item_on_a_node_walks_its_children() {
         in_vault("#intro.item(0)").unwrap(),
         EvalValue::Fragment(_)
     ));
-    assert_eq!(in_vault("#intro.item(1).id").unwrap(), text("c1"));
+    assert_eq!(in_vault("#intro.item(1)::id").unwrap(), text("c1"));
 }
 
 #[test]
 fn a_node_has_only_its_own_members() {
     assert_eq!(
-        in_vault("#c1.tags"),
+        in_vault("#c1.nope"),
         Err(EvalError::UnknownMember {
             on: "element",
-            member: "tags".to_string()
+            member: "nope".to_string()
         })
     );
-    // A property is reached through `.prop`, never directly.
-    assert_eq!(in_vault("#c1.prop.n").unwrap(), int(1));
+    assert_eq!(in_vault("#c1.n").unwrap(), int(1));
 }
 
 #[test]
 fn a_directory_lists_the_documents_under_it() {
     assert_eq!(
-        in_vault("vault.docs.map(d => d.path)").unwrap(),
+        in_vault("vault::docs.map(d => d::path)").unwrap(),
         seq(vec![
             text("docs/a.tmt"),
             text("docs/sub/b.tmt"),
             text("here.tmt")
         ])
     );
-    assert_eq!(in_vault("addr(dir:docs).docs.len()").unwrap(), int(2));
-    assert_eq!(in_vault("addr(dir:./docs/sub).docs.len()").unwrap(), int(1));
+    assert_eq!(in_vault("addr(dir:docs)::docs.len()").unwrap(), int(2));
+    assert_eq!(
+        in_vault("addr(dir:./docs/sub)::docs.len()").unwrap(),
+        int(1)
+    );
 }
 
 #[test]
 fn children_are_the_documents_directly_in_the_directory() {
     // `docs` goes down into `docs/sub`; `children` does not.
     assert_eq!(
-        in_vault("addr(dir:docs).children.map(d => d.path)").unwrap(),
+        in_vault("addr(dir:docs)::children.map(d => d::path)").unwrap(),
         seq(vec![text("docs/a.tmt")])
     );
     assert_eq!(
-        in_vault("vault.children.map(d => d.path)").unwrap(),
+        in_vault("vault::children.map(d => d::path)").unwrap(),
         seq(vec![text("here.tmt")])
     );
     assert_eq!(
-        in_vault("addr(dir:docs/sub).children.len()").unwrap(),
+        in_vault("addr(dir:docs/sub)::children.len()").unwrap(),
         int(1)
     );
 }
 
 #[test]
 fn addr_reads_a_link_style_address() {
-    assert_eq!(in_vault("addr(tmt:docs/a.tmt#top.prop.x)").unwrap(), int(7));
+    assert_eq!(in_vault("addr(tmt:docs/a.tmt#top.x)").unwrap(), int(7));
     assert_eq!(
         in_vault("addr(tmt:docs/a.tmt)").unwrap(),
         EvalValue::Document(DocRef("docs/a.tmt".to_string()))
     );
-    assert_eq!(in_vault("addr(#c1).prop.n").unwrap(), int(1));
-    assert_eq!(in_vault("addr(ref:a#top.prop.x)").unwrap(), int(7));
-    assert_eq!(
-        in_vault("addr(\"tmt:docs/a.tmt#top.prop.x\")").unwrap(),
-        int(7)
-    );
+    assert_eq!(in_vault("addr(#c1).n").unwrap(), int(1));
+    assert_eq!(in_vault("addr(ref:a#top.x)").unwrap(), int(7));
+    assert_eq!(in_vault("addr(\"tmt:docs/a.tmt#top.x\")").unwrap(), int(7));
     // The steps after `#` go as far as an expression after `#` goes.
-    assert_eq!(in_vault("addr(#c1.prop.tags.item(1))").unwrap(), text("y"));
+    assert_eq!(in_vault("addr(#c1.tags.item(1))").unwrap(), text("y"));
 }
 
 #[test]
@@ -873,11 +967,8 @@ fn addr_rejects_what_is_not_an_address() {
 
 #[test]
 fn a_string_known_only_at_run_time_is_read_with_dot_addr() {
-    assert_eq!(
-        in_vault("\"tmt:docs/a.tmt#top.prop.x\".addr()").unwrap(),
-        int(7)
-    );
-    assert_eq!(in_vault("\"#c1.prop.n\".addr()").unwrap(), int(1));
+    assert_eq!(in_vault("\"tmt:docs/a.tmt#top.x\".addr()").unwrap(), int(7));
+    assert_eq!(in_vault("\"#c1.n\".addr()").unwrap(), int(1));
     assert!(matches!(
         in_vault("\"not an address\".addr()"),
         Err(EvalError::BadAddress(_))
@@ -893,8 +984,7 @@ fn an_address_inside_a_lambda_still_resolves_against_the_right_document() {
     // `#top` inside `addr(...)` is resolved against `docs/a.tmt`, not `self`,
     // even though the lambda runs while `self` is `here.tmt`.
     assert_eq!(
-        in_vault("vault.docs.filter(d => d.path == \"docs/a.tmt\").map(d => d#top.prop.x)")
-            .unwrap(),
+        in_vault("vault::docs.filter(d => d::path == \"docs/a.tmt\").map(d => d#top.x)").unwrap(),
         seq(vec![int(7)])
     );
 }
@@ -1131,7 +1221,7 @@ fn an_element_without_an_id_cannot_be_linked() {
 
 #[test]
 fn link_turns_a_list_of_documents_into_a_list_of_links() {
-    let links = in_vault("addr(dir:docs).docs.map(d => d.link())").unwrap();
+    let links = in_vault("addr(dir:docs)::docs.map(d => d.link())").unwrap();
     let EvalValue::Seq(items) = links else {
         panic!("expected a list");
     };
@@ -1495,20 +1585,21 @@ fn in_list_vault(src: &str) -> Result<EvalValue, EvalError> {
 
 #[test]
 fn a_list_is_found_by_its_id_like_an_element() {
-    assert_eq!(in_list_vault("#shopping.id").unwrap(), text("shopping"));
-    assert_eq!(in_list_vault("#shopping.name").unwrap(), text("list"));
-    assert_eq!(in_list_vault("#shopping.connects").unwrap(), seq(vec![]));
-    assert_eq!(in_list_vault("#shopping.prop").unwrap(), EvalValue::Null);
+    assert_eq!(in_list_vault("#shopping::id").unwrap(), text("shopping"));
+    assert_eq!(in_list_vault("#shopping::name").unwrap(), text("list"));
+    assert_eq!(in_list_vault("#shopping::connects").unwrap(), seq(vec![]));
+    // A list holds no data of its own.
+    assert!(in_list_vault("#shopping.title").is_err());
     // An item still has its own id, and the list's does not shadow it.
-    assert_eq!(in_list_vault("#i1.id").unwrap(), text("i1"));
-    assert!(in_list_vault("#nope.id").is_err());
+    assert_eq!(in_list_vault("#i1::id").unwrap(), text("i1"));
+    assert!(in_list_vault("#nope::id").is_err());
 }
 
 #[test]
 fn item_on_a_list_counts_its_items() {
-    assert_eq!(in_list_vault("#shopping.item(0).id").unwrap(), text("i1"));
+    assert_eq!(in_list_vault("#shopping.item(0)::id").unwrap(), text("i1"));
     assert_eq!(
-        in_list_vault("#shopping.item(1).id").unwrap(),
+        in_list_vault("#shopping.item(1)::id").unwrap(),
         EvalValue::Null
     );
     assert!(in_list_vault("#shopping.item(3)").is_err());
@@ -1518,7 +1609,7 @@ fn item_on_a_list_counts_its_items() {
 /// document, as the section already is -- so it can be asked for its id.
 #[test]
 fn a_list_among_the_blocks_is_a_node() {
-    assert_eq!(in_list_vault("#item(1).id").unwrap(), text("shopping"));
+    assert_eq!(in_list_vault("#item(1)::id").unwrap(), text("shopping"));
     assert!(matches!(
         in_list_vault("#item(0)").unwrap(),
         EvalValue::Fragment(_)
@@ -1632,7 +1723,7 @@ fn a_list_of_documents_is_a_list_that_cannot_be_stored_as_data() {
     };
 
     // The message names the value's own type, as it did before `NotData` knew about vaults...
-    let err = evaluate_data(&parse("vault.docs"), &cx).unwrap_err();
+    let err = evaluate_data(&parse("vault::docs"), &cx).unwrap_err();
     assert_eq!(err.to_string(), "a list cannot be stored as data");
     // ...and a caller that has no vault can still tell that a vault is what the list is of.
     assert_eq!(

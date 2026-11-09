@@ -190,7 +190,9 @@ fn references_in(expr: &InterpExpr, out: &mut Vec<(Span, Reference)>) {
                 references_in(arg, out);
             }
         }
-        InterpExprKind::Member { object, .. } => references_in(object, out),
+        InterpExprKind::Member { object, .. } | InterpExprKind::Connect { object, .. } => {
+            references_in(object, out)
+        }
         InterpExprKind::NamedArg { value, .. } => references_in(value, out),
         InterpExprKind::Binary { lhs, rhs, .. } => {
             references_in(lhs, out);

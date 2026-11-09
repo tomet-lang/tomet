@@ -384,6 +384,11 @@ const CASES: &[Case] = &[
     // ---- interpolation ----------------------------------------------
     case(Some("補間 `${...}`"), "識別子", "${name}\n"),
     case(None, "メンバ参照", "${a.b.c}\n"),
+    case(
+        None,
+        "`::` はノードから、そこに付く物（`id` `name` `meta`、文書の `path`）へ渡る。`.` はノードの中のデータ key を読む",
+        "${#u1::meta.tag}\n",
+    ),
     case(None, "関数呼び出し", "${sum(1, 2)}\n"),
     case(None, "`$name(...)` 形式", "$uuid()\n"),
     case(Some("式の部品"), "`true` `false` `null` は値", "${true}\n"),
@@ -404,7 +409,7 @@ const CASES: &[Case] = &[
     case(
         None,
         "`#` の左に文書。左を省くと `self`",
-        "${tmt(\"a.tmt\")#intro.prop}\n",
+        "${tmt(\"a.tmt\")#intro.title}\n",
     ),
     case(
         None,
@@ -1194,6 +1199,7 @@ fn interp_str(expr: &InterpExpr) -> String {
             format!("{}({})", interp_str(callee), inner.join(", "))
         }
         K::Member { object, member } => format!("{}.{member}", interp_str(object)),
+        K::Connect { object, member } => format!("{}::{member}", interp_str(object)),
         K::NamedArg { name, value } => format!("{name}: {}", interp_str(value)),
         K::Binary { op, lhs, rhs } => {
             format!("({} {} {})", interp_str(lhs), op.symbol(), interp_str(rhs))

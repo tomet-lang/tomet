@@ -101,7 +101,7 @@ fn a_definition_used_twice_is_written_once() {
 #[test]
 fn where_the_file_sits_is_frozen_to_the_value_it_has() {
     let converted = convert(
-        "In ${self.path}, named ${self.filename}.\n",
+        "In ${self::path}, named ${self::filename}.\n",
         Options::default(),
     );
     let text = printed(&converted);
@@ -117,7 +117,7 @@ fn where_the_file_sits_is_frozen_to_the_value_it_has() {
 #[test]
 fn an_expression_with_one_part_frozen_is_frozen_whole_and_nothing_is_carried_for_it() {
     let converted = convert(
-        "${macro.gh(1)} at ${self.path}, ${macro.gh(self.path)}\n",
+        "${macro.gh(1)} at ${self::path}, ${macro.gh(self::path)}\n",
         Options::default(),
     );
     let text = printed(&converted);
@@ -145,12 +145,12 @@ fn another_documents_content_is_taken_in() {
 #[test]
 fn an_expression_with_no_value_in_the_vault_is_left_as_it_is() {
     let converted = convert(
-        "${tmt(\"docs/gone.tmt\").meta.title} and ${macro.nowhere(1)}\n",
+        "${tmt(\"docs/gone.tmt\")::meta.title} and ${macro.nowhere(1)}\n",
         Options::default(),
     );
     let text = printed(&converted);
     assert!(
-        text.contains("${tmt(\"docs/gone.tmt\").meta.title}"),
+        text.contains("${tmt(\"docs/gone.tmt\")::meta.title}"),
         "{text}"
     );
     assert!(text.contains("${macro.nowhere(1)}"), "{text}");
@@ -167,11 +167,11 @@ fn an_expression_with_no_value_in_the_vault_is_left_as_it_is() {
 
 #[test]
 fn a_meta_field_is_left_unless_asked_to_freeze() {
-    let source = "::meta(title: Hello)\n\n${self.meta.title}\n";
+    let source = "::meta(title: Hello)\n\n${self::meta.title}\n";
     let left = convert(source, Options::default());
     assert!(matches!(&treatments(&left)[..], [Treatment::Left { .. }]));
     assert_eq!(left.remaining.len(), 1);
-    assert!(printed(&left).contains("${self.meta.title}"));
+    assert!(printed(&left).contains("${self::meta.title}"));
 
     let frozen = convert(
         source,
@@ -197,7 +197,7 @@ fn what_a_file_cannot_hold_yet_is_left_and_reported() {
 
 #[test]
 fn standalone_is_added_to_a_profile_that_is_already_declared() {
-    let converted = convert("::profile(oneline)\n\n${self.path}\n", Options::default());
+    let converted = convert("::profile(oneline)\n\n${self::path}\n", Options::default());
     let text = printed(&converted);
     assert!(text.contains("::profile(oneline, standalone)"), "{text}");
     assert_eq!(text.matches("::profile").count(), 1, "{text}");
@@ -222,7 +222,7 @@ fn a_file_that_is_already_standalone_is_not_changed() {
 #[test]
 fn the_result_has_nothing_left_for_the_validator_but_what_was_reported_left() {
     let converted = convert(
-        "${macro.gh(1)} ${self.path} ${var.topic} ${include(tmt(\"docs/b.tmt\"))}\n\n=[ T ${self.filename} ]\n",
+        "${macro.gh(1)} ${self::path} ${var.topic} ${include(tmt(\"docs/b.tmt\"))}\n\n=[ T ${self::filename} ]\n",
         Options::default(),
     );
     assert!(converted.remaining.is_empty(), "{:?}", converted.remaining);
@@ -243,9 +243,9 @@ fn outside_its_vault_the_converted_file_renders_as_the_original_did_inside() {
 
 ${include(tmt(\"docs/b.tmt\"))}
 
-=[ ${self.filename} ]
+=[ ${self::filename} ]
 
-See ${macro.gh(7)} about ${var.topic} in ${self.path}.
+See ${macro.gh(7)} about ${var.topic} in ${self::path}.
 ";
     let inside = {
         let vault = vault();

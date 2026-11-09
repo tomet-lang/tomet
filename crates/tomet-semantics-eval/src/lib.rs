@@ -521,7 +521,7 @@ nam: ${macro.named(who: "world")}
         let self_err = eval_str("a: ${self}\n", &[]).unwrap_err();
         assert_eq!(self_err[0].message, NO_VAULT);
 
-        let vault_err = eval_str("a: ${vault.docs}\n", &[]).unwrap_err();
+        let vault_err = eval_str("a: ${vault::docs}\n", &[]).unwrap_err();
         assert_eq!(
             vault_err[0].message,
             "no vault to list the vault root's documents in"

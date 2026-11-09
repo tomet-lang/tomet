@@ -43,6 +43,9 @@ fn describe(expr: &InterpExpr) -> String {
         InterpExprKind::Member { object, member } => {
             format!("Member({}, {member})", describe(object))
         }
+        InterpExprKind::Connect { object, member } => {
+            format!("Connect({}, {member})", describe(object))
+        }
         InterpExprKind::NamedArg { name, value } => {
             format!("NamedArg({name}, {})", describe(value))
         }
@@ -57,17 +60,49 @@ fn parses_hash_id_interpolation() {
     let doc2 = parse_file("${#(intro)}\n").unwrap();
     assert_eq!(describe(interp_expr(&doc2.body[0])), "Id(intro)");
 
-    let doc3 = parse_file("${#intro.prop.tags}\n").unwrap();
+    let doc3 = parse_file("${#intro.tags}\n").unwrap();
     assert_eq!(
         describe(interp_expr(&doc3.body[0])),
-        "Member(Member(Id(intro), prop), tags)"
+        "Member(Id(intro), tags)"
     );
 
-    let doc4 = parse_file("${#intro.prop.tags.item(0)}\n").unwrap();
+    let doc4 = parse_file("${#intro.tags.item(0)}\n").unwrap();
     assert_eq!(
         describe(interp_expr(&doc4.body[0])),
-        "Call(Member(Member(Member(Id(intro), prop), tags), item), [Int(0)])"
+        "Call(Member(Member(Id(intro), tags), item), [Int(0)])"
     );
+}
+
+#[test]
+fn a_double_colon_goes_from_a_node_and_a_dot_reads_inside_it() {
+    for (source, expected) in [
+        ("${u1::id}", "Connect(Identifier(u1), id)"),
+        ("${#u1::meta.tag}", "Member(Connect(Id(u1), meta), tag)"),
+        (
+            "${self::doc::meta}",
+            "Connect(Connect(Identifier(self), doc), meta)",
+        ),
+        (
+            "${self::meta.tags.join(\", \")}",
+            "Call(Member(Member(Connect(Identifier(self), meta), tags), join), [String(\", \")])",
+        ),
+        // Space around the sigil is space, as it is around a dot.
+        ("${a :: b}", "Connect(Identifier(a), b)"),
+        (
+            "${vault::docs.item(0)}",
+            "Call(Member(Connect(Identifier(vault), docs), item), [Int(0)])",
+        ),
+    ] {
+        let doc = parse_file(&format!("{source}\n")).unwrap();
+        assert_eq!(describe(interp_expr(&doc.body[0])), expected, "{source}");
+    }
+    // A single colon is still not an operator, and `::` needs a name after it.
+    assert!(parse_file("${a:}\n").is_err());
+    assert!(parse_file("${a::}\n").is_err());
+    assert!(parse_file("${a::1}\n").is_err());
+    // The printed expression reads back as the same tree.
+    let doc = parse_file("${#u1::meta.tag}\n").unwrap();
+    assert_eq!(interp_expr(&doc.body[0]).to_string(), "#u1::meta.tag");
 }
 
 #[test]

@@ -170,7 +170,7 @@ pub enum Command {
     ///
     /// What the file takes from its vault is dealt with: a macro or variable
     /// the vault defines is written into the file, and what depends on where
-    /// the file sits or on other files (`${self.path}`, `${include(...)}`,
+    /// the file sits or on other files (`${self::path}`, `${include(...)}`,
     /// `${vault...}`) is replaced by the value it has there. The result
     /// declares `::profile(standalone)`.
     ///
@@ -187,7 +187,7 @@ pub enum Command {
         /// file keeps its name there).
         #[arg(short, long)]
         out: Option<PathBuf>,
-        /// Also replace `${self.meta.x}` by its value. Without it the
+        /// Also replace `${self::meta.x}` by its value. Without it the
         /// expression is left, because a file cannot hold the vault's
         /// `::field` that give a metadata field its type.
         #[arg(long)]

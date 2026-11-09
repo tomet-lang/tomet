@@ -539,6 +539,14 @@
           "named": true
         },
         {
+          "type": "interp_connect",
+          "named": true
+        },
+        {
+          "type": "interp_connect_call",
+          "named": true
+        },
+        {
           "type": "interp_group",
           "named": true
         },
@@ -619,6 +627,160 @@
           "named": true
         },
         {
+          "type": "interp_connect",
+          "named": true
+        },
+        {
+          "type": "interp_connect_call",
+          "named": true
+        },
+        {
+          "type": "interp_group",
+          "named": true
+        },
+        {
+          "type": "interp_hash",
+          "named": true
+        },
+        {
+          "type": "interp_hash_call",
+          "named": true
+        },
+        {
+          "type": "interp_lambda",
+          "named": true
+        },
+        {
+          "type": "interp_member",
+          "named": true
+        },
+        {
+          "type": "interp_named_arg",
+          "named": true
+        },
+        {
+          "type": "number",
+          "named": true
+        },
+        {
+          "type": "string",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "interp_connect",
+    "named": true,
+    "fields": {
+      "member": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "identifier",
+            "named": true
+          }
+        ]
+      },
+      "object": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "identifier",
+            "named": true
+          },
+          {
+            "type": "interp_addr",
+            "named": true
+          },
+          {
+            "type": "interp_call",
+            "named": true
+          },
+          {
+            "type": "interp_connect",
+            "named": true
+          },
+          {
+            "type": "interp_connect_call",
+            "named": true
+          },
+          {
+            "type": "interp_group",
+            "named": true
+          },
+          {
+            "type": "interp_hash",
+            "named": true
+          },
+          {
+            "type": "interp_hash_call",
+            "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
+    "type": "interp_connect_call",
+    "named": true,
+    "fields": {
+      "member": {
+        "multiple": true,
+        "required": false,
+        "types": [
+          {
+            "type": "identifier",
+            "named": true
+          }
+        ]
+      },
+      "name": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "interp_connect",
+            "named": true
+          },
+          {
+            "type": "interp_connect_call",
+            "named": true
+          }
+        ]
+      }
+    },
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "identifier",
+          "named": true
+        },
+        {
+          "type": "interp_addr",
+          "named": true
+        },
+        {
+          "type": "interp_binary",
+          "named": true
+        },
+        {
+          "type": "interp_call",
+          "named": true
+        },
+        {
+          "type": "interp_connect",
+          "named": true
+        },
+        {
+          "type": "interp_connect_call",
+          "named": true
+        },
+        {
           "type": "interp_group",
           "named": true
         },
@@ -675,6 +837,14 @@
         },
         {
           "type": "interp_call",
+          "named": true
+        },
+        {
+          "type": "interp_connect",
+          "named": true
+        },
+        {
+          "type": "interp_connect_call",
           "named": true
         },
         {
@@ -774,6 +944,14 @@
           "named": true
         },
         {
+          "type": "interp_connect",
+          "named": true
+        },
+        {
+          "type": "interp_connect_call",
+          "named": true
+        },
+        {
           "type": "interp_group",
           "named": true
         },
@@ -856,6 +1034,14 @@
           "named": true
         },
         {
+          "type": "interp_connect",
+          "named": true
+        },
+        {
+          "type": "interp_connect_call",
+          "named": true
+        },
+        {
           "type": "interp_group",
           "named": true
         },
@@ -913,6 +1099,14 @@
             "named": true
           },
           {
+            "type": "interp_connect",
+            "named": true
+          },
+          {
+            "type": "interp_connect_call",
+            "named": true
+          },
+          {
             "type": "interp_group",
             "named": true
           },
@@ -961,6 +1155,14 @@
         },
         {
           "type": "interp_call",
+          "named": true
+        },
+        {
+          "type": "interp_connect",
+          "named": true
+        },
+        {
+          "type": "interp_connect_call",
           "named": true
         },
         {
@@ -1016,6 +1218,14 @@
         },
         {
           "type": "interp_call",
+          "named": true
+        },
+        {
+          "type": "interp_connect",
+          "named": true
+        },
+        {
+          "type": "interp_connect_call",
           "named": true
         },
         {

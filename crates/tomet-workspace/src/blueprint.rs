@@ -136,7 +136,7 @@ pub struct Created {
 /// `vars` are the values passed to `tomet new --var key=value`, read in the
 /// blueprint as `${var.key}`. A name nothing declares is refused, and so is a
 /// variable that has neither a value nor a `default`: the blueprint's `::var`
-/// (over the vault's) says which there are. The document being created is `self`, so `${self.filename}` is the new file's
+/// (over the vault's) says which there are. The document being created is `self`, so `${self::filename}` is the new file's
 /// name. `${generate.now()}` is written in the offset the settings give
 /// `created` (or `modified`), UTC if neither has one.
 ///
@@ -427,7 +427,7 @@ mod tests {
     fn generated_values_come_from_the_injected_clock_and_random_source() {
         let file = blueprint_file(
             "fixed",
-            "::blueprint(note)\n::var(\n  author: { type: string }\n)\n::id(${generate.uuid()})\n::meta(\n  day: ${generate.now().format(\"YYYY-MM-DD\")}\n  file: ${self.filename}\n  by: ${var.author}\n)\n",
+            "::blueprint(note)\n::var(\n  author: { type: string }\n)\n::id(${generate.uuid()})\n::meta(\n  day: ${generate.now().format(\"YYYY-MM-DD\")}\n  file: ${self::filename}\n  by: ${var.author}\n)\n",
         );
         let mut vars = HashMap::new();
         vars.insert("author".to_string(), Value::String("Ann".into()));

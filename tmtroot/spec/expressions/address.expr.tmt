@@ -18,9 +18,9 @@
 - 右は、一意アドレス `#(x)` / `#x` と、その後ろに続くステップ。
 
 ```tm
-${#intro.prop.tags}
-${self#intro.prop.tags}
-${tmt("docs/a.tmt")#intro.prop.tags.item(2)}
+${#intro.tags}
+${self#intro.tags}
+${tmt("docs/a.tmt")#intro.tags.item(2)}
 ${tmt("docs/a.tmt")}
 ```
 
@@ -46,9 +46,9 @@ ${tmt("docs/a.tmt")}
 
 ```tm
 ${addr(tmt:docs/a.tmt#intro)}
-${addr(tmt:docs/a.tmt#intro.prop.tags.item(2))}
+${addr(tmt:docs/a.tmt#intro.tags.item(2))}
 ${addr("tmt:docs/a (copy).tmt#intro")}
-${#note.prop.source.addr().prop.title}
+${#note.source.addr().title}
 ```
 
 - `addr(` の直後から、対応する `)` までを、生の文字列として読む。`:`、`.`、`-`、`/` は式の記号として解釈されない。`@link` に書いたアドレスをそのまま貼れる。
@@ -65,29 +65,38 @@ ${#note.prop.source.addr().prop.title}
 プロパティなどに文字列で持たせたアドレスは、文字列のメソッド `.addr()` で辿る。`addr(...)` と同じ規則で文字列を解釈して、文書、要素、値を返す。
 
 ```tm
-${#note.prop.source.addr().prop.title}
+${#note.source.addr().title}
 ```
 
 `addr(...)` はソースに書かれたアドレス、`.addr()` は実行時に得た文字列。見た目が同じ文字の並びでも、混同されない。解釈できない文字列はエラー。
 
 =[ ステップ ]
 
-`#` の後ろで辿れるもの。id を持てるものは、要素、節、リストの3つで、どれも同じメンバーが使える。節の `.name` は `section`、リストの `.name` は `list`。リストは引数も値も持たないので、`.prop` は Null になり、`.item(n)` は n 番目の項目（項目は要素）を返す。
+`#` の後ろで辿れるもの。id を持てるものは、要素、節、リストの3つで、どれも同じ規則に従う。節の `::name` は `section`、リストの `::name` は `list`。リストは引数も値も持たないので、`.key` で読めるものはなく、`.item(n)` は n 番目の項目（項目は要素）を返す。
+
+ノードからノードへ渡るのは `::`、ノードの中のデータを読むのは `.`。ユーザーが `@user(id: "u123", name: "Alice")` と書いた `id` や `name` は、ノード自身の `id` や `name` と別のものなので、橋渡しの階層（旧 `.prop`）は要らない。
 
 @table
-|[ 構文                       ][ 指すもの                                          ]
-|[ `.prop`                    ][ 要素の引数と値をまとめたマップ                    ]
-|[ `.prop.key` / `.prop(key)` ][ そのマップの `key` の値                           ]
-|[ `.id`                      ][ 要素の ID 文字列                                  ]
-|[ `.name`                    ][ 要素の種類名                                      ]
-|[ `.connects`                ][ 接続要素のリスト                                  ]
-|[ `.item(n)`                 ][ リストの値、または子ブロックの n 番目（0 始まり） ]
+|[ 構文            ][ 指すもの ]
+|[ `#x::id`        ][ ノード自身の ID 文字列 ]
+|[ `#x::name`      ][ ノードの種類名 ]
+|[ `#x::meta`      ][ ノードの `{...}` をマップにしたもの。無ければ空のマップ（`@x(...){ a: 1 }` は `@x(...)::meta(a: 1)`） ]
+|[ `#x::connects`  ][ 接続要素のリスト ]
+|[ `#x::content`   ][ 子ブロック ]
+|[ `#x::doc`       ][ ノードがある文書 ]
+|[ `#x::rule` ほか ][ ノードに積まれた、その名前のコネクトのデータ ]
+|[ `#x.key`        ][ ノードの `(...)` と `{...}` の key `key` の値 ]
+|[ `#x::meta.key`  ][ `{...}` の中の key `key` の値 ]
+|[ `#x.item(n)`    ][ リストの値、または子ブロックの n 番目（0 始まり） ]
+|[ `#x.link()`     ][ ノードへのリンク（断片） ]
 
-文書の値のメンバー（`.path` など）は @file(tmtroot/spec/expressions/self.expr.tmt)。
+`.key` で読める key がなければ、エラーになる。`id`、`name`、`content`、`connects` と書いたときは、ノード自身のものは `::` で読むと案内する。旧 `.prop` は廃止された。書くと「`.prop` is retired」というエラーが、`.key` と `::` の使い分けを案内する。
+
+文書の値のメンバー（`::path` など）は @file(tmtroot/spec/expressions/self.expr.tmt)。
 
 `#item(0)` は文書ルートの n 番目のブロックを指す。`item` という id を持つ要素と見分けがつかないので、id が `item` の要素は `#(item)` と書く。
 
-`.` は、値の型が持つメンバーを辿る操作で、文書内アドレスのステップも同じ規則に従う。`#x` は「id が x の要素」を取る操作で、文書に対してだけ成り立つ。一意性が文書の単位だからで、要素の中の id という引き方はない。
+`.` は、値の中のデータの key を読む操作（と、`.item(n)` のようなメソッド呼び出し）で、`::` は、ノードに付く物へ渡る操作。文書内アドレスのステップも同じ規則に従う。`#x` は「id が x の要素」を取る操作で、文書に対してだけ成り立つ。一意性が文書の単位だからで、要素の中の id という引き方はない。
 
 =[ 失敗の扱い ]
 

@@ -18,6 +18,11 @@ pub enum EvalError {
         expected: String,
         got: usize,
     },
+    /// A spelling the expression language no longer reads. `instead` says what to write.
+    Retired {
+        written: String,
+        instead: String,
+    },
     /// A value of the wrong type for what was asked of it.
     TypeMismatch {
         what: String,
@@ -83,6 +88,9 @@ impl fmt::Display for EvalError {
             }
             EvalError::UnknownMember { on, member } => {
                 write!(f, "a {on} has no member `{member}`")
+            }
+            EvalError::Retired { written, instead } => {
+                write!(f, "`{written}` is retired; {instead}")
             }
             EvalError::WrongArgCount {
                 function,

@@ -40,9 +40,9 @@ pub enum Reach {
     Var(String),
     /// A call that answers from another document: `tmt`, `ref`, `include`.
     OtherDocument(&'static str),
-    /// A value that contains where the file sits: `self.path`, `self.filename`, `link`.
+    /// A value that contains where the file sits: `self::path`, `self::filename`, `link`.
     Placement(&'static str),
-    /// `self.meta`, whose fields are typed by the vault's `::field`.
+    /// `self::meta`, whose fields are typed by the vault's `::field`.
     FieldType,
     /// An address written with `tmt:`, `ref:` or `dir:` on the left of `#`.
     Address(&'static str),
@@ -63,9 +63,12 @@ impl std::fmt::Display for Reach {
             }
             Reach::OtherDocument(function) => write!(f, "another document (`{function}(...)`)"),
             Reach::Placement("link") => write!(f, "a link, which writes where the file sits"),
-            Reach::Placement(what) => write!(f, "where the file sits (`self.{what}`)"),
+            Reach::Placement(what) => write!(f, "where the file sits (`self::{what}`)"),
             Reach::FieldType => {
-                write!(f, "the type the vault gives a metadata field (`self.meta`)")
+                write!(
+                    f,
+                    "the type the vault gives a metadata field (`self::meta`)"
+                )
             }
             Reach::Address(scheme) => {
                 write!(
@@ -115,7 +118,7 @@ impl OwnNames {
 ///
 /// Nothing is evaluated, so an expression that would fail is judged by what it names. A lambda
 /// parameter is never outside (it is given by the expression's own receiver, which is walked), and
-/// `self`, `#id` and `self.kind` are the file itself.
+/// `self`, `#id` and `self::kind` are the file itself.
 pub fn reaches_outside(expr: &InterpExpr, own: &OwnNames) -> Vec<Reaching> {
     let mut found = Vec::new();
     walk(expr, own, &mut found);
@@ -157,6 +160,12 @@ fn walk(expr: &InterpExpr, own: &OwnNames, out: &mut Vec<Reaching>) {
                 (Some("macro"), name) if !own.macros.iter().any(|m| m == name) => {
                     push(Reach::Macro(name.to_string()));
                 }
+                _ => {}
+            }
+            walk(object, own, out);
+        }
+        InterpExprKind::Connect { object, member } => {
+            match (name_of(object), member.as_str()) {
                 (Some("self"), "path") => push(Reach::Placement("path")),
                 (Some("self"), "filename") => push(Reach::Placement("filename")),
                 (Some("self"), "meta") => push(Reach::FieldType),
@@ -270,14 +279,14 @@ mod tests {
             "add(1, 2)",
             "macro.mine(1)",
             "var.name",
-            "self.kind",
+            "self::kind",
             "self.item(0)",
             "#intro",
             "self#intro",
             "addr(#intro)",
             "\"#intro\".addr()",
             "(a, b) => add(a, b)",
-            "exists(self.kind) && not(false)",
+            "exists(self::kind) && not(false)",
         ] {
             assert_eq!(reaches(source), vec![], "`{source}`");
         }
@@ -291,9 +300,12 @@ mod tests {
         );
         assert_eq!(reaches("var.other"), vec![Reach::Var("other".into())]);
         assert_eq!(reaches("vault.docs"), vec![Reach::Vault]);
-        assert_eq!(reaches("self.path"), vec![Reach::Placement("path")]);
-        assert_eq!(reaches("self.filename"), vec![Reach::Placement("filename")]);
-        assert_eq!(reaches("self.meta.created"), vec![Reach::FieldType]);
+        assert_eq!(reaches("self::path"), vec![Reach::Placement("path")]);
+        assert_eq!(
+            reaches("self::filename"),
+            vec![Reach::Placement("filename")]
+        );
+        assert_eq!(reaches("self::meta.created"), vec![Reach::FieldType]);
         assert_eq!(
             reaches("tmt(\"a.tmt\").kind"),
             vec![Reach::OtherDocument("tmt")]
@@ -327,7 +339,7 @@ mod tests {
             vec![Reach::Macro("other".into())]
         );
         assert_eq!(
-            reaches("macro.mine(self.path)"),
+            reaches("macro.mine(self::path)"),
             vec![Reach::Placement("path")]
         );
     }

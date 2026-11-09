@@ -4,7 +4,7 @@
 //! where `--out` says, or to standard output. What was done goes to standard error, so standard
 //! output is exactly the file, as it is for the conversion commands.
 //!
-//! There is no `--in-place`: freezing replaces `${self.path}` and its like by their values, so
+//! There is no `--in-place`: freezing replaces `${self::path}` and its like by their values, so
 //! doing it to the original would take those expressions out of the file in the vault. The
 //! command refuses to write over its own input for the same reason.
 //!
@@ -24,7 +24,7 @@ use crate::util::{format_parse_error, vault_for};
 
 pub(crate) fn run(file: &Path, out: Option<&Path>, freeze_fields: bool) -> Result<()> {
     if !file.is_file() {
-        // Not `-`: where a file sits is part of what `${self.path}` says, so there is nothing to
+        // Not `-`: where a file sits is part of what `${self::path}` says, so there is nothing to
         // freeze it to for text that has no place.
         return Err(anyhow!(
             "'{}' is not a file: a document is taken out of its vault from where it sits",

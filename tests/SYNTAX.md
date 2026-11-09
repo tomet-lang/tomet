@@ -1448,6 +1448,17 @@ Interp $
   interp  a.b.c
 ```
 
+### `::` はノードから、そこに付く物（`id` `name` `meta`、文書の `path`）へ渡る。`.` はノードの中のデータ key を読む
+
+```tmt
+${#u1::meta.tag}
+```
+
+```
+Interp $
+  interp  #u1::meta.tag
+```
+
 ### 関数呼び出し
 
 ```tmt
@@ -1552,12 +1563,12 @@ Interp $
 ### `#` の左に文書。左を省くと `self`
 
 ```tmt
-${tmt("a.tmt")#intro.prop}
+${tmt("a.tmt")#intro.title}
 ```
 
 ```
 Interp $
-  interp  tmt("a.tmt")#intro.prop
+  interp  tmt("a.tmt")#intro.title
 ```
 
 ### `addr(` は中身を生の文字列として読む

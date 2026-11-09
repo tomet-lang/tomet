@@ -39,8 +39,9 @@ tmt:docs/spec/syntax.tmt#intro
 
 ```
 #intro                          一意アドレス
-#intro.prop.tags                intro の tags プロパティ
-#intro.prop.tags.item(2)        tags リストの 3 番目の要素
+#intro.tags                     intro の tags プロパティ
+#intro.tags.item(2)             tags リストの 3 番目の要素
+#intro::id                      intro 自身の ID（`.id` なら、引数にユーザーが書いた id）
 #intro.item(2)                  intro の 3 番目の子ブロック
 #item(0).item(1)                ルートからの絶対位置
 ```
@@ -52,24 +53,24 @@ tmt:docs/spec/syntax.tmt#intro
 @table
 |[ 構文          ][ 指すもの ]
 |[ `#x` / `#(x)` ][ `#(x)` が付与された要素 ]
-|[ `.prop`       ][ 要素のプロパティ全体（引数・値のマップ） ]
-|[ `.prop.key`   ][ プロパティマップ内のキー `key` の値（`prop(key)` も可） ]
-|[ `.id`         ][ 要素の ID 文字列 ]
-|[ `.name`       ][ 要素の種類名（`card` など） ]
-|[ `.connects`   ][ 接続要素（`::connect`）のリスト ]
+|[ `.key`        ][ 要素の引数と値の key `key` の値（ユーザーが書いたデータ） ]
+|[ `::id`        ][ 要素自身の ID 文字列 ]
+|[ `::name`      ][ 要素の種類名（`card` など） ]
+|[ `::meta`      ][ 要素の `{...}` のマップ（`::meta.key` でその key） ]
+|[ `::connects`  ][ 接続要素（`::connect`）のリスト ]
 |[ `.item(n)`    ][ 配列の値、または子ブロックの n 番目(0 始まり) ]
 |[ `#item(0)`    ][ ドキュメントルートの n 番目のブロック ]
 
 ===[ プロパティと値の中 ]
 
-配列やリストの値の中は、`prop.key` の後ろに `item(n)` をつないで指す。添字は 0 始まり。
+配列やリストの値の中は、`.key` の後ろに `item(n)` をつないで指す。添字は 0 始まり。
 
 ```
 @card(tags: (a, b, c)) #(intro)
 
-${#intro.prop.tags}                 (a, b, c) を指す
-${#intro.prop.tags.item(2)}         c を指す
-${#intro.prop(tags).item(2)}        関数呼び出し記法（等価）
+${#intro.tags}                 (a, b, c) を指す
+${#intro.tags.item(2)}         c を指す
+${#intro.tags.item(2)}        関数呼び出し記法（等価）
 ```
 
 ==[ 絶対アドレス ]
@@ -116,7 +117,7 @@ ${#intro.prop(tags).item(2)}        関数呼び出し記法（等価）
 
 - 同一文書内のアンカーリンク: `@link(#intro)` または `@link(id:intro)`
 - 外部文書内のアンカーリンク: `@link(tmt:path/to/doc.tmt#intro)`
-- 式によるプロパティ参照: `${#intro.prop.tags}`
+- 式によるプロパティ参照: `${#intro.tags}`
 - 外部文書内の要素への式による参照: `${tmt("path/to/doc.tmt")#intro}` または `${addr(tmt:path/to/doc.tmt#intro)}`
 
 =[ テンプレートとアドレス ]

@@ -1378,6 +1378,14 @@
         },
         {
           "type": "SYMBOL",
+          "name": "interp_connect_call"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "interp_connect"
+        },
+        {
+          "type": "SYMBOL",
           "name": "interp_member"
         },
         {
@@ -1597,6 +1605,14 @@
                 },
                 {
                   "type": "SYMBOL",
+                  "name": "interp_connect_call"
+                },
+                {
+                  "type": "SYMBOL",
+                  "name": "interp_connect"
+                },
+                {
+                  "type": "SYMBOL",
                   "name": "interp_hash"
                 },
                 {
@@ -1613,6 +1629,68 @@
           {
             "type": "STRING",
             "value": "."
+          },
+          {
+            "type": "FIELD",
+            "name": "member",
+            "content": {
+              "type": "SYMBOL",
+              "name": "identifier"
+            }
+          }
+        ]
+      }
+    },
+    "interp_connect": {
+      "type": "PREC_LEFT",
+      "value": 0,
+      "content": {
+        "type": "SEQ",
+        "members": [
+          {
+            "type": "FIELD",
+            "name": "object",
+            "content": {
+              "type": "CHOICE",
+              "members": [
+                {
+                  "type": "SYMBOL",
+                  "name": "identifier"
+                },
+                {
+                  "type": "SYMBOL",
+                  "name": "interp_call"
+                },
+                {
+                  "type": "SYMBOL",
+                  "name": "interp_hash_call"
+                },
+                {
+                  "type": "SYMBOL",
+                  "name": "interp_connect_call"
+                },
+                {
+                  "type": "SYMBOL",
+                  "name": "interp_connect"
+                },
+                {
+                  "type": "SYMBOL",
+                  "name": "interp_hash"
+                },
+                {
+                  "type": "SYMBOL",
+                  "name": "interp_group"
+                },
+                {
+                  "type": "SYMBOL",
+                  "name": "interp_addr"
+                }
+              ]
+            }
+          },
+          {
+            "type": "STRING",
+            "value": "::"
           },
           {
             "type": "FIELD",
@@ -1747,6 +1825,72 @@
           ]
         }
       ]
+    },
+    "interp_connect_call": {
+      "type": "PREC_LEFT",
+      "value": 0,
+      "content": {
+        "type": "SEQ",
+        "members": [
+          {
+            "type": "FIELD",
+            "name": "name",
+            "content": {
+              "type": "CHOICE",
+              "members": [
+                {
+                  "type": "SYMBOL",
+                  "name": "interp_connect"
+                },
+                {
+                  "type": "SYMBOL",
+                  "name": "interp_connect_call"
+                }
+              ]
+            }
+          },
+          {
+            "type": "REPEAT",
+            "content": {
+              "type": "SEQ",
+              "members": [
+                {
+                  "type": "STRING",
+                  "value": "."
+                },
+                {
+                  "type": "FIELD",
+                  "name": "member",
+                  "content": {
+                    "type": "SYMBOL",
+                    "name": "identifier"
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "type": "STRING",
+            "value": "("
+          },
+          {
+            "type": "CHOICE",
+            "members": [
+              {
+                "type": "SYMBOL",
+                "name": "_interp_args"
+              },
+              {
+                "type": "BLANK"
+              }
+            ]
+          },
+          {
+            "type": "STRING",
+            "value": ")"
+          }
+        ]
+      }
     },
     "interp_hash_call": {
       "type": "PREC_LEFT",

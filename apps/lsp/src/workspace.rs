@@ -480,7 +480,7 @@ mod tests {
         let mut ws = Workspace::new();
         ws.set_buffer(
             a.clone(),
-            "${tmt(\"b.tmt\").meta.title}\n\n${macro.gh(7)}\n".to_string(),
+            "${tmt(\"b.tmt\")::meta.title}\n\n${macro.gh(7)}\n".to_string(),
         );
         let at = |line| lsp_types::Position::new(line, 4);
 

@@ -15,9 +15,15 @@
 //!   | also holds documents, directories, functions and datetimes, which can
 //!   | be the result of an expression and never data. A fragment (`link`,
 //!   | `include`) is the one non-scalar value that can be placed in output.
-//!   | Structured document parts (inspectable via `.name`, `.prop`, `.id`,
-//!   | `.connects`, `.content`, `.item(n)`) are owned [`Part`]s (Layer 2),
-//!   | converted from Layer 1 [`tomet_tree::Node`] via [`Part::from_tree_node`].
+//!   | Structured document parts are owned [`Part`]s (Layer 2), converted from
+//!   | Layer 1 [`tomet_tree::Node`] via [`Part::from_tree_node`].
+//! - (`::` between nodes, `.` inside them)
+//!   | `node::id`, `node::name`, `node::meta` and `doc::path` go from a node to
+//!   | what hangs off it ([`InterpExprKind::Connect`]). `node.key` reads a key of
+//!   | the data the node holds, whatever the author called it (`@user(id: "u123")`
+//!   | has an `id` that `node::id` is not), and `node.link()` calls a method. The
+//!   | old `.prop` level between a node and its data is gone and reports where to
+//!   | write what it meant ([`EvalError::Retired`]).
 //! - (Names by position)
 //!   | A name is looked up in the one table its position selects: a call in
 //!   | the builtin functions, a bare name in the lambda parameters and then
@@ -173,7 +179,11 @@ fn eval(expr: &InterpExpr, cx: &EvalContext, env: &Env) -> Result<EvalValue, Eva
                 return Err(EvalError::NoValue(member.clone()));
             }
             let value = eval(object, cx, env)?;
-            member_value(value, member, cx)
+            member_value(value, member)
+        }
+        InterpExprKind::Connect { object, member } => {
+            let value = eval(object, cx, env)?;
+            connect_value(value, member, cx)
         }
         InterpExprKind::Call { callee, args } => call(callee, args, cx, env),
         InterpExprKind::NamedArg { name, .. } => Err(EvalError::message(format!(
@@ -204,12 +214,27 @@ fn name_value(name: &str, cx: &EvalContext, env: &Env) -> Result<EvalValue, Eval
     }
 }
 
-/// `value.member`, without a call.
-fn member_value(value: EvalValue, member: &str, cx: &EvalContext) -> Result<EvalValue, EvalError> {
+/// `value::member`: from a node to what hangs off it. Only a document, a directory and a part of a
+/// document are nodes; the keys of a map are read with a dot.
+fn connect_value(value: EvalValue, member: &str, cx: &EvalContext) -> Result<EvalValue, EvalError> {
     match &value {
-        EvalValue::Document(doc) => parts::document_member(doc, member, cx),
+        EvalValue::Document(doc) => parts::document_connect(doc, member, cx),
+        EvalValue::Part { doc, part } => parts::part_connect(doc, part, member),
+        EvalValue::Directory(dir) => parts::directory_connect(dir, member, cx),
+        other => Err(EvalError::message(format!(
+            "`::{member}` goes from a node to what hangs off it, and a {} is not a node; \
+             a key of its data is read with `.{member}`",
+            other.type_name()
+        ))),
+    }
+}
+
+/// `value.member`, without a call.
+fn member_value(value: EvalValue, member: &str) -> Result<EvalValue, EvalError> {
+    match &value {
+        EvalValue::Document(doc) => parts::document_member(doc, member),
         EvalValue::Part { doc, part } => parts::part_member(doc, part, member),
-        EvalValue::Directory(dir) => parts::directory_member(dir, member, cx),
+        EvalValue::Directory(dir) => parts::directory_member(dir, member),
         EvalValue::DateTime(value) => datetime::member(value, member),
         EvalValue::Map(entries) => entries
             .iter()
@@ -283,6 +308,9 @@ fn call(
                 other => methods::call_method(other, member, args, cx),
             }
         }
+        InterpExprKind::Connect { member, .. } => Err(EvalError::message(format!(
+            "`::{member}` is not a method; a method is called with a dot, `.{member}(...)`"
+        ))),
         _ => Err(EvalError::message("only a name or a member can be called")),
     }
 }
@@ -444,7 +472,7 @@ pub const RESERVED_NAMES: &[(&str, &str)] = &[
         "var",
         "The variables declared by `::var`: `var.name` (`tomet new --var` fills them in)",
     ),
-    ("vault", "The vault's root directory: `vault.docs`"),
+    ("vault", "The vault's root directory: `vault::docs`"),
     (
         "generate",
         "`generate.uuid()` and `generate.now()` (only when creating a document)",

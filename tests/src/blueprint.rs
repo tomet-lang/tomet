@@ -32,7 +32,7 @@ fn test_blueprint_end_to_end_lifecycle() {
   date: ${generate.now().format("YYYY-MM-DD")}
   author: ${var.author}
   title: ${var.title}
-  file: ${self.filename}
+  file: ${self::filename}
 )
 
 =[ Goals for ${generate.now().format("YYYY-MM-DD")} ]#(goals)

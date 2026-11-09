@@ -10,13 +10,13 @@
 特別な関数ではなく、`Seq` のメソッドと無名関数（@file(tmtroot/spec/expressions/lambda.expr.tmt)）の組み合わせで書く。
 
 ```tm
-- ${vault.docs
-    .filter(d => d.meta.tags.contains("rust"))
-    .sort(d => d.meta.created, "desc")
+- ${vault::docs
+    .filter(d => d::meta.tags.contains("rust"))
+    .sort(d => d::meta.created, "desc")
     .map(d => d.link())}
 ```
 
-- 対象は、文書の `Seq`。`vault.docs` や `addr(dir:docs/notes).docs`（@file(tmtroot/spec/expressions/self.expr.tmt)）が作る。対象を省いた暗黙の既定はない。
+- 対象は、文書の `Seq`。`vault::docs` や `addr(dir:docs/notes)::docs`（@file(tmtroot/spec/expressions/self.expr.tmt)）が作る。対象を省いた暗黙の既定はない。
 - 使える場所に制限はない。どの文書にも書ける。
 
 =[ Seq のメソッド ]
@@ -36,7 +36,7 @@
 
 =[ 欠けたキー ]
 
-`d.meta` の中のキーの扱いは @file(tmtroot/spec/expressions/self.expr.tmt) の表に従う。宣言されたフィールドは、その文書になくても読める（`list` 型は空の Seq、それ以外は Null。`exists(d.meta.draft)`）。宣言されていないフィールドを、メンバーで書くとエラー。綴りの間違いが「何も一致しない」結果に化けることはない。
+`d::meta` の中のキーの扱いは @file(tmtroot/spec/expressions/self.expr.tmt) の表に従う。宣言されたフィールドは、その文書になくても読める（`list` 型は空の Seq、それ以外は Null。`exists(d::meta.draft)`）。宣言されていないフィールドを、メンバーで書くとエラー。綴りの間違いが「何も一致しない」結果に化けることはない。
 
 =[ まだ決まっていないこと ]
 

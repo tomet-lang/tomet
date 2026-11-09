@@ -1440,7 +1440,7 @@ fn check_ctmt_declarations_reports_expected_diagnostics() {
 /// The promise of a declared `::profile(standalone)` is checked with the rest, by `validate_document`.
 #[test]
 fn a_standalone_document_that_needs_the_outside_is_reported() {
-    let doc = parse("::profile(standalone)\n\nsee ${macro.gh(1)} and ${self.kind}\n");
+    let doc = parse("::profile(standalone)\n\nsee ${macro.gh(1)} and ${self::kind}\n");
     let errors = validate_document(&doc);
     assert_eq!(errors.len(), 1, "{errors:?}");
     assert!(matches!(&errors[0], Diagnostic::NotStandalone { what, .. } if what.contains("`gh`")));

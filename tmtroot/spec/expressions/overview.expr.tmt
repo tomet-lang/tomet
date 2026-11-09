@@ -10,7 +10,7 @@
 式には2つの書き方がある。木としては同じもので、`$` が sigil、その後ろが式の本体。
 
 ```tm
-${self.meta.created.format("YYYY-MM-DD")}
+${self::meta.created.format("YYYY-MM-DD")}
 $include(addr(tmt:docs/a.tmt))
 ```
 
@@ -24,8 +24,9 @@ $include(addr(tmt:docs/a.tmt))
 - リテラル: 文字列 `"..."`、整数、小数、`true`、`false`、`null`。
 - 名前: `self` のような予約された値（@file(tmtroot/spec/expressions/names.expr.tmt)）。
 - アドレス: `<文書>#<id>` の形（@file(tmtroot/spec/expressions/address.expr.tmt)）。
-- メンバー: `値.名前`。値の型が、辿れるものを決める。
-- 呼び出し: `名前(引数)` と `値.名前(引数)`。
+- ノードの持ち物: `値::名前`。ノード（文書、ディレクトリ、文書の中の要素や節）から、そこに付く物へ渡る。`node::id`、`node::name`、`node::meta`、`doc::path`、`dir::docs`。
+- データの key: `値.名前`。ノードや Map の中にあるデータの key を読む。`@user(id: "u123")` の `id` は `node.id` で、ノード自身の ID は `node::id`。旧 `.prop` はない。
+- 呼び出し: `名前(引数)` と `値.名前(引数)`。`()` の有無で、データの key と区別される。
 - 無名関数: `d => 式`（@file(tmtroot/spec/expressions/lambda.expr.tmt)）。
 - 名前付き引数: `名前: 式`。
 

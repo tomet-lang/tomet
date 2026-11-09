@@ -418,7 +418,7 @@ mod tests {
         root
     }
 
-    const QUERY: &str = "- ${vault.docs\n    .filter(d => d.meta.tags.contains(\"rust\"))\n    .sort(d => d.meta.created, \"desc\")\n    .map(d => d.link())}\n";
+    const QUERY: &str = "- ${vault::docs\n    .filter(d => d::meta.tags.contains(\"rust\"))\n    .sort(d => d::meta.created, \"desc\")\n    .map(d => d.link())}\n";
 
     #[test]
     fn prepared_document_answers_a_query_from_the_vault() {
@@ -488,7 +488,7 @@ mod tests {
         let root = vault_fixture("tomet_test_load_bad_expression");
         fs::write(
             root.join("index.tmt"),
-            "${vault.docs.filter(d => d.meta.tgs.contains(\"x\"))}\n",
+            "${vault::docs.filter(d => d::meta.tgs.contains(\"x\"))}\n",
         )
         .expect("index");
 
@@ -502,7 +502,7 @@ mod tests {
             prepared.unresolved[0].reason
         );
         assert!(
-            flat(&doc)[0].starts_with("${vault.docs"),
+            flat(&doc)[0].starts_with("${vault::docs"),
             "{:?}",
             flat(&doc)
         );
@@ -841,11 +841,11 @@ mod tests {
             &[
                 (
                     "host.tmt",
-                    "=[ Host ]\n\nhere is ${self.path}\n\n${include(tmt(\"parts/a.tmt\"))}\n",
+                    "=[ Host ]\n\nhere is ${self::path}\n\n${include(tmt(\"parts/a.tmt\"))}\n",
                 ),
                 (
                     "parts/a.tmt",
-                    "::meta(title: A)\n\n=[ A ]\n\nI am ${self.path} (${self.meta.title})\n",
+                    "::meta(title: A)\n\n=[ A ]\n\nI am ${self::path} (${self::meta.title})\n",
                 ),
             ],
         );
@@ -963,17 +963,17 @@ mod tests {
         };
         let text = |s: &str| tomet_expr::EvalValue::String(s.to_string());
 
-        assert_eq!(eval("self.meta.title").unwrap(), text("Host"));
+        assert_eq!(eval("self::meta.title").unwrap(), text("Host"));
         assert_eq!(
-            eval("tmt(\"other.tmt\").meta.title").unwrap(),
+            eval("tmt(\"other.tmt\")::meta.title").unwrap(),
             text("Saved")
         );
-        assert_eq!(eval("#intro.id").unwrap(), text("intro"));
+        assert_eq!(eval("#intro::id").unwrap(), text("intro"));
 
         // The other document is open in the editor, edited and not saved.
         vault.set_buffer(&root.join("other.tmt"), "::meta(title: Edited)\n");
         assert_eq!(
-            eval("tmt(\"other.tmt\").meta.title").unwrap(),
+            eval("tmt(\"other.tmt\")::meta.title").unwrap(),
             text("Edited")
         );
 

@@ -390,20 +390,20 @@ mod tests {
             doc.text_at("#main-meta.icon").as_deref(),
             Some("@doc.icon(star)")
         );
-        assert_eq!(
-            doc.text_at("#main-meta.prop.title").as_deref(),
-            Some("\"Doc\"")
-        );
+        assert_eq!(doc.text_at("#main-meta.title").as_deref(), Some("\"Doc\""));
         assert_eq!(doc.text_at("#warn.type").as_deref(), Some("\"warning\""));
 
         // Query element metadata
-        assert_eq!(doc.text_at("#main-meta.id").as_deref(), Some("main-meta"));
-        assert_eq!(doc.text_at("#main-meta.name").as_deref(), Some("meta"));
-        assert_eq!(doc.text_at("#warn.name").as_deref(), Some("callout"));
+        assert_eq!(doc.text_at("#main-meta::id").as_deref(), Some("main-meta"));
+        assert_eq!(doc.text_at("#main-meta::name").as_deref(), Some("meta"));
+        assert_eq!(doc.text_at("#warn::name").as_deref(), Some("callout"));
+        // The old `.prop` level, and a dot for what the node is, name nothing.
+        assert_eq!(doc.text_at("#main-meta.prop.title"), None);
+        assert_eq!(doc.text_at("#main-meta.id"), None);
 
         // Query content
         assert_eq!(
-            doc.text_at("#warn.content").as_deref(),
+            doc.text_at("#warn::content").as_deref(),
             Some(" Be careful! ")
         );
     }
@@ -468,7 +468,7 @@ mod tests {
             doc_list.node_at("#t1"),
             doc_list.node_at("#item(0).item(0)")
         );
-        assert_eq!(doc_list.text_at("#t1.id").as_deref(), Some("t1"));
+        assert_eq!(doc_list.text_at("#t1::id").as_deref(), Some("t1"));
 
         // Update list item id
         doc_list

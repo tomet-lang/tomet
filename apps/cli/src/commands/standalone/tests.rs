@@ -44,7 +44,7 @@ fn vault(dir: &Dir) {
 fn a_file_in_a_vault_is_written_out_standalone() {
     let dir = Dir::new("ok");
     vault(&dir);
-    let file = dir.write("docs/a.tmt", "See ${macro.gh(1)} in ${self.path}.\n");
+    let file = dir.write("docs/a.tmt", "See ${macro.gh(1)} in ${self::path}.\n");
     let out = dir.path("out");
     fs::create_dir_all(&out).unwrap();
     run(&file, Some(&out), false).expect("nothing is left");
@@ -54,7 +54,7 @@ fn a_file_in_a_vault_is_written_out_standalone() {
     assert!(text.contains("::macro"), "{text}");
     assert!(text.contains("${macro.gh(1)}"), "{text}");
     assert!(text.contains("docs/a.tmt"), "{text}");
-    assert!(!text.contains("${self.path}"), "{text}");
+    assert!(!text.contains("${self::path}"), "{text}");
 
     // The promise is kept: the validator finds nothing in what was written.
     let written = tomet_ast_parser::parse_file(&text).unwrap();
@@ -62,7 +62,7 @@ fn a_file_in_a_vault_is_written_out_standalone() {
     // The original is as it was.
     assert_eq!(
         fs::read_to_string(&file).unwrap(),
-        "See ${macro.gh(1)} in ${self.path}.\n"
+        "See ${macro.gh(1)} in ${self::path}.\n"
     );
 }
 
@@ -70,7 +70,7 @@ fn a_file_in_a_vault_is_written_out_standalone() {
 fn it_will_not_write_over_the_file_it_reads() {
     let dir = Dir::new("same");
     vault(&dir);
-    let source = "In ${self.path}.\n";
+    let source = "In ${self::path}.\n";
     let file = dir.write("a.tmt", source);
 
     let error = run(&file, Some(&file), false).unwrap_err().to_string();
@@ -92,7 +92,7 @@ fn only_a_file_can_be_taken_out_of_its_vault() {
 fn something_left_is_an_error_but_the_file_is_still_written() {
     let dir = Dir::new("left");
     vault(&dir);
-    let file = dir.write("a.tmt", "@frobnicate[ x ] in ${self.path}\n");
+    let file = dir.write("a.tmt", "@frobnicate[ x ] in ${self::path}\n");
     let out = dir.path("a.out.tmt");
 
     let error = run(&file, Some(&out), false).unwrap_err().to_string();
@@ -106,17 +106,21 @@ fn something_left_is_an_error_but_the_file_is_still_written() {
 fn a_meta_field_is_frozen_only_when_asked() {
     let dir = Dir::new("fields");
     vault(&dir);
-    let file = dir.write("a.tmt", "::meta(title: Hello)\n\n${self.meta.title}\n");
+    let file = dir.write("a.tmt", "::meta(title: Hello)\n\n${self::meta.title}\n");
 
     let kept = dir.path("kept.tmt");
     assert!(run(&file, Some(&kept), false).is_err());
     assert!(
         fs::read_to_string(&kept)
             .unwrap()
-            .contains("${self.meta.title}")
+            .contains("${self::meta.title}")
     );
 
     let frozen = dir.path("frozen.tmt");
     run(&file, Some(&frozen), true).expect("nothing is left");
-    assert!(!fs::read_to_string(&frozen).unwrap().contains("${self.meta"));
+    assert!(
+        !fs::read_to_string(&frozen)
+            .unwrap()
+            .contains("${self::meta")
+    );
 }

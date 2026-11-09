@@ -3,7 +3,7 @@
   path: "CONTRIBUTING.md"
 )
 
-${macro.generated_by(self.path)}
+${macro.generated_by(self::path)}
 
 =[ Contributing to Tomet ]
 

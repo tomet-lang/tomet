@@ -63,7 +63,7 @@ tomet new --list
 - `${generate.uuid()}`: 新しいUUID v4文字列を生成。
 - `${generate.now()}`: 今の日時（RFC 3339）を生成。
 - `${generate.now().format("YYYY-MM-DD")}`: 日時を整形する。`.format` は渡された日時を整形するだけの純粋なメソッド（書式の記号は @file(tmtroot/spec/expressions/types.expr.tmt)）。
-- `${self.filename}`: 作成先ファイル名。
+- `${self::filename}`: 作成先ファイル名。
 - `${var.title}`: `::var` が宣言した変数。値は CLI の `--var title=...` か、宣言の `default`。`default` が無ければ必須。
 
 ブループリントが受け取る入力は、`::var` が宣言したものだけ（@file(tmtroot/spec/elements/std.vars.element.tmt)）。宣言にない名前を `--var` で渡すとエラーになり、宣言にない `${var.x}` は `tomet check` が報告する。

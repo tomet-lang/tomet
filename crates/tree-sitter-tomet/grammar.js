@@ -471,6 +471,8 @@ module.exports = grammar({
       choice(
         $.interp_call,
         $.interp_hash_call,
+        $.interp_connect_call,
+        $.interp_connect,
         $.interp_member,
         $.interp_hash,
         $.interp_group,
@@ -498,8 +500,8 @@ module.exports = grammar({
     _interp_arg: ($) => choice($.interp_named_arg, $._interp_expr),
     interp_named_arg: ($) =>
       seq(field("name", $.identifier), ":", $._interp_expr),
-    // `.name` after something that is not a bare name: `addr(...).docs`,
-    // `x.addr().prop`, `doc#(id).prop`.
+    // `.name` after something that is not a bare name: `addr(...)::docs.item(0)`,
+    // `x.addr().title`, `doc#(id).title`.
     interp_member: ($) =>
       prec.left(
         seq(
@@ -508,12 +510,38 @@ module.exports = grammar({
             choice(
               $.interp_call,
               $.interp_hash_call,
+              $.interp_connect_call,
+              $.interp_connect,
               $.interp_hash,
               $.interp_group,
               $.interp_addr,
             ),
           ),
           ".",
+          field("member", $.identifier),
+        ),
+      ),
+    // `node::name`: from a node to what hangs off it (`u1::meta`, `self::doc::meta`,
+    // `addr(dir:docs)::docs`). The dot reads data inside a node; the `::` goes from
+    // node to node. The member is an `identifier`, which already spans the
+    // `.key.key` that may follow it (`self::meta.tags`).
+    interp_connect: ($) =>
+      prec.left(
+        seq(
+          field(
+            "object",
+            choice(
+              $.identifier,
+              $.interp_call,
+              $.interp_hash_call,
+              $.interp_connect_call,
+              $.interp_connect,
+              $.interp_hash,
+              $.interp_group,
+              $.interp_addr,
+            ),
+          ),
+          "::",
           field("member", $.identifier),
         ),
       ),
@@ -539,6 +567,21 @@ module.exports = grammar({
         optional(field("doc", choice($.interp_call, $.identifier))),
         "#",
         choice($.identifier, seq("(", $.identifier, ")")),
+      ),
+    // A call whose callee is a `::` member: `self::meta.tags.join(", ")`. Kept apart
+    // from `interp_call` for the same reason as `interp_hash_call`: `$name(...)` can
+    // never start with a `::` path.
+    // Like `interp_call`, its callee may be an earlier such call followed by `.name`:
+    // `vault::docs.filter(f).map(g)`.
+    interp_connect_call: ($) =>
+      prec.left(
+        seq(
+          field("name", choice($.interp_connect, $.interp_connect_call)),
+          repeat(seq(".", field("member", $.identifier))),
+          "(",
+          optional($._interp_args),
+          ")",
+        ),
       ),
     // A call whose callee is a `#` address: `#item(0)`, `doc#id.item(2)`.
     // Kept apart from `interp_call` so that `$name(...)` can never start

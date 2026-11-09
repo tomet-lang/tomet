@@ -1165,7 +1165,17 @@ pub enum InterpExprKind {
         callee: Box<InterpExpr>,
         args: Vec<InterpExpr>,
     },
+    /// `object.member`: a key of the data an element, a map or a section holds, or the start of a
+    /// method call (`object.member(...)` is [`InterpExprKind::Call`] on this). A node's own
+    /// attributes are not read with a dot; see [`InterpExprKind::Connect`].
     Member {
+        object: Box<InterpExpr>,
+        member: String,
+    },
+    /// `object::member`: from a node to what hangs off it -- an attribute of the node (`::id`,
+    /// `::name`, a document's `::path`), the connect of that name (`::meta`), or the document or
+    /// directory it leads to. The dot reads data inside a node; the double colon goes from node to node.
+    Connect {
         object: Box<InterpExpr>,
         member: String,
     },
@@ -1281,6 +1291,7 @@ impl fmt::Display for InterpExpr {
             InterpExprKind::Literal(Literal::Bool(b)) => write!(f, "{b}"),
             InterpExprKind::Literal(Literal::Null) => f.write_str("null"),
             InterpExprKind::Member { object, member } => write!(f, "{object}.{member}"),
+            InterpExprKind::Connect { object, member } => write!(f, "{object}::{member}"),
             InterpExprKind::NamedArg { name, value } => write!(f, "{name}: {value}"),
             InterpExprKind::Binary { op, lhs, rhs } => {
                 write!(f, "{lhs} {} {rhs}", op.symbol())

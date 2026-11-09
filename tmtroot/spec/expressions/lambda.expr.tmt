@@ -8,7 +8,7 @@
 =[ 形 ]
 
 ```tm
-d => d.meta.tags.contains("rust")
+d => d::meta.tags.contains("rust")
 (a, b) => a >= b
 ```
 

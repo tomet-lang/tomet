@@ -35,8 +35,9 @@ pub struct DirRef(pub String);
 ///
 /// Unlike a whole document ([`EvalValue::Document`]) or detached block output
 /// ([`EvalValue::Fragment`]), a [`Part`] belongs to a source document and can
-/// be inspected via `.name`, `.prop`, `.id`, `.connects`, `.content`, and
-/// `.item(n)`.
+/// be inspected via `::id`, `::name`, `::connects`, `::content`, the connect of a
+/// given name (`::meta`) and `::doc`; read for a key of its data (`.key`); and
+/// asked for `.item(n)` and `.link()`.
 ///
 /// A heading's id attaches to the whole section (heading and everything under
 /// it), not to a lone element, and a list's to the whole list, not to one of

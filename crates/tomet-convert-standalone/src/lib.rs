@@ -46,7 +46,7 @@ use tomet_vault::Vault;
 /// What more than the minimum a conversion may do. The default does none of it.
 #[derive(Debug, Clone, Copy, Default)]
 pub struct Options {
-    /// Freeze `${self.meta.x}` to its value. Without it the expression is left, because the
+    /// Freeze `${self::meta.x}` to its value. Without it the expression is left, because the
     /// vault's `::field` that type it cannot be carried into a file yet.
     pub freeze_fields: bool,
 }

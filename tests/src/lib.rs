@@ -158,7 +158,14 @@ pub const KNOWN_TS_ERRORS: &[(&str, &[&str])] = &[
     // and an element as the positional one (`(@file(path))`) are errors. `tomet-parser` reads both.
     (
         "syntax/declaration-paths-positional.tmt",
-        &[MISSING_NODE, ", \"", ")"],
+        &[
+            MISSING_NODE,
+            ", \"",
+            ")",
+            "(daily.blueprint.tmt",
+            "(deck.vocabulary.tmt",
+            "(tomet.dict.tmt",
+        ],
     ),
     // A block where a `{...}` group's value goes (`card: [ @card[ ${2} ] ]`, the body of a block
     // macro in `::macro(...)`): `grammar.js` reads a `[ ... ]` value in `(args)` but not as the

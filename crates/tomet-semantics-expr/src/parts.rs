@@ -139,11 +139,11 @@ fn block_value(doc: &DocRef, block: &Block) -> EvalValue {
 
 // ---- members of a part -------------------------------------------------------
 
-/// An element's `(args)` and `{value}` seen as one map: the value's keys win
-/// on a conflict, since `{value}` is where an element's real data usually
+/// The data a node holds -- its `(args)` and `{value}` -- seen as one map: the value's keys win
+/// on a conflict, since `{value}` is where a node's real data usually
 /// lives (`::meta(...)`) while `(args)` tends toward attributes. When neither is
 /// a map, whichever scalar group there is.
-fn prop(doc: &DocRef, args: &Option<Value>, value: &Option<Group>) -> EvalValue {
+fn data(doc: &DocRef, args: &Option<Value>, value: &Option<Group>) -> EvalValue {
     let args_map = match args {
         Some(Value::Map(entries)) => Some(entries.clone()),
         _ => None,
@@ -207,17 +207,63 @@ fn children(doc: &DocRef, part: &Part) -> Vec<EvalValue> {
     }
 }
 
+/// What a part holds as data, whatever the part is: `u1.id` is a key of this.
+fn part_data(doc: &DocRef, part: &Part) -> EvalValue {
+    match part {
+        Part::Element(el) => data(doc, &el.data.args, &el.data.value),
+        Part::Section(sec) => data(doc, &sec.data.args, &sec.data.value),
+        Part::Connect(conn) => data(doc, &conn.data.args, &conn.data.value),
+        Part::Declaration(d) => data(doc, &d.data.args, &d.data.value),
+        Part::Item(item) => data(doc, &item.data.args, &item.data.value),
+        // A list has neither arguments nor a value group.
+        Part::List(_) => data(doc, &None, &None),
+    }
+}
+
+/// `part.key`: a key of the data the part holds, in its `(...)` or `{...}`.
+///
+/// The keys are the author's, so `@user(id: "u123")` has an `id` that is not the node's own
+/// (`part::id`). A key the part does not have is an error, with the way to what was probably meant
+/// for the spellings that used to read the node's own properties.
 pub(crate) fn part_member(doc: &DocRef, part: &Part, member: &str) -> Result<EvalValue, EvalError> {
+    if let EvalValue::Map(entries) = part_data(doc, part)
+        && let Some((_, value)) = entries.into_iter().find(|(key, _)| key == member)
+    {
+        return Ok(value);
+    }
     match member {
-        "prop" => Ok(match part {
-            Part::Element(el) => prop(doc, &el.data.args, &el.data.value),
-            Part::Section(sec) => prop(doc, &sec.data.args, &sec.data.value),
-            Part::Connect(conn) => prop(doc, &conn.data.args, &conn.data.value),
-            Part::Declaration(d) => prop(doc, &d.data.args, &d.data.value),
-            Part::Item(item) => prop(doc, &item.data.args, &item.data.value),
-            // A list has neither arguments nor a value group.
-            Part::List(_) => prop(doc, &None, &None),
+        "prop" => Err(retired_prop()),
+        "id" | "name" | "content" | "connects" => Err(EvalError::message(format!(
+            "this element has no data key `{member}`; the node's own `{member}` is read with \
+             `::{member}`, as `node::{member}`"
+        ))),
+        _ => Err(EvalError::UnknownMember {
+            on: "element",
+            member: member.to_string(),
         }),
+    }
+}
+
+/// The error for `.prop` and `.prop(key)`: the level between a node and its data is gone.
+fn retired_prop() -> EvalError {
+    EvalError::Retired {
+        written: ".prop".to_string(),
+        instead: "read a data argument directly with `.key` (`node.title`), and a node's own \
+                  properties with `::` (`node::id`, `node::meta`)"
+            .to_string(),
+    }
+}
+
+/// `part::member`: from a node to what hangs off it. The node's own `id`, `name`, `content` and
+/// `connects`; the `doc` it is in; its `meta`, which is its `{...}` (`@user(id: "u1"){ tag: vip }` is
+/// `@user(id: "u1")::meta(tag: vip)`, and the map is empty when there is none); or the connect of
+/// that name stacked after it (`u1::rule`), as the map of its data.
+pub(crate) fn part_connect(
+    doc: &DocRef,
+    part: &Part,
+    member: &str,
+) -> Result<EvalValue, EvalError> {
+    match member {
         "id" => Ok(part
             .id()
             .map(|id| EvalValue::String(id.to_string()))
@@ -234,34 +280,57 @@ pub(crate) fn part_member(doc: &DocRef, part: &Part, member: &str) -> Result<Eva
             Part::Section(_) => "section".to_string(),
             Part::List(_) => "list".to_string(),
         })),
-        "connects" => {
-            // A connect takes no connects of its own.
-            let connects: &[Connect] = match part {
-                Part::Element(el) => &el.connects,
-                Part::Section(sec) => &sec.connects,
-                Part::List(list) => &list.connects,
-                Part::Item(item) => &item.connects,
-                Part::Connect(_) | Part::Declaration(_) => &[],
-            };
-            Ok(EvalValue::Seq(
-                connects
-                    .iter()
-                    .map(|conn| EvalValue::Part {
-                        doc: doc.clone(),
-                        part: Box::new(Part::Connect(Box::new(conn.clone()))),
-                    })
-                    .collect(),
-            ))
-        }
         "content" => Ok(EvalValue::Fragment(child_blocks(part))),
-        _ => Err(EvalError::UnknownMember {
-            on: "element",
-            member: member.to_string(),
-        }),
+        "doc" => Ok(EvalValue::Document(doc.clone())),
+        "meta" => Ok(part_meta(doc, part)),
+        "connects" => Ok(EvalValue::Seq(
+            connects_of(part)
+                .iter()
+                .map(|conn| EvalValue::Part {
+                    doc: doc.clone(),
+                    part: Box::new(Part::Connect(Box::new(conn.clone()))),
+                })
+                .collect(),
+        )),
+        _ => connects_of(part)
+            .iter()
+            .find(|conn| conn.name.is_bare_named(member))
+            .map(|conn| data(doc, &conn.data.args, &conn.data.value))
+            .ok_or_else(|| EvalError::UnknownMember {
+                on: "element",
+                member: member.to_string(),
+            }),
     }
 }
 
-/// Calls on a part: `.item(n)` and `.prop(key)`.
+/// The `{...}` a part carries, as a map: empty when it has none.
+fn part_meta(doc: &DocRef, part: &Part) -> EvalValue {
+    let group = match part {
+        Part::Element(el) => &el.data.value,
+        Part::Section(sec) => &sec.data.value,
+        Part::Connect(conn) => &conn.data.value,
+        Part::Declaration(d) => &d.data.value,
+        Part::Item(item) => &item.data.value,
+        Part::List(_) => &None,
+    };
+    match group {
+        Some(group) => EvalValue::from_ast(&group.as_data(), doc),
+        None => EvalValue::Map(Vec::new()),
+    }
+}
+
+/// The connects stacked after a part. A connect takes none of its own.
+fn connects_of(part: &Part) -> &[Connect] {
+    match part {
+        Part::Element(el) => &el.connects,
+        Part::Section(sec) => &sec.connects,
+        Part::List(list) => &list.connects,
+        Part::Item(item) => &item.connects,
+        Part::Connect(_) | Part::Declaration(_) => &[],
+    }
+}
+
+/// Calls on a part: `.item(n)` and `.link()`.
 pub(crate) fn part_method(
     doc: &DocRef,
     part: &Part,
@@ -283,33 +352,7 @@ pub(crate) fn part_method(
                 .unwrap_or_else(|_| unreachable!("`exactly` returned one value"));
             index_into(&children(doc, part), &index)
         }
-        "prop" => {
-            let key = match args.exactly(".prop", 1)?.pop() {
-                Some(EvalValue::String(key)) => key,
-                Some(other) => {
-                    return Err(EvalError::mismatch(
-                        "`.prop`",
-                        "a string key",
-                        other.type_name(),
-                    ));
-                }
-                None => unreachable!("`exactly` returned one value"),
-            };
-            match part_member(doc, part, "prop")? {
-                EvalValue::Map(entries) => entries
-                    .into_iter()
-                    .find(|(k, _)| *k == key)
-                    .map(|(_, v)| v)
-                    .ok_or(EvalError::UnknownMember {
-                        on: "map",
-                        member: key,
-                    }),
-                other => Err(EvalError::UnknownMember {
-                    on: other.type_name(),
-                    member: key,
-                }),
-            }
-        }
+        "prop" => Err(retired_prop()),
         _ => Err(EvalError::UnknownMember {
             on: "element",
             member: member.to_string(),
@@ -319,7 +362,32 @@ pub(crate) fn part_method(
 
 // ---- members of a document and a directory -----------------------------------
 
-pub(crate) fn document_member(
+/// `doc.member`: a document holds no data of its own to read with a dot. What used to be read this
+/// way is reached with `::`, and the error says so.
+pub(crate) fn document_member(doc: &DocRef, member: &str) -> Result<EvalValue, EvalError> {
+    let _ = doc;
+    match member {
+        "path" | "filename" | "meta" | "kind" => Err(moved_to_connect(member)),
+        _ => Err(EvalError::UnknownMember {
+            on: "document",
+            member: member.to_string(),
+        }),
+    }
+}
+
+/// The error for a member that used to be read with a dot and is reached with `::` now.
+fn moved_to_connect(member: &str) -> EvalError {
+    EvalError::Retired {
+        written: format!(".{member}"),
+        instead: format!(
+            "`.` reads the data keys of a node, and `::` reaches what hangs off it; write `::{member}`"
+        ),
+    }
+}
+
+/// `doc::member`: the document's `path`, `filename`, `meta`, `kind` and `id`; `doc` is the document
+/// itself, as it is for every node in it.
+pub(crate) fn document_connect(
     doc: &DocRef,
     member: &str,
     cx: &EvalContext,
@@ -334,6 +402,10 @@ pub(crate) fn document_member(
         "kind" => Ok(tomet_declaration::document_kind(&*load(doc, cx)?)
             .map(EvalValue::String)
             .unwrap_or(EvalValue::Null)),
+        "id" => Ok(tomet_declaration::document_id(&*load(doc, cx)?)
+            .map(EvalValue::String)
+            .unwrap_or(EvalValue::Null)),
+        "doc" => Ok(EvalValue::Document(doc.clone())),
         _ => Err(EvalError::UnknownMember {
             on: "document",
             member: member.to_string(),
@@ -366,7 +438,20 @@ pub(crate) fn document_method(
     }
 }
 
-pub(crate) fn directory_member(
+/// `dir.member`: a directory holds no data to read with a dot; see [`document_member`].
+pub(crate) fn directory_member(dir: &DirRef, member: &str) -> Result<EvalValue, EvalError> {
+    let _ = dir;
+    match member {
+        "docs" | "children" => Err(moved_to_connect(member)),
+        _ => Err(EvalError::UnknownMember {
+            on: "directory",
+            member: member.to_string(),
+        }),
+    }
+}
+
+/// `dir::member`: the documents under the directory (`docs`), or directly in it (`children`).
+pub(crate) fn directory_connect(
     dir: &DirRef,
     member: &str,
     cx: &EvalContext,

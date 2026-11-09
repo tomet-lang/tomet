@@ -106,7 +106,7 @@ fn custom_element_hook_falling_through_matches_generic_rendering() {
 /// It used to assert that `$gh(42)` came out as the expanded URL. Four
 /// converters each decided that for themselves and three of them
 /// decided differently -- this one evaluated without an
-/// `EvaluationContext` or the vault's config, so `${self.path}`
+/// `EvaluationContext` or the vault's config, so `${self::path}`
 /// resolved in CommonMark and not here. Evaluation moved to
 /// `tomet-transform`'s `resolve_expressions`, which runs before any
 /// converter sees the tree; the expansion those assertions were about

@@ -7,7 +7,7 @@
 |[ `true`, `false` ][        ]
 |[ `@name`         ][        ]
 |[ `var.xxx`       ][        ]
-|[ `self.meta`     ][        ]
+|[ `self::meta`    ][        ]
 |[ `self.xxx`      ][        ]
 
 =[.ctmtファイル]

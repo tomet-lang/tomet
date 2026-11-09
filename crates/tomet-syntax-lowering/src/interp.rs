@@ -74,7 +74,9 @@ fn offset_expr(expr: &mut InterpExpr, base: usize) {
         | InterpExprKind::Id(_)
         | InterpExprKind::Literal(_)
         | InterpExprKind::Addr { .. } => {}
-        InterpExprKind::Member { object, .. } => offset_expr(object, base),
+        InterpExprKind::Member { object, .. } | InterpExprKind::Connect { object, .. } => {
+            offset_expr(object, base)
+        }
         InterpExprKind::DocId { doc, .. } => offset_expr(doc, base),
         InterpExprKind::Group(inner) => offset_expr(inner, base),
         InterpExprKind::Call { callee, args } => {
@@ -166,7 +168,7 @@ pub fn parse_interpolation(cur: &mut Cursor) -> Result<Interpolation> {
 /// `Lambda | NamedArg | Or`, the whole of an expression.
 ///
 /// Precedence, loosest first: `=>`, `||`, `&&`, comparison, then the
-/// postfix forms (`.name`, `(args)`). The grammar has no keywords, so
+/// postfix forms (`.name`, `::name`, `(args)`). The grammar has no keywords, so
 /// `true`, `false` and `null` are the only words that mean anything on
 /// their own, and they are values.
 pub(crate) fn parse_interp_expr(cur: &mut Cursor) -> Result<InterpExpr> {
@@ -186,13 +188,13 @@ pub(crate) fn parse_interp_expr(cur: &mut Cursor) -> Result<InterpExpr> {
         });
     }
 
-    // Check if this is `name: expr` (NamedArg)
+    // Check if this is `name: expr` (NamedArg). `name::member` is a connect, not a name.
     let mut look = *cur;
     if look.peek().is_some_and(is_interp_ident_start)
         && let Ok(name) = eat_interp_ident(&mut look)
     {
         skip_expr_ws(&mut look);
-        if look.peek() == Some(':') && look.peek_at(1) != Some('/') {
+        if look.peek() == Some(':') && !matches!(look.peek_at(1), Some('/' | ':')) {
             look.bump(); // consume ':'
             skip_expr_ws(&mut look);
             *cur = look;
@@ -358,7 +360,7 @@ fn parse_interp_comparison(cur: &mut Cursor) -> Result<InterpExpr> {
     Ok(binary(op, lhs, rhs, cur, start_pos))
 }
 
-/// `primary (. Ident | ( Args ))*`
+/// `primary (. Ident | :: Ident | ( Args ))*`
 fn parse_interp_postfix(cur: &mut Cursor) -> Result<InterpExpr> {
     skip_expr_ws(cur);
     let start_pos = cur.pos();
@@ -387,6 +389,20 @@ fn parse_interp_postfix(cur: &mut Cursor) -> Result<InterpExpr> {
                 let member = eat_interp_ident(cur)?.to_string();
                 expr = InterpExpr {
                     kind: InterpExprKind::Member {
+                        object: Box::new(expr),
+                        member,
+                    },
+                    span: cur.span_from(start_pos),
+                };
+            }
+            Some(':') if look.peek_at(1) == Some(':') => {
+                look.bump();
+                look.bump();
+                skip_expr_ws(&mut look);
+                *cur = look;
+                let member = eat_interp_ident(cur)?.to_string();
+                expr = InterpExpr {
+                    kind: InterpExprKind::Connect {
                         object: Box::new(expr),
                         member,
                     },

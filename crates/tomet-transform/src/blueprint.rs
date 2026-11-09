@@ -224,7 +224,7 @@ mod tests {
 
     #[test]
     fn instantiates_blueprint_to_kind_and_resolves_expressions() {
-        let src = "::blueprint(daily-note)\n::id(${generate.uuid()})\n::meta(\n  date: ${generate.now().format(\"YYYY-MM-DD\")}\n  file: ${self.filename}\n  title: ${var.title}\n)\n\n=[ Plan for ${var.title} ]#(plan)\n";
+        let src = "::blueprint(daily-note)\n::id(${generate.uuid()})\n::meta(\n  date: ${generate.now().format(\"YYYY-MM-DD\")}\n  file: ${self::filename}\n  title: ${var.title}\n)\n\n=[ Plan for ${var.title} ]#(plan)\n";
         let vars = EvalValue::Map(vec![(
             "title".to_string(),
             EvalValue::String("Sprint 42".into()),

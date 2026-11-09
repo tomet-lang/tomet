@@ -221,7 +221,7 @@ mod tests {
             notes: Default::default(),
         };
         let interp = tomet_ast_parser::parse_interpolation_str(
-            "${vault.docs.filter(d => d.meta.tags.contains(\"rust\")).map(d => d.path)}",
+            "${vault::docs.filter(d => d::meta.tags.contains(\"rust\")).map(d => d::path)}",
         )
         .unwrap();
         assert_eq!(

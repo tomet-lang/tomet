@@ -1,8 +1,12 @@
 //! Address-based resolution and editing operations for [`EditDoc`].
 //!
 //! Provides resolution of address strings (such as `#intro`, `#item(0)`,
-//! `#intro.item(1)`, `#meta.icon`, etc.) to [`NodeId`]s, attribute values,
+//! `#intro.item(1)`, `#meta.icon`, `#meta::id`, etc.) to [`NodeId`]s, attribute values,
 //! or text content, along with high-level mutation helpers.
+//!
+//! The steps follow the expression language: `.key` reads a key of the data a node holds and
+//! `.item(n)` walks to a child, while `::name` reaches what the node is itself (`::id`, `::name`,
+//! `::content`). There is no `.prop` level between a node and its data.
 
 use crate::doc::EditDoc;
 use crate::node::{AttrGroup, ChildItem, NodeId, NodeKind};
@@ -22,10 +26,10 @@ pub enum BaseTarget {
 pub enum Step {
     /// Child node or sequence item index (`.item(n)`).
     Item(usize),
-    /// Property namespace (`.prop`).
-    Prop,
-    /// Property key or field name (`.key`, `.id`, `.name`, `.content`).
+    /// A key of the data the node holds (`.key`).
     Field(String),
+    /// What the node is itself (`::id`, `::name`, `::content`).
+    Attr(String),
 }
 
 /// A parsed intra-document address path.
@@ -73,8 +77,8 @@ pub fn parse_address_path(raw: &str) -> Option<AddressPath> {
         let rest = &stripped[end + 1..];
         (BaseTarget::RootItem(idx), rest)
     } else {
-        // Bare identifier up to next '.' or '(' or end
-        let end = fragment.find('.').unwrap_or(fragment.len());
+        // Bare identifier up to the next '.', ':' or end
+        let end = fragment.find(['.', ':']).unwrap_or(fragment.len());
         let id = &fragment[..end];
         let rest = &fragment[end..];
         (BaseTarget::Id(id.trim().to_string()), rest)
@@ -84,33 +88,33 @@ pub fn parse_address_path(raw: &str) -> Option<AddressPath> {
     let mut steps = Vec::new();
     let mut cur = rest.trim();
     while !cur.is_empty() {
-        if let Some(after_dot) = cur.strip_prefix('.') {
-            cur = after_dot.trim();
+        let is_attr = if let Some(after) = cur.strip_prefix("::") {
+            cur = after.trim();
+            true
+        } else if let Some(after) = cur.strip_prefix('.') {
+            cur = after.trim();
+            false
         } else {
             break;
-        }
+        };
 
-        if let Some(stripped) = cur.strip_prefix("item(") {
+        if !is_attr && let Some(stripped) = cur.strip_prefix("item(") {
             let end = stripped.find(')')?;
             let idx: usize = stripped[..end].trim().parse().ok()?;
             steps.push(Step::Item(idx));
             cur = stripped[end + 1..].trim();
-        } else if let Some(stripped) = cur.strip_prefix("prop(") {
-            let end = stripped.find(')')?;
-            let key = stripped[..end].trim().trim_matches('"').trim_matches('\'');
-            steps.push(Step::Prop);
-            steps.push(Step::Field(key.to_string()));
-            cur = stripped[end + 1..].trim();
-        } else if cur == "prop" || cur.starts_with("prop.") {
-            steps.push(Step::Prop);
-            cur = cur.strip_prefix("prop").unwrap().trim();
         } else {
-            // General field name up to next '.' or '('
-            let end = cur.find(['.', '(']).unwrap_or(cur.len());
-            let field = cur[..end].trim();
-            if !field.is_empty() {
-                steps.push(Step::Field(field.to_string()));
+            // A name up to the next '.', ':' or '('
+            let end = cur.find(['.', ':', '(']).unwrap_or(cur.len());
+            let name = cur[..end].trim();
+            if name.is_empty() {
+                return None;
             }
+            steps.push(if is_attr {
+                Step::Attr(name.to_string())
+            } else {
+                Step::Field(name.to_string())
+            });
             cur = cur[end..].trim();
         }
     }
@@ -145,7 +149,7 @@ impl EditDoc {
     }
 
     /// Resolves the owner node for an address, even if the address points to
-    /// a sub-field or property (e.g. `#meta.prop.icon` or `#callout.content`).
+    /// a sub-field or property (e.g. `#meta.icon` or `#callout::content`).
     pub fn node_for(&self, addr: &str) -> Option<NodeId> {
         let path = parse_address_path(addr)?;
         let mut cur_id = match &path.base {
@@ -230,17 +234,17 @@ impl EditDoc {
             }
         } else {
             match remaining_steps {
-                [Step::Field(f)] if f == "id" => node.id_attr().map(|s| s.to_string()),
-                [Step::Field(f)] if f == "name" => match &node.kind {
+                [Step::Attr(a)] if a == "id" => node.id_attr().map(|s| s.to_string()),
+                [Step::Attr(a)] if a == "name" => match &node.kind {
                     NodeKind::BlockForm { name, .. } => Some(name.clone()),
                     _ => None,
                 },
-                [Step::Field(f)] if f == "content" => match &node.kind {
+                [Step::Attr(a)] if a == "content" => match &node.kind {
                     NodeKind::BlockForm { .. } => self.content_text(cur_id),
                     NodeKind::Paragraph { text } => Some(text.clone()),
                     _ => None,
                 },
-                [Step::Prop, Step::Field(key)] | [Step::Field(key)] => match &node.kind {
+                [Step::Field(key)] => match &node.kind {
                     NodeKind::BlockForm { .. } => node
                         .slots
                         .data_slot
@@ -264,9 +268,9 @@ impl EditDoc {
         let path =
             parse_address_path(addr).ok_or_else(|| EditError::AddressNotFound(addr.to_string()))?;
 
-        // Check if addr targets `.content` specifically on a BlockForm
-        if let [.., Step::Field(f)] = path.steps.as_slice()
-            && f == "content"
+        // Check if addr targets `::content` specifically on a BlockForm
+        if let [.., Step::Attr(a)] = path.steps.as_slice()
+            && a == "content"
         {
             let owner_id = self
                 .node_for(addr)
@@ -332,7 +336,7 @@ impl EditDoc {
         let path =
             parse_address_path(addr).ok_or_else(|| EditError::AddressNotFound(addr.to_string()))?;
         let key = match path.steps.as_slice() {
-            [.., Step::Prop, Step::Field(k)] | [.., Step::Field(k)] => k.clone(),
+            [.., Step::Field(k)] => k.clone(),
             _ => return Err(EditError::AddressNotFound(addr.to_string())),
         };
 

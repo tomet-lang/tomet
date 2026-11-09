@@ -4,7 +4,7 @@
 //! The text has the shape `<document>#<address inside it>`. The left side is
 //! `tmt:path`, `ref:name` or `dir:path`, or nothing for the current document.
 //! The right side is read as the steps that follow a `#` in an expression, so
-//! `intro.prop.tags.item(2)` means what it means after `#` anywhere else.
+//! `intro.tags.item(2)` means what it means after `#` anywhere else.
 
 use super::context::EvalContext;
 use super::error::EvalError;

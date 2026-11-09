@@ -190,14 +190,14 @@ fn a_fragment_on_its_own_line_is_its_blocks() {
 
 #[test]
 fn a_list_item_that_is_one_expression_becomes_an_item_per_element() {
-    let (doc, unresolved) = run("- first\n- ${addr(dir:docs).docs.map(d => d.link())}\n- last\n");
+    let (doc, unresolved) = run("- first\n- ${addr(dir:docs)::docs.map(d => d.link())}\n- last\n");
     assert_eq!(text_of(&doc), "[first,<link>,<link>,last]");
     assert!(unresolved.is_empty(), "{unresolved:?}");
 }
 
 #[test]
 fn a_list_of_scalars_becomes_items_of_text() {
-    let (doc, _) = run("- ${addr(dir:docs).docs.map(d => d.path)}\n");
+    let (doc, _) = run("- ${addr(dir:docs)::docs.map(d => d::path)}\n");
     assert_eq!(text_of(&doc), "[docs/a.tmt,docs/b.tmt]");
 }
 
@@ -209,7 +209,7 @@ fn a_list_item_with_more_than_the_expression_keeps_it_inline() {
 
 #[test]
 fn an_empty_result_removes_the_item() {
-    let (doc, unresolved) = run("- a\n- ${addr(dir:docs).docs.filter(d => false)}\n- b\n");
+    let (doc, unresolved) = run("- a\n- ${addr(dir:docs)::docs.filter(d => false)}\n- b\n");
     assert_eq!(text_of(&doc), "[a,b]");
     assert!(unresolved.is_empty());
 }
@@ -221,8 +221,8 @@ fn a_list_in_the_text_is_a_mismatch_that_says_to_join_it() {
     assert_eq!(text_of(&doc), "Tags: ${#c1.prop}");
     assert_eq!(unresolved.len(), 1);
 
-    let (doc, unresolved) = run("Docs: ${addr(dir:docs).docs}\n");
-    assert_eq!(text_of(&doc), "Docs: ${addr(dir:docs).docs}");
+    let (doc, unresolved) = run("Docs: ${addr(dir:docs)::docs}\n");
+    assert_eq!(text_of(&doc), "Docs: ${addr(dir:docs)::docs}");
     assert!(reasons(&unresolved)[0].contains(".join"), "{unresolved:?}");
 }
 
@@ -357,7 +357,7 @@ fn a_value_in_an_element_argument_keeps_its_type() {
 #[test]
 fn a_value_in_a_value_group_keeps_its_type_and_a_list_stays_a_list() {
     let (doc, unresolved) =
-        run("::meta(n: ${add(1, 1)}, names: ${addr(dir:docs).docs.map(d => d.path)})\n");
+        run("::meta(n: ${add(1, 1)}, names: ${addr(dir:docs)::docs.map(d => d::path)})\n");
     assert!(unresolved.is_empty(), "{unresolved:?}");
     let declaration = &doc.header[0];
     let Some(Value::Map(entries)) = &declaration.data.args else {
@@ -412,7 +412,7 @@ fn expressions_inside_an_elements_content_are_resolved_too() {
 fn a_reference_is_answered_from_the_document_the_resolver_holds() {
     // `#c1` is looked up through the resolver, which holds `here.tmt` as it
     // was written -- not through the document this pass is rewriting.
-    let (doc, unresolved) = run("n=${#c1.prop.n} extra=${#c1.prop.extra}\n");
+    let (doc, unresolved) = run("n=${#c1.n} extra=${#c1.extra}\n");
     assert_eq!(text_of(&doc), "n=1 extra=yes");
     assert!(unresolved.is_empty());
 }
@@ -452,7 +452,7 @@ fn creation_only_names_are_refused_when_rendering() {
 
 #[test]
 fn with_no_vault_a_reference_to_another_document_fails_and_stays() {
-    let mut doc = tomet_ast_parser::parse_file("see ${tmt(\"x.tmt\")#a.id}\n").unwrap();
+    let mut doc = tomet_ast_parser::parse_file("see ${tmt(\"x.tmt\")#a::id}\n").unwrap();
     let macros = HashMap::new();
     let vars = EvalValue::Null;
     let cx = EvalContext {
@@ -469,7 +469,7 @@ fn with_no_vault_a_reference_to_another_document_fails_and_stays() {
     };
     let unresolved = resolve_expressions(&mut doc, &cx);
     assert_eq!(unresolved.len(), 1);
-    assert_eq!(text_of(&doc), "see ${tmt(\"x.tmt\")#a.id}");
+    assert_eq!(text_of(&doc), "see ${tmt(\"x.tmt\")#a::id}");
 }
 
 #[test]
@@ -588,7 +588,7 @@ fn an_include_lands_one_heading_below_the_section_it_sits_in() {
 /// Only the picked `${...}` are resolved; the rest stay interpolations (not text) and are not reported.
 #[test]
 fn only_the_selected_expressions_are_resolved() {
-    let src = "a ${self.path} b ${macro.gh(1)} c\n\n${self.filename}\n\n- ${self.path}\n\n@card(n: ${self.path}){ k: ${self.path} }\n";
+    let src = "a ${self::path} b ${macro.gh(1)} c\n\n${self::filename}\n\n- ${self::path}\n\n@card(n: ${self::path}){ k: ${self::path} }\n";
     let resolver = vault();
     let macros = HashMap::new();
     let cx = EvalContext {
@@ -619,7 +619,7 @@ fn only_the_selected_expressions_are_resolved() {
 
     let mut left = Vec::new();
     tomet_tree::for_each_interpolation(&doc, |interp| left.push(interp.expr.to_string()));
-    assert_eq!(left, vec!["macro.gh(1)", "self.filename"]);
+    assert_eq!(left, vec!["macro.gh(1)", "self::filename"]);
 }
 
 #[test]
@@ -627,7 +627,7 @@ fn written_number_in_metadata_interpolates_as_written() {
     let resolver = MemoryResolver::new()
         .with_source(
             "doc.tmt",
-            "::meta(rev: 1.10)\n\nVersion is ${self.meta.rev}.\n",
+            "::meta(rev: 1.10)\n\nVersion is ${self::meta.rev}.\n",
         )
         .unwrap();
     let cx = EvalContext {
@@ -643,7 +643,7 @@ fn written_number_in_metadata_interpolates_as_written() {
         notes: Default::default(),
     };
     let mut doc =
-        tomet_ast_parser::parse_file("::meta(rev: 1.10)\n\nVersion is ${self.meta.rev}.\n")
+        tomet_ast_parser::parse_file("::meta(rev: 1.10)\n\nVersion is ${self::meta.rev}.\n")
             .unwrap();
     let unresolved = resolve_expressions(&mut doc, &cx);
     assert!(unresolved.is_empty());

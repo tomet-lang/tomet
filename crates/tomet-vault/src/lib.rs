@@ -156,12 +156,12 @@ impl Scope<'_> {
 ///
 /// "Vault" is the directory the config file sits in. Whether `root` names
 /// a directory that exists is not this type's concern; it only decides
-/// what `${self.path}` is measured from.
+/// what `${self::path}` is measured from.
 pub struct Vault {
     /// The config governing this vault, or the defaults when there is none.
     pub config: PrinterConfig,
     /// The directory declared vocabulary paths are relative to, and the
-    /// one `${self.path}` is measured from.
+    /// one `${self::path}` is measured from.
     pub root: PathBuf,
     /// Vocabularies that were declared but could not be accepted. Not
     /// fatal: a caller reports them and carries on, because one bad
@@ -667,7 +667,7 @@ mod tests {
                 .is_empty()
         );
         assert!(
-            validate_sources("${tmt(\"other.tmt\").meta.title}\n", &[], None, &[])
+            validate_sources("${tmt(\"other.tmt\")::meta.title}\n", &[], None, &[])
                 .unwrap()
                 .is_empty()
         );
@@ -856,7 +856,7 @@ mod tests {
         let (doc, prepared) = prepared(
             &vault,
             "/v/notes/a.tmt",
-            "at ${self.path} (${self.filename})\n",
+            "at ${self::path} (${self::filename})\n",
         );
         assert!(prepared.unresolved.is_empty(), "{:?}", prepared.unresolved);
         assert_eq!(text_of(&doc), "at notes/a.tmt (a.tmt)");
@@ -877,7 +877,7 @@ mod tests {
         let (doc, prepared) = prepared(
             &vault,
             "/v/a.tmt",
-            "::meta(title: A)\n\nrust? ${self.meta.tags.contains(\"rust\")}\n",
+            "::meta(title: A)\n\nrust? ${self::meta.tags.contains(\"rust\")}\n",
         );
         assert!(prepared.unresolved.is_empty(), "{:?}", prepared.unresolved);
         assert_eq!(text_of(&doc), "rust? false");
@@ -908,10 +908,10 @@ mod tests {
         let (doc, prepared) = prepared(
             &vault,
             "/v/a.tmt",
-            "@card(n: ${add(1, 2)})#(c1)\n\nn is ${#c1.prop.n}\n",
+            "@card(n: ${add(1, 2)})#(c1)\n\nn is ${#c1.n}\n",
         );
         assert_eq!(prepared.unresolved.len(), 1, "{:?}", prepared.unresolved);
-        assert_eq!(text_of(&doc), "n is ${#c1.prop.n}");
+        assert_eq!(text_of(&doc), "n is ${#c1.n}");
     }
     // ---- a document that declares `::profile(standalone)` is read without the vault ---------
 
