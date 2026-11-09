@@ -29,9 +29,9 @@ fn vault() -> MemoryResolver {
         .unwrap()
 }
 
-/// The block macro `name` whose body is `body`, as `::macros(name: [ body ])` defines it.
+/// The block macro `name` whose body is `body`, as `::macro(name: [ body ])` defines it.
 fn block_macro(name: &str, body: &str) -> Value {
-    let src = format!("::macros({name}: [{body}])\n");
+    let src = format!("::macro({name}: [{body}])\n");
     let file = tomet_ast_parser::parse_file(&src).expect("the macro parses");
     let Some(Value::Map(entries)) = &file.header[0].data.args else {
         panic!("expected `(name: template)` entries");

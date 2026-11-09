@@ -34,7 +34,7 @@ pub use groups::{
     FieldConfig, FormatConfig, GroupOrder, MetaConfig, RegistryConfig, WorkspaceConfig, format,
     meta, registry, workspace,
 };
-pub use layer::{ConfigLayer, registry_entries};
+pub use layer::{ConfigLayer, registered_by, registry_entries};
 pub use schema::{ConfigEntrySpec, ConfigGroupSpec, ConfigSpecProvider, all_config_specs};
 pub use tomet_spec_derive::Config;
 
@@ -47,10 +47,10 @@ pub struct Config {
     pub format: FormatConfig,
     pub meta: MetaConfig,
     pub workspace: WorkspaceConfig,
-    /// The macros a vault defines with `::macros`: name to template. Not a
+    /// The macros a vault defines with `::macro`: name to template. Not a
     /// setting, so it is not read from the `::settings`/`::config` tree.
     pub macros: std::collections::HashMap<String, tomet_ast::Value>,
-    /// The variables a vault declares with `::vars`, in the order written.
+    /// The variables a vault declares with `::var`, in the order written.
     pub vars: Vec<(String, tomet_declaration::VarDecl)>,
     pub registry: RegistryConfig,
 }
@@ -83,7 +83,7 @@ impl Config {
     }
 
     /// Reads the typed groups off one value tree assembled from the declarations: `::format` is
-    /// the root, the `::fields` are its `meta` map (beside the `meta` formatting hints), the
+    /// the root, the `::field` are its `meta` map (beside the `meta` formatting hints), the
     /// `::workspace` its `workspace` map, and the registries lists of paths.
     fn from_merged(layer: &ConfigLayer) -> Self {
         let mut root = Vec::new();
@@ -121,7 +121,7 @@ mod tests {
 
     #[test]
     fn test_fields_declaration_parsing() {
-        let src = r#"::fields(
+        let src = r#"::field(
   aliases: {
     type: list
     always_newline: true
@@ -295,7 +295,7 @@ mod tests {
         let src = r#"::format(
   meta.always_newline: true
 )
-::fields(
+::field(
   url.wiki: { type: list, always_newline: true }
   title: { length: 70 }
 )
@@ -311,5 +311,55 @@ mod tests {
         assert_eq!(cfg.meta.fields.get("title").unwrap().length, Some(70));
         assert_eq!(cfg.workspace.ignore, vec!["target", "build"]);
         assert_eq!(cfg.workspace.unswept, vec!["tests/fixtures"]);
+    }
+
+    #[test]
+    fn a_dotted_head_declares_what_the_grouped_form_declares() {
+        let dotted = load_config_from_str(
+            r#"::macro.copyright("(C) 2026")
+::format.meta(always_newline: true)
+::format.link(no_space: true, group_order: "[]()")
+::field.aliases(type: list, always_newline: true)
+::field.url.wiki(type: list, always_newline: true)
+::field.title(length: 70)[ the title ]
+::workspace.ignore("target", "build")
+::workspace.unswept("tests/fixtures")
+::blueprint.note(@file(note.blueprint.tmt))
+::vocabulary.deck(@file(deck.vocabulary.tmt))
+::dictionary.tomet(@file(tomet.dict.tmt))
+"#,
+        )
+        .expect("dotted heads");
+        let grouped = load_config_from_str(
+            r#"::macro(copyright: "(C) 2026")
+::format(meta: { always_newline: true }, link: { no_space: true, group_order: "[]()" })
+::field(
+  aliases: { type: list, always_newline: true }
+  url.wiki: { type: list, always_newline: true }
+  title: { length: 70 }
+)
+::workspace(ignore: ("target", "build"), unswept: ("tests/fixtures"))
+::blueprint(note: @file(note.blueprint.tmt))
+::vocabulary(deck: @file(deck.vocabulary.tmt))
+::dictionary(tomet: @file(tomet.dict.tmt))
+"#,
+        )
+        .expect("grouped");
+        assert_eq!(dotted.macros, grouped.macros);
+        assert_eq!(dotted.format.link_no_space, grouped.format.link_no_space);
+        assert!(dotted.meta.always_newline);
+        assert_eq!(dotted.meta.fields.len(), grouped.meta.fields.len());
+        assert!(dotted.meta.fields.get("url.wiki").unwrap().always_newline);
+        assert_eq!(dotted.meta.fields.get("title").unwrap().length, Some(70));
+        assert_eq!(dotted.workspace.ignore, vec!["target", "build"]);
+        assert_eq!(dotted.workspace.unswept, vec!["tests/fixtures"]);
+        assert_eq!(dotted.registry, grouped.registry);
+    }
+
+    #[test]
+    fn one_positional_argument_of_a_path_is_a_list_of_one_where_a_list_is_read() {
+        // `X.X` is `X`: the one argument is the entry, and a list setting reads it as a list of one.
+        let cfg = load_config_from_str("::workspace.ignore(\"target\")\n").expect("parses");
+        assert_eq!(cfg.workspace.ignore, vec!["target"]);
     }
 }

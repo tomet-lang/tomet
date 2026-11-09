@@ -5,7 +5,7 @@
 //! [`LoadedDictionaries::add`](tomet_semantics::LoadedDictionaries::add), pure, and finding and
 //! reading the files is here, because the semantics layer may not do I/O.
 //!
-//! Nothing is discovered. A vault lists its dictionaries by path (`::dictionaries( name:
+//! Nothing is discovered. A vault lists its dictionaries by path (`::dictionary( name:
 //! @file(path) )`) and each file names itself with `::dictionary(name)`.
 
 use std::path::Path;

@@ -1,55 +1,41 @@
 ::kind(config)
 ::id(config-vault)
-::macros(
-  copyright: "(C) 2026 Tomet Projects"
-  generated_by:| @comment[ Generated from ${1}. Edit that, then `tomet export .`. ]
-)
-::format(
-  meta: { always_newline: true }
-  heading: { space_inside_brackets: true }
-  table: { adjust_width: auto, max_col_width: 50 }
-  link: {
-    no_space: true
-    group_order: "[]()"
-  }
-  quote: { always_newline: true }
-  callout: {
-    style: { content: block }
-  }
-  list: {
-    multiline: {
-      style: { content: box }
-    }
-  }
-)
-::fields(
-  aliases: { type: list, always_newline: true }
-  created: { type: datetime, format: rfc3339, offset: "+09:00" }
-  modified: { type: datetime, format: rfc3339, offset: "+09:00" }
-  topics: { type: list, list_type: "@link", always_newline: false }
-  url.wiki: { type: list, always_newline: true }
-  url.source: { type: list, always_newline: true }
-  url.main: { type: list, always_newline: true }
-)
-::blueprints(
-  writ: @file(tmtroot/schema/blueprints/writ.blueprint.tmt)
-  element: @file(tmtroot/schema/blueprints/element.blueprint.tmt)
-  crate: @file(tmtroot/schema/blueprints/crate.blueprint.tmt)
-)
-::vocabularies(
-  writ: @file(tmtroot/schema/vocabularies/writ.vocabulary.tmt)
-  rust: @file(tmtroot/schema/vocabularies/rust.vocabulary.tmt)
-  bookmark: @file(tmtroot/schema/vocabularies/bookmark.vocabulary.tmt)
-  node-graph: @file(tmtroot/schema/vocabularies/node-graph.vocabulary.tmt)
-  scenario: @file(tmtroot/schema/vocabularies/scenario.vocabulary.tmt)
-  video: @file(tmtroot/schema/vocabularies/video.vocabulary.tmt)
-  idea: @file(tmtroot/schema/vocabularies/idea.vocabulary.tmt)
-  roots: @file(tmtroot/schema/vocabularies/roots.vocabulary.tmt)
-)
-::dictionaries(
-  tomet: @file(tmtroot/dict/tomet.dict.tmt)
-)
-::workspace(
-  ignore: ( "00-09 System/01 Apps/obsidian" )
-  unswept: ( "tests/fixtures", "tests/ref", "tests/store" )
-)
+
+::macro.copyright("(C) 2026 Tomet Projects")
+::macro.generated_by[
+@comment[ Generated from ${1}. Edit that, then `tomet export .`. ]
+]
+
+::format.meta(always_newline: true)
+::format.heading(space_inside_brackets: true)
+::format.table(adjust_width: auto, max_col_width: 50)
+::format.link(no_space: true, group_order: "[]()")
+::format.quote(always_newline: true)
+::format.callout(style: { content: block })
+::format.list(multiline: { style: { content: box } })
+
+::field.aliases(type: list, always_newline: true)
+::field.created(type: datetime, format: rfc3339, offset: "+09:00")
+::field.modified(type: datetime, format: rfc3339, offset: "+09:00")
+::field.topics(type: list, list_type: "@link", always_newline: false)
+::field.url.wiki(type: list, always_newline: true)
+::field.url.source(type: list, always_newline: true)
+::field.url.main(type: list, always_newline: true)
+
+::blueprint.writ(@file(tmtroot/schema/blueprints/writ.blueprint.tmt))
+::blueprint.element(@file(tmtroot/schema/blueprints/element.blueprint.tmt))
+::blueprint.crate(@file(tmtroot/schema/blueprints/crate.blueprint.tmt))
+
+::vocabulary.writ(@file(tmtroot/schema/vocabularies/writ.vocabulary.tmt))
+::vocabulary.rust(@file(tmtroot/schema/vocabularies/rust.vocabulary.tmt))
+::vocabulary.bookmark(@file(tmtroot/schema/vocabularies/bookmark.vocabulary.tmt))
+::vocabulary.node-graph(@file(tmtroot/schema/vocabularies/node-graph.vocabulary.tmt))
+::vocabulary.scenario(@file(tmtroot/schema/vocabularies/scenario.vocabulary.tmt))
+::vocabulary.video(@file(tmtroot/schema/vocabularies/video.vocabulary.tmt))
+::vocabulary.idea(@file(tmtroot/schema/vocabularies/idea.vocabulary.tmt))
+::vocabulary.roots(@file(tmtroot/schema/vocabularies/roots.vocabulary.tmt))
+
+::dictionary.tomet(@file(tmtroot/dict/tomet.dict.tmt))
+
+::workspace.ignore("00-09 System/01 Apps/obsidian")
+::workspace.unswept("tests/fixtures", "tests/ref", "tests/store")

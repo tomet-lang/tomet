@@ -90,7 +90,7 @@ fn prepare_file(mut doc: tomet::ast::File, opts: &ProcessOptions) -> tomet::ast:
         for decl in cfg_doc.header {
             if matches!(
                 tomet::declaration::DeclKind::from_name(&decl.name.name),
-                Some(tomet::declaration::DeclKind::Macros | tomet::declaration::DeclKind::Vars)
+                Some(tomet::declaration::DeclKind::Macro | tomet::declaration::DeclKind::Var)
             ) {
                 prefix_header.push(decl);
             }

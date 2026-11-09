@@ -1,9 +1,7 @@
 ::kind(vocabulary)
-::vocabulary(roots){
-  version: "1.0.0"
-}
+::vocabulary.roots(version: "1.0.0")
 
-::elements(
+::element(
   root: {
     display: block
     singleton: false

@@ -21,7 +21,7 @@
 //!   ordinary document that is also a layer; its name is the vault's to choose
 //!   ([`WorkspaceConfig::folder_entry`](tomet_config::WorkspaceConfig::folder_entry),
 //!   `::workspace(folder: { entry: ... })`) and is not a constant of this crate.
-//! - (document) the document's own declarations (`::format`, `::fields`, `::macros`, ...), applied
+//! - (document) the document's own declarations (`::format`, `::field`, `::macro`, ...), applied
 //!   by [`config_for`].
 //!
 //! The nearer layer wins, key by key; see [`Config::from_layers`] for the
@@ -238,15 +238,15 @@ mod tests {
         let dir = Dir::new("stack");
         dir.write(
             VAULT_CONFIG_FILE,
-            "::format(table: { max_col_width: 50 }, link: { no_space: true })\n::macros(m: \"vault\", v: \"vault\")\n",
+            "::format(table: { max_col_width: 50 }, link: { no_space: true })\n::macro(m: \"vault\", v: \"vault\")\n",
         );
         dir.write(
             "a/self.tmt",
-            "::format(table: { max_col_width: 60 })\n::macros(m: \"outer\")\n",
+            "::format(table: { max_col_width: 60 })\n::macro(m: \"outer\")\n",
         );
         dir.write(
             "a/b/self.tmt",
-            "::format(table: { max_col_width: 70 })\n::macros(m: \"inner\")\n",
+            "::format(table: { max_col_width: 70 })\n::macro(m: \"inner\")\n",
         );
         let deep = dir.write("a/b/note.tmt", "");
         let shallow = dir.write("a/note.tmt", "");

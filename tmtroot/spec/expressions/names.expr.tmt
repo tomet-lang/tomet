@@ -23,8 +23,8 @@
 @table
 |[ 名前       ][ 型           ][ 中身 ]
 |[ `self`     ][ 文書         ][ 式を書いたファイル（@file(tmtroot/spec/expressions/self.expr.tmt)） ]
-|[ `macro`    ][ 名前空間     ][ vault と文書の `::macros` で定義したマクロ（@file(tmtroot/spec/expressions/macro.expr.tmt)） ]
-|[ `var`      ][ Map          ][ vault と文書の `::vars` で宣言した変数。値は `default`、作成時は `--var` が上書きする（@file(tmtroot/spec/elements/std.vars.element.tmt)） ]
+|[ `macro`    ][ 名前空間     ][ vault と文書の `::macro` で定義したマクロ（@file(tmtroot/spec/expressions/macro.expr.tmt)） ]
+|[ `var`      ][ Map          ][ vault と文書の `::var` で宣言した変数。値は `default`、作成時は `--var` が上書きする（@file(tmtroot/spec/elements/std.vars.element.tmt)） ]
 |[ `vault`    ][ ディレクトリ ][ vault のルート ]
 |[ `generate` ][ 名前空間     ][ 作成時だけ。生成関数（@file(tmtroot/spec/expressions/func.expr.tmt)） ]
 

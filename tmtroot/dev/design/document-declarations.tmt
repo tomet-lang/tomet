@@ -1,6 +1,6 @@
 =[ 文書宣言 `::name` ]
 
-Status: 第1段階（`@kind` 等から `::name` への移行）は実装済み。その後 2026-11-09 の設計決定（@file(tmtroot/dev/design/nexus-brackets-and-singular-declarations.tmt)）により、複数形宣言（`::macros{}`, `::vars{}`, `::fields{}` 等）はすべて **単数ルート＋ドットパス＋丸括弧 `::macro.x(...)` / `::var.x(...)` / `::field.x(...)`** へ、また後置コネクト `:name(...)` も **`::name(...)`（および糖衣 `#(id)` / `{...}`）** へと発展統合された。以下は 2026-10 時点の初期移行設計の記録である。
+Status: 第1段階（`@kind` 等から `::name` への移行）は実装済み。その後 2026-11-09 の設計決定（@file(tmtroot/dev/design/nexus-brackets-and-singular-declarations.tmt)）により、複数形宣言（`::macro{}`, `::var{}`, `::field{}` 等）はすべて **単数ルート＋ドットパス＋丸括弧 `::macro.x(...)` / `::var.x(...)` / `::field.x(...)`** へ、また後置コネクト `:name(...)` も **`::name(...)`（および糖衣 `#(id)` / `{...}`）** へと発展統合された。以下は 2026-10 時点の初期移行設計の記録である。
 
 文書自身を説明する宣言（`kind` `meta` `config` `use` ...）を、`@` の要素ではなく、`::name(...)` で書く。
 
@@ -31,7 +31,7 @@ Status: 第1段階（`@kind` 等から `::name` への移行）は実装済み�
 |[ `##` `^` `^^`      ][ 使わない。`##` は情報用に検討して取り下げた。`^` は「地面が無く不安定」で却下 ]
 |[ つづりを決めるもの ][ 語彙が宣言した `Region`。`preamble` なら `::name`、`body` なら `@name` ]
 |[ `::` に入る名前    ][ 標準: `kind` `version` `use` `config` `settings` `blueprint` `vocabulary` `meta`、新設の `macros` `vars` `rule`。ユーザー定義: `region: preamble` を宣言した要素 ]
-|[ `@vocabulary(ns)`  ][ `::vocabulary(ns)` にする ]
+|[ `@vocabulary(ns)`  ][ `::vocabulary.ns()` にする ]
 |[ 脚注               ][ 定義 `@footnote(id)[...]` も参照 `^(id)` も、`@ftn(id)[...]` に統一する。`@footnote` と `^` の要素はなくなる。移行は `tandr` ]
 |[ 後方互換           ][ 考えない。すべて移行する。移行は `tandr` に任せる ]
 
@@ -59,11 +59,11 @@ Status: 第1段階（`@kind` 等から `::name` への移行）は実装済み�
 名前の定義は、設定ではなく宣言として書く。
 
 ```tm
-::macros(
+::macro(
   gh: "https://github.com/tomet/tomet/issues/${1}"
 )
 
-::vars(
+::var(
   title: {
     type: string
     about: | 作成するノートの題。
@@ -74,11 +74,11 @@ Status: 第1段階（`@kind` 等から `::name` への移行）は実装済み�
 
 @table
 |[ 項目             ][ 決定 ]
-|[ `::macros()`     ][ 名前から本体への値の表。呼び出しは `$macro.gh(12)`。`::settings{ macros }` からは出す（マクロは振る舞いの設定ではなく名前の定義で、cotomet 自身のものだから）。文書の定義は vault の同名を上書きする ]
-|[ `::vars()`       ][ `elements` に近い、宣言のマップ。`名前: { type, default, about }`。参照は `${var.xxx}`。`::macros` と同じく、vault の `default.config.tmt` にも書け、文書が同じ名前を宣言ごとに上書きする ]
+|[ `::macro()`     ][ 名前から本体への値の表。呼び出しは `$macro.gh(12)`。`::settings{ macros }` からは出す（マクロは振る舞いの設定ではなく名前の定義で、cotomet 自身のものだから）。文書の定義は vault の同名を上書きする ]
+|[ `::var()`       ][ `elements` に近い、宣言のマップ。`名前: { type, default, about }`。参照は `${var.xxx}`。`::macro` と同じく、vault の `default.config.tmt` にも書け、文書が同じ名前を宣言ごとに上書きする ]
 |[ 必須と省略可     ][ `default` が無ければ必須、あれば省略可。値を直接書く形は無い（マップの値は `default:` の中に書く） ]
 |[ `type`           ][ 型の名前（一覧は `tomet_type::Type`。`meta` のフィールドの `type:` と同じ語彙）。省くと string（コマンドラインから渡るのは文字列だから） ]
-|[ `--var` との関係 ][ 場当たりだった作成時専用の `vars` を昇格する。旧 `vars.` の名前空間は `var.` に吸収し、並存させない。`--var` は `::vars` で宣言した名前に絞る（宣言にない名前はエラー）。blueprint の入力と `${var.x}` の参照を `tomet check` で検証できる。「作成時専用」の制限はなくなり、作成時専用に残るのは `generate` だけ ]
+|[ `--var` との関係 ][ 場当たりだった作成時専用の `vars` を昇格する。旧 `vars.` の名前空間は `var.` に吸収し、並存させない。`--var` は `::var` で宣言した名前に絞る（宣言にない名前はエラー）。blueprint の入力と `${var.x}` の参照を `tomet check` で検証できる。「作成時専用」の制限はなくなり、作成時専用に残るのは `generate` だけ ]
 |[ 単数形           ][ `::macro(name)` `::var(name)` `::element(name)` は後で足す。「単数形を並べたもの」と同じ意味にする。今は足さない ]
 
 名前の決め方: 表の形をした宣言は複数形（`macros` `vars`）、1つのものを述べる宣言は単数形（`kind` `meta`）。式の名前空間は単数形（`macro.gh` `var.title`）。
@@ -150,7 +150,7 @@ m: { git: x, rev: y }:rule(allow:list(git, rev, path))
 ==[ 未決 ]
 
 - `macros` を `::settings` から出す件は、作者の確認待ち。
-- `::macros` の本体に、値（マップなど）を許す範囲。cotomet は任意の値、tomet は今は文字列だけ。
+- `::macro` の本体に、値（マップなど）を許す範囲。cotomet は任意の値、tomet は今は文字列だけ。
 - `::var(name)` 等の単数形を足すとき、`::macro(name)` の本体の置き場所（`{data}` はマップなので、文字列のテンプレートの入る位置）。
 - cotomet の値へのコネクトの持たせ方。`Value` に注釈の入る場所が無い。
 - `[content]` を `::` が取るか。標準の宣言で取るものは無い。

@@ -1754,9 +1754,9 @@ fn eval_value_number_preserves_written_representation_and_computes_numerically()
     );
 }
 
-// ---- block macros: `::macros(name: [ ... ])` ----
+// ---- block macros: `::macro(name: [ ... ])` ----
 
-/// The `[ ... ]` value of the first entry of the `::macros` declaration in `src`.
+/// The `[ ... ]` value of the first entry of the `::macro` declaration in `src`.
 fn block_macro(src: &str) -> Value {
     let file = tomet_ast_parser::parse_file(src).expect("parses");
     let Some(Value::Map(entries)) = &file.header[0].data.args else {
@@ -1777,11 +1777,11 @@ fn a_block_macro_is_its_blocks_with_the_places_filled_in() {
     let macros = macros_of(&[
         (
             "card",
-            block_macro("::macros(card: [\n@card(title: ${1})[ ${2} ]\n])\n"),
+            block_macro("::macro(card: [\n@card(title: ${1})[ ${2} ]\n])\n"),
         ),
         (
             "notice",
-            block_macro("::macros(notice: [ Notice: ${msg} ])\n"),
+            block_macro("::macro(notice: [ Notice: ${msg} ])\n"),
         ),
     ]);
     let run = |src: &str| run_with(src, Phase::Output, &EvalValue::Null, &macros);
@@ -1820,7 +1820,7 @@ fn a_block_macro_is_its_blocks_with_the_places_filled_in() {
 
 #[test]
 fn a_number_given_to_a_block_macro_stays_a_number_in_data() {
-    let macros = macros_of(&[("n", block_macro("::macros(n: [\n@meter(of: ${1})\n])\n"))]);
+    let macros = macros_of(&[("n", block_macro("::macro(n: [\n@meter(of: ${1})\n])\n"))]);
     let run = |src: &str| run_with(src, Phase::Output, &EvalValue::Null, &macros);
     let EvalValue::Fragment(blocks) = run("macro.n(7)").unwrap() else {
         panic!("a block macro is a fragment");
@@ -1839,13 +1839,13 @@ fn a_block_macro_checks_its_arguments_as_a_text_macro_does() {
     let macros = macros_of(&[
         (
             "card",
-            block_macro("::macros(card: [\n@card(title: ${1})[ ${2} ]\n])\n"),
+            block_macro("::macro(card: [\n@card(title: ${1})[ ${2} ]\n])\n"),
         ),
         (
             "notice",
-            block_macro("::macros(notice: [ Notice: ${msg} ])\n"),
+            block_macro("::macro(notice: [ Notice: ${msg} ])\n"),
         ),
-        ("none", block_macro("::macros(none: [ plain ])\n")),
+        ("none", block_macro("::macro(none: [ plain ])\n")),
     ]);
     let run = |src: &str| run_with(src, Phase::Output, &EvalValue::Null, &macros);
     assert_eq!(

@@ -287,7 +287,7 @@ fn format_diagnostics(
 ///
 /// Declarations at the top are validated by `check_ctmt_declarations`. If the
 /// evaluator also reports errors within header declarations (such as a malformed
-/// `::vars` or `::macros` entry), those duplicates are dropped in favor of the
+/// `::var` or `::macro` entry), those duplicates are dropped in favor of the
 /// declaration check's diagnostic so each problem is reported once.
 fn check_ctmt(file: &Path, src: &str, json: bool) -> CheckFileResult {
     let parsed = match cotomet::parse_file_with_expressions(src) {
@@ -400,12 +400,12 @@ mod tests {
         fs::create_dir_all(dir.join(".tomet/vocabularies")).unwrap();
         fs::write(
             dir.join(tomet_load_config::VAULT_CONFIG_FILE),
-            "::kind(config)\n::vocabularies(deck: @file(.tomet/vocabularies/deck.vocabulary.tmt))\n",
+            "::kind(config)\n::vocabulary(deck: @file(.tomet/vocabularies/deck.vocabulary.tmt))\n",
         )
         .unwrap();
         fs::write(
             dir.join(".tomet/vocabularies/deck.vocabulary.tmt"),
-            "::kind(vocabulary)\n::vocabulary(deck)\n\n::elements(card: {})\n",
+            "::kind(vocabulary)\n::vocabulary.deck()\n\n::element(card: {})\n",
         )
         .unwrap();
         dir
@@ -497,7 +497,7 @@ mod tests {
         let root = vault("uuid");
         fs::write(
             root.join(tomet_load_config::VAULT_CONFIG_FILE),
-            "::kind(config)\n::fields(id: { type: uuid })\n",
+            "::kind(config)\n::field(id: { type: uuid })\n",
         )
         .unwrap();
         fs::write(
@@ -614,7 +614,7 @@ mod tests {
         let root = vault("blueprint_check");
         fs::write(
             root.join(tomet_load_config::VAULT_CONFIG_FILE),
-            "::kind(config)\n::blueprints(bp: @file(bp.tmt))\n",
+            "::kind(config)\n::blueprint(bp: @file(bp.tmt))\n",
         )
         .unwrap();
         fs::write(
@@ -664,7 +664,7 @@ mod tests {
         }
 
         // 1. Valid standard declarations pass
-        let good_src = "::kind(catalog, 1)\n::version(1.0.0)\n::meta(\n  author: \"me\"\n)\n::macros(\n  name: \"val\"\n)\n::vars(\n  n: { type: int, default: 1 }\n)\nkey: 42\n";
+        let good_src = "::kind(catalog, 1)\n::version(1.0.0)\n::meta(\n  author: \"me\"\n)\n::macro(\n  name: \"val\"\n)\n::var(\n  n: { type: int, default: 1 }\n)\nkey: 42\n";
         let good_file = root.join("good.ctmt");
         fs::write(&good_file, good_src).unwrap();
         assert_eq!(ctmt_messages(&good_file, good_src), Vec::<String>::new());
@@ -731,7 +731,7 @@ mod tests {
         }
 
         // 1. .ctmt with ${macro.vocab("writ", "1.0.0")} passes check
-        let good_src = "::macros(vocab: \"vocabularies/${1}/${1}@${2}.vocabulary.tmt\")\npath: ${macro.vocab(\"writ\", \"1.0.0\")}\n";
+        let good_src = "::macro(vocab: \"vocabularies/${1}/${1}@${2}.vocabulary.tmt\")\npath: ${macro.vocab(\"writ\", \"1.0.0\")}\n";
         let good_file = root.join("good.ctmt");
         fs::write(&good_file, good_src).unwrap();
         assert_eq!(ctmt_errors(&good_file, good_src), Vec::<String>::new());
@@ -752,7 +752,7 @@ mod tests {
         assert!(err.to_string().contains("1 of 1 file(s) failed"));
 
         // 3. .ctmt with ${macro.vocab("writ")} fails check, message contains arity error
-        let bad_arity_src = "::macros(vocab: \"vocabularies/${1}/${1}@${2}.vocabulary.tmt\")\npath: ${macro.vocab(\"writ\")}\n";
+        let bad_arity_src = "::macro(vocab: \"vocabularies/${1}/${1}@${2}.vocabulary.tmt\")\npath: ${macro.vocab(\"writ\")}\n";
         let bad_arity_file = root.join("bad_arity.ctmt");
         fs::write(&bad_arity_file, bad_arity_src).unwrap();
         let errs = ctmt_errors(&bad_arity_file, bad_arity_src);
@@ -779,8 +779,8 @@ mod tests {
         let err = check(&addr_file, false, true, false).expect_err("address expr fails");
         assert!(err.to_string().contains("1 of 1 file(s) failed"));
 
-        // 5. .ctmt with bad ::vars entry reports exactly 1 message
-        let bad_var_src = "::vars(bad: 123)\npath: \"ok\"\n";
+        // 5. .ctmt with bad ::var entry reports exactly 1 message
+        let bad_var_src = "::var(bad: 123)\npath: \"ok\"\n";
         let bad_var_file = root.join("bad_var.ctmt");
         fs::write(&bad_var_file, bad_var_src).unwrap();
         let errs = ctmt_errors(&bad_var_file, bad_var_src);

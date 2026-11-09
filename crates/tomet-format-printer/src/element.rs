@@ -370,7 +370,7 @@ pub(crate) fn render_group_entries(entries: &[Entry], config: &PrinterConfig) ->
             // nested map needs its own braces here or `m: { k: v }`
             // prints as `m: k: v` and reparses as a string. With this crate's own
             // block renderer, as `(args)` has: a `key: [...]` value (a block macro
-            // in `::macros(...)`) holds whole blocks, and the restricted default
+            // in `::macro(...)`) holds whole blocks, and the restricted default
             // would print an element in it as nothing.
             Entry::Pair(k, v) => format!(
                 "{}: {}",

@@ -401,7 +401,7 @@ mod tests {
         fs::create_dir_all(root.join("notes")).expect("temp dirs");
         fs::write(
             root.join(tomet_load_config::VAULT_CONFIG_FILE),
-            "::kind(config)\n::fields(tags: { type: list }, created: { type: datetime })\n",
+            "::kind(config)\n::field(tags: { type: list }, created: { type: datetime })\n",
         )
         .expect("config");
         for (file, tags, created) in [
@@ -565,7 +565,7 @@ mod tests {
                 ("bp.blueprint.tmt", "::kind(blueprint)\n::blueprint(note)\n"),
                 (
                     "deck.vocabulary.tmt",
-                    "::kind(vocabulary)\n::vocabulary(deck){ version: \"1.0.0\" }\n\n::elements(card: {})\n",
+                    "::kind(vocabulary)\n::vocabulary.deck(version: \"1.0.0\")\n\n::element(card: {})\n",
                 ),
                 (
                     "tomet.dictionary.tmt",
@@ -576,7 +576,7 @@ mod tests {
         let path = root.join(tomet_load_config::VAULT_CONFIG_FILE);
         fs::write(
             &path,
-            "::kind(config)\n::blueprints(note: @file(bp.blueprint.tmt), wrong: @file(bp.blueprint.tmt))\n::vocabularies(deck: @file(deck.vocabulary.tmt), other: @file(deck.vocabulary.tmt))\n::dictionaries(tomet: @file(tomet.dictionary.tmt), words: @file(tomet.dictionary.tmt))\n",
+            "::kind(config)\n::blueprint(note: @file(bp.blueprint.tmt), wrong: @file(bp.blueprint.tmt))\n::vocabulary(deck: @file(deck.vocabulary.tmt), other: @file(deck.vocabulary.tmt))\n::dictionary(tomet: @file(tomet.dictionary.tmt), words: @file(tomet.dictionary.tmt))\n",
         )
         .unwrap();
         let vault = Vault::discover(&root);
@@ -595,9 +595,9 @@ mod tests {
         assert_eq!(
             mismatches,
             [
-                ("blueprints".to_string(), "wrong".to_string()),
-                ("vocabularies".to_string(), "other".to_string()),
-                ("dictionaries".to_string(), "words".to_string()),
+                ("blueprint".to_string(), "wrong".to_string()),
+                ("vocabulary".to_string(), "other".to_string()),
+                ("dictionary".to_string(), "words".to_string()),
             ]
         );
     }

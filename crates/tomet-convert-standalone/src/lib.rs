@@ -13,7 +13,7 @@
 //!   | what this crate meant to do.
 //! - (Carry what is a definition)
 //!   | A macro or a variable the vault defines and the file uses is written into the file's
-//!   | `::macros` / `::vars`. The expressions that use it stay expressions.
+//!   | `::macro` / `::var`. The expressions that use it stay expressions.
 //! - (Freeze what is a place)
 //!   | What depends on where the file sits or on other files -- `self.path`, `vault`, `include`,
 //!   | an address into another document -- has no definition to carry. The `${...}` is replaced by
@@ -30,8 +30,8 @@
 //! =[ Not here ]
 //!
 //! - Printing. The result is a [`File`]; the command prints it the way the vault prints.
-//! - A vocabulary, `self.meta` typed by `::fields`, and `@term`: each is left and reported. A file
-//!   cannot hold a vocabulary or its own `::fields` yet, and a term is not frozen yet.
+//! - A vocabulary, `self.meta` typed by `::field`, and `@term`: each is left and reported. A file
+//!   cannot hold a vocabulary or its own `::field` yet, and a term is not frozen yet.
 //!   `Options::freeze_fields` is the way out for `self.meta`.
 
 use std::path::Path;
@@ -47,7 +47,7 @@ use tomet_vault::Vault;
 #[derive(Debug, Clone, Copy, Default)]
 pub struct Options {
     /// Freeze `${self.meta.x}` to its value. Without it the expression is left, because the
-    /// vault's `::fields` that type it cannot be carried into a file yet.
+    /// vault's `::field` that type it cannot be carried into a file yet.
     pub freeze_fields: bool,
 }
 
@@ -236,7 +236,7 @@ fn need(dirt: &Dirt, vault: &Vault, options: &Options) -> Need {
             }
         }
         Dirt::Expression(Reach::FieldType) if !options.freeze_fields => Need::Cannot(
-            "a file cannot hold its own `::fields` yet; `freeze_fields` writes the value instead"
+            "a file cannot hold its own `::field` yet; `freeze_fields` writes the value instead"
                 .to_string(),
         ),
         Dirt::Expression(_) => Need::Freeze,
@@ -293,11 +293,11 @@ fn carry(vault: &Vault, groups: &[Place<'_>], decisions: &[Decision], document: 
     }
     macros.sort_by(|a, b| a.0.cmp(&b.0));
     vars.sort_by(|a, b| a.0.cmp(&b.0));
-    add_entries(document, "macros", macros);
-    add_entries(document, "vars", vars);
+    add_entries(document, "macro", macros);
+    add_entries(document, "var", vars);
 }
 
-/// A variable as `::vars` writes it: `{ type, default, about }`.
+/// A variable as `::var` writes it: `{ type, default, about }`.
 fn var_declaration(decl: &tomet_declaration::VarDecl) -> Value {
     let mut fields = vec![(
         "type".to_string(),

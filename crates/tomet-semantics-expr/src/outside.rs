@@ -34,15 +34,15 @@ const INSIDE_FUNCTIONS: &[&str] = &[
 pub enum Reach {
     /// `vault`, however it is used.
     Vault,
-    /// `macro.name` where the file has no `::macros` entry for `name`.
+    /// `macro.name` where the file has no `::macro` entry for `name`.
     Macro(String),
-    /// `var.name` where the file has no `::vars` entry for `name`.
+    /// `var.name` where the file has no `::var` entry for `name`.
     Var(String),
     /// A call that answers from another document: `tmt`, `ref`, `include`.
     OtherDocument(&'static str),
     /// A value that contains where the file sits: `self.path`, `self.filename`, `link`.
     Placement(&'static str),
-    /// `self.meta`, whose fields are typed by the vault's `::fields`.
+    /// `self.meta`, whose fields are typed by the vault's `::field`.
     FieldType,
     /// An address written with `tmt:`, `ref:` or `dir:` on the left of `#`.
     Address(&'static str),
@@ -56,10 +56,10 @@ impl std::fmt::Display for Reach {
         match self {
             Reach::Vault => write!(f, "the vault (`vault`)"),
             Reach::Macro(name) => {
-                write!(f, "the macro `{name}`, which `::macros` does not define")
+                write!(f, "the macro `{name}`, which `::macro` does not define")
             }
             Reach::Var(name) => {
-                write!(f, "the variable `{name}`, which `::vars` does not declare")
+                write!(f, "the variable `{name}`, which `::var` does not declare")
             }
             Reach::OtherDocument(function) => write!(f, "another document (`{function}(...)`)"),
             Reach::Placement("link") => write!(f, "a link, which writes where the file sits"),
@@ -335,7 +335,7 @@ mod tests {
     #[test]
     fn the_names_a_document_defines_are_read_from_the_document() {
         let doc = tomet_ast_parser::parse_file(
-            "::macros(gh: \"https://x/${1}\")\n::vars(topic: { type: string })\n",
+            "::macro(gh: \"https://x/${1}\")\n::var(topic: { type: string })\n",
         )
         .unwrap();
         let own = OwnNames::of_document(&doc);

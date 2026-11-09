@@ -9,7 +9,7 @@ use tomet_tree::{ValueExt, for_each_declaration, for_each_declaration_mut};
 use crate::expressions::{Unresolved, resolve_expressions};
 
 /// What a `::blueprint` directive says about the blueprint. Its variables are
-/// not here: the blueprint declares them with `::vars`.
+/// not here: the blueprint declares them with `::var`.
 #[derive(Debug, Clone, PartialEq)]
 pub struct BlueprintInfo {
     pub target_kind: String,
@@ -101,12 +101,12 @@ pub fn instantiate_blueprint(doc: &mut File, cx: &EvalContext) -> Instantiated {
     });
     changed |= dropped_own_kind;
 
-    // The blueprint's `::vars` are its inputs. They have been given their values
+    // The blueprint's `::var` are its inputs. They have been given their values
     // by now (see `tomet-workspace`), and a document made from it has none to ask for.
     let mut dropped_vars = false;
     doc.header.retain(|declaration| {
         let is_vars =
-            classify_declaration_lenient(declaration) == ElementKind::Declaration(DeclKind::Vars);
+            classify_declaration_lenient(declaration) == ElementKind::Declaration(DeclKind::Var);
         dropped_vars |= is_vars;
         !is_vars
     });

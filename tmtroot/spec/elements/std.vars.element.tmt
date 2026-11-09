@@ -3,14 +3,18 @@
 
 =[ 全容 ]
 
-`::vars` は、この文書が持つ変数を宣言する。`elements` と同じ、名前をキーにした宣言の表。式からは `${var.名前}` で読む（@file(tmtroot/spec/expressions/names.expr.tmt)）。
+`::var` は、この文書が持つ変数を宣言する。変数1つを、名前をヘッドに書いた宣言1つで書き、直後の `[ ... ]` がその説明（`about`）になる。式からは `${var.名前}` で読む（@file(tmtroot/spec/expressions/names.expr.tmt)）。
 
 ```tm
-::vars(
-  title: {
-    type: string
-    about: | 作成するノートの題。
-  }
+::var.title(type: string)[ 作成するノートの題。 ]
+::var.draft(type: bool, default: false)
+```
+
+名前をキーにした表を `::var(...)` に渡す形も、同じ木になる。
+
+```tm
+::var(
+  title: { type: string, about: | 作成するノートの題。 }
   draft: { type: bool, default: false }
 )
 ```
@@ -23,21 +27,21 @@
 
 - 各項目は宣言のマップで、値を直接書く形は無い。マップの値を既定値にしたいときは、`default:` の中に書く。
 - 値は、作成時（`tomet new`）に `--var key=value` で渡せる。文字列で渡り、`type` に従って変換する。宣言にない名前を渡すと、エラー（@file(tmtroot/spec/cli/new.tmt)）。
-- 先頭の並びに書く（`Region::Preamble`）。1文書に1つ。
+- 先頭の並びに書く（`Region::Preamble`）。何度書いてもよく、同じ名前は後のものが勝つ。
 
 =[ vault と文書 ]
 
-vault の設定（`default.config.tmt`）にも、文書にも書ける。`::macros` と同じ規則で、vault の宣言が土台になり、文書の宣言が同じ名前を上書きする。上書きは宣言ごとで、`type` や `default` を1つずつ混ぜることはしない。
+vault の設定（`default.config.tmt`）にも、文書にも書ける。`::macro` と同じ規則で、vault の宣言が土台になり、文書の宣言が同じ名前を上書きする。上書きは宣言ごとで、`type` や `default` を1つずつ混ぜることはしない。
 
-vault に書いた変数は、その vault のすべての文書で `${var.名前}` として読める。ブループリントが受け取る入力は、vault の宣言とブループリントの `::vars` を合わせたもの。
+vault に書いた変数は、その vault のすべての文書で `${var.名前}` として読める。ブループリントが受け取る入力は、vault の宣言とブループリントの `::var` を合わせたもの。
 
 =[ 検証 ]
 
 - `${var.x}` の `x` が、vault にも文書にも宣言されていなければ、`tomet check` が報告する。
 - 宣言のマップでないもの、知らないキー、変数に使えない `type`、`type` に合わない `default` は、エラー（`tomet check`）。
-- ブループリントでは、`::vars` がその入力の一覧になる（@file(tmtroot/spec/features/blueprint.tmt)）。作る文書には持ち越さない。
+- ブループリントでは、`::var` がその入力の一覧になる（@file(tmtroot/spec/features/blueprint.tmt)）。作る文書には持ち越さない。
 - ブループリントでない文書の、`default` の無い変数は、値を持てないので、`${var.x}` で読むとエラー。
 
 #[ 未実装 ]
 
-- 単数形の `::var(name)`。「`::vars` に1つずつ書いたもの」と同じ意味で足す予定。
+- 複数形 `::vars` は廃止した。書くと `tomet check` が、`::var` に書き直すよう報告する。

@@ -43,7 +43,7 @@ impl ExportType {
 }
 
 /// What a document declares about itself that is not formatting or a registry: where it is exported
-/// (`::export`), and the macros and variables it defines (`::macros`, `::vars`).
+/// (`::export`), and the macros and variables it defines (`::macro`, `::var`).
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct DocumentConfig {
     /// Target export types specified by `::export`'s `type`.
@@ -52,9 +52,9 @@ pub struct DocumentConfig {
     pub export_path: Option<String>,
     /// Per-export-type output paths specified by `::export`'s `path` as a map of format to path.
     pub export_paths: HashMap<ExportType, String>,
-    /// User-defined macro templates, from the `::macros` declaration.
+    /// User-defined macro templates, from the `::macro` declaration.
     pub macros: HashMap<String, Value>,
-    /// The variables declared with `::vars`, in the order written. A later
+    /// The variables declared with `::var`, in the order written. A later
     /// declaration of a name replaces an earlier one.
     pub vars: Vec<(String, VarDecl)>,
 }
@@ -69,7 +69,7 @@ impl DocumentConfig {
     }
 }
 
-/// Returns this document's `::export`, `::macros` and `::vars`.
+/// Returns this document's `::export`, `::macro` and `::var`.
 ///
 /// `::export` is read in either form, `(type: commonmark, path: "README.md")` or the same keys in
 /// `{...}`; a `path` is one path for every type, or a map of format to path.
@@ -188,7 +188,7 @@ mod tests {
 
     #[test]
     fn parses_the_macros_declaration() {
-        let doc = parse_file("::macros(\n  gh: \"https://github.com/org/repo/issues/$1\"\n  jira: \"https://jira.org/browse/$1\"\n)\n").unwrap();
+        let doc = parse_file("::macro(\n  gh: \"https://github.com/org/repo/issues/$1\"\n  jira: \"https://jira.org/browse/$1\"\n)\n").unwrap();
         let config = document_config(&doc);
         assert_eq!(
             config.macros.get("gh").and_then(|v| v.as_str()),
@@ -202,7 +202,7 @@ mod tests {
 
     #[test]
     fn the_macros_declaration_reads_every_entry() {
-        let doc = parse_file("::macros(\n  a: \"1\"\n  b: \"2\"\n)\n").unwrap();
+        let doc = parse_file("::macro(\n  a: \"1\"\n  b: \"2\"\n)\n").unwrap();
         let config = document_config(&doc);
         assert_eq!(config.macros.len(), 2);
     }

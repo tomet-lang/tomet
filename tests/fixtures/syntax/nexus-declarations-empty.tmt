@@ -3,7 +3,7 @@
 
 ::kind(fixture)
 ::meta()
-::macros()
-::elements[ 説明 ]
+::macro()
+::element[ 説明 ]
 
 =[ 本文 ]

@@ -77,7 +77,7 @@ impl Part {
 /// A name that holds members and is not itself a value you can print.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Namespace {
-    /// `macro`: the macros defined by `::macros`.
+    /// `macro`: the macros defined by `::macro`.
     Macro,
     /// `generate`: the functions whose result changes from call to call.
     /// Only available when a document is being created.

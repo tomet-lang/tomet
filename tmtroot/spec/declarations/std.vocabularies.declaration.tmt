@@ -4,16 +4,14 @@
 =[ 全容 ]
 
 ```tm
-::vocabularies(
-  deck: @file(tmtroot/schema/vocabularies/deck.vocabulary.tmt)
-)
+::vocabulary.deck(@file(tmtroot/schema/vocabularies/deck.vocabulary.tmt))
 ```
 
-この vault が使う語彙のファイルを、名前をつけて登録する。キーは、ファイルが `::vocabulary(deck)` で名乗る名前空間。登録の決まりは @file(tmtroot/spec/declarations/std.blueprints.declaration.tmt) と同じ。
+この vault が使う語彙のファイルを、名前をつけて登録する。ヘッドの名前は、ファイルが `::vocabulary.deck(version: "1.0.0")` で名乗る名前空間。語彙のファイル自身の先頭にある `::vocabulary.deck(...)` は名前付きの引数（`version` `open`）を取り、登録の `::vocabulary.deck(@file(...))` は位置引数にファイルを取る。2つは同じ文書に並ばない。登録の決まりは @file(tmtroot/spec/declarations/std.blueprints.declaration.tmt) と同じ。
 
 =[ 要素はここには書かない ]
 
-どの要素名があって、何を取るかは、語彙の文書（`::vocabulary`）が言う。ここは語彙のファイルがどこにあるかだけを書く。`::elements` の書き方は @file(tmtroot/spec/features/vocabulary.tmt)。
+どの要素名があって、何を取るかは、語彙の文書（`::vocabulary`）が言う。ここは語彙のファイルがどこにあるかだけを書く。`::element` の書き方は @file(tmtroot/spec/features/vocabulary.tmt)。
 
 =[ 書く場所 ]
 

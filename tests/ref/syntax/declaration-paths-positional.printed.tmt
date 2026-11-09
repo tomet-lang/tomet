@@ -1,0 +1,16 @@
+::kind(fixture)
+
+::id(declaration-paths-positional)
+
+::workspace.ignore(target, .git)
+
+::workspace.unswept(tests/fixtures, tests/ref)
+
+::blueprint.daily(@file(daily.blueprint.tmt))
+
+::vocabulary.deck(@file(deck.vocabulary.tmt))
+
+::dictionary.tomet(@file(tomet.dict.tmt))
+
+=[本文]
+宣言のあとの本文。

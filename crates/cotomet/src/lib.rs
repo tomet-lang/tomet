@@ -114,7 +114,7 @@ mod tests {
     #[cfg(feature = "eval")]
     #[test]
     fn eval_feature_evaluates_expression() {
-        let src = "::macros(vocab: \"vocabularies/${1}/${1}@${2}.vocabulary.tmt\")\na: ${macro.vocab(\"writ\", \"1.0.0\")}\n";
+        let src = "::macro(vocab: \"vocabularies/${1}/${1}@${2}.vocabulary.tmt\")\na: ${macro.vocab(\"writ\", \"1.0.0\")}\n";
         let file = eval::eval_str(src, &[]).unwrap();
         let Value::Map(entries) = file.body else {
             panic!("expected map");

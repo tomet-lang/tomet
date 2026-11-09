@@ -1,0 +1,28 @@
+// A declaration's head is a path into the document's tree. `::field.author(...)`
+// is the `author` entry of `::field`, and it is the same entry as
+// `::field(author: { ... })` grouped under the name. A trailing `[...]` is the
+// entry's prose, and the one positional argument of an entry is the entry
+// itself (`::macro.copyright("...")` is `copyright: "..."`). What takes
+// several positional arguments, or a file as one, is in `declaration-paths-positional.tmt`.
+
+::kind(fixture)
+::id(declaration-paths)
+
+::macro.copyright("(C) 2026 Tomet Projects")
+::macro.generated_by[ @comment[ Generated from ${1}. ] ]
+
+::format.meta(always_newline: true)
+::format.table(adjust_width: auto, max_col_width: 50)
+
+::field.aliases(type: list, always_newline: true)
+::field.url.wiki(type: list, always_newline: true)
+::field.author(type: string, required: true)[ 文書の著者 ]
+
+::var.title(type: string, default: "Untitled")[ 作成するノートの題 ]
+::var.draft(type: bool, default: false)
+
+::element.card(display: block)[ 一枚のカード ]
+
+=[ 本文 ]
+
+宣言のあとの本文。

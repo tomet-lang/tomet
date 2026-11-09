@@ -15,7 +15,7 @@
     }
   }
 )
-::fields(
+::field(
   id: { type: nanoid, length: 8, prefix: doc-, force: true, overwrite: true }
   aliases: { type: list, always_newline: true }
   created: { type: datetime, format: rfc3339, offset: "+09:00" }

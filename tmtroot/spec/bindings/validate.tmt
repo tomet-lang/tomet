@@ -10,7 +10,7 @@ JS・Java・Python の `validate`: vault をディスクではなくソース文
 
 @table
 |[ 渡すもの       ][ 何のため ]
-|[ 語彙           ][ 文書が使う `::vocabulary(ns)` の文書。渡さなければ `std` だけを知っていて、語彙の要素はすべて未知になる ]
+|[ 語彙           ][ 文書が使う `::vocabulary.ns()` の文書。渡さなければ `std` だけを知っていて、語彙の要素はすべて未知になる ]
 |[ 設定           ][ 設定の文書（`default.config.tmt` が持つもの）。`meta` の `type:` 宣言を与え、`uuid` と `datetime` のフィールドの形を調べさせる ]
 |[ ブループリント ][ `::blueprint(kind)` の文書。文書の `::kind` と一致するものに適合するかを調べる ]
 

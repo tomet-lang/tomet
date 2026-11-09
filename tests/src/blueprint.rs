@@ -23,7 +23,7 @@ fn test_blueprint_end_to_end_lifecycle() {
 ::blueprint(daily-note){
   description: "Daily Standup & Plan"
 }
-::vars(
+::var(
   author: { type: string, default: "Anonymous" }
   title: { type: string, default: "Daily" }
 )

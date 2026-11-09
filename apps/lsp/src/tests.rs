@@ -325,7 +325,7 @@ fn completions_with_multibyte_characters() {
 
 #[test]
 fn hover_on_macro_evaluation() {
-    let text = "::macros(\n  gh: \"https://github.com/tomet/tomet/issues/${1}\"\n  greet: \"Hello, ${1} ${2}!\"\n  copyright: \"(C) 2026 Tomet Projects\"\n)\n\n$macro.gh(42)\n\n$macro.greet(\"Alice\", \"Bob\")\n\n${macro.copyright()}\n\n$emoji(\"sparkles\")\n";
+    let text = "::macro(\n  gh: \"https://github.com/tomet/tomet/issues/${1}\"\n  greet: \"Hello, ${1} ${2}!\"\n  copyright: \"(C) 2026 Tomet Projects\"\n)\n\n$macro.gh(42)\n\n$macro.greet(\"Alice\", \"Bob\")\n\n${macro.copyright()}\n\n$emoji(\"sparkles\")\n";
 
     // Hover on $macro.gh(42) (line 6, char 2)
     let hover = hover_for(text, Position::new(6, 2), None).expect("hover found for $gh");
@@ -396,7 +396,7 @@ fn hover_on_macro_auto_discovered_from_workspace_config() {
     let config_path = dir.join(tomet_load_config::VAULT_CONFIG_FILE);
     std::fs::write(
         &config_path,
-        "::macros(\n  youtube_video: \"https://www.youtube.com/watch?v=${1}\"\n  twitter_post: \"https://x.com/${1}/status/${2}\"\n)\n",
+        "::macro(\n  youtube_video: \"https://www.youtube.com/watch?v=${1}\"\n  twitter_post: \"https://x.com/${1}/status/${2}\"\n)\n",
     )
     .unwrap();
 
@@ -475,17 +475,16 @@ fn double_colon_at_the_start_of_a_line_offers_the_declarations() {
             "id",
             "meta",
             "format",
-            "fields",
+            "field",
             "workspace",
             "export",
-            "blueprints",
-            "vocabularies",
-            "use",
-            "version",
-            "macros",
-            "vars",
             "blueprint",
             "vocabulary",
+            "use",
+            "version",
+            "macro",
+            "var",
+            "element",
         ] {
             assert!(labels.contains(&want), "{line:?}: {want} in {labels:?}");
         }

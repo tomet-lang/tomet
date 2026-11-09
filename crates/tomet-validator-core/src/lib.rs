@@ -98,7 +98,14 @@ pub fn validate_core(doc: &File, bindings: &Bindings, errors: &mut Vec<Diagnosti
 
     tomet_tree::for_each_declaration(doc, |declaration| {
         // A declaration is held to `std` alone: it is spelled `::`, so it is not
-        // looked up in the vocabularies in scope.
+        // looked up in the vocabularies in scope. A retired plural (`::fields`) is not unknown: it
+        // is reported as retired, with the name to write instead, by `check_document_declarations`.
+        let head = declaration.name.to_string();
+        if tomet_declaration::DeclKind::retired(head.split('.').next().unwrap_or_default())
+            .is_some()
+        {
+            return;
+        }
         if let Err(unknown) = tomet_semantics::classify_declaration(declaration) {
             errors.push(Diagnostic::UnknownElement {
                 name: unknown.name,
@@ -383,12 +390,17 @@ fn check_arguments_of(
 /// Runs checks on the standard declarations in `doc`, mapping each [`tomet_declaration::Problem`]
 /// back to a [`Diagnostic`] with the declaration element's span.
 pub fn check_document_declarations(doc: &File, errors: &mut Vec<Diagnostic>) {
-    use tomet_declaration::{Host, Problem, check_declarations, declarations};
+    use tomet_declaration::{Declaration, Host, Problem, check_declarations};
 
-    let found = declarations(doc);
-    let decls: Vec<_> = found.iter().map(|f| f.declaration.clone()).collect();
+    // Every declaration written, not only the standard ones: a retired spelling is reported by
+    // what it was, and the check skips a name that is nobody's.
+    let (decls, spans): (Vec<_>, Vec<_>) = doc
+        .header
+        .iter()
+        .filter_map(|written| Declaration::from_ast(written).map(|d| (d, written.span)))
+        .unzip();
     for (idx, problem) in check_declarations(&decls, Host::Tmt) {
-        let span = found[idx].span;
+        let span = spans[idx];
         match problem {
             Problem::InvalidVersion { declaration, found } => {
                 errors.push(Diagnostic::InvalidVersion {
@@ -422,7 +434,7 @@ pub fn check_document_declarations(doc: &File, errors: &mut Vec<Diagnostic>) {
             Problem::Repeated { declaration, first } => {
                 errors.push(Diagnostic::DuplicateSingleton {
                     name: declaration.to_string(),
-                    first: found[first].span,
+                    first: spans[first],
                     duplicate: span,
                 });
             }
@@ -434,6 +446,26 @@ pub fn check_document_declarations(doc: &File, errors: &mut Vec<Diagnostic>) {
             }
             Problem::ExpectedEntries { declaration } => {
                 errors.push(Diagnostic::ExpectedEntries { declaration, span });
+            }
+            Problem::UnexpectedPath { declaration } => {
+                errors.push(Diagnostic::UnexpectedDeclarationPath { declaration, span });
+            }
+            Problem::UnexpectedProse {
+                declaration,
+                reason,
+            } => {
+                errors.push(Diagnostic::UnexpectedDeclarationProse {
+                    declaration,
+                    reason,
+                    span,
+                });
+            }
+            Problem::Retired { written, instead } => {
+                errors.push(Diagnostic::RetiredDeclaration {
+                    written,
+                    instead,
+                    span,
+                });
             }
         }
     }
@@ -483,6 +515,26 @@ pub fn check_ctmt_declarations(declarations: &[Declared], errors: &mut Vec<Diagn
             }
             Problem::ExpectedEntries { declaration } => {
                 errors.push(Diagnostic::ExpectedEntries { declaration, span });
+            }
+            Problem::UnexpectedPath { declaration } => {
+                errors.push(Diagnostic::UnexpectedDeclarationPath { declaration, span });
+            }
+            Problem::UnexpectedProse {
+                declaration,
+                reason,
+            } => {
+                errors.push(Diagnostic::UnexpectedDeclarationProse {
+                    declaration,
+                    reason,
+                    span,
+                });
+            }
+            Problem::Retired { written, instead } => {
+                errors.push(Diagnostic::RetiredDeclaration {
+                    written,
+                    instead,
+                    span,
+                });
             }
             Problem::InvalidVersion { declaration, found } => {
                 errors.push(Diagnostic::InvalidVersion {
@@ -597,7 +649,7 @@ pub fn check_vocabulary_params(doc: &File, errors: &mut Vec<Diagnostic>) {
     for declaration in &doc.header {
         if elements_span.is_none()
             && classify_declaration_lenient(declaration)
-                == ElementKind::Declaration(DeclKind::Elements)
+                == ElementKind::Declaration(DeclKind::Element)
         {
             elements_span = Some(declaration.span);
         }
@@ -605,7 +657,7 @@ pub fn check_vocabulary_params(doc: &File, errors: &mut Vec<Diagnostic>) {
     let Some(span) = elements_span else { return };
     for problem in vocab.param_problems() {
         errors.push(Diagnostic::InvalidDefinition {
-            declaration: "elements",
+            declaration: "element",
             name: format!("{}.{}", problem.element, problem.param),
             reason: problem.reason,
             span,

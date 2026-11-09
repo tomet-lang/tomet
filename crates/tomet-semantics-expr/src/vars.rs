@@ -1,7 +1,7 @@
 //! The value of `var`: what the declared variables are, once a default or a
 //! `--var` has been applied. See `tmtroot/spec/elements/std.vars.element.tmt`.
 //!
-//! The declarations come from `::vars` (a document's, over its vault's); what
+//! The declarations come from `::var` (a document's, over its vault's); what
 //! was passed comes from `tomet new --var key=value`, and is text. A default
 //! is read as written: a default that does not fit its `type` is left as it
 //! is, and `tomet check` reports it, as for `typed_meta`. A value passed on
@@ -39,7 +39,7 @@ impl VarScope {
 /// Why `--var` could not be applied.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum VarError {
-    /// A name passed that no `::vars` declares.
+    /// A name passed that no `::var` declares.
     Undeclared { name: String, declared: Vec<String> },
     /// A text that is not a value of the declared type.
     BadValue {
@@ -56,7 +56,7 @@ impl std::fmt::Display for VarError {
         match self {
             VarError::Undeclared { name, declared } if declared.is_empty() => write!(
                 f,
-                "`--var {name}`: nothing declares a variable `{name}`; declare it in `::vars`"
+                "`--var {name}`: nothing declares a variable `{name}`; declare it in `::var`"
             ),
             VarError::Undeclared { name, declared } => write!(
                 f,

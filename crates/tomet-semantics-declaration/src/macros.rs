@@ -139,7 +139,7 @@ mod tests {
     #[test]
     fn a_block_body_takes_what_its_placeholders_say() {
         let arity = Arity::of_body(&body(
-            "::macros(m: [\n@card(title: ${1})[ hi ${name} ]\n\n${3}\n])\n",
+            "::macro(m: [\n@card(title: ${1})[ hi ${name} ]\n\n${3}\n])\n",
         ));
         assert_eq!(arity.positional, 3);
         assert_eq!(arity.named, ["name"]);
@@ -147,7 +147,7 @@ mod tests {
 
     #[test]
     fn a_zero_or_a_call_is_not_a_placeholder() {
-        let value = body("::macros(m: [ ${0} ${a.b} ${f(1)} ${\"s\"} ${1} ${n} ])\n");
+        let value = body("::macro(m: [ ${0} ${a.b} ${f(1)} ${\"s\"} ${1} ${n} ])\n");
         assert_eq!(expressions_in_body(&value), ["0", "a.b", "f(1)", "\"s\""]);
         assert_eq!(Arity::of_body(&value).positional, 1);
     }

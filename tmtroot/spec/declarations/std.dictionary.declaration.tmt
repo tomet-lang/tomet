@@ -36,7 +36,7 @@
 
 =[ 書く場所 ]
 
-辞書の文書の先頭に一つ。`.tmt` のみ。辞書は、vault の設定で `::dictionaries` に登録して初めて、言及の宛先になる（@file(tmtroot/spec/declarations/std.dictionaries.declaration.tmt)）。
+辞書の文書の先頭に一つ。`.tmt` のみ。辞書は、vault の設定で `::dictionary` に登録して初めて、言及の宛先になる（@file(tmtroot/spec/declarations/std.dictionaries.declaration.tmt)）。
 
 =[ 未実装 ]
 

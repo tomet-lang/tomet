@@ -6,6 +6,12 @@
 /// Closed on purpose. The standard declarations are the language's own, and a host matches on
 /// this to do what only it knows (a `.tmt` binds a vocabulary for `Use`, a vault reads `Workspace`);
 /// a user's own preamble element is a vocabulary's, and is not here.
+///
+/// Every name is singular. A declaration is a node of the document's tree: `::field` is the
+/// `field` node, and the fields it holds are its children, written either in the head as a
+/// dot-path (`::field.author(type: string)`) or grouped under the parent
+/// (`::field(author: { type: string })`); both are the same tree. The plural spellings
+/// (`::fields`, `::macros`, ...) are retired; see [`DeclKind::retired`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum DeclKind {
     /// `::kind(name, 2)`: what kind of document this is, and the major version of that kind.
@@ -19,56 +25,55 @@ pub enum DeclKind {
     Profile,
     /// `::meta(title: T, ...)`: information about the document: its free attributes, as `name: value` entries.
     Meta,
-    /// `::format(...)`: how documents are formatted: the rules `tomet format` and the printers follow.
+    /// `::format.table(max_col_width: 50)`: how documents are formatted: the rules `tomet format` and
+    /// the printers follow. One declaration per element it styles, or all grouped under `::format(...)`.
     Format,
-    /// `::fields(name: { type, ... })`: the `::meta` fields this vault or folder declares: their types and shapes.
-    Fields,
-    /// `::workspace(ignore, unswept)`: which paths are part of the vault. Only the vault config may write it.
+    /// `::field.author(type: string)[ about ]`: a `::meta` field this vault or folder declares: its
+    /// type and shape. The `[...]` is the field's `about`.
+    Field,
+    /// `::workspace.ignore("target")`: which paths are part of the vault. Only the vault config may write it.
     Workspace,
     /// `::export(type, path)`: where and in which formats this document is exported.
     Export,
-    /// `::blueprints(name: @file(path))`: the blueprints this vault or folder registers.
+    /// Two things, told apart by whether the head has a path. `::blueprint(kind)` is the header of a
+    /// blueprint document: what `tomet new` makes a document of that kind from. `::blueprint.name(@file(path))`
+    /// registers the blueprint file `path` under `name` in a vault or folder config.
     ///
-    /// The key is the name it is registered under and must be the name the file gives itself
-    /// (`::blueprint(name)`); `tomet check` reports a key that is not. The value is `@file`, not a
-    /// new element: it is a link `tomet` already tracks and can rewrite when the file moves.
-    Blueprints,
-    /// `::vocabularies(name: @file(path))`: the vocabularies this vault or folder registers.
-    ///
-    /// Like [`Blueprints`](DeclKind::Blueprints): the key is the namespace the file gives itself
-    /// (`::vocabulary(name)`).
-    Vocabularies,
-    /// `::dictionaries(name: @file(path))`: the dictionaries of terms this vault or folder registers. Like
-    /// [`DeclKind::Vocabularies`], the key is the binding and must be the name the file gives itself
-    /// (`::dictionary(name)`), and the path is relative to the vault root.
-    Dictionaries,
+    /// The registered name must be the name the file gives itself (`::blueprint(name)`); `tomet check`
+    /// reports one that is not. The value is `@file`, not a new element: it is a link `tomet` already
+    /// tracks and can rewrite when the file moves.
+    Blueprint,
+    /// Two things, by the value: `::vocabulary.ns(version: "1.0.0")` is the header of a vocabulary
+    /// document (named arguments), and `::vocabulary.ns(@file(path))` registers the file under the
+    /// namespace `ns` in a vault or folder config. The registered name must be the namespace the file
+    /// gives itself.
+    Vocabulary,
+    /// Two things, told apart by whether the head has a path. `::dictionary(name){ "term": ... }` is the
+    /// header of a dictionary document (the name its terms are mentioned by, `@term(name#id)`, and its
+    /// terms); `::dictionary.name(@file(path))` registers the file in a vault or folder config, with
+    /// the path relative to the vault root.
+    Dictionary,
     /// `::migration(...)`: the settings of the migration tool. `tomet` reads nothing from it; it is
     /// registered so that the vault config may carry it until the tool declares its own vocabulary.
     Migration,
-    /// `::macros(name: "template")`: the macros this document or vault defines.
-    Macros,
-    /// `::vars(name: { type, default, about })`: the variables this document or vault declares.
-    Vars,
+    /// `::macro.name("template")`: a macro this document or vault defines. A text macro is a string;
+    /// a block macro is the `[...]` after the head, `::macro.card[ @card[ ${1} ] ]`.
+    Macro,
+    /// `::var.name(type: string, default: x)[ about ]`: a variable this document or vault declares.
+    Var,
     /// `::use(ns, 3)`: brings a vocabulary into scope.
     Use,
-    /// `::blueprint(kind)`: what `tomet new` makes a document of that kind from.
-    Blueprint,
-    /// `::vocabulary(ns){ ... }`: the header of a vocabulary document.
-    Vocabulary,
-    /// `::dictionary(name){ "term": @term[description]#(id) }`: a dictionary of terms. Each entry is a term
-    /// (its name is the key, quoted, so a word in any language fits) with a description and, optionally, a
-    /// stable identifier; a document mentions one with `@term`.
-    Dictionary,
-    /// `::elements(...)`: the elements a vocabulary declares.
-    Elements,
+    /// `::element.name(display: block)[ about ]`: an element a vocabulary declares.
+    Element,
 }
 
 /// How many times a declaration may be written in one document.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Cardinality {
-    /// At most once: a second `::meta` is a mistake.
+    /// At most once: a second `::kind` or `::meta` is a mistake.
     Once,
-    /// As often as needed: `::use` brings in one vocabulary each.
+    /// As often as needed: `::use` brings in one vocabulary each, and `::field.author`, `::field.created`
+    /// are one declaration per field. A path in the head is what makes several declarations one tree.
     Many,
 }
 
@@ -107,12 +112,15 @@ impl Scope {
 /// to it, so which declarations may carry one is fixed here and not left to each reader.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Shape {
-    /// `::kind(config, 2)`: `(args)` bound to the declaration's positional slots, no `{...}`.
+    /// `::kind(config, 2)`: `(args)` bound to the declaration's positional slots, no `{...}`, and no
+    /// path after the name.
     Args,
-    /// `::meta(title: T)`: `(name: value, ...)`, every argument a named entry of the declaration's
-    /// own map, no `{...}`. `::meta()` is the declaration with no entries.
+    /// `::meta(title: T)` or `::field.author(type: string)`: a tree of entries, written as named
+    /// arguments of the declaration or as a dot-path in its head. No `{...}`. See
+    /// [`Declaration::entries`](crate::Declaration::entries) for how the two spellings meet.
     Entries,
-    /// `::vocabulary(ns){ ... }`: `(args)` for the slots, and a `{...}` body read as data.
+    /// `::dictionary(ns){ ... }`: `(args)` for the slots, and a `{...}` body read as data. The same
+    /// name with a path in the head is an [`Entries`](Shape::Entries) registration and takes no body.
     ArgsAndData,
 }
 
@@ -126,6 +134,10 @@ pub struct Spec {
     /// `version`. Once, here, for every host that reads a declaration.
     pub positional: &'static [&'static str],
     pub cardinality: Cardinality,
+    /// Whether the form without a path names the document itself and so may be written once, even
+    /// though the declaration as a whole is [`Cardinality::Many`]: `::blueprint(daily)` is the
+    /// header of a blueprint, `::blueprint.daily(@file(...))` one of many registrations.
+    pub own_header: bool,
     pub scope: Scope,
     /// What it is written with: whether `(...)` holds entries and whether it takes a `{...}`.
     pub shape: Shape,
@@ -134,230 +146,232 @@ pub struct Spec {
     pub vault_only: bool,
 }
 
-/// Every standard declaration, in the order they are listed to people.
-const SPECS: [Spec; 20] = [
+/// What a trailing `[...]` on a declaration with a path becomes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Prose {
+    /// It is the declaration's `about:` entry: `::field.author(type: string)[ the author ]` is
+    /// `::field.author(type: string, about: [ the author ])`.
+    About,
+    /// It is the whole value: `::macro.card[ @card[ ${1} ] ]` is `::macro.card([ @card[ ${1} ] ])`.
+    Value,
+    /// The declaration takes none.
+    None,
+}
+
+const fn spec(
+    kind: DeclKind,
+    name: &'static str,
+    cardinality: Cardinality,
+    scope: Scope,
+    shape: Shape,
+) -> Spec {
     Spec {
-        kind: DeclKind::Kind,
-        name: "kind",
+        kind,
+        name,
+        positional: &[],
+        cardinality,
+        own_header: false,
+        scope,
+        shape,
+        vault_only: false,
+    }
+}
+
+/// Every standard declaration, in the order they are listed to people.
+const SPECS: [Spec; 17] = [
+    Spec {
         // The second slot is the major version of that kind, an integer of 1 or more, and may be
         // left out. The validator checks the value; nothing reads it yet.
         positional: &["kind", "version"],
-        cardinality: Cardinality::Once,
-        scope: Scope::Both,
-        shape: Shape::Args,
-        vault_only: false,
+        ..spec(
+            DeclKind::Kind,
+            "kind",
+            Cardinality::Once,
+            Scope::Both,
+            Shape::Args,
+        )
     },
     Spec {
-        kind: DeclKind::Id,
-        name: "id",
         // The identity itself. Dots are part of it (`std.config`, `doc-kWBcIUUz`): it is one bare
         // argument.
         positional: &["id"],
-        cardinality: Cardinality::Once,
-        scope: Scope::Both,
-        shape: Shape::Args,
-        vault_only: false,
+        ..spec(
+            DeclKind::Id,
+            "id",
+            Cardinality::Once,
+            Scope::Both,
+            Shape::Args,
+        )
     },
     Spec {
-        kind: DeclKind::Version,
-        name: "version",
         positional: &["version"],
-        cardinality: Cardinality::Once,
-        scope: Scope::Both,
-        shape: Shape::Args,
-        vault_only: false,
+        ..spec(
+            DeclKind::Version,
+            "version",
+            Cardinality::Once,
+            Scope::Both,
+            Shape::Args,
+        )
     },
+    // Bare names, one or more, in no particular order: `::profile(oneline, standalone)`. There is
+    // no slot to name them after, so the arguments are read as they were written. `oneline` and
+    // `standalone` mean nothing yet for a `.ctmt` file; opening it is this value and nothing else.
+    spec(
+        DeclKind::Profile,
+        "profile",
+        Cardinality::Once,
+        Scope::Tmt,
+        Shape::Args,
+    ),
+    spec(
+        DeclKind::Meta,
+        "meta",
+        Cardinality::Once,
+        Scope::Both,
+        Shape::Entries,
+    ),
+    spec(
+        DeclKind::Format,
+        "format",
+        Cardinality::Many,
+        Scope::Tmt,
+        Shape::Entries,
+    ),
+    spec(
+        DeclKind::Field,
+        "field",
+        Cardinality::Many,
+        Scope::Tmt,
+        Shape::Entries,
+    ),
     Spec {
-        kind: DeclKind::Profile,
-        name: "profile",
-        // Bare names, one or more, in no particular order: `::profile(oneline, standalone)`. There is
-        // no slot to name them after, so the arguments are read as they were written.
-        positional: &[],
-        cardinality: Cardinality::Once,
-        // `oneline` and `standalone` mean nothing yet for a `.ctmt` file; opening it is this value and
-        // nothing else.
-        scope: Scope::Tmt,
-        shape: Shape::Args,
-        vault_only: false,
-    },
-    Spec {
-        kind: DeclKind::Meta,
-        name: "meta",
-        positional: &[],
-        cardinality: Cardinality::Once,
-        scope: Scope::Both,
-        shape: Shape::Entries,
-        vault_only: false,
-    },
-    Spec {
-        kind: DeclKind::Format,
-        name: "format",
-        positional: &[],
-        cardinality: Cardinality::Once,
-        scope: Scope::Tmt,
-        shape: Shape::Entries,
-        vault_only: false,
-    },
-    Spec {
-        kind: DeclKind::Fields,
-        name: "fields",
-        positional: &[],
-        cardinality: Cardinality::Once,
-        scope: Scope::Tmt,
-        shape: Shape::Entries,
-        vault_only: false,
-    },
-    Spec {
-        kind: DeclKind::Workspace,
-        name: "workspace",
-        positional: &[],
-        cardinality: Cardinality::Once,
-        scope: Scope::Tmt,
-        shape: Shape::Entries,
         vault_only: true,
+        ..spec(
+            DeclKind::Workspace,
+            "workspace",
+            Cardinality::Many,
+            Scope::Tmt,
+            Shape::Entries,
+        )
     },
+    spec(
+        DeclKind::Export,
+        "export",
+        Cardinality::Once,
+        Scope::Tmt,
+        Shape::Entries,
+    ),
     Spec {
-        kind: DeclKind::Export,
-        name: "export",
-        positional: &[],
-        cardinality: Cardinality::Once,
-        scope: Scope::Tmt,
-        shape: Shape::Entries,
-        vault_only: false,
-    },
-    Spec {
-        kind: DeclKind::Blueprints,
-        name: "blueprints",
-        positional: &[],
-        cardinality: Cardinality::Once,
-        scope: Scope::Tmt,
-        shape: Shape::Entries,
-        vault_only: false,
-    },
-    Spec {
-        kind: DeclKind::Vocabularies,
-        name: "vocabularies",
-        positional: &[],
-        cardinality: Cardinality::Once,
-        scope: Scope::Tmt,
-        shape: Shape::Entries,
-        vault_only: false,
-    },
-    Spec {
-        kind: DeclKind::Dictionaries,
-        name: "dictionaries",
-        positional: &[],
-        cardinality: Cardinality::Once,
-        scope: Scope::Tmt,
-        shape: Shape::Entries,
-        vault_only: false,
-    },
-    Spec {
-        kind: DeclKind::Migration,
-        name: "migration",
-        positional: &[],
-        cardinality: Cardinality::Once,
-        scope: Scope::Tmt,
-        shape: Shape::Entries,
-        vault_only: false,
-    },
-    Spec {
-        kind: DeclKind::Macros,
-        name: "macros",
-        positional: &[],
-        cardinality: Cardinality::Once,
-        scope: Scope::Both,
-        shape: Shape::Entries,
-        vault_only: false,
-    },
-    Spec {
-        kind: DeclKind::Vars,
-        name: "vars",
-        positional: &[],
-        cardinality: Cardinality::Once,
-        scope: Scope::Both,
-        shape: Shape::Entries,
-        vault_only: false,
-    },
-    Spec {
-        kind: DeclKind::Use,
-        name: "use",
-        // The namespace to bring into scope. The vault says where it lives, so this names it, not
-        // its file. The second slot is the version wanted, an integer of 1 or more, and may be
-        // left out.
-        positional: &["target", "version"],
-        // One per vocabulary brought in; the two axes -- where it may sit and how often -- are
-        // independent, and this is the proof.
-        cardinality: Cardinality::Many,
-        scope: Scope::Tmt,
-        shape: Shape::Args,
-        vault_only: false,
-    },
-    Spec {
-        kind: DeclKind::Blueprint,
-        name: "blueprint",
         // The kind the blueprint produces. `target` and not `kind`: `::kind(blueprint)` sits
         // directly above it, and `kind` there would mean the output's kind while `::kind` means
         // this file's.
         positional: &["target"],
-        cardinality: Cardinality::Once,
-        scope: Scope::Tmt,
-        shape: Shape::ArgsAndData,
-        vault_only: false,
+        own_header: true,
+        ..spec(
+            DeclKind::Blueprint,
+            "blueprint",
+            Cardinality::Many,
+            Scope::Tmt,
+            Shape::ArgsAndData,
+        )
     },
+    spec(
+        DeclKind::Vocabulary,
+        "vocabulary",
+        Cardinality::Many,
+        Scope::Tmt,
+        Shape::Entries,
+    ),
     Spec {
-        kind: DeclKind::Vocabulary,
-        name: "vocabulary",
-        positional: &[],
-        cardinality: Cardinality::Once,
-        scope: Scope::Tmt,
-        shape: Shape::ArgsAndData,
-        vault_only: false,
-    },
-    Spec {
-        kind: DeclKind::Dictionary,
-        name: "dictionary",
         // The name the dictionary is mentioned by: `@term(tomet#id)` names it `tomet`.
         positional: &["name"],
-        cardinality: Cardinality::Once,
-        scope: Scope::Tmt,
-        shape: Shape::ArgsAndData,
-        vault_only: false,
+        own_header: true,
+        ..spec(
+            DeclKind::Dictionary,
+            "dictionary",
+            Cardinality::Many,
+            Scope::Tmt,
+            Shape::ArgsAndData,
+        )
     },
+    // `tomet` reads nothing from it.
+    spec(
+        DeclKind::Migration,
+        "migration",
+        Cardinality::Once,
+        Scope::Tmt,
+        Shape::Entries,
+    ),
+    spec(
+        DeclKind::Macro,
+        "macro",
+        Cardinality::Many,
+        Scope::Both,
+        Shape::Entries,
+    ),
+    spec(
+        DeclKind::Var,
+        "var",
+        Cardinality::Many,
+        Scope::Both,
+        Shape::Entries,
+    ),
     Spec {
-        kind: DeclKind::Elements,
-        name: "elements",
-        positional: &[],
-        cardinality: Cardinality::Once,
-        scope: Scope::Tmt,
-        shape: Shape::Entries,
-        vault_only: false,
+        // The namespace to bring into scope. The vault says where it lives, so this names it, not
+        // its file. The second slot is the version wanted, an integer of 1 or more, and may be
+        // left out.
+        //
+        // One per vocabulary brought in; the two axes -- where it may sit and how often -- are
+        // independent, and this is the proof.
+        positional: &["target", "version"],
+        ..spec(
+            DeclKind::Use,
+            "use",
+            Cardinality::Many,
+            Scope::Tmt,
+            Shape::Args,
+        )
     },
+    spec(
+        DeclKind::Element,
+        "element",
+        Cardinality::Many,
+        Scope::Tmt,
+        Shape::Entries,
+    ),
+];
+
+/// The plural spellings the singular declarations replaced, and the name that replaces each.
+const RETIRED: [(&str, DeclKind); 7] = [
+    ("fields", DeclKind::Field),
+    ("macros", DeclKind::Macro),
+    ("vars", DeclKind::Var),
+    ("vocabularies", DeclKind::Vocabulary),
+    ("blueprints", DeclKind::Blueprint),
+    ("dictionaries", DeclKind::Dictionary),
+    ("elements", DeclKind::Element),
 ];
 
 impl DeclKind {
     /// Every standard declaration.
-    pub const ALL: [DeclKind; 20] = [
+    pub const ALL: [DeclKind; 17] = [
         DeclKind::Kind,
         DeclKind::Id,
         DeclKind::Version,
         DeclKind::Profile,
         DeclKind::Meta,
         DeclKind::Format,
-        DeclKind::Fields,
+        DeclKind::Field,
         DeclKind::Workspace,
         DeclKind::Export,
-        DeclKind::Blueprints,
-        DeclKind::Vocabularies,
-        DeclKind::Dictionaries,
-        DeclKind::Migration,
-        DeclKind::Macros,
-        DeclKind::Vars,
-        DeclKind::Use,
         DeclKind::Blueprint,
         DeclKind::Vocabulary,
         DeclKind::Dictionary,
-        DeclKind::Elements,
+        DeclKind::Migration,
+        DeclKind::Macro,
+        DeclKind::Var,
+        DeclKind::Use,
+        DeclKind::Element,
     ];
 
     /// What is fixed about this declaration.
@@ -381,6 +395,17 @@ impl DeclKind {
             .map(|spec| spec.kind)
     }
 
+    /// The declaration that replaced `name`, when `name` is a plural spelling that is retired:
+    /// `fields` is `field`, `vocabularies` is `vocabulary`. A retired name is not a declaration any
+    /// more ([`from_name`](DeclKind::from_name) does not find it); this is what lets a checker say
+    /// what to write instead of only that the name is unknown.
+    pub fn retired(name: &str) -> Option<DeclKind> {
+        RETIRED
+            .iter()
+            .find(|(retired, _)| *retired == name)
+            .map(|(_, kind)| *kind)
+    }
+
     /// What its positional arguments are called, in order.
     pub fn positional_keys(self) -> &'static [&'static str] {
         self.spec().positional
@@ -394,6 +419,15 @@ impl DeclKind {
     /// What it is written with.
     pub fn shape(self) -> Shape {
         self.spec().shape
+    }
+
+    /// What a trailing `[...]` on this declaration, written with a path, becomes.
+    pub fn prose(self) -> Prose {
+        match self {
+            DeclKind::Field | DeclKind::Var | DeclKind::Element => Prose::About,
+            DeclKind::Macro => Prose::Value,
+            _ => Prose::None,
+        }
     }
 
     /// Whether only the vault config may write it.
@@ -431,6 +465,21 @@ mod tests {
     }
 
     #[test]
+    fn every_declaration_is_singular_and_the_plurals_are_retired() {
+        for (retired, instead) in RETIRED {
+            assert_eq!(DeclKind::from_name(retired), None, "{retired}");
+            assert_eq!(DeclKind::retired(retired), Some(instead));
+            assert_eq!(
+                format!("{}s", instead.name()).replace("ys", "ies"),
+                retired,
+                "{retired} is the plural of {instead}"
+            );
+        }
+        assert_eq!(DeclKind::retired("field"), None);
+        assert_eq!(DeclKind::retired("callout"), None);
+    }
+
+    #[test]
     fn the_signatures_are_the_ones_the_language_has_always_had() {
         assert_eq!(DeclKind::Kind.positional_keys(), ["kind", "version"]);
         assert_eq!(DeclKind::Id.positional_keys(), ["id"]);
@@ -444,20 +493,13 @@ mod tests {
     }
 
     #[test]
-    fn only_three_declarations_take_a_brace_body() {
+    fn only_two_declarations_take_a_brace_body() {
         let with_body: Vec<DeclKind> = DeclKind::ALL
             .into_iter()
             .filter(|k| k.shape() == Shape::ArgsAndData)
             .collect();
-        assert_eq!(
-            with_body,
-            [
-                DeclKind::Blueprint,
-                DeclKind::Vocabulary,
-                DeclKind::Dictionary
-            ]
-        );
-        // The ones that hold `name: value` entries have no positional slot to bind them to.
+        assert_eq!(with_body, [DeclKind::Blueprint, DeclKind::Dictionary]);
+        // The ones that hold entries have no positional slot to bind them to.
         for kind in DeclKind::ALL {
             if kind.shape() == Shape::Entries {
                 assert!(kind.positional_keys().is_empty(), "{kind}");
@@ -475,10 +517,38 @@ mod tests {
     }
 
     #[test]
-    fn only_use_may_be_written_more_than_once() {
-        for kind in DeclKind::ALL {
-            assert_eq!(kind.is_singleton(), kind != DeclKind::Use, "{kind}");
-        }
+    fn what_a_document_says_about_itself_is_written_once() {
+        let once: Vec<DeclKind> = DeclKind::ALL
+            .into_iter()
+            .filter(|k| k.is_singleton())
+            .collect();
+        assert_eq!(
+            once,
+            [
+                DeclKind::Kind,
+                DeclKind::Id,
+                DeclKind::Version,
+                DeclKind::Profile,
+                DeclKind::Meta,
+                DeclKind::Export,
+                DeclKind::Migration
+            ]
+        );
+        // Two of the many have a header of their own, which is written once.
+        let own_header: Vec<DeclKind> = DeclKind::ALL
+            .into_iter()
+            .filter(|k| k.spec().own_header)
+            .collect();
+        assert_eq!(own_header, [DeclKind::Blueprint, DeclKind::Dictionary]);
+    }
+
+    #[test]
+    fn a_trailing_prose_is_the_about_of_what_is_described() {
+        assert_eq!(DeclKind::Field.prose(), Prose::About);
+        assert_eq!(DeclKind::Var.prose(), Prose::About);
+        assert_eq!(DeclKind::Element.prose(), Prose::About);
+        assert_eq!(DeclKind::Macro.prose(), Prose::Value);
+        assert_eq!(DeclKind::Meta.prose(), Prose::None);
     }
 
     #[test]
@@ -494,8 +564,8 @@ mod tests {
                 DeclKind::Id,
                 DeclKind::Version,
                 DeclKind::Meta,
-                DeclKind::Macros,
-                DeclKind::Vars
+                DeclKind::Macro,
+                DeclKind::Var
             ]
         );
         assert!(DeclKind::ALL.iter().all(|k| k.allowed_in(Host::Tmt)));

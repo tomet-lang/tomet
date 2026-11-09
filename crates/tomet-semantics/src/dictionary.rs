@@ -14,7 +14,7 @@
 //! mention by identifier does not change. A term and an identifier are each unique within their
 //! dictionary, the way an id is unique within its document.
 //!
-//! This is the pure half. Finding and reading the files a vault registers with `::dictionaries` is
+//! This is the pure half. Finding and reading the files a vault registers with `::dictionary` is
 //! `tomet-load`'s, the same split as for vocabularies ([`crate::vocabulary`]).
 
 use std::collections::BTreeMap;

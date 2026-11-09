@@ -232,7 +232,7 @@ const CASES: &[Case] = &[
     case(
         None,
         "型の `list(string)` は列ではなく呼び出しのまま残る",
-        "::fields(tags: { type: list(string) })\n",
+        "::field(tags: { type: list(string) })\n",
     ),
     case(None, "入れ子のマップ", "@memo(m: { x: 1 })\n"),
     case(
@@ -522,11 +522,11 @@ const CASES: &[Case] = &[
          `meta` `macros` `format` `fields` `workspace` `export` `blueprints` \
          `vocabularies` `dictionaries` `migration` `vars` `elements`。\
          `::meta{ ... }` はもう書けない（下の「主グループの無いネクサス」）",
-        "::meta(title: \"x\")\n::macros(gh: \"https://x/${1}\")\n::vars(a: { type: string })\n\
-         ::format(table: { max_col_width: 50 })\n::fields(created: { type: datetime })\n\
-         ::workspace(ignore: (\"a\"))\n::export(type: commonmark)\n::blueprints(b: \"b.tmt\")\n\
-         ::vocabularies(v: \"v.tmt\")\n::dictionaries(d: \"d.tmt\")\n::migration(m: 1)\n\
-         ::elements(card: { display: block })\n",
+        "::meta(title: \"x\")\n::macro(gh: \"https://x/${1}\")\n::var(a: { type: string })\n\
+         ::format(table: { max_col_width: 50 })\n::field(created: { type: datetime })\n\
+         ::workspace(ignore: (\"a\"))\n::export(type: commonmark)\n::blueprint(b: \"b.tmt\")\n\
+         ::vocabulary(v: \"v.tmt\")\n::dictionary(d: \"d.tmt\")\n::migration(m: 1)\n\
+         ::element(card: { display: block })\n",
     ),
     case(
         None,

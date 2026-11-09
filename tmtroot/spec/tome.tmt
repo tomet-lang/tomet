@@ -31,7 +31,7 @@ tomos）」を意味します。
 
 pub struct Header {
     pub title: Option<Vec<Inline>>,     // Section なら Some("タイトル"), File なら None
-    pub declarations: Vec<Declaration>, // ::kind, ::rule, ::vars などの宣言群
+    pub declarations: Vec<Declaration>, // ::kind, ::rule, ::var などの宣言群
     pub data: Data,                     // (args) や {attrs}
     pub id: Option<Id>,
     pub connects: Vec<Connect>,         // :meta(), :as() などの後置コネクト

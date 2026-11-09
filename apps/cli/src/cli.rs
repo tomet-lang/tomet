@@ -189,7 +189,7 @@ pub enum Command {
         out: Option<PathBuf>,
         /// Also replace `${self.meta.x}` by its value. Without it the
         /// expression is left, because a file cannot hold the vault's
-        /// `::fields` that give a metadata field its type.
+        /// `::field` that give a metadata field its type.
         #[arg(long)]
         freeze_fields: bool,
     },

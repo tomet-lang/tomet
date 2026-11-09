@@ -2,13 +2,14 @@
 //!
 //! Checks the positional argument count, version slots, declared versions,
 //! macros, and variable definitions, and that a declaration is written in the [`Shape`] it has:
-//! `(...)` alone, or `(...)` with a `{...}` body only for the three that read one.
+//! `(...)` alone, or `(...)` with a `{...}` body only for the two that read one. A plural spelling the
+//! singular declarations replaced (`::fields`) is reported with the name to write instead.
 
 use tomet_ast::Value;
 use tomet_semantics_core::admits::admits;
 use tomet_type::Type;
 
-use crate::declaration::Declaration;
+use crate::declaration::{Declaration, EntriesError};
 use crate::kind::{Cardinality, DeclKind, Host, Shape};
 use crate::profile::Profile;
 use crate::read::profile_names;
@@ -51,11 +52,25 @@ pub enum Problem {
     /// reads about a document, its identity, is the declaration `::id(...)`.
     MetaIdMoved,
     /// A `{...}` written on a declaration that has no body: `::meta(){ a: 1 }`. Its entries go in
-    /// the `(...)`: `::meta(a: 1)`. Only `::vocabulary`, `::blueprint` and `::dictionary` take one.
+    /// the `(...)`: `::meta(a: 1)`. Only the header of `::blueprint` and of `::dictionary` take one.
     UnexpectedData { declaration: &'static str },
-    /// The `(...)` of a declaration of `name: value` entries is something else: `::macros(gh)`, or
-    /// a bare value among the entries, as in `::meta(a: 1, 2)`.
+    /// The `(...)` of a declaration of entries is something else: `::macro(gh)`, or a bare value
+    /// among the entries, as in `::meta(a: 1, 2)`. A value goes with a name in the head:
+    /// `::macro.gh("...")`.
     ExpectedEntries { declaration: &'static str },
+    /// A path written after the name of a declaration that has none: `::kind.version(2)`. Its
+    /// arguments are in the parentheses, `::kind(config, 2)`.
+    UnexpectedPath { declaration: &'static str },
+    /// A `[...]` that has nothing to be the prose of, or that clashes with the value.
+    UnexpectedProse {
+        declaration: &'static str,
+        reason: &'static str,
+    },
+    /// A plural spelling that the singular declaration replaced: `::fields` is `::field`.
+    Retired {
+        written: String,
+        instead: &'static str,
+    },
 }
 
 impl std::fmt::Display for Problem {
@@ -100,7 +115,25 @@ impl std::fmt::Display for Problem {
             Problem::ExpectedEntries { declaration } => {
                 write!(
                     f,
-                    "`::{declaration}(...)` holds `name: value` entries; found a value without a name"
+                    "`::{declaration}(...)` holds `name: value` entries; found a value without a name. \
+                     Name it in the head, `::{declaration}.name(value)`"
+                )
+            }
+            Problem::UnexpectedPath { declaration } => {
+                write!(
+                    f,
+                    "`::{declaration}` takes its arguments in the parentheses and has no path after its name"
+                )
+            }
+            Problem::UnexpectedProse {
+                declaration,
+                reason,
+            } => write!(f, "`::{declaration}`: {reason}"),
+            Problem::Retired { written, instead } => {
+                write!(
+                    f,
+                    "`::{written}` is retired; write `::{instead}.<name>(...)` for each entry, or \
+                     `::{instead}(<name>: ...)` to group them"
                 )
             }
         }
@@ -130,7 +163,18 @@ pub fn check_declarations(declarations: &[Declaration], host: Host) -> Vec<(usiz
     let mut seen_once = std::collections::HashMap::new();
 
     for (idx, decl) in declarations.iter().enumerate() {
-        let Some(kind) = decl.kind() else { continue };
+        let Some(kind) = decl.kind() else {
+            if let Some(instead) = DeclKind::retired(&decl.name) {
+                problems.push((
+                    idx,
+                    Problem::Retired {
+                        written: decl.name.clone(),
+                        instead: instead.name(),
+                    },
+                ));
+            }
+            continue;
+        };
         let spec = kind.spec();
 
         if !spec.scope.allows(host) {
@@ -143,7 +187,10 @@ pub fn check_declarations(declarations: &[Declaration], host: Host) -> Vec<(usiz
             continue;
         }
 
-        if spec.cardinality == Cardinality::Once {
+        // What is written once: the declarations a document says about itself, and the header of
+        // one that has a path-less form of its own (`::blueprint(daily)`, as against the
+        // registrations `::blueprint.daily(@file(...))`, of which there are many).
+        if spec.cardinality == Cardinality::Once || decl.is_own_header() {
             if let Some(&first_idx) = seen_once.get(&kind) {
                 problems.push((
                     idx,
@@ -157,7 +204,16 @@ pub fn check_declarations(declarations: &[Declaration], host: Host) -> Vec<(usiz
             }
         }
 
-        if spec.shape != Shape::ArgsAndData && decl.data.is_some() {
+        let has_path = !decl.path.is_empty();
+        if spec.shape == Shape::Args && has_path {
+            problems.push((
+                idx,
+                Problem::UnexpectedPath {
+                    declaration: spec.name,
+                },
+            ));
+        }
+        if (spec.shape != Shape::ArgsAndData || has_path) && decl.data.is_some() {
             problems.push((
                 idx,
                 Problem::UnexpectedData {
@@ -165,12 +221,14 @@ pub fn check_declarations(declarations: &[Declaration], host: Host) -> Vec<(usiz
                 },
             ));
         }
-        if spec.shape == Shape::Entries && !is_entries(decl) {
+        if spec.shape == Shape::Entries || has_path {
+            if let Err(error) = decl.entries() {
+                problems.push((idx, entries_problem(spec.name, error)));
+            }
+        } else if decl.prose.is_some() {
             problems.push((
                 idx,
-                Problem::ExpectedEntries {
-                    declaration: spec.name,
-                },
+                entries_problem(spec.name, EntriesError::UnexpectedProse),
             ));
         }
 
@@ -184,18 +242,19 @@ pub fn check_declarations(declarations: &[Declaration], host: Host) -> Vec<(usiz
             DeclKind::Profile => {
                 check_profile(idx, decl, spec.name, &mut problems);
             }
-            DeclKind::Macros => {
+            DeclKind::Macro => {
                 check_macros(idx, decl, spec.name, &mut problems);
             }
-            DeclKind::Vars => {
+            DeclKind::Var => {
                 check_vars(idx, decl, spec.name, &mut problems);
             }
-            DeclKind::Fields => {
+            DeclKind::Field => {
                 check_fields(idx, decl, spec.name, &mut problems);
             }
             DeclKind::Meta => {
-                if let Some(Value::Map(entries)) = decl.bound_args()
-                    && entries.iter().any(|(key, _)| key == "id")
+                if decl
+                    .entries()
+                    .is_ok_and(|entries| entries.iter().any(|(key, _)| key == "id"))
                 {
                     problems.push((idx, Problem::MetaIdMoved));
                 }
@@ -207,15 +266,20 @@ pub fn check_declarations(declarations: &[Declaration], host: Host) -> Vec<(usiz
     problems
 }
 
-/// Whether the `(...)` of `decl` is `name: value` entries, none of them a bare value. `::name()` is
-/// entries with none, and so is a declaration built without any `(...)`, which no parse produces.
-fn is_entries(decl: &Declaration) -> bool {
-    match &decl.args {
-        None => true,
-        Some(Value::Map(entries)) => entries
-            .iter()
-            .all(|(key, _)| key != tomet_semantics_core::POSITIONAL_ENTRY_KEY),
-        Some(_) => false,
+/// What is wrong with a declaration that is not written as entries.
+fn entries_problem(declaration: &'static str, error: EntriesError) -> Problem {
+    match error {
+        EntriesError::ValueWithoutName => Problem::ExpectedEntries { declaration },
+        EntriesError::UnexpectedProse => Problem::UnexpectedProse {
+            declaration,
+            reason: "there is no `[...]` here: it goes after a head that names what it describes \
+                     (`::field.author(...)[ about ]`), and only a field, a variable, an element or \
+                     a macro takes one",
+        },
+        EntriesError::ProseAndValue => Problem::UnexpectedProse {
+            declaration,
+            reason: "a macro is either a string argument or a `[...]`, not both",
+        },
     }
 }
 
@@ -255,7 +319,8 @@ fn check_version_slot(
 }
 
 /// The version a declaration wrote, where its kind keeps it: `::version(1.10)` takes it as an
-/// argument, `::vocabulary` and `::blueprint` as `version:` in their `{...}` body.
+/// argument, `::vocabulary.ns(version: "1.0.0")` as a field of its entry, and `::blueprint` as
+/// `version:` in its `{...}` body.
 fn written_version(decl: &Declaration, kind: DeclKind) -> Option<Value> {
     match kind {
         DeclKind::Version => decl.bound_args().and_then(|args| match args {
@@ -265,7 +330,16 @@ fn written_version(decl: &Declaration, kind: DeclKind) -> Option<Value> {
                 .map(|(_, v)| v),
             other => Some(other),
         }),
-        DeclKind::Vocabulary | DeclKind::Blueprint => match &decl.data {
+        DeclKind::Vocabulary => decl.entries().ok()?.into_iter().find_map(|(_, entry)| {
+            let Value::Map(fields) = entry else {
+                return None;
+            };
+            fields
+                .into_iter()
+                .find(|(key, _)| key == "version")
+                .map(|(_, v)| v)
+        }),
+        DeclKind::Blueprint => match &decl.data {
             Some(Value::Map(entries)) => entries
                 .iter()
                 .find(|(key, _)| key == "version")
@@ -608,32 +682,27 @@ mod tests {
 
     #[test]
     fn declared_versions_in_vocabulary_and_blueprint() {
+        let bad = |name: &str, version: &str| {
+            let src = match name {
+                "vocabulary" => format!("::vocabulary.deck(version: {version})\n"),
+                _ => format!("::blueprint(note){{ version: {version} }}\n"),
+            };
+            problems_of(&src)
+        };
         for name in ["vocabulary", "blueprint"] {
-            let bad = Declaration::new(
-                name,
-                None,
-                Some(Value::Map(vec![(
-                    "version".into(),
-                    Value::String("abc".into()),
-                )])),
-            );
-            let problems = check_declarations(&[bad], Host::Tmt);
-            assert_eq!(problems.len(), 1);
             assert_eq!(
-                problems[0].1,
-                Problem::InvalidDefinition {
-                    declaration: name,
+                bad(name, "abc"),
+                [Problem::InvalidDefinition {
+                    declaration: if name == "vocabulary" {
+                        "vocabulary"
+                    } else {
+                        "blueprint"
+                    },
                     name: "version".into(),
                     reason: "`abc` is not a version such as `1.10.0`".into(),
-                }
+                }]
             );
-
-            let good = Declaration::new(
-                name,
-                None,
-                Some(Value::Map(vec![("version".into(), Value::Float(1.10))])),
-            );
-            assert!(check_declarations(&[good], Host::Tmt).is_empty());
+            assert!(bad(name, "1.10").is_empty(), "{name}");
         }
     }
 
@@ -641,7 +710,7 @@ mod tests {
     fn unevaluated_expressions_in_version_are_skipped() {
         for src in [
             "::version(${expr.ver})\n",
-            "::vocabulary(deck){ version: ${expr.ver} }\n",
+            "::vocabulary.deck(version: ${expr.ver})\n",
             "::blueprint(note){ version: ${expr.ver} }\n",
         ] {
             let doc = parse(src);
@@ -656,7 +725,7 @@ mod tests {
     #[test]
     fn a_block_macro_may_hold_only_places_for_arguments() {
         let doc = parse(
-            "::macros(ok: [ @card(title: ${1})[ ${who} ] ], bad: [ ${a.b} and ${f(1)} ${1} ])\n",
+            "::macro(ok: [ @card(title: ${1})[ ${who} ] ], bad: [ ${a.b} and ${f(1)} ${1} ])\n",
         );
         let decls: Vec<_> = declarations(&doc)
             .into_iter()
@@ -675,7 +744,7 @@ mod tests {
     #[test]
     fn macros_and_vars_checks() {
         let bad_macro = Declaration::new(
-            "macros",
+            "macro",
             Some(Value::Map(vec![("gh".into(), Value::Int(42))])),
             None,
         );
@@ -684,7 +753,7 @@ mod tests {
         assert_eq!(
             problems[0].1,
             Problem::InvalidDefinition {
-                declaration: "macros",
+                declaration: "macro",
                 name: "gh".into(),
                 reason: "a macro is a string template, such as `\"https://x/${1}\"`, or block \
                          content, such as `[ @card[ ${1} ] ]`"
@@ -693,7 +762,7 @@ mod tests {
         );
 
         let bad_var = Declaration::new(
-            "vars",
+            "var",
             Some(Value::Map(vec![(
                 "n".into(),
                 Value::Map(vec![
@@ -708,7 +777,7 @@ mod tests {
         assert_eq!(
             problems[0].1,
             Problem::InvalidDefinition {
-                declaration: "vars",
+                declaration: "var",
                 name: "n".into(),
                 reason: "`default` is not a value of `type: int`: `3` is not an integer".into(),
             }
@@ -766,16 +835,8 @@ mod tests {
 
     #[test]
     fn repeated_singletons_are_reported() {
-        let meta1 = Declaration::new(
-            "meta",
-            Some(Value::Map(vec![("a".into(), Value::Int(1))])),
-            None,
-        );
-        let meta2 = Declaration::new(
-            "meta",
-            Some(Value::Map(vec![("b".into(), Value::Int(2))])),
-            None,
-        );
+        let meta1 = Declaration::new("id", Some(Value::String("a".into())), None);
+        let meta2 = Declaration::new("id", Some(Value::String("b".into())), None);
         let problems = check_declarations(&[meta1, meta2], Host::Ctmt);
         assert_eq!(problems.len(), 1);
         assert_eq!(
@@ -783,14 +844,14 @@ mod tests {
             (
                 1,
                 Problem::Repeated {
-                    declaration: "meta",
+                    declaration: "id",
                     first: 0,
                 }
             )
         );
         assert_eq!(
             problems[0].1.to_string(),
-            "`meta` may appear once in a document"
+            "`id` may appear once in a document"
         );
 
         // Many cardinality is allowed to repeat
@@ -816,15 +877,15 @@ mod tests {
 
     #[test]
     fn fields_type_declaration_validation() {
-        let valid = problems_of("::fields(tags: { type: list(string) })\n");
+        let valid = problems_of("::field(tags: { type: list(string) })\n");
         assert!(valid.is_empty(), "{valid:?}");
 
-        let invalid = problems_of("::fields(owner: { type: person })\n");
+        let invalid = problems_of("::field(owner: { type: person })\n");
         assert_eq!(invalid.len(), 1);
         assert!(matches!(
             &invalid[0],
             Problem::InvalidDefinition {
-                declaration: "fields",
+                declaration: "field",
                 name,
                 reason,
             } if name == "owner" && reason.contains("`person` is not a type")
@@ -868,7 +929,6 @@ mod tests {
     #[test]
     fn the_declarations_that_take_a_body_still_take_it() {
         for src in [
-            "::vocabulary(deck){ version: 1.0 }\n",
             "::blueprint(note){ version: 1.0 }\n",
             "::dictionary(tomet){ \"a\": @term[x] }\n",
         ] {
@@ -878,9 +938,9 @@ mod tests {
 
     #[test]
     fn the_parentheses_of_an_entries_declaration_hold_entries() {
-        assert!(problems_of("::macros()\n").is_empty());
+        assert!(problems_of("::macro()\n").is_empty());
         assert!(problems_of("::meta(a: 1, b: 2)\n").is_empty());
-        for src in ["::macros(gh)\n", "::meta(a: 1, 2)\n", "::workspace(x)\n"] {
+        for src in ["::macro(gh)\n", "::meta(a: 1, 2)\n", "::workspace(x)\n"] {
             let found = problems_of(src);
             assert_eq!(found.len(), 1, "{src}: {found:?}");
             assert!(
@@ -890,7 +950,130 @@ mod tests {
         }
         assert_eq!(
             problems_of("::meta(1)\n")[0].to_string(),
-            "`::meta(...)` holds `name: value` entries; found a value without a name"
+            "`::meta(...)` holds `name: value` entries; found a value without a name. \
+             Name it in the head, `::meta.name(value)`"
+        );
+    }
+
+    #[test]
+    fn a_dotted_head_and_the_grouped_form_are_checked_alike() {
+        for src in [
+            "::macro.gh(\"https://x/${1}\")\n",
+            "::macro(gh: \"https://x/${1}\")\n",
+            "::macro.card[ @card[ ${1} ] ]\n",
+            "::field.url.wiki(type: list(string))[ the wiki ]\n",
+            "::var.n(type: int, default: 3)[ how many ]\n",
+            "::workspace.ignore(\"target\", \".git\")\n",
+            "::format.table(max_col_width: 50)\n",
+            "::blueprint.daily(@file(daily.blueprint.tmt))\n",
+            "::vocabulary.deck(@file(deck.vocabulary.tmt))\n",
+            "::dictionary.tomet(@file(tomet.dict.tmt))\n",
+            "::element.card(display: block)[ a card ]\n",
+        ] {
+            assert!(problems_of(src).is_empty(), "{src}: {:?}", problems_of(src));
+        }
+        // The same invalid definition is found either way.
+        for src in [
+            "::field.owner(type: person)\n",
+            "::field(owner: { type: person })\n",
+        ] {
+            let found = problems_of(src);
+            assert!(
+                matches!(&found[..], [Problem::InvalidDefinition { name, .. }] if name == "owner"),
+                "{src}: {found:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn the_registrations_are_many_and_the_header_of_a_blueprint_is_one() {
+        assert!(
+            problems_of("::blueprint.a(@file(a.tmt))\n::blueprint.b(@file(b.tmt))\n").is_empty()
+        );
+        assert!(problems_of("::format.meta(always_newline: true)\n::format.table()\n").is_empty());
+        assert_eq!(
+            problems_of("::blueprint(a)\n::blueprint(b)\n"),
+            [Problem::Repeated {
+                declaration: "blueprint",
+                first: 0
+            }]
+        );
+        // A registration beside the header is not a second header.
+        assert!(problems_of("::blueprint(a)\n::blueprint.b(@file(b.tmt))\n").is_empty());
+    }
+
+    #[test]
+    fn a_path_belongs_to_the_declarations_of_entries() {
+        assert_eq!(
+            problems_of("::kind.version(2)\n"),
+            [Problem::UnexpectedPath {
+                declaration: "kind"
+            }]
+        );
+        assert_eq!(
+            problems_of("::use.deck(3)\n"),
+            [Problem::UnexpectedPath { declaration: "use" }]
+        );
+    }
+
+    #[test]
+    fn a_prose_goes_where_it_describes_something() {
+        // A field, a variable, an element and a macro take one after a head with a path.
+        assert!(problems_of("::element.card[ a card ]\n").is_empty());
+        // Nowhere to attach it.
+        for src in [
+            "::field(author: { type: string })[ x ]\n",
+            "::kind(note)[ x ]\n",
+            "::format.table()[ x ]\n",
+            "::macro.m(\"x\")[ y ]\n",
+        ] {
+            let found = problems_of(src);
+            assert_eq!(found.len(), 1, "{src}: {found:?}");
+            assert!(
+                matches!(found[0], Problem::UnexpectedProse { .. }),
+                "{src}: {found:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_plural_declaration_says_what_to_write_instead() {
+        let found = problems_of("::fields(a: { type: string })\n");
+        assert!(
+            found.is_empty(),
+            "a retired name is not a standard one: {found:?}"
+        );
+
+        let doc = parse("::fields(a: { type: string })\n::macros(m: \"x\")\n");
+        let decls: Vec<_> = doc
+            .header
+            .iter()
+            .filter_map(Declaration::from_ast)
+            .collect();
+        let found = check_declarations(&decls, Host::Tmt);
+        assert_eq!(
+            found,
+            [
+                (
+                    0,
+                    Problem::Retired {
+                        written: "fields".into(),
+                        instead: "field"
+                    }
+                ),
+                (
+                    1,
+                    Problem::Retired {
+                        written: "macros".into(),
+                        instead: "macro"
+                    }
+                ),
+            ]
+        );
+        assert_eq!(
+            found[0].1.to_string(),
+            "`::fields` is retired; write `::field.<name>(...)` for each entry, or \
+             `::field(<name>: ...)` to group them"
         );
     }
 }

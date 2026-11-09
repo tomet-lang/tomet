@@ -395,7 +395,7 @@ mod pipe_value_tests {
     // swallow the `, b: ...`: the merge once wrote a document the parser
     // refuses. The run is written as the `[ ... ]` it means.
     const BASE: &str =
-        "::elements(\n  line: {\n    about: | one\n           | two\n    k: 1\n  }\n)\n";
+        "::element(\n  line: {\n    about: | one\n           | two\n    k: 1\n  }\n)\n";
 
     fn conflicted() -> String {
         let m = merge(

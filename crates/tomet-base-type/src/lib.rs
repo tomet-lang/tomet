@@ -5,7 +5,7 @@
 //! =[ Architecture & Responsibilities ]
 //!
 //! - (One vocabulary)
-//!   | A `type:` is written in the settings' `meta` fields, in `::vars`, and in
+//!   | A `type:` is written in the settings' `meta` fields, in `::var`, and in
 //!   | a vocabulary's arguments. They all name a [`Type`] here, so a name that
 //!   | one place accepts is a name every place accepts.
 //! - (A pure base-layer crate)

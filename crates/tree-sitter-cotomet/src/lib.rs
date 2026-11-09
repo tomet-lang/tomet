@@ -228,7 +228,7 @@ mod tests {
             "::meta(title: \"Catalog\", tags: (a, b))\n",
             "::meta(\n  title: \"x\"\n)\na: 1\n",
             "::config(format: json){ strict: true }\n",
-            "::macros(gh: \"https://x/${1}\")\n::vars(a: 1)\n",
+            "::macro(gh: \"https://x/${1}\")\n::var(a: 1)\n",
         ] {
             let tree = parse(src);
             assert!(

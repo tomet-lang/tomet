@@ -959,7 +959,7 @@ mod tests {
         assert_eq!(scope_events("a @em[ x ] b\n", Visit::Skip), "<P<E>E>P");
     }
 
-    /// The `[...]` value of `::macros(m: [ ... ])` in `src`.
+    /// The `[...]` value of `::macro(m: [ ... ])` in `src`.
     fn macro_body(file: &mut File) -> &mut Value {
         let Some(Value::Map(entries)) = &mut file.header[0].data.args else {
             panic!("expected `(name: template)` entries");
@@ -968,7 +968,7 @@ mod tests {
     }
 
     /// Two blocks: an element on a line of its own, then a `${2}` on a line of its own.
-    const BODY: &str = "::macros(m: [\n@card(title: ${1}, n: ${3})[ hi ${name} ]\n\n${2}\n])\n";
+    const BODY: &str = "::macro(m: [\n@card(title: ${1}, n: ${3})[ hi ${name} ]\n\n${2}\n])\n";
 
     fn interpolations(value: &Value) -> Vec<String> {
         let mut found = Vec::new();

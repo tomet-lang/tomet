@@ -13,7 +13,7 @@
 - ( ) `examples` が今の tomet で `tomet check` を通らない
   - `examples` で `tomet check .` を実行すると 15 ファイル中 11 が失敗する (2026-11-01、PATH の `tomet 0.5.0`)。
     `::meta` の `id:` (今は `::id(...)`)、`vault` 名前空間が未宣言、`config` の裸書き、など。
-    `examples` の最新コミットは「`::elements` と `::name` に書き直した」で、`::id` への移行より前。
+    `examples` の最新コミットは「`::element` と `::name` に書き直した」で、`::id` への移行より前。
   - 元の項目 (青写真の `${uuid()}` などが `unresolved` と警告される) も残っている。
     青写真が使われるときに埋まる値なので害は無い。青写真に書いて黙らせるか、警告を許すか。
   - 先に `tomet refactor --meta-id` で移行できるものがあるかを見る。

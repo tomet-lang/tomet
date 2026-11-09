@@ -2,12 +2,12 @@
 //!
 //! A vault's configuration is a stack of files -- the vault config, then each folder config on the
 //! way down to a document, then the document's own declarations -- and the nearer layer wins, key
-//! by key. Each concern is a declaration of its own (`::format`, `::fields`, `::workspace`,
-//! `::blueprints`, `::vocabularies`, `::dictionaries`, `::macros`, `::vars`), and a layer keeps what
+//! by key. Each concern is a declaration of its own (`::format`, `::field`, `::workspace`,
+//! `::blueprint`, `::vocabulary`, `::dictionary`, `::macro`, `::var`), and a layer keeps what
 //! each one said.
 //! They are of three kinds, and the kind decides how they are read: tables from a name to a
-//! definition (`::macros`, `::vars`, `::fields`, `::blueprints`, `::vocabularies`,
-//! `::dictionaries`: merged by name), knobs of a tool (`::format`, `::workspace`, `::export`:
+//! definition (`::macro`, `::var`, `::field`, `::blueprint`, `::vocabulary`,
+//! `::dictionary`: merged by name), knobs of a tool (`::format`, `::workspace`, `::export`:
 //! merged key by key), and pointers to other files (`::import`, not implemented yet).
 //! Merging happens on those values, before they become a [`Config`](crate::Config): a typed group
 //! cannot tell a key that was never written from one written with its default, so two typed groups
@@ -37,11 +37,11 @@ impl ConfigLayer {
     pub fn from_doc<B>(doc: &File<B>) -> Self {
         Self {
             format: document_entries(doc, DeclKind::Format),
-            fields: document_entries(doc, DeclKind::Fields),
+            fields: document_entries(doc, DeclKind::Field),
             workspace: document_entries(doc, DeclKind::Workspace),
-            blueprints: document_entries(doc, DeclKind::Blueprints),
-            vocabularies: document_entries(doc, DeclKind::Vocabularies),
-            dictionaries: document_entries(doc, DeclKind::Dictionaries),
+            blueprints: document_entries(doc, DeclKind::Blueprint),
+            vocabularies: document_entries(doc, DeclKind::Vocabulary),
+            dictionaries: document_entries(doc, DeclKind::Dictionary),
             macros: tomet_declaration::document_macros(doc)
                 .into_iter()
                 .collect(),
@@ -54,11 +54,11 @@ impl ConfigLayer {
     fn entries_mut(&mut self, kind: DeclKind) -> Option<&mut Vec<(String, Value)>> {
         match kind {
             DeclKind::Format => Some(&mut self.format),
-            DeclKind::Fields => Some(&mut self.fields),
+            DeclKind::Field => Some(&mut self.fields),
             DeclKind::Workspace => Some(&mut self.workspace),
-            DeclKind::Blueprints => Some(&mut self.blueprints),
-            DeclKind::Vocabularies => Some(&mut self.vocabularies),
-            DeclKind::Dictionaries => Some(&mut self.dictionaries),
+            DeclKind::Blueprint => Some(&mut self.blueprints),
+            DeclKind::Vocabulary => Some(&mut self.vocabularies),
+            DeclKind::Dictionary => Some(&mut self.dictionaries),
             _ => None,
         }
     }
@@ -137,10 +137,21 @@ impl ConfigLayer {
     }
 }
 
-/// The `(name, path)` pairs a document registers in its `::blueprints`, `::vocabularies` or
-/// `::dictionaries` (`kind`), in the order written. An entry that is not a reference to a file is left out.
+/// The `(name, path)` pairs a document registers in its `::blueprint`, `::vocabulary` or
+/// `::dictionary` (`kind`), in the order written: `::blueprint.writ(@file(path))`, or the same
+/// grouped, `::blueprint(writ: @file(path))`. An entry that is not a reference to a file is left out.
 pub fn registry_entries<B>(doc: &File<B>, kind: DeclKind) -> Vec<(String, String)> {
     document_entries(doc, kind)
+        .into_iter()
+        .filter_map(|(name, value)| registered_path(&value).map(|path| (name, path)))
+        .collect()
+}
+
+/// The `(name, path)` pairs one declaration registers; see [`registry_entries`].
+pub fn registered_by(declaration: &tomet_declaration::Declaration) -> Vec<(String, String)> {
+    declaration
+        .entries()
+        .unwrap_or_default()
         .into_iter()
         .filter_map(|(name, value)| registered_path(&value).map(|path| (name, path)))
         .collect()
@@ -191,9 +202,9 @@ mod tests {
     #[test]
     fn the_inner_layer_wins_key_by_key() {
         let outer = layer(
-            "::format(table: { max_col_width: 50 }, link: { no_space: true }, meta: { always_newline: true })\n::macros(a: \"outer-a\", b: \"outer-b\")\n",
+            "::format(table: { max_col_width: 50 }, link: { no_space: true }, meta: { always_newline: true })\n::macro(a: \"outer-a\", b: \"outer-b\")\n",
         );
-        let inner = layer("::format(table: { max_col_width: 80 })\n::macros(b: \"inner-b\")\n");
+        let inner = layer("::format(table: { max_col_width: 80 })\n::macro(b: \"inner-b\")\n");
         let cfg = Config::from_layers([&outer, &inner]);
         // Replaced where the inner layer says something ...
         assert_eq!(cfg.format.table_max_col_width, Some(80));
@@ -213,10 +224,10 @@ mod tests {
     #[test]
     fn a_name_table_is_merged_by_name_and_the_later_entry_wins() {
         let outer = layer(
-            "::blueprints(a: @file(a.tmt), b: @file(b.tmt))\n::fields(created: { type: datetime })\n",
+            "::blueprint(a: @file(a.tmt), b: @file(b.tmt))\n::field(created: { type: datetime })\n",
         );
         let inner = layer(
-            "::blueprints(b: @file(b2.tmt), c: @file(c.tmt))\n::fields(created: { format: rfc3339 })\n",
+            "::blueprint(b: @file(b2.tmt), c: @file(c.tmt))\n::field(created: { format: rfc3339 })\n",
         );
         let cfg = Config::from_layers([&outer, &inner]);
         assert_eq!(
@@ -235,15 +246,15 @@ mod tests {
     #[test]
     fn a_registry_entry_that_is_not_a_file_registers_nothing() {
         let cfg = Config::from_layers([&layer(
-            "::vocabularies(deck: @file(deck.tmt), odd: 3, link: @link(x))\n",
+            "::vocabulary(deck: @file(deck.tmt), odd: 3, link: @link(x))\n",
         )]);
         assert_eq!(cfg.registry.vocabularies, vec!["deck.tmt".to_string()]);
     }
 
     #[test]
     fn dictionaries_are_registered_like_vocabularies_and_stacked_by_name() {
-        let outer = layer("::dictionaries(tomet: @file(a.tmt), user: @file(u.tmt))\n");
-        let inner = layer("::dictionaries(tomet: @file(b.tmt))\n");
+        let outer = layer("::dictionary(tomet: @file(a.tmt), user: @file(u.tmt))\n");
+        let inner = layer("::dictionary(tomet: @file(b.tmt))\n");
         let cfg = Config::from_layers([&outer, &inner]);
         assert_eq!(
             cfg.registry.dictionaries,

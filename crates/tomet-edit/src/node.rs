@@ -31,7 +31,7 @@ impl ChildItem {
 /// Target attribute slot or group on a form.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum AttrGroup {
-    /// `{ key: value, ... }` data map (e.g. in `::vocabulary(ns){ ... }` or `@card(){ ... }`).
+    /// `{ key: value, ... }` data map (e.g. in `::vocabulary.ns(...)` or `@card(){ ... }`).
     Data,
     /// `( key: value, ... )` arguments (e.g. in `@callout(type: "info")` or `::meta(title: T)`).
     Args,

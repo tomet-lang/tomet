@@ -822,11 +822,11 @@ unknown element `memo`: only `std` and this document's own `::kind` may be writt
 ### 型の `list(string)` は列ではなく呼び出しのまま残る
 
 ```tmt
-::fields(tags: { type: list(string) })
+::field(tags: { type: list(string) })
 ```
 
 ```
-Declaration ::fields
+Declaration ::field
   args    {tags: {type: list("string")}}
 ```
 
@@ -1969,43 +1969,43 @@ unknown element `x`: only `std` and this document's own `::kind` may be written 
 
 ```tmt
 ::meta(title: "x")
-::macros(gh: "https://x/${1}")
-::vars(a: { type: string })
+::macro(gh: "https://x/${1}")
+::var(a: { type: string })
 ::format(table: { max_col_width: 50 })
-::fields(created: { type: datetime })
+::field(created: { type: datetime })
 ::workspace(ignore: ("a"))
 ::export(type: commonmark)
-::blueprints(b: "b.tmt")
-::vocabularies(v: "v.tmt")
-::dictionaries(d: "d.tmt")
+::blueprint(b: "b.tmt")
+::vocabulary(v: "v.tmt")
+::dictionary(d: "d.tmt")
 ::migration(m: 1)
-::elements(card: { display: block })
+::element(card: { display: block })
 ```
 
 ```
 Declaration ::meta
   args    {title: "x"}
-Declaration ::macros
+Declaration ::macro
   args    {gh: "https://x/${1}"}
-Declaration ::vars
+Declaration ::var
   args    {a: {type: "string"}}
 Declaration ::format
   args    {table: {max_col_width: 50}}
-Declaration ::fields
+Declaration ::field
   args    {created: {type: "datetime"}}
 Declaration ::workspace
   args    {ignore: ("a")}
 Declaration ::export
   args    {type: "commonmark"}
-Declaration ::blueprints
+Declaration ::blueprint
   args    {b: "b.tmt"}
-Declaration ::vocabularies
+Declaration ::vocabulary
   args    {v: "v.tmt"}
-Declaration ::dictionaries
+Declaration ::dictionary
   args    {d: "d.tmt"}
 Declaration ::migration
   args    {m: 1}
-Declaration ::elements
+Declaration ::element
   args    {card: {display: "block"}}
 ```
 
@@ -2025,6 +2025,13 @@ Declaration ::dictionary
   args    "tomet"
   group
     vault: "a unit"
+```
+
+検証:
+
+```
+`::vocabulary` takes no `{...}`; write its entries in the parentheses, `::vocabulary(name: value)`
+`::vocabulary(...)` holds `name: value` entries; found a value without a name. Name it in the head, `::vocabulary.name(value)`
 ```
 
 ### 中身が空の宣言も `()` を書く

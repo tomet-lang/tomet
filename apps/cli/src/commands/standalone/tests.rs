@@ -36,7 +36,7 @@ impl Drop for Dir {
 fn vault(dir: &Dir) {
     dir.write(
         "vault.config.tmt",
-        "::kind(config)\n::macros(\n  gh: \"https://x/issues/${1}\"\n)\n",
+        "::kind(config)\n::macro(\n  gh: \"https://x/issues/${1}\"\n)\n",
     );
 }
 
@@ -51,7 +51,7 @@ fn a_file_in_a_vault_is_written_out_standalone() {
 
     let text = fs::read_to_string(out.join("a.tmt")).unwrap();
     assert!(text.contains("::profile(standalone)"), "{text}");
-    assert!(text.contains("::macros"), "{text}");
+    assert!(text.contains("::macro"), "{text}");
     assert!(text.contains("${macro.gh(1)}"), "{text}");
     assert!(text.contains("docs/a.tmt"), "{text}");
     assert!(!text.contains("${self.path}"), "{text}");

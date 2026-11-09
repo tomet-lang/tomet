@@ -135,7 +135,7 @@ pub struct Created {
 ///
 /// `vars` are the values passed to `tomet new --var key=value`, read in the
 /// blueprint as `${var.key}`. A name nothing declares is refused, and so is a
-/// variable that has neither a value nor a `default`: the blueprint's `::vars`
+/// variable that has neither a value nor a `default`: the blueprint's `::var`
 /// (over the vault's) says which there are. The document being created is `self`, so `${self.filename}` is the new file's
 /// name. `${generate.now()}` is written in the offset the settings give
 /// `created` (or `modified`), UTC if neither has one.
@@ -184,7 +184,7 @@ fn instantiate_blueprint_file_with(
     if !scope.unset.is_empty() {
         let names = scope.unset.join(", ");
         bail!(
-            "no value for {names}: pass `--var {}=...`, or give it a `default` in the blueprint's `::vars`",
+            "no value for {names}: pass `--var {}=...`, or give it a `default` in the blueprint's `::var`",
             scope.unset[0]
         );
     }
@@ -308,7 +308,7 @@ mod tests {
         fs::create_dir_all(dir.join(".tomet/blueprints")).unwrap();
         fs::write(
             dir.join(".tomet/blueprints/daily-note.blueprint.tmt"),
-            "::kind(blueprint)\n::blueprint(daily-note)\n::vars(\n  title: { type: string }\n)\n::id(${generate.uuid()})\n::meta(\n  title: ${var.title}\n)\n\n=[ Tasks for ${var.title} ]#(tasks)\n",
+            "::kind(blueprint)\n::blueprint(daily-note)\n::var(\n  title: { type: string }\n)\n::id(${generate.uuid()})\n::meta(\n  title: ${var.title}\n)\n\n=[ Tasks for ${var.title} ]#(tasks)\n",
         )
         .unwrap();
         dir
@@ -427,7 +427,7 @@ mod tests {
     fn generated_values_come_from_the_injected_clock_and_random_source() {
         let file = blueprint_file(
             "fixed",
-            "::blueprint(note)\n::vars(\n  author: { type: string }\n)\n::id(${generate.uuid()})\n::meta(\n  day: ${generate.now().format(\"YYYY-MM-DD\")}\n  file: ${self.filename}\n  by: ${var.author}\n)\n",
+            "::blueprint(note)\n::var(\n  author: { type: string }\n)\n::id(${generate.uuid()})\n::meta(\n  day: ${generate.now().format(\"YYYY-MM-DD\")}\n  file: ${self.filename}\n  by: ${var.author}\n)\n",
         );
         let mut vars = HashMap::new();
         vars.insert("author".to_string(), Value::String("Ann".into()));
@@ -456,7 +456,7 @@ mod tests {
     fn a_variable_takes_its_default_and_a_passed_value_wins() {
         let file = blueprint_file(
             "title",
-            "::blueprint(note)\n::vars(\n  title: { default: \"Untitled\" }\n)\n\n=[ ${var.title} ]\n",
+            "::blueprint(note)\n::var(\n  title: { default: \"Untitled\" }\n)\n\n=[ ${var.title} ]\n",
         );
         let config = PrinterConfig::default();
         let made = |vars: &HashMap<String, Value>| {
@@ -539,7 +539,7 @@ mod tests {
 
     #[test]
     fn a_required_variable_that_is_not_passed_stops_the_creation() {
-        let src = "::blueprint(note)\n::vars(\n  title: { type: string }\n)\n\n=[ ${var.title} ]\n";
+        let src = "::blueprint(note)\n::var(\n  title: { type: string }\n)\n\n=[ ${var.title} ]\n";
         let err = made_with("required", src, &[]).unwrap_err().to_string();
         assert!(
             err.contains("title") && err.contains("--var title"),
@@ -554,7 +554,7 @@ mod tests {
 
     #[test]
     fn a_name_nothing_declares_is_refused() {
-        let src = "::blueprint(note)\n::vars(\n  title: { default: \"x\" }\n)\n";
+        let src = "::blueprint(note)\n::var(\n  title: { default: \"x\" }\n)\n";
         let err = made_with("undeclared", src, &[("titel", "Hi")])
             .unwrap_err()
             .to_string();
@@ -567,7 +567,7 @@ mod tests {
     #[test]
     fn a_passed_value_is_converted_to_the_declared_type() {
         let src =
-            "::blueprint(note)\n::vars(\n  n: { type: int }\n)\n::meta(count: ${add(var.n, 1)})\n";
+            "::blueprint(note)\n::var(\n  n: { type: int }\n)\n::meta(count: ${add(var.n, 1)})\n";
         assert!(
             made_with("typed", src, &[("n", "41")])
                 .unwrap()
@@ -582,9 +582,9 @@ mod tests {
     #[test]
     fn the_blueprints_vars_do_not_go_into_the_new_document() {
         let src =
-            "::blueprint(note)\n::vars(\n  title: { default: \"x\" }\n)\n\n=[ ${var.title} ]\n";
+            "::blueprint(note)\n::var(\n  title: { default: \"x\" }\n)\n\n=[ ${var.title} ]\n";
         let content = made_with("dropped", src, &[]).unwrap();
-        assert!(!content.contains("::vars"), "{content}");
+        assert!(!content.contains("::var"), "{content}");
         assert!(content.contains("::kind(note)"), "{content}");
     }
 

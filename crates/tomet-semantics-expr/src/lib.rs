@@ -34,7 +34,7 @@
 //!   | the variables a document or a vault declares, filled in by `tomet new --var`
 //!   | when creating.
 //! - (Macros)
-//!   | Macros defined by `::macros` are called as `macro.name(...)`. Macro
+//!   | Macros defined by `::macro` are called as `macro.name(...)`. Macro
 //!   | arguments are ordinary expressions. Calls check argument counts and
 //!   | required named arguments, reporting `unknown macro` when missing.
 //!
@@ -438,11 +438,11 @@ pub const RESERVED_NAMES: &[(&str, &str)] = &[
     ("self", "The document this expression is written in"),
     (
         "macro",
-        "The macros defined by `::macros`: `macro.name(...)`",
+        "The macros defined by `::macro`: `macro.name(...)`",
     ),
     (
         "var",
-        "The variables declared by `::vars`: `var.name` (`tomet new --var` fills them in)",
+        "The variables declared by `::var`: `var.name` (`tomet new --var` fills them in)",
     ),
     ("vault", "The vault's root directory: `vault.docs`"),
     (

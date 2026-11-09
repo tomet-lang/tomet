@@ -2,7 +2,7 @@
 name                 = "tomet-declaration"
 version.workspace    = true
 edition.workspace    = true
-description          = "What a document's declarations -- ::kind, ::meta, ::macros, ::vars and the rest -- mean, apart from what the body elements and vocabularies mean."
+description          = "What a document's declarations -- ::kind, ::meta, ::macro, ::var and the rest -- mean, apart from what the body elements and vocabularies mean."
 license.workspace    = true
 repository.workspace = true
 

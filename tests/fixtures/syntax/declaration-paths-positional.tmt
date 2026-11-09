@@ -1,0 +1,18 @@
+// The one positional argument of a declaration with a path is the entry itself
+// (`X.X` is `X`): `::blueprint.daily(@file(...))` registers a file under the
+// name `daily`, and several positional arguments are a sequence, so
+// `::workspace.ignore("target", ".git")` is `ignore: ("target", ".git")`.
+
+::kind(fixture)
+::id(declaration-paths-positional)
+
+::workspace.ignore("target", ".git")
+::workspace.unswept("tests/fixtures", "tests/ref")
+
+::blueprint.daily(@file(daily.blueprint.tmt))
+::vocabulary.deck(@file(deck.vocabulary.tmt))
+::dictionary.tomet(@file(tomet.dict.tmt))
+
+=[ 本文 ]
+
+宣言のあとの本文。

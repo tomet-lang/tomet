@@ -5,7 +5,7 @@
 //! files is here, because the semantics layer may not do I/O.
 //!
 //! Nothing is discovered. A vault lists its vocabularies by path and each
-//! file names itself with `::vocabulary(ns)`, the same shape blueprints
+//! file names itself with `::vocabulary.ns()`, the same shape blueprints
 //! use -- so a path that rotted is reported where it is written instead
 //! of at every document that wanted it.
 
@@ -94,7 +94,7 @@ mod tests {
         let root = scratch_dir("tomet_test_load_vocabulary_reserved_doc");
         fs::write(
             root.join("doc.vocabulary.tmt"),
-            "::kind(vocabulary)\n::vocabulary(doc){ version: \"1.0.0\" }\n",
+            "::kind(vocabulary)\n::vocabulary.doc(version: \"1.0.0\")\n",
         )
         .expect("vocabulary file");
 
@@ -118,7 +118,7 @@ mod tests {
         let root = scratch_dir("tomet_test_load_vocabulary_reserved_doc_index");
         fs::write(
             root.join("index.vocabulary.tmt"),
-            "::kind(vocabulary)\n::vocabulary(doc.index){ version: \"1.0.0\" }\n",
+            "::kind(vocabulary)\n::vocabulary.doc.index(version: \"1.0.0\")\n",
         )
         .expect("vocabulary file");
 

@@ -77,38 +77,27 @@ pub fn version_string(declaration: &Declaration) -> Option<String> {
 }
 
 /// What a `::meta(...)` states: the map of its fields. `::meta()` states none, and is an empty map
-/// rather than nothing. `None` when the arguments are not `name: value` entries
+/// rather than nothing. `None` when the declaration is not written as entries
 /// ([`check_declarations`](crate::check_declarations) says so).
 pub fn meta(declaration: &Declaration) -> Option<Value> {
-    entries_value(declaration)
+    declaration.entries().ok().map(Value::Map)
 }
 
-/// The macros a `::macros` defines, in the order written: each entry is a name and its template.
+/// The macros a `::macro` defines, in the order written: each entry is a name and its template.
 ///
 /// A template is a [`Value`]: a string is a text macro, and `[ ... ]` is a block macro (see
 /// [`crate::Arity`]). An entry of any other kind is returned too, because refusing it is
-/// `tomet check`'s business and not a reader's; whoever calls the macro finds out it cannot. The
-/// `(args)` form (`::macros(gh: "...")`) and the `{data}` form are both read.
+/// `tomet check`'s business and not a reader's; whoever calls the macro finds out it cannot.
+/// `::macro.gh("...")` defines one and `::macro(gh: "...", n: "...")` defines several, with the same
+/// result (see [`Declaration::entries`]).
 pub fn macros(declaration: &Declaration) -> Vec<(String, Value)> {
     entries(declaration)
 }
 
-/// The `(args)` of a declaration whose arguments are `name: value` entries, as the map they are.
-/// `None` for no `(args)`, or for ones that are not entries (a lone `::meta(x)`).
-fn entries_value(declaration: &Declaration) -> Option<Value> {
-    match declaration.bound_args() {
-        Some(map @ Value::Map(_)) => Some(map),
-        _ => None,
-    }
-}
-
-/// The `(name, value)` entries of a declaration whose `(...)` is a map (`::macros(gh: "...")`).
-/// Empty for `::name()`, and for arguments that are not entries.
+/// The `(name, value)` entries of a declaration, as [`Declaration::entries`] reads them. Empty for
+/// `::name()`, and for a declaration that is not written as entries.
 pub(crate) fn entries(declaration: &Declaration) -> Vec<(String, Value)> {
-    match entries_value(declaration) {
-        Some(Value::Map(entries)) => entries,
-        _ => Vec::new(),
-    }
+    declaration.entries().unwrap_or_default()
 }
 
 fn first<B>(doc: &File<B>, kind: DeclKind) -> Option<Declaration> {
@@ -166,13 +155,26 @@ pub fn document_meta<B>(doc: &File<B>) -> Option<Value> {
     meta(&first(doc, DeclKind::Meta)?)
 }
 
-/// The `(name, value)` entries of the document's first declaration of `kind` whose `(...)` is a map
-/// (`::format(...)`, `::fields(...)`, `::blueprints(...)`). Empty when the document does not
-/// write it.
+/// The `(name, value)` entries of every declaration of `kind` in the document, in the order first
+/// written (`::format.table(...)`, `::field.created(...)`, `::blueprint.writ(...)`, or the same
+/// grouped under `::format(...)`). An entry written twice is the later one. Empty when the document
+/// does not write it.
 pub fn document_entries<B>(doc: &File<B>, kind: DeclKind) -> Vec<(String, Value)> {
-    first(doc, kind)
-        .map(|found| entries(&found))
-        .unwrap_or_default()
+    let mut merged = Vec::new();
+    for found in declarations(doc).iter().filter(|found| found.kind == kind) {
+        merge_entries(&mut merged, entries(&found.declaration));
+    }
+    merged
+}
+
+/// Adds `more` to `into`; a name already there takes the new value where it stands.
+fn merge_entries(into: &mut Vec<(String, Value)>, more: Vec<(String, Value)>) {
+    for (name, value) in more {
+        match into.iter().position(|(have, _)| *have == name) {
+            Some(at) => into[at].1 = value,
+            None => into.push((name, value)),
+        }
+    }
 }
 
 /// Every macro the document defines, in the order written; a name defined twice appears twice,
@@ -180,7 +182,7 @@ pub fn document_entries<B>(doc: &File<B>, kind: DeclKind) -> Vec<(String, Value)
 pub fn document_macros<B>(doc: &File<B>) -> Vec<(String, Value)> {
     declarations(doc)
         .iter()
-        .filter(|found| found.kind == DeclKind::Macros)
+        .filter(|found| found.kind == DeclKind::Macro)
         .flat_map(|found| macros(&found.declaration))
         .collect()
 }
@@ -192,7 +194,7 @@ pub fn document_vars<B>(doc: &File<B>) -> Vec<(String, VarDecl)> {
     let mut index: BTreeMap<String, usize> = BTreeMap::new();
     for found in declarations(doc)
         .iter()
-        .filter(|found| found.kind == DeclKind::Vars)
+        .filter(|found| found.kind == DeclKind::Var)
     {
         for (name, decl) in read_var_decls(&found.declaration) {
             let Ok(decl) = decl else { continue };
@@ -376,7 +378,7 @@ mod tests {
     #[test]
     fn macros_are_the_entries_of_every_macros_declaration() {
         let doc =
-            parse("::macros(gh: \"https://x/${1}\", n: 3, wiki: \"w/${1}\", blk: [ hello ])\n");
+            parse("::macro(gh: \"https://x/${1}\", n: 3, wiki: \"w/${1}\", blk: [ hello ])\n");
         let read = document_macros(&doc);
         let names: Vec<&str> = read.iter().map(|(name, _)| name.as_str()).collect();
         // A template of any kind is read; refusing a kind is `check`'s.
@@ -385,12 +387,12 @@ mod tests {
         assert_eq!(read[1].1, Value::Int(3));
         assert!(matches!(read[3].1, Value::Blocks(_)));
         // no entries, no macros
-        assert!(document_macros(&parse("::macros()\n")).is_empty());
+        assert!(document_macros(&parse("::macro()\n")).is_empty());
     }
 
     #[test]
     fn a_variable_declared_twice_is_the_later_declaration() {
-        let doc = parse("::vars(a: { default: 1 })\n::vars(a: { default: 2 }, b: {})\n");
+        let doc = parse("::var(a: { default: 1 })\n::var(a: { default: 2 }, b: {})\n");
         let vars = document_vars(&doc);
         assert_eq!(vars.len(), 2);
         assert_eq!(vars[0].0, "a");

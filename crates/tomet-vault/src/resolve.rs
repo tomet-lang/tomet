@@ -120,7 +120,7 @@ mod tests {
         tomet_config::load_config_from_str(settings).expect("valid settings")
     }
 
-    const SETTINGS: &str = "::fields(
+    const SETTINGS: &str = "::field(
   tags: { type: list }
   created: { type: datetime, format: rfc3339 }
   title: { type: string }

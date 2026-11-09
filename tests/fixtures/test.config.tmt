@@ -29,7 +29,7 @@
     }
   }
 )
-::fields(
+::field(
   id: {
     type: nanoid
     length: 8

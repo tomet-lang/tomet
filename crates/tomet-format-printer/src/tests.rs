@@ -250,7 +250,7 @@ fn test_wikilink_no_space_setting() {
 
 #[test]
 fn test_nanoid_generation_and_ensure_document_id() {
-    let settings_src = r#"::fields(
+    let settings_src = r#"::field(
   id: {
     type: nanoid
     length: 8
@@ -278,7 +278,7 @@ fn test_nanoid_generation_and_ensure_document_id() {
 
 #[test]
 fn test_nanoid_force_and_overwrite_behavior() {
-    let settings_src = r#"::fields(
+    let settings_src = r#"::field(
   id: {
     type: nanoid
     length: 8
@@ -738,12 +738,12 @@ fn inline_raw_with_backtick_falls_back_to_at_raw() {
 
 #[test]
 fn a_block_value_in_a_group_keeps_every_block_it_holds() {
-    // `::macros(name: [ ... ])` is a `{...}` group, whose `key: [...]` values used to be printed
+    // `::macro(name: [ ... ])` is a `{...}` group, whose `key: [...]` values used to be printed
     // as paragraph inlines only: an element in one came out as `[]`.
     for src in [
-        "::macros(card: [ @card(title: ${1})[ ${2} ] ])\n",
-        "::macros(two: [\none ${1}\n\n@card[ x ]\n])\n",
-        "::macros(note: [ Note: ${msg} ])\n",
+        "::macro(card: [ @card(title: ${1})[ ${2} ] ])\n",
+        "::macro(two: [\none ${1}\n\n@card[ x ]\n])\n",
+        "::macro(note: [ Note: ${msg} ])\n",
     ] {
         let before = tomet_ast_parser::parse_file(src).unwrap();
         let printed = document_to_tm(&before);
@@ -920,18 +920,18 @@ fn a_declaration_of_entries_is_printed_in_parentheses_and_reads_back() {
     for src in [
         "::meta(title: Hello, draft: true)\n",
         "::meta()\n",
-        "::macros(gh: \"https://x/${1}\")\n",
-        "::macros()\n",
-        "::vars(n: {type: int, default: 3})\n",
+        "::macro(gh: \"https://x/${1}\")\n",
+        "::macro()\n",
+        "::var(n: {type: int, default: 3})\n",
         "::format(link: {no_space: true})\n",
-        "::fields(tags: {type: list(string)})\n",
+        "::field(tags: {type: list(string)})\n",
         "::workspace(ignore: (a, b))\n",
         "::export(type: html)\n",
-        "::blueprints(daily: @file(b.tmt))\n",
-        "::vocabularies(deck: @file(deck.tmt))\n",
-        "::dictionaries(tomet: @file(dict.tmt))\n",
+        "::blueprint(daily: @file(b.tmt))\n",
+        "::vocabulary(deck: @file(deck.tmt))\n",
+        "::dictionary(tomet: @file(dict.tmt))\n",
         "::migration(source: obsidian)\n",
-        "::elements(card: {}, ref: {})\n",
+        "::element(card: {}, ref: {})\n",
     ] {
         let before = tomet_ast_parser::parse_file(src).unwrap();
         let printed = document_to_tm(&before);
@@ -941,7 +941,7 @@ fn a_declaration_of_entries_is_printed_in_parentheses_and_reads_back() {
     }
 }
 
-/// `::vocabulary`, `::blueprint` and `::dictionary` keep a `{...}` body after their parentheses.
+/// A declaration keeps a `{...}` body after its parentheses; the printer does not know which ones mean it.
 #[test]
 fn a_declaration_with_a_body_keeps_its_braces() {
     for src in [
@@ -961,9 +961,9 @@ fn a_declaration_with_a_body_keeps_its_braces() {
 #[test]
 fn a_declaration_without_a_group_is_printed_with_an_empty_one() {
     let doc = File::new(
-        vec![tomet_tree::declaration_new("macros")],
+        vec![tomet_tree::declaration_new("macro")],
         Vec::new(),
         Span::dummy(),
     );
-    assert_eq!(document_to_tm(&doc), "::macros()\n");
+    assert_eq!(document_to_tm(&doc), "::macro()\n");
 }

@@ -93,7 +93,7 @@ mod tests {
     use std::path::PathBuf;
 
     const SETTINGS: &str = "::kind(config)
-::fields(
+::field(
   tags: { type: list }
   created: { type: datetime }
 )

@@ -27,17 +27,17 @@ const INVALID: &str = "syntax/nexus-invalid-";
 /// The declarations that took `{...}` alone, and take `(...)` now.
 const PAREN_DECLARATIONS: [&str; 12] = [
     "meta",
-    "macros",
+    "macro",
     "format",
-    "fields",
+    "field",
     "workspace",
     "export",
-    "blueprints",
-    "vocabularies",
-    "dictionaries",
+    "blueprint",
+    "vocabulary",
+    "dictionary",
     "migration",
-    "vars",
-    "elements",
+    "var",
+    "element",
 ];
 
 /// `(fixture, line:col of the refusal, what the message says)`.
@@ -289,25 +289,51 @@ fn the_twelve_declarations_read_their_parenthesised_arguments() {
             "`::{name}(...)` has no `{{...}}` body"
         );
     }
-    // `::vocabulary(ns){...}` and `::dictionary(name){...}` keep their body.
-    for name in ["vocabulary", "dictionary"] {
+    // The header of `::blueprint(kind){...}` and `::dictionary(name){...}` keeps its body.
+    for name in ["blueprint", "dictionary"] {
         let decl = doc
             .header
             .iter()
-            .find(|d| d.name.name == name)
-            .unwrap_or_else(|| panic!("no `::{name}` in the fixture"));
+            .find(|d| d.name.name == name && d.data.value.is_some())
+            .unwrap_or_else(|| panic!("no `::{name}(...){{...}}` in the fixture"));
         assert!(decl.data.args.is_some(), "`::{name}(...)` names itself");
-        assert!(
-            decl.data.value.is_some(),
-            "`::{name}(...){{...}}` keeps its body"
-        );
     }
+}
+
+#[test]
+fn a_declaration_head_is_a_path_that_is_kept_whole() {
+    let src = read_fixture(Path::new("syntax/declaration-paths.tmt"));
+    let doc = parse_file(&src).expect("the declaration-paths fixture parses");
+    let heads: Vec<String> = doc.header.iter().map(|d| d.name.to_string()).collect();
+    for want in [
+        "macro.copyright",
+        "field.url.wiki",
+        "field.author",
+        "element.card",
+    ] {
+        assert!(heads.iter().any(|head| head == want), "{want} in {heads:?}");
+    }
+    let src = read_fixture(Path::new("syntax/declaration-paths-positional.tmt"));
+    let doc = parse_file(&src).expect("the positional fixture parses");
+    let heads: Vec<String> = doc.header.iter().map(|d| d.name.to_string()).collect();
+    for want in ["workspace.ignore", "blueprint.daily", "dictionary.tomet"] {
+        assert!(heads.iter().any(|head| head == want), "{want} in {heads:?}");
+    }
+    let src = read_fixture(Path::new("syntax/declaration-paths.tmt"));
+    let doc = parse_file(&src).expect("the declaration-paths fixture parses");
+    // The prose after the head is kept with the declaration.
+    let author = doc
+        .header
+        .iter()
+        .find(|d| d.name.to_string() == "field.author")
+        .expect("::field.author");
+    assert!(author.content.is_some());
 }
 
 #[test]
 fn an_empty_declaration_keeps_its_parentheses() {
     let src = read_fixture(Path::new("syntax/nexus-declarations-empty.tmt"));
-    parse_file(&src).expect("`::meta()`, `::macros()` and `::elements[ ... ]` parse");
+    parse_file(&src).expect("`::meta()`, `::macro()` and `::element[ ... ]` parse");
 }
 
 #[test]

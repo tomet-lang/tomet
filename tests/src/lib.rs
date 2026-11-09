@@ -153,8 +153,15 @@ pub const KNOWN_TS_ERRORS: &[(&str, &[&str])] = &[
     // directly. `tomet-parser`'s `list.rs::eat_list_marker` recognizes
     // it; `grammar.js` has not been taught the combine form yet.
     ("syntax/combine.tmt", &[ANY_ERROR]),
+    // Positional arguments in a declaration's `(...)`: `grammar.js` reads one scalar or one string
+    // there, so a second positional argument (`("target", ".git")`, as `::kind(a, 2)` also fails)
+    // and an element as the positional one (`(@file(path))`) are errors. `tomet-parser` reads both.
+    (
+        "syntax/declaration-paths-positional.tmt",
+        &[MISSING_NODE, ", \"", ")"],
+    ),
     // A block where a `{...}` group's value goes (`card: [ @card[ ${2} ] ]`, the body of a block
-    // macro in `::macros(...)`): `grammar.js` reads a `[ ... ]` value in `(args)` but not as the
+    // macro in `::macro(...)`): `grammar.js` reads a `[ ... ]` value in `(args)` but not as the
     // value of a pair in `{...}`, even when it holds a single paragraph. `tomet-parser` reads it
     // (`syntax/block-macro.tmt` is in the corpus for that); highlighting it is the grammar's to
     // catch up on.

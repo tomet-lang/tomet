@@ -2,7 +2,7 @@
 
 // A macro whose body is `[ ... ]` is a block macro: where a string macro gives
 // text, it gives the blocks, with `${1}` and `${name}` filled in.
-::macros(
+::macro(
   card: [ @card(title: ${1})[ ${2} ] ]
   notice: [ Notice: ${msg} ]
   plain: "https://example.com/${1}"

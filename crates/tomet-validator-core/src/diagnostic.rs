@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::fmt;
 use tomet_cst::TextRange;
+use tomet_declaration::Problem;
 use tomet_position::LineIndex;
 use tomet_span::Span;
 
@@ -203,8 +204,8 @@ pub enum Diagnostic {
     /// Reported rather than ignored quietly: a setting that does nothing and says nothing is how a
     /// reader comes to believe it is obeyed. `span` is the declaration.
     VaultOnlyDeclaration { name: String, span: Span },
-    /// A `::blueprints` / `::vocabularies` entry whose key is not the name the file it registers
-    /// gives itself (`::blueprint(x)`, `::vocabulary(x)`). The key is the name it is registered under;
+    /// A `::blueprint` / `::vocabulary` entry whose key is not the name the file it registers
+    /// gives itself (`::blueprint(x)`, `::vocabulary.x()`). The key is the name it is registered under;
     /// the file must agree. `declared` is `None` when the file names nothing. `span` is the declaration.
     RegistryNameMismatch {
         declaration: &'static str,
@@ -228,7 +229,7 @@ pub enum Diagnostic {
     /// `::meta` keeps the free attributes of a document; what tomet itself reads about it does
     /// not live there. `span` is the `::meta` element.
     MetaIdMoved { span: Span },
-    /// An entry of `::macros` or `::vars` that cannot be used as written: a macro
+    /// An entry of `::macro` or `::var` that cannot be used as written: a macro
     /// whose template is not a string, or a variable whose declaration is not a
     /// map, has an unknown key or type, or has a `default` its `type` does not hold.
     ///
@@ -257,8 +258,8 @@ pub enum Diagnostic {
         declaration: &'static str,
         span: Span,
     },
-    /// A `{...}` written on a declaration that takes none: `::meta(){ a: 1 }`. Only `::vocabulary`,
-    /// `::blueprint` and `::dictionary` have a body; the others hold their entries in `(...)`.
+    /// A `{...}` written on a declaration that takes none: `::meta(){ a: 1 }`. Only the header of
+    /// `::blueprint` and of `::dictionary` has a body; the others hold their entries in `(...)`.
     ///
     /// `span` is the whole declaration: a group has no span of its own.
     UnexpectedDeclarationData {
@@ -266,9 +267,26 @@ pub enum Diagnostic {
         span: Span,
     },
     /// The `(...)` of a declaration of `name: value` entries holds something else, such as
-    /// `::macros(gh)`. `span` is the whole declaration.
+    /// `::macro(gh)`. `span` is the whole declaration.
     ExpectedEntries {
         declaration: &'static str,
+        span: Span,
+    },
+    /// A path after the name of a declaration that takes none: `::kind.version(2)`.
+    UnexpectedDeclarationPath {
+        declaration: &'static str,
+        span: Span,
+    },
+    /// A `[...]` on a declaration that has nothing it could be the prose of. `reason` says why.
+    UnexpectedDeclarationProse {
+        declaration: &'static str,
+        reason: &'static str,
+        span: Span,
+    },
+    /// A plural spelling the singular declaration replaced, such as `::field` for `::field`.
+    RetiredDeclaration {
+        written: String,
+        instead: &'static str,
         span: Span,
     },
 }
@@ -307,6 +325,9 @@ impl Diagnostic {
             Diagnostic::NotForThisHost { span, .. } => *span,
             Diagnostic::UnexpectedDeclarationData { span, .. } => *span,
             Diagnostic::ExpectedEntries { span, .. } => *span,
+            Diagnostic::UnexpectedDeclarationPath { span, .. } => *span,
+            Diagnostic::UnexpectedDeclarationProse { span, .. } => *span,
+            Diagnostic::RetiredDeclaration { span, .. } => *span,
         }
     }
 
@@ -599,14 +620,37 @@ impl Diagnostic {
             Diagnostic::NotForThisHost { declaration, .. } => {
                 write!(f, "`::{declaration}` is not permitted in this host")
             }
-            Diagnostic::UnexpectedDeclarationData { declaration, .. } => write!(
+            // One wording, in `tomet_declaration::Problem`, for the problems of a declaration.
+            Diagnostic::UnexpectedDeclarationData { declaration, .. } => {
+                write!(f, "{}", Problem::UnexpectedData { declaration })
+            }
+            Diagnostic::ExpectedEntries { declaration, .. } => {
+                write!(f, "{}", Problem::ExpectedEntries { declaration })
+            }
+            Diagnostic::UnexpectedDeclarationPath { declaration, .. } => {
+                write!(f, "{}", Problem::UnexpectedPath { declaration })
+            }
+            Diagnostic::UnexpectedDeclarationProse {
+                declaration,
+                reason,
+                ..
+            } => write!(
                 f,
-                "`::{declaration}` takes no `{{...}}`; write its entries in the parentheses, \
-                 `::{declaration}(name: value)`"
+                "{}",
+                Problem::UnexpectedProse {
+                    declaration,
+                    reason
+                }
             ),
-            Diagnostic::ExpectedEntries { declaration, .. } => write!(
+            Diagnostic::RetiredDeclaration {
+                written, instead, ..
+            } => write!(
                 f,
-                "`::{declaration}(...)` holds `name: value` entries; found a value without a name"
+                "{}",
+                Problem::Retired {
+                    written: written.clone(),
+                    instead
+                }
             ),
         }
     }

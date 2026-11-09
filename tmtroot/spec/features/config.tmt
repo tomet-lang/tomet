@@ -11,7 +11,7 @@ tomet の設定は、三つの層を重ねて決まる。外側から順に、@t
 
 - @term(tomet#vault-config): @term(tomet#vault) の境目。設定のいちばん外側で、vault だけが書ける設定を持つ。
 - @term(tomet#folder-config): そのフォルダと下の文書に効く。vault のルートから文書のあるフォルダまで、外側から順に積まれる。
-- 文書自身の宣言: 文書の先頭に書いた `::format`、`::fields`、`::macros` などが、その文書にだけ効く。
+- 文書自身の宣言: 文書の先頭に書いた `::format`、`::field`、`::macro` などが、その文書にだけ効く。
 
 =[ 重ね方 ]
 

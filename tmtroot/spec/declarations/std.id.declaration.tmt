@@ -26,10 +26,10 @@ tomet refactor --in-place --meta-id .
 
 =[ 型の検査 ]
 
-`::fields` が `id` に `type` を宣言していれば、`::id` はその形かどうかを検査される。`uuid` は検査する。`nanoid` は文字の形が決まっていないので、検査しない。
+`::field` が `id` に `type` を宣言していれば、`::id` はその形かどうかを検査される。`uuid` は検査する。`nanoid` は文字の形が決まっていないので、検査しない。
 
 =[ 未実装 ]
 
 - vault の文書のあいだでの一意性。そうあるべきだが、検査していない。
 - `::id` から文書を引く道。`ref:` はファイル名で引くだけで、`::id` を読まない。
-- 識別子を作る設定（`type` `length` `prefix` `force` `overwrite`）の置き場所。いまは `::fields(id: { ... })` に書き、読むのは `tomet convert` だけ。置き場所は未定。
+- 識別子を作る設定（`type` `length` `prefix` `force` `overwrite`）の置き場所。いまは `::field(id: { ... })` に書き、読むのは `tomet convert` だけ。置き場所は未定。

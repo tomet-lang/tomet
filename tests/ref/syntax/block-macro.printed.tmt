@@ -1,6 +1,6 @@
 ::kind(fixture)
 
-::macros(card: [@card(title: ${1})[${2}
+::macro(card: [@card(title: ${1})[${2}
 ]], notice: [Notice: ${msg}], plain: "https://example.com/${1}")
 
 =[ブロックマクロ]

@@ -2,29 +2,29 @@
 
 ::meta(title: "nexus declarations", tags: (a, b))
 
-::macros(gh: "https://github.com/tomet/tomet/issues/${1}")
+::macro(gh: "https://github.com/tomet/tomet/issues/${1}")
 
-::vars(title: {type: string, default: Daily})
+::var(title: {type: string, default: Daily})
 
 ::format(table: {max_col_width: 50})
 
-::fields(created: {type: datetime, format: rfc3339})
+::field(created: {type: datetime, format: rfc3339})
 
 ::workspace(ignore: (tests/fixtures))
 
 ::export(type: commonmark, path: README.md)
 
-::blueprints(daily: daily.blueprint.tmt)
+::blueprint(daily: daily.blueprint.tmt)
 
-::vocabularies(deck: deck.vocabulary.tmt)
+::vocabulary(deck: deck.vocabulary.tmt)
 
-::dictionaries(tomet: tomet.dict.tmt)
+::dictionary(tomet: tomet.dict.tmt)
 
 ::migration(meta: {created: {type: datetime, format: iso8601}})
 
-::elements(card: {display: block})
+::element(card: {display: block})
 
-::vocabulary(ns){ version: 1.0.0 }
+::blueprint(daily){ version: "1.0" }
 
 ::dictionary(tomet){ vault: "a unit" }
 

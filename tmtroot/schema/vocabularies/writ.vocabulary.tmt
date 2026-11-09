@@ -1,9 +1,7 @@
 ::kind(vocabulary)
-::vocabulary(writ){
-  version: "1.0.0"
-}
+::vocabulary.writ(version: "1.0.0")
 
-::elements(
+::element(
   rule: {
     display: block
     singleton: false

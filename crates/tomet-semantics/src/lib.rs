@@ -10,7 +10,7 @@
 //!   | consumers (`tomet-html`, `tomet-markdown`, `tomet-links`, `tomet-tui`, `tomet-lsp`) to
 //!   | classify elements without pulling in the parser.
 //! - (Declarations are not here)
-//!   | What `::kind`, `::meta`, `::macros`, `::vars` and the other standard declarations *mean* --
+//!   | What `::kind`, `::meta`, `::macro`, `::var` and the other standard declarations *mean* --
 //!   | their slots, how often each may be written, what reading one gives -- is
 //!   | `tomet-declaration`'s, so a `.ctmt` file reads them the same way. This crate keeps
 //!   | what only a tomet document does with them: [`ElementKind::Declaration`] classifies one,
@@ -31,8 +31,8 @@
 //!   | Unifies positional argument mapping
 //!   | (e.g. `@raw(rust)` -> `{lang: "rust"}`) for built-in and vocabulary-declared schemas.
 //! - (Document Configuration (`config`))
-//!   | Reads a document's `::export` into a structured [`DocumentConfig`], with the `::macros` and
-//!   | `::vars` it declares.
+//!   | Reads a document's `::export` into a structured [`DocumentConfig`], with the `::macro` and
+//!   | `::var` it declares.
 //! - (Dictionaries (`dictionary`))
 //!   | Reads a `::dictionary(name)` document into a [`Dictionary`] of [`Term`]s, collects the ones a
 //!   | vault registers in [`LoadedDictionaries`], and resolves what a `@term` names ([`TermRef`]).

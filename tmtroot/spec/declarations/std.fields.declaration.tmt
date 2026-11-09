@@ -4,14 +4,24 @@
 =[ 全容 ]
 
 ```tm
-::fields(
+::field.aliases(type: list, always_newline: true)
+::field.created(type: datetime, format: rfc3339, offset: "+09:00")
+::field.url.wiki(type: list, always_newline: true)
+::field.author(type: string, required: true)[ 文書の著者 ]
+```
+
+`::meta` の項目の型と形を宣言する。項目1つを、名前をヘッドに書いた宣言1つで書く。名前は `.` を含んでもよい（`url.wiki`）。引数がその項目の宣言で、直後の `[ ... ]` はその説明（`about`）になる。
+
+名前をキーにした表を `::field(...)` に渡す形も、同じ木になる。
+
+```tm
+::field(
   aliases: { type: list, always_newline: true }
-  created: { type: datetime, format: rfc3339, offset: "+09:00" }
   url.wiki: { type: list, always_newline: true }
 )
 ```
 
-`::meta` の項目の型と形を宣言する。キーは項目の名前で、`.` を含んでもよい（`url.wiki`）。値は、その項目の宣言。
+複数形 `::fields` は廃止した。書くと `tomet check` が、`::field` に書き直すよう報告する。
 
 - `type`: 項目の型（`string` `list` `list(string)` `datetime` `uuid` など）。
 - `format` `offset`: 日時の書き方。

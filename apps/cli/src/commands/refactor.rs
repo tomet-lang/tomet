@@ -139,7 +139,7 @@ mod tests {
   type: note
   title: "My Title"
 )
-::macros(
+::macro(
   gh: "https://github.com/${1}"
 )
 

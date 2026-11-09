@@ -104,7 +104,7 @@ impl fmt::Display for EvalError {
             ),
             EvalError::NoValue(name) => write!(
                 f,
-                "`var.{name}` is declared but has no value: give it a `default` in `::vars`, \
+                "`var.{name}` is declared but has no value: give it a `default` in `::var`, \
                  or pass `--var {name}=...` when creating the document"
             ),
             EvalError::Unresolved(what) => write!(f, "{what}"),

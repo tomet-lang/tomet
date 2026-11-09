@@ -21,8 +21,8 @@ fn messages(source: &str) -> Vec<String> {
 fn a_document_that_needs_nothing_from_outside_has_no_findings() {
     let source = "\
 ::profile(standalone)
-::macros(gh: \"https://x/${1}\")
-::vars(topic: { type: string, default: \"a\" })
+::macro(gh: \"https://x/${1}\")
+::var(topic: { type: string, default: \"a\" })
 
 See ${macro.gh(1)} on ${var.topic}, a ${self.kind} and ${add(1, 2)}.
 ";
@@ -51,7 +51,7 @@ fn what_the_expression_takes_is_named_in_the_report() {
     assert_eq!(
         messages(source),
         vec![
-            "`::profile(standalone)` is declared, but the file needs the macro `gh`, which `::macros` does not define"
+            "`::profile(standalone)` is declared, but the file needs the macro `gh`, which `::macro` does not define"
                 .to_string()
         ]
     );

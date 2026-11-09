@@ -1,11 +1,11 @@
 vocabulary は、ある kind の文書が使える要素の名前と、その要素が取るものを宣言する
-文書。`::vocabulary(ns)` で名前空間を名乗り、`::elements` に要素を並べる。
+文書。`::vocabulary.ns()` で名前空間を名乗り、`::element` に要素を並べる。
 
 ```tm
 ::kind(vocabulary)
-::vocabulary(deck){ version: "1.0.0" }
+::vocabulary.deck(version: "1.0.0")
 
-::elements(
+::element(
   card: {
     display: block
     about: | カード一枚。
@@ -26,7 +26,7 @@ vocabulary は、ある kind の文書が使える要素の名前と、その要
 
 #[ 名前はキー ]
 
-`::elements` の中身は、要素の名前をキーにしたマップ。`args` の中身は、引数の名前を
+`::element` の中身は、要素の名前をキーにしたマップ。`args` の中身は、引数の名前を
 キーにしたマップ。どの段も「キー: フィールドのマップ」という同じ形で、要素と引数で
 別の記法を覚える必要がない。名前を `@element(card)` のように括弧の引数へ入れる綴りは
 無い。

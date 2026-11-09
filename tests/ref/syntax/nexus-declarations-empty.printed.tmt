@@ -2,8 +2,8 @@
 
 ::meta()
 
-::macros()
+::macro()
 
-::elements[説明]
+::element[説明]
 
 =[本文]

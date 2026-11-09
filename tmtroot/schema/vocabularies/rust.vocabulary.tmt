@@ -1,9 +1,7 @@
 ::kind(vocabulary)
-::vocabulary(rust){
-  version: "1.0.0"
-}
+::vocabulary.rust(version: "1.0.0")
 
-::elements(
+::element(
   crate: {
     display: inline
     singleton: false

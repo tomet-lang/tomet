@@ -1,8 +1,5 @@
 ::kind(vocabulary)
-::vocabulary(idea){
-  version: "1.0.0"
-  open: true
-}
+::vocabulary.idea(version: "1.0.0", open: true)
 
 @dir(docs/design/ideas/) のためのスケッチパッド語彙。要素をひとつも宣言せず、
 `open: true` によって**どんな名前でも受け付ける**。

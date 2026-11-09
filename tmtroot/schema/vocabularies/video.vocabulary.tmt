@@ -1,7 +1,7 @@
 ::kind(vocabulary)
-::vocabulary(video){ version: "1.0.0" }
+::vocabulary.video(version: "1.0.0")
 
-::elements(
+::element(
   timestamp: {
     display: block
     about: | 動画の一点についてのメモ。`[content]` が本文。

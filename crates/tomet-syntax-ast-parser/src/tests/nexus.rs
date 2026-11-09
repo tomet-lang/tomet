@@ -282,7 +282,7 @@ fn a_data_file_header_is_held_to_the_same_rule() {
         ("::meta\nk: v\n", NEEDS_PRIMARY, 0),
         ("::meta{ a: 1 }\nk: v\n", NEEDS_PRIMARY, 0),
         ("::meta{}\n", NEEDS_PRIMARY, 0),
-        ("::kind(x)\n::vars{ a: 1 }\nk: v\n", NEEDS_PRIMARY, 10),
+        ("::kind(x)\n::var{ a: 1 }\nk: v\n", NEEDS_PRIMARY, 10),
         ("::meta:(a: 1)\nk: v\n", NO_CONNECT, 0),
         ("::meta(a: 1)::{b: 2}\nk: v\n", NO_CONNECT, 0),
     ] {
@@ -297,7 +297,7 @@ fn a_data_file_header_is_held_to_the_same_rule() {
     for src in [
         "::meta()\nk: v\n",
         "::meta(a: 1)\nk: v\n",
-        "::kind(x)\n::macros(a: 1)\n::vars(b: 2)\nk: v\n",
+        "::kind(x)\n::macro(a: 1)\n::var(b: 2)\nk: v\n",
         "::meta(a: 1)\n",
     ] {
         let file = parse_data_file(src).unwrap_or_else(|e| panic!("{src:?}: {e}"));

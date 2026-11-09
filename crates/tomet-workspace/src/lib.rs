@@ -31,7 +31,7 @@ mod tests {
   type: task
   created: 2026-04-12T18:00:00+09:00
 )
-::macros(
+::macro(
   youtube_ch: "https://www.youtube.com/${1}"
 )
 

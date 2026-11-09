@@ -83,7 +83,7 @@ pub struct Prepared {
 /// Validates `source` the way a host with no disk can: what `tomet check` says
 /// of it, given the vault's pieces as text.
 ///
-/// - `vocabularies`: `::vocabulary(ns)` documents. One that does not parse, has
+/// - `vocabularies`: `::vocabulary.ns()` documents. One that does not parse, has
 ///   no header, or claims a reserved or already-taken namespace is skipped: it
 ///   binds no namespace.
 /// - `config`: the settings, as a config document (what `default.config.tmt`
@@ -549,8 +549,8 @@ impl Vault {
         DocRef(rel.strip_prefix("./").unwrap_or(&rel).to_string())
     }
 
-    /// The macros and variables in scope for `doc`: its own `::macros` and
-    /// `::vars`, then the vault's for every name it did not claim.
+    /// The macros and variables in scope for `doc`: its own `::macro` and
+    /// `::var`, then the vault's for every name it did not claim.
     ///
     /// The document wins a collision, which is the direction every other
     /// scope in this format runs. Before this lived here it lived in the
@@ -588,7 +588,7 @@ mod tests {
     use super::*;
 
     const BLUEPRINT: &str = "::kind(blueprint)\n::blueprint(note)\n::meta(\n  date: \"2026\"\n)\n\n=[ Items ]#(items)::rule(allow: (task))\n";
-    const UUID_SETTINGS: &str = "::kind(config)\n::fields(id: { type: uuid })\n";
+    const UUID_SETTINGS: &str = "::kind(config)\n::field(id: { type: uuid })\n";
 
     fn texts(items: &[&str]) -> Vec<String> {
         items.iter().map(|s| s.to_string()).collect()
@@ -668,7 +668,7 @@ mod tests {
         );
     }
 
-    const ACME: &str = "::kind(vocabulary)\n::vocabulary(acme){ version: \"1.0.0\" }\n";
+    const ACME: &str = "::kind(vocabulary)\n::vocabulary.acme(version: \"1.0.0\")\n";
 
     #[test]
     fn a_vocabulary_handed_in_as_text_binds_like_one_read_from_disk() {
@@ -686,7 +686,7 @@ mod tests {
             ".",
             &[(
                 "doc.tmt",
-                "::kind(vocabulary)\n::vocabulary(doc){ version: \"1.0.0\" }\n",
+                "::kind(vocabulary)\n::vocabulary.doc(version: \"1.0.0\")\n",
             )],
         );
         assert!(
@@ -866,8 +866,7 @@ mod tests {
 
     #[test]
     fn a_document_reads_its_own_meta_typed_by_the_settings() {
-        let config =
-            tomet_config::load_config_from_str("::fields(tags: { type: list })\n").unwrap();
+        let config = tomet_config::load_config_from_str("::field(tags: { type: list })\n").unwrap();
         let vault = Vault::from_sources(config, "/v", &[]);
         // No `tags` written: still a list, so `.contains` answers instead of failing.
         let (doc, prepared) = prepared(
@@ -882,14 +881,14 @@ mod tests {
     #[test]
     fn macros_from_the_vault_and_the_document_are_both_in_scope() {
         let config = tomet_config::load_config_from_str(
-            "::macros(gh: \"https://gh/${1}\", site: \"vault\")\n",
+            "::macro(gh: \"https://gh/${1}\", site: \"vault\")\n",
         )
         .unwrap();
         let vault = Vault::from_sources(config, "/v", &[]);
         let (doc, prepared) = prepared(
             &vault,
             "/v/a.tmt",
-            "::macros(site: \"doc\")\n\n${macro.gh(1)} ${macro.site()}\n",
+            "::macro(site: \"doc\")\n\n${macro.gh(1)} ${macro.site()}\n",
         );
         assert!(prepared.unresolved.is_empty(), "{:?}", prepared.unresolved);
         // The document wins a collision.
@@ -915,7 +914,7 @@ mod tests {
 
     fn vault_with_a_macro() -> Vault {
         let config = tomet_config::load_config_from_str(
-            "::macros(gh: \"https://gh/${1}\")\n::fields(n: { type: uuid })\n",
+            "::macro(gh: \"https://gh/${1}\")\n::field(n: { type: uuid })\n",
         )
         .unwrap();
         Vault::from_sources(config, "/v", &[("acme.tmt", ACME)])
@@ -938,7 +937,7 @@ mod tests {
         let (doc, own) = prepared(
             &vault,
             "/v/a.tmt",
-            &format!("{PROMISE}::macros(gh: \"mine/${{1}}\")\n\n${{macro.gh(1)}}\n"),
+            &format!("{PROMISE}::macro(gh: \"mine/${{1}}\")\n\n${{macro.gh(1)}}\n"),
         );
         assert!(own.unresolved.is_empty(), "{:?}", own.unresolved);
         assert_eq!(text_of(&doc), "mine/1");

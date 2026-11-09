@@ -1,0 +1,26 @@
+::kind(fixture)
+
+::id(declaration-paths)
+
+::macro.copyright("(C) 2026 Tomet Projects")
+
+::macro.generated_by[@comment[Generated from ${1}.]]
+
+::format.meta(always_newline: true)
+
+::format.table(adjust_width: auto, max_col_width: 50)
+
+::field.aliases(type: list, always_newline: true)
+
+::field.url.wiki(type: list, always_newline: true)
+
+::field.author(type: string, required: true)[文書の著者]
+
+::var.title(type: string, default: Untitled)[作成するノートの題]
+
+::var.draft(type: bool, default: false)
+
+::element.card(display: block)[一枚のカード]
+
+=[本文]
+宣言のあとの本文。

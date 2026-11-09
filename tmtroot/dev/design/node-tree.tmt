@@ -34,7 +34,7 @@ Section と File は実は同じではないか、という問いから始まっ
 
 ==[ 得られるもの ]
 
-- 宣言にスコープがつく。`::kind` `::rule` `::vars` `::macros` `::vocabulary` が、Section やフォルダの単位で効く。
+- 宣言にスコープがつく。`::kind` `::rule` `::var` `::macro` `::vocabulary` が、Section やフォルダの単位で効く。
 - File と Section の相互変換が機械的になる。節をファイルに切り出すには、節のコネクトを先頭の並びに上げる。逆も同じ。
 - `<doc>#<addr>` のアドレスが、Folder・File・Section を通した一本の道筋になる。
 - `OutsidePreamble` が一般化される。「文書の先頭の並び」が「各ノードの見出し部」になる。
@@ -65,8 +65,8 @@ notes/
 
 ```tm
 ::kind(notebook)
-::vars(author: { type: string })
-::macros(gh: "https://.../${1}")
+::var(author: { type: string })
+::macro(gh: "https://.../${1}")
 
 =[ notes について ]
 このフォルダは日々のメモを置く。
