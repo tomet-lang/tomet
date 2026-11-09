@@ -137,7 +137,7 @@ Each source says so in its own output, from the macro rather than by
 hand:
 
 ```tmt
-$macro.generated_by(self.path)
+$macro.generated_by(self::path)
 ```
 
 `.gitattributes` marks `/AGENTS.md` and `/README.ja.md`
@@ -156,7 +156,7 @@ working in this repository reads, so it is the file most likely to be
 edited in place by something that never looked at @dir(tmtroot/) -- and the
 edit would be lost at the next export, silently.
 
-The banner is written `${macro.generated_by(self.path)}` and not typed
+The banner is written `${macro.generated_by(self::path)}` and not typed
 out because typing it puts the source's own path inside the source, where
 it goes stale the moment the file moves. The wording lives once, in
 `default.config.tmt`.
