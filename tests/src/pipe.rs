@@ -55,6 +55,16 @@ const SAME: &[(&str, &str, &str)] = &[
     ),
     ("a heading", "=| alpha\n | beta\n", "=[ alpha\n  beta ]\n"),
     (
+        "a titled thematic break: the closing fence stands for the `]---`",
+        "---\n| alpha\n| beta\n---\n",
+        "---[ alpha\nbeta ]---\n",
+    ),
+    (
+        "a titled thematic break inside a body",
+        "@container\n| ---\n| | alpha\n| ---\n| after\n",
+        "@container[\n---[ alpha ]---\nafter\n]\n",
+    ),
+    (
         "a group opening directly on the list marker, with no space",
         "-| alpha\n | beta\n",
         "-[ alpha\n  beta ]\n",

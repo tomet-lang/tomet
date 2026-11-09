@@ -1921,6 +1921,10 @@
             "named": true
           },
           {
+            "type": "marked_content",
+            "named": true
+          },
+          {
             "type": "punctuation",
             "named": true
           },

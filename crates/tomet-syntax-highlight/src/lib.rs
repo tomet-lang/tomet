@@ -489,6 +489,10 @@ mod tests {
     fn a_thematic_break() {
         assert!(has("---\n", "---", "contentSeparator"));
         assert!(has("---[ Title ]---\n", "---", "contentSeparator"));
+        // Both fences of the `|` form.
+        let piped = "---\n| Title\n---\n";
+        assert!(has(piped, "---", "contentSeparator"));
+        assert!(!has(piped, "Title", "contentSeparator"));
     }
 
     #[test]

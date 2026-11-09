@@ -43,6 +43,7 @@ module.exports = grammar({
     // `(a)` is a group or the start of `(a) => ...`; only the `=>` after the
     // `)` decides, which a lookahead of one token cannot see.
     [$._interp_operand, $.interp_lambda],
+    [$.thematic_break, $.titled_thematic_break],
   ],
 
   rules: {
@@ -161,14 +162,26 @@ module.exports = grammar({
     // own trailing newline, same as `heading` does, since it's a
     // full-line construct with content of its own rather than a bare
     // marker.
+    //
+    // The title may also be `|` lines starting on the line right after the
+    // opening run (`marked_content`, the same `[content]`-without-brackets
+    // group an element takes). The closing run is required there too: it
+    // is the `]---` the `|` form has no `]` to carry. `thematic_break` is
+    // the same dash run followed by a newline, so the two share a prefix;
+    // the conflict is resolved by the closing run, which a plain break
+    // never has (and `prec.dynamic` prefers the titled break when both fit).
     titled_thematic_break: ($) =>
-      seq(
-        field("open", alias($._dash_run, $.thematic_break_marker)),
-        "[",
-        field("content", repeat($._bracket_item)),
-        "]",
-        field("close", alias($._dash_run, $.thematic_break_marker)),
-        $._newline,
+      prec.dynamic(
+        1,
+        seq(
+          field("open", alias($._dash_run, $.thematic_break_marker)),
+          choice(
+            seq("[", field("content", repeat($._bracket_item)), "]"),
+            seq($._newline, field("content", $.marked_content)),
+          ),
+          field("close", alias($._dash_run, $.thematic_break_marker)),
+          $._newline,
+        ),
       ),
 
     // ---- fenced code blocks ----------------------------------------------

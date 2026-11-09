@@ -495,15 +495,27 @@ fn lower_thematic_break(node: &SyntaxNode) -> Result<Block> {
         if let Some(err_node) = node.children().find(|c| c.kind() == K::ERROR) {
             return Err(lower_error(&err_node));
         }
-        let title = match content.children().find(|n| n.kind() == K::PARAGRAPH) {
-            Some(paragraph) if content.children().count() == 1 => {
-                lower_inlines(&paragraph, open + 1, close - 1)?
-            }
-            None => Vec::new(),
-            Some(_) => return Err(unsupported("a title of several blocks")),
-        };
         // The span of a titled break runs through its line end.
         let span = Span::new(start, end);
+        let piped = content.first_token().is_some_and(|t| t.kind() == K::PIPE);
+        let title = if piped {
+            // `|` lines are the content of the break the way `[ ... ]` is, so they are read as
+            // any other content is; the break still takes one paragraph for a title.
+            let mut blocks = lower_content(&content)?.into_iter();
+            match (blocks.next(), blocks.next()) {
+                (None, _) => Vec::new(),
+                (Some(Block::Paragraph(paragraph)), None) => paragraph.content,
+                (Some(_), _) => return Err(unsupported("a title of several blocks")),
+            }
+        } else {
+            match content.children().find(|n| n.kind() == K::PARAGRAPH) {
+                Some(paragraph) if content.children().count() == 1 => {
+                    lower_inlines(&paragraph, open + 1, close - 1)?
+                }
+                None => Vec::new(),
+                Some(_) => return Err(unsupported("a title of several blocks")),
+            }
+        };
         let mut hr = element_new(Name::bare("hr"))
             .with_placement(Placement::Block)
             .with_span(span);

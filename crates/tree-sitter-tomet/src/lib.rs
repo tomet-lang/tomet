@@ -93,7 +93,15 @@
 //!  | shape mismatch: the real parser (`document.rs::is_thematic_break`)
 //!  | correctly accepts any run of 3+. See
 //!  | `more_than_three_dashes_are_only_partially_consumed_by_thematic_break`
-//!  | below for the pinned exact shape.
+//!  | below for the pinned exact shape. The same goes for the closing run
+//!  | of the `|` form of a titled break (`---` / `| Title` / `---`).
+//! -| **Two `|`-form titled breaks that share a `---` pair up differently.**
+//!  | In `---`/`| a`/`---`/`| b`/`---`, both "(a) is the title, then a
+//!  | paragraph `| b`" and "a plain break, a paragraph `| a`, then (b) is
+//!  | the title" are valid readings, and the grammar picks the second;
+//!  | `tomet-parser` reads left to right and takes the first (a `---` that
+//!  | closes a break never opens the next one). Not an `ERROR`. Pinned by
+//!  | `consecutive_pipe_form_breaks_pair_up_the_other_way_round`.
 //! -| **A bare call or sequence occupying the *whole* `(args)`/`{value}`
 //!  | doesn't parse, unlike the same value under a named key (`a: (b, c)`,
 //!  | `a: list(string)`, which work fine).** `@id(list(a, b))` and
@@ -234,6 +242,54 @@ mod tests {
         let root = tree.root_node();
         assert!(!root.has_error());
         assert_eq!(root.named_child(0).unwrap().kind(), "titled_thematic_break");
+    }
+
+    /// The kinds of the root's named children.
+    fn block_kinds(src: &str) -> Vec<&'static str> {
+        let tree = parse(src);
+        let root = tree.root_node();
+        assert!(!root.has_error(), "{src:?}");
+        (0..root.named_child_count() as u32)
+            .map(|i| root.named_child(i).unwrap().kind())
+            .collect()
+    }
+
+    #[test]
+    fn parses_a_titled_thematic_break_written_with_pipe_lines() {
+        // `|` lines are the title; the closing run stands for the `]---`.
+        for src in ["---\n| Title\n---\n", "---\n| one\n| two\n---\n"] {
+            assert_eq!(block_kinds(src), ["titled_thematic_break"], "{src:?}");
+        }
+        let tree = parse("---\n| one\n| two\n---\n");
+        let hr = tree.root_node().named_child(0).unwrap();
+        assert_eq!(
+            hr.child_by_field_name("content").unwrap().kind(),
+            "marked_content"
+        );
+        assert_eq!(
+            hr.child_by_field_name("close").unwrap().kind(),
+            "thematic_break_marker"
+        );
+    }
+
+    #[test]
+    fn consecutive_pipe_form_breaks_pair_up_the_other_way_round() {
+        // `tomet-parser` closes the first break with the second `---` (titled, paragraph, plain);
+        // both readings are valid here and this grammar takes the other one. See the module doc.
+        assert_eq!(
+            block_kinds("---\n| a\n---\n| b\n---\n"),
+            ["thematic_break", "paragraph", "titled_thematic_break"]
+        );
+    }
+
+    #[test]
+    fn a_plain_break_followed_by_a_pipe_line_without_a_closing_run_stays_plain() {
+        // No closing `---`, so there is no titled break; the plain break is still one.
+        let tree = parse("---\n| text\n");
+        assert_eq!(
+            tree.root_node().named_child(0).unwrap().kind(),
+            "thematic_break"
+        );
     }
 
     #[test]

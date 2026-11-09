@@ -45,7 +45,8 @@
 //! A `|` run is `[content]` spelled without brackets, and so it is the same
 //! node: a `CONTENT` that opens with a `PIPE` and has no closing `]`. It is a
 //! form's content (`@quote| text`, or `|` on the line after the form), a
-//! list item's (`-| text`), a heading's (`=| text`) or a `key: | prose` value.
+//! list item's (`-| text`), a heading's (`=| text`), a titled thematic break's (`|` lines between
+//! two `---` lines, see `parse_thematic_break`) or a `key: | prose` value.
 //! It ends at the first line that does not repeat its marker in the same column
 //! -- a blank line, or a `|` somewhere else, ends it too -- and the error for that
 //! last case (a marker in a column that continues nothing) is lowering's, not the tree's. The `|` that begins each later
@@ -1731,6 +1732,25 @@ fn tail_claims_something(groups: &[SyntaxNode]) -> bool {
 }
 
 impl<'a, 't> CstParser<'a, 't> {
+    /// A thematic break: `---`, or a titled one, which is a pair of fences around a title.
+    ///
+    /// The title is `[content]` on the opening line (`---[ Title ]---`), or its `|` spelling, `|`
+    /// lines starting on the line right after the opening `---` (a blank line in between leaves a
+    /// plain break and a paragraph):
+    ///
+    /// ```text
+    /// ---
+    /// | Title
+    /// | more title
+    /// ---
+    /// ```
+    ///
+    /// Both are the same node, `FENCE CONTENT FENCE`, and the closing fence is required in both:
+    /// it is the `]---` of the bracketed form, which a `|` run has no `]` to carry. Without it
+    /// the break gets an empty `ERROR`, and lowering reports it. A closing fence is 3 or more
+    /// dashes and does not have to match the opening one. A `---` that closes one break never
+    /// opens the next, so `---⏎| a⏎---⏎| b⏎---` is a titled break, a paragraph `| b`, and a plain
+    /// break.
     fn parse_thematic_break(&mut self) {
         self.builder.start_node(K::THEMATIC_BREAK.into());
         self.builder.start_node(K::FENCE.into());
@@ -1784,10 +1804,44 @@ impl<'a, 't> CstParser<'a, 't> {
             } else if self.current_kind() == Some(K::NEWLINE) {
                 self.bump();
             }
+        } else if self.current_kind() == Some(K::NEWLINE) && self.pipe_follows_line(self.pos) {
+            self.bump(); // the newline
+            self.bump_while(K::WHITESPACE); // an outer run's markers
+            self.parse_pipe_content();
+            self.parse_closing_fence_line();
         } else {
             self.parse_inline(InlineStop::Line);
         }
         self.builder.finish_node();
+    }
+
+    /// The closing `---` of a titled thematic break written with `|` lines, on the line right
+    /// after the last of them. Like the `]---` of the bracketed form it is required: without it
+    /// the break gets an empty `ERROR`, which lowering reports, and the line that is there is left
+    /// alone, because it is not part of the break.
+    fn parse_closing_fence_line(&mut self) {
+        // The run has ended at the newline of its last line; the closing line is the next one.
+        let at_newline = self.current_kind() == Some(K::NEWLINE);
+        let from = if at_newline { self.pos + 1 } else { self.pos };
+        let j = self.skip_ws_from(from);
+        if !at_newline || self.run_len(j, K::MINUS) < 3 {
+            self.builder.start_node(K::ERROR.into());
+            self.builder.finish_node();
+            return;
+        }
+        self.bump(); // the newline
+        self.bump_while(K::WHITESPACE); // an outer run's markers
+        self.builder.start_node(K::FENCE.into());
+        self.bump_while(K::MINUS);
+        self.builder.finish_node();
+        self.bump_while(K::WHITESPACE);
+        if !matches!(self.current_kind(), None | Some(K::NEWLINE)) {
+            self.builder.start_node(K::ERROR.into());
+            self.parse_inline(InlineStop::Line);
+            self.builder.finish_node();
+        } else if self.current_kind() == Some(K::NEWLINE) {
+            self.bump();
+        }
     }
 
     /// The head of a form that stands as a block: its sigil and groups, or a box.
@@ -3024,6 +3078,22 @@ mod tests {
             child_kinds(&root),
             [K::THEMATIC_BREAK, K::THEMATIC_BREAK, K::LIST]
         );
+        // `|` lines are the title of the break, then the closing fence: one node, whole.
+        let src = "---\n| one\n| two\n---\n- item\n";
+        let root = parse_cst(src);
+        assert_eq!(child_kinds(&root), [K::THEMATIC_BREAK, K::LIST]);
+        let hr = find(&root, K::THEMATIC_BREAK).unwrap();
+        assert_eq!(hr.text().to_string(), "---\n| one\n| two\n---\n");
+        assert_eq!(
+            child_kinds(&hr),
+            [K::FENCE, K::CONTENT, K::FENCE],
+            "{src:?}"
+        );
+        // Without the closing fence the break is an error, and the line after it is not its own.
+        let root = parse_cst("---\n| one\nafter\n");
+        let hr = find(&root, K::THEMATIC_BREAK).unwrap();
+        assert_eq!(child_kinds(&hr), [K::FENCE, K::CONTENT, K::ERROR]);
+        assert_eq!(hr.text().to_string(), "---\n| one");
     }
 
     #[test]
