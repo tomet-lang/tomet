@@ -87,9 +87,9 @@ module.exports = grammar({
     line_raw: ($) => prec.right(repeat1(seq($._line_raw_line, $._newline))),
     _line_raw_line: (_$) => token(prec(2, /``([^`\n][^\n]*)?/)),
 
-    // A `;` at the start of a line breaks the block, as a blank line does
-    // (`tomet-parser`'s `cst.rs`, `SEMI`). It is only a break where a block
-    // can begin, so a paragraph's lines may not start with a `;` punctuation
+    // A `;` at the start of a line breaks the block, as a blank line does.
+    // It is only a break where a block can begin, so a paragraph's lines may
+    // not start with a `;` punctuation
     // (`_first_line_item`) and the `;` in `text` is carved out below. In the
     // middle of a line it is plain `punctuation`. Known simplification: only
     // at the top level, not inside `[content]` or a `|` run.
@@ -868,9 +868,8 @@ module.exports = grammar({
     // leaving it for whichever *outer* rule holds the sibling
     // `repeat(...)` to pick up. `id_group` is included alongside it
     // because a connect is structurally an element in its own right
-    // (see below) and can carry its own id the same way one does --
-    // `tomet-parser::cst.rs::parse_connect` claims an adjacent
-    // `#(...)` for itself the same way its own group-reading does.
+    // (see below) and can carry its own id the same way one does: a
+    // connect claims an adjacent `#(...)` for itself, as its own groups are.
     //
     // `prec.right(4, ...)` (higher than `inline_element`'s own
     // `prec.right(3, ...)`): a bare group right after `::name` --

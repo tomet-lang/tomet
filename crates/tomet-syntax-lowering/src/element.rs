@@ -5,6 +5,9 @@
 //! They fold CST nodes into AST values and groups without re-reading source text.
 
 use crate::error::{Error, Result};
+use crate::lower::error_node::lower_error;
+use crate::lower::form::{lower_element, lower_slot, slot_of};
+use crate::lower::groups::{lower_content, lower_embedded, lower_group_list};
 use tomet_ast::{Bare, Block, Connect, Data, Entry, Group, Id, Placement, Value};
 use tomet_cst::{SyntaxElement, SyntaxKind as K, SyntaxNode, SyntaxToken};
 use tomet_span::Span;
@@ -193,7 +196,7 @@ pub(crate) fn lower_value_group(node: &SyntaxNode) -> Result<Group> {
     while i < children.len() {
         let child = &children[i];
         match child.kind() {
-            K::ERROR => return Err(crate::lower::lower_error(child)),
+            K::ERROR => return Err(lower_error(child)),
             K::MAP_ENTRY => {
                 let (key, value, offset) = lower_map_entry(child)?;
                 if key == POSITIONAL_ENTRY_KEY {
@@ -299,7 +302,7 @@ pub(crate) fn lower_value_group(node: &SyntaxNode) -> Result<Group> {
                             i += 1;
                         }
 
-                        let read = crate::lower::lower_group_list(groups)?;
+                        let read = lower_group_list(groups)?;
                         entries.push(Entry::Bare(Bare {
                             data: read.data,
                             content: read.content,
@@ -320,7 +323,7 @@ pub(crate) fn lower_value_group(node: &SyntaxNode) -> Result<Group> {
                             return Err(err(pos, "expected a value"));
                         }
                         let block = is_block_placed_in_group(&n);
-                        let (value, _) = crate::lower::lower_embedded(&n)?;
+                        let (value, _) = lower_embedded(&n)?;
                         let entry = match value {
                             Value::Hole(mut hole) => {
                                 if block {
@@ -411,7 +414,7 @@ pub(crate) fn lower_map_entries(
                 {
                     continue;
                 }
-                return Err(crate::lower::lower_error(child));
+                return Err(lower_error(child));
             }
             K::MAP_ENTRY => {
                 let (key, value, offset) = lower_map_entry(child)?;
@@ -633,16 +636,16 @@ fn lower_single_value_from_children(
         let elem = &elements[non_trivia_indices[0]];
         match elem {
             SyntaxElement::Node(n) => match n.kind() {
-                K::ERROR => return Err(crate::lower::lower_error(n)),
-                K::CONTENT => return Ok(Value::Blocks(crate::lower::lower_content(n)?)),
+                K::ERROR => return Err(lower_error(n)),
+                K::CONTENT => return Ok(Value::Blocks(lower_content(n)?)),
                 K::SLOT => return Ok(Value::String(n.text().to_string())),
                 K::INLINE_FORM | K::BLOCK_FORM => {
                     return if opens_with_dollar(n) {
                         Ok(Value::Interp(crate::interp::lower_interpolation(n)?))
-                    } else if let Some(slot) = crate::lower::slot_of(n) {
-                        Ok(Value::Hole(Box::new(crate::lower::lower_slot(&slot)?)))
+                    } else if let Some(slot) = slot_of(n) {
+                        Ok(Value::Hole(Box::new(lower_slot(&slot)?)))
                     } else {
-                        Ok(Value::Element(Box::new(crate::lower::lower_element(n)?)))
+                        Ok(Value::Element(Box::new(lower_element(n)?)))
                     };
                 }
                 K::INTERP_EXPR => return Ok(Value::Interp(crate::interp::lower_interpolation(n)?)),
@@ -752,7 +755,7 @@ fn lower_call_args(args_node: &SyntaxNode, raw_args: bool) -> Result<Vec<Value>>
     let mut args = Vec::new();
     for item in items {
         if item.kind() == K::ERROR {
-            return Err(crate::lower::lower_error(&item));
+            return Err(lower_error(&item));
         }
         if item.kind() == K::MAP_ENTRY {
             return Err(err(
