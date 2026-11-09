@@ -156,8 +156,9 @@ pub enum ElementKind {
     /// `@task(status)[ ... ]` -- an actionable task item.
     Task,
     /// `@term(tomet#vault-config)`, `@term(tomet#name("vault.config.tmt"))`, `@term("vault.config.tmt")` -- a
-    /// mention of a term a dictionary defines. In a `::dictionary` the same element is the definition:
-    /// `"vault.config.tmt": @term[description]#(vault-config)`.
+    /// mention of a term a dictionary defines. In a `::dictionary` document the same element, as a
+    /// block of the body, is the definition: `;@term("vault.config.tmt")#(vault-config)` and its
+    /// description (see [`Definitions`](crate::Definitions)).
     Term,
     /// `@comment[ ... ]` -- a note for whoever reads the exported *source*, not the rendered
     /// document. Each exporter writes it in its target's own comment syntax (`<!-- -->` in HTML and
@@ -513,8 +514,8 @@ pub fn required_shape(kind: &ElementKind) -> Option<Shape> {
         Footnote => return None,
         Tag => return None,
         Task => return None,
-        // Either shape: a mention sits inside a sentence, and the definition in a `::dictionary` stands as
-        // an entry of its value group.
+        // Either shape: a mention sits inside a sentence, and the definition in a `::dictionary` stands
+        // as a block of the body.
         Term => return None,
         // Either shape: a banner stands alone, and a note can sit inside a sentence of the source.
         Comment => return None,

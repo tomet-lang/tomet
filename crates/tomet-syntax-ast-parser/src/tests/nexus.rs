@@ -265,7 +265,6 @@ fn a_declaration_with_a_primary_group_is_valid() {
         "::meta(id: x, title: T)\n",
         // The ones that keep a `{}` body have a `()` before it.
         "::vocabulary(ns){ a: 1 }\n",
-        "::dictionary(name){ a: 1 }\n",
         "::blueprint(x){ a: 1 }\n",
     ] {
         assert_eq!(ok(src).header.len(), 1, "{src:?}");

@@ -113,13 +113,15 @@ impl Scope {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Shape {
     /// `::kind(config, 2)`: `(args)` bound to the declaration's positional slots, no `{...}`, and no
-    /// path after the name.
+    /// path after the name -- unless the declaration has a header of its own
+    /// ([`Spec::own_header`]), where a path is a registration: `::dictionary(tomet)` is the
+    /// header of a dictionary, `::dictionary.tomet(@file(...))` registers one.
     Args,
     /// `::meta(title: T)` or `::field.author(type: string)`: a tree of entries, written as named
     /// arguments of the declaration or as a dot-path in its head. No `{...}`. See
     /// [`Declaration::entries`](crate::Declaration::entries) for how the two spellings meet.
     Entries,
-    /// `::dictionary(ns){ ... }`: `(args)` for the slots, and a `{...}` body read as data. The same
+    /// `::blueprint(note){ ... }`: `(args)` for the slots, and a `{...}` body read as data. The same
     /// name with a path in the head is an [`Entries`](Shape::Entries) registration and takes no body.
     ArgsAndData,
 }
@@ -291,7 +293,7 @@ const SPECS: [Spec; 17] = [
             "dictionary",
             Cardinality::Many,
             Scope::Tmt,
-            Shape::ArgsAndData,
+            Shape::Args,
         )
     },
     // `tomet` reads nothing from it.
@@ -493,12 +495,12 @@ mod tests {
     }
 
     #[test]
-    fn only_two_declarations_take_a_brace_body() {
+    fn only_the_blueprint_takes_a_brace_body() {
         let with_body: Vec<DeclKind> = DeclKind::ALL
             .into_iter()
             .filter(|k| k.shape() == Shape::ArgsAndData)
             .collect();
-        assert_eq!(with_body, [DeclKind::Blueprint, DeclKind::Dictionary]);
+        assert_eq!(with_body, [DeclKind::Blueprint]);
         // The ones that hold entries have no positional slot to bind them to.
         for kind in DeclKind::ALL {
             if kind.shape() == Shape::Entries {

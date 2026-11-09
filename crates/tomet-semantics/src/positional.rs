@@ -33,7 +33,7 @@ pub fn builtin_positional_arg_keys(name: &Name) -> &'static [&'static str] {
         // `@link`, there is no scheme prefix to carry it.
         "file" | "dir" => &["target"],
         // A mention names one term: `tomet#id`, `tomet#name("...")` or the term itself. In a
-        // `::dictionary` the same element is the definition and takes no argument.
+        // `::dictionary` the same element, as a block of the body, defines the term it names.
         "term" => &["target"],
         "callout" => &["variant"],
         "heading" => &["level"],

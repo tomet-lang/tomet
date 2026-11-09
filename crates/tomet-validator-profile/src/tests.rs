@@ -102,15 +102,17 @@ fn a_term_is_taken_from_outside_unless_the_file_is_the_dictionary_that_defines_i
             target: "word".into()
         }]
     );
-    let own = "::dictionary(d){ \"word\": @term[ W ]#(w) }\n\na @term(\"word\") b @term(d#w)\n";
+    let own = "::dictionary(d)\n\n;@term(\"word\")[ W ]#(w)\n\na @term(\"word\") b @term(d#w)\n";
     assert_eq!(findings(own), vec![]);
-    // A definition has no argument and is not a mention.
-    assert_eq!(findings("::dictionary(d){ \"w\": @term[ W ] }\n"), vec![]);
+    // A definition, a `@term` block of the body with a name, is not a mention.
+    assert_eq!(findings("::dictionary(d)\n\n;@term(\"w\")[ W ]\n"), vec![]);
     // A word the file's own dictionary lacks is still outside.
     assert_eq!(
-        findings("::dictionary(d){ \"w\": @term[ W ] }\n\n@term(\"other\")\n").len(),
+        findings("::dictionary(d)\n\n;@term(\"w\")[ W ]\n\nsee @term(\"other\")\n").len(),
         1
     );
+    // A `@term` block in a document that is no dictionary is a mention.
+    assert_eq!(findings("::kind(note)\n\n;@term(\"w\")[ W ]\n").len(), 1);
 }
 
 #[test]
@@ -134,6 +136,6 @@ fn a_term_in_a_list_item_is_found_too() {
             target: "word".into()
         }]
     );
-    let own = "::dictionary(d){ \"word\": @term[ W ]#(w) }\n\n-@term(d#w) mentioned\n";
+    let own = "::dictionary(d)\n\n;@term(\"word\")[ W ]#(w)\n\n-@term(d#w) mentioned\n";
     assert_eq!(findings(own), vec![]);
 }

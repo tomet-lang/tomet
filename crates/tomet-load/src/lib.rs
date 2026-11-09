@@ -569,7 +569,7 @@ mod tests {
                 ),
                 (
                     "tomet.dictionary.tmt",
-                    "::kind(dictionary)\n::dictionary(tomet){ \"a\": @term[x] }\n",
+                    "::kind(dictionary)\n::dictionary(tomet)\n\n;@term(\"a\")[x]\n",
                 ),
             ],
         );

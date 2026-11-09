@@ -9,7 +9,7 @@ use crate::kind::{DeclKind, Prose};
 /// Owned, because a tomet declaration's data is built from its group, not stored. A `.tmt`
 /// document gives one through [`Declaration::from_ast`]; a `.ctmt` file's header is the same
 /// things. A standard declaration is written on its `(args)`; `{data}` is the body of
-/// `::dictionary` and `::blueprint` alone (see [`Shape`](crate::Shape)).
+/// `::blueprint` alone (see [`Shape`](crate::Shape)).
 ///
 /// The head is a path into the document's tree: `::field.url.wiki(...)` is `name: "field"` and
 /// `path: ["url", "wiki"]`. What the declaration says about that place is read through

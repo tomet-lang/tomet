@@ -1,0 +1,9 @@
+::id(dictionary.sample)
+
+@term[@term[]{ value: #vault-config } のあるディレクトリと、その下の文書の全体。]{ value: vault }#(vault)
+
+@term[@term[]{ value: #vault } の境目を示す設定ファイル。]{ value: vault.config.tmt }#(vault-config)
+
+@term[散文。`[]`や`|`の中でかく文字]{ value: prose }
+
+@term[]{ value: empty }

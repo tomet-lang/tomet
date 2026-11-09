@@ -289,15 +289,13 @@ fn the_twelve_declarations_read_their_parenthesised_arguments() {
             "`::{name}(...)` has no `{{...}}` body"
         );
     }
-    // The header of `::blueprint(kind){...}` and `::dictionary(name){...}` keeps its body.
-    for name in ["blueprint", "dictionary"] {
-        let decl = doc
-            .header
-            .iter()
-            .find(|d| d.name.name == name && d.data.value.is_some())
-            .unwrap_or_else(|| panic!("no `::{name}(...){{...}}` in the fixture"));
-        assert!(decl.data.args.is_some(), "`::{name}(...)` names itself");
-    }
+    // The header of `::blueprint(kind){...}` keeps its body.
+    let decl = doc
+        .header
+        .iter()
+        .find(|d| d.name.name == "blueprint" && d.data.value.is_some())
+        .expect("no `::blueprint(...){...}` in the fixture");
+    assert!(decl.data.args.is_some(), "`::blueprint(...)` names itself");
 }
 
 #[test]

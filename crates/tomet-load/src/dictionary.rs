@@ -5,8 +5,8 @@
 //! [`LoadedDictionaries::add`](tomet_semantics::LoadedDictionaries::add), pure, and finding and
 //! reading the files is here, because the semantics layer may not do I/O.
 //!
-//! Nothing is discovered. A vault lists its dictionaries by path (`::dictionary( name:
-//! @file(path) )`) and each file names itself with `::dictionary(name)`.
+//! Nothing is discovered. A vault lists its dictionaries by path (`::dictionary.name(@file(path))`)
+//! and each file names itself with `::dictionary(name)`.
 
 use std::path::Path;
 
@@ -45,7 +45,7 @@ mod tests {
         fs::create_dir_all(&root).expect("temp dir");
         fs::write(
             root.join("tomet.tmt"),
-            "::dictionary(tomet){ \"vault.config.tmt\": @term[ x ]#(vault-config) }\n",
+            "::dictionary(tomet)\n\n;@term(\"vault.config.tmt\")[ x ]#(vault-config)\n",
         )
         .expect("dictionary");
 

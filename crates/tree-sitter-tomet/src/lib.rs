@@ -860,7 +860,7 @@ mod tests {
             "::meta()\n",
             "::meta[ x ]\n",
             "::vocabulary(ns){ version: \"1.0.0\" }\n",
-            "::dictionary(n){ \"a\": @term| x }\n",
+            "::dictionary(n)\n\n;@term(\"a\")\n| x\n",
             "- item ::rule(a)\n",
             "- item ::{ a: 1 }\n",
             "- item ::( a )\n",

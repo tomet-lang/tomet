@@ -139,9 +139,14 @@ pub fn document_blueprint<B>(doc: &File<B>) -> Option<String> {
     blueprint_target(&first(doc, DeclKind::Blueprint)?)
 }
 
-/// The name of the dictionary a document is; `None` for a document that is not one.
+/// The name of the dictionary a document is, from its `::dictionary(name)` header; `None` for a
+/// document that is not one. A registration (`::dictionary.tomet(@file(...))`) does not make the
+/// document that writes it a dictionary.
 pub fn document_dictionary<B>(doc: &File<B>) -> Option<String> {
-    dictionary_name(&first(doc, DeclKind::Dictionary)?)
+    let header = declarations(doc)
+        .into_iter()
+        .find(|found| found.kind == DeclKind::Dictionary && found.declaration.is_own_header())?;
+    dictionary_name(&header.declaration)
 }
 
 /// The language version this document declares, as written.
@@ -279,7 +284,7 @@ mod tests {
     #[test]
     fn a_dictionary_is_named_by_its_declaration() {
         assert_eq!(
-            document_dictionary(&parse("::dictionary(tomet){ \"a\": @term[x] }\n")).as_deref(),
+            document_dictionary(&parse("::dictionary(tomet)\n")).as_deref(),
             Some("tomet")
         );
         assert_eq!(
@@ -287,6 +292,11 @@ mod tests {
             Some("tomet")
         );
         assert_eq!(document_dictionary(&parse("::kind(note)\n")), None);
+        // A registration is not the document being a dictionary.
+        assert_eq!(
+            document_dictionary(&parse("::dictionary.tomet(@file(tomet.dict.tmt))\n")),
+            None
+        );
     }
 
     #[test]

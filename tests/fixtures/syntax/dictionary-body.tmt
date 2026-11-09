@@ -1,0 +1,15 @@
+// A dictionary is a document, and its terms are blocks of the body: `;@term("word")`
+// with the meaning in `[...]`, in `|` lines after it, or in the blocks that follow.
+
+::kind(dictionary)
+::id(dictionary.sample)
+::dictionary(sample)
+
+;@term("vault")#(vault)
+| @term(#vault-config) のあるディレクトリと、その下の文書の全体。
+
+;@term("vault.config.tmt")#(vault-config)
+| @term(#vault) の境目を示す設定ファイル。
+
+;@term("prose")[ 散文。`[]`や`|`の中でかく文字 ]
+;@term("empty")

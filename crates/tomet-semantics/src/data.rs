@@ -10,9 +10,9 @@ pub fn element_data(el: tomet_ast::ElementView<'_>) -> Option<tomet_ast::Value> 
     data_of(el.data)
 }
 
-/// [`element_data`] for a declaration: its `{...}` body. Only the header of `::blueprint` and of
-/// `::dictionary` has one (see [`tomet_declaration::Shape`]); the other standard declarations
-/// are read through [`declaration_entries`].
+/// [`element_data`] for a declaration: its `{...}` body. Only the header of `::blueprint` has one
+/// (see [`tomet_declaration::Shape`]); the other standard declarations are read through
+/// [`declaration_entries`].
 pub fn declaration_data(declaration: &tomet_ast::Declaration) -> Option<tomet_ast::Value> {
     data_of(&declaration.data)
 }

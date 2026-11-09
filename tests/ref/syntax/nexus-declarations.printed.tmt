@@ -26,7 +26,5 @@
 
 ::blueprint(daily){ version: "1.0" }
 
-::dictionary(tomet){ vault: "a unit" }
-
 =[本文]
 宣言のあとの本文。

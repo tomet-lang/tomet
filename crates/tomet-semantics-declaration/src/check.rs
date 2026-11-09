@@ -2,7 +2,7 @@
 //!
 //! Checks the positional argument count, version slots, declared versions,
 //! macros, and variable definitions, and that a declaration is written in the [`Shape`] it has:
-//! `(...)` alone, or `(...)` with a `{...}` body only for the two that read one. A plural spelling the
+//! `(...)` alone, or `(...)` with a `{...}` body only for the one that reads one (`::blueprint`). A plural spelling the
 //! singular declarations replaced (`::fields`) is reported with the name to write instead.
 
 use tomet_ast::Value;
@@ -52,7 +52,8 @@ pub enum Problem {
     /// reads about a document, its identity, is the declaration `::id(...)`.
     MetaIdMoved,
     /// A `{...}` written on a declaration that has no body: `::meta(){ a: 1 }`. Its entries go in
-    /// the `(...)`: `::meta(a: 1)`. Only the header of `::blueprint` and of `::dictionary` take one.
+    /// the `(...)`: `::meta(a: 1)`. Only the header of `::blueprint` takes one. A `::dictionary` does not:
+    /// its terms are `;@term("word")[meaning]` blocks of the document body.
     UnexpectedData { declaration: &'static str },
     /// The `(...)` of a declaration of entries is something else: `::macro(gh)`, or a bare value
     /// among the entries, as in `::meta(a: 1, 2)`. A value goes with a name in the head:
@@ -105,6 +106,13 @@ impl std::fmt::Display for Problem {
                     "`id` is not written in `::meta`; the identity of a document is `::id(...)`"
                 )
             }
+            Problem::UnexpectedData {
+                declaration: "dictionary",
+            } => write!(
+                f,
+                "`::dictionary` takes no `{{...}}`; its terms are blocks of the document body, \
+                 `;@term(\"word\")[meaning]#(id)`"
+            ),
             Problem::UnexpectedData { declaration } => {
                 write!(
                     f,
@@ -205,7 +213,7 @@ pub fn check_declarations(declarations: &[Declaration], host: Host) -> Vec<(usiz
         }
 
         let has_path = !decl.path.is_empty();
-        if spec.shape == Shape::Args && has_path {
+        if spec.shape == Shape::Args && has_path && !spec.own_header {
             problems.push((
                 idx,
                 Problem::UnexpectedPath {
@@ -927,13 +935,26 @@ mod tests {
     }
 
     #[test]
-    fn the_declarations_that_take_a_body_still_take_it() {
-        for src in [
-            "::blueprint(note){ version: 1.0 }\n",
-            "::dictionary(tomet){ \"a\": @term[x] }\n",
-        ] {
-            assert!(problems_of(src).is_empty(), "{src}");
-        }
+    fn the_blueprint_header_still_takes_its_body() {
+        assert!(problems_of("::blueprint(note){ version: 1.0 }\n").is_empty());
+    }
+
+    #[test]
+    fn a_dictionary_header_takes_no_body_and_points_at_the_document_body() {
+        assert!(problems_of("::dictionary(tomet)\n").is_empty());
+        assert!(problems_of("::dictionary.tomet(@file(tomet.dict.tmt))\n").is_empty());
+        let found = problems_of("::dictionary(tomet){ \"a\": @term[x] }\n");
+        assert_eq!(
+            found,
+            [Problem::UnexpectedData {
+                declaration: "dictionary"
+            }]
+        );
+        assert_eq!(
+            found[0].to_string(),
+            "`::dictionary` takes no `{...}`; its terms are blocks of the document body, \
+             `;@term(\"word\")[meaning]#(id)`"
+        );
     }
 
     #[test]

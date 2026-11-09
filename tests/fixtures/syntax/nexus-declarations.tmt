@@ -1,7 +1,6 @@
 // The declarations that used to take `{...}` alone take `(...)`:
-// `::meta(...)`, not `::meta{...}`. `::dictionary(name){ ... }` and
-// `::blueprint(kind){ ... }` already had a `(...)` and keep the `{...}` body
-// after it. The parser reads declarations without knowing what they mean, so
+// `::meta(...)`, not `::meta{...}`. `::blueprint(kind){ ... }` already had a
+// `(...)` and keeps the `{...}` body after it. The parser reads declarations without knowing what they mean, so
 // one document can carry all of them.
 
 ::kind(fixture)
@@ -22,7 +21,6 @@
   card: { display: block }
 )
 ::blueprint(daily){ version: "1.0" }
-::dictionary(tomet){ "vault": "a unit" }
 
 =[ 本文 ]
 

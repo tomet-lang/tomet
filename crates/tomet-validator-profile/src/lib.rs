@@ -123,17 +123,18 @@ fn vocabulary_findings(doc: &File, findings: &mut Vec<Finding>) {
 }
 
 /// A `@term` mention that does not resolve when the only dictionary there is, is the document
-/// itself (if it is one).
+/// itself (if it is one). The `@term` blocks that define its terms are not mentions.
 fn term_findings(doc: &File, findings: &mut Vec<Finding>) {
-    use tomet_semantics::{ElementKind, LoadedDictionaries, TermRef, ValueExt};
+    use tomet_semantics::{Definitions, ElementKind, LoadedDictionaries, TermRef, ValueExt};
 
     let own = tomet_declaration::document_dictionary(doc);
     let mut dictionaries = LoadedDictionaries::default();
     if own.is_some() {
         dictionaries.add("", doc);
     }
-    let mut mention = |el: ElementView<'_>| {
-        if tomet_semantics::classify_std_lenient(el) != ElementKind::Term {
+    let definitions = Definitions::of(doc);
+    let mut mention = |el: ElementView<'_>, is_definition: bool| {
+        if is_definition || tomet_semantics::classify_std_lenient(el) != ElementKind::Term {
             return;
         }
         // A `@term` with no argument is a definition, not a mention.
@@ -154,11 +155,12 @@ fn term_findings(doc: &File, findings: &mut Vec<Finding>) {
             });
         }
     };
-    tomet_tree::for_each_element(doc, |el| mention(el.as_view()));
-    // A list item written `-@term(...)` is a `ListItem` with a name, not an `Element`.
+    tomet_tree::for_each_element(doc, |el| mention(el.as_view(), definitions.contains(el)));
+    // A list item written `-@term(...)` is a `ListItem` with a name, not an `Element`. It is
+    // never a definition: a definition is a block of the body.
     tomet_tree::for_each_list_item(doc, |item| {
         if let Some(el) = item.as_element_view() {
-            mention(el);
+            mention(el, false);
         }
     });
 }

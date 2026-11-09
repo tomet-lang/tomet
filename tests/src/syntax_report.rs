@@ -530,9 +530,11 @@ const CASES: &[Case] = &[
     ),
     case(
         None,
-        "`::vocabulary(ns){ ... }` と `::dictionary(name){ ... }` はもともと `(...)` を持つので、\
-         `{...}` の本体をそのまま取る",
-        "::vocabulary(ns){ version: \"1.0.0\" }\n::dictionary(tomet){ \"vault\": \"a unit\" }\n",
+        "`::vocabulary(ns){ ... }` と `::blueprint(kind){ ... }` はもともと `(...)` を持つので、\
+         `{...}` の本体をそのまま取る。辞書の語は本文のブロック（`;@term(\"語\")[説明]`）で、\
+         `::dictionary(name)` は `{...}` を取らない",
+        "::vocabulary(ns){ version: \"1.0.0\" }\n::blueprint(note){ version: \"1.0\" }\n\
+         ::dictionary(tomet)\n\n;@term(\"vault\")[ a unit ]\n",
     ),
     case(None, "中身が空の宣言も `()` を書く", "::meta()\n"),
     case(

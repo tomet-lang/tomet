@@ -319,17 +319,20 @@ impl Vault {
         diagnostics
     }
 
-    /// The `@term` mentions in `doc` that name no term of this vault's dictionaries. An `@term`
-    /// with no argument is a definition (in a `::dictionary`), not a mention.
+    /// The `@term` mentions in `doc` that name no term of this vault's dictionaries. The `@term`
+    /// blocks that define the terms of a `::dictionary` document are not mentions.
     fn unresolved_terms(&self, doc: &File) -> Vec<Diagnostic> {
-        use tomet_semantics::{ElementKind, TermRef, ValueExt};
+        use tomet_semantics::{Definitions, ElementKind, TermRef, ValueExt};
 
         let own = tomet_declaration::document_dictionary(doc);
         let dictionaries = self.dictionaries_for(doc);
+        let definitions = Definitions::of(doc);
         let mut unresolved = Vec::new();
         tomet_tree::for_each_element(doc, |el| {
             let view = el.as_view();
-            if tomet_semantics::classify_std_lenient(view) != ElementKind::Term {
+            if tomet_semantics::classify_std_lenient(view) != ElementKind::Term
+                || definitions.contains(el)
+            {
                 return;
             }
             let Some(target) = tomet_semantics::normalized_element_args(view).and_then(|args| {
@@ -413,13 +416,14 @@ impl Vault {
     /// dictionary is. A mention that names no term is left as it is; `tomet check` reports it.
     fn fill_terms(&self, doc: &mut File) {
         use tomet_ast::{Block, Inline, Paragraph, Text};
-        use tomet_semantics::{ElementKind, TermRef, ValueExt};
+        use tomet_semantics::{Definitions, ElementKind, TermRef, ValueExt};
 
         let dictionaries = self.dictionaries_for(doc);
         if dictionaries.is_empty() {
             return;
         }
         let own = tomet_declaration::document_dictionary(doc);
+        let definitions = Definitions::of(doc);
         tomet_tree::for_each_element_mut(doc, |el| {
             let view = el.as_view();
             if el
@@ -427,6 +431,7 @@ impl Vault {
                 .as_ref()
                 .is_some_and(|content| !content.is_empty())
                 || tomet_semantics::classify_std_lenient(view) != ElementKind::Term
+                || definitions.contains(el)
             {
                 return;
             }
@@ -712,7 +717,7 @@ mod tests {
         dictionaries.add(
             "tomet.tmt",
             &tomet_ast_parser::parse_file(
-                "::dictionary(tomet){ \"vault.config.tmt\": @term[ The file that marks a vault. ]#(vault-config) }\n",
+                "::dictionary(tomet)\n\n;@term(\"vault.config.tmt\")#(vault-config)\n| The file that marks a vault.\n",
             )
             .expect("parses"),
         );
@@ -739,8 +744,8 @@ mod tests {
         );
         assert_eq!(reasons("a @term(#vault-config) b\n").len(), 1);
         assert_eq!(reasons("a @term(tomet#gone) b\n").len(), 1);
-        // The definition has no argument: it is not a mention.
-        assert!(reasons("::dictionary(d){ \"w\": @term[ W ] }\n").is_empty());
+        // A definition, a `@term` block of a dictionary's body, is not a mention.
+        assert!(reasons("::dictionary(d)\n\n;@term(\"w\")[ W ]\n").is_empty());
     }
 
     /// A resolved mention comes out as the term's own text, so a converter renders a word; what the
@@ -982,7 +987,7 @@ mod tests {
                 .any(|d| matches!(d, Diagnostic::UnresolvedTerm { .. }))
         );
         // A document that is the dictionary it mentions from is its own.
-        let own = format!("{PROMISE}::dictionary(d){{ \"w\": @term[ W ]#(w) }}\n\n@term(d#w)\n");
+        let own = format!("{PROMISE}::dictionary(d)\n\n;@term(\"w\")[ W ]#(w)\n\n@term(d#w)\n");
         assert!(
             !vault
                 .diagnostics(&vault.parse(&own).unwrap().0, &[])

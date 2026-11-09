@@ -7,8 +7,8 @@
 //!
 //! - (Declaration means `::declaration`)
 //!   | A declaration is a `::name(args)` at the top of a document, about the document
-//!   | rather than in it; only the header of `::blueprint` and of `::dictionary` add a `{data}`
-//!   | body to it. This crate is that and only that: a datetime, a type or an
+//!   | rather than in it; only the header of `::blueprint` adds a `{data}`
+//!   | body to it. (A dictionary's terms are blocks of the document body, not data of its header.) This crate is that and only that: a datetime, a type or an
 //!   | expression is another concept and lives elsewhere.
 //! - (Singular names, a path in the head)
 //!   | Every name is singular, and what a declaration holds is written either in the head as a

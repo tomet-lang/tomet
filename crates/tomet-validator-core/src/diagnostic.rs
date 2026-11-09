@@ -259,7 +259,7 @@ pub enum Diagnostic {
         span: Span,
     },
     /// A `{...}` written on a declaration that takes none: `::meta(){ a: 1 }`. Only the header of
-    /// `::blueprint` and of `::dictionary` has a body; the others hold their entries in `(...)`.
+    /// `::blueprint` has a body; the others hold their entries in `(...)`.
     ///
     /// `span` is the whole declaration: a group has no span of its own.
     UnexpectedDeclarationData {

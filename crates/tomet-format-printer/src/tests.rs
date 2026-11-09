@@ -947,7 +947,6 @@ fn a_declaration_with_a_body_keeps_its_braces() {
     for src in [
         "::vocabulary(deck){ version: 1.0.0, open: true }\n",
         "::blueprint(note){ description: \"A note\" }\n",
-        "::dictionary(tomet){ term: @term[desc] }\n",
     ] {
         let before = tomet_ast_parser::parse_file(src).unwrap();
         assert!(before.header[0].data.value.is_some(), "{src:?}");

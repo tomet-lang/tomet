@@ -1,26 +1,38 @@
 //! Dictionaries of terms: reading a `::dictionary` document, and looking a term up.
 //!
 //! A dictionary defines words a vault's documents use, once, so that a document mentions one with
-//! `@term` instead of writing it out. It is a document of its own:
+//! `@term` instead of writing it out. It is a document of its own, and the terms are its body:
 //!
 //! ```text
-//! ::dictionary(tomet){
-//!   "vault.config.tmt": @term[ The file that marks a vault. ]#(vault-config)
-//! }
+//! ::kind(dictionary)
+//! ::id(dictionary.tomet)
+//! ::dictionary(tomet)
+//!
+//! ;@term("vault.config.tmt")#(vault-config)
+//! | The file that marks a vault.
+//!
+//! ;@term("prose")[ The text written in `[]` and `|`. ]
 //! ```
 //!
-//! The key is the term, quoted, so a word in any language fits. The content of the `@term` is its
-//! description. `#(vault-config)` is an optional stable identifier: the term may be renamed and a
-//! mention by identifier does not change. A term and an identifier are each unique within their
-//! dictionary, the way an id is unique within its document.
+//! A `@term` block with a name is a definition. The name is the term, quoted, so a word in any
+//! language fits. Its meaning is its `[content]` (a `|` line is that content too) followed by the
+//! blocks written after it, up to the next definition. `#(vault-config)` is an optional stable
+//! identifier: the term may be renamed and a mention by identifier does not change. A term and an
+//! identifier are each unique within their dictionary, the way an id is unique within its document.
+//!
+//! The same `@term` written inline, anywhere else, is a mention ([`TermRef`]). In a dictionary the
+//! definitions are the `@term` blocks of the body, at the top or under a heading; [`Definitions`]
+//! says which elements those are, so that nothing checks a definition as if it were a mention.
 //!
 //! This is the pure half. Finding and reading the files a vault registers with `::dictionary` is
 //! `tomet-load`'s, the same split as for vocabularies ([`crate::vocabulary`]).
 
 use std::collections::BTreeMap;
 
-use tomet_ast::{Block, File, Value};
+use tomet_ast::{Block, Element, File, Placement};
 use tomet_declaration::{DeclKind, dictionary_name};
+use tomet_span::Span;
+use tomet_tree::ValueExt;
 
 use crate::kind::{ElementKind, classify_std_lenient};
 
@@ -31,7 +43,8 @@ pub struct Term {
     pub name: String,
     /// The stable identifier, `#(id)` after the `@term`, when it has one.
     pub id: Option<String>,
-    /// What the term means: the `[content]` of its `@term`. Empty when it has none.
+    /// What the term means: the `[content]` of its `@term`, then the blocks written after it up to
+    /// the next definition. Empty when it has neither.
     pub description: Vec<Block>,
 }
 
@@ -54,6 +67,78 @@ impl Dictionary {
         self.terms
             .iter()
             .find(|term| term.id.as_deref() == Some(id))
+    }
+}
+
+/// The `@term` blocks of a document that define terms, rather than mention them.
+///
+/// Only a document that is a dictionary has any. A definition is a `@term` block with the document
+/// body (or a heading of it) for its parent; a `@term` inside another element, or inline, is a
+/// mention even in a dictionary, such as the `@term(#vault-config)` in a description.
+#[derive(Debug, Clone, Default)]
+pub struct Definitions {
+    spans: Vec<Span>,
+}
+
+impl Definitions {
+    /// The definitions of `doc`: none when it declares no `::dictionary(name)`.
+    pub fn of(doc: &File) -> Self {
+        let mut found = Vec::new();
+        if tomet_declaration::document_dictionary(doc).is_some() {
+            definitions_in(&doc.body, &mut found);
+        }
+        Definitions {
+            spans: found
+                .iter()
+                .map(|definition| definition.element.span)
+                .collect(),
+        }
+    }
+
+    /// Whether `element` is one of the definitions, as against a mention.
+    pub fn contains(&self, element: &Element) -> bool {
+        // `Span` compares equal to every other span, by design; a position is `exact_eq`.
+        self.spans.iter().any(|span| span.exact_eq(&element.span))
+    }
+}
+
+/// One definition in the body: the `@term` block, and the blocks that follow it.
+struct Definition<'a> {
+    element: &'a Element,
+    after: &'a [Block],
+}
+
+fn is_definition(block: &Block) -> Option<&Element> {
+    match block {
+        Block::Element(el)
+            if el.placement == Placement::Block
+                && classify_std_lenient(el.as_view()) == ElementKind::Term =>
+        {
+            Some(el)
+        }
+        _ => None,
+    }
+}
+
+/// Collects the definitions of `blocks` and of the headings in them, in document order. What follows a
+/// definition belongs to it until the next definition or the next heading.
+fn definitions_in<'a>(blocks: &'a [Block], out: &mut Vec<Definition<'a>>) {
+    for (index, block) in blocks.iter().enumerate() {
+        if let Block::Section(section) = block {
+            definitions_in(&section.blocks, out);
+        }
+        let Some(element) = is_definition(block) else {
+            continue;
+        };
+        let rest = &blocks[index + 1..];
+        let end = rest
+            .iter()
+            .position(|next| is_definition(next).is_some() || matches!(next, Block::Section(_)))
+            .unwrap_or(rest.len());
+        out.push(Definition {
+            element,
+            after: &rest[..end],
+        });
     }
 }
 
@@ -179,15 +264,16 @@ pub struct LoadedDictionaries {
 
 impl LoadedDictionaries {
     /// Reads `doc`, which was read from `label` (a path, as the vault registers it), and accepts
-    /// the dictionary it declares.
+    /// the dictionary it declares, with the terms its body defines.
     ///
-    /// Not accepted: a document that declares no `::dictionary(name)`, and a name another dictionary
-    /// already has. Only the entry is left out for an identifier used twice and for an entry that is
-    /// not an `@term`. (A term written twice is a parse error: a map has no repeated key.)
-    pub fn add<B>(&mut self, label: &str, doc: &File<B>) {
+    /// Not accepted: a document that declares no `::dictionary(name)`, one that writes its terms
+    /// in the retired `{...}` of that declaration, and a name another dictionary already has. Only
+    /// the term is left out for a `@term` block with no name, a name defined twice and an
+    /// identifier used twice.
+    pub fn add(&mut self, label: &str, doc: &File) {
         let Some(found) = tomet_declaration::declarations(doc)
             .into_iter()
-            .find(|found| found.kind == DeclKind::Dictionary)
+            .find(|found| found.kind == DeclKind::Dictionary && found.declaration.is_own_header())
         else {
             self.errors.push(format!(
                 "declared dictionary {label}: it does not declare a ::dictionary(name)"
@@ -200,6 +286,13 @@ impl LoadedDictionaries {
             ));
             return;
         };
+        if found.declaration.data.is_some() {
+            self.errors.push(format!(
+                "declared dictionary {label}: `::dictionary({name}){{...}}` is retired; write each term \
+                 as a block of the document, `;@term(\"word\")[meaning]#(id)`"
+            ));
+            return;
+        }
         if let Some((held, _)) = self.by_name.get(&name) {
             self.errors.push(format!(
                 "declared dictionary {label}: `{name}` is already the dictionary of {held}"
@@ -207,33 +300,38 @@ impl LoadedDictionaries {
             return;
         }
 
+        let mut defined = Vec::new();
+        definitions_in(&doc.body, &mut defined);
         let mut terms: Vec<Term> = Vec::new();
-        if let Some(Value::Map(entries)) = &found.declaration.data {
-            for (key, value) in entries {
-                let problem = |what: &str| format!("dictionary {label}: `{key}` {what}");
-                let Value::Element(el) = value else {
-                    self.errors.push(problem("is not an @term"));
-                    continue;
-                };
-                if classify_std_lenient(el.as_view()) != ElementKind::Term {
-                    self.errors.push(problem("is not an @term"));
-                    continue;
-                }
-                let id = el.id.as_ref().map(|id| id.0.clone());
-                if let Some(id) = &id
-                    && terms.iter().any(|term| term.id.as_ref() == Some(id))
-                {
-                    self.errors.push(problem(&format!(
-                        "uses the identifier `{id}` of another term"
-                    )));
-                    continue;
-                }
-                terms.push(Term {
-                    name: key.clone(),
-                    id,
-                    description: el.content.clone().unwrap_or_default(),
-                });
+        for definition in defined {
+            let el = definition.element;
+            let Some(term) = term_name(el) else {
+                self.errors.push(format!(
+                    "dictionary {label}: a @term block names no term; write `;@term(\"word\")`"
+                ));
+                continue;
+            };
+            let problem = |what: &str| format!("dictionary {label}: `{term}` {what}");
+            if terms.iter().any(|held| held.name == term) {
+                self.errors.push(problem("is defined twice"));
+                continue;
             }
+            let id = el.id.as_ref().map(|id| id.0.clone());
+            if let Some(id) = &id
+                && terms.iter().any(|held| held.id.as_ref() == Some(id))
+            {
+                self.errors.push(problem(&format!(
+                    "uses the identifier `{id}` of another term"
+                )));
+                continue;
+            }
+            let mut description = el.content.clone().unwrap_or_default();
+            description.extend(definition.after.iter().cloned());
+            terms.push(Term {
+                name: term,
+                id,
+                description,
+            });
         }
         self.by_name.insert(
             name.clone(),
@@ -306,6 +404,15 @@ impl LoadedDictionaries {
     }
 }
 
+/// The word a `@term` definition defines: its one argument, as it is written.
+fn term_name(el: &Element) -> Option<String> {
+    crate::normalized_element_args(el.as_view())?
+        .get("target")?
+        .as_str()
+        .filter(|name| !name.is_empty())
+        .map(String::from)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -318,7 +425,7 @@ mod tests {
         loaded
     }
 
-    const TOMET: &str = "::kind(dictionary)\n::dictionary(tomet){\n  \"vault.config.tmt\": @term[ The file that marks a vault. ]#(vault-config)\n  \"ボールト設定\": @term[ Same word. ]\n}\n";
+    const TOMET: &str = "::kind(dictionary)\n::dictionary(tomet)\n\n;@term(\"vault.config.tmt\")#(vault-config)\n| The file that marks a vault.\n\n;@term(\"ボールト設定\")[ Same word. ]\n";
 
     #[test]
     fn a_term_is_found_by_its_name_and_by_its_identifier() {
@@ -357,10 +464,10 @@ mod tests {
     }
 
     #[test]
-    fn an_entry_that_is_not_a_term_and_a_reused_identifier_are_left_out() {
+    fn a_term_unnamed_defined_twice_or_reusing_an_identifier_is_left_out() {
         let loaded = loaded(&[(
             "d.tmt",
-            "::dictionary(d){\n  \"a\": @term[ A ]#(x)\n  \"b\": @link(x)\n  \"c\": 3\n  \"d\": @term[ D ]#(x)\n}\n",
+            "::dictionary(d)\n\n;@term(\"a\")[ A ]#(x)\n;@term[ no word ]\n;@term(\"a\")[ again ]\n;@term(\"d\")[ D ]#(x)\n;@term(\"e\")[ E ]\n",
         )]);
         let terms: Vec<&str> = loaded
             .get("d")
@@ -369,16 +476,98 @@ mod tests {
             .iter()
             .map(|term| term.name.as_str())
             .collect();
-        assert_eq!(terms, ["a"]);
+        assert_eq!(terms, ["a", "e"]);
         assert_eq!(loaded.errors.len(), 3, "{:?}", loaded.errors);
-        assert!(loaded.errors.iter().any(|e| e.contains("`b`")));
-        assert!(loaded.errors.iter().any(|e| e.contains("`c`")));
+        assert!(loaded.errors.iter().any(|e| e.contains("names no term")));
+        assert!(
+            loaded
+                .errors
+                .iter()
+                .any(|e| e.contains("`a`") && e.contains("twice"))
+        );
         assert!(
             loaded
                 .errors
                 .iter()
                 .any(|e| e.contains("`d`") && e.contains("`x`"))
         );
+    }
+
+    #[test]
+    fn the_meaning_of_a_term_is_its_content_then_the_blocks_after_it() {
+        let loaded = loaded(&[(
+            "d.tmt",
+            "::dictionary(d)\n\nintroduction, belongs to no term\n\n;@term(\"a\")\n| from the pipe\n\nand a paragraph\n\n;@term(\"b\")[ bracketed ]\n\nmore of b\n\n;@term(\"c\")\n",
+        )]);
+        assert!(loaded.errors.is_empty(), "{:?}", loaded.errors);
+        let d = loaded.get("d").expect("d");
+        let blocks = |name: &str| d.by_name(name).expect(name).description.len();
+        assert_eq!(blocks("a"), 2);
+        assert_eq!(blocks("b"), 2);
+        assert_eq!(blocks("c"), 0);
+    }
+
+    #[test]
+    fn a_term_under_a_heading_is_defined_and_a_heading_ends_the_meaning_before_it() {
+        let loaded = loaded(&[(
+            "d.tmt",
+            "::dictionary(d)\n\n;@term(\"a\")[ A ]\n\n=[ Part two ]\n\n;@term(\"b\")[ B ]\n",
+        )]);
+        assert!(loaded.errors.is_empty(), "{:?}", loaded.errors);
+        let d = loaded.get("d").expect("d");
+        assert!(d.by_name("a").is_some() && d.by_name("b").is_some());
+        assert_eq!(d.by_name("a").expect("a").description.len(), 1);
+    }
+
+    #[test]
+    fn the_retired_brace_body_is_refused_and_says_where_the_terms_go() {
+        let loaded = loaded(&[("old.tmt", "::dictionary(old){\n  \"a\": @term[ A ]\n}\n")]);
+        assert!(loaded.is_empty());
+        assert_eq!(loaded.errors.len(), 1, "{:?}", loaded.errors);
+        assert!(loaded.errors[0].contains("old.tmt"));
+        assert!(loaded.errors[0].contains("retired"), "{:?}", loaded.errors);
+        assert!(loaded.errors[0].contains(";@term("), "{:?}", loaded.errors);
+    }
+
+    #[test]
+    fn a_registration_is_not_a_dictionary_header() {
+        let loaded = loaded(&[(
+            "vault.config.tmt",
+            "::dictionary.tomet(@file(tomet.dict.tmt))\n",
+        )]);
+        assert!(loaded.is_empty());
+        assert!(
+            loaded.errors[0].contains("does not declare"),
+            "{:?}",
+            loaded.errors
+        );
+    }
+
+    #[test]
+    fn definitions_are_the_term_blocks_of_a_dictionary_and_not_the_mentions_in_them() {
+        let doc = tomet_ast_parser::parse_file(
+            "::dictionary(d)\n\n;@term(\"a\")#(a)\n| see @term(#b)\n\n;@term(\"b\")#(b)\n",
+        )
+        .expect("parses");
+        let definitions = Definitions::of(&doc);
+        let mut defined = 0;
+        let mut mentioned = 0;
+        tomet_tree::for_each_element(&doc, |el| {
+            if classify_std_lenient(el.as_view()) != ElementKind::Term {
+                return;
+            }
+            if definitions.contains(el) {
+                defined += 1;
+            } else {
+                mentioned += 1;
+            }
+        });
+        assert_eq!((defined, mentioned), (2, 1));
+
+        // A document that is no dictionary defines nothing: its block `@term` is a mention.
+        let note = tomet_ast_parser::parse_file("::kind(note)\n\n;@term(\"a\")\n").expect("parses");
+        let definitions = Definitions::of(&note);
+        tomet_tree::for_each_element(&note, |el| assert!(!definitions.contains(el)));
     }
 
     #[test]
@@ -455,7 +644,7 @@ mod tests {
 
     #[test]
     fn a_name_two_dictionaries_define_is_ambiguous_until_one_is_named() {
-        let other = "::dictionary(user){ \"vault.config.tmt\": @term[ Theirs. ] }\n";
+        let other = "::dictionary(user)\n\n;@term(\"vault.config.tmt\")[ Theirs. ]\n";
         let loaded = loaded(&[("tomet.tmt", TOMET), ("user.tmt", other)]);
         assert_eq!(
             loaded

@@ -1,0 +1,13 @@
+::kind(dictionary)
+
+::id(dictionary.sample)
+
+::dictionary(sample)
+
+@term(vault)[@term(#vault-config) のあるディレクトリと、その下の文書の全体。]#(vault)
+
+@term(vault.config.tmt)[@term(#vault) の境目を示す設定ファイル。]#(vault-config)
+
+@term(prose)[散文。`[]`や`|`の中でかく文字]
+
+@term(empty)

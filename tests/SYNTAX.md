@@ -2009,11 +2009,14 @@ Declaration ::element
   args    {card: {display: "block"}}
 ```
 
-### `::vocabulary(ns){ ... }` と `::dictionary(name){ ... }` はもともと `(...)` を持つので、`{...}` の本体をそのまま取る
+### `::vocabulary(ns){ ... }` と `::blueprint(kind){ ... }` はもともと `(...)` を持つので、`{...}` の本体をそのまま取る。辞書の語は本文のブロック（`;@term("語")[説明]`）で、`::dictionary(name)` は `{...}` を取らない
 
 ```tmt
 ::vocabulary(ns){ version: "1.0.0" }
-::dictionary(tomet){ "vault": "a unit" }
+::blueprint(note){ version: "1.0" }
+::dictionary(tomet)
+
+;@term("vault")[ a unit ]
 ```
 
 ```
@@ -2021,10 +2024,17 @@ Declaration ::vocabulary
   args    "ns"
   group
     version: "1.0.0"
+Declaration ::blueprint
+  args    "note"
+  group
+    version: "1.0"
 Declaration ::dictionary
   args    "tomet"
-  group
-    vault: "a unit"
+Block  @term
+  args    "vault"
+  content
+    Paragraph
+      Text "a unit"
 ```
 
 検証:
