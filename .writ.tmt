@@ -21,7 +21,8 @@ does not relax the rule to fit the change it wanted to make.
     8: ( "crates/tomet", "apps/*", "bindings/*", "editors/*", "tests", "benches" )
     7: ( "crates/tomet-workspace*", "crates/tomet-load*" )
     6: (
-      "crates/tomet-format*",
+      "crates/tomet-formatter",
+      "crates/tomet-printer",
       "crates/tomet-convert*",
       "crates/tomet-extract*",
       "crates/tomet-transform",
@@ -72,7 +73,7 @@ validators) never parse -- and they are below it because the syntax crates need 
 
 @dir(crates/cotomet) is the public facade over `serde_cotomet`, `tomet-ast`, and `tomet-ast-parser`. It sits in layer 3.
 
-@dir(crates/tomet-extract) and @dir(crates/tomet-search) are listed by name in the layer of `crates/tomet-format*`. They are pure in-memory extraction and query
+@dir(crates/tomet-extract) and @dir(crates/tomet-search) are listed by name in layer 6. They are pure in-memory extraction and query
 engines rather than internal syntax or semantics producers, and their names carry no prefix shared with the producer groups.
 
 @dir(crates/tomet-edit) is likewise listed by name: it is a backend-neutral in-memory editing model that apps bridge to external

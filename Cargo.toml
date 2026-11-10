@@ -100,8 +100,8 @@ members = [
   "crates/tomet-extract",
 
   #= Format -- .tmt source text production & formatting
-  "crates/tomet-format",
-  "crates/tomet-format-printer",
+  "crates/tomet-formatter",
+  "crates/tomet-printer",
 
   #= Workspace -- multi-file/disk operations & config discovery
   "crates/tomet-workspace",
@@ -169,8 +169,8 @@ tomet-convert-standalone = { path = "crates/tomet-convert-standalone", version =
 tomet-pandoc             = { path = "crates/tomet-convert-pandoc", version = "0.5.0" }
 tomet-typst              = { path = "crates/tomet-convert-typst", version = "0.5.0" }
 #--- Format ---
-tomet-formatter   = { path = "crates/tomet-format", version = "0.5.0" }
-tomet-printer     = { path = "crates/tomet-format-printer", version = "0.5.0" }
+tomet-formatter   = { path = "crates/tomet-formatter", version = "0.5.0" }
+tomet-printer     = { path = "crates/tomet-printer", version = "0.5.0" }
 #---
 tomet-transform = { path = "crates/tomet-transform", version = "0.5.0" }
 tomet-search    = { path = "crates/tomet-search", version = "0.5.0" }

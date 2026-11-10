@@ -12,7 +12,6 @@ tomet-ast-parser  = { workspace = true }
 tomet-config      = { workspace = true }
 tomet-declaration = { workspace = true }
 tomet-expr        = { workspace = true }
-tomet-formatter   = { workspace = true }
 tomet-indexer     = { workspace = true }
 tomet-load-config = { workspace = true }
 tomet-printer     = { workspace = true }

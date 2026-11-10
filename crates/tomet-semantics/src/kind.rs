@@ -115,7 +115,7 @@ pub enum ElementKind {
     /// `positional::builtin_positional_arg_key` (`variant` is its
     /// positional), the Markdown and Typst writers' `render_callout`,
     /// the Markdown *reader*, which turns `> [!note]` into
-    /// `Name::bare("callout")`, `tomet-format-printer`'s style branch,
+    /// `Name::bare("callout")`, `tomet-printer`'s style branch,
     /// two arms in `tomet-config`, and the LSP.
     ///
     /// The reader is what settles it: a Markdown round-trip produced an

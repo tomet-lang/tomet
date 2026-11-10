@@ -27,7 +27,7 @@ pub(crate) fn render_file(file: &tomet_ast::File, config: &PrinterConfig, out: &
 }
 
 /// Renders a run of sibling blocks -- a document's, a section's, an element's `[content]` -- with a
-/// blank line between each. Without one, two paragraphs read back as one, and an element that
+/// blank line between each one that writes something. Without one, two paragraphs read back as one, and an element that
 /// starts the next line joins the paragraph before it.
 ///
 /// With `paragraph.separator: semicolon` a `;` opening the next block's line stands in for the
@@ -35,16 +35,24 @@ pub(crate) fn render_file(file: &tomet_ast::File, config: &PrinterConfig, out: &
 /// keeps its blank line.
 pub(crate) fn render_blocks(blocks: &[Block], config: &PrinterConfig, out: &mut String) {
     let semicolon = config.format.paragraph_separator == Some(ParagraphSeparator::Semicolon);
-    for (i, block) in blocks.iter().enumerate() {
-        if i > 0 {
-            let separator = if semicolon && flows(&blocks[i - 1], config) && flows(block, config) {
+    let mut previous: Option<&Block> = None;
+    for block in blocks {
+        let mut text = String::new();
+        render_block(block, config, &mut text);
+        // A block that writes nothing (an empty paragraph) is not there: it gets no separator.
+        if text.is_empty() {
+            continue;
+        }
+        if let Some(previous) = previous {
+            let separator = if semicolon && flows(previous, config) && flows(block, config) {
                 ParagraphSeparator::Semicolon
             } else {
                 ParagraphSeparator::Blank
             };
             out.push_str(&separator.after_line_end(""));
         }
-        render_block(block, config, out);
+        out.push_str(&text);
+        previous = Some(block);
     }
 }
 
@@ -234,7 +242,10 @@ pub(crate) fn render_list_with_indent(
             head_prefix.push_str(") ");
         }
 
+        // The content of an item stands on the item's own line(s): a block it ends with (an
+        // element placed as a block) does not bring a line end of its own.
         let content_str = render_content_blocks(&item.content, config);
+        let content_str = content_str.trim_end_matches('\n');
         let lines: Vec<&str> = content_str.lines().collect();
         let item_attrs = item.data.value.as_ref().map(|v| v.as_data());
 
@@ -257,7 +268,7 @@ pub(crate) fn render_list_with_indent(
             out.push('\n');
         } else {
             out.push_str(&head_prefix);
-            out.push_str(&content_str);
+            out.push_str(content_str);
             if let Some(attrs) = item_attrs {
                 out.push(' ');
                 out.push_str(&render_value(&attrs));

@@ -45,7 +45,5 @@ An empty element is written with its group: a @memo[] in a sentence, or a
 
 =[In a list]
 - @memo[]{ a: "1" }
-
 - @memo[本文]
-
 - @memo[]

@@ -42,5 +42,5 @@ pub fn hole_to_tm(hole: &tomet_ast::Hole) -> String {
 pub fn document_to_tm_with_config(doc: &File, config: &PrinterConfig) -> String {
     let mut out = String::new();
     block::render_file(doc, config, &mut out);
-    tomet_formatter::format_source(&out)
+    out
 }

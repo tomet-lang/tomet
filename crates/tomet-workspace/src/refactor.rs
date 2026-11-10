@@ -6,7 +6,6 @@ use std::path::{Path, PathBuf};
 use tomet_ast::File;
 use tomet_ast_parser::parse_file;
 use tomet_config::PrinterConfig;
-use tomet_formatter::format_source;
 use tomet_indexer::{collect_tm_files_with_config, is_excluded_by_config};
 use tomet_load_config::find_config_file;
 use tomet_printer::document_to_tm_with_config;
@@ -89,10 +88,7 @@ pub fn refactor_source(
     let mut doc = parse_file(src).map_err(|e| anyhow::anyhow!("parse error: {e}"))?;
     let changes = refactor_file(&mut doc, config, options);
 
-    let rendered = document_to_tm_with_config(&doc, config);
-    let formatted = format_source(&rendered);
-
-    Ok((formatted, changes))
+    Ok((document_to_tm_with_config(&doc, config), changes))
 }
 
 /// Discovers and refactors all `.tmt` files in `dir_or_file`.

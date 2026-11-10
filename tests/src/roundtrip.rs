@@ -489,3 +489,28 @@ fn a_hole_survives_print_and_parse() {
         }
     }
 }
+
+/// The printer writes text that is clean as it is -- no trailing blanks, no run of blank lines,
+/// one final newline -- so it needs no pass of `tomet-formatter` after it. Checked on the
+/// documents of the corpus and on what comes back from Pandoc, whose AST has the shapes a
+/// parser does not give (a list item that is a block element, an empty paragraph).
+#[test]
+fn the_printer_writes_text_the_formatter_leaves_as_it_is() {
+    for (rel, src) in parseable_corpus() {
+        let doc = tomet_ast_parser::parse_file(&src)
+            .unwrap_or_else(|e| panic!("{} failed to parse: {e}", rel.display()));
+        let from_pandoc = tomet_pandoc::from_pandoc(&tomet_pandoc::to_pandoc(&doc));
+        for (what, doc) in [
+            ("the document", &doc),
+            ("its Pandoc round trip", &from_pandoc),
+        ] {
+            let printed = tomet_printer::document_to_tm(doc);
+            assert_eq!(
+                tomet_formatter::format_source(&printed),
+                printed,
+                "the printer's text for {what} of {} is not clean",
+                rel.display()
+            );
+        }
+    }
+}
