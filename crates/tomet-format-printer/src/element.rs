@@ -116,7 +116,7 @@ pub fn render_element(el: ElementView<'_>, config: &PrinterConfig) -> String {
             if layout != ContentLayout::Expanded {
                 out.push('\n');
             }
-            out.push_str(&layout.render(&lines, "  ", ""));
+            out.push_str(&layout.render_element(&lines, ""));
         }
         if let Some(value) = &el.data.value {
             out.push_str(&render_element_value(value, config));

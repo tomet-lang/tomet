@@ -5,7 +5,7 @@ use tomet_cst::{SyntaxElement, SyntaxKind as K, SyntaxNode};
 use tomet_cst_parser::parse_cst;
 use tomet_style::GroupLayout;
 
-use crate::edit::{Edit, apply_keeping_the_document};
+use crate::edit::{Edit, apply_keeping_the_document, leading_indent};
 
 /// Lays the fields of each `::meta(...)` out the way `meta.always_newline` asks: one to a line, or
 /// all on one line. Unset, `src` is returned as written; so is a `::meta` that has no field,
@@ -89,8 +89,7 @@ fn edit(src: &str, form: &SyntaxNode, layout: GroupLayout) -> Option<Edit> {
     }
 
     let start = usize::from(form.text_range().start());
-    let line = &src[src[..start].rfind('\n').map_or(0, |i| i + 1)..start];
-    let indent = &line[..line.len() - line.trim_start_matches([' ', '\t']).len()];
+    let indent = leading_indent(src, start);
     let text = layout.render(&fields, indent);
     let range = args.text_range();
     (src[usize::from(range.start())..usize::from(range.end())] != text)

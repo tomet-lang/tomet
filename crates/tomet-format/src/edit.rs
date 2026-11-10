@@ -16,3 +16,15 @@ pub(crate) fn apply_keeping_the_document(text: &str, edits: Vec<Edit>) -> Option
     }
     (parse_file(&next).ok()? == doc).then_some(next)
 }
+
+/// The leading white space of the line that `at` is on.
+pub(crate) fn leading_indent(src: &str, at: usize) -> &str {
+    let line = &src[src[..at].rfind('\n').map_or(0, |i| i + 1)..];
+    &line[..line.len() - line.trim_start_matches([' ', '\t']).len()]
+}
+
+/// The text of the line that `at` is on, from the start of the line up to `at`.
+pub(crate) fn line_prefix(src: &str, at: usize) -> &str {
+    let start = src[..at].rfind('\n').map_or(0, |i| i + 1);
+    &src[start..at]
+}

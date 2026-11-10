@@ -47,8 +47,12 @@ impl ContentLayout {
     }
 
     /// The text from `[` to `]` that lays `lines` out. The lines after the first stand at `pad`, and
-    /// the `]` of `Expanded` and `Block` at `close`. Content of no line or of one line is written
-    /// `[ ]` and `[ one ]` by `Block` and `Box`.
+    /// the `]` of `Expanded` and `Block` at `close`. `Box` closes inline at the end of the last line,
+    /// so `close` does not apply to it. Content of no line or of one line is written `[ ]` and
+    /// `[ one ]` by `Block` and `Box`.
+    ///
+    /// For the common layouts, prefer [`render_element`](Self::render_element) or
+    /// [`render_item`](Self::render_item).
     pub fn render<S: AsRef<str>>(self, lines: &[S], pad: &str, close: &str) -> String {
         let mut out = String::from("[");
         match (self, lines) {
@@ -79,6 +83,17 @@ impl ContentLayout {
             }
         }
         out
+    }
+
+    /// Lays `lines` out for a block element (such as a callout) standing at `base`: content lines
+    /// stand two spaces deeper, and the closing bracket of `Expanded` and `Block` at `base`.
+    pub fn render_element<S: AsRef<str>>(self, lines: &[S], base: &str) -> String {
+        self.render(lines, &format!("{base}  "), base)
+    }
+
+    /// Lays `lines` out for a list item whose content and closing bracket stand under `pad`.
+    pub fn render_item<S: AsRef<str>>(self, lines: &[S], pad: &str) -> String {
+        self.render(lines, pad, pad)
     }
 }
 
@@ -113,6 +128,19 @@ mod tests {
         assert_eq!(
             ContentLayout::Block.render(&lines, "    ", "  "),
             "[ one\n    two\n  ]"
+        );
+    }
+
+    #[test]
+    fn render_element_and_item_place_brackets_correctly() {
+        let lines = ["one", "two"];
+        assert_eq!(
+            ContentLayout::Block.render_element(&lines, "  "),
+            ContentLayout::Block.render(&lines, "    ", "  ")
+        );
+        assert_eq!(
+            ContentLayout::Box.render_item(&lines, "    "),
+            ContentLayout::Box.render(&lines, "    ", "    ")
         );
     }
 

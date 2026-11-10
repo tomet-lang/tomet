@@ -244,7 +244,7 @@ pub(crate) fn render_list_with_indent(
             // The content stands two columns under the marker, and so does the closing bracket.
             let pad = " ".repeat(head_prefix.chars().count() + 2);
             out.push_str(&head_prefix);
-            out.push_str(&layout.render(&lines, &pad, &pad));
+            out.push_str(&layout.render_item(&lines, &pad));
             if let Some(attrs) = item_attrs {
                 out.push(' ');
                 out.push_str(&render_value(&attrs));

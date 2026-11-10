@@ -7,7 +7,7 @@ use tomet_cst::{SyntaxKind as K, SyntaxNode};
 use tomet_cst_parser::parse_cst;
 use tomet_style::ContentLayout;
 
-use crate::edit::{Edit, apply_keeping_the_document};
+use crate::edit::{Edit, apply_keeping_the_document, leading_indent, line_prefix};
 
 /// The most times a document is gone over: a layout inside another one is reached on the next, and
 /// forms nest no deeper than the parser reads.
@@ -88,7 +88,7 @@ fn callout_edit(src: &str, form: &SyntaxNode, layout: ContentLayout) -> Option<E
         usize::from(content.text_range().end()),
     );
     let lines = content_lines(&content)?;
-    let base = leading_white_space(src, usize::from(form.text_range().start()));
+    let base = leading_indent(src, usize::from(form.text_range().start()));
     if base.contains('\t') {
         return None;
     }
@@ -103,10 +103,7 @@ fn callout_edit(src: &str, form: &SyntaxNode, layout: ContentLayout) -> Option<E
     } else {
         format!("\n{base}")
     };
-    let text = format!(
-        "{opening}{}",
-        layout.render(&lines, &format!("{base}  "), base)
-    );
+    let text = format!("{opening}{}", layout.render_element(&lines, base));
     Some((from, end, text))
 }
 
@@ -118,19 +115,13 @@ fn list_edit(src: &str, item: &SyntaxNode, layout: ContentLayout) -> Option<Edit
         usize::from(content.text_range().end()),
     );
     let lines = content_lines(&content)?;
-    let line_start = src[..start].rfind('\n').map_or(0, |i| i + 1);
+    let prefix = line_prefix(src, start);
     // A column counted in characters is a column only where the line is indented by spaces.
-    if src[line_start..start].contains('\t') {
+    if prefix.contains('\t') {
         return None;
     }
-    let pad = " ".repeat(src[line_start..start].chars().count() + 2);
-    Some((start, end, layout.render(&lines, &pad, &pad)))
-}
-
-/// The indentation of the line that `at` is on.
-fn leading_white_space(src: &str, at: usize) -> &str {
-    let line = &src[src[..at].rfind('\n').map_or(0, |i| i + 1)..];
-    &line[..line.len() - line.trim_start_matches([' ', '\t']).len()]
+    let pad = " ".repeat(prefix.chars().count() + 2);
+    Some((start, end, layout.render_item(&lines, &pad)))
 }
 
 /// The lines of a `[content]` that runs over several lines, without the brackets, the white space
