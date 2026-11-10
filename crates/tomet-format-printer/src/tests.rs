@@ -2,7 +2,6 @@ use super::*;
 use crate::value::render_value_inner_with_config;
 use tomet_ast::{Bare, Block, Data, Entry, File, Group, Inline, Name, Paragraph, Section, Value};
 use tomet_config::{FieldConfig, FormatConfig, MetaConfig, load_config_from_str};
-use tomet_field_utils::generate_id_for_field;
 use tomet_span::Span;
 use tomet_style::{ContentLayout, GroupOrder, ParagraphSeparator};
 use tomet_tree::element_new;
@@ -264,10 +263,6 @@ fn test_nanoid_generation_and_ensure_document_id() {
     assert_eq!(id_cfg.field_type.as_deref(), Some("nanoid"));
     assert_eq!(id_cfg.length, Some(8));
     assert_eq!(id_cfg.prefix.as_deref(), Some("doc-"));
-
-    let gen_id = generate_id_for_field(id_cfg);
-    assert!(gen_id.starts_with("doc-"));
-    assert_eq!(gen_id.len(), 4 + 8); // "doc-" + 8 chars
 
     let mut doc = tomet_markdown::from_markdown("# Test Note\nHello world\n");
     ensure_document_id_with_config(&mut doc, &cfg);

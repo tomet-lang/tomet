@@ -2,9 +2,9 @@
 
 @rule(tomet-type-purity){
   why: | `tomet-type` is a pure, side-effect-free base-layer crate representing the type
-       | vocabulary. It performs no I/O and holds zero external dependencies.
-       | Layering rules in the root `.writ.tmt` govern that Layer 1 crates depend on no
-       | other workspace crates.
+       | vocabulary. It performs no I/O and holds zero external dependencies, and it depends
+       | on no other workspace crate. Which crates may depend on it is the root
+       | `.writ.tmt`'s.
   guard: { twrit: pure }
   pure: {
     crates: [ "crates/tomet-base-type" ]

@@ -52,12 +52,20 @@ Layer 0 depends on no workspace member at all. Things may depend on it --
 is the hand-maintained grammar approximation and is only worth having while
 it stays independent of the parser.
 
-The base layer, `crates/tomet-base-*`, sits just above it and below the syntax layer. It holds what any layer needs to say where
-something is in a source text, and it knows no grammar: @dir(crates/tomet-base-span) is a byte range, and
-@dir(crates/tomet-base-position) turns a byte offset into the line and column a person reads. Each depends on nothing in the
-workspace. They are not syntax -- the AST carries a range on every node, and the tools that show a position (the command line, the
-language server, extraction, the validators) never parse -- and they are below it because the syntax crates need them to say where
-an error is.
+The base layer, `crates/tomet-base-*`, sits just above it and below the syntax layer. It holds what any layer needs and no grammar
+decides, and it knows no grammar:
+
+- where something is in a source text: @dir(crates/tomet-base-span) is a byte range, and @dir(crates/tomet-base-position) turns a
+  byte offset into the line and column a person reads;
+- the types a value is declared as, and how text is held to one: @dir(crates/tomet-base-type);
+- how text is ordered: @dir(crates/tomet-base-sort);
+- the shape of a document's id, whether a text has it, and drawing a new one: @dir(crates/tomet-base-id), which is an id of a
+  type and so depends on @dir(crates/tomet-base-type).
+
+A base crate depends on nothing above the base layer, and on another base crate only when what it holds is about that crate's
+vocabulary, as the id is about the type. The others depend on nothing in the workspace. Span and position are not syntax -- the AST
+carries a range on every node, and the tools that show a position (the command line, the language server, extraction, the
+validators) never parse -- and they are below it because the syntax crates need them to say where an error is.
 
 @dir(crates/serde_cotomet) is listed by name in layer 2. cotomet is the data language dual to tomet.
 `serde_cotomet` reads and writes Rust types through serde, and depends on `tomet-ast` and `tomet-ast-parser`. It shares no prefix with the tomet syntax group.

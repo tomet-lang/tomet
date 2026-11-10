@@ -20,10 +20,11 @@ members = [
   "crates/tree-sitter-tomet",
   "crates/tree-sitter-cotomet",
 
-  #= Base -- pure foundational primitives; depends on nothing in the workspace
+  #= Base -- foundational primitives; depends on nothing above the base layer
   "crates/tomet-base-span",
   "crates/tomet-base-position",
   "crates/tomet-base-type",
+  "crates/tomet-base-id",
   "crates/tomet-base-sort",
 
   #= Syntax -- grammar/parsing
@@ -100,7 +101,6 @@ members = [
 
   #= Format -- .tmt source text production & formatting
   "crates/tomet-format",
-  "crates/tomet-format-field-utils",
   "crates/tomet-format-printer",
 
   #= Workspace -- multi-file/disk operations & config discovery
@@ -130,6 +130,7 @@ repository   = "https://github.com/tomet-lang/tomet"
 tomet   = { path = "crates/tomet", version = "0.5.0" }
 cotomet = { path = "crates/cotomet", version = "0.5.0" }
 #--- Base ---
+tomet-id       = { path = "crates/tomet-base-id", version = "0.5.0" }
 tomet-position = { path = "crates/tomet-base-position", version = "0.5.0" }
 tomet-sort     = { path = "crates/tomet-base-sort", version = "0.5.0" }
 tomet-span     = { path = "crates/tomet-base-span", version = "0.5.0" }
@@ -168,7 +169,6 @@ tomet-convert-standalone = { path = "crates/tomet-convert-standalone", version =
 tomet-pandoc             = { path = "crates/tomet-convert-pandoc", version = "0.5.0" }
 tomet-typst              = { path = "crates/tomet-convert-typst", version = "0.5.0" }
 #--- Format ---
-tomet-field-utils = { path = "crates/tomet-format-field-utils", version = "0.5.0" }
 tomet-formatter   = { path = "crates/tomet-format", version = "0.5.0" }
 tomet-printer     = { path = "crates/tomet-format-printer", version = "0.5.0" }
 #---

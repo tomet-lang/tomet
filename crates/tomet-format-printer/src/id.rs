@@ -2,9 +2,10 @@
 
 use tomet_ast::{Declaration, File, Id, Value};
 use tomet_config::PrinterConfig;
-use tomet_field_utils::{generate_id_for_field, is_valid_id_format};
+use tomet_id::IdSpec;
 use tomet_spelling::scalar_text;
 use tomet_tree::{ValueExt, declaration_new};
+use tomet_type::Type;
 
 /// Ensures that a document has an `::id(...)` declaration if configured to do so.
 ///
@@ -15,10 +16,13 @@ pub fn ensure_document_id_with_config(doc: &mut File, config: &PrinterConfig) {
     let Some(id_cfg) = config.meta.fields.get("id") else {
         return;
     };
-    if id_cfg.field_type.is_none() {
+    // Nothing is made for a vault that asks for no type of id, or for a type that is not one.
+    let Some(ty) = id_cfg.field_type.as_deref().and_then(Type::from_name) else {
         return;
-    }
-
+    };
+    let Some(spec) = IdSpec::new(&ty, id_cfg.prefix.as_deref(), id_cfg.length) else {
+        return;
+    };
     let force = id_cfg.force.unwrap_or(true);
     let overwrite = id_cfg.overwrite.unwrap_or(false);
 
@@ -28,8 +32,8 @@ pub fn ensure_document_id_with_config(doc: &mut File, config: &PrinterConfig) {
             continue;
         }
         found = true;
-        if overwrite && !declared_id(declaration).is_some_and(|id| is_valid_id_format(id, id_cfg)) {
-            declaration.data.args = Some(Value::String(generate_id_for_field(id_cfg)));
+        if overwrite && !declared_id(declaration).is_some_and(|id| spec.accepts(id)) {
+            declaration.data.args = Some(Value::String(spec.generate()));
         }
     }
 
@@ -40,7 +44,7 @@ pub fn ensure_document_id_with_config(doc: &mut File, config: &PrinterConfig) {
             .max()
             .map_or(0, |index| index + 1);
         let mut declaration = declaration_new("id");
-        declaration.data.args = Some(Value::String(generate_id_for_field(id_cfg)));
+        declaration.data.args = Some(Value::String(spec.generate()));
         doc.header.insert(at, declaration);
     }
 }

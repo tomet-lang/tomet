@@ -9,7 +9,7 @@ repository.workspace = true
 [dependencies]
 tomet-ast         = { workspace = true }
 tomet-config      = { workspace = true }
-tomet-field-utils = { workspace = true }
+tomet-id          = { workspace = true }
 tomet-formatter   = { workspace = true }
 tomet-semantics   = { workspace = true }
 tomet-spelling    = { workspace = true }

@@ -9,7 +9,6 @@ use crate::element::render_interp;
 use crate::inline::render_content_blocks;
 use tomet_ast::{Block, Declaration, Entry, Group, Value};
 use tomet_config::{FieldConfig, PrinterConfig};
-use tomet_field_utils::is_iso8601;
 use tomet_spelling::{key_text, scalar_text};
 use tomet_style::{ColonSpacing, GroupLayout, ValueAlignment};
 
@@ -230,15 +229,16 @@ fn render_meta_field_value(
         return String::new();
     }
     if let Some(cfg) = field_cfg {
-        if (cfg.format.as_deref() == Some("rfc3339")
-            || cfg
-                .field_type
-                .as_deref()
-                .and_then(tomet_type::Type::from_name)
-                == Some(tomet_type::Type::Datetime))
-            && let Value::String(s) = v
+        if let Value::String(s) = v
+            && (cfg.format.as_deref() == Some("rfc3339")
+                || cfg
+                    .field_type
+                    .as_deref()
+                    .and_then(tomet_type::Type::from_name)
+                    == Some(tomet_type::Type::Datetime))
+            && let Some(rfc3339) = tomet_type::datetime::to_rfc3339(s, cfg.offset.as_deref())
         {
-            return tomet_field_utils::format_rfc3339(s, cfg.offset.as_deref());
+            return rfc3339;
         }
         if cfg.always_newline
             && let Value::Seq(items) = v
@@ -255,7 +255,7 @@ fn render_meta_field_value(
         }
     }
     if let Value::String(s) = v
-        && is_iso8601(s)
+        && tomet_type::datetime::parse_datetime_parts(s).is_some()
     {
         return s.clone();
     }

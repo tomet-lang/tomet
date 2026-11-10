@@ -1,14 +1,13 @@
 [package]
-name                 = "tomet-field-utils"
+name                 = "tomet-id"
 version.workspace    = true
 edition.workspace    = true
-description          = "Small pure helpers for @meta field values in Tomet documents."
+description          = "The shape of a document's id -- its type, prefix and length -- whether a text has it, and drawing a new one."
 license.workspace    = true
 repository.workspace = true
 
 [dependencies]
-tomet-config = { workspace = true }
-tomet-type   = { workspace = true }
+tomet-type = { workspace = true }
 #--- Crates.io ---
 nanoid = { workspace = true }
 uuid   = { workspace = true }

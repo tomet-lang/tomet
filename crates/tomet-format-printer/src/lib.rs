@@ -7,8 +7,7 @@
 //! loading/discovery) to drive formatting choices: meta format
 //! (yaml/json/toml), link-key spacing, callout/list style. Also owns `::meta` id
 //! auto-generation (`ensure_document_id_with_config`, which mutates the
-//! AST directly), built on the pure generate/validate/convert helpers
-//! in `tomet-field-utils`.
+//! AST directly), built on `tomet_id::IdSpec`.
 
 pub mod block;
 pub mod element;

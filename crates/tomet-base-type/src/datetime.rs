@@ -80,6 +80,44 @@ pub fn parse_offset_seconds(text: &str) -> Option<i32> {
     Some(sign * (i32::from(hours) * 3600 + i32::from(minutes) * 60))
 }
 
+/// A date, or a date and a time, written as RFC 3339: `T` between the date and the time, the
+/// seconds spelled out, and an offset.
+///
+/// - What the text gives is kept as it is: its own offset (`Z`, `+09:00`) and its fraction.
+/// - What it lacks is supplied: midnight for a bare date, `:00` seconds, and `default_offset`
+///   (`Z` when `None`) for a missing offset.
+///
+/// `None` when the text is not a datetime ([`parse_datetime_parts`]), or when `default_offset` is
+/// given and is not an offset ([`parse_offset_seconds`]).
+pub fn to_rfc3339(text: &str, default_offset: Option<&str>) -> Option<String> {
+    parse_datetime_parts(text)?;
+    let default_offset = match default_offset {
+        None => "Z",
+        Some(offset) => {
+            parse_offset_seconds(offset)?;
+            offset.trim()
+        }
+    };
+    let text = text.trim();
+    // The date is ASCII and ten bytes long: the reading above has checked it.
+    let (date, rest) = text.split_at(10);
+    let Some(time) = rest.strip_prefix('T').or_else(|| rest.strip_prefix(' ')) else {
+        return Some(format!("{date}T00:00:00{default_offset}"));
+    };
+    let (clock, offset) = time.split_at(time.find(['Z', '+', '-']).unwrap_or(time.len()));
+    let seconds = if clock.matches(':').count() == 1 {
+        ":00"
+    } else {
+        ""
+    };
+    let offset = if offset.is_empty() {
+        default_offset
+    } else {
+        offset
+    };
+    Some(format!("{date}T{clock}{seconds}{offset}"))
+}
+
 /// `YYYY-MM-DD`.
 fn parse_date(text: &str) -> Option<(u16, u8, u8)> {
     let mut parts = text.split('-');
@@ -154,6 +192,71 @@ mod tests {
 
     fn read(text: &str) -> DateTimeParts {
         parse_datetime_parts(text).unwrap_or_else(|| panic!("`{text}` should read"))
+    }
+
+    #[test]
+    fn rfc3339_supplies_what_the_text_lacks() {
+        for (text, want) in [
+            ("2026-06-17T05:52:44", "2026-06-17T05:52:44Z"),
+            ("2026-04-12T18:39", "2026-04-12T18:39:00Z"),
+            ("2026-04-12 18:39", "2026-04-12T18:39:00Z"),
+            ("2026-04-12", "2026-04-12T00:00:00Z"),
+            ("2026-04-12T18:39:00.5", "2026-04-12T18:39:00.5Z"),
+        ] {
+            assert_eq!(to_rfc3339(text, None).as_deref(), Some(want), "{text}");
+        }
+        for (text, want) in [
+            ("2026-06-17T05:52:44", "2026-06-17T05:52:44+09:00"),
+            ("2026-04-12T18:39", "2026-04-12T18:39:00+09:00"),
+            ("2026-04-12 18:39", "2026-04-12T18:39:00+09:00"),
+            ("2026-04-12", "2026-04-12T00:00:00+09:00"),
+        ] {
+            assert_eq!(
+                to_rfc3339(text, Some("+09:00")).as_deref(),
+                Some(want),
+                "{text}"
+            );
+        }
+    }
+
+    #[test]
+    fn rfc3339_keeps_the_offset_the_text_gives() {
+        for (text, want) in [
+            ("2026-06-17T05:52:44Z", "2026-06-17T05:52:44Z"),
+            ("2026-06-17T05:52:44+09:00", "2026-06-17T05:52:44+09:00"),
+            ("2026-06-17 05:52:44-05:30", "2026-06-17T05:52:44-05:30"),
+            ("2026-06-17T05:52+09:00", "2026-06-17T05:52:00+09:00"),
+        ] {
+            assert_eq!(
+                to_rfc3339(text, Some("+01:00")).as_deref(),
+                Some(want),
+                "{text}"
+            );
+        }
+    }
+
+    /// What `tomet check` does not read as a datetime is not given an offset.
+    #[test]
+    fn rfc3339_leaves_what_is_not_a_datetime_to_the_caller() {
+        for text in [
+            "not-a-date",
+            "2026/06/17",
+            "2026-13-01",
+            "2026-02-30",
+            "2026-06-17T05:52:44garbage",
+        ] {
+            assert_eq!(to_rfc3339(text, Some("+09:00")), None, "{text}");
+        }
+    }
+
+    #[test]
+    fn rfc3339_needs_a_default_offset_that_is_one() {
+        assert_eq!(to_rfc3339("2026-04-12", Some("tokyo")), None);
+        assert_eq!(to_rfc3339("2026-04-12", Some("+9")), None);
+        assert_eq!(
+            to_rfc3339("2026-04-12", Some(" +09:00 ")).as_deref(),
+            Some("2026-04-12T00:00:00+09:00")
+        );
     }
 
     #[test]
