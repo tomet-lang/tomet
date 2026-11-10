@@ -4,6 +4,8 @@
 //! one only where the parser reads it as the same text and the quoted one everywhere else, so what
 //! the parser reads is the truth and this crate states it once for every writer.
 //!
+//! - [`is_name`]: a name the parser reads as one name where a name is expected: an element's
+//!   `@name(`, an interpolation call's `$name(`.
 //! - [`write_key`] / [`key_text`]: a map key, bare when [`is_bare_key`] says the parser reads it
 //!   as itself.
 //! - [`write_scalar_string`] / [`scalar_text`]: a string value, bare when no other value could be
@@ -17,13 +19,11 @@ use tomet_type::Type;
 ///
 /// - `true`, `false` or `null`;
 /// - a number made of digits, or digits, a `.` and digits (`2024`, `1.0`);
-/// - a name: an ASCII letter or `_`, then ASCII letters, digits, `_`, `-` and `.`, where each
-///   `.` has a name part right after it, and no run of digits that opens a token (after a `_`,
-///   `-` or `.`) is followed by `.` and a digit, which reads as a float.
+/// - a [name](is_name).
 ///
 /// A key with any other character, a non-ASCII letter included, is quoted.
 pub fn is_bare_key(key: &str) -> bool {
-    matches!(key, "true" | "false" | "null") || is_number_key(key) || is_bare_name(key)
+    matches!(key, "true" | "false" | "null") || is_number_key(key) || is_name(key)
 }
 
 fn is_number_key(key: &str) -> bool {
@@ -34,8 +34,15 @@ fn is_number_key(key: &str) -> bool {
     }
 }
 
-fn is_bare_name(key: &str) -> bool {
-    let bytes = key.as_bytes();
+/// Whether `name` is read as one name: an ASCII letter or `_`, then ASCII letters, digits, `_`, `-`
+/// and `.`, where each `.` has a name part right after it, and no run of digits that opens a token
+/// (after a `_`, `-` or `.`) is followed by `.` and a digit, which reads as a float. A lone `true`,
+/// `false` or `null` is a value and not a name.
+pub fn is_name(name: &str) -> bool {
+    if matches!(name, "true" | "false" | "null") {
+        return false;
+    }
+    let bytes = name.as_bytes();
     let Some(&first) = bytes.first() else {
         return false;
     };
@@ -119,16 +126,8 @@ pub fn quoted_text(s: &str) -> String {
 /// Writes a string value: bare where the same text could be read as nothing else, inside `"..."`
 /// where it could be a number, a keyword, an empty or padded text, or holds a delimiter, a quote or
 /// a control character, or opens with a character that starts something.
-///
-/// Text shaped like an interpolation (`${x}`, `$f(x)`) is left bare, so it reads back as the
-/// interpolation and not as the string.
 pub fn write_scalar_string(s: &str, out: &mut String) {
     if Type::Datetime.holds_text(s) == Some(true) {
-        out.push_str(s);
-        return;
-    }
-
-    if is_interpolation_text(s) {
         out.push_str(s);
         return;
     }
@@ -160,12 +159,6 @@ pub fn scalar_text(s: &str) -> String {
     let mut out = String::with_capacity(s.len() + 2);
     write_scalar_string(s, &mut out);
     out
-}
-
-/// Whether `s` is the text of an interpolation: `${...}`, or `$name(...)`.
-fn is_interpolation_text(s: &str) -> bool {
-    (s.starts_with("${") && s.ends_with('}'))
-        || (s.starts_with('$') && s.contains('(') && s.ends_with(')'))
 }
 
 /// Whether the parser reads `s`, bare, as a number.
@@ -273,8 +266,10 @@ mod tests {
         for quoted in ["true", "false", "null", "123", "45.67", "", " a", "a b"] {
             assert_eq!(scalar_text(quoted), format!("\"{quoted}\""));
         }
-        assert_eq!(scalar_text("${x}"), "${x}");
-        assert_eq!(scalar_text("$f(x)"), "$f(x)");
+        // Text shaped like an interpolation is a string like any other: quoted, never read as the
+        // interpolation.
+        assert_eq!(scalar_text("${x}"), "\"${x}\"");
+        assert_eq!(scalar_text("$f(x)"), "\"$f(x)\"");
         assert_eq!(scalar_text("hello \"world\""), "\"hello \\\"world\\\"\"");
         assert_eq!(scalar_text("line1\nline2"), "\"line1\\nline2\"");
     }

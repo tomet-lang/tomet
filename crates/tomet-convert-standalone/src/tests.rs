@@ -59,7 +59,7 @@ fn a_macro_the_vault_defines_is_written_into_the_file() {
     assert!(text.contains("::macro"), "{text}");
     assert!(text.contains("https://github.com/x/issues/${1}"), "{text}");
     assert!(
-        text.contains("${macro.gh(7)}"),
+        text.contains("$macro.gh(7)"),
         "the call stays a call: {text}"
     );
     assert!(text.contains("::profile(standalone)"), "{text}");
@@ -74,7 +74,7 @@ fn a_block_macro_the_vault_defines_is_written_into_the_file_as_blocks() {
     assert!(text.contains("::macro"), "{text}");
     assert!(text.contains("Note: ${1}"), "{text}");
     assert!(
-        text.contains("${macro.note(\"x\")}"),
+        text.contains("$macro.note(\"x\")"),
         "the call stays a call: {text}"
     );
     assert_eq!(treatments(&converted), vec![Treatment::Carried]);
@@ -153,7 +153,7 @@ fn an_expression_with_no_value_in_the_vault_is_left_as_it_is() {
         text.contains("${tmt(\"docs/gone.tmt\")::meta.title}"),
         "{text}"
     );
-    assert!(text.contains("${macro.nowhere(1)}"), "{text}");
+    assert!(text.contains("$macro.nowhere(1)"), "{text}");
     let left = converted
         .changes
         .iter()

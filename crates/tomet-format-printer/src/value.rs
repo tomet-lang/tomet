@@ -5,6 +5,7 @@
 //! how a group reads, and writes the `[content]` of an embedded element through the printer's own
 //! block renderer ([`render_content_blocks`]).
 
+use crate::element::render_interp;
 use crate::inline::render_content_blocks;
 use tomet_ast::{Block, Declaration, Entry, Group, Value};
 use tomet_config::{FieldConfig, PrinterConfig};
@@ -100,11 +101,7 @@ pub(crate) fn render_value_inner_with_config(v: &Value, config: &PrinterConfig) 
         // set and `content`/`value`/`children` all `None` (an MVP scope
         // limit enforced at parse time, not just convention) -- so `args`
         // alone is the whole element to print back.
-        // A `$name(args)`/`${...}` sitting in a value slot is written back in
-        // the `${...}` form (`InterpExpr`'s own `Display`), the same
-        // normalization `tomet-transform::interp` uses for one left
-        // unresolved in prose.
-        Value::Interp(interp) => format!("${{{}}}", interp.expr),
+        Value::Interp(interp) => render_interp(interp),
         Value::Element(el) => render_embedded(
             format!("@{}", el.name),
             &el.data,

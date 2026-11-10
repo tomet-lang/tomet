@@ -58,6 +58,9 @@ const SCALARS: &[&str] = &[
     "inf",
     "2024-01-02",
     "2024-01-02T03:04:05Z",
+    "${x}",
+    "$f(x)",
+    "$macro.gh(1)",
     "a$b",
     "a\nb",
     "a\tb",
@@ -272,4 +275,122 @@ fn cotomet_writes_every_string_so_it_reads_back() {
             Err(e) => Err(format!("written {written:?} does not parse: {e}")),
         }
     });
+}
+
+/// Interpolations as the grammar reads them, each written in the form that is not the printer's: a
+/// call is `${f(x)}` here and the printer is to write `$f(x)`; the rest are `${...}` either way.
+const INTERPOLATIONS: &[&str] = &[
+    "${f(x)}",
+    "${macro.gh(1)}",
+    "${macro.gh(\"tomet/tomet\")}",
+    "${macro.gh(\"a)b\")}",
+    "${a.b.c(1, \"two\", three)}",
+    "${f()}",
+    "${f(g(x))}",
+    "${x}",
+    "${a.b}",
+    "${f(x).g}",
+    "${f(x).g(y)}",
+    "${a::b}",
+    "${self::path}",
+    "${f(x) == 1}",
+    "${x => f(x)}",
+    "${(f(x))}",
+    "${tmt(\"b.tmt\")::meta.title}",
+    "${true}",
+    "${1}",
+    "${#id}",
+    "${doc#id}",
+];
+
+/// The places an interpolation stands: a value, running text, a line of its own, an element's args.
+fn in_every_place(interp: &str) -> [String; 4] {
+    [
+        format!("::x(v: {interp})\n"),
+        format!("see {interp} now\n"),
+        format!("{interp}\n"),
+        format!("@link({interp})[T]\n"),
+    ]
+}
+
+#[test]
+fn the_printer_writes_every_interpolation_so_it_reads_back() {
+    let mut bad = Vec::new();
+    for interp in INTERPOLATIONS {
+        for src in in_every_place(interp) {
+            if let Err(why) = through_printer(&src) {
+                bad.push(format!("{src:?}: {why}"));
+            }
+        }
+    }
+    assert_none("tomet-printer, interpolation", &bad);
+}
+
+#[test]
+fn the_printer_writes_a_call_as_a_call_and_anything_else_in_braces() {
+    // The call form is `$callee(args)`; `${...}` opens an expression space, so what is not a call
+    // of a name has no other form.
+    let printed =
+        |src: &str| tomet_printer::document_to_tm(&tomet_ast_parser::parse_file(src).unwrap());
+    let mut bad = Vec::new();
+    for (src, written) in [
+        ("::x(v: ${macro.gh(1)})\n", "::x(v: $macro.gh(1))\n"),
+        (
+            "see ${macro.gh(\"a)b\")} now\n",
+            "see $macro.gh(\"a)b\") now\n",
+        ),
+        ("${f(x)}\n", "$f(x)\n"),
+        (
+            "@link(${a.b(1, \"two\")})[T]\n",
+            "@link($a.b(1, \"two\"))[T]\n",
+        ),
+        ("::x(v: $macro.gh(1))\n", "::x(v: $macro.gh(1))\n"),
+        ("see ${x} now\n", "see ${x} now\n"),
+        ("see ${a.b} now\n", "see ${a.b} now\n"),
+        ("see ${f(x).g(y)} now\n", "see ${f(x).g(y)} now\n"),
+        ("see ${self::path} now\n", "see ${self::path} now\n"),
+        ("see ${f(x) == 1} now\n", "see ${f(x) == 1} now\n"),
+    ] {
+        let got = printed(src);
+        if got != written {
+            bad.push(format!("{src:?} is printed as {got:?}, not {written:?}"));
+        }
+    }
+    assert_none("tomet-printer, call interpolation", &bad);
+}
+
+#[test]
+fn a_call_is_written_as_a_call_exactly_when_the_parser_reads_the_name() {
+    // The callee is any run of the pieces a name has a rule about. Where `${name(1)}` parses, the
+    // printer's text reads back as the same document, and it is `$name(1)` exactly when the parser
+    // reads `$name(1)` as that same call: braces for a name it reads otherwise would corrupt the
+    // document, and braces kept for a name it reads would be braces for nothing.
+    let (mut wrong, mut needless, mut tried) = (Vec::new(), Vec::new(), 0usize);
+    for name in runs(PARTS, MAX_PARTS).into_iter().filter(|n| n.is_ascii()) {
+        let Ok(before) = tomet_ast_parser::parse_file(&format!("see ${{{name}(1)}} now\n")) else {
+            continue;
+        };
+        tried += 1;
+        let printed = tomet_printer::document_to_tm(&before);
+        let call_form = format!("see ${name}(1) now\n");
+        let reads_as_call = matches!(
+            tomet_ast_parser::parse_file(&call_form),
+            Ok(file) if file == before
+        );
+        match (printed == call_form, reads_as_call) {
+            (true, false) => wrong.push(format!("name {name:?} is written {printed:?}")),
+            (false, true) => needless.push(format!("name {name:?} is written {printed:?}")),
+            _ => {}
+        }
+        match tomet_ast_parser::parse_file(&printed) {
+            Ok(after) if after == before => {}
+            Ok(_) => wrong.push(format!(
+                "name {name:?}: {printed:?} reads as another document"
+            )),
+            Err(e) => wrong.push(format!("name {name:?}: {printed:?} does not parse: {e}")),
+        }
+    }
+    assert!(tried > 1000, "only {tried} names parsed");
+    assert_none("tomet-printer, call written as a call", &wrong);
+    assert_none("tomet-printer, call kept in braces", &needless);
 }

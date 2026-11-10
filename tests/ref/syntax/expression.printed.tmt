@@ -17,11 +17,11 @@ ${x <= 1 && y >= 2}
 ${(a || b) && c}
 
 =[無名関数]
-${xs.filter(d => d::meta.tags.contains("rust"))}
+$xs.filter(d => d::meta.tags.contains("rust"))
 
 ${xs.sort(d => d::meta.created, "desc").map(d => d.link())}
 
-${xs.filter((a, b) => a > b)}
+$xs.filter((a, b) => a > b)
 
 =[文書とアドレス]
 ${#intro.tags}
@@ -50,10 +50,10 @@ ${addr(tmt:docs/a.tmt#intro)}
 
 ${addr(dir:docs/my-notes)::docs}
 
-${include(addr(tmt:docs/a.tmt#intro), heading: false)}
+$include(addr(tmt:docs/a.tmt#intro), heading: false)
 
-${include(addr(tmt:docs/a.tmt))}
+$include(addr(tmt:docs/a.tmt))
 
 ${addr(dir:docs)}
 
-本文の中にも置ける -- ${a == b} や ${slug-of(title)} のように。
+本文の中にも置ける -- ${a == b} や $slug-of(title) のように。

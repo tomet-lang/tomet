@@ -36,6 +36,36 @@ mod tests {
         tomet_ast_parser::parse_file(src).expect("valid source")
     }
 
+    /// The value `call` stands for where an element's args hold it.
+    fn macro_call(call: &str) -> Value {
+        parse_doc(&format!("@x({call})\n"))
+            .body
+            .into_iter()
+            .find_map(|block| match block {
+                tomet_ast::Block::Element(el) => el.data.args,
+                _ => None,
+            })
+            .expect("an element with args")
+    }
+
+    #[test]
+    fn an_argument_stays_an_integer_only_when_it_is_written_as_one() {
+        let macros = HashMap::from([("p".to_string(), Value::String("https://x/${1}".into()))]);
+        let set = MacroSet::from_map(&macros);
+        for (url, call) in [
+            ("https://x/7", "$macro.p(7)"),
+            ("https://x/007", "$macro.p(\"007\")"),
+            ("https://x/+7", "$macro.p(\"+7\")"),
+            ("https://x/a\"b)", "$macro.p(\"a\\\"b)\")"),
+        ] {
+            assert_eq!(
+                set.rewrite_url(url).map(Value::Interp),
+                Some(macro_call(call)),
+                "{url}"
+            );
+        }
+    }
+
     #[test]
     fn test_macro_pattern_and_set() {
         let mut macros = HashMap::new();
@@ -47,12 +77,14 @@ mod tests {
 
         let set = MacroSet::from_map(&macros);
         assert_eq!(
-            set.rewrite_url("https://github.com/tomet/tomet"),
-            Some("$macro.gh(\"tomet/tomet\")".into())
+            set.rewrite_url("https://github.com/tomet/tomet")
+                .map(Value::Interp),
+            Some(macro_call("$macro.gh(\"tomet/tomet\")"))
         );
         assert_eq!(
-            set.rewrite_url("https://github.com/tomet/tomet/issues/42"),
-            Some("$macro.gh_issue(\"tomet/tomet\", 42)".into())
+            set.rewrite_url("https://github.com/tomet/tomet/issues/42")
+                .map(Value::Interp),
+            Some(macro_call("$macro.gh_issue(\"tomet/tomet\", 42)"))
         );
 
         let mut doc = parse_doc(
@@ -75,11 +107,11 @@ mod tests {
             vec![
                 (
                     "link".into(),
-                    Some(Value::String("$macro.gh(\"tomet/tomet\")".into()))
+                    Some(macro_call("$macro.gh(\"tomet/tomet\")"))
                 ),
                 (
                     "embed".into(),
-                    Some(Value::String("$macro.gh_issue(\"tomet/tomet\", 42)".into()))
+                    Some(macro_call("$macro.gh_issue(\"tomet/tomet\", 42)"))
                 ),
                 (
                     "note".into(),

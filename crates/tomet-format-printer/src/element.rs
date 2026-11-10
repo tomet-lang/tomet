@@ -1,11 +1,11 @@
 //! Rendering elements, values, args, and connects.
 
 use tomet_ast::{
-    Bare, Block, Connect, Data, Declaration, ElementView, Entry, Group, Hole, Interpolation,
-    Placement, Value,
+    Bare, Block, Connect, Data, Declaration, ElementView, Entry, Group, Hole, InterpExpr,
+    InterpExprKind, Interpolation, Placement, Value,
 };
 use tomet_config::PrinterConfig;
-use tomet_spelling::key_text;
+use tomet_spelling::{is_name, key_text};
 use tomet_style::GroupOrder;
 
 use crate::id::render_id;
@@ -348,9 +348,28 @@ pub(crate) fn render_element_value(value: &Group, config: &PrinterConfig) -> Str
     format!("{{{}}}", render_group_entries(entries, config))
 }
 
-/// Renders an interpolation: `${expr}`.
+/// Renders an interpolation: `$callee(args)` for a call of a name (`$macro.gh(1)`), `${expr}` for
+/// anything else, since `${` opens an expression space and a call needs none.
 pub(crate) fn render_interp(interp: &Interpolation) -> String {
-    format!("${{{}}}", interp.expr)
+    match &interp.expr.kind {
+        InterpExprKind::Call { callee, .. }
+            if callee_name(callee).is_some_and(|name| is_name(&name)) =>
+        {
+            format!("${}", interp.expr)
+        }
+        _ => format!("${{{}}}", interp.expr),
+    }
+}
+
+/// The dotted name `callee` spells (`macro.gh`), if it is only identifiers joined by `.`.
+fn callee_name(callee: &InterpExpr) -> Option<String> {
+    match &callee.kind {
+        InterpExprKind::Identifier(name) => Some(name.clone()),
+        InterpExprKind::Member { object, member } => {
+            Some(format!("{}.{member}", callee_name(object)?))
+        }
+        _ => None,
+    }
 }
 
 /// Renders a value group's entries in source order.

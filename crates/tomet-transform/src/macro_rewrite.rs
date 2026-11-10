@@ -1,8 +1,9 @@
 //! Reverse URL-to-macro pattern matching and rewriting.
 
 use std::collections::HashMap;
-use tomet_ast::{File, Value};
+use tomet_ast::{File, InterpExpr, InterpExprKind, Interpolation, Literal, Value};
 use tomet_semantics::{ElementKind, classify_std_lenient};
+use tomet_span::Span;
 use tomet_tree::{DataExt, for_each_element_mut};
 
 /// A compiled macro matcher for reverse URL-to-macro rewriting.
@@ -84,20 +85,33 @@ impl MacroPattern {
         }
     }
 
-    /// Formats extracted args into `$macro("arg1", "arg2")` invocation syntax.
-    pub fn format_invocation(&self, args: &[String]) -> String {
-        let formatted_args: Vec<String> = args
+    /// The call `$macro.<name>(args)` for the arguments `match_url` extracted. An argument that
+    /// reads as the integer it is written as stays an integer; every other one is a string.
+    pub fn invocation(&self, args: &[String]) -> Interpolation {
+        let node = |kind| InterpExpr {
+            kind,
+            span: Span::dummy(),
+        };
+        let callee = node(InterpExprKind::Member {
+            object: Box::new(node(InterpExprKind::Identifier("macro".into()))),
+            member: self.name.clone(),
+        });
+        let args = args
             .iter()
             .map(|a| {
-                if a.parse::<i64>().is_ok() {
-                    a.clone()
-                } else {
-                    format!("\"{}\"", a.replace('\\', "\\\\").replace('"', "\\\""))
-                }
+                node(InterpExprKind::Literal(match a.parse::<i64>() {
+                    Ok(n) if n.to_string() == *a => Literal::Int(n),
+                    _ => Literal::String(a.clone()),
+                }))
             })
             .collect();
-
-        format!("$macro.{}({})", self.name, formatted_args.join(", "))
+        Interpolation {
+            expr: node(InterpExprKind::Call {
+                callee: Box::new(callee),
+                args,
+            }),
+            span: Span::dummy(),
+        }
     }
 }
 
@@ -131,17 +145,14 @@ impl MacroSet {
     }
 
     /// Rewrites `url` to a macro invocation if any pattern matches.
-    pub fn rewrite_url(&self, url: &str) -> Option<String> {
-        for pat in &self.patterns {
-            if let Some(args) = pat.match_url(url) {
-                return Some(pat.format_invocation(&args));
-            }
-        }
-        None
+    pub fn rewrite_url(&self, url: &str) -> Option<Interpolation> {
+        self.patterns
+            .iter()
+            .find_map(|pat| pat.match_url(url).map(|args| pat.invocation(&args)))
     }
 }
 
-/// Transforms link targets in `doc` matching any macro in `macro_set` into `$macro(...)` invocations.
+/// Transforms link targets in `doc` matching any macro in `macro_set` into `$macro.<name>(...)` invocations.
 pub fn transform_link_targets_with_macros(doc: &mut File, macro_set: &MacroSet) -> usize {
     let mut count = 0;
     for_each_element_mut(doc, |el| {
@@ -153,13 +164,13 @@ pub fn transform_link_targets_with_macros(doc: &mut File, macro_set: &MacroSet) 
         if let Some(Value::String(url)) = el.data.get_attr("target") {
             if let Some(macro_call) = macro_set.rewrite_url(url) {
                 el.data
-                    .transform_prop("target", |_| Value::String(macro_call));
+                    .transform_prop("target", |_| Value::Interp(macro_call));
                 count += 1;
             }
         } else if let Some(Value::String(url)) = &el.data.args
             && let Some(macro_call) = macro_set.rewrite_url(url)
         {
-            el.data.args = Some(Value::String(macro_call));
+            el.data.args = Some(Value::Interp(macro_call));
             count += 1;
         }
     });
