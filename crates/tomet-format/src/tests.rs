@@ -1,5 +1,6 @@
 use super::*;
-use tomet_config::{FieldConfig, FormatConfig, GroupOrder, ParagraphSeparator};
+use tomet_config::{FieldConfig, FormatConfig};
+use tomet_style::{GroupOrder, ParagraphSeparator};
 
 #[test]
 fn format_source_with_config_leaves_meta_block_completely_untouched() {

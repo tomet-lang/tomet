@@ -1,0 +1,10 @@
+[package]
+name                 = "tomet-style"
+version.workspace    = true
+edition.workspace    = true
+description          = "The choices the grammar offers among spellings that read back as the same document."
+license.workspace    = true
+repository.workspace = true
+
+[dependencies]
+tomet-ast = { workspace = true }

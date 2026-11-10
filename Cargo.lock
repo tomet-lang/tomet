@@ -1506,6 +1506,7 @@ dependencies = [
  "serde",
  "tomet-ast",
  "tomet-ast-parser",
+ "tomet-spelling",
 ]
 
 [[package]]
@@ -1822,6 +1823,7 @@ dependencies = [
  "tomet-config",
  "tomet-cst-parser",
  "tomet-formatter",
+ "tomet-style",
  "tomet-synth",
  "tomet-tests",
 ]
@@ -1879,6 +1881,7 @@ dependencies = [
  "tomet-semantics",
  "tomet-semantics-core",
  "tomet-spec-derive",
+ "tomet-style",
  "tomet-tree",
 ]
 
@@ -1954,7 +1957,7 @@ dependencies = [
  "tomet-config",
  "tomet-cst",
  "tomet-cst-parser",
- "tomet-style",
+ "tomet-spelling",
  "tomet-tree",
  "tomet-validator",
  "tomet-vault",
@@ -2003,6 +2006,7 @@ dependencies = [
  "tomet-ast",
  "tomet-ast-parser",
  "tomet-config",
+ "tomet-style",
  "tomet-tree",
  "unicode-width",
 ]
@@ -2224,8 +2228,11 @@ dependencies = [
  "tomet-markdown",
  "tomet-semantics",
  "tomet-span",
+ "tomet-spelling",
  "tomet-style",
  "tomet-tree",
+ "tomet-type",
+ "unicode-width",
 ]
 
 [[package]]
@@ -2308,6 +2315,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "tomet-spelling"
+version = "0.5.0"
+dependencies = [
+ "tomet-type",
+]
+
+[[package]]
 name = "tomet-stats"
 version = "0.5.0"
 dependencies = [
@@ -2325,12 +2339,6 @@ name = "tomet-style"
 version = "0.5.0"
 dependencies = [
  "tomet-ast",
- "tomet-config",
- "tomet-field-utils",
- "tomet-semantics",
- "tomet-tree",
- "tomet-type",
- "unicode-width",
 ]
 
 [[package]]
@@ -2358,6 +2366,8 @@ dependencies = [
  "tomet-pandoc",
  "tomet-printer",
  "tomet-semantics",
+ "tomet-spelling",
+ "tomet-style",
  "tomet-transform",
  "tomet-tree",
  "tomet-typst",
@@ -2389,7 +2399,6 @@ dependencies = [
  "tomet-search",
  "tomet-semantics",
  "tomet-span",
- "tomet-style",
  "tomet-tree",
 ]
 

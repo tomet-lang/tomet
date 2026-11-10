@@ -31,14 +31,15 @@ pub mod tree;
 
 pub use discovery::{ConfigError, load_config_from_str};
 pub use groups::{
-    FieldConfig, FormatConfig, GroupOrder, MetaConfig, ParagraphSeparator, RegistryConfig,
-    WorkspaceConfig, format, meta, registry, workspace,
+    FieldConfig, FormatConfig, MetaConfig, RegistryConfig, WorkspaceConfig, format, meta, registry,
+    workspace,
 };
 pub use layer::{ConfigLayer, registered_by, registry_entries};
 pub use schema::{ConfigEntrySpec, ConfigGroupSpec, ConfigSpecProvider, all_config_specs};
 pub use tomet_spec_derive::Config;
 
 use tomet_ast::{File, Value};
+use tomet_style::GroupOrder;
 use tree::merge_entry;
 
 /// Full Tomet document / vault configuration.
@@ -118,6 +119,7 @@ impl Config {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use tomet_style::ParagraphSeparator;
 
     #[test]
     fn test_fields_declaration_parsing() {

@@ -1,7 +1,8 @@
 //! Element group order formatting according to `GroupOrder` settings.
 
 use tomet_ast_parser::parse_file;
-use tomet_config::{GroupOrder, PrinterConfig};
+use tomet_config::PrinterConfig;
+use tomet_style::GroupOrder;
 use tomet_tree::Visit;
 
 /// Byte offset of the `close` matching the `open` at `open_pos` in

@@ -1,0 +1,10 @@
+[package]
+name                 = "tomet-spelling"
+version.workspace    = true
+edition.workspace    = true
+description          = "How a map key and a string are spelled so that the parser reads back what was written."
+license.workspace    = true
+repository.workspace = true
+
+[dependencies]
+tomet-type = { workspace = true }

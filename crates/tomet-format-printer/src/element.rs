@@ -4,10 +4,13 @@ use tomet_ast::{
     Bare, Block, Connect, Data, Declaration, ElementView, Entry, Group, Hole, Interpolation,
     Placement, Value,
 };
-use tomet_config::{GroupOrder, PrinterConfig};
+use tomet_config::PrinterConfig;
+use tomet_spelling::key_text;
+use tomet_style::GroupOrder;
 
 use crate::id::render_id;
 use crate::inline::{raw_content_text, render_content_blocks};
+use crate::value::{render_args, render_meta_declaration, render_nested};
 
 /// Render an [`Element`] AST node into Tomet syntax:
 /// `<sigil><name>(args)[content]{value}`.
@@ -267,7 +270,7 @@ pub fn render_hole(hole: &Hole, config: &PrinterConfig) -> String {
 /// `::name(args)[content]{value}#(id)`.
 pub fn render_declaration(declaration: &Declaration, config: &PrinterConfig) -> String {
     if declaration.name.is_bare_named("meta") {
-        let mut out = tomet_style::render_meta_declaration(declaration, config);
+        let mut out = render_meta_declaration(declaration, config);
         out.push_str(&render_id(declaration.id.as_ref()));
         return out;
     }
@@ -366,19 +369,9 @@ pub(crate) fn render_group_entries(entries: &[Entry], config: &PrinterConfig) ->
     let rendered: Vec<String> = entries
         .iter()
         .map(|entry| match entry {
-            // `render_nested`, not `render_value_inner_with_config`: a
-            // nested map needs its own braces here or `m: { k: v }`
-            // prints as `m: k: v` and reparses as a string. With this crate's own
-            // block renderer, as `(args)` has: a `key: [...]` value (a block macro
-            // in `::macro(...)`) holds whole blocks, and the restricted default
-            // would print an element in it as nothing.
-            Entry::Pair(k, v) => format!(
-                "{}: {}",
-                tomet_style::key_text(k),
-                tomet_style::render_nested_with_blocks(v, config, &mut |blocks, cfg| {
-                    render_content_blocks(blocks, cfg)
-                })
-            ),
+            // `render_nested`, not `render_value_inner_with_config`: a nested map needs its own
+            // braces here or `m: { k: v }` prints as `m: k: v` and reparses as a string.
+            Entry::Pair(k, v) => format!("{}: {}", key_text(k), render_nested(v, config)),
             Entry::Element(child) => render_element(child.as_view(), config),
             Entry::Hole(hole) => render_hole(hole, config),
             Entry::Bare(bare) => render_bare(bare, config),
@@ -437,18 +430,4 @@ pub(crate) fn render_connects(connects: &[Connect], config: &PrinterConfig) -> S
         }
     }
     out
-}
-
-/// Renders `(args)` with full block-content fidelity: any `key: [...]`
-/// value (`Value::Blocks`, see `tomet-syntax-ast`) is rendered through
-/// this crate's own `render_content_blocks` -- the real recursive block
-/// renderer, which `tomet-format-style` (a lower layer) cannot call
-/// itself -- rather than the restricted, paragraph-inlines-only fallback
-/// `tomet_style::render_args_with_config` would otherwise use. Needed so
-/// e.g. `@conflict(a: [multi-paragraph content], ...)` round-trips
-/// without losing anything beyond the first paragraph.
-pub(crate) fn render_args(args: &Value, config: &PrinterConfig) -> String {
-    tomet_style::render_args_with_blocks(args, config, &mut |blocks, cfg| {
-        render_content_blocks(blocks, cfg)
-    })
 }

@@ -1,11 +1,10 @@
 use super::*;
+use crate::value::render_value_inner_with_config;
 use tomet_ast::{Bare, Block, Data, Entry, File, Group, Inline, Name, Paragraph, Section, Value};
-use tomet_config::{
-    FieldConfig, FormatConfig, GroupOrder, MetaConfig, ParagraphSeparator, load_config_from_str,
-};
+use tomet_config::{FieldConfig, FormatConfig, MetaConfig, load_config_from_str};
 use tomet_field_utils::generate_id_for_field;
 use tomet_span::Span;
-use tomet_style::render_value_inner;
+use tomet_style::{GroupOrder, ParagraphSeparator};
 use tomet_tree::element_new;
 
 #[test]
@@ -211,7 +210,7 @@ fn test_rfc3339_with_offset_formatting() {
 
 #[test]
 fn test_null_value_rendering() {
-    let rendered = render_value_inner(&Value::Null);
+    let rendered = render_value_inner_with_config(&Value::Null, &PrinterConfig::default());
     assert_eq!(rendered, "");
     let md = "---\ntitle:\n---\n\n# Document\n";
     let doc = tomet_markdown::from_markdown(md);

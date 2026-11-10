@@ -9,5 +9,6 @@ description          = "Serde support for cotomet: read and write Rust types as 
 [dependencies]
 tomet-ast        = { workspace = true }
 tomet-ast-parser = { workspace = true }
+tomet-spelling   = { workspace = true }
 #--- Crates.io ---
 serde = { workspace = true }

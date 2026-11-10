@@ -3,7 +3,7 @@
 use tomet_ast::{Declaration, File, Id, Value};
 use tomet_config::PrinterConfig;
 use tomet_field_utils::{generate_id_for_field, is_valid_id_format};
-use tomet_style::quote_scalar_string;
+use tomet_spelling::scalar_text;
 use tomet_tree::{ValueExt, declaration_new};
 
 /// Ensures that a document has an `::id(...)` declaration if configured to do so.
@@ -59,7 +59,7 @@ fn declared_id(declaration: &Declaration) -> Option<&str> {
 /// parser reads it.
 pub(crate) fn render_id(id: Option<&Id>) -> String {
     match id {
-        Some(id) => format!("#({})", quote_scalar_string(&id.0)),
+        Some(id) => format!("#({})", scalar_text(&id.0)),
         None => String::new(),
     }
 }

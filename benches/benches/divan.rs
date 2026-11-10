@@ -13,7 +13,8 @@
 
 use divan::{AllocProfiler, Bencher};
 use tomet_benches::{Flavor, assert_parses, fixtures, synth_doc};
-use tomet_config::{FormatConfig, GroupOrder, PrinterConfig};
+use tomet_config::{FormatConfig, PrinterConfig};
+use tomet_style::GroupOrder;
 
 #[global_allocator]
 static ALLOC: AllocProfiler = AllocProfiler::system();

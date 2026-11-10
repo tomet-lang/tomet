@@ -52,6 +52,10 @@ name = "syntax_report"
 path = "src/syntax_report.rs"
 
 [[test]]
+name = "spelling"
+path = "src/spelling.rs"
+
+[[test]]
 name = "rule"
 path = "src/rule.rs"
 
@@ -75,6 +79,8 @@ tomet-cst-parser    = { workspace = true }
 tomet-ast-parser    = { workspace = true }
 tomet-printer       = { workspace = true }
 tomet-semantics     = { workspace = true }
+tomet-spelling      = { workspace = true }
+tomet-style         = { workspace = true }
 tomet-transform     = { workspace = true }
 tomet-tree          = { workspace = true }
 tomet-typst         = { workspace = true }

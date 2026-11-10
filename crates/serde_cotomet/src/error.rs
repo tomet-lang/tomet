@@ -65,9 +65,9 @@ impl fmt::Display for Error {
 /// anywhere else: `"a.tmt".source`, not `a.tmt.source`.
 fn segment_text(key: &str) -> String {
     if key.contains('.') {
-        crate::print::quoted_text(key)
+        tomet_spelling::quoted_text(key)
     } else {
-        crate::print::key_text(key)
+        tomet_spelling::key_text(key)
     }
 }
 

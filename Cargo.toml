@@ -35,6 +35,8 @@ members = [
   "crates/tomet-syntax-lowering",
   "crates/tomet-syntax-ast-parser",
   "crates/tomet-syntax-highlight",
+  "crates/tomet-syntax-spelling",
+  "crates/tomet-syntax-style",
 
   #= Semantics -- classification/eval/resolve
   "crates/tomet-semantics",
@@ -99,7 +101,6 @@ members = [
   #= Format -- .tmt source text production & formatting
   "crates/tomet-format",
   "crates/tomet-format-field-utils",
-  "crates/tomet-format-style",
   "crates/tomet-format-printer",
 
   #= Workspace -- multi-file/disk operations & config discovery
@@ -141,6 +142,8 @@ tomet-cst-parser = { path = "crates/tomet-syntax-cst-parser", version = "0.5.0" 
 tomet-lowering   = { path = "crates/tomet-syntax-lowering", version = "0.5.0" }
 tomet-ast-parser = { path = "crates/tomet-syntax-ast-parser", version = "0.5.0" }
 tomet-highlight  = { path = "crates/tomet-syntax-highlight", version = "0.5.0" }
+tomet-spelling   = { path = "crates/tomet-syntax-spelling", version = "0.5.0" }
+tomet-style      = { path = "crates/tomet-syntax-style", version = "0.5.0" }
 tomet-tree       = { path = "crates/tomet-syntax-tree", version = "0.5.0" }
 #--- Semantics ---
 tomet-address        = { path = "crates/tomet-semantics-address", version = "0.5.0" }
@@ -168,7 +171,6 @@ tomet-typst              = { path = "crates/tomet-convert-typst", version = "0.5
 tomet-field-utils = { path = "crates/tomet-format-field-utils", version = "0.5.0" }
 tomet-formatter   = { path = "crates/tomet-format", version = "0.5.0" }
 tomet-printer     = { path = "crates/tomet-format-printer", version = "0.5.0" }
-tomet-style       = { path = "crates/tomet-format-style", version = "0.5.0" }
 #---
 tomet-transform = { path = "crates/tomet-transform", version = "0.5.0" }
 tomet-search    = { path = "crates/tomet-search", version = "0.5.0" }

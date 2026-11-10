@@ -1,15 +1,16 @@
 //! Rendering blocks, sections, headings, and lists.
 
 use tomet_ast::{Block, Element, Inline, List, Placement, Section};
-use tomet_config::{ParagraphSeparator, PrinterConfig};
+use tomet_config::PrinterConfig;
 use tomet_semantics::{ElementKind, classify_std_lenient, heading_level};
-use tomet_style::render_value;
+use tomet_style::{ParagraphSeparator, stands_like_a_paragraph};
 
 use crate::element::{
-    render_args, render_connects, render_declaration, render_element, render_hole, render_interp,
+    render_connects, render_declaration, render_element, render_hole, render_interp,
 };
 use crate::id::render_id;
 use crate::inline::{render_content_blocks, render_inlines};
+use crate::value::{render_args, render_value};
 
 pub(crate) fn render_file(file: &tomet_ast::File, config: &PrinterConfig, out: &mut String) {
     for (i, decl) in file.header.iter().enumerate() {
@@ -46,23 +47,23 @@ pub(crate) fn render_blocks(blocks: &[Block], config: &PrinterConfig, out: &mut 
     }
 }
 
-/// Is `block` one that a `;` can set off from a neighbour like a blank line does? A paragraph with
-/// text, and the element, hole or interpolation that stands as one. A heading is not (it prints
-/// as `=[ ]` sugar, which `;` would not precede), nor is a section, a list, or a paragraph that
-/// prints nothing.
+/// Is `block` one that a `;` can set off from a neighbour like a blank line does? One that
+/// [`stands_like_a_paragraph`], bar the printer's own exceptions: a heading, which prints as `=[ ]`
+/// sugar that `;` would not precede, and a paragraph that prints nothing.
 #[deny(clippy::wildcard_enum_match_arm)]
 fn flows(block: &Block, config: &PrinterConfig) -> bool {
-    match block {
-        Block::Paragraph(p) => {
-            !matches!(
-                p.content.first(),
-                Some(Inline::Element(el)) if classify_std_lenient(el.as_view()) == ElementKind::Heading
-            ) && !render_inlines(&p.content, config).trim().is_empty()
+    stands_like_a_paragraph(block)
+        && match block {
+            Block::Paragraph(p) => {
+                !matches!(
+                    p.content.first(),
+                    Some(Inline::Element(el)) if classify_std_lenient(el.as_view()) == ElementKind::Heading
+                ) && !render_inlines(&p.content, config).trim().is_empty()
+            }
+            Block::Element(el) => classify_std_lenient(el.as_view()) != ElementKind::Heading,
+            // No exception of their own; a section and a list are already out.
+            Block::Hole(_) | Block::Interp(_) | Block::Section(_) | Block::List(_) => true,
         }
-        Block::Element(el) => classify_std_lenient(el.as_view()) != ElementKind::Heading,
-        Block::Hole(_) | Block::Interp(_) => true,
-        Block::Section(_) | Block::List(_) => false,
-    }
 }
 
 #[deny(clippy::wildcard_enum_match_arm)]

@@ -4,7 +4,8 @@ use std::collections::BTreeMap;
 
 use tomet_ast::{Block, Value};
 use tomet_ast_parser::parse_file;
-use tomet_config::{ParagraphSeparator, PrinterConfig};
+use tomet_config::PrinterConfig;
+use tomet_style::{ParagraphSeparator, stands_like_a_paragraph};
 use tomet_tree::{Node, Visit, walk};
 
 /// Sets the paragraphs of `src` off from each other the way `paragraph.separator` asks: by a blank
@@ -72,16 +73,8 @@ fn block_runs<'a>(node: Node<'a>) -> Vec<&'a [Block]> {
     runs
 }
 
-/// Is `block` one that stands like a paragraph, so that a blank line and a `;` set it off alike?
-fn flows(block: &Block) -> bool {
-    match block {
-        Block::Paragraph(_) | Block::Element(_) | Block::Hole(_) | Block::Interp(_) => true,
-        Block::Section(_) | Block::List(_) => false,
-    }
-}
-
 /// Records, keyed by where it starts, the rewrite of the gap between each two neighbours of
-/// `blocks` that both [`flows`].
+/// `blocks` that both [`stands_like_a_paragraph`].
 fn collect(
     blocks: &[Block],
     src: &str,
@@ -91,7 +84,7 @@ fn collect(
     // A `;` opening the first block's line separates it from nothing: a blank line has none.
     if separator == ParagraphSeparator::Blank
         && let Some(first) = blocks.first()
-        && flows(first)
+        && stands_like_a_paragraph(first)
         && !first.span().is_dummy()
         && let Some((from, to)) = leading_semicolon(src, first.span().start)
     {
@@ -99,7 +92,7 @@ fn collect(
     }
     for pair in blocks.windows(2) {
         let (before, after) = (&pair[0], &pair[1]);
-        if !flows(before) || !flows(after) {
+        if !stands_like_a_paragraph(before) || !stands_like_a_paragraph(after) {
             continue;
         }
         let (before, after) = (before.span(), after.span());

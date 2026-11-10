@@ -85,7 +85,8 @@ fn formatting_does_not_change_the_parsed_document() {
 fn a_paragraph_separator_does_not_change_the_parsed_document() {
     // `paragraph.separator` rewrites the text between two paragraphs: a blank line and a `;` that
     // opens the next line are two spellings of one separator.
-    use tomet_config::{FormatConfig, ParagraphSeparator, PrinterConfig};
+    use tomet_config::{FormatConfig, PrinterConfig};
+    use tomet_style::ParagraphSeparator;
 
     let mut changed_by = [0usize; 2];
     for (rel, src) in parseable_corpus() {

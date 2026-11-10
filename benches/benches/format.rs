@@ -11,7 +11,8 @@ use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_m
 use tomet_benches::{
     Flavor, Input, assert_parses, external_sets, fixtures, synth_doc, total_bytes,
 };
-use tomet_config::{FormatConfig, GroupOrder, PrinterConfig};
+use tomet_config::{FormatConfig, PrinterConfig};
+use tomet_style::GroupOrder;
 
 const SIZES: &[usize] = &[1_000, 10_000, 100_000];
 const LARGE: usize = 1_000_000;

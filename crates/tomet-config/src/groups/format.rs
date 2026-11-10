@@ -1,16 +1,9 @@
-//! Formatting and printer rule configuration ([`FormatConfig`], [`GroupOrder`],
-//! [`ParagraphSeparator`]).
+//! Formatting and printer rule configuration ([`FormatConfig`]).
 
 use tomet_ast::Value;
 use tomet_spec_derive::Config;
+use tomet_style::{GroupOrder, ParagraphSeparator};
 use tomet_tree::ValueExt;
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub enum GroupOrder {
-    #[default]
-    ArgsFirst, // @link(args)[content]{value}
-    ContentFirst, // @link[content](args){value}
-}
 
 fn parse_group_order(value: &Value) -> Option<GroupOrder> {
     match value.as_str()? {
@@ -18,16 +11,6 @@ fn parse_group_order(value: &Value) -> Option<GroupOrder> {
         "args_first" | "args_content" | "()[]" | "args" => Some(GroupOrder::ArgsFirst),
         _ => None,
     }
-}
-
-/// How one paragraph is set off from the one after it. Both spellings read back as the same
-/// document: a blank line, or a `;` at the start of the next line.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ParagraphSeparator {
-    /// A blank line: `a`, an empty line, `b`.
-    Blank,
-    /// A `;` opening the next paragraph's line: `a`, `;b`.
-    Semicolon,
 }
 
 fn parse_paragraph_separator(value: &Value) -> Option<ParagraphSeparator> {

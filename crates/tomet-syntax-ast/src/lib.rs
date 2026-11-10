@@ -34,7 +34,7 @@
 //! - (Clear Crate Boundaries)
 //!   | Semantics: Classification of element meanings (links, `::meta`, `::config`) lives in `tomet-semantics`.
 //!   | Traversal & Manipulation: Generic tree traversal algorithms live in `tomet-tree`.
-//!   | Formatting & Printing: Serialization to `.tmt` text lives in `tomet-style` and `tomet-printer`.
+//!   | Formatting & Printing: Serialization to `.tmt` text lives in `tomet-printer`; how a key and a string are spelled, in `tomet-spelling`.
 //!   | Validation: Field formatting and lint validation live in `tomet-validator`.
 //! - (Span Equality Contract)
 //!   | [`Span`] implements a custom `PartialEq` that always returns `true` so that structural

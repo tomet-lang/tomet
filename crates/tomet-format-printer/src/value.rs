@@ -1,261 +1,40 @@
-//! Applies `tomet_config::PrinterConfig`'s style rules (meta format,
-//! link-key spacing (`target`, `@link`/`<embed>`'s one shared key), per-field
-//! `::meta` formatting) to a single
-//! `tomet_ast::Value`, `Element` or `Declaration`, returning `.tmt`-syntax text.
-//! Deliberately scoped to single nodes -- no `File`, no tree
-//! position, no recursion into sibling/child elements of other kinds --
-//! so both `tomet-printer` (rebuilds a whole `File`) and
-//! `tomet-formatter` (patches specific spans of existing `.tmt` text)
-//! can depend on this without a circular dependency (`tomet-printer`
-//! already depends on `tomet-formatter`). `render_meta_declaration`
-//! specifically covers only `::meta` declarations' actual shape per the
-//! grammar (`args` the map of the document's fields, written `::meta(k: v)`) -- not the general
-//! element-rendering logic for every other sigil/kind, which stays in
-//! `tomet-printer` since it recurses into inline/child content and
-//! is genuinely part of rebuilding a whole file from its AST.
+//! Single-node renderers: a [`Value`], an element or hole standing in a value slot, and a
+//! `::meta` declaration, written as `.tmt` text per a [`PrinterConfig`].
+//!
+//! A key and a string are spelled by `tomet-spelling`; this module decides where a value goes and
+//! how a group reads, and writes the `[content]` of an embedded element through the printer's own
+//! block renderer ([`render_content_blocks`]).
 
-use tomet_ast::{Block, Declaration, Entry, Group, Inline, Value};
-
-/// Renders one `Block` of a value-embedded element's `[content]` (`Vec<Block>`):
-/// a value-embedded element's content is inline in practice, so this only
-/// descends into a `Paragraph`'s own inlines, not into nested structure.
-#[deny(clippy::wildcard_enum_match_arm)]
-fn render_nested_block(block: &Block, config: &PrinterConfig, out: &mut String) {
-    let Block::Paragraph(p) = block else {
-        return;
-    };
-    for inline in &p.content {
-        match inline {
-            Inline::Text(t) => out.push_str(&t.value),
-            Inline::Raw(r) => out.push_str(&r.value),
-            Inline::LineBreak(_) => out.push('\n'),
-            Inline::SoftBreak(_) => out.push(' '),
-            Inline::Element(child_el) => {
-                let child_val = Value::Element(Box::new(child_el.clone()));
-                out.push_str(&render_nested(&child_val, config));
-            }
-            Inline::Interp(interp) => {
-                let child_val = Value::Interp(interp.clone());
-                out.push_str(&render_nested(&child_val, config));
-            }
-            Inline::Hole(hole) => {
-                let child_val = Value::Hole(Box::new(hole.clone()));
-                out.push_str(&render_nested(&child_val, config));
-            }
-        }
-    }
-}
+use crate::inline::render_content_blocks;
+use tomet_ast::{Block, Declaration, Entry, Group, Value};
 use tomet_config::{FieldConfig, PrinterConfig};
 use tomet_field_utils::is_iso8601;
+use tomet_spelling::{key_text, scalar_text};
 use unicode_width::UnicodeWidthStr;
 
-pub fn render_value(v: &Value) -> String {
-    format!("{{{}}}", render_value_inner(v))
-}
-
-pub fn render_value_inner(v: &Value) -> String {
-    render_value_inner_with_config(v, &PrinterConfig::default())
-}
-
-/// Formats a string scalar for Tomet source text, wrapping in `"` and escaping
-/// inner quotes and special characters only when necessary.
-pub fn quote_scalar_string(s: &str) -> String {
-    let mut out = String::with_capacity(s.len() + 2);
-    write_scalar_string(s, &mut out);
-    out
-}
-
-/// Characters legal inside a bare map key.
-pub fn is_ident_char(c: char) -> bool {
-    c.is_alphanumeric() || c == '_' || c == '-' || c == '.'
-}
-
-/// Writes `s` as a `"..."` string, with `\"`, `\\`, `\n`, `\r`, `\t` escapes.
-pub fn write_quoted(s: &str, out: &mut String) {
-    out.push('"');
-    for c in s.chars() {
-        match c {
-            '"' => out.push_str("\\\""),
-            '\\' => out.push_str("\\\\"),
-            '\n' => out.push_str("\\n"),
-            '\r' => out.push_str("\\r"),
-            '\t' => out.push_str("\\t"),
-            _ => out.push(c),
-        }
-    }
-    out.push('"');
-}
-
-/// `s` as a `"..."` string whatever it holds.
-pub fn quoted_text(s: &str) -> String {
-    let mut out = String::new();
-    write_quoted(s, &mut out);
-    out
-}
-
-/// Writes a map key: bare when it is a non-empty run of [`is_ident_char`],
-/// quoted (`"tmtroot/a/b.tmt"`) otherwise.
-pub fn write_key(key: &str, out: &mut String) {
-    if !key.is_empty() && key.chars().all(is_ident_char) {
-        out.push_str(key);
-    } else {
-        write_quoted(key, out);
-    }
-}
-
-/// [`write_key`] as an owned string.
-pub fn key_text(key: &str) -> String {
-    let mut out = String::new();
-    write_key(key, &mut out);
-    out
-}
-
-fn classify_number(s: &str) -> bool {
-    let b = s.as_bytes();
-    let digits = |mut i: usize| {
-        let start = i;
-        while b.get(i).is_some_and(u8::is_ascii_digit) {
-            i += 1;
-        }
-        (i > start).then_some(i)
-    };
-    let mut i = usize::from(b.first() == Some(&b'-'));
-    match b.get(i) {
-        Some(b'0') => i += 1,
-        Some(b'1'..=b'9') => {
-            let Some(next_i) = digits(i) else {
-                return false;
-            };
-            i = next_i;
-        }
-        _ => return false,
-    }
-    if b.get(i) == Some(&b'.') {
-        let Some(next_i) = digits(i + 1) else {
-            return false;
-        };
-        i = next_i;
-    }
-    if matches!(b.get(i), Some(b'e' | b'E')) {
-        i += 1;
-        if matches!(b.get(i), Some(b'+' | b'-')) {
-            i += 1;
-        }
-        let Some(next_i) = digits(i) else {
-            return false;
-        };
-        i = next_i;
-    }
-    i == b.len()
-}
-
-/// Appends a safely quoted/escaped string scalar to `out`.
-pub fn write_scalar_string(s: &str, out: &mut String) {
-    if is_iso8601(s) {
-        out.push_str(s);
-        return;
-    }
-
-    if (s.starts_with("${") && s.ends_with('}'))
-        || (s.starts_with('$') && s.contains('(') && s.ends_with(')'))
-    {
-        out.push_str(s);
-        return;
-    }
-
-    let first_char = s.chars().next();
-    let starts_with_special = matches!(
-        first_char,
-        Some('&' | '*' | '!' | '%' | '@' | '`' | '|' | '>' | '?' | '-' | '~')
-    );
-
-    let is_bare_keyword_or_number = matches!(s, "null" | "true" | "false") || classify_number(s);
-
-    let needs_quotes = s.is_empty()
-        || is_bare_keyword_or_number
-        || s.trim() != s
-        || starts_with_special
-        || s.contains([
-            '"', '\'', ':', ',', '(', ')', '[', ']', '{', '}', '\n', '\r', '\t', ' ',
-        ]);
-
-    if needs_quotes {
-        write_quoted(s, out);
-    } else {
-        out.push_str(s);
-    }
-}
-
-/// Renders a `Vec<Block>` slot (an element's `[content]`, or a `key:
-/// [...]` value) back into `.tmt` source text.
-///
-/// This crate deliberately stays scoped to single nodes (see the module
-/// doc) and has no real block renderer of its own -- recursing through
-/// sections/lists/nested elements is `tomet-printer`'s
-/// `render_content_blocks`, one layer up, which this crate cannot depend
-/// on without an upward (and circular) dependency. Threading the renderer
-/// in as a callback instead lets `tomet-printer` plug its real one in
-/// (full fidelity, needed for e.g. `@conflict(a: [multi-paragraph content],
-/// ...)`), while every other caller (`tomet-formatter`, which patches
-/// spans incrementally and has no block renderer either) keeps the
-/// restricted default (`default_block_renderer`: paragraph-inlines only,
-/// same limit `Value::Element`'s own `content` already lived with before
-/// this existed).
-pub type BlockRenderer<'a> = dyn FnMut(&[Block], &PrinterConfig) -> String + 'a;
-
-fn default_block_renderer(blocks: &[Block], config: &PrinterConfig) -> String {
-    let mut out = String::new();
-    for block in blocks {
-        render_nested_block(block, config, &mut out);
-    }
-    out
+pub(crate) fn render_value(v: &Value) -> String {
+    format!(
+        "{{{}}}",
+        render_value_inner_with_config(v, &PrinterConfig::default())
+    )
 }
 
 /// Renders a value that sits *inside* another one.
 ///
-/// A map needs its own braces there. `render_value_inner_with_config`
-/// deliberately renders a map unwrapped, because at the top level the
-/// caller supplies the braces -- but recursing into it that way printed
-/// `m: { k: v }` as `m: k: v`, which reparses as the string `"k: v"`.
-/// Nesting was destroyed by any print-then-parse cycle.
-///
-/// Public because the printer renders a value group's pairs itself and
-/// needs the same rule.
-pub fn render_nested(v: &Value, config: &PrinterConfig) -> String {
-    render_nested_with_blocks(v, config, &mut default_block_renderer)
-}
-
-/// [`render_nested`] with the block renderer supplied explicitly, the way
-/// [`render_args_with_blocks`] has it for `(args)`: a printer that can render blocks in full
-/// passes its own, so a `key: [...]` value of a `{...}` group is not cut down to
-/// paragraph-inlines only.
-pub fn render_nested_with_blocks(
-    v: &Value,
-    config: &PrinterConfig,
-    render_blocks: &mut BlockRenderer,
-) -> String {
+/// A map needs its own braces there. [`render_value_inner_with_config`] renders a map unwrapped,
+/// because at the top level the caller supplies the braces, and a map nested that way would print
+/// `m: { k: v }` as `m: k: v`, which reads back as the string `"k: v"`.
+pub(crate) fn render_nested(v: &Value, config: &PrinterConfig) -> String {
     match v {
-        Value::Map(_) => format!(
-            "{{{}}}",
-            render_value_inner_with_blocks(v, config, render_blocks)
-        ),
-        _ => render_value_inner_with_blocks(v, config, render_blocks),
+        Value::Map(_) => format!("{{{}}}", render_value_inner_with_config(v, config)),
+        _ => render_value_inner_with_config(v, config),
     }
 }
 
-pub fn render_value_inner_with_config(v: &Value, config: &PrinterConfig) -> String {
-    render_value_inner_with_blocks(v, config, &mut default_block_renderer)
-}
-
-/// Same as [`render_value_inner_with_config`], but with the block
-/// renderer supplied explicitly instead of defaulting to the restricted
-/// one. See [`BlockRenderer`].
+/// Renders a value in a slot of its own. A map is written without braces, since the caller
+/// supplies them at the top level; [`render_nested`] is the form for a value inside another.
 #[deny(clippy::wildcard_enum_match_arm)]
-pub fn render_value_inner_with_blocks(
-    v: &Value,
-    config: &PrinterConfig,
-    render_blocks: &mut BlockRenderer,
-) -> String {
+pub(crate) fn render_value_inner_with_config(v: &Value, config: &PrinterConfig) -> String {
     match v {
         Value::Null => String::new(),
         Value::Bool(b) => b.to_string(),
@@ -263,13 +42,13 @@ pub fn render_value_inner_with_blocks(
         Value::Float(f) => Value::float_text(*f),
         // As written: formatting must not turn `1.10` into `1.1`.
         Value::Number(text) => text.clone(),
-        Value::String(s) => quote_scalar_string(s),
+        Value::String(s) => scalar_text(s),
         // `(a, b)` is the sequence spelling -- `[...]` already means
         // `[content]`, and `list(...)` is a type.
         Value::Seq(items) => {
             let rendered: Vec<_> = items
                 .iter()
-                .map(|item| render_nested_with_blocks(item, config, render_blocks))
+                .map(|item| render_nested(item, config))
                 .collect();
             format!("({})", rendered.join(", "))
         }
@@ -278,14 +57,11 @@ pub fn render_value_inner_with_blocks(
                 let key = &entries[0].0;
                 if key == "target" {
                     let space = if config.format.link_no_space { "" } else { " " };
-                    format!(
-                        "@({key}:{space}{})",
-                        render_nested_with_blocks(&entries[0].1, config, render_blocks)
-                    )
+                    format!("@({key}:{space}{})", render_nested(&entries[0].1, config))
                 } else {
                     let mut parts = Vec::new();
                     for (idx, (k, val)) in entries.iter().enumerate() {
-                        let val_str = render_nested_with_blocks(val, config, render_blocks);
+                        let val_str = render_nested(val, config);
                         // An empty key is the parser's positional-entry
                         // sentinel (`k.is_empty()`, since a real map key
                         // can never be empty -- an empty quoted key is
@@ -303,7 +79,7 @@ pub fn render_value_inner_with_blocks(
             } else {
                 let mut parts = Vec::new();
                 for (idx, (k, val)) in entries.iter().enumerate() {
-                    let val_str = render_nested_with_blocks(val, config, render_blocks);
+                    let val_str = render_nested(val, config);
                     // See the matching comment in the single-entry branch
                     // above -- an empty key is a positional entry, printed
                     // bare rather than as `: value`.
@@ -317,10 +93,7 @@ pub fn render_value_inner_with_blocks(
             }
         }
         Value::Call(name, args) => {
-            let rendered: Vec<_> = args
-                .iter()
-                .map(|a| render_nested_with_blocks(a, config, render_blocks))
-                .collect();
+            let rendered: Vec<_> = args.iter().map(|a| render_nested(a, config)).collect();
             format!("{name}({})", rendered.join(", "))
         }
         // `parse_entry_value` only ever produces one of these with `args`
@@ -337,37 +110,29 @@ pub fn render_value_inner_with_blocks(
             &el.data,
             el.content.as_deref(),
             config,
-            render_blocks,
         ),
-        Value::Hole(hole) => render_embedded_hole(hole, config, render_blocks),
-        Value::Blocks(blocks) => format!("[{}]", render_blocks(blocks, config)),
+        Value::Hole(hole) => render_embedded_hole(hole, config),
+        Value::Blocks(blocks) => format!("[{}]", render_content_blocks(blocks, config)),
     }
 }
 
 /// A hole sitting in a value slot: `<?matcher(args){value}>[content]`. The head is
 /// inside the box and the content follows it; no `id` is printed, as for an element.
-fn render_embedded_hole(
-    hole: &tomet_ast::Hole,
-    config: &PrinterConfig,
-    render_blocks: &mut BlockRenderer,
-) -> String {
+fn render_embedded_hole(hole: &tomet_ast::Hole, config: &PrinterConfig) -> String {
     let mut s = String::from("<?");
     if let Some(matcher) = &hole.matcher {
         s.push_str(&matcher.to_string());
     }
     if let Some(args) = &hole.data.args {
-        s.push_str(&format!(
-            "({})",
-            render_args_with_blocks(args, config, render_blocks)
-        ));
+        s.push_str(&format!("({})", render_args(args, config)));
     }
     if let Some(group) = &hole.data.value {
-        s.push_str(&render_embedded_value(group, config, render_blocks));
+        s.push_str(&render_embedded_value(group, config));
     }
     s.push('>');
     if let Some(content) = hole.content.as_deref() {
         s.push('[');
-        s.push_str(&render_blocks(content, config));
+        s.push_str(&render_content_blocks(content, config));
         s.push(']');
     }
     s
@@ -381,33 +146,25 @@ fn render_embedded(
     data: &tomet_ast::Data,
     content: Option<&[Block]>,
     config: &PrinterConfig,
-    render_blocks: &mut BlockRenderer,
 ) -> String {
     let mut s = match &data.args {
-        Some(args) => format!(
-            "{head}({})",
-            render_args_with_blocks(args, config, render_blocks)
-        ),
+        Some(args) => format!("{head}({})", render_args(args, config)),
         None => head,
     };
     if let Some(content) = content {
         s.push('[');
-        s.push_str(&render_blocks(content, config));
+        s.push_str(&render_content_blocks(content, config));
         s.push(']');
     }
     if let Some(group) = &data.value {
-        s.push_str(&render_embedded_value(group, config, render_blocks));
+        s.push_str(&render_embedded_value(group, config));
     }
     s
 }
 
 /// A `{...}` group of an embedded node, its entries in source order.
 #[deny(clippy::wildcard_enum_match_arm)]
-fn render_embedded_value(
-    group: &Group,
-    config: &PrinterConfig,
-    render_blocks: &mut BlockRenderer,
-) -> String {
+fn render_embedded_value(group: &Group, config: &PrinterConfig) -> String {
     let Group(entries) = group;
     let mut s = String::from('{');
     for (i, entry) in entries.iter().enumerate() {
@@ -415,25 +172,22 @@ fn render_embedded_value(
             s.push_str(", ");
         }
         match entry {
-            Entry::Pair(k, v) => s.push_str(&format!(
-                "{}: {}",
-                key_text(k),
-                render_nested_with_blocks(v, config, render_blocks)
-            )),
+            Entry::Pair(k, v) => {
+                s.push_str(&format!("{}: {}", key_text(k), render_nested(v, config)))
+            }
             Entry::Element(nested) => {
                 let nested = Value::Element(Box::new(nested.clone()));
-                s.push_str(&render_nested_with_blocks(&nested, config, render_blocks));
+                s.push_str(&render_nested(&nested, config));
             }
             Entry::Hole(nested) => {
                 let nested = Value::Hole(Box::new(nested.clone()));
-                s.push_str(&render_nested_with_blocks(&nested, config, render_blocks));
+                s.push_str(&render_nested(&nested, config));
             }
             Entry::Bare(bare) => s.push_str(&render_embedded(
                 String::new(),
                 &bare.data,
                 bare.content.as_deref(),
                 config,
-                render_blocks,
             )),
         }
     }
@@ -441,17 +195,11 @@ fn render_embedded_value(
     s
 }
 
-pub fn render_args_with_config(v: &Value, config: &PrinterConfig) -> String {
-    render_args_with_blocks(v, config, &mut default_block_renderer)
-}
-
-/// Same as [`render_args_with_config`], but with the block renderer
-/// supplied explicitly. See [`BlockRenderer`].
-pub fn render_args_with_blocks(
-    v: &Value,
-    config: &PrinterConfig,
-    render_blocks: &mut BlockRenderer,
-) -> String {
+/// Renders the `(args)` of an element or declaration. A lone `target` entry is written
+/// `target: value`; any other value is rendered by [`render_value_inner_with_config`], with a
+/// `key: [...]` value written through the printer's block renderer, so
+/// `@conflict(a: [multi-paragraph content], ...)` keeps everything past the first paragraph.
+pub(crate) fn render_args(v: &Value, config: &PrinterConfig) -> String {
     if let Value::Map(entries) = v
         && entries.len() == 1
     {
@@ -460,11 +208,11 @@ pub fn render_args_with_blocks(
             let space = if config.format.link_no_space { "" } else { " " };
             return format!(
                 "{key}:{space}{}",
-                render_value_inner_with_blocks(&entries[0].1, config, render_blocks)
+                render_value_inner_with_config(&entries[0].1, config)
             );
         }
     }
-    render_value_inner_with_blocks(v, config, render_blocks)
+    render_value_inner_with_config(v, config)
 }
 
 fn render_meta_field_value(
@@ -522,7 +270,7 @@ fn render_meta_field_value(
 /// else a single `::meta(k: v, ...)` line, and `::meta()` for a document with no field. The fields
 /// are the declaration's `(args)`; `{...}` is no part of `::meta`, but a declaration that has one
 /// (`tomet check` reports it) is printed with it rather than losing it.
-pub fn render_meta_declaration(declaration: &Declaration, config: &PrinterConfig) -> String {
+pub(crate) fn render_meta_declaration(declaration: &Declaration, config: &PrinterConfig) -> String {
     let head = "::meta";
     if config.meta.always_newline
         && declaration.data.value.is_none()
@@ -573,7 +321,7 @@ pub fn render_meta_declaration(declaration: &Declaration, config: &PrinterConfig
     let mut out = String::from(head);
     out.push('(');
     if let Some(args) = &declaration.data.args {
-        out.push_str(&render_args_with_config(args, config));
+        out.push_str(&render_args(args, config));
     }
     out.push(')');
     if let Some(v) = tomet_semantics::data::declaration_data(declaration) {
@@ -588,6 +336,10 @@ pub fn render_meta_declaration(declaration: &Declaration, config: &PrinterConfig
 mod tests {
     use super::*;
     use tomet_ast::Group;
+
+    fn render_value_inner(v: &Value) -> String {
+        render_value_inner_with_config(v, &PrinterConfig::default())
+    }
 
     fn map(entries: &[(&str, Value)]) -> Value {
         Value::Map(
@@ -653,16 +405,13 @@ mod tests {
     }
 
     #[test]
-    fn render_args_with_config_handles_target() {
+    fn render_args_handles_target() {
         let cfg = PrinterConfig::default();
         let reference = Value::Map(vec![(
             "target".to_string(),
             Value::String("ref:name".to_string()),
         )]);
-        assert_eq!(
-            render_args_with_config(&reference, &cfg),
-            "target: \"ref:name\""
-        );
+        assert_eq!(render_args(&reference, &cfg), "target: \"ref:name\"");
 
         let cfg_no_space = PrinterConfig {
             format: tomet_config::FormatConfig {
@@ -672,7 +421,7 @@ mod tests {
             ..Default::default()
         };
         assert_eq!(
-            render_args_with_config(&reference, &cfg_no_space),
+            render_args(&reference, &cfg_no_space),
             "target:\"ref:name\""
         );
     }
@@ -857,24 +606,6 @@ mod tests {
         assert_eq!(
             render_meta_declaration(&el, &cfg),
             "::meta(\n  plain.key: 1\n  \"tmtroot/a b.tmt\": 2\n)"
-        );
-    }
-
-    #[test]
-    fn test_quote_scalar_string_escaping_and_keywords() {
-        assert_eq!(quote_scalar_string("true"), "\"true\"");
-        assert_eq!(quote_scalar_string("false"), "\"false\"");
-        assert_eq!(quote_scalar_string("null"), "\"null\"");
-        assert_eq!(quote_scalar_string("123"), "\"123\"");
-        assert_eq!(quote_scalar_string("45.67"), "\"45.67\"");
-        assert_eq!(
-            quote_scalar_string("hello \"world\""),
-            "\"hello \\\"world\\\"\""
-        );
-        assert_eq!(quote_scalar_string("line1\nline2"), "\"line1\\nline2\"");
-        assert_eq!(
-            quote_scalar_string("2026-06-17T05:52:44Z"),
-            "2026-06-17T05:52:44Z"
         );
     }
 }

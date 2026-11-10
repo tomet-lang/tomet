@@ -26,6 +26,7 @@ shared corpus, or that cross a crate boundary, live here.
 | `src/nexus.rs` | The nexus rule (a primary group is required) held against the `syntax/nexus*` fixtures |
 | `src/syntax_report.rs` | Generates and checks `SYNTAX.md` |
 | `src/roundtrip.rs` | Parser + formatter and parser + printer invariants |
+| `src/spelling.rs` | A key or a string as the printer and cotomet's writer spell it, read back by the parser |
 | `src/snapshot.rs` | `.tmt` -> HTML / CommonMark / Typst / printed `.tmt` |
 
 ## Running

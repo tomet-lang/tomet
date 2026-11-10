@@ -177,7 +177,7 @@ impl AttrSlot {
             let sep = self.infer_new_entry_sep();
             let mut key_raw = String::new();
             if !key.is_empty() {
-                tomet_style::write_key(key, &mut key_raw);
+                tomet_spelling::write_key(key, &mut key_raw);
             }
             let sep_raw = if key.is_empty() {
                 String::new()
@@ -232,7 +232,7 @@ impl AttrEntry {
         }
         if !self.key.is_empty() {
             if self.key_raw.is_empty() {
-                tomet_style::write_key(&self.key, out);
+                tomet_spelling::write_key(&self.key, out);
             } else {
                 out.push_str(&self.key_raw);
             }
