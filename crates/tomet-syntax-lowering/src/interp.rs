@@ -4,14 +4,14 @@ use tomet_cst::SyntaxNode;
 use tomet_lexer::Cursor;
 use tomet_span::Span;
 
-/// First character of an interpolation expression identifier.
+/// First character of an interpolation expression identifier. A name is ASCII.
 pub fn is_interp_ident_start(c: char) -> bool {
-    c.is_alphabetic() || c == '_'
+    c.is_ascii_alphabetic() || c == '_'
 }
 
 /// Subsequent characters of an interpolation expression identifier.
 pub fn is_interp_ident_char(c: char) -> bool {
-    c.is_alphanumeric() || c == '_' || c == '-'
+    c.is_ascii_alphanumeric() || c == '_' || c == '-'
 }
 
 /// Reads a `"..."` string, with `\"`, `\\`, `\n`, `\t` escapes.

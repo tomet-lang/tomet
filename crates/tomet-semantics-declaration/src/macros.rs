@@ -38,8 +38,8 @@ pub fn is_ident_placeholder(s: &str) -> bool {
     let Some(first) = chars.next() else {
         return false;
     };
-    (first.is_alphabetic() || first == '_')
-        && chars.all(|c| c.is_alphanumeric() || c == '_' || c == '-')
+    (first.is_ascii_alphabetic() || first == '_')
+        && chars.all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-')
 }
 
 /// What a template takes: how many positional arguments, and which named ones.

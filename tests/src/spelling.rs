@@ -191,10 +191,10 @@ fn the_enumeration_covers_what_it_claims() {
 #[test]
 fn a_key_is_bare_exactly_when_the_parser_reads_it_bare() {
     // Both ways: a bare key the parser reads as another would corrupt the document, and a quoted
-    // one it would read bare is quoting for nothing. Keys with a non-ASCII letter are always
-    // quoted whatever the parser takes of them; see the crate doc.
+    // one it would read bare is quoting for nothing. A name is ASCII, so a key with any other
+    // letter is quoted, and the parser reads it bare as nothing but text.
     let (mut wrong, mut needless) = (Vec::new(), Vec::new());
-    for key in keys().into_iter().filter(|k| k.is_ascii()) {
+    for key in keys() {
         let quoted_src = format!("::x({}: 1)\n", quoted(&key));
         let Ok(expected) = tomet_ast_parser::parse_file(&quoted_src) else {
             continue;
@@ -366,7 +366,7 @@ fn a_call_is_written_as_a_call_exactly_when_the_parser_reads_the_name() {
     // reads `$name(1)` as that same call: braces for a name it reads otherwise would corrupt the
     // document, and braces kept for a name it reads would be braces for nothing.
     let (mut wrong, mut needless, mut tried) = (Vec::new(), Vec::new(), 0usize);
-    for name in runs(PARTS, MAX_PARTS).into_iter().filter(|n| n.is_ascii()) {
+    for name in runs(PARTS, MAX_PARTS) {
         let Ok(before) = tomet_ast_parser::parse_file(&format!("see ${{{name}(1)}} now\n")) else {
             continue;
         };
@@ -393,4 +393,45 @@ fn a_call_is_written_as_a_call_exactly_when_the_parser_reads_the_name() {
     assert!(tried > 1000, "only {tried} names parsed");
     assert_none("tomet-printer, call written as a call", &wrong);
     assert_none("tomet-printer, call kept in braces", &needless);
+}
+
+/// Pieces of the names that must not be read: a letter outside ASCII among those a name is made of.
+const OUTSIDE_PARTS: &[&str] = &["a", "é", "名", "_", "-", ".", "1"];
+
+#[test]
+fn a_name_with_a_letter_outside_ascii_is_read_as_no_name_anywhere() {
+    // A name is ASCII wherever the grammar reads one: an element's `@name(`, a call's `$name(`, a
+    // box's `<?name>`, a declaration's `::name(` and an identifier in `${...}`. With a letter
+    // outside ASCII in it, the first four are text and the last is no expression.
+    let mut bad = Vec::new();
+    for name in runs(OUTSIDE_PARTS, 3).into_iter().filter(|n| !n.is_ascii()) {
+        for (what, marker, src) in [
+            ("element", "Element(", format!("see @{name}(1) now\n")),
+            ("call", "Interp(", format!("see ${name}(1) now\n")),
+            ("box", "Hole(", format!("see <?{name}> now\n")),
+            ("declaration", "Declaration {", format!("::{name}(1)\n")),
+            ("expression", "Interp(", format!("see ${{{name}}} now\n")),
+            (
+                "expression call",
+                "Interp(",
+                format!("see ${{{name}(1)}} now\n"),
+            ),
+        ] {
+            let Ok(file) = tomet_ast_parser::parse_file(&src) else {
+                continue;
+            };
+            // The name must be the one written: `@_é_(1)` holds an emphasis, `_é_`, which is text.
+            let dump = format!("{file:?}");
+            // The text around an expression is ASCII, so a letter outside it is the expression's.
+            let holds_name = if what.starts_with("expression") {
+                !dump.is_ascii()
+            } else {
+                dump.contains(&format!("{name:?}"))
+            };
+            if dump.contains(marker) && holds_name {
+                bad.push(format!("{what} {name:?}: {src:?} is read as one"));
+            }
+        }
+    }
+    assert_none("a non-ASCII name", &bad);
 }

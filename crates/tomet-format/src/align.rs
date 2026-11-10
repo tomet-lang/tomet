@@ -97,7 +97,7 @@ fn args_group(src: &str, node: Node<'_>) -> Option<(usize, usize)> {
     };
     let name_len: usize = rest[sigil..]
         .chars()
-        .take_while(|c| c.is_alphanumeric() || matches!(c, '_' | '-' | '.'))
+        .take_while(|c| c.is_ascii_alphanumeric() || matches!(c, '_' | '-' | '.'))
         .map(char::len_utf8)
         .sum();
     let mut open = span.start + sigil + name_len;

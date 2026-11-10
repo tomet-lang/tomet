@@ -3,6 +3,9 @@
 //! A name is a token that may start one and the tokens that follow it with no white space
 //! between: words, digits, `_`, `-`, and a `.` with another part right after it. The tokenizer
 //! cuts these finely; the parser joins them back into one `IDENT` or one `NAME` node.
+//!
+//! A name is ASCII. The tokenizer reads a word of any letters as one `IDENT`, so `aé` and `名前`
+//! arrive as single tokens; a word with a letter outside ASCII is text and no part of a name.
 
 use super::CstParser;
 use tomet_cst::{SyntaxKind, SyntaxKind as K};
@@ -11,12 +14,14 @@ pub(super) fn is_name_start(c: char) -> bool {
     c.is_ascii_alphabetic() || c == '_'
 }
 
-/// Can a token of this kind be a part of a name once it is under way?
-fn is_name_part(kind: SyntaxKind) -> bool {
-    matches!(
-        kind,
-        K::IDENT | K::INT_NUMBER | K::UNDERSCORE | K::MINUS | K::TRUE_KW | K::FALSE_KW | K::NULL_KW
-    )
+/// Can a token of this kind and text be a part of a name once it is under way? A word is one only
+/// in ASCII when `ascii` says the name is to be.
+fn is_name_part(kind: SyntaxKind, text: &str, ascii: bool) -> bool {
+    match kind {
+        K::IDENT => !ascii || text.is_ascii(),
+        K::INT_NUMBER | K::UNDERSCORE | K::MINUS | K::TRUE_KW | K::FALSE_KW | K::NULL_KW => true,
+        _ => false,
+    }
 }
 
 impl<'a, 't> CstParser<'a, 't> {
@@ -30,7 +35,9 @@ impl<'a, 't> CstParser<'a, 't> {
         };
         let first_text = self.text_at(from);
         let valid_start = match first_kind {
-            K::IDENT => first_text.chars().next().is_some_and(is_name_start),
+            K::IDENT => {
+                first_text.is_ascii() && first_text.chars().next().is_some_and(is_name_start)
+            }
             K::UNDERSCORE => true,
             K::TRUE_KW | K::FALSE_KW | K::NULL_KW => {
                 let next = from + 1;
@@ -43,32 +50,44 @@ impl<'a, 't> CstParser<'a, 't> {
             _ => false,
         };
         if valid_start {
-            self.name_run_len(from)
+            self.name_run_len(from, true)
         } else {
             0
         }
     }
 
     /// [`CstParser::name_tokens_at`] for a box's name, whose first character is `first`'s to
-    /// accept: any letter for a name tag, a name start for a marked box.
-    pub(super) fn slot_name_tokens_at(&self, i: usize, first: impl Fn(char) -> bool) -> usize {
+    /// accept. A marked box's name is an ASCII name like any other (`ascii`), and `first` a name
+    /// start. A name tag's is a label for the reader, not a name: it starts with any letter and
+    /// may hold any letters.
+    pub(super) fn slot_name_tokens_at(
+        &self,
+        i: usize,
+        first: impl Fn(char) -> bool,
+        ascii: bool,
+    ) -> usize {
         let Some(first_kind) = self.raw_kind_at(i) else {
             return 0;
         };
         let first_text = self.text_at(i);
         let valid_start = match first_kind {
             K::IDENT | K::TRUE_KW | K::FALSE_KW | K::NULL_KW => {
-                first_text.chars().next().is_some_and(first)
+                (!ascii || first_text.is_ascii()) && first_text.chars().next().is_some_and(first)
             }
             K::UNDERSCORE => first('_'),
             _ => false,
         };
-        if valid_start { self.name_run_len(i) } else { 0 }
+        if valid_start {
+            self.name_run_len(i, ascii)
+        } else {
+            0
+        }
     }
 
     /// The length, in tokens, of the name that starts at `from`, whose first token is known to
-    /// be a valid start: it, and every token against the end of the last that is a part of a name.
-    fn name_run_len(&self, from: usize) -> usize {
+    /// be a valid start: it, and every token against the end of the last that is a part of a name
+    /// (a word only in ASCII when `ascii`).
+    fn name_run_len(&self, from: usize, ascii: bool) -> usize {
         let mut count = 1;
         let mut last_end = self.start_of(from) + self.text_at(from).len();
         while let Some(kind) = self.raw_kind_at(from + count) {
@@ -82,9 +101,11 @@ impl<'a, 't> CstParser<'a, 't> {
                 K::DOT => {
                     let next = from + count + 1;
                     self.start_of(next) == tok_start + tok_len
-                        && self.raw_kind_at(next).is_some_and(is_name_part)
+                        && self
+                            .raw_kind_at(next)
+                            .is_some_and(|k| is_name_part(k, self.text_at(next), ascii))
                 }
-                k => is_name_part(k),
+                k => is_name_part(k, self.text_at(from + count), ascii),
             };
             if !continues {
                 break;

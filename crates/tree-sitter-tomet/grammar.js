@@ -395,7 +395,20 @@ module.exports = grammar({
     // same as the other excluded characters.
     // `<` is excluded for the same longest-match reason: a box (`label`, `hole`) opens with it
     // and must win over a `text` run that would swallow `<PATH>` whole.
-    text: (_$) => /[^\n\\`*_=~<@$#:()\[{\]/|;-]+/,
+    //
+    // `$` and `<?` are excluded from that run, so they open an interpolation or a hole -- but a
+    // name is ASCII, and `$a-é(1)` or `<?aé>` is text in `tomet-parser`. Tree-sitter cannot take
+    // back an interpolation or a hole it has begun, so these two prefixes, each through the first
+    // letter outside ASCII, are a `text` token of their own: longer than the `$` or the `<?name`
+    // it would otherwise open with, so it wins.
+    text: (_$) =>
+      token(
+        choice(
+          /[^\n\\`*_=~<@$#:()\[{\]/|;-]+/,
+          /\$[A-Za-z_][A-Za-z0-9_.\-]*[^\x00-\x7F]/,
+          prec(3, /<\?[A-Za-z0-9_.\-]*[^\x00-\x7F]/),
+        ),
+      ),
 
     punctuation: ($) => choice($._punctuation_not_semi, ";"),
     _punctuation_not_semi: (_$) =>

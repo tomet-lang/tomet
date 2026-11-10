@@ -19,14 +19,14 @@ impl<'a, 't> CstParser<'a, 't> {
         let marked = self.kind_at(i + 1) == Some(K::QUESTION);
         let mut j = i + 1 + usize::from(marked);
         if !marked {
-            let n = self.slot_name_tokens_at(j, char::is_alphabetic);
+            let n = self.slot_name_tokens_at(j, char::is_alphabetic, false);
             if n == 0 {
                 return None;
             }
             j += n;
             return (self.kind_at(j) == Some(K::GT)).then_some((false, j));
         }
-        let n = self.slot_name_tokens_at(j, is_name_start);
+        let n = self.slot_name_tokens_at(j, is_name_start, true);
         if n > 0 {
             j += n;
         }
@@ -62,7 +62,7 @@ impl<'a, 't> CstParser<'a, 't> {
         } else {
             char::is_alphabetic
         };
-        let n = self.slot_name_tokens_at(self.pos, first_pred);
+        let n = self.slot_name_tokens_at(self.pos, first_pred, marked);
         if n > 0 {
             self.builder.start_node(K::NAME.into());
             for _ in 0..n {
