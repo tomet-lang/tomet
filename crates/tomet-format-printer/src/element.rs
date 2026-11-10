@@ -6,7 +6,7 @@ use tomet_ast::{
 };
 use tomet_config::PrinterConfig;
 use tomet_spelling::{is_name, key_text};
-use tomet_style::GroupOrder;
+use tomet_style::{ContentLayout, GroupOrder};
 
 use crate::id::render_id;
 use crate::inline::{raw_content_text, render_content_blocks};
@@ -97,123 +97,33 @@ pub fn render_element(el: ElementView<'_>, config: &PrinterConfig) -> String {
     }
 
     if el.name.is_bare_named("callout")
-        && let Some(style) = config.format.callout_content_style.as_deref()
+        && let Some(layout) = config.format.callout_content_style
     {
-        if style == "expanded" {
-            let mut out = String::from("@callout");
-            out.push_str(empty_primary_group(
-                el.data.args.is_some(),
-                el.content.is_some(),
-            ));
-            if let Some(args) = &el.data.args {
-                out.push('(');
-                out.push_str(&render_args(args, config));
-                out.push(')');
-            }
-            if let Some(content) = el.content {
-                let inlines_text = render_content_blocks(content, config);
-                out.push_str("[\n");
-                for line in inlines_text.lines() {
-                    out.push_str("  ");
-                    out.push_str(line);
-                    out.push('\n');
-                }
-                out.push(']');
-            }
-            if let Some(value) = &el.data.value {
-                out.push_str(&render_element_value(value, config));
-            }
-            out.push_str(&render_id(el.id));
-            out.push_str(&render_connects(el.connects, config));
-            return out;
-        } else if style == "block" {
-            let mut out = String::from("@callout");
-            out.push_str(empty_primary_group(
-                el.data.args.is_some(),
-                el.content.is_some(),
-            ));
-            if let Some(args) = &el.data.args {
-                out.push('(');
-                out.push_str(&render_args(args, config));
-                out.push(')');
-            }
-            if let Some(content) = el.content {
-                let inlines_text = render_content_blocks(content, config);
-                let lines: Vec<&str> = inlines_text.lines().collect();
-                out.push('\n');
-                if lines.is_empty() {
-                    out.push_str("[ ]");
-                } else if lines.len() == 1 {
-                    out.push_str("[ ");
-                    out.push_str(lines[0]);
-                    out.push_str(" ]");
-                } else {
-                    for (idx, line) in lines.iter().enumerate() {
-                        if idx == 0 {
-                            out.push_str("[ ");
-                            out.push_str(line);
-                            out.push('\n');
-                        } else {
-                            out.push_str("  ");
-                            out.push_str(line);
-                            out.push('\n');
-                        }
-                    }
-                    out.push(']');
-                }
-            }
-            if let Some(value) = &el.data.value {
-                out.push_str(&render_element_value(value, config));
-            }
-            out.push_str(&render_id(el.id));
-            out.push_str(&render_connects(el.connects, config));
-            return out;
-        } else if style == "box" {
-            let mut out = String::from("@callout");
-            out.push_str(empty_primary_group(
-                el.data.args.is_some(),
-                el.content.is_some(),
-            ));
-            if let Some(args) = &el.data.args {
-                out.push('(');
-                out.push_str(&render_args(args, config));
-                out.push(')');
-            }
-            if let Some(content) = el.content {
-                let inlines_text = render_content_blocks(content, config);
-                let lines: Vec<&str> = inlines_text.lines().collect();
-                out.push('\n');
-                if lines.is_empty() {
-                    out.push_str("[ ]");
-                } else if lines.len() == 1 {
-                    out.push_str("[ ");
-                    out.push_str(lines[0]);
-                    out.push_str(" ]");
-                } else {
-                    for (idx, line) in lines.iter().enumerate() {
-                        if idx == 0 {
-                            out.push_str("[ ");
-                            out.push_str(line);
-                            out.push('\n');
-                        } else if idx == lines.len() - 1 {
-                            out.push_str("  ");
-                            out.push_str(line);
-                            out.push_str(" ]");
-                        } else {
-                            out.push_str("  ");
-                            out.push_str(line);
-                            out.push('\n');
-                        }
-                    }
-                }
-            }
-            if let Some(value) = &el.data.value {
-                out.push_str(&render_element_value(value, config));
-            }
-            out.push_str(&render_id(el.id));
-            out.push_str(&render_connects(el.connects, config));
-            return out;
+        let mut out = String::from("@callout");
+        out.push_str(empty_primary_group(
+            el.data.args.is_some(),
+            el.content.is_some(),
+        ));
+        if let Some(args) = &el.data.args {
+            out.push('(');
+            out.push_str(&render_args(args, config));
+            out.push(')');
         }
+        if let Some(content) = el.content {
+            let text = render_content_blocks(content, config);
+            let lines: Vec<&str> = text.lines().collect();
+            // `Expanded` keeps its bracket on the element's line, the others open it on the next.
+            if layout != ContentLayout::Expanded {
+                out.push('\n');
+            }
+            out.push_str(&layout.render(&lines, "  ", ""));
+        }
+        if let Some(value) = &el.data.value {
+            out.push_str(&render_element_value(value, config));
+        }
+        out.push_str(&render_id(el.id));
+        out.push_str(&render_connects(el.connects, config));
+        return out;
     }
 
     // One sigil, whatever the placement. A block-placed element is told apart

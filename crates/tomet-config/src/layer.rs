@@ -209,8 +209,14 @@ mod tests {
         // Replaced where the inner layer says something ...
         assert_eq!(cfg.format.table_max_col_width, Some(80));
         // ... and kept where it does not, down to a sibling key of the same map.
-        assert!(cfg.format.link_no_space);
-        assert!(cfg.meta.always_newline);
+        assert_eq!(
+            cfg.format.link_target_colon,
+            Some(tomet_style::ColonSpacing::Tight)
+        );
+        assert_eq!(
+            cfg.meta.field_layout,
+            Some(tomet_style::GroupLayout::OnePerLine)
+        );
         assert_eq!(
             cfg.macros.get("a").and_then(|v| v.as_str()),
             Some("outer-a")
@@ -270,8 +276,9 @@ mod tests {
         assert!(l.strip_vault_only().is_empty());
         let cfg = Config::from_layers([&l]);
         assert!(cfg.workspace.ignore.is_empty());
-        assert!(
-            cfg.format.link_no_space,
+        assert_eq!(
+            cfg.format.link_target_colon,
+            Some(tomet_style::ColonSpacing::Tight),
             "the rest of the layer still applies"
         );
     }

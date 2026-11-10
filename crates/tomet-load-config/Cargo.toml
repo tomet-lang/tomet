@@ -11,4 +11,5 @@ tomet-config     = { workspace = true }
 tomet-ast-parser = { workspace = true }
 
 [dev-dependencies]
+tomet-style = { workspace = true }
 tomet-ast = { workspace = true }

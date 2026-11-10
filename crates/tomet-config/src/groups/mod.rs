@@ -16,3 +16,13 @@ pub use format::FormatConfig;
 pub use meta::{FieldConfig, MetaConfig};
 pub use registry::RegistryConfig;
 pub use workspace::WorkspaceConfig;
+
+/// A flag as a setting writes it: `true` or `false`, or the text of either.
+pub(crate) fn parse_flag(value: &tomet_ast::Value) -> Option<bool> {
+    use tomet_tree::ValueExt;
+    match value.as_str() {
+        Some("true" | "1") => Some(true),
+        Some("false" | "0") => Some(false),
+        _ => value.as_bool(),
+    }
+}

@@ -1,8 +1,9 @@
 //! Formatting and printer rule configuration ([`FormatConfig`]).
 
+use super::parse_flag;
 use tomet_ast::Value;
 use tomet_spec_derive::Config;
-use tomet_style::{GroupOrder, ParagraphSeparator};
+use tomet_style::{BracketSpacing, ColonSpacing, ContentLayout, GroupOrder, ParagraphSeparator};
 use tomet_tree::ValueExt;
 
 fn parse_group_order(value: &Value) -> Option<GroupOrder> {
@@ -19,6 +20,30 @@ fn parse_paragraph_separator(value: &Value) -> Option<ParagraphSeparator> {
         "semicolon" => Some(ParagraphSeparator::Semicolon),
         _ => None,
     }
+}
+
+fn parse_bracket_spacing(value: &Value) -> Option<BracketSpacing> {
+    parse_flag(value).map(|padded| {
+        if padded {
+            BracketSpacing::Padded
+        } else {
+            BracketSpacing::Tight
+        }
+    })
+}
+
+fn parse_colon_spacing(value: &Value) -> Option<ColonSpacing> {
+    parse_flag(value).map(|no_space| {
+        if no_space {
+            ColonSpacing::Tight
+        } else {
+            ColonSpacing::Spaced
+        }
+    })
+}
+
+fn parse_content_layout(value: &Value) -> Option<ContentLayout> {
+    ContentLayout::from_name(value.as_str()?)
 }
 
 /// Formatting and printer rule configuration.
@@ -48,20 +73,29 @@ pub struct FormatConfig {
     #[config(key = "map.max_key_width", default = 20)]
     pub map_max_key_width: Option<usize>,
 
-    /// Space inside brackets for headings (`=[ title ]` vs `=[title]`).
-    #[config(key = "heading.space_inside_brackets", default = false)]
-    pub heading_space_inside_brackets: bool,
+    /// Whether the title of a heading has a space inside its brackets (`=[ title ]` vs
+    /// `=[title]`). Unset, the formatter leaves each heading as written and the printer writes
+    /// none.
+    #[config(
+        key = "heading.space_inside_brackets",
+        type = "bool",
+        parse_with = "parse_bracket_spacing"
+    )]
+    pub heading_brackets: Option<BracketSpacing>,
 
-    /// Omit spaces around link content (`@[content]` vs `@ [content]`).
-    #[config(key = "link.no_space", alias = "wikilink.no_space", default = false)]
-    pub link_no_space: bool,
+    /// Whether a `target` that is the only argument of an element, as in `@link(target: x)`, has no
+    /// space after its colon (`target:x` vs `target: x`). Any other argument is written with the
+    /// space. Unset, the formatter leaves each as written and the printer writes the space.
+    #[config(
+        key = "link.no_space",
+        type = "bool",
+        parse_with = "parse_colon_spacing"
+    )]
+    pub link_target_colon: Option<ColonSpacing>,
 
     /// Delimiter group order for links (`()[]` vs `[]()`).
     #[config(
         key = "link.group_order",
-        alias = "link.order",
-        alias = "wikilink.group_order",
-        alias = "wikilink.order",
         type = "string",
         default = "()[]",
         parse_with = "parse_group_order"
@@ -71,21 +105,31 @@ pub struct FormatConfig {
     /// Default delimiter group order for all elements.
     #[config(
         key = "element.group_order",
-        alias = "element.order",
-        alias = "group_order",
         type = "string",
         default = "args_first",
         parse_with = "parse_group_order"
     )]
     pub group_order: Option<GroupOrder>,
 
-    /// Callout box content style (e.g. "block", "quote").
-    #[config(key = "callout.style.content", type = "string")]
-    pub callout_content_style: Option<String>,
+    /// How the content of a `@callout` is laid out between its brackets: `expanded`, `block` or
+    /// `box` ([`ContentLayout`]). Unset, or any other value, the printer writes it as it writes the
+    /// content of any element.
+    #[config(
+        key = "callout.style.content",
+        type = "string",
+        parse_with = "parse_content_layout"
+    )]
+    pub callout_content_style: Option<ContentLayout>,
 
-    /// Multiline list item content style (e.g. "box", "bullet").
-    #[config(key = "list.multiline.style.content", type = "string")]
-    pub list_multiline_style_content: Option<String>,
+    /// How the content of a list item that runs over several lines is laid out between its
+    /// brackets: `expanded`, `block` or `box` ([`ContentLayout`]). Unset, or any other value, the
+    /// printer writes the content after the marker as it is.
+    #[config(
+        key = "list.multiline.style.content",
+        type = "string",
+        parse_with = "parse_content_layout"
+    )]
+    pub list_multiline_style_content: Option<ContentLayout>,
 
     /// Table column width alignment behavior ("auto", "true", "false").
     #[config(key = "table.adjust_width", type = "string | bool", default = "auto")]
@@ -109,7 +153,7 @@ impl FormatConfig {
     /// Returns the configured group order for a specific element name (e.g. "link"),
     /// falling back to the global `group_order`.
     pub fn element_group_order(&self, element_name: &str) -> Option<GroupOrder> {
-        if (element_name == "link" || element_name == "wikilink")
+        if element_name == "link"
             && let Some(order) = self.link_group_order
         {
             return Some(order);

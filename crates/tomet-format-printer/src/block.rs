@@ -3,7 +3,7 @@
 use tomet_ast::{Block, Element, Inline, List, Placement, Section};
 use tomet_config::PrinterConfig;
 use tomet_semantics::{ElementKind, classify_std_lenient, heading_level};
-use tomet_style::{ParagraphSeparator, stands_like_a_paragraph};
+use tomet_style::{BracketSpacing, ParagraphSeparator, stands_like_a_paragraph};
 
 use crate::element::{
     render_connects, render_declaration, render_element, render_hole, render_interp,
@@ -37,11 +37,12 @@ pub(crate) fn render_blocks(blocks: &[Block], config: &PrinterConfig, out: &mut 
     let semicolon = config.format.paragraph_separator == Some(ParagraphSeparator::Semicolon);
     for (i, block) in blocks.iter().enumerate() {
         if i > 0 {
-            if semicolon && flows(&blocks[i - 1], config) && flows(block, config) {
-                out.push(';');
+            let separator = if semicolon && flows(&blocks[i - 1], config) && flows(block, config) {
+                ParagraphSeparator::Semicolon
             } else {
-                out.push('\n');
-            }
+                ParagraphSeparator::Blank
+            };
+            out.push_str(&separator.after_line_end(""));
         }
         render_block(block, config, out);
     }
@@ -130,19 +131,19 @@ pub(crate) fn render_block(block: &Block, config: &PrinterConfig, out: &mut Stri
     }
 }
 
+/// The spaces inside a heading's brackets: none unless asked for.
+fn heading_spacing(config: &PrinterConfig) -> BracketSpacing {
+    config
+        .format
+        .heading_brackets
+        .unwrap_or(BracketSpacing::Tight)
+}
+
 pub(crate) fn render_section(sec: &Section, config: &PrinterConfig, out: &mut String) {
     let level = sec.level.max(1);
     out.push_str(&"=".repeat(level));
     if !sec.title.is_empty() {
-        if config.format.heading_space_inside_brackets {
-            out.push_str("[ ");
-            out.push_str(&render_inlines(&sec.title, config));
-            out.push_str(" ]");
-        } else {
-            out.push('[');
-            out.push_str(&render_inlines(&sec.title, config));
-            out.push(']');
-        }
+        out.push_str(&heading_spacing(config).wrap(&render_inlines(&sec.title, config)));
     }
     if let Some(args) = &sec.data.args {
         out.push('(');
@@ -176,15 +177,7 @@ pub(crate) fn render_heading_element(el: &Element, config: &PrinterConfig, out: 
     let level = heading_level(el.as_view()).unwrap_or(1) as usize;
     let content = el.content.as_deref().unwrap_or(&[]);
     out.push_str(&"#".repeat(level));
-    if config.format.heading_space_inside_brackets {
-        out.push_str("[ ");
-        out.push_str(&render_content_blocks(content, config));
-        out.push_str(" ]");
-    } else {
-        out.push('[');
-        out.push_str(&render_content_blocks(content, config));
-        out.push(']');
-    }
+    out.push_str(&heading_spacing(config).wrap(&render_content_blocks(content, config)));
     if let Some(v) = el.data.value.as_ref().map(|v| v.as_data()) {
         out.push(' ');
         out.push_str(&render_value(&v));
@@ -245,64 +238,13 @@ pub(crate) fn render_list_with_indent(
         let lines: Vec<&str> = content_str.lines().collect();
         let item_attrs = item.data.value.as_ref().map(|v| v.as_data());
 
-        if lines.len() > 1 && config.format.list_multiline_style_content.is_some() {
-            let style = config
-                .format
-                .list_multiline_style_content
-                .as_deref()
-                .unwrap();
-            let prefix_width = head_prefix.chars().count();
-            let pad = " ".repeat(prefix_width + 2);
-
+        if lines.len() > 1
+            && let Some(layout) = config.format.list_multiline_style_content
+        {
+            // The content stands two columns under the marker, and so does the closing bracket.
+            let pad = " ".repeat(head_prefix.chars().count() + 2);
             out.push_str(&head_prefix);
-            if style == "expanded" {
-                out.push_str("[\n");
-                for line in &lines {
-                    out.push_str(&pad);
-                    out.push_str(line);
-                    out.push('\n');
-                }
-                out.push_str(&pad);
-                out.push(']');
-            } else if style == "block" {
-                if lines.len() == 1 {
-                    out.push_str("[ ");
-                    out.push_str(lines[0]);
-                    out.push_str(" ]");
-                } else {
-                    out.push_str("[ ");
-                    for (idx, line) in lines.iter().enumerate() {
-                        if idx == 0 {
-                            out.push_str(line);
-                            out.push('\n');
-                        } else {
-                            out.push_str(&pad);
-                            out.push_str(line);
-                            out.push('\n');
-                        }
-                    }
-                    out.push_str(&pad);
-                    out.push(']');
-                }
-            } else if style == "box" {
-                out.push_str("[ ");
-                for (idx, line) in lines.iter().enumerate() {
-                    if idx == 0 {
-                        out.push_str(line);
-                        out.push('\n');
-                    } else if idx == lines.len() - 1 {
-                        out.push_str(&pad);
-                        out.push_str(line);
-                        out.push_str(" ]");
-                    } else {
-                        out.push_str(&pad);
-                        out.push_str(line);
-                        out.push('\n');
-                    }
-                }
-            } else {
-                out.push_str(&content_str);
-            }
+            out.push_str(&layout.render(&lines, &pad, &pad));
             if let Some(attrs) = item_attrs {
                 out.push(' ');
                 out.push_str(&render_value(&attrs));

@@ -1,8 +1,10 @@
 //! Metadata styling rules and per-field constraints ([`MetaConfig`], [`FieldConfig`]).
 
+use super::parse_flag;
 use std::collections::BTreeMap;
 use tomet_ast::Value;
 use tomet_spec_derive::Config;
+use tomet_style::GroupLayout;
 use tomet_tree::ValueExt;
 
 /// Per-field metadata schema and constraint rules.
@@ -54,13 +56,29 @@ fn parse_meta_fields(value: &Value) -> Option<BTreeMap<String, FieldConfig>> {
     Some(fields)
 }
 
+fn parse_field_layout(value: &Value) -> Option<GroupLayout> {
+    parse_flag(value).map(|one_per_line| {
+        if one_per_line {
+            GroupLayout::OnePerLine
+        } else {
+            GroupLayout::OneLine
+        }
+    })
+}
+
 /// Document metadata formatting and schema rules.
 #[derive(Debug, Clone, Default, PartialEq, Config)]
 #[config(group = "meta")]
 pub struct MetaConfig {
-    /// Always write metadata keys on separate newlines.
-    #[config(key = "meta.always_newline", default = false)]
-    pub always_newline: bool,
+    /// Whether the fields of `::meta(...)` are written one to a line (`true`) or on one line
+    /// (`false`). Unset, the formatter leaves each `::meta` as written and the printer writes one
+    /// line.
+    #[config(
+        key = "meta.always_newline",
+        type = "bool",
+        parse_with = "parse_field_layout"
+    )]
+    pub field_layout: Option<GroupLayout>,
 
     /// Per-field schema attributes template for specification generation.
     #[config(flatten)]

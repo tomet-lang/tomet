@@ -151,9 +151,6 @@ fn rewrite_gap(gap: &str, separator: ParagraphSeparator) -> Option<String> {
     if blank_lines.is_empty() && !semicolon {
         return None;
     }
-    let text = match separator {
-        ParagraphSeparator::Blank => format!("\n\n{indent}"),
-        ParagraphSeparator::Semicolon => format!("\n{indent};"),
-    };
+    let text = format!("\n{}", separator.after_line_end(indent));
     (text != gap).then_some(text)
 }

@@ -13,7 +13,7 @@ pub struct ConfigEntrySpec {
     pub default_value: Option<&'static str>,
     /// Prose description extracted from `///` doc-comments.
     pub description: &'static str,
-    /// Alternative/legacy key aliases (e.g. `&["link.order"]`).
+    /// Other keys that set the same entry.
     pub aliases: &'static [&'static str],
 }
 

@@ -8,3 +8,5 @@ repository.workspace = true
 
 [dependencies]
 tomet-ast = { workspace = true }
+#--- Crates.io ---
+unicode-width = { workspace = true }

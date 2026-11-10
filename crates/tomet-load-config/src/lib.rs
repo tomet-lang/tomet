@@ -253,8 +253,9 @@ mod tests {
 
         let (deep_cfg, _, _) = find_config_file(&deep).unwrap();
         assert_eq!(deep_cfg.format.table_max_col_width, Some(70));
-        assert!(
-            deep_cfg.format.link_no_space,
+        assert_eq!(
+            deep_cfg.format.link_target_colon,
+            Some(tomet_style::ColonSpacing::Tight),
             "the vault's sibling key survives"
         );
         assert_eq!(
@@ -297,7 +298,10 @@ mod tests {
         );
         let (cfg, _, _) = find_config_file(&entry).unwrap();
         assert_eq!(cfg.format.table_max_col_width, Some(60));
-        assert!(cfg.format.link_no_space);
+        assert_eq!(
+            cfg.format.link_target_colon,
+            Some(tomet_style::ColonSpacing::Tight)
+        );
     }
 
     #[test]
@@ -361,8 +365,8 @@ mod tests {
         let (cfg, file, root) = find_config_file(&note).unwrap();
         assert_eq!(root, dir.0.join("inner"));
         assert_eq!(file, dir.0.join("inner").join(VAULT_CONFIG_FILE));
-        assert!(
-            !cfg.format.link_no_space,
+        assert_eq!(
+            cfg.format.link_target_colon, None,
             "the outer vault does not leak in"
         );
     }
@@ -378,8 +382,9 @@ mod tests {
         let note = dir.write("a/note.tmt", "");
         let (cfg, _, _) = find_config_file(&note).unwrap();
         assert_eq!(cfg.workspace.ignore, vec!["target".to_string()]);
-        assert!(
-            cfg.format.link_no_space,
+        assert_eq!(
+            cfg.format.link_target_colon,
+            Some(tomet_style::ColonSpacing::Tight),
             "the rest of that folder config still applies"
         );
     }
@@ -395,7 +400,10 @@ mod tests {
         let src = "::format(table: { max_col_width: 99 })\n";
         let cfg = config_for(Some(&note), src);
         assert_eq!(cfg.format.table_max_col_width, Some(99));
-        assert!(cfg.format.link_no_space);
+        assert_eq!(
+            cfg.format.link_target_colon,
+            Some(tomet_style::ColonSpacing::Tight)
+        );
     }
 
     #[test]
@@ -403,6 +411,9 @@ mod tests {
         let dir = Dir::new("lone");
         let note = dir.write("note.tmt", "");
         let cfg = config_for(Some(&note), "::format(link: { no_space: true })\n");
-        assert!(cfg.format.link_no_space);
+        assert_eq!(
+            cfg.format.link_target_colon,
+            Some(tomet_style::ColonSpacing::Tight)
+        );
     }
 }

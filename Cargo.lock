@@ -2006,6 +2006,8 @@ dependencies = [
  "tomet-ast",
  "tomet-ast-parser",
  "tomet-config",
+ "tomet-cst",
+ "tomet-cst-parser",
  "tomet-style",
  "tomet-tree",
  "unicode-width",
@@ -2126,6 +2128,7 @@ dependencies = [
  "tomet-ast",
  "tomet-ast-parser",
  "tomet-config",
+ "tomet-style",
 ]
 
 [[package]]
@@ -2232,7 +2235,6 @@ dependencies = [
  "tomet-style",
  "tomet-tree",
  "tomet-type",
- "unicode-width",
 ]
 
 [[package]]
@@ -2339,6 +2341,7 @@ name = "tomet-style"
 version = "0.5.0"
 dependencies = [
  "tomet-ast",
+ "unicode-width",
 ]
 
 [[package]]

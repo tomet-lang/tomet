@@ -4,7 +4,7 @@ use tomet_ast::{Bare, Block, Data, Entry, File, Group, Inline, Name, Paragraph, 
 use tomet_config::{FieldConfig, FormatConfig, MetaConfig, load_config_from_str};
 use tomet_field_utils::generate_id_for_field;
 use tomet_span::Span;
-use tomet_style::{GroupOrder, ParagraphSeparator};
+use tomet_style::{ContentLayout, GroupOrder, ParagraphSeparator};
 use tomet_tree::element_new;
 
 #[test]
@@ -12,7 +12,7 @@ fn test_printer_config_space_inside_brackets() {
     let doc = tomet_ast_parser::parse_file("=[Title]\n").unwrap();
     let cfg = PrinterConfig {
         format: FormatConfig {
-            heading_space_inside_brackets: true,
+            heading_brackets: Some(tomet_style::BracketSpacing::Padded),
             ..Default::default()
         },
         ..Default::default()
@@ -90,7 +90,7 @@ fn connects_survive_a_specially_styled_callout() {
     let doc = tomet_ast_parser::parse_file("@callout(info)[x]::rule(allow: (card))\n").unwrap();
     let cfg = PrinterConfig {
         format: FormatConfig {
-            callout_content_style: Some("block".to_string()),
+            callout_content_style: Some(ContentLayout::Block),
             ..Default::default()
         },
         ..Default::default()
@@ -105,7 +105,7 @@ fn test_iso8601_timestamp_rendering_in_meta() {
     let doc = tomet_markdown::from_markdown(md);
     let cfg = PrinterConfig {
         meta: MetaConfig {
-            always_newline: true,
+            field_layout: Some(tomet_style::GroupLayout::OnePerLine),
             ..Default::default()
         },
         ..Default::default()
@@ -157,7 +157,7 @@ fn test_rfc3339_and_aliases_always_newline_meta_field_formatting() {
 
     let cfg = PrinterConfig {
         meta: MetaConfig {
-            always_newline: true,
+            field_layout: Some(tomet_style::GroupLayout::OnePerLine),
             fields: meta_fields,
             ..Default::default()
         },
@@ -197,7 +197,7 @@ fn test_rfc3339_with_offset_formatting() {
 
     let cfg = PrinterConfig {
         meta: MetaConfig {
-            always_newline: true,
+            field_layout: Some(tomet_style::GroupLayout::OnePerLine),
             fields: meta_fields,
             ..Default::default()
         },
@@ -216,7 +216,7 @@ fn test_null_value_rendering() {
     let doc = tomet_markdown::from_markdown(md);
     let cfg = PrinterConfig {
         meta: MetaConfig {
-            always_newline: true,
+            field_layout: Some(tomet_style::GroupLayout::OnePerLine),
             ..Default::default()
         },
         ..Default::default()
@@ -239,7 +239,7 @@ fn test_wikilink_no_space_setting() {
 
     let cfg_no_space = PrinterConfig {
         format: FormatConfig {
-            link_no_space: true,
+            link_target_colon: Some(tomet_style::ColonSpacing::Tight),
             ..Default::default()
         },
         ..Default::default()
@@ -357,7 +357,7 @@ fn test_callout_content_style_formatting() {
     // Test "block" style
     let cfg_block = PrinterConfig {
         format: FormatConfig {
-            callout_content_style: Some("block".to_string()),
+            callout_content_style: Some(ContentLayout::Block),
             ..Default::default()
         },
         ..Default::default()
@@ -368,7 +368,7 @@ fn test_callout_content_style_formatting() {
     // Test "box" style
     let cfg_box = PrinterConfig {
         format: FormatConfig {
-            callout_content_style: Some("box".to_string()),
+            callout_content_style: Some(ContentLayout::Box),
             ..Default::default()
         },
         ..Default::default()
@@ -379,7 +379,7 @@ fn test_callout_content_style_formatting() {
     // Test "expanded" style
     let cfg_expanded = PrinterConfig {
         format: FormatConfig {
-            callout_content_style: Some("expanded".to_string()),
+            callout_content_style: Some(ContentLayout::Expanded),
             ..Default::default()
         },
         ..Default::default()
@@ -395,7 +395,7 @@ fn test_list_multiline_style_formatting() {
 
     let cfg_box = PrinterConfig {
         format: FormatConfig {
-            list_multiline_style_content: Some("box".to_string()),
+            list_multiline_style_content: Some(ContentLayout::Box),
             ..Default::default()
         },
         ..Default::default()
@@ -405,7 +405,7 @@ fn test_list_multiline_style_formatting() {
 
     let cfg_block = PrinterConfig {
         format: FormatConfig {
-            list_multiline_style_content: Some("block".to_string()),
+            list_multiline_style_content: Some(ContentLayout::Block),
             ..Default::default()
         },
         ..Default::default()
@@ -420,7 +420,7 @@ fn test_single_line_block_style_formatting() {
     let doc_callout = tomet_markdown::from_markdown(md_callout);
     let cfg = PrinterConfig {
         format: FormatConfig {
-            callout_content_style: Some("block".to_string()),
+            callout_content_style: Some(ContentLayout::Block),
             ..Default::default()
         },
         ..Default::default()
@@ -440,7 +440,7 @@ fn test_link_no_space_setting() {
 
     let cfg_nospace = PrinterConfig {
         format: FormatConfig {
-            link_no_space: true,
+            link_target_colon: Some(tomet_style::ColonSpacing::Tight),
             ..Default::default()
         },
         ..Default::default()
@@ -836,7 +836,7 @@ fn a_callout_without_a_primary_group_is_printed_with_an_empty_one() {
     for style in ["expanded", "block", "box"] {
         let cfg = PrinterConfig {
             format: FormatConfig {
-                callout_content_style: Some(style.to_string()),
+                callout_content_style: ContentLayout::from_name(style),
                 ..Default::default()
             },
             ..Default::default()

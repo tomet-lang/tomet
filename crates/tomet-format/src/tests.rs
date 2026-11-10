@@ -679,7 +679,8 @@ fn only_the_entries_of_a_group_written_over_several_lines_are_aligned() {
 }
 
 #[test]
-fn document_metadata_is_not_aligned() {
+fn document_metadata_is_aligned_like_any_other_group() {
+    // The values are what the document says and stay; only the spaces after the colons move.
     let src = "::meta(\n  title: T\n  id: x\n)\n\ntext\n";
-    assert_eq!(aligned(src), src);
+    assert_eq!(aligned(src), "::meta(\n  title: T\n  id:    x\n)\n\ntext\n");
 }

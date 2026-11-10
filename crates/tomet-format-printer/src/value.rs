@@ -11,7 +11,16 @@ use tomet_ast::{Block, Declaration, Entry, Group, Value};
 use tomet_config::{FieldConfig, PrinterConfig};
 use tomet_field_utils::is_iso8601;
 use tomet_spelling::{key_text, scalar_text};
-use unicode_width::UnicodeWidthStr;
+use tomet_style::{ColonSpacing, GroupLayout, ValueAlignment};
+
+/// What stands between the colon of a link's `target` and its value: a space unless asked not to.
+fn link_colon(config: &PrinterConfig) -> &'static str {
+    config
+        .format
+        .link_target_colon
+        .unwrap_or(ColonSpacing::Spaced)
+        .after_colon()
+}
 
 pub(crate) fn render_value(v: &Value) -> String {
     format!(
@@ -57,7 +66,7 @@ pub(crate) fn render_value_inner_with_config(v: &Value, config: &PrinterConfig) 
             if entries.len() == 1 {
                 let key = &entries[0].0;
                 if key == "target" {
-                    let space = if config.format.link_no_space { "" } else { " " };
+                    let space = link_colon(config);
                     format!("@({key}:{space}{})", render_nested(&entries[0].1, config))
                 } else {
                     let mut parts = Vec::new();
@@ -202,7 +211,7 @@ pub(crate) fn render_args(v: &Value, config: &PrinterConfig) -> String {
     {
         let key = &entries[0].0;
         if key == "target" {
-            let space = if config.format.link_no_space { "" } else { " " };
+            let space = link_colon(config);
             return format!(
                 "{key}:{space}{}",
                 render_value_inner_with_config(&entries[0].1, config)
@@ -254,7 +263,7 @@ fn render_meta_field_value(
 }
 
 /// Renders a `::meta(...)` declaration per `config`'s meta format settings: with
-/// `config.meta.always_newline`, one field per line with the per-field formatting rules
+/// `config.meta.field_layout` (`meta.always_newline`), one field per line with the per-field formatting rules
 ///
 /// ```text
 /// ::meta(
@@ -269,7 +278,7 @@ fn render_meta_field_value(
 /// (`tomet check` reports it) is printed with it rather than losing it.
 pub(crate) fn render_meta_declaration(declaration: &Declaration, config: &PrinterConfig) -> String {
     let head = "::meta";
-    if config.meta.always_newline
+    if config.meta.field_layout == Some(GroupLayout::OnePerLine)
         && declaration.data.value.is_none()
         && let Some(Value::Map(entries)) = tomet_semantics::data::declaration_entries(declaration)
         && !entries.is_empty()
@@ -283,36 +292,32 @@ pub(crate) fn render_meta_declaration(declaration: &Declaration, config: &Printe
             .collect();
         // A value that runs over several lines, or is empty, has nothing on the line to align.
         let on_the_line = |value: &str| !(value.starts_with('\n') || value.is_empty());
-        let mut out = format!("{head}(\n");
-        for (i, (key, value)) in rows.iter().enumerate() {
-            out.push_str("  ");
-            out.push_str(key);
-            out.push(':');
-            if on_the_line(value) {
-                // A key wider than `map.max_key_width` is not padded, and the others do not pad
-                // to it.
-                let widest = config.format.max_key_width();
-                let width = if config.format.map_align_values && key.width() <= widest {
-                    // The widest key of the run of rows this one is in.
-                    let run = |range: &mut dyn Iterator<Item = &(String, String)>| {
-                        range
-                            .take_while(|(_, value)| on_the_line(value))
-                            .map(|(key, _)| key.width())
-                            .filter(|&width| width <= widest)
-                            .max()
-                            .unwrap_or(0)
-                    };
-                    run(&mut rows[i..].iter()).max(run(&mut rows[..i].iter().rev()))
-                } else {
-                    key.width()
+        let alignment = config.format.map_align_values.then(|| ValueAlignment {
+            widest_key: config.format.max_key_width(),
+        });
+        let entries: Vec<String> = rows
+            .iter()
+            .enumerate()
+            .map(|(i, (key, value))| {
+                let pad = match alignment {
+                    // The run of rows this one is in: those around it whose value is on the line.
+                    Some(alignment) if on_the_line(value) => {
+                        let forward = rows[i..].iter().take_while(|(_, value)| on_the_line(value));
+                        let backward = rows[..i]
+                            .iter()
+                            .rev()
+                            .take_while(|(_, value)| on_the_line(value));
+                        let column =
+                            alignment.column(forward.chain(backward).map(|(key, _)| key.as_str()));
+                        alignment.padding(key, column)
+                    }
+                    None if on_the_line(value) => 1,
+                    _ => 0,
                 };
-                out.push_str(&" ".repeat(width - key.width() + 1));
-            }
-            out.push_str(value);
-            out.push('\n');
-        }
-        out.push(')');
-        return out;
+                format!("{key}:{}{value}", " ".repeat(pad))
+            })
+            .collect();
+        return format!("{head}{}", GroupLayout::OnePerLine.render(&entries, ""));
     }
 
     let mut out = String::from(head);
@@ -412,7 +417,7 @@ mod tests {
 
         let cfg_no_space = PrinterConfig {
             format: tomet_config::FormatConfig {
-                link_no_space: true,
+                link_target_colon: Some(tomet_style::ColonSpacing::Tight),
                 ..Default::default()
             },
             ..Default::default()
@@ -449,7 +454,7 @@ mod tests {
             "::meta(id: doc-12345678)"
         );
         let mut cfg = PrinterConfig::default();
-        cfg.meta.always_newline = true;
+        cfg.meta.field_layout = Some(tomet_style::GroupLayout::OnePerLine);
         assert_eq!(
             render_meta_declaration(&el, &cfg),
             "::meta(\n  id: doc-12345678\n)"
@@ -465,7 +470,7 @@ mod tests {
         )]));
         let cfg = PrinterConfig {
             meta: tomet_config::MetaConfig {
-                always_newline: true,
+                field_layout: Some(tomet_style::GroupLayout::OnePerLine),
                 ..Default::default()
             },
             ..Default::default()
@@ -488,7 +493,7 @@ mod tests {
             ("created".to_string(), text("c")),
         ]));
         let mut cfg = PrinterConfig::default();
-        cfg.meta.always_newline = true;
+        cfg.meta.field_layout = Some(tomet_style::GroupLayout::OnePerLine);
         cfg.meta.fields.insert(
             "tags".to_string(),
             tomet_config::FieldConfig {
@@ -519,7 +524,7 @@ mod tests {
             ("kind".to_string(), text("k")),
         ]));
         let mut cfg = PrinterConfig::default();
-        cfg.meta.always_newline = true;
+        cfg.meta.field_layout = Some(tomet_style::GroupLayout::OnePerLine);
         cfg.format.map_align_values = true;
         assert_eq!(
             render_meta_declaration(&el, &cfg),
@@ -532,7 +537,7 @@ mod tests {
         let el = tomet_tree::declaration_new("meta");
         let mut cfg = PrinterConfig::default();
         assert_eq!(render_meta_declaration(&el, &cfg), "::meta()");
-        cfg.meta.always_newline = true;
+        cfg.meta.field_layout = Some(tomet_style::GroupLayout::OnePerLine);
         assert_eq!(render_meta_declaration(&el, &cfg), "::meta()");
 
         let mut empty = tomet_tree::declaration_new("meta");
@@ -554,7 +559,7 @@ mod tests {
             ),
         ]));
         let mut cfg = PrinterConfig::default();
-        cfg.meta.always_newline = true;
+        cfg.meta.field_layout = Some(tomet_style::GroupLayout::OnePerLine);
         cfg.meta.fields.insert(
             "tags".to_string(),
             tomet_config::FieldConfig {
@@ -582,7 +587,7 @@ mod tests {
             Value::Int(2),
         )])));
         let mut cfg = PrinterConfig::default();
-        cfg.meta.always_newline = true;
+        cfg.meta.field_layout = Some(tomet_style::GroupLayout::OnePerLine);
         assert_eq!(render_meta_declaration(&el, &cfg), "::meta(a: 1){b: 2}");
     }
 
@@ -595,7 +600,7 @@ mod tests {
         ]));
         let cfg = PrinterConfig {
             meta: tomet_config::MetaConfig {
-                always_newline: true,
+                field_layout: Some(tomet_style::GroupLayout::OnePerLine),
                 ..Default::default()
             },
             ..Default::default()

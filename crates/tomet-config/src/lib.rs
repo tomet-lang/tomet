@@ -119,7 +119,7 @@ impl Config {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tomet_style::ParagraphSeparator;
+    use tomet_style::{ContentLayout, ParagraphSeparator};
 
     #[test]
     fn test_fields_declaration_parsing() {
@@ -159,7 +159,7 @@ mod tests {
                 .unwrap()
                 .format
                 .callout_content_style,
-            Some("block".to_string())
+            Some(ContentLayout::Block)
         );
 
         let retired = r#"::format(elements: { callout: { style: { content: block } } })
@@ -194,8 +194,14 @@ mod tests {
 )
 "#;
         let cfg = load_config_from_str(src).expect("failed to parse format");
-        assert!(cfg.format.heading_space_inside_brackets);
-        assert!(cfg.format.link_no_space);
+        assert_eq!(
+            cfg.format.heading_brackets,
+            Some(tomet_style::BracketSpacing::Padded)
+        );
+        assert_eq!(
+            cfg.format.link_target_colon,
+            Some(tomet_style::ColonSpacing::Tight)
+        );
     }
 
     #[test]
@@ -245,14 +251,14 @@ mod tests {
         assert_eq!(cfg1.format.group_order, Some(GroupOrder::ContentFirst));
 
         let src2 = r#"::format(
-  group_order: "[]()"
+  element: { group_order: "[]()" }
 )
 "#;
         let cfg2 = load_config_from_str(src2).expect("failed to parse format");
         assert_eq!(cfg2.format.group_order, Some(GroupOrder::ContentFirst));
 
         let src3 = r#"::format(
-  group_order: "args_first"
+  element: { group_order: "args_first" }
 )
 "#;
         let cfg3 = load_config_from_str(src3).expect("failed to parse format");
@@ -292,7 +298,7 @@ mod tests {
     #[test]
     fn test_dot_notation_variants() {
         let src_deep_dot = r#"::format(
-  callout.style.content: "quote"
+  callout.style.content: "expanded"
   list.multiline.style.content: "box"
   table.adjust_width: true
   table.max_col_width: 80
@@ -300,10 +306,13 @@ mod tests {
 )
 "#;
         let cfg = load_config_from_str(src_deep_dot).expect("failed to parse deep dot format");
-        assert_eq!(cfg.format.callout_content_style.as_deref(), Some("quote"));
         assert_eq!(
-            cfg.format.list_multiline_style_content.as_deref(),
-            Some("box")
+            cfg.format.callout_content_style,
+            Some(ContentLayout::Expanded)
+        );
+        assert_eq!(
+            cfg.format.list_multiline_style_content,
+            Some(ContentLayout::Box)
         );
         assert_eq!(cfg.format.table_adjust_width.as_deref(), Some("true"));
         assert_eq!(cfg.format.table_max_col_width, Some(80));
@@ -311,22 +320,34 @@ mod tests {
 
         let src_mixed = r#"::format(
   callout: {
-    style.content: "custom"
+    style.content: "block"
   }
   list.multiline: {
-    style.content: "bullet"
+    style.content: "expanded"
   }
 )
 "#;
         let cfg_mixed = load_config_from_str(src_mixed).expect("failed to parse mixed format");
         assert_eq!(
-            cfg_mixed.format.callout_content_style.as_deref(),
-            Some("custom")
+            cfg_mixed.format.callout_content_style,
+            Some(ContentLayout::Block)
         );
         assert_eq!(
-            cfg_mixed.format.list_multiline_style_content.as_deref(),
-            Some("bullet")
+            cfg_mixed.format.list_multiline_style_content,
+            Some(ContentLayout::Expanded)
         );
+    }
+
+    #[test]
+    fn a_content_layout_that_is_not_one_is_unset() {
+        let src = r#"::format(
+  callout.style.content: "quote"
+  list.multiline.style.content: "bullet"
+)
+"#;
+        let cfg = load_config_from_str(src).expect("parses");
+        assert_eq!(cfg.format.callout_content_style, None);
+        assert_eq!(cfg.format.list_multiline_style_content, None);
     }
 
     #[test]
@@ -344,7 +365,10 @@ mod tests {
 )
 "#;
         let cfg = load_config_from_str(src).expect("failed to parse meta and workspace");
-        assert!(cfg.meta.always_newline);
+        assert_eq!(
+            cfg.meta.field_layout,
+            Some(tomet_style::GroupLayout::OnePerLine)
+        );
         assert!(cfg.meta.fields.contains_key("url.wiki"));
         assert!(cfg.meta.fields.get("url.wiki").unwrap().always_newline);
         assert_eq!(cfg.meta.fields.get("title").unwrap().length, Some(70));
@@ -385,8 +409,14 @@ mod tests {
         )
         .expect("grouped");
         assert_eq!(dotted.macros, grouped.macros);
-        assert_eq!(dotted.format.link_no_space, grouped.format.link_no_space);
-        assert!(dotted.meta.always_newline);
+        assert_eq!(
+            dotted.format.link_target_colon,
+            grouped.format.link_target_colon
+        );
+        assert_eq!(
+            dotted.meta.field_layout,
+            Some(tomet_style::GroupLayout::OnePerLine)
+        );
         assert_eq!(dotted.meta.fields.len(), grouped.meta.fields.len());
         assert!(dotted.meta.fields.get("url.wiki").unwrap().always_newline);
         assert_eq!(dotted.meta.fields.get("title").unwrap().length, Some(70));

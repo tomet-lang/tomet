@@ -5,8 +5,8 @@ use std::collections::BTreeMap;
 
 use tomet_ast_parser::parse_file;
 use tomet_config::PrinterConfig;
+use tomet_style::ValueAlignment;
 use tomet_tree::{Node, Visit, walk};
-use unicode_width::UnicodeWidthStr;
 
 use crate::reorder::find_matching;
 
@@ -25,8 +25,7 @@ use crate::reorder::find_matching;
 /// line, a comment, an entry whose value runs over several lines, or any other line. Width is
 /// display width, so a wide key counts for two columns a character, and a key wider than
 /// `map.max_key_width` is left out of the alignment: written `key: value`, it neither widens the
-/// others nor ends the run. Only the groups of declarations and elements are aligned, and not a
-/// `::meta` one: the formatter never alters document metadata.
+/// others nor ends the run. Only the groups of declarations and elements are aligned.
 ///
 /// Only spacing changes, and that is checked, not assumed: if the rewritten text does not parse to
 /// the `File` it started from, `src` is returned unchanged.
@@ -38,11 +37,13 @@ pub fn format_map_alignment(src: &str, config: &PrinterConfig) -> String {
         return src.to_string();
     };
 
-    let widest = config.format.max_key_width();
+    let alignment = ValueAlignment {
+        widest_key: config.format.max_key_width(),
+    };
     let mut edits = BTreeMap::new();
     let _ = walk(&doc, &mut |node, _| {
         if let Some((open, close)) = args_group(src, node) {
-            align_group(src, open, close, widest, &mut edits);
+            align_group(src, open, close, alignment, &mut edits);
         }
         Visit::<()>::Descend
     });
@@ -65,14 +66,11 @@ pub fn format_map_alignment(src: &str, config: &PrinterConfig) -> String {
     }
 }
 
-/// The byte offsets of the `(` and `)` of the args of `node`, when it is a declaration (but not
-/// `::meta`) or an element written with them.
+/// The byte offsets of the `(` and `)` of the args of `node`, when it is a declaration or an element
+/// written with them.
 fn args_group(src: &str, node: Node<'_>) -> Option<(usize, usize)> {
     let span = match node {
         Node::Declaration(d) => {
-            if d.name.namespace.is_none() && d.name.name == "meta" {
-                return None;
-            }
             d.data.args.as_ref()?;
             d.span
         }
@@ -170,12 +168,12 @@ struct Row<'a> {
 }
 
 /// Records, keyed by where the line starts, the new text of each line of the group between `open`
-/// and `close` that alignment changes. Keys wider than `widest` columns are not padded to.
+/// and `close` that alignment changes.
 fn align_group(
     src: &str,
     open: usize,
     close: usize,
-    widest: usize,
+    alignment: ValueAlignment,
     edits: &mut BTreeMap<usize, (usize, String)>,
 ) {
     let inner = &src[open + 1..close];
@@ -196,14 +194,14 @@ fn align_group(
         match classify(text, start, &mut scan) {
             Some(row) => {
                 if run.last().is_some_and(|last| last.indent != row.indent) {
-                    align_run(&mut run, widest, &mut found);
+                    align_run(&mut run, alignment, &mut found);
                 }
                 run.push(row);
             }
-            None => align_run(&mut run, widest, &mut found),
+            None => align_run(&mut run, alignment, &mut found),
         }
     }
-    align_run(&mut run, widest, &mut found);
+    align_run(&mut run, alignment, &mut found);
 
     // A group whose brackets or quotes do not close is not read as assumed: change nothing in it.
     if scan.at_top() && !scan.broken {
@@ -262,21 +260,15 @@ fn entry_parts(line: &str) -> Option<(&str, &str)> {
     (!value.is_empty() && !value.starts_with("//")).then_some((key, value))
 }
 
-/// Aligns the rows of a finished run, and empties it. A key wider than `widest` columns neither
-/// widens the others nor is padded: it is written `key: value`.
-fn align_run(run: &mut Vec<Row<'_>>, widest: usize, found: &mut Vec<(usize, (usize, String))>) {
-    let width = run
-        .iter()
-        .map(|row| row.key.width())
-        .filter(|&width| width <= widest)
-        .max()
-        .unwrap_or(0);
+/// Aligns the rows of a finished run, and empties it.
+fn align_run(
+    run: &mut Vec<Row<'_>>,
+    alignment: ValueAlignment,
+    found: &mut Vec<(usize, (usize, String))>,
+) {
+    let column = alignment.column(run.iter().map(|row| row.key));
     for row in run.drain(..) {
-        let pad = if row.key.width() <= widest {
-            width - row.key.width() + 1
-        } else {
-            1
-        };
+        let pad = alignment.padding(row.key, column);
         let text = format!("{}{}:{}{}", row.indent, row.key, " ".repeat(pad), row.value);
         if text != row.text {
             found.push((row.start, (row.start + row.text.len(), text)));

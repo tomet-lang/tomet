@@ -24,6 +24,10 @@ name = "cotomet"
 path = "src/cotomet.rs"
 
 [[test]]
+name = "dictionary"
+path = "src/dictionary.rs"
+
+[[test]]
 name = "nexus"
 path = "src/nexus.rs"
 

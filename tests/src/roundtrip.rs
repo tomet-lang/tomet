@@ -173,6 +173,130 @@ fn aligning_values_does_not_change_the_parsed_document() {
 }
 
 #[test]
+fn laying_out_content_does_not_change_the_parsed_document() {
+    // A layout only moves white space inside and around the brackets of content that already runs
+    // over several lines, and what it writes is what it would write again.
+    use tomet_config::PrinterConfig;
+    use tomet_style::ContentLayout;
+
+    let mut changed = 0;
+    for layout in ContentLayout::ALL {
+        let mut config = PrinterConfig::default();
+        config.format.callout_content_style = Some(layout);
+        config.format.list_multiline_style_content = Some(layout);
+        for (rel, src) in parseable_corpus() {
+            let before = tomet_ast_parser::parse_file(&src)
+                .unwrap_or_else(|e| panic!("{} failed to parse: {e}", rel.display()));
+            let once = tomet_formatter::format_source_with_config(&src, &config);
+            let after = tomet_ast_parser::parse_file(&once).unwrap_or_else(|e| {
+                panic!("{} failed to parse after {layout:?}: {e}", rel.display())
+            });
+            assert!(
+                before == after,
+                "{layout:?} changed the parsed document for {}",
+                rel.display()
+            );
+            assert_eq!(
+                tomet_formatter::format_source_with_config(&once, &config),
+                once,
+                "{layout:?} is not idempotent for {}",
+                rel.display()
+            );
+            if once != tomet_formatter::format_source_with_config(&src, &PrinterConfig::default()) {
+                changed += 1;
+            }
+        }
+    }
+    assert!(changed > 0, "no fixture has multi-line content to lay out");
+}
+
+#[test]
+fn spacing_a_heading_and_a_link_does_not_change_the_parsed_document() {
+    // Only the spaces inside a heading's brackets and after the colon of a link's `target` move, and
+    // what is written is what would be written again.
+    use tomet_config::PrinterConfig;
+
+    let mut changed = 0;
+    for on in [true, false] {
+        let mut config = PrinterConfig::default();
+        config.format.heading_brackets = Some(if on {
+            tomet_style::BracketSpacing::Padded
+        } else {
+            tomet_style::BracketSpacing::Tight
+        });
+        config.format.link_target_colon = Some(if on {
+            tomet_style::ColonSpacing::Tight
+        } else {
+            tomet_style::ColonSpacing::Spaced
+        });
+        for (rel, src) in parseable_corpus() {
+            let before = tomet_ast_parser::parse_file(&src)
+                .unwrap_or_else(|e| panic!("{} failed to parse: {e}", rel.display()));
+            let once = tomet_formatter::format_source_with_config(&src, &config);
+            let after = tomet_ast_parser::parse_file(&once).unwrap_or_else(|e| {
+                panic!(
+                    "{} failed to parse after spacing ({on}): {e}",
+                    rel.display()
+                )
+            });
+            assert!(
+                before == after,
+                "spacing ({on}) changed the parsed document for {}",
+                rel.display()
+            );
+            assert_eq!(
+                tomet_formatter::format_source_with_config(&once, &config),
+                once,
+                "spacing ({on}) is not idempotent for {}",
+                rel.display()
+            );
+            if once != tomet_formatter::format_source_with_config(&src, &PrinterConfig::default()) {
+                changed += 1;
+            }
+        }
+    }
+    assert!(changed > 0, "no fixture has a heading or a link to space");
+}
+
+#[test]
+fn laying_out_meta_does_not_change_the_parsed_document() {
+    // Only where the fields of `::meta` break and the spaces after their colons move, and what is
+    // written is what would be written again.
+    use tomet_config::PrinterConfig;
+    use tomet_style::GroupLayout;
+
+    let mut changed = 0;
+    for layout in [GroupLayout::OneLine, GroupLayout::OnePerLine] {
+        let mut config = PrinterConfig::default();
+        config.meta.field_layout = Some(layout);
+        config.format.map_align_values = true;
+        for (rel, src) in parseable_corpus() {
+            let before = tomet_ast_parser::parse_file(&src)
+                .unwrap_or_else(|e| panic!("{} failed to parse: {e}", rel.display()));
+            let once = tomet_formatter::format_source_with_config(&src, &config);
+            let after = tomet_ast_parser::parse_file(&once).unwrap_or_else(|e| {
+                panic!("{} failed to parse after {layout:?}: {e}", rel.display())
+            });
+            assert!(
+                before == after,
+                "{layout:?} changed the parsed document for {}",
+                rel.display()
+            );
+            assert_eq!(
+                tomet_formatter::format_source_with_config(&once, &config),
+                once,
+                "{layout:?} is not idempotent for {}",
+                rel.display()
+            );
+            if once != tomet_formatter::format_source_with_config(&src, &PrinterConfig::default()) {
+                changed += 1;
+            }
+        }
+    }
+    assert!(changed > 0, "no fixture has a ::meta to lay out");
+}
+
+#[test]
 fn printed_source_parses() {
     // parse -> print -> parse. This asserts only that `tomet-printer`
     // emits syntax `tomet-parser` accepts, not that the round trip is an
@@ -199,7 +323,10 @@ fn config_fixtures_load() {
     // The fixtures are local to this package.
     let cfg = tomet_load_config::load_config_from_file(&fixtures_dir().join("test.config.tmt"))
         .expect("failed to load test.config.tmt");
-    assert!(cfg.meta.always_newline);
+    assert_eq!(
+        cfg.meta.field_layout,
+        Some(tomet_style::GroupLayout::OnePerLine)
+    );
     assert!(cfg.meta.fields.get("aliases").unwrap().always_newline);
     assert_eq!(
         cfg.meta.fields.get("created").unwrap().format.as_deref(),
@@ -209,11 +336,17 @@ fn config_fixtures_load() {
         cfg.meta.fields.get("created").unwrap().offset.as_deref(),
         Some("+09:00")
     );
-    assert!(cfg.format.link_no_space);
-    assert_eq!(cfg.format.callout_content_style.as_deref(), Some("block"));
     assert_eq!(
-        cfg.format.list_multiline_style_content.as_deref(),
-        Some("box")
+        cfg.format.link_target_colon,
+        Some(tomet_style::ColonSpacing::Tight)
+    );
+    assert_eq!(
+        cfg.format.callout_content_style,
+        Some(tomet_style::ContentLayout::Block)
+    );
+    assert_eq!(
+        cfg.format.list_multiline_style_content,
+        Some(tomet_style::ContentLayout::Box)
     );
     assert_eq!(
         cfg.workspace.ignore,
@@ -224,12 +357,12 @@ fn config_fixtures_load() {
         tomet_load_config::load_config_from_file(&fixtures_dir().join("default.config.tmt"))
             .expect("failed to load default.config.tmt");
     assert_eq!(
-        default_cfg.format.callout_content_style.as_deref(),
-        Some("block")
+        default_cfg.format.callout_content_style,
+        Some(tomet_style::ContentLayout::Block)
     );
     assert_eq!(
-        default_cfg.format.list_multiline_style_content.as_deref(),
-        Some("box")
+        default_cfg.format.list_multiline_style_content,
+        Some(tomet_style::ContentLayout::Box)
     );
 }
 

@@ -16,8 +16,6 @@ tomet-spelling    = { workspace = true }
 tomet-style       = { workspace = true }
 tomet-tree        = { workspace = true }
 tomet-type        = { workspace = true }
-#--- Crates.io ---
-unicode-width     = { workspace = true }
 
 [dev-dependencies]
 tomet-markdown   = { workspace = true }
