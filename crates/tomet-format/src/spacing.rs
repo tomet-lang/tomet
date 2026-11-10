@@ -6,7 +6,7 @@ use tomet_cst::{SyntaxElement, SyntaxKind as K, SyntaxNode};
 use tomet_cst_parser::parse_cst;
 use tomet_style::{BracketSpacing, ColonSpacing};
 
-use crate::edit::{Edit, apply_keeping_the_document};
+use crate::edit::{Edit, apply_keeping_the_document, is_element};
 
 /// Spaces the title of each heading written between brackets (`=[ title ]`) the way
 /// `heading.space_inside_brackets` asks. Unset, `src` is returned as written; so is a heading that
@@ -62,17 +62,12 @@ pub fn format_link_targets(src: &str, config: &PrinterConfig) -> String {
 /// `args` are an element's.
 fn target_edit(args: &SyntaxNode, spacing: ColonSpacing) -> Option<Edit> {
     let element = args.parent()?;
-    if !matches!(element.kind(), K::BLOCK_FORM | K::INLINE_FORM) {
+    if !matches!(element.kind(), K::BLOCK_FORM | K::INLINE_FORM) || !is_element(&element) {
         return None;
     }
-    let is_at = element
-        .children()
-        .find(|child| child.kind() == K::SIGIL)?
-        .first_token()
-        .is_some_and(|token| token.kind() == K::AT);
     let mut entries = args.children();
     let entry = entries.next()?;
-    if !is_at || entries.next().is_some() || entry.kind() != K::MAP_ENTRY {
+    if entries.next().is_some() || entry.kind() != K::MAP_ENTRY {
         return None;
     }
     let mut parts = entry.children_with_tokens();

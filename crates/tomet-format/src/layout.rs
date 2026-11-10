@@ -7,10 +7,19 @@ use tomet_cst::{SyntaxKind as K, SyntaxNode};
 use tomet_cst_parser::parse_cst;
 use tomet_style::ContentLayout;
 
-use crate::edit::{Edit, apply_keeping_the_document, leading_indent, line_prefix};
+use crate::edit::{
+    Edit, apply_keeping_the_document, is_element_named, leading_indent, line_prefix,
+};
 
-/// The most times a document is gone over: a layout inside another one is reached on the next, and
-/// forms nest no deeper than the parser reads.
+/// Outer-first nesting layout:
+/// Formatting an outer form (such as `@callout[...]`) shifts the indentation base for all lines
+/// inside it and replaces the enclosing text range. Because an inner form's edits would overlap
+/// with the outer form's replacement, each pass formats the outermost unformatted forms without
+/// overlapping ranges.
+///
+/// Each pass advances one nesting level deeper into the document, reaching a fixed point when all
+/// nested forms are laid out. In practice, forms nest only a few levels deep; `MAX_PASSES` provides
+/// a safe ceiling bounded by the parser's nesting depth.
 const MAX_PASSES: usize = tomet_cst_parser::MAX_DEPTH;
 
 /// Lays out, in `src`, the `[content]` of each `@callout` standing on its own lines and of each
@@ -47,8 +56,9 @@ pub fn format_content_layouts(src: &str, config: &PrinterConfig) -> String {
     text
 }
 
-/// The edits of one pass, in the order of the text. A form inside the content of one that is laid
-/// out is left to the next pass, which finds the outer one already as it should be.
+/// The edits of one pass, in the order of the text. Inner forms contained within an outer form's
+/// edit range are deferred to the next pass to avoid overlapping replacement ranges, and because
+/// their indentation base is determined only after the outer form is laid out.
 fn collect(src: &str, callout: Option<ContentLayout>, list: Option<ContentLayout>) -> Vec<Edit> {
     let root = parse_cst(src);
     let mut edits: Vec<Edit> = Vec::new();
@@ -58,7 +68,9 @@ fn collect(src: &str, callout: Option<ContentLayout>, list: Option<ContentLayout
             continue;
         }
         let edit = match node.kind() {
-            K::BLOCK_FORM if is_callout(&node) => callout.and_then(|l| callout_edit(src, &node, l)),
+            K::BLOCK_FORM if is_element_named(&node, "callout") => {
+                callout.and_then(|l| callout_edit(src, &node, l))
+            }
             K::LIST_ITEM => list.and_then(|l| list_edit(src, &node, l)),
             _ => None,
         };
@@ -70,13 +82,6 @@ fn collect(src: &str, callout: Option<ContentLayout>, list: Option<ContentLayout
         }
     }
     edits
-}
-
-fn is_callout(form: &SyntaxNode) -> bool {
-    form.children()
-        .find(|child| child.kind() == K::SIGIL)
-        .and_then(|sigil| sigil.children().find(|child| child.kind() == K::NAME))
-        .is_some_and(|name| name.text() == "callout")
 }
 
 /// A callout's brackets stand under its line, indented as it is: `Expanded` keeps its opening one

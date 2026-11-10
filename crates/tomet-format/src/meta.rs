@@ -5,7 +5,7 @@ use tomet_cst::{SyntaxElement, SyntaxKind as K, SyntaxNode};
 use tomet_cst_parser::parse_cst;
 use tomet_style::GroupLayout;
 
-use crate::edit::{Edit, apply_keeping_the_document, leading_indent};
+use crate::edit::{Edit, apply_keeping_the_document, is_declaration_named, leading_indent};
 
 /// Lays the fields of each `::meta(...)` out the way `meta.always_newline` asks: one to a line, or
 /// all on one line. Unset, `src` is returned as written; so is a `::meta` that has no field,
@@ -21,27 +21,13 @@ pub fn format_meta_layout(src: &str, config: &PrinterConfig) -> String {
     let root = parse_cst(src);
     let edits: Vec<Edit> = root
         .descendants()
-        .filter(|node| node.kind() == K::BLOCK_FORM && is_meta(node))
+        .filter(|node| node.kind() == K::BLOCK_FORM && is_declaration_named(node, "meta"))
         .filter_map(|meta| edit(src, &meta, layout))
         .collect();
     if edits.is_empty() {
         return src.to_string();
     }
     apply_keeping_the_document(src, edits).unwrap_or_else(|| src.to_string())
-}
-
-/// Whether `form` is the declaration `::meta`, not the element `@meta`.
-fn is_meta(form: &SyntaxNode) -> bool {
-    let Some(sigil) = form.children().find(|child| child.kind() == K::SIGIL) else {
-        return false;
-    };
-    sigil
-        .first_token()
-        .is_some_and(|token| token.kind() == K::COLON)
-        && sigil
-            .children()
-            .find(|child| child.kind() == K::NAME)
-            .is_some_and(|name| name.text() == "meta")
 }
 
 /// A field as `key: value`: its text as written, with one space after the colon. `None` for a field
