@@ -276,45 +276,57 @@ fn binary(
 
 /// `And ('||' And)*`
 fn parse_interp_or(cur: &mut Cursor) -> Result<InterpExpr> {
+    parse_interp_chain(cur, BinaryOp::Or, parse_interp_and)
+}
+
+/// `Comparison ('&&' Comparison)*`
+fn parse_interp_and(cur: &mut Cursor) -> Result<InterpExpr> {
+    parse_interp_chain(cur, BinaryOp::And, parse_interp_comparison)
+}
+
+/// `operand (op operand)*` for the logical operator `op`. Its first character alone is the mistake
+/// for the whole symbol (`|` for `||`) and says so.
+fn parse_interp_chain(
+    cur: &mut Cursor,
+    op: BinaryOp,
+    operand: fn(&mut Cursor) -> Result<InterpExpr>,
+) -> Result<InterpExpr> {
     skip_expr_ws(cur);
     let start_pos = cur.pos();
-    let mut lhs = parse_interp_and(cur)?;
+    let mut lhs = operand(cur)?;
     loop {
         let mut look = *cur;
         skip_expr_ws(&mut look);
-        if look.peek() == Some('|') && look.peek_at(1) == Some('|') {
-            look.bump();
-            look.bump();
+        if let Some(found) = operator_at(&look, std::iter::once(op)) {
+            bump_symbol(&mut look, found);
             *cur = look;
-            let rhs = parse_interp_and(cur)?;
-            lhs = binary(BinaryOp::Or, lhs, rhs, cur, start_pos);
-        } else if look.peek() == Some('|') {
-            return Err(err(look.pos(), "unexpected '|', did you mean '||'?"));
+            let rhs = operand(cur)?;
+            lhs = binary(op, lhs, rhs, cur, start_pos);
+        } else if look.peek() == op.symbol().chars().next() {
+            return Err(err(
+                look.pos(),
+                format!(
+                    "unexpected '{}', did you mean '{}'?",
+                    &op.symbol()[..1],
+                    op.symbol()
+                ),
+            ));
         } else {
             return Ok(lhs);
         }
     }
 }
 
-/// `Comparison ('&&' Comparison)*`
-fn parse_interp_and(cur: &mut Cursor) -> Result<InterpExpr> {
-    skip_expr_ws(cur);
-    let start_pos = cur.pos();
-    let mut lhs = parse_interp_comparison(cur)?;
-    loop {
-        let mut look = *cur;
-        skip_expr_ws(&mut look);
-        if look.peek() == Some('&') && look.peek_at(1) == Some('&') {
-            look.bump();
-            look.bump();
-            *cur = look;
-            let rhs = parse_interp_comparison(cur)?;
-            lhs = binary(BinaryOp::And, lhs, rhs, cur, start_pos);
-        } else if look.peek() == Some('&') {
-            return Err(err(look.pos(), "unexpected '&', did you mean '&&'?"));
-        } else {
-            return Ok(lhs);
-        }
+/// The operator of `ops` spelled at the cursor, the longest spelling when two are (`<=` over `<`).
+fn operator_at(cur: &Cursor, ops: impl Iterator<Item = BinaryOp>) -> Option<BinaryOp> {
+    ops.filter(|op| cur.starts_with(op.symbol()))
+        .max_by_key(|op| op.symbol().len())
+}
+
+/// Moves the cursor past the symbol of `op`, which it stands at.
+fn bump_symbol(cur: &mut Cursor, op: BinaryOp) {
+    for _ in op.symbol().chars() {
+        cur.bump();
     }
 }
 
@@ -323,20 +335,20 @@ fn parse_interp_and(cur: &mut Cursor) -> Result<InterpExpr> {
 fn take_comparison(cur: &mut Cursor) -> Result<Option<BinaryOp>> {
     let mut look = *cur;
     skip_expr_ws(&mut look);
-    let (op, len) = match (look.peek(), look.peek_at(1)) {
-        (Some('='), Some('=')) => (BinaryOp::Eq, 2),
-        (Some('!'), Some('=')) => (BinaryOp::Ne, 2),
-        (Some('<'), Some('=')) => (BinaryOp::Le, 2),
-        (Some('>'), Some('=')) => (BinaryOp::Ge, 2),
-        (Some('<'), _) => (BinaryOp::Lt, 1),
-        (Some('>'), _) => (BinaryOp::Gt, 1),
-        (Some('='), Some('>')) => return Ok(None),
-        (Some('='), _) => return Err(err(look.pos(), "unexpected '=', did you mean '=='?")),
-        _ => return Ok(None),
+    let Some(op) = operator_at(
+        &look,
+        BinaryOp::ALL.into_iter().filter(|op| op.is_comparison()),
+    ) else {
+        return match (look.peek(), look.peek_at(1)) {
+            (Some('='), Some('>')) => Ok(None),
+            (Some('='), _) => Err(err(
+                look.pos(),
+                format!("unexpected '=', did you mean '{}'?", BinaryOp::Eq.symbol()),
+            )),
+            _ => Ok(None),
+        };
     };
-    for _ in 0..len {
-        look.bump();
-    }
+    bump_symbol(&mut look, op);
     *cur = look;
     Ok(Some(op))
 }

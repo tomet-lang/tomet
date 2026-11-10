@@ -382,6 +382,21 @@ fn comparisons_do_not_chain() {
 }
 
 #[test]
+fn every_binary_operator_is_read_from_its_own_symbol() {
+    // The symbol is the node's own (`BinaryOp::symbol`); the parser has to read each one back as
+    // that operator, and nothing else, or a printed expression reads as another.
+    for op in tomet_ast::BinaryOp::ALL {
+        let doc = parse_file(&format!("${{a {} b}}\n", op.symbol())).unwrap();
+        match &interp_expr(&doc.body[0]).kind {
+            InterpExprKind::Binary { op: read, .. } => {
+                assert_eq!(*read, op, "{}", op.symbol());
+            }
+            other => panic!("{}: read as {other:?}", op.symbol()),
+        }
+    }
+}
+
+#[test]
 fn a_lone_equals_ampersand_or_bar_is_an_error_that_names_the_fix() {
     for (src, hint) in [("${a = b}", "=="), ("${a & b}", "&&"), ("${a | b}", "||")] {
         let err = parse_file(&format!("{src}\n")).unwrap_err();

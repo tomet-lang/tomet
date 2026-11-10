@@ -592,16 +592,22 @@ fn binary(
     match op {
         // The right side is not evaluated once the left decides the answer.
         BinaryOp::And => {
-            if !truth("&&", eval(lhs, cx, env)?)? {
+            if !truth(BinaryOp::And.symbol(), eval(lhs, cx, env)?)? {
                 return Ok(EvalValue::Bool(false));
             }
-            Ok(EvalValue::Bool(truth("&&", eval(rhs, cx, env)?)?))
+            Ok(EvalValue::Bool(truth(
+                BinaryOp::And.symbol(),
+                eval(rhs, cx, env)?,
+            )?))
         }
         BinaryOp::Or => {
-            if truth("||", eval(lhs, cx, env)?)? {
+            if truth(BinaryOp::Or.symbol(), eval(lhs, cx, env)?)? {
                 return Ok(EvalValue::Bool(true));
             }
-            Ok(EvalValue::Bool(truth("||", eval(rhs, cx, env)?)?))
+            Ok(EvalValue::Bool(truth(
+                BinaryOp::Or.symbol(),
+                eval(rhs, cx, env)?,
+            )?))
         }
         _ => {
             let (l, r) = (eval(lhs, cx, env)?, eval(rhs, cx, env)?);

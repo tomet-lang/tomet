@@ -1233,7 +1233,20 @@ pub enum BinaryOp {
 }
 
 impl BinaryOp {
-    /// The spelling in source.
+    /// Every operator, so that a reader can look for the one spelled at a position.
+    pub const ALL: [BinaryOp; 8] = [
+        BinaryOp::Eq,
+        BinaryOp::Ne,
+        BinaryOp::Lt,
+        BinaryOp::Le,
+        BinaryOp::Gt,
+        BinaryOp::Ge,
+        BinaryOp::And,
+        BinaryOp::Or,
+    ];
+
+    /// The spelling in source. It is the only place an operator is spelled: the parser finds the
+    /// operator at a position by these symbols, longest first (`<=` over `<`).
     pub fn symbol(self) -> &'static str {
         match self {
             BinaryOp::Eq => "==",
