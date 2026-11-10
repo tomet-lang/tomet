@@ -31,8 +31,8 @@ pub mod tree;
 
 pub use discovery::{ConfigError, load_config_from_str};
 pub use groups::{
-    FieldConfig, FormatConfig, GroupOrder, MetaConfig, RegistryConfig, WorkspaceConfig, format,
-    meta, registry, workspace,
+    FieldConfig, FormatConfig, GroupOrder, MetaConfig, ParagraphSeparator, RegistryConfig,
+    WorkspaceConfig, format, meta, registry, workspace,
 };
 pub use layer::{ConfigLayer, registered_by, registry_entries};
 pub use schema::{ConfigEntrySpec, ConfigGroupSpec, ConfigSpecProvider, all_config_specs};
@@ -194,6 +194,43 @@ mod tests {
         let cfg = load_config_from_str(src).expect("failed to parse format");
         assert!(cfg.format.heading_space_inside_brackets);
         assert!(cfg.format.link_no_space);
+    }
+
+    #[test]
+    fn the_paragraph_separator_is_unset_blank_or_semicolon() {
+        let load = |src: &str| {
+            load_config_from_str(src)
+                .expect("failed to parse format")
+                .format
+        };
+        assert_eq!(load("::format()\n").paragraph_separator, None);
+        assert_eq!(
+            load("::format(paragraph: { separator: blank })\n").paragraph_separator,
+            Some(ParagraphSeparator::Blank)
+        );
+        assert_eq!(
+            load("::format(paragraph: { separator: semicolon })\n").paragraph_separator,
+            Some(ParagraphSeparator::Semicolon)
+        );
+        // A value that is no separator leaves it unset instead of guessing one.
+        assert_eq!(
+            load("::format(paragraph: { separator: newline })\n").paragraph_separator,
+            None
+        );
+    }
+
+    #[test]
+    fn the_widest_key_aligned_is_twenty_columns_unless_set() {
+        let load = |src: &str| {
+            load_config_from_str(src)
+                .expect("failed to parse format")
+                .format
+        };
+        assert_eq!(load("::format()\n").max_key_width(), 20);
+        assert_eq!(
+            load("::format(map: { max_key_width: 8 })\n").max_key_width(),
+            8
+        );
     }
 
     #[test]

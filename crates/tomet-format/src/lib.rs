@@ -20,20 +20,26 @@
 //! The bug class is excluded by construction rather than by exception.
 //!
 //! [`format_source_with_config`] formats tables according to `PrinterConfig`
-//! (e.g. `table.adjust_width`, `table.max_col_width`, `table.align`) and
-//! applies [`format_source`]. It never alters document metadata (`::meta`)
+//! (e.g. `table.adjust_width`, `table.max_col_width`, `table.align`), sets paragraphs
+//! off by a blank line or a `;` (`paragraph.separator`, [`format_paragraph_separators`]),
+//! aligns the values of a multi-line `(...)` group (`map.align_values`,
+//! [`format_map_alignment`]) and applies [`format_source`]. It never alters document metadata (`::meta`)
 //! or injects structural elements.
 
+pub mod align;
 pub mod clean;
 pub mod data;
+pub mod paragraph;
 pub mod reorder;
 pub mod table;
 
 #[cfg(test)]
 mod tests;
 
+pub use align::format_map_alignment;
 pub use clean::clean_whitespace;
 pub use data::format_data_source;
+pub use paragraph::format_paragraph_separators;
 pub use reorder::format_element_group_order;
 pub use table::format_tables_with_config;
 
@@ -46,7 +52,8 @@ pub fn format_source(src: &str) -> String {
     clean::clean_whitespace(&normalized)
 }
 
-/// Formats `src` by applying configured table layout formatting, element group order, and whitespace hygiene.
+/// Formats `src` by applying configured table layout formatting, element group order, paragraph
+/// separators, value alignment, and whitespace hygiene.
 /// Never mutates metadata or inserts structural blocks.
 pub fn format_source_with_config(src: &str, config: &PrinterConfig) -> String {
     let formatted_tables = table::format_tables_with_config(src, config);
@@ -56,5 +63,7 @@ pub fn format_source_with_config(src: &str, config: &PrinterConfig) -> String {
         } else {
             formatted_tables
         };
-    format_source(&formatted_elements)
+    let separated = paragraph::format_paragraph_separators(&formatted_elements, config);
+    let aligned = align::format_map_alignment(&separated, config);
+    format_source(&aligned)
 }

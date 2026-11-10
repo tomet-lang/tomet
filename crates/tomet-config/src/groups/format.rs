@@ -1,4 +1,5 @@
-//! Formatting and printer rule configuration ([`FormatConfig`], [`GroupOrder`]).
+//! Formatting and printer rule configuration ([`FormatConfig`], [`GroupOrder`],
+//! [`ParagraphSeparator`]).
 
 use tomet_ast::Value;
 use tomet_spec_derive::Config;
@@ -19,10 +20,51 @@ fn parse_group_order(value: &Value) -> Option<GroupOrder> {
     }
 }
 
+/// How one paragraph is set off from the one after it. Both spellings read back as the same
+/// document: a blank line, or a `;` at the start of the next line.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ParagraphSeparator {
+    /// A blank line: `a`, an empty line, `b`.
+    Blank,
+    /// A `;` opening the next paragraph's line: `a`, `;b`.
+    Semicolon,
+}
+
+fn parse_paragraph_separator(value: &Value) -> Option<ParagraphSeparator> {
+    match value.as_str()? {
+        "blank" => Some(ParagraphSeparator::Blank),
+        "semicolon" => Some(ParagraphSeparator::Semicolon),
+        _ => None,
+    }
+}
+
 /// Formatting and printer rule configuration.
 #[derive(Debug, Clone, Default, PartialEq, Config)]
 #[config(group = "format")]
 pub struct FormatConfig {
+    /// How a paragraph is separated from the block after it (`blank` or `semicolon`). Applies
+    /// between paragraphs and the elements, holes and interpolations that stand like one; a
+    /// heading, a list or a code block keeps the blank line it has. Unset, the formatter leaves
+    /// each separator as written and the printer, which has none to keep, writes a blank line.
+    #[config(
+        key = "paragraph.separator",
+        type = "string",
+        parse_with = "parse_paragraph_separator"
+    )]
+    pub paragraph_separator: Option<ParagraphSeparator>,
+
+    /// Align the values of consecutive `key: value` lines of a `(...)` group written over several
+    /// lines, the colon staying on the key (`meta:    {...}` over `heading: {...}`). A blank line,
+    /// a comment, or an entry whose value runs over several lines ends a run. Off, each line keeps
+    /// the spacing it has.
+    #[config(key = "map.align_values", default = false)]
+    pub map_align_values: bool,
+
+    /// Widest key, in display columns, that `map.align_values` pads the others to. A longer key
+    /// is written `key: value` and neither widens the others nor ends the run.
+    #[config(key = "map.max_key_width", default = 20)]
+    pub map_max_key_width: Option<usize>,
+
     /// Space inside brackets for headings (`=[ title ]` vs `=[title]`).
     #[config(key = "heading.space_inside_brackets", default = false)]
     pub heading_space_inside_brackets: bool,
@@ -76,6 +118,11 @@ pub struct FormatConfig {
 }
 
 impl FormatConfig {
+    /// [`FormatConfig::map_max_key_width`], or its default when unset.
+    pub fn max_key_width(&self) -> usize {
+        self.map_max_key_width.unwrap_or(20)
+    }
+
     /// Returns the configured group order for a specific element name (e.g. "link"),
     /// falling back to the global `group_order`.
     pub fn element_group_order(&self, element_name: &str) -> Option<GroupOrder> {

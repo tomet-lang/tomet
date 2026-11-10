@@ -1,6 +1,8 @@
 use super::*;
 use tomet_ast::{Bare, Block, Data, Entry, File, Group, Inline, Name, Paragraph, Section, Value};
-use tomet_config::{FieldConfig, FormatConfig, GroupOrder, MetaConfig, load_config_from_str};
+use tomet_config::{
+    FieldConfig, FormatConfig, GroupOrder, MetaConfig, ParagraphSeparator, load_config_from_str,
+};
 use tomet_field_utils::generate_id_for_field;
 use tomet_span::Span;
 use tomet_style::render_value_inner;
@@ -965,4 +967,72 @@ fn a_declaration_without_a_group_is_printed_with_an_empty_one() {
         Span::dummy(),
     );
     assert_eq!(document_to_tm(&doc), "::macro()\n");
+}
+
+fn printed_with_separator(src: &str, separator: Option<ParagraphSeparator>) -> String {
+    let doc = tomet_ast_parser::parse_file(src).unwrap();
+    let cfg = PrinterConfig {
+        format: FormatConfig {
+            paragraph_separator: separator,
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+    let printed = document_to_tm_with_config(&doc, &cfg);
+    // Whichever way the paragraphs are set off, they read back as the same document.
+    assert_eq!(
+        tomet_ast_parser::parse_file(&printed).unwrap(),
+        doc,
+        "printed: {printed:?}"
+    );
+    printed
+}
+
+#[test]
+fn paragraphs_are_set_off_by_a_blank_line_unless_a_semicolon_is_asked_for() {
+    let src = "a\n\nb\n\nc\n";
+    assert_eq!(printed_with_separator(src, None), "a\n\nb\n\nc\n");
+    assert_eq!(
+        printed_with_separator(src, Some(ParagraphSeparator::Blank)),
+        "a\n\nb\n\nc\n"
+    );
+    assert_eq!(
+        printed_with_separator(src, Some(ParagraphSeparator::Semicolon)),
+        "a\n;b\n;c\n"
+    );
+}
+
+#[test]
+fn a_semicolon_also_sets_off_the_elements_that_stand_like_a_paragraph() {
+    let src = "a\n\n@file(x)\n\n@file(y)\n";
+    assert_eq!(
+        printed_with_separator(src, Some(ParagraphSeparator::Semicolon)),
+        "a\n;@file(x)\n;@file(y)\n"
+    );
+}
+
+#[test]
+fn a_semicolon_inside_a_section_sets_off_its_paragraphs_but_not_the_heading() {
+    let printed = printed_with_separator(
+        "=[ t ]\n\na\n\nb\n\n=[ u ]\n\nc\n",
+        Some(ParagraphSeparator::Semicolon),
+    );
+    assert!(printed.contains("a\n;b\n"), "got: {printed:?}");
+    assert!(!printed.contains(";=["), "got: {printed:?}");
+    assert!(!printed.contains(";c"), "got: {printed:?}");
+}
+
+#[test]
+fn a_list_keeps_its_blank_line_when_a_semicolon_is_asked_for() {
+    let src = "a\n\n- x\n\nb\n";
+    assert_eq!(
+        printed_with_separator(src, Some(ParagraphSeparator::Semicolon)),
+        printed_with_separator(src, None)
+    );
+}
+
+#[test]
+fn a_paragraph_that_starts_with_a_semicolon_is_still_escaped_after_one() {
+    let printed = printed_with_separator("a\n\n\\;b\n", Some(ParagraphSeparator::Semicolon));
+    assert_eq!(printed, "a\n;\\;b\n");
 }

@@ -1,7 +1,7 @@
 //! Rendering blocks, sections, headings, and lists.
 
 use tomet_ast::{Block, Element, Inline, List, Placement, Section};
-use tomet_config::PrinterConfig;
+use tomet_config::{ParagraphSeparator, PrinterConfig};
 use tomet_semantics::{ElementKind, classify_std_lenient, heading_level};
 use tomet_style::render_value;
 
@@ -28,12 +28,40 @@ pub(crate) fn render_file(file: &tomet_ast::File, config: &PrinterConfig, out: &
 /// Renders a run of sibling blocks -- a document's, a section's, an element's `[content]` -- with a
 /// blank line between each. Without one, two paragraphs read back as one, and an element that
 /// starts the next line joins the paragraph before it.
+///
+/// With `paragraph.separator: semicolon` a `;` opening the next block's line stands in for the
+/// blank line, but only between two blocks that [`flows`]; a heading, a list or a code block
+/// keeps its blank line.
 pub(crate) fn render_blocks(blocks: &[Block], config: &PrinterConfig, out: &mut String) {
+    let semicolon = config.format.paragraph_separator == Some(ParagraphSeparator::Semicolon);
     for (i, block) in blocks.iter().enumerate() {
         if i > 0 {
-            out.push('\n');
+            if semicolon && flows(&blocks[i - 1], config) && flows(block, config) {
+                out.push(';');
+            } else {
+                out.push('\n');
+            }
         }
         render_block(block, config, out);
+    }
+}
+
+/// Is `block` one that a `;` can set off from a neighbour like a blank line does? A paragraph with
+/// text, and the element, hole or interpolation that stands as one. A heading is not (it prints
+/// as `=[ ]` sugar, which `;` would not precede), nor is a section, a list, or a paragraph that
+/// prints nothing.
+#[deny(clippy::wildcard_enum_match_arm)]
+fn flows(block: &Block, config: &PrinterConfig) -> bool {
+    match block {
+        Block::Paragraph(p) => {
+            !matches!(
+                p.content.first(),
+                Some(Inline::Element(el)) if classify_std_lenient(el.as_view()) == ElementKind::Heading
+            ) && !render_inlines(&p.content, config).trim().is_empty()
+        }
+        Block::Element(el) => classify_std_lenient(el.as_view()) != ElementKind::Heading,
+        Block::Hole(_) | Block::Interp(_) => true,
+        Block::Section(_) | Block::List(_) => false,
     }
 }
 

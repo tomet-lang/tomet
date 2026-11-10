@@ -7,7 +7,7 @@ use tomet_tree::Visit;
 /// Byte offset of the `close` matching the `open` at `open_pos` in
 /// `src` (which must be `open`), tracking nested `open`/`close` depth
 /// and skipping over `"..."`/`'...'` quoted runs.
-fn find_matching(src: &str, open_pos: usize, open: char, close: char) -> Option<usize> {
+pub(crate) fn find_matching(src: &str, open_pos: usize, open: char, close: char) -> Option<usize> {
     let bytes = src.as_bytes();
     let mut i = open_pos + open.len_utf8();
     let mut depth: u32 = 0;

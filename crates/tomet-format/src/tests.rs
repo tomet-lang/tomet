@@ -1,5 +1,5 @@
 use super::*;
-use tomet_config::{FieldConfig, FormatConfig, GroupOrder};
+use tomet_config::{FieldConfig, FormatConfig, GroupOrder, ParagraphSeparator};
 
 #[test]
 fn format_source_with_config_leaves_meta_block_completely_untouched() {
@@ -401,4 +401,284 @@ fn format_element_group_order_scaling_is_linear_not_quadratic() {
         ratio < 10.0,
         "Scaling ratio {ratio:.2} exceeds threshold 10.0 for 4x size increase (small: {med_small:.0}ns, large: {med_large:.0}ns)"
     );
+}
+
+fn separator_config(separator: Option<ParagraphSeparator>) -> PrinterConfig {
+    PrinterConfig {
+        format: FormatConfig {
+            paragraph_separator: separator,
+            ..Default::default()
+        },
+        ..Default::default()
+    }
+}
+
+/// `src` formatted with `separator`, which must leave the document it parses to as it was.
+fn separated(src: &str, separator: Option<ParagraphSeparator>) -> String {
+    let out = format_source_with_config(src, &separator_config(separator));
+    assert_eq!(
+        tomet_ast_parser::parse_file(&out).unwrap(),
+        tomet_ast_parser::parse_file(src).unwrap(),
+        "changed the document: {out:?}"
+    );
+    out
+}
+
+#[test]
+fn paragraphs_are_left_as_written_unless_a_separator_is_configured() {
+    for src in ["a\n\nb\n", "a\n;b\n", "a\n\n; b\n"] {
+        assert_eq!(separated(src, None), format_source(src));
+    }
+}
+
+#[test]
+fn a_blank_line_becomes_a_semicolon_and_back() {
+    let semicolon = Some(ParagraphSeparator::Semicolon);
+    let blank = Some(ParagraphSeparator::Blank);
+    assert_eq!(separated("a\n\nb\n\n\nc\n", semicolon), "a\n;b\n;c\n");
+    assert_eq!(separated("a\n;b\n;c\n", blank), "a\n\nb\n\nc\n");
+    // A `;` that is followed by a space, and one that follows a blank line already.
+    assert_eq!(separated("a\n\n; b\n", semicolon), "a\n;b\n");
+    assert_eq!(separated("a\n\n; b\n", blank), "a\n\nb\n");
+}
+
+#[test]
+fn the_separator_is_idempotent() {
+    for separator in [ParagraphSeparator::Blank, ParagraphSeparator::Semicolon] {
+        let config = separator_config(Some(separator));
+        let once = format_source_with_config("a\n\nb\n;c\n\n\n@x(1)\n", &config);
+        assert_eq!(format_source_with_config(&once, &config), once);
+    }
+}
+
+#[test]
+fn the_elements_that_stand_like_a_paragraph_are_set_off_too() {
+    assert_eq!(
+        separated(
+            "a\n\n@file(x)\n\n@file(y)\n",
+            Some(ParagraphSeparator::Semicolon)
+        ),
+        "a\n;@file(x)\n;@file(y)\n"
+    );
+    assert_eq!(
+        separated(";@file(x)\n;@file(y)\n", Some(ParagraphSeparator::Blank)),
+        "@file(x)\n\n@file(y)\n"
+    );
+}
+
+#[test]
+fn a_heading_a_list_and_a_comment_keep_what_they_have() {
+    let src = "a\n\n=[ t ]\n\nb\n\n- x\n\nc\n\n// note\n\nd\n";
+    let out = separated(src, Some(ParagraphSeparator::Semicolon));
+    assert!(out.contains("a\n\n=[ t ]"), "got: {out:?}");
+    assert!(out.contains("// note\n\nd"), "got: {out:?}");
+    assert!(!out.contains(";=["), "got: {out:?}");
+}
+
+#[test]
+fn paragraphs_in_a_section_an_element_and_a_list_item_are_set_off_too() {
+    let semicolon = Some(ParagraphSeparator::Semicolon);
+    assert_eq!(
+        separated("=[ t ]\n\na\n\nb\n", semicolon),
+        "=[ t ]\n\na\n;b\n"
+    );
+    assert_eq!(
+        separated("@x[\n  a\n\n  b\n]\n", semicolon),
+        "@x[\n  a\n  ;b\n]\n"
+    );
+}
+
+#[test]
+fn what_follows_a_list_is_not_a_paragraph_of_it() {
+    // `b` is not in the item, however it is indented: it follows the list, which keeps its blank.
+    let src = "- a\n\n  b\n";
+    assert_eq!(
+        separated(src, Some(ParagraphSeparator::Semicolon)),
+        format_source(src)
+    );
+}
+
+#[test]
+fn a_document_that_does_not_parse_is_left_alone() {
+    let src = "a\n\n@x(\n\nb\n";
+    assert_eq!(
+        format_paragraph_separators(src, &separator_config(Some(ParagraphSeparator::Semicolon))),
+        src
+    );
+}
+
+fn aligned(src: &str) -> String {
+    let config = PrinterConfig {
+        format: FormatConfig {
+            map_align_values: true,
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+    let out = format_source_with_config(src, &config);
+    assert_eq!(
+        tomet_ast_parser::parse_file(&out).unwrap(),
+        tomet_ast_parser::parse_file(src).unwrap(),
+        "changed the document: {out:?}"
+    );
+    assert_eq!(
+        format_source_with_config(&out, &config),
+        out,
+        "not idempotent"
+    );
+    out
+}
+
+#[test]
+fn values_are_left_as_written_unless_alignment_is_asked_for() {
+    let src = "::x(\n  a: 1\n  longer: 2\n)\n";
+    assert_eq!(
+        format_source_with_config(src, &PrinterConfig::default()),
+        src
+    );
+}
+
+#[test]
+fn the_values_of_a_multi_line_group_are_aligned_after_the_colon() {
+    let src = "::format(
+  meta: { always_newline: true }
+  heading: { space_inside_brackets: true }
+  table: { adjust_width: auto, max_col_width: 50 }
+  link: { no_space: true, group_order: \"[]()\" }
+  quote: { always_newline: true }
+  callout: { style: { content: block } }
+  list: { multiline: { style: { content: box } } }
+)
+";
+    let want = "::format(
+  meta:    { always_newline: true }
+  heading: { space_inside_brackets: true }
+  table:   { adjust_width: auto, max_col_width: 50 }
+  link:    { no_space: true, group_order: \"[]()\" }
+  quote:   { always_newline: true }
+  callout: { style: { content: block } }
+  list:    { multiline: { style: { content: box } } }
+)
+";
+    assert_eq!(aligned(src), want);
+    // The other style of alignment, the colon aligned, is brought to this one.
+    assert_eq!(aligned(&want.replace("meta:    ", "meta   : ")), want);
+}
+
+#[test]
+fn a_blank_line_a_comment_and_a_multi_line_value_end_a_run() {
+    let src = "::x(
+  a: 1
+  bbb: 2
+
+  c: 3
+  dddd: 4
+  // a note
+  e: 5
+  ffffff: 6
+  list:
+    - x
+  g: 7
+  hh: 8
+)
+";
+    let want = "::x(
+  a:   1
+  bbb: 2
+
+  c:    3
+  dddd: 4
+  // a note
+  e:      5
+  ffffff: 6
+  list:
+    - x
+  g:  7
+  hh: 8
+)
+";
+    assert_eq!(aligned(src), want);
+}
+
+#[test]
+fn a_wide_key_counts_for_its_display_width() {
+    assert_eq!(
+        aligned("::x(\n  \"見出し\": 1\n  abcdefghij: 2\n  a: 3\n)\n"),
+        "::x(\n  \"見出し\":   1\n  abcdefghij: 2\n  a:          3\n)\n"
+    );
+}
+
+#[test]
+fn a_key_wider_than_the_limit_is_left_out_of_the_alignment() {
+    let src = "::x(
+  a: 1
+  a_key_that_is_far_too_long: 2
+  bb: 3
+)
+";
+    // The default limit is 20 columns: the long key is `key: value`, and the rest still align.
+    assert_eq!(
+        aligned(src),
+        "::x(
+  a:  1
+  a_key_that_is_far_too_long: 2
+  bb: 3
+)
+"
+    );
+    // With the limit raised it is aligned to like any other.
+    let config = PrinterConfig {
+        format: FormatConfig {
+            map_align_values: true,
+            map_max_key_width: Some(40),
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+    assert_eq!(
+        format_source_with_config(src, &config),
+        "::x(
+  a:                          1
+  a_key_that_is_far_too_long: 2
+  bb:                         3
+)
+"
+    );
+    // And lowered, only the keys that fit are aligned.
+    let config = PrinterConfig {
+        format: FormatConfig {
+            map_align_values: true,
+            map_max_key_width: Some(1),
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+    assert_eq!(format_source_with_config(src, &config), src);
+}
+
+#[test]
+fn a_line_the_parser_reads_as_a_string_is_not_an_entry() {
+    // A bare non-ASCII key is no key: `見出し: 1` is one string, and its spacing is its value.
+    let src = "::x(\n  見出し: 1\n  abcdefgh: 2\n  a: 3\n)\n";
+    assert_eq!(
+        aligned(src),
+        "::x(\n  見出し: 1\n  abcdefgh: 2\n  a:        3\n)\n"
+    );
+}
+
+#[test]
+fn only_the_entries_of_a_group_written_over_several_lines_are_aligned() {
+    let src = "::x(a: 1, longer: 2)\n\n@y(a: 1, bb: 2)[text]\n";
+    assert_eq!(aligned(src), src);
+    // The group of an element is aligned as that of a declaration is; a nested one on its own.
+    assert_eq!(
+        aligned("@y(\n  a: 1\n  bbb: @z(\n    c: 1\n    dd: 2\n  )\n  e: 3\n)[text]\n"),
+        "@y(\n  a: 1\n  bbb: @z(\n    c:  1\n    dd: 2\n  )\n  e: 3\n)[text]\n"
+    );
+}
+
+#[test]
+fn document_metadata_is_not_aligned() {
+    let src = "::meta(\n  title: T\n  id: x\n)\n\ntext\n";
+    assert_eq!(aligned(src), src);
 }

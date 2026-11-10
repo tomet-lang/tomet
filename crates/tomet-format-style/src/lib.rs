@@ -47,6 +47,7 @@ fn render_nested_block(block: &Block, config: &PrinterConfig, out: &mut String) 
 }
 use tomet_config::{FieldConfig, PrinterConfig};
 use tomet_field_utils::is_iso8601;
+use unicode_width::UnicodeWidthStr;
 
 pub fn render_value(v: &Value) -> String {
     format!("{{{}}}", render_value_inner(v))
@@ -528,18 +529,41 @@ pub fn render_meta_declaration(declaration: &Declaration, config: &PrinterConfig
         && let Some(Value::Map(entries)) = tomet_semantics::data::declaration_entries(declaration)
         && !entries.is_empty()
     {
+        let rows: Vec<(String, String)> = entries
+            .iter()
+            .map(|(k, v)| {
+                let val_str = render_meta_field_value(v, config.meta.fields.get(k), config);
+                (key_text(k), val_str)
+            })
+            .collect();
+        // A value that runs over several lines, or is empty, has nothing on the line to align.
+        let on_the_line = |value: &str| !(value.starts_with('\n') || value.is_empty());
         let mut out = format!("{head}(\n");
-        for (k, v) in &entries {
-            let field_cfg = config.meta.fields.get(k);
-            let val_str = render_meta_field_value(v, field_cfg, config);
+        for (i, (key, value)) in rows.iter().enumerate() {
             out.push_str("  ");
-            write_key(k, &mut out);
-            if val_str.starts_with('\n') || val_str.is_empty() {
-                out.push(':');
-            } else {
-                out.push_str(": ");
+            out.push_str(key);
+            out.push(':');
+            if on_the_line(value) {
+                // A key wider than `map.max_key_width` is not padded, and the others do not pad
+                // to it.
+                let widest = config.format.max_key_width();
+                let width = if config.format.map_align_values && key.width() <= widest {
+                    // The widest key of the run of rows this one is in.
+                    let run = |range: &mut dyn Iterator<Item = &(String, String)>| {
+                        range
+                            .take_while(|(_, value)| on_the_line(value))
+                            .map(|(key, _)| key.width())
+                            .filter(|&width| width <= widest)
+                            .max()
+                            .unwrap_or(0)
+                    };
+                    run(&mut rows[i..].iter()).max(run(&mut rows[..i].iter().rev()))
+                } else {
+                    key.width()
+                };
+                out.push_str(&" ".repeat(width - key.width() + 1));
             }
-            out.push_str(&val_str);
+            out.push_str(value);
             out.push('\n');
         }
         out.push(')');
@@ -703,6 +727,57 @@ mod tests {
         assert_eq!(
             render_meta_declaration(&el, &cfg),
             "::meta(\n  id: doc-12345678\n)"
+        );
+    }
+
+    #[test]
+    fn the_fields_of_a_meta_are_aligned_when_values_are_to_be() {
+        let text = |s: &str| Value::String(s.to_string());
+        let mut el = tomet_tree::declaration_new("meta");
+        el.data.args = Some(Value::Map(vec![
+            ("id".to_string(), text("x")),
+            ("title".to_string(), text("T")),
+            ("tags".to_string(), Value::Seq(vec![text("a"), text("b")])),
+            ("kind".to_string(), text("k")),
+            ("created".to_string(), text("c")),
+        ]));
+        let mut cfg = PrinterConfig::default();
+        cfg.meta.always_newline = true;
+        cfg.meta.fields.insert(
+            "tags".to_string(),
+            tomet_config::FieldConfig {
+                always_newline: true,
+                ..Default::default()
+            },
+        );
+        assert_eq!(
+            render_meta_declaration(&el, &cfg),
+            "::meta(\n  id: x\n  title: T\n  tags:\n    - a\n    - b\n  kind: k\n  created: c\n)"
+        );
+        // A field that runs over several lines ends a run: `tags` is not aligned with its
+        // neighbours, and they are aligned among themselves.
+        cfg.format.map_align_values = true;
+        assert_eq!(
+            render_meta_declaration(&el, &cfg),
+            "::meta(\n  id:    x\n  title: T\n  tags:\n    - a\n    - b\n  kind:    k\n  created: c\n)"
+        );
+    }
+
+    #[test]
+    fn a_meta_field_wider_than_the_limit_is_left_out_of_the_alignment() {
+        let text = |s: &str| Value::String(s.to_string());
+        let mut el = tomet_tree::declaration_new("meta");
+        el.data.args = Some(Value::Map(vec![
+            ("id".to_string(), text("x")),
+            ("a_field_that_is_far_too_long".to_string(), text("y")),
+            ("kind".to_string(), text("k")),
+        ]));
+        let mut cfg = PrinterConfig::default();
+        cfg.meta.always_newline = true;
+        cfg.format.map_align_values = true;
+        assert_eq!(
+            render_meta_declaration(&el, &cfg),
+            "::meta(\n  id:   x\n  a_field_that_is_far_too_long: y\n  kind: k\n)"
         );
     }
 

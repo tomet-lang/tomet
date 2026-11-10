@@ -82,6 +82,96 @@ fn formatting_does_not_change_the_parsed_document() {
 }
 
 #[test]
+fn a_paragraph_separator_does_not_change_the_parsed_document() {
+    // `paragraph.separator` rewrites the text between two paragraphs: a blank line and a `;` that
+    // opens the next line are two spellings of one separator.
+    use tomet_config::{FormatConfig, ParagraphSeparator, PrinterConfig};
+
+    let mut changed_by = [0usize; 2];
+    for (rel, src) in parseable_corpus() {
+        let before = tomet_ast_parser::parse_file(&src)
+            .unwrap_or_else(|e| panic!("{} failed to parse: {e}", rel.display()));
+        for (i, separator) in [ParagraphSeparator::Blank, ParagraphSeparator::Semicolon]
+            .into_iter()
+            .enumerate()
+        {
+            let config = PrinterConfig {
+                format: FormatConfig {
+                    paragraph_separator: Some(separator),
+                    ..Default::default()
+                },
+                ..Default::default()
+            };
+            let once = tomet_formatter::format_source_with_config(&src, &config);
+            let after = tomet_ast_parser::parse_file(&once).unwrap_or_else(|e| {
+                panic!("{} failed to parse after {separator:?}: {e}", rel.display())
+            });
+            assert!(
+                before == after,
+                "{separator:?} changed the parsed document for {}",
+                rel.display()
+            );
+            assert_eq!(
+                tomet_formatter::format_source_with_config(&once, &config),
+                once,
+                "{separator:?} is not idempotent for {}",
+                rel.display()
+            );
+            if once != tomet_formatter::format_source_with_config(&src, &PrinterConfig::default()) {
+                changed_by[i] += 1;
+            }
+        }
+    }
+    // Both directions must really rewrite something in the corpus, or the check above is vacuous.
+    assert!(
+        changed_by[0] > 0,
+        "no fixture has a `;` to turn into a blank line"
+    );
+    assert!(
+        changed_by[1] > 0,
+        "no fixture has a blank line to turn into a `;`"
+    );
+}
+
+#[test]
+fn aligning_values_does_not_change_the_parsed_document() {
+    // `map.align_values` only moves the spaces after a `key:`; a key the parser reads as a string
+    // (`見出し: 1`) has its spacing for its value, and must be left alone.
+    use tomet_config::{FormatConfig, PrinterConfig};
+
+    let config = PrinterConfig {
+        format: FormatConfig {
+            map_align_values: true,
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+    let mut changed = 0;
+    for (rel, src) in parseable_corpus() {
+        let before = tomet_ast_parser::parse_file(&src)
+            .unwrap_or_else(|e| panic!("{} failed to parse: {e}", rel.display()));
+        let once = tomet_formatter::format_source_with_config(&src, &config);
+        let after = tomet_ast_parser::parse_file(&once)
+            .unwrap_or_else(|e| panic!("{} failed to parse after aligning: {e}", rel.display()));
+        assert!(
+            before == after,
+            "aligning changed the parsed document for {}",
+            rel.display()
+        );
+        assert_eq!(
+            tomet_formatter::format_source_with_config(&once, &config),
+            once,
+            "aligning is not idempotent for {}",
+            rel.display()
+        );
+        if once != tomet_formatter::format_source_with_config(&src, &PrinterConfig::default()) {
+            changed += 1;
+        }
+    }
+    assert!(changed > 0, "no fixture has a multi-line group to align");
+}
+
+#[test]
 fn printed_source_parses() {
     // parse -> print -> parse. This asserts only that `tomet-printer`
     // emits syntax `tomet-parser` accepts, not that the round trip is an

@@ -13,3 +13,5 @@ tomet-field-utils = { workspace = true }
 tomet-semantics   = { workspace = true }
 tomet-type        = { workspace = true }
 tomet-tree        = { workspace = true }
+#--- Crates.io ---
+unicode-width     = { workspace = true }
