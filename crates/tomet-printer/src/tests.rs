@@ -3,7 +3,7 @@ use crate::value::render_value_inner_with_config;
 use tomet_ast::{
     Bare, Block, Data, Entry, File, Group, Inline, Name, Paragraph, Section, Text, Value,
 };
-use tomet_config::{FieldConfig, FormatConfig, MetaConfig, load_config_from_str};
+use tomet_config::{FieldConfig, FormatConfig, MetaConfig};
 use tomet_span::Span;
 use tomet_style::{ContentLayout, GroupOrder, ParagraphSeparator};
 use tomet_tree::element_new;
@@ -248,140 +248,6 @@ fn test_wikilink_no_space_setting() {
     let printed_no_space = document_to_tm_with_config(&doc, &cfg_no_space);
     assert!(printed_no_space.contains("@link(target:\"ref:target\")"));
     assert!(printed_no_space.contains("@link(target:\"ref:target\")[display]"));
-}
-
-#[test]
-fn test_nanoid_generation_and_ensure_document_id() {
-    let settings_src = r#"::field(
-  id: {
-    type: nanoid
-    length: 8
-    prefix: "doc-"
-  }
-)
-"#;
-    let cfg = load_config_from_str(settings_src).expect("failed to parse settings");
-    let id_cfg = cfg.meta.fields.get("id").expect("id config present");
-    assert_eq!(id_cfg.field_type.as_deref(), Some("nanoid"));
-    assert_eq!(id_cfg.length, Some(8));
-    assert_eq!(id_cfg.prefix.as_deref(), Some("doc-"));
-
-    let mut doc = tomet_markdown::from_markdown("# Test Note\nHello world\n");
-    ensure_document_id_with_config(&mut doc, &cfg);
-
-    let printed = document_to_tm_with_config(&doc, &cfg);
-    assert!(printed.contains("::id(doc-"), "{printed}");
-    assert!(!printed.contains("::meta"), "{printed}");
-}
-
-#[test]
-fn test_nanoid_force_and_overwrite_behavior() {
-    let settings_src = r#"::field(
-  id: {
-    type: nanoid
-    length: 8
-    prefix: "doc-"
-    force: true
-    overwrite: true
-  }
-)
-"#;
-    let cfg = load_config_from_str(settings_src).expect("failed to parse settings");
-    let id_cfg = cfg.meta.fields.get("id").unwrap();
-    assert_eq!(id_cfg.force, Some(true));
-    assert_eq!(id_cfg.overwrite, Some(true));
-
-    // Case 1: Valid existing ID is kept
-    let md1 = "---\nid: doc-12345678\n---\n# Note 1\n";
-    let mut doc1 = tomet_markdown::from_markdown(md1);
-    ensure_document_id_with_config(&mut doc1, &cfg);
-    let printed1 = document_to_tm_with_config(&doc1, &cfg);
-    assert!(printed1.contains("::id(doc-12345678)"), "{printed1}");
-
-    // Case 2: Invalid format existing ID is overwritten when overwrite: true
-    let md2 = "---\nid: invalid-slug\n---\n# Note 2\n";
-    let mut doc2 = tomet_markdown::from_markdown(md2);
-    ensure_document_id_with_config(&mut doc2, &cfg);
-    let printed2 = document_to_tm_with_config(&doc2, &cfg);
-    assert!(!printed2.contains("invalid-slug"));
-    assert!(printed2.contains("::id(doc-"), "{printed2}");
-
-    // Case 3: When force: true and overwrite: false, invalid existing ID is preserved
-    let cfg_no_overwrite = PrinterConfig {
-        meta: MetaConfig {
-            fields: std::collections::BTreeMap::from([(
-                "id".to_string(),
-                FieldConfig {
-                    field_type: Some("nanoid".to_string()),
-                    length: Some(8),
-                    prefix: Some("doc-".to_string()),
-                    force: Some(true),
-                    overwrite: Some(false),
-                    ..Default::default()
-                },
-            )]),
-            ..Default::default()
-        },
-        ..Default::default()
-    };
-    let mut doc3 = tomet_markdown::from_markdown(md2);
-    ensure_document_id_with_config(&mut doc3, &cfg_no_overwrite);
-    let printed3 = document_to_tm_with_config(&doc3, &cfg_no_overwrite);
-    assert!(printed3.contains("::id(invalid-slug)"), "{printed3}");
-}
-
-/// The id a vault's `id` settings ask for: what they come to as a type, and nothing for what
-/// is not a form of id.
-#[test]
-fn the_id_settings_come_to_a_type_that_is_a_form_of_id() {
-    let printed = |field: FieldConfig| {
-        let cfg = PrinterConfig {
-            meta: MetaConfig {
-                fields: std::collections::BTreeMap::from([("id".to_string(), field)]),
-                ..Default::default()
-            },
-            ..Default::default()
-        };
-        let mut doc = tomet_markdown::from_markdown("# Note\n");
-        ensure_document_id_with_config(&mut doc, &cfg);
-        document_to_tm_with_config(&doc, &cfg)
-    };
-    let field = |field_type: &str, prefix: Option<&str>, length: Option<usize>| FieldConfig {
-        field_type: Some(field_type.to_string()),
-        prefix: prefix.map(String::from),
-        length,
-        ..Default::default()
-    };
-
-    // The length of the id a document was given, the prefix included.
-    let id_len = |printed: &str| {
-        let id = printed.split("::id(").nth(1)?;
-        Some(id.split(')').next()?.len())
-    };
-
-    // A nanoid is as long as the vault says and 8 when it does not.
-    assert_eq!(
-        id_len(&printed(field("nanoid", Some("n-"), Some(12)))),
-        Some(2 + 12)
-    );
-    assert_eq!(id_len(&printed(field("nanoid", None, None))), Some(8));
-
-    // A uuid has no length, and a length the vault gives for it is not asked.
-    assert_eq!(
-        id_len(&printed(field("uuid", Some("u-"), Some(3)))),
-        Some(2 + 36)
-    );
-
-    // No type, a type that is no form of id, a name that is no type, or a prefix the type does
-    // not take: nothing is made.
-    for none in [
-        FieldConfig::default(),
-        field("string", None, None),
-        field("int", Some("x"), None),
-        field("person", None, None),
-    ] {
-        assert!(!printed(none.clone()).contains("::id("), "{none:?}");
-    }
 }
 
 #[test]

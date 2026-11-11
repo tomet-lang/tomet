@@ -16,7 +16,7 @@
 //! - (A type carries its arguments)
 //!   | A [`Type`] is a [`Kind`] and the arguments that kind takes: a `nanoid`
 //!   | has a `length` and a `prefix`, a `list` an item type and a `length`,
-//!   | every type a `default`. What a kind takes is part of the kind, so a
+//!   | every type a `default` and `overwrite`. What a kind takes is part of the kind, so a
 //!   | combination that makes no sense (a `string` with a `prefix`) cannot be
 //!   | held.
 //! - (Built from structure, not sliced from text)

@@ -309,6 +309,21 @@ pub enum Command {
         #[arg(long = "var", value_parser = parse_key_val)]
         vars: Vec<(String, String)>,
     },
+    /// Apply a blueprint to existing .tmt document(s).
+    Apply {
+        /// Target file(s) or director(y/ies) to apply to.
+        #[arg(required = true)]
+        paths: Vec<PathBuf>,
+        /// Blueprint name to apply (defaults to the document's `::kind`).
+        #[arg(short, long, visible_alias = "kind")]
+        blueprint: Option<String>,
+        /// Dry-run mode without modifying files on disk.
+        #[arg(long)]
+        dry_run: bool,
+        /// Pass custom variable as `key=value`. Can be specified multiple times.
+        #[arg(long = "var", value_parser = parse_key_val)]
+        vars: Vec<(String, String)>,
+    },
 }
 
 fn parse_key_val(s: &str) -> Result<(String, String), String> {

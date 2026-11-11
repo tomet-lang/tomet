@@ -5,9 +5,7 @@
 //! ones built from Markdown or edited purely at the AST level). Uses
 //! `tomet_config::PrinterConfig` (see that crate for config
 //! loading/discovery) to drive formatting choices: meta format
-//! (yaml/json/toml), link-key spacing, callout/list style. Also owns `::meta` id
-//! auto-generation (`ensure_document_id_with_config`, which mutates the
-//! AST directly), built on `tomet_id::IdSpec`.
+//! (yaml/json/toml), link-key spacing, callout/list style.
 
 pub mod block;
 pub mod element;
@@ -19,7 +17,6 @@ mod value;
 mod tests;
 
 pub use element::render_element;
-pub use id::ensure_document_id_with_config;
 
 use tomet_ast::File;
 use tomet_config::PrinterConfig;

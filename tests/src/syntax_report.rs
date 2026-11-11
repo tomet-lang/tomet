@@ -1340,6 +1340,14 @@ fn interp_str(expr: &InterpExpr) -> String {
         K::Lambda { params, body } => {
             format!("lambda({}) => {}", params.join(", "), interp_str(body))
         }
+        K::Seq(items) => {
+            let inner: Vec<String> = items.iter().map(interp_str).collect();
+            if items.len() == 1 {
+                format!("({},)", inner[0])
+            } else {
+                format!("({})", inner.join(", "))
+            }
+        }
     }
 }
 

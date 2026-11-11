@@ -2223,7 +2223,6 @@ dependencies = [
  "tomet-ast",
  "tomet-ast-parser",
  "tomet-config",
- "tomet-id",
  "tomet-markdown",
  "tomet-semantics",
  "tomet-span",
@@ -2454,9 +2453,13 @@ version = "0.5.0"
 dependencies = [
  "tomet-ast",
  "tomet-ast-parser",
+ "tomet-expr",
+ "tomet-id",
  "tomet-semantics",
+ "tomet-semantics-core",
  "tomet-span",
  "tomet-tree",
+ "tomet-type",
  "tomet-validator-core",
  "tomet-validator-rule",
 ]

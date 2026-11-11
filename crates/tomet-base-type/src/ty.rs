@@ -11,7 +11,7 @@ use crate::{AutoFill, DefaultValue, Kind, TypeError, Version, datetime, is_uuid,
 /// - `uuid` has a `prefix`;
 /// - `nanoid` has a `length` and a `prefix`;
 /// - `list` has an item type and a `length`;
-/// - every kind has a `default`.
+/// - every kind has a `default` and `overwrite`.
 ///
 /// What a kind takes is part of the kind, so an argument that does not belong
 /// to it (a `string` with a `prefix`) cannot be held: a type is made by
@@ -23,6 +23,7 @@ use crate::{AutoFill, DefaultValue, Kind, TypeError, Version, datetime, is_uuid,
 pub struct Type {
     pub(crate) form: Form,
     pub(crate) default: Option<DefaultValue>,
+    pub(crate) overwrite: bool,
 }
 
 // A type holds no number that is not equal to itself: `Type::build` is the only way to make one
@@ -78,7 +79,13 @@ impl Type {
         Type {
             form,
             default: None,
+            overwrite: false,
         }
+    }
+
+    /// Whether an existing value may be overwritten when a blueprint is applied.
+    pub fn overwrite(&self) -> bool {
+        self.overwrite
     }
 
     /// Which kind of type it is.
@@ -236,6 +243,9 @@ impl fmt::Display for Type {
         }
         if let Some(default) = &self.default {
             arguments.push(format!("default: {default}"));
+        }
+        if self.overwrite {
+            arguments.push("overwrite: true".to_string());
         }
         f.write_str(self.kind().name())?;
         if !arguments.is_empty() {

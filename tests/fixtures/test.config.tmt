@@ -30,13 +30,6 @@
   }
 )
 ::field(
-  id: {
-    type: nanoid
-    length: 8
-    prefix: "doc-"
-    force: true
-    overwrite: true
-  }
   aliases: {
     type: list
     always_newline: true

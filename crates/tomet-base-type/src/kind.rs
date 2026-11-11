@@ -106,13 +106,13 @@ impl Kind {
     }
 
     /// The names of the arguments written as `name: value`, in the order they
-    /// are written; `default` is last and every kind has it.
+    /// are written; `default` and `overwrite` are accepted for every kind.
     pub(crate) fn named(self) -> &'static [&'static str] {
         match self {
-            Kind::Uuid => &["prefix", "default"],
-            Kind::Nanoid => &["length", "prefix", "default"],
-            Kind::List => &["length", "default"],
-            _ => &["default"],
+            Kind::Uuid => &["prefix", "default", "overwrite"],
+            Kind::Nanoid => &["length", "prefix", "default", "overwrite"],
+            Kind::List => &["length", "default", "overwrite"],
+            _ => &["default", "overwrite"],
         }
     }
 }
@@ -155,9 +155,11 @@ mod tests {
     }
 
     #[test]
-    fn every_kind_has_a_default_and_it_is_written_last() {
+    fn every_kind_has_a_default_and_overwrite() {
         for kind in Kind::ALL {
-            assert_eq!(kind.named().last(), Some(&"default"), "{kind}");
+            assert!(kind.named().contains(&"default"), "{kind}");
+            assert!(kind.named().contains(&"overwrite"), "{kind}");
+            assert_eq!(kind.named().last(), Some(&"overwrite"), "{kind}");
         }
     }
 }

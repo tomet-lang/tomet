@@ -26,7 +26,7 @@ use tomet_ast::Value;
 use tomet_config::PrinterConfig;
 use tomet_expr::{DocRef, EvalContext, MemoryResolver};
 use tomet_position::{LineCol, LineIndex};
-use tomet_transform::{SeatProblem, Source, SystemSource, instantiate_blueprint};
+use tomet_transform::{SeatProblem, Source, SystemSource, apply_blueprint, instantiate_blueprint};
 
 /// Every blueprint `config` declares, as `(name, path)`, sorted by name.
 ///
@@ -392,6 +392,165 @@ pub fn create_file_from_blueprint_with(
         path: target_abs_path,
         blueprint: blueprint_file,
         unfilled: made.unfilled,
+    })
+}
+
+/// The result of applying a blueprint to an existing file on disk.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Applied {
+    /// Where the document is.
+    pub path: PathBuf,
+    /// The blueprint file that was applied.
+    pub blueprint: PathBuf,
+    /// Whether the file was modified (or would be modified if not `dry_run`).
+    pub changed: bool,
+    /// What the document was left to fill in.
+    pub unfilled: Vec<Unfilled>,
+}
+
+/// Applies a blueprint to an existing document on disk, with the real clock and random source ([`source_for`]).
+///
+/// If `blueprint_name` is `None`, extracts the blueprint name from the document's `::kind`.
+pub fn apply_blueprint_to_file(
+    root: &Path,
+    blueprint_name: Option<&str>,
+    target_rel_path: &Path,
+    vars: &HashMap<String, Value>,
+    config: &PrinterConfig,
+    dry_run: bool,
+) -> Result<Applied> {
+    apply_blueprint_to_file_with(
+        root,
+        blueprint_name,
+        target_rel_path,
+        vars,
+        config,
+        dry_run,
+        &source_for(config),
+    )
+}
+
+/// Applies a blueprint to an existing document on disk with the given `source`.
+///
+/// If `blueprint_name` is `None`, extracts the blueprint name from the document's `::kind`.
+pub fn apply_blueprint_to_file_with(
+    root: &Path,
+    blueprint_name: Option<&str>,
+    target_rel_path: &Path,
+    vars: &HashMap<String, Value>,
+    config: &PrinterConfig,
+    dry_run: bool,
+    source: &dyn Source,
+) -> Result<Applied> {
+    let rel_path = target_rel_path.strip_prefix(root).unwrap_or(target_rel_path);
+    let target_abs_path = root.join(rel_path);
+
+    let doc_src = fs::read_to_string(&target_abs_path)
+        .with_context(|| format!("failed to read target document at {}", target_abs_path.display()))?;
+
+    let mut doc = tomet_ast_parser::parse_file(&doc_src)
+        .map_err(|e| anyhow::anyhow!("failed to parse document: {e}"))?;
+
+    let name = match blueprint_name {
+        Some(n) => n.to_string(),
+        None => tomet_declaration::document_kind(&doc).ok_or_else(|| {
+            anyhow::anyhow!("document has no `::kind`: specify `--blueprint <name>`")
+        })?,
+    };
+
+    let blueprint_file = find_blueprint(root, &name, config).ok_or_else(|| {
+        let known = list_blueprints(root, config)
+            .into_iter()
+            .map(|(n, _)| n)
+            .collect::<Vec<_>>();
+        if known.is_empty() {
+            anyhow::anyhow!(
+                "blueprint '{name}' not found: this vault declares none. \
+                 Add its path to `blueprints` in the config."
+            )
+        } else {
+            anyhow::anyhow!(
+                "blueprint '{name}' not found. Declared: {}",
+                known.join(", ")
+            )
+        }
+    })?;
+
+    let bp_src = fs::read_to_string(&blueprint_file)
+        .with_context(|| format!("failed to read blueprint at {}", blueprint_file.display()))?;
+
+    let blueprint = tomet_ast_parser::parse_file(&bp_src)
+        .map_err(|e| anyhow::anyhow!("failed to parse blueprint: {e}"))?;
+
+    let self_doc = DocRef(rel_path.to_string_lossy().replace('\\', "/"));
+
+    // Variables and macros setup (blueprint declarations take precedence over vault)
+    let blueprint_config = tomet_semantics::document_config(&blueprint);
+    let mut declared = blueprint_config.vars.clone();
+    for (var_name, decl) in &config.vars {
+        if !declared.iter().any(|(held, _)| held == var_name) {
+            declared.push((var_name.clone(), decl.clone()));
+        }
+    }
+    let mut passed: Vec<(String, Value)> = vars
+        .iter()
+        .map(|(key, value)| (key.clone(), value.clone()))
+        .collect();
+    passed.sort_by(|a, b| a.0.cmp(&b.0));
+    let scope = tomet_expr::var_scope(&declared, &self_doc, &passed)?;
+    if !scope.unset.is_empty() {
+        let names = scope.unset.join(", ");
+        bail!(
+            "no value for {names}: pass `--var {}=...`, or give it a `default` in the blueprint's `::var`",
+            scope.unset[0]
+        );
+    }
+
+    let resolver = MemoryResolver::new().with_document(&self_doc.0, Arc::new(doc.clone()));
+
+    let mut macros = blueprint_config.macros;
+    for (macro_name, template) in &config.macros {
+        macros
+            .entry(macro_name.clone())
+            .or_insert_with(|| template.clone());
+    }
+
+    let cx = EvalContext {
+        resolver: &resolver,
+        self_doc,
+        macros: &macros,
+        var: &scope.values,
+        var_unset: &scope.unset,
+        includes: &[],
+        heading_level: 0,
+        notes: Default::default(),
+    };
+
+    let outcome = apply_blueprint(&mut doc, &blueprint, &cx, source)
+        .map_err(|problems| SeatsNotFilled::new(&blueprint_file, &bp_src, problems))?;
+
+    let unfilled = outcome
+        .unresolved
+        .into_iter()
+        .map(|u| Unfilled {
+            line: 1 + bp_src[..u.span.start.min(bp_src.len())].matches('\n').count(),
+            message: u.message(),
+            source: u.source,
+            reason: u.reason,
+        })
+        .collect();
+
+    if !dry_run && outcome.changed {
+        let formatted = tomet_printer::document_to_tm_with_config(&doc, config);
+        fs::write(&target_abs_path, formatted)
+            .with_context(|| format!("failed to write file {}", target_abs_path.display()))?;
+    }
+
+    Ok(Applied {
+        path: target_abs_path,
+        blueprint: blueprint_file,
+        changed: outcome.changed,
+        unfilled,
     })
 }
 
@@ -968,5 +1127,158 @@ mod tests {
             },
         );
         assert_eq!(source_for(&config).now().offset().whole_hours(), -5);
+    }
+
+    #[test]
+    fn test_apply_blueprint_to_file_inferred_kind() {
+        let root = vault("apply-inferred");
+        let config = declaring(&[".tomet/blueprints/daily-note.blueprint.tmt"]);
+
+        // Document has ::kind(daily-note) but is missing title in meta and missing section
+        let doc_path = root.join("notes/daily.tmt");
+        fs::create_dir_all(doc_path.parent().unwrap()).unwrap();
+        fs::write(
+            &doc_path,
+            "::kind(daily-note)\n::id(my-id)\n\nExisting body text.\n",
+        )
+        .unwrap();
+
+        let mut vars = HashMap::new();
+        vars.insert("title".to_string(), Value::String("Sprint 42".into()));
+
+        let applied = apply_blueprint_to_file(
+            &root,
+            None,
+            Path::new("notes/daily.tmt"),
+            &vars,
+            &config,
+            false,
+        )
+        .unwrap();
+
+        assert!(applied.changed);
+        let content = fs::read_to_string(&doc_path).unwrap();
+        assert!(content.contains("title: \"Sprint 42\""));
+        assert!(content.contains("Tasks for Sprint 42"));
+        assert!(content.contains("Existing body text."));
+
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn test_apply_blueprint_to_file_missing_kind_requires_explicit_blueprint() {
+        let root = vault("apply-no-kind");
+        let config = declaring(&[".tomet/blueprints/daily-note.blueprint.tmt"]);
+
+        let doc_path = root.join("notes/raw.tmt");
+        fs::create_dir_all(doc_path.parent().unwrap()).unwrap();
+        fs::write(&doc_path, "Just some notes.\n").unwrap();
+
+        let err = apply_blueprint_to_file(
+            &root,
+            None,
+            Path::new("notes/raw.tmt"),
+            &HashMap::new(),
+            &config,
+            false,
+        )
+        .unwrap_err();
+
+        assert!(err.to_string().contains("specify `--blueprint <name>`"));
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn test_apply_blueprint_to_file_explicit_blueprint() {
+        let root = vault("apply-explicit");
+        let config = declaring(&[".tomet/blueprints/daily-note.blueprint.tmt"]);
+
+        let doc_path = root.join("notes/raw.tmt");
+        fs::create_dir_all(doc_path.parent().unwrap()).unwrap();
+        fs::write(&doc_path, "Just some notes.\n").unwrap();
+
+        let mut vars = HashMap::new();
+        vars.insert("title".to_string(), Value::String("Sprint 42".into()));
+
+        let applied = apply_blueprint_to_file(
+            &root,
+            Some("daily-note"),
+            Path::new("notes/raw.tmt"),
+            &vars,
+            &config,
+            false,
+        )
+        .unwrap();
+
+        assert!(applied.changed);
+        let content = fs::read_to_string(&doc_path).unwrap();
+        assert!(content.contains("::kind(daily-note)"));
+        assert!(content.contains("title: \"Sprint 42\""));
+        assert!(content.contains("Tasks for Sprint 42"));
+        assert!(content.contains("Just some notes."));
+
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn test_apply_blueprint_to_file_dry_run() {
+        let root = vault("apply-dry-run");
+        let config = declaring(&[".tomet/blueprints/daily-note.blueprint.tmt"]);
+
+        let doc_path = root.join("notes/daily.tmt");
+        fs::create_dir_all(doc_path.parent().unwrap()).unwrap();
+        let original = "::kind(daily-note)\n\nExisting body text.\n";
+        fs::write(&doc_path, original).unwrap();
+
+        let mut vars = HashMap::new();
+        vars.insert("title".to_string(), Value::String("Sprint 42".into()));
+
+        let applied = apply_blueprint_to_file(
+            &root,
+            None,
+            Path::new("notes/daily.tmt"),
+            &vars,
+            &config,
+            true, // dry_run
+        )
+        .unwrap();
+
+        assert!(applied.changed);
+        let content = fs::read_to_string(&doc_path).unwrap();
+        assert_eq!(content, original, "file on disk must remain unchanged on dry-run");
+
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn test_apply_blueprint_to_file_unfillable_seats_fails() {
+        let root = vault("apply-unfillable");
+        fs::write(
+            root.join(".tomet/blueprints/daily-note.blueprint.tmt"),
+            "::kind(blueprint)\n::blueprint(daily-note)\n::meta(required_key: <$string>)\n",
+        )
+        .unwrap();
+        let config = declaring(&[".tomet/blueprints/daily-note.blueprint.tmt"]);
+
+        let doc_path = root.join("notes/daily.tmt");
+        fs::create_dir_all(doc_path.parent().unwrap()).unwrap();
+        let original = "::kind(daily-note)\n\nExisting body text.\n";
+        fs::write(&doc_path, original).unwrap();
+
+        let err = apply_blueprint_to_file(
+            &root,
+            None,
+            Path::new("notes/daily.tmt"),
+            &HashMap::new(),
+            &config,
+            false,
+        )
+        .unwrap_err();
+
+        assert!(err.downcast_ref::<SeatsNotFilled>().is_some(), "{err:?}");
+        let content = fs::read_to_string(&doc_path).unwrap();
+        assert_eq!(content, original, "file must not be modified on error");
+
+        let _ = fs::remove_dir_all(&root);
     }
 }

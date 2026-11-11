@@ -1,10 +1,15 @@
 //! Blueprint schema extraction, transformation, and instantiation.
 
-use tomet_ast::{File, Name, Value};
-use tomet_expr::EvalContext;
+use tomet_ast::{Block, File, Inline, Name, Section, Value};
+use tomet_expr::{EvalContext, evaluate_type};
+use tomet_id::IdSpec;
 use tomet_semantics::DeclKind;
 use tomet_semantics::{ElementKind, classify_declaration_lenient, normalized_declaration_args};
-use tomet_tree::{ValueExt, for_each_declaration, for_each_declaration_mut};
+use tomet_semantics_core::admits;
+use tomet_tree::{
+    DataExt, ValueExt, declaration_new, for_each_declaration, for_each_declaration_mut,
+};
+use tomet_type::Type;
 
 use crate::expressions::{Unresolved, resolve_expressions};
 use crate::seats::{SeatProblem, fill_seats, seats_left};
@@ -171,6 +176,308 @@ pub fn instantiate_blueprint(
     })
 }
 
+/// The outcome of applying a blueprint to an existing document.
+#[derive(Debug, Default, Clone, PartialEq)]
+pub struct ApplyOutcome {
+    /// Whether the document was modified.
+    pub changed: bool,
+    /// Expressions in the applied blueprint elements that could not be resolved.
+    pub unresolved: Vec<Unresolved>,
+}
+
+/// Checks whether a document value satisfies a required type.
+pub fn value_satisfies_type(val: &Value, ty: &Type) -> bool {
+    if let Some(spec) = IdSpec::new(ty) {
+        val.scalar_text().is_some_and(|text| spec.accepts(&text))
+    } else {
+        admits(ty, val).is_ok()
+    }
+}
+
+fn section_id(sec: &Section) -> Option<String> {
+    sec.id.as_ref().map(|id| id.0.clone())
+}
+
+fn extract_section_title(title_inlines: &[Inline]) -> String {
+    let mut title = String::new();
+    for inline in title_inlines {
+        if let Inline::Text(t) = inline {
+            title.push_str(&t.value);
+        }
+    }
+    title
+}
+
+fn collect_doc_sections<'a>(blocks: &'a [Block], doc_sections: &mut Vec<&'a Section>) {
+    for block in blocks {
+        if let Block::Section(sec) = block {
+            doc_sections.push(sec);
+            collect_doc_sections(&sec.blocks, doc_sections);
+        }
+    }
+}
+
+/// Applies a blueprint to an existing document `doc` in-place.
+///
+/// 1. `::kind`: If `doc` has no `::kind` declaration, inserts `::kind(target_kind)` at index 0.
+/// 2. `::id`: If `blueprint` declares `::id`:
+///    - If `doc` has no `::id`: inserts `::id(...)` placed after `::kind` / `::version`.
+///    - If `doc` has `::id`: keeps existing ID UNLESS blueprint's `::id` is a `TypeSeat` with
+///      `overwrite: true` AND existing ID does not satisfy the seat's `Type`.
+/// 3. `::meta`: If `blueprint` declares `::meta`:
+///    - For each `(key, bp_val)`:
+///      - If missing in `doc`: adds it.
+///      - If present in `doc`: keeps existing value UNLESS `bp_val` is a `TypeSeat` with
+///        `overwrite: true` AND existing value does not satisfy the seat's `Type`.
+/// 4. Top-level sections: For each top-level section in `blueprint.body`:
+///    - If missing in `doc` (matched by id or title): appends to `doc.body`.
+///
+/// Returns `Err(problems)` if any seat in the elements being added or overwritten cannot be filled,
+/// leaving `doc` untouched.
+pub fn apply_blueprint(
+    doc: &mut File,
+    blueprint: &File,
+    cx: &EvalContext,
+    source: &dyn Source,
+) -> Result<ApplyOutcome, Vec<SeatProblem>> {
+    let info = extract_blueprint_info(blueprint);
+
+    // 1. Check ::kind
+    let has_kind = doc.header.iter().any(|d| {
+        classify_declaration_lenient(d) == ElementKind::Declaration(DeclKind::Kind)
+    });
+    let add_kind = if !has_kind {
+        info.as_ref().map(|i| i.target_kind.clone())
+    } else {
+        None
+    };
+
+    // 2. Check ::id
+    let bp_id_decl = blueprint.header.iter().find(|d| {
+        classify_declaration_lenient(d) == ElementKind::Declaration(DeclKind::Id)
+    });
+    let doc_id_decl = doc.header.iter().find(|d| {
+        classify_declaration_lenient(d) == ElementKind::Declaration(DeclKind::Id)
+    });
+
+    let mut add_id = false;
+    let mut overwrite_id = false;
+    if let Some(bp_id) = bp_id_decl {
+        match doc_id_decl {
+            None => {
+                add_id = true;
+            }
+            Some(doc_id) => {
+                let bp_id_val = normalized_declaration_args(bp_id)
+                    .as_ref()
+                    .and_then(|args| args.get("id"))
+                    .or(bp_id.data.args.as_ref())
+                    .cloned();
+                if let Some(Value::TypeSeat(seat)) = &bp_id_val {
+                    if let Ok(ty) = evaluate_type(&seat.expr, cx) {
+                        if ty.overwrite() {
+                            let doc_val = normalized_declaration_args(doc_id)
+                                .as_ref()
+                                .and_then(|args| args.get("id"))
+                                .or(doc_id.data.args.as_ref())
+                                .cloned()
+                                .unwrap_or(Value::Null);
+                            if !value_satisfies_type(&doc_val, &ty) {
+                                overwrite_id = true;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // 3. Check ::meta
+    let bp_meta_decl = blueprint.header.iter().find(|d| {
+        classify_declaration_lenient(d) == ElementKind::Declaration(DeclKind::Meta)
+    });
+    let doc_meta_decl = doc.header.iter().find(|d| {
+        classify_declaration_lenient(d) == ElementKind::Declaration(DeclKind::Meta)
+    });
+
+    let mut meta_patch_entries = Vec::new();
+    if let Some(bp_meta) = bp_meta_decl {
+        let bp_entries = tomet_semantics::data::declaration_entries(bp_meta)
+            .and_then(|v| match v {
+                Value::Map(entries) => Some(entries),
+                _ => None,
+            })
+            .unwrap_or_default();
+
+        for (key, bp_val) in bp_entries {
+            let doc_val = doc_meta_decl.and_then(|d| d.data.get_attr(&key));
+            match doc_val {
+                None => {
+                    meta_patch_entries.push((key, bp_val));
+                }
+                Some(doc_val) => {
+                    if let Value::TypeSeat(seat) = &bp_val {
+                        if let Ok(ty) = evaluate_type(&seat.expr, cx) {
+                            if ty.overwrite() && !value_satisfies_type(doc_val, &ty) {
+                                meta_patch_entries.push((key, bp_val));
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // 4. Check sections
+    let mut doc_sections = Vec::new();
+    collect_doc_sections(&doc.body, &mut doc_sections);
+
+    let mut missing_sections = Vec::new();
+    for block in &blueprint.body {
+        if let Block::Section(bp_sec) = block {
+            let bp_id = section_id(bp_sec);
+            let bp_title = extract_section_title(&bp_sec.title);
+            let exists = doc_sections.iter().any(|d_sec| {
+                let d_id = section_id(d_sec);
+                let d_title = extract_section_title(&d_sec.title);
+                if let (Some(bp_id), Some(d_id)) = (&bp_id, d_id) {
+                    bp_id == &d_id
+                } else if bp_id.is_none() {
+                    d_title.trim() == bp_title.trim()
+                } else {
+                    false
+                }
+            });
+            if !exists {
+                missing_sections.push(Block::Section(bp_sec.clone()));
+            }
+        }
+    }
+
+    // If nothing to add or overwrite, return early unchanged
+    if add_kind.is_none()
+        && !add_id
+        && !overwrite_id
+        && meta_patch_entries.is_empty()
+        && missing_sections.is_empty()
+    {
+        return Ok(ApplyOutcome {
+            changed: false,
+            unresolved: Vec::new(),
+        });
+    }
+
+    // Construct patch AST
+    let mut patch = File::default();
+    if let Some(target_kind) = &add_kind {
+        let mut kind_decl = declaration_new("kind");
+        kind_decl.data.args = Some(Value::String(target_kind.clone()));
+        patch.header.push(kind_decl);
+    }
+    if add_id || overwrite_id {
+        let mut id_decl = declaration_new("id");
+        id_decl.data.args = bp_id_decl.and_then(|d| d.data.args.clone());
+        patch.header.push(id_decl);
+    }
+    if !meta_patch_entries.is_empty() {
+        let mut meta_decl = declaration_new("meta");
+        meta_decl.data.args = Some(Value::Map(meta_patch_entries));
+        patch.header.push(meta_decl);
+    }
+    patch.body = missing_sections;
+
+    // Fill seats on patch. If any cannot be filled, returns Err without modifying doc.
+    fill_seats(&mut patch, cx, source)?;
+
+    // Resolve expressions on patch
+    let unresolved = resolve_expressions(&mut patch, cx);
+
+    let left = seats_left(&patch);
+    if !left.is_empty() {
+        return Err(left);
+    }
+
+    // Apply patch to doc
+    let mut changed = false;
+
+    if add_kind.is_some() {
+        if let Some(patch_kind) = patch.header.iter().find(|d| {
+            classify_declaration_lenient(d) == ElementKind::Declaration(DeclKind::Kind)
+        }) {
+            doc.header.insert(0, patch_kind.clone());
+            changed = true;
+        }
+    }
+
+    if add_id {
+        if let Some(patch_id) = patch.header.iter().find(|d| {
+            classify_declaration_lenient(d) == ElementKind::Declaration(DeclKind::Id)
+        }) {
+            let insert_idx = doc
+                .header
+                .iter()
+                .enumerate()
+                .filter(|(_, d)| {
+                    let kind = classify_declaration_lenient(d);
+                    kind == ElementKind::Declaration(DeclKind::Kind)
+                        || kind == ElementKind::Declaration(DeclKind::Version)
+                })
+                .map(|(i, _)| i + 1)
+                .last()
+                .unwrap_or(0);
+            doc.header.insert(insert_idx, patch_id.clone());
+            changed = true;
+        }
+    } else if overwrite_id {
+        if let Some(patch_id) = patch.header.iter().find(|d| {
+            classify_declaration_lenient(d) == ElementKind::Declaration(DeclKind::Id)
+        }) {
+            if let Some(doc_id) = doc.header.iter_mut().find(|d| {
+                classify_declaration_lenient(d) == ElementKind::Declaration(DeclKind::Id)
+            }) {
+                doc_id.data.args = patch_id.data.args.clone();
+                changed = true;
+            }
+        }
+    }
+
+    if let Some(patch_meta) = patch.header.iter().find(|d| {
+        classify_declaration_lenient(d) == ElementKind::Declaration(DeclKind::Meta)
+    }) {
+        let filled_entries = tomet_semantics::data::declaration_entries(patch_meta)
+            .and_then(|v| match v {
+                Value::Map(entries) => Some(entries),
+                _ => None,
+            })
+            .unwrap_or_default();
+
+        if !filled_entries.is_empty() {
+            if let Some(doc_meta) = doc.header.iter_mut().find(|d| {
+                classify_declaration_lenient(d) == ElementKind::Declaration(DeclKind::Meta)
+            }) {
+                for (k, v) in filled_entries {
+                    doc_meta.data.set_prop(&k, v);
+                }
+            } else {
+                let mut new_meta = declaration_new("meta");
+                new_meta.data.args = Some(Value::Map(filled_entries));
+                doc.header.push(new_meta);
+            }
+            changed = true;
+        }
+    }
+
+    if !patch.body.is_empty() {
+        doc.body.extend(patch.body);
+        changed = true;
+    }
+
+    Ok(ApplyOutcome {
+        changed,
+        unresolved,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -277,5 +584,176 @@ mod tests {
             report.unresolved
         );
         assert!(format!("{doc:?}").contains("Interp"));
+    }
+
+    const UUID: &str = "00000000-0000-0000-0000-000000000000";
+
+    fn apply_test(
+        doc_src: &str,
+        bp_src: &str,
+        ids: &[&str],
+    ) -> Result<(File, ApplyOutcome), Vec<SeatProblem>> {
+        let mut doc = tomet_ast_parser::parse_file(doc_src).unwrap();
+        let bp = tomet_ast_parser::parse_file(bp_src).unwrap();
+        let macros = HashMap::new();
+        let cx = EvalContext {
+            resolver: &NoResolver,
+            self_doc: DocRef("test.tmt".into()),
+            macros: &macros,
+            var: &EvalValue::Null,
+            var_unset: &[],
+            includes: &[],
+            heading_level: 0,
+            notes: Default::default(),
+        };
+        let source = FixedSource::at("2026-11-11T09:30:00+09:00")
+            .unwrap()
+            .with_ids(ids.iter().copied());
+        let outcome = apply_blueprint(&mut doc, &bp, &cx, &source)?;
+        Ok((doc, outcome))
+    }
+
+    #[test]
+    fn apply_adds_missing_kind_id_meta_and_sections() {
+        let doc_src = "Existing paragraph.\n";
+        let bp_src = "::kind(blueprint)\n::blueprint(task)\n::id(<$uuid(default: auto)>)\n::meta(\n  title: <$string(default: \"Untitled\")>\n)\n\n=[ Details ]#(details)\n";
+        let (doc, outcome) = apply_test(doc_src, bp_src, &[UUID]).unwrap();
+        assert!(outcome.changed);
+
+        // Header has ::kind(task), ::id(UUID), ::meta(title: "Untitled")
+        let kind = doc
+            .header
+            .iter()
+            .find(|d| classify_declaration_lenient(d) == ElementKind::Declaration(DeclKind::Kind))
+            .expect("::kind");
+        assert_eq!(kind.data.args, Some(Value::String("task".into())));
+
+        let id = doc
+            .header
+            .iter()
+            .find(|d| classify_declaration_lenient(d) == ElementKind::Declaration(DeclKind::Id))
+            .expect("::id");
+        assert_eq!(id.data.args, Some(Value::String(UUID.into())));
+
+        let meta = doc
+            .header
+            .iter()
+            .find(|d| classify_declaration_lenient(d) == ElementKind::Declaration(DeclKind::Meta))
+            .expect("::meta");
+        assert_eq!(
+            meta.data.get_attr("title"),
+            Some(&Value::String("Untitled".into()))
+        );
+
+        // Body has existing paragraph and added section
+        assert_eq!(doc.body.len(), 2);
+        assert!(matches!(&doc.body[0], Block::Paragraph(_)));
+        assert!(matches!(&doc.body[1], Block::Section(s) if s.id.as_ref().map(|i| i.0.as_str()) == Some("details")));
+    }
+
+    #[test]
+    fn apply_already_conforming_document_is_untouched() {
+        let doc_src = "::kind(task)\n::id(123e4567-e89b-12d3-a456-426614174000)\n::meta(\n  title: \"Existing\"\n)\n\n=[ Details ]#(details)\n\nBody content.\n";
+        let bp_src = "::kind(blueprint)\n::blueprint(task)\n::id(<$uuid(default: auto)>)\n::meta(\n  title: <$string(default: \"Untitled\")>\n)\n\n=[ Details ]#(details)\n";
+        let before = tomet_ast_parser::parse_file(doc_src).unwrap();
+        let (doc, outcome) = apply_test(doc_src, bp_src, &[UUID]).unwrap();
+        assert!(!outcome.changed);
+        assert_eq!(doc, before);
+    }
+
+    #[test]
+    fn apply_preserves_existing_valid_id_and_meta_with_overwrite_true() {
+        let doc_src = "::kind(task)\n::id(123e4567-e89b-12d3-a456-426614174000)\n::meta(\n  count: 42\n)\n";
+        let bp_src = "::kind(blueprint)\n::blueprint(task)\n::id(<$uuid(default: auto, overwrite: true)>)\n::meta(\n  count: <$int(default: 0, overwrite: true)>\n)\n";
+        let (doc, outcome) = apply_test(doc_src, bp_src, &[UUID]).unwrap();
+        assert!(!outcome.changed);
+
+        let id = doc
+            .header
+            .iter()
+            .find(|d| classify_declaration_lenient(d) == ElementKind::Declaration(DeclKind::Id))
+            .expect("::id");
+        assert_eq!(
+            id.data.args,
+            Some(Value::String("123e4567-e89b-12d3-a456-426614174000".into()))
+        );
+
+        let meta = doc
+            .header
+            .iter()
+            .find(|d| classify_declaration_lenient(d) == ElementKind::Declaration(DeclKind::Meta))
+            .expect("::meta");
+        assert_eq!(meta.data.get_attr("count"), Some(&Value::Int(42)));
+    }
+
+    #[test]
+    fn apply_replaces_existing_invalid_id_and_meta_with_overwrite_true() {
+        let doc_src = "::kind(task)\n::id(not-a-uuid)\n::meta(\n  count: \"not-an-int\"\n)\n";
+        let bp_src = "::kind(blueprint)\n::blueprint(task)\n::id(<$uuid(default: auto, overwrite: true)>)\n::meta(\n  count: <$int(default: 99, overwrite: true)>\n)\n";
+        let (doc, outcome) = apply_test(doc_src, bp_src, &[UUID]).unwrap();
+        assert!(outcome.changed);
+
+        let id = doc
+            .header
+            .iter()
+            .find(|d| classify_declaration_lenient(d) == ElementKind::Declaration(DeclKind::Id))
+            .expect("::id");
+        assert_eq!(id.data.args, Some(Value::String(UUID.into())));
+
+        let meta = doc
+            .header
+            .iter()
+            .find(|d| classify_declaration_lenient(d) == ElementKind::Declaration(DeclKind::Meta))
+            .expect("::meta");
+        assert_eq!(meta.data.get_attr("count"), Some(&Value::Int(99)));
+    }
+
+    #[test]
+    fn apply_preserves_existing_invalid_id_and_meta_with_overwrite_false() {
+        let doc_src = "::kind(task)\n::id(not-a-uuid)\n::meta(\n  count: \"not-an-int\"\n)\n";
+        let bp_src = "::kind(blueprint)\n::blueprint(task)\n::id(<$uuid(default: auto)>)\n::meta(\n  count: <$int(default: 99)>\n)\n";
+        let (doc, outcome) = apply_test(doc_src, bp_src, &[UUID]).unwrap();
+        assert!(!outcome.changed);
+
+        let id = doc
+            .header
+            .iter()
+            .find(|d| classify_declaration_lenient(d) == ElementKind::Declaration(DeclKind::Id))
+            .expect("::id");
+        assert_eq!(id.data.args, Some(Value::String("not-a-uuid".into())));
+
+        let meta = doc
+            .header
+            .iter()
+            .find(|d| classify_declaration_lenient(d) == ElementKind::Declaration(DeclKind::Meta))
+            .expect("::meta");
+        assert_eq!(
+            meta.data.get_attr("count"),
+            Some(&Value::String("not-an-int".into()))
+        );
+    }
+
+    #[test]
+    fn apply_unfillable_seat_in_missing_section_or_field_returns_err_without_modifying_doc() {
+        let doc_src = "::kind(task)\nExisting paragraph.\n";
+        let before = tomet_ast_parser::parse_file(doc_src).unwrap();
+        let bp_src = "::kind(blueprint)\n::blueprint(task)\n::meta(\n  unfillable: <$string>\n)\n";
+        let mut doc = tomet_ast_parser::parse_file(doc_src).unwrap();
+        let bp = tomet_ast_parser::parse_file(bp_src).unwrap();
+        let macros = HashMap::new();
+        let cx = EvalContext {
+            resolver: &NoResolver,
+            self_doc: DocRef("test.tmt".into()),
+            macros: &macros,
+            var: &EvalValue::Null,
+            var_unset: &[],
+            includes: &[],
+            heading_level: 0,
+            notes: Default::default(),
+        };
+        let source = FixedSource::at("2026-11-11T09:30:00+09:00").unwrap();
+        let res = apply_blueprint(&mut doc, &bp, &cx, &source);
+        assert!(res.is_err());
+        assert_eq!(doc, before);
     }
 }

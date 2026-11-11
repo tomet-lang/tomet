@@ -135,6 +135,12 @@ fn main() -> ExitCode {
             force,
             vars,
         } => commands::new::new_cmd(path, blueprint.as_deref(), *list, *force, vars),
+        Command::Apply {
+            paths,
+            blueprint,
+            dry_run,
+            vars,
+        } => commands::apply::apply_cmd(paths, blueprint.as_deref(), *dry_run, vars),
         Command::Standalone {
             file,
             out,

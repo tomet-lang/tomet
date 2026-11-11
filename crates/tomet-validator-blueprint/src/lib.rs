@@ -4,13 +4,24 @@
 //! `::rule` constraints) from blueprint documents (`::kind(blueprint)`), and validates
 //! target documents for conformance.
 
+use std::collections::HashMap;
+
 use tomet_ast::{Block, Connect, ElementView, File, Inline, Section, Value};
 use tomet_semantics::DeclKind;
 use tomet_semantics::{Bindings, ElementKind, classify_declaration_lenient, classify_std_lenient};
 use tomet_span::Span;
 use tomet_tree::{ValueExt, for_each_top_level_element};
+use tomet_type::Type;
 use tomet_validator_core::Diagnostic;
 use tomet_validator_rule::{RuleArgs, check_descendants_against_rule, decode_rule_args};
+
+/// A required `::meta` or `::id` key extracted from a blueprint, with an optional expected [`Type`].
+#[derive(Debug, Clone, PartialEq)]
+pub struct RequiredMetaKey {
+    pub key: String,
+    pub span: Span,
+    pub expected_type: Option<Type>,
+}
 
 /// Structural requirement extracted from a blueprint.
 #[derive(Debug, Clone, PartialEq)]
@@ -18,7 +29,7 @@ pub struct BlueprintSchema {
     pub target_kind: String,
     /// The `::meta` keys the blueprint declares, and `id` when it declares `::id(...)`: the
     /// document's identity is required, though it is not written in `::meta`.
-    pub required_meta_keys: Vec<(String, Span)>,
+    pub required_meta_keys: Vec<RequiredMetaKey>,
     pub required_sections: Vec<RequiredSection>,
 }
 
@@ -29,6 +40,27 @@ pub struct RequiredSection {
     pub span: Span,
     /// `::rule(...)` constraints attached to this section in the blueprint.
     pub rules: Vec<RuleArgs>,
+}
+
+fn find_type_seat(val: &Value) -> Option<&tomet_ast::TypeSeat> {
+    match val {
+        Value::TypeSeat(seat) => Some(seat),
+        _ => None,
+    }
+}
+
+fn evaluate_type_seat(seat: &tomet_ast::TypeSeat) -> Option<Type> {
+    let cx = tomet_expr::EvalContext {
+        resolver: &tomet_expr::NoResolver,
+        self_doc: tomet_expr::DocRef(String::new()),
+        macros: &HashMap::new(),
+        var: &tomet_expr::EvalValue::Null,
+        var_unset: &[],
+        includes: &[],
+        heading_level: 0,
+        notes: Default::default(),
+    };
+    tomet_expr::evaluate_type(&seat.expr, &cx).ok()
 }
 
 /// Extracts the [`BlueprintSchema`] requirements from a blueprint document.
@@ -53,14 +85,30 @@ pub fn extract_blueprint_schema(blueprint: &File) -> Option<BlueprintSchema> {
                 }
             }
             ElementKind::Declaration(DeclKind::Id) => {
-                required_meta_keys.push(("id".to_string(), span));
+                let norm_args = tomet_semantics::normalized_declaration_args(declaration);
+                let seat = norm_args
+                    .as_ref()
+                    .and_then(|args| args.get("id"))
+                    .or(declaration.data.args.as_ref())
+                    .and_then(find_type_seat);
+                let expected_type = seat.and_then(evaluate_type_seat);
+                required_meta_keys.push(RequiredMetaKey {
+                    key: "id".to_string(),
+                    span,
+                    expected_type,
+                });
             }
             ElementKind::Declaration(DeclKind::Meta) => {
                 if let Some(Value::Map(entries)) =
                     tomet_semantics::data::declaration_entries(declaration)
                 {
-                    for (k, _) in entries {
-                        required_meta_keys.push((k, span));
+                    for (k, v) in entries {
+                        let expected_type = find_type_seat(&v).and_then(evaluate_type_seat);
+                        required_meta_keys.push(RequiredMetaKey {
+                            key: k,
+                            span,
+                            expected_type,
+                        });
                     }
                 }
             }
@@ -123,34 +171,63 @@ pub fn validate_against_schema(
     let mut errors = Vec::new();
     let doc_span = doc.span;
 
-    // 1. Verify required ::meta keys
-    let mut doc_meta_keys = Vec::new();
+    // 1. Verify required ::meta keys and ::id
+    let mut doc_fields: HashMap<String, (Option<Value>, Span)> = HashMap::new();
     let mut doc_meta_span = doc_span;
 
     for declaration in &doc.header {
-        if classify_declaration_lenient(declaration) == ElementKind::Declaration(DeclKind::Id) {
-            doc_meta_keys.push("id".to_string());
-        } else if classify_declaration_lenient(declaration)
-            == ElementKind::Declaration(DeclKind::Meta)
-        {
-            doc_meta_span = declaration.span;
-            if let Some(Value::Map(entries)) =
-                tomet_semantics::data::declaration_entries(declaration)
-            {
-                for (k, _) in entries {
-                    doc_meta_keys.push(k);
+        match classify_declaration_lenient(declaration) {
+            ElementKind::Declaration(DeclKind::Id) => {
+                let val = tomet_semantics::normalized_declaration_args(declaration)
+                    .as_ref()
+                    .and_then(|args| args.get("id"))
+                    .or(declaration.data.args.as_ref())
+                    .cloned();
+                doc_fields.insert("id".to_string(), (val, declaration.span));
+            }
+            ElementKind::Declaration(DeclKind::Meta) => {
+                doc_meta_span = declaration.span;
+                if let Some(Value::Map(entries)) =
+                    tomet_semantics::data::declaration_entries(declaration)
+                {
+                    for (k, v) in entries {
+                        doc_fields.insert(k, (Some(v), declaration.span));
+                    }
                 }
             }
+            _ => {}
         }
     }
 
-    for (req_key, _) in &schema.required_meta_keys {
-        if !doc_meta_keys.contains(req_key) {
-            errors.push(Diagnostic::MissingRequiredMetaKey {
-                key: req_key.clone(),
-                kind: schema.target_kind.clone(),
-                span: doc_meta_span,
-            });
+    for req in &schema.required_meta_keys {
+        match doc_fields.get(&req.key) {
+            None => {
+                errors.push(Diagnostic::MissingRequiredMetaKey {
+                    key: req.key.clone(),
+                    kind: schema.target_kind.clone(),
+                    span: doc_meta_span,
+                });
+            }
+            Some((val_opt, field_span)) => {
+                if let Some(ty) = &req.expected_type {
+                    let val = val_opt.as_ref().unwrap_or(&Value::Null);
+                    if !tomet_semantics_core::is_placeholder(val) {
+                        let conforms = if let Some(spec) = tomet_id::IdSpec::new(ty) {
+                            val.scalar_text().is_some_and(|text| spec.accepts(&text))
+                        } else {
+                            tomet_semantics_core::admits(ty, val).is_ok()
+                        };
+                        if !conforms {
+                            errors.push(Diagnostic::InvalidFieldValue {
+                                field: req.key.clone(),
+                                field_type: ty.to_string(),
+                                value: describe_value(val),
+                                span: *field_span,
+                            });
+                        }
+                    }
+                }
+            }
         }
     }
 
@@ -270,6 +347,21 @@ fn collect_doc_sections<'a>(blocks: &'a [Block], doc_sections: &mut Vec<&'a Sect
     }
 }
 
+/// A value as a reader would have written it, for a message.
+fn describe_value(value: &Value) -> String {
+    match value {
+        Value::String(text) => text.clone(),
+        Value::Bool(b) => b.to_string(),
+        Value::Int(n) => n.to_string(),
+        Value::Float(n) => n.to_string(),
+        Value::Number(text) => text.clone(),
+        Value::Seq(_) => "a list".to_string(),
+        Value::Map(_) => "a map".to_string(),
+        Value::Null => "null".to_string(),
+        _ => "something else".to_string(),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -372,5 +464,97 @@ mod tests {
             errors_good.is_empty(),
             "expected no errors, got: {errors_good:?}"
         );
+    }
+
+    #[test]
+    fn schema_extracts_expected_types_from_type_seats() {
+        let blueprint = parse(
+            "::blueprint(task)\n::id(<$uuid(default: auto)>)\n::meta(count: <$int>, tag: raw)\n\n=[ Body ]\n",
+        );
+        let schema = extract_blueprint_schema(&blueprint).expect("schema");
+        assert_eq!(schema.target_kind, "task");
+        assert_eq!(schema.required_meta_keys.len(), 3);
+        assert_eq!(schema.required_meta_keys[0].key, "id");
+        assert_eq!(
+            schema.required_meta_keys[0].expected_type,
+            Some("uuid(default: auto)".parse().unwrap())
+        );
+        assert_eq!(schema.required_meta_keys[1].key, "count");
+        assert_eq!(
+            schema.required_meta_keys[1].expected_type,
+            Some("int".parse().unwrap())
+        );
+        assert_eq!(schema.required_meta_keys[2].key, "tag");
+        assert_eq!(schema.required_meta_keys[2].expected_type, None);
+    }
+
+    #[test]
+    fn validates_document_conforming_to_blueprint_types() {
+        let blueprint = parse(
+            "::blueprint(task)\n::id(<$uuid(default: auto)>)\n::meta(count: <$int>)\n\n=[ Body ]\n",
+        );
+        let doc = parse(
+            "::kind(task)\n::id(123e4567-e89b-12d3-a456-426614174000)\n::meta(count: 42)\n\n=[ Body ]\n",
+        );
+        let errors = validate_against_blueprint(&doc, &blueprint);
+        assert!(errors.is_empty(), "expected no errors, got: {errors:?}");
+    }
+
+    #[test]
+    fn reports_invalid_field_value_on_id() {
+        let blueprint = parse("::blueprint(task)\n::id(<$uuid>)\n\n=[ Body ]\n");
+        let doc = parse("::kind(task)\n::id(not-a-uuid)\n\n=[ Body ]\n");
+        let errors = validate_against_blueprint(&doc, &blueprint);
+        assert_eq!(errors.len(), 1, "{errors:?}");
+        assert!(
+            matches!(
+                &errors[0],
+                Diagnostic::InvalidFieldValue { field, field_type, value, .. }
+                if field == "id" && field_type == "uuid" && value == "not-a-uuid"
+            ),
+            "{errors:?}"
+        );
+    }
+
+    #[test]
+    fn reports_invalid_field_value_on_meta() {
+        let blueprint = parse("::blueprint(task)\n::meta(count: <$int>)\n\n=[ Body ]\n");
+        let doc = parse("::kind(task)\n::meta(count: \"not-an-int\")\n\n=[ Body ]\n");
+        let errors = validate_against_blueprint(&doc, &blueprint);
+        assert_eq!(errors.len(), 1, "{errors:?}");
+        assert!(
+            matches!(
+                &errors[0],
+                Diagnostic::InvalidFieldValue { field, field_type, value, .. }
+                if field == "count" && field_type == "int" && value == "not-an-int"
+            ),
+            "{errors:?}"
+        );
+    }
+
+    #[test]
+    fn reports_missing_id_and_meta_key_with_type_seats() {
+        let blueprint = parse(
+            "::blueprint(task)\n::id(<$uuid>)\n::meta(count: <$int>)\n\n=[ Body ]\n",
+        );
+        let doc = parse("::kind(task)\n\n=[ Body ]\n");
+        let errors = validate_against_blueprint(&doc, &blueprint);
+        assert_eq!(errors.len(), 2, "{errors:?}");
+        assert!(
+            matches!(&errors[0], Diagnostic::MissingRequiredMetaKey { key, .. } if key == "id"),
+            "{errors:?}"
+        );
+        assert!(
+            matches!(&errors[1], Diagnostic::MissingRequiredMetaKey { key, .. } if key == "count"),
+            "{errors:?}"
+        );
+    }
+
+    #[test]
+    fn placeholders_in_document_are_not_flagged_as_invalid_field_value() {
+        let blueprint = parse("::blueprint(task)\n::id(<$uuid>)\n\n=[ Body ]\n");
+        let doc = parse("::kind(task)\n::id(<$uuid>)\n\n=[ Body ]\n");
+        let errors = validate_against_blueprint(&doc, &blueprint);
+        assert!(errors.is_empty(), "expected no errors, got: {errors:?}");
     }
 }

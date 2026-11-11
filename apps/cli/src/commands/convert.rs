@@ -359,9 +359,8 @@ fn html(doc: &tomet_ast::File, path: &Path, options: &HtmlOptions) -> String {
     tomet_html::render_page_with(doc, &title, &render)
 }
 
-/// Markdown to Tomet, laid out as the vault's config says (table widths) and
-/// given an id if the config asks for one. The result is parsed again, so a
-/// conversion never hands back text that is not Tomet.
+/// Markdown to Tomet, laid out as the vault's config says (table widths).
+/// The result is parsed again, so a conversion never hands back text that is not Tomet.
 fn from_markdown(src: &str, path: &Path) -> Result<String> {
     // Standard input has no place of its own; it borrows the working
     // directory's config.
@@ -378,8 +377,7 @@ fn from_markdown(src: &str, path: &Path) -> Result<String> {
         table_max_col_width: config.format.table_max_col_width,
         table_align: config.format.table_align.clone(),
     };
-    let mut doc = tomet_markdown::from_markdown_with_options(src, &import);
-    tomet_printer::ensure_document_id_with_config(&mut doc, &config);
+    let doc = tomet_markdown::from_markdown_with_options(src, &import);
     let tmt = tomet_printer::document_to_tm_with_config(&doc, &config);
     if let Err(e) = tomet_ast_parser::parse_file(&tmt) {
         return Err(anyhow!(

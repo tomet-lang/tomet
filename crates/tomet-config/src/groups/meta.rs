@@ -34,14 +34,6 @@ pub struct FieldConfig {
     /// Static string prefix.
     #[config(key = "meta.<field>.prefix", type = "string")]
     pub prefix: Option<String>,
-
-    /// Force presence validation.
-    #[config(key = "meta.<field>.force", type = "bool")]
-    pub force: Option<bool>,
-
-    /// Allow overwriting during migrations.
-    #[config(key = "meta.<field>.overwrite", type = "bool")]
-    pub overwrite: Option<bool>,
 }
 
 fn parse_meta_fields(value: &Value) -> Option<BTreeMap<String, FieldConfig>> {
@@ -121,20 +113,6 @@ fn parse_meta_field_props(
                     }
                 }
                 "prefix" => field_cfg.prefix = pv.as_str().map(String::from),
-                "force" => {
-                    if let Some(b) = pv.as_bool() {
-                        field_cfg.force = Some(b);
-                    } else if let Some(s) = pv.as_str() {
-                        field_cfg.force = Some(s == "true" || s == "1");
-                    }
-                }
-                "overwrite" => {
-                    if let Some(b) = pv.as_bool() {
-                        field_cfg.overwrite = Some(b);
-                    } else if let Some(s) = pv.as_str() {
-                        field_cfg.overwrite = Some(s == "true" || s == "1");
-                    }
-                }
                 _ => {}
             }
         }

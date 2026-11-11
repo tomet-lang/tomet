@@ -252,6 +252,22 @@ fn an_argument_must_be_of_the_sort_the_parameter_takes() {
             "the number `NaN`"
         )
     );
+    assert_eq!(
+        Type::build("nanoid", &[], &[("overwrite", int(1))]),
+        wrong(Kind::Nanoid, "overwrite", "true or false", "the integer `1`")
+    );
+    assert_eq!(
+        Type::build("nanoid", &[], &[("overwrite", text("true"))]),
+        wrong(Kind::Nanoid, "overwrite", "true or false", "the text \"true\"")
+    );
+    assert_eq!(
+        Type::build(
+            "nanoid",
+            &[],
+            &[("overwrite", Arg::Type(bare(Kind::Bool)))]
+        ),
+        wrong(Kind::Nanoid, "overwrite", "true or false", "the type `bool`")
+    );
 }
 
 #[test]
@@ -351,6 +367,10 @@ fn auto_is_the_value_of_default_and_of_nothing_else() {
         Type::build("list", &[Arg::Auto], &[]),
         elsewhere(Kind::List, "item")
     );
+    assert_eq!(
+        Type::build("nanoid", &[], &[("overwrite", Arg::Auto)]),
+        elsewhere(Kind::Nanoid, "overwrite")
+    );
     // Not even where a kind has no `default: auto` to give it meaning.
     assert_eq!(
         Type::build("string", &[], &[("default", Arg::Auto)]),
@@ -371,15 +391,15 @@ fn the_messages_name_the_type_and_the_argument() {
     );
     assert_eq!(
         message(Type::build("uuid", &[], &[("length", int(8))]).unwrap_err()),
-        "`uuid` has no argument `length`; it takes `prefix` and `default`"
+        "`uuid` has no argument `length`; it takes `prefix`, `default` and `overwrite`"
     );
     assert_eq!(
         message(Type::build("list", &[], &[("prefix", text("x"))]).unwrap_err()),
-        "`list` has no argument `prefix`; it takes an item type, `length` and `default`"
+        "`list` has no argument `prefix`; it takes an item type, `length`, `default` and `overwrite`"
     );
     assert_eq!(
         message(Type::build("int", &[int(1)], &[]).unwrap_err()),
-        "`int` takes no argument written by position, only named ones: `default`"
+        "`int` takes no argument written by position, only named ones: `default` and `overwrite`"
     );
     assert_eq!(
         message(
@@ -433,6 +453,16 @@ fn the_text_form_is_the_canonical_spelling() {
         ("float(default: 100000.0)", "float(default: 1e5)"),
         ("bool(default: true)", "bool(default: true)"),
         ("string(default: null)", "string(default: null)"),
+        ("nanoid(overwrite: true)", "nanoid(overwrite: true)"),
+        ("nanoid", "nanoid(overwrite: false)"),
+        (
+            r#"nanoid(length: 8, prefix: "doc-", overwrite: true)"#,
+            r#"nanoid(prefix: "doc-", length: 8, overwrite: true)"#,
+        ),
+        (
+            r#"nanoid(length: 8, prefix: "doc-", default: auto, overwrite: true)"#,
+            r#"nanoid(length: 8, prefix: "doc-", overwrite: true, default: auto)"#,
+        ),
     ] {
         let ty = read(source);
         assert_eq!(ty.to_string(), spelling, "{source}");
@@ -601,11 +631,28 @@ fn sample() -> Vec<Type> {
     }
     for prefix in ["", "doc-", "a \"b\""] {
         add("uuid", &[], &[("prefix", text(prefix))]);
+        add(
+            "uuid",
+            &[],
+            &[
+                ("prefix", text(prefix)),
+                ("overwrite", Arg::Datum(Datum::Bool(true))),
+            ],
+        );
         for length in [1, 8, 40] {
             add(
                 "nanoid",
                 &[],
                 &[("length", int(length)), ("prefix", text(prefix))],
+            );
+            add(
+                "nanoid",
+                &[],
+                &[
+                    ("length", int(length)),
+                    ("prefix", text(prefix)),
+                    ("overwrite", Arg::Datum(Datum::Bool(true))),
+                ],
             );
         }
     }
@@ -722,4 +769,74 @@ fn nested_lists_keep_their_items() {
     assert_eq!(inner.kind(), Kind::List);
     assert_eq!(inner.item(), Some(&bare(Kind::Int)));
     assert_eq!(ty, list_of(list_of(bare(Kind::Int))));
+}
+
+#[test]
+fn overwrite_is_accepted_for_every_kind_and_defaults_to_false() {
+    for kind in Kind::ALL {
+        let bare = Type::bare(kind);
+        assert!(!bare.overwrite(), "{kind}: default is false");
+        let positional: Vec<Arg> = if kind == Kind::List {
+            vec![Arg::Type(Type::bare(Kind::String))]
+        } else {
+            vec![]
+        };
+        let ty_default = Type::build(kind.name(), &positional, &[]).unwrap();
+        assert!(!ty_default.overwrite(), "{kind}: build default is false");
+
+        // overwrite: false explicitly
+        let ty_false = Type::build(
+            kind.name(),
+            &positional,
+            &[("overwrite", Arg::Datum(Datum::Bool(false)))],
+        )
+        .unwrap();
+        assert!(!ty_false.overwrite(), "{kind}: explicit false");
+
+        // overwrite: true
+        let ty_true = Type::build(
+            kind.name(),
+            &positional,
+            &[("overwrite", Arg::Datum(Datum::Bool(true)))],
+        )
+        .unwrap();
+        assert!(ty_true.overwrite(), "{kind}: explicit true");
+    }
+}
+
+#[test]
+fn overwrite_display_and_from_str_roundtrip() {
+    for (src, canonical, expected_overwrite) in [
+        ("nanoid(overwrite: true)", "nanoid(overwrite: true)", true),
+        ("nanoid(overwrite: false)", "nanoid", false),
+        (
+            r#"nanoid(length: 8, prefix: "note-", default: auto, overwrite: true)"#,
+            r#"nanoid(length: 8, prefix: "note-", default: auto, overwrite: true)"#,
+            true,
+        ),
+        (
+            r#"nanoid(length: 8, prefix: "note-", default: auto, overwrite: false)"#,
+            r#"nanoid(length: 8, prefix: "note-", default: auto)"#,
+            false,
+        ),
+        (
+            "uuid(default: auto, overwrite: true)",
+            "uuid(default: auto, overwrite: true)",
+            true,
+        ),
+        ("string(overwrite: true)", "string(overwrite: true)", true),
+        (
+            "list(string, length: 5, overwrite: true)",
+            "list(string, length: 5, overwrite: true)",
+            true,
+        ),
+        ("bool(overwrite: true)", "bool(overwrite: true)", true),
+    ] {
+        let ty: Type = src.parse().unwrap();
+        assert_eq!(ty.overwrite(), expected_overwrite, "{src}");
+        assert_eq!(ty.to_string(), canonical, "{src}");
+        let back: Type = ty.to_string().parse().unwrap();
+        assert_eq!(back, ty, "{src}");
+        assert_eq!(back.overwrite(), expected_overwrite, "{src}");
+    }
 }

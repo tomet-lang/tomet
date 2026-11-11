@@ -21,6 +21,7 @@ impl Type {
     /// - `default` (every kind) is a plain value, or `auto` for a kind that
     ///   makes a value up ([`Kind::auto`]). It is not held to the type here
     ///   (see [`DefaultValue::Given`]);
+    /// - `overwrite` (every kind) is a boolean (`true` or `false`), defaulting to `false`;
     /// - a name that is not one of these, or is written twice, is an error;
     /// - [`Arg::Auto`] is the value of `default` and of no other argument.
     pub fn build(name: &str, positional: &[Arg], named: &[(&str, Arg)]) -> Result<Type, TypeError> {
@@ -71,6 +72,10 @@ impl Type {
         let default = get("default")
             .map(|arg| default_of(kind, arg))
             .transpose()?;
+        let overwrite = get("overwrite")
+            .map(|arg| overwrite_of(kind, arg))
+            .transpose()?
+            .unwrap_or(false);
         let form = match kind {
             Kind::String => Form::String,
             Kind::Int => Form::Int,
@@ -106,7 +111,11 @@ impl Type {
                     .transpose()?,
             },
         };
-        Ok(Type { form, default })
+        Ok(Type {
+            form,
+            default,
+            overwrite,
+        })
     }
 }
 
@@ -174,5 +183,13 @@ fn default_of(kind: Kind, arg: &Arg) -> Result<DefaultValue, TypeError> {
             arg,
         )),
         Arg::Type(_) => Err(wrong(kind, "default", "a value or `auto`", arg)),
+    }
+}
+
+/// An `overwrite`: a boolean (`true` or `false`).
+fn overwrite_of(kind: Kind, arg: &Arg) -> Result<bool, TypeError> {
+    match arg {
+        Arg::Datum(Datum::Bool(b)) => Ok(*b),
+        _ => Err(wrong(kind, "overwrite", "true or false", arg)),
     }
 }
