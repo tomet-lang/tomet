@@ -8,9 +8,10 @@
 //! arrive as single tokens; a word with a letter outside ASCII is text and no part of a name.
 
 use super::CstParser;
+use tomet_cst::CstSlotMark as SlotMark;
 use tomet_cst::{SyntaxKind, SyntaxKind as K};
 
-pub(super) fn is_name_start(c: char) -> bool {
+fn is_name_start(c: char) -> bool {
     c.is_ascii_alphabetic() || c == '_'
 }
 
@@ -50,24 +51,24 @@ impl<'a, 't> CstParser<'a, 't> {
             _ => false,
         };
         if valid_start {
-            self.name_run_len(from, true)
+            self.name_run_len(from, true, true)
         } else {
             0
         }
     }
 
-    /// [`CstParser::name_tokens_at`] for a box's name, whose first character is `first`'s to
-    /// accept. A marked box's name is an ASCII name like any other (`ascii`), and `first` a name
-    /// start. A name tag's is a label for the reader, not a name: it starts with any letter and
-    /// may hold any letters.
-    pub(super) fn slot_name_tokens_at(
-        &self,
-        i: usize,
-        first: impl Fn(char) -> bool,
-        ascii: bool,
-    ) -> usize {
+    /// [`CstParser::name_tokens_at`] for the name of the box with `mark`, whose shape is the
+    /// mark's: a name tag's is a label for the reader, not a name, so it starts with any letter
+    /// and may hold any letters; a hole's matcher and a type seat's type are ASCII names like any
+    /// other, and the type is one word, with no `.` in it.
+    pub(super) fn slot_name_tokens_at(&self, i: usize, mark: SlotMark) -> usize {
         let Some(first_kind) = self.raw_kind_at(i) else {
             return 0;
+        };
+        let ascii = mark != SlotMark::NameTag;
+        let first = |c: char| match mark {
+            SlotMark::NameTag => c.is_alphabetic(),
+            SlotMark::Hole | SlotMark::TypeSeat => is_name_start(c),
         };
         let first_text = self.text_at(i);
         let valid_start = match first_kind {
@@ -78,7 +79,7 @@ impl<'a, 't> CstParser<'a, 't> {
             _ => false,
         };
         if valid_start {
-            self.name_run_len(i, ascii)
+            self.name_run_len(i, ascii, mark != SlotMark::TypeSeat)
         } else {
             0
         }
@@ -86,8 +87,8 @@ impl<'a, 't> CstParser<'a, 't> {
 
     /// The length, in tokens, of the name that starts at `from`, whose first token is known to
     /// be a valid start: it, and every token against the end of the last that is a part of a name
-    /// (a word only in ASCII when `ascii`).
-    fn name_run_len(&self, from: usize, ascii: bool) -> usize {
+    /// (a word only in ASCII when `ascii`; a `.` between two parts only when `dotted`).
+    fn name_run_len(&self, from: usize, ascii: bool, dotted: bool) -> usize {
         let mut count = 1;
         let mut last_end = self.start_of(from) + self.text_at(from).len();
         while let Some(kind) = self.raw_kind_at(from + count) {
@@ -100,7 +101,8 @@ impl<'a, 't> CstParser<'a, 't> {
                 // A `.` joins two parts: it needs one against its far side.
                 K::DOT => {
                     let next = from + count + 1;
-                    self.start_of(next) == tok_start + tok_len
+                    dotted
+                        && self.start_of(next) == tok_start + tok_len
                         && self
                             .raw_kind_at(next)
                             .is_some_and(|k| is_name_part(k, self.text_at(next), ascii))

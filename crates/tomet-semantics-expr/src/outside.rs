@@ -140,6 +140,11 @@ fn walk(expr: &InterpExpr, own: &OwnNames, out: &mut Vec<Reaching>) {
             }
         }
         InterpExprKind::Group(inner) => walk(inner, own, out),
+        InterpExprKind::Seq(items) => {
+            for item in items {
+                walk(item, own, out);
+            }
+        }
         InterpExprKind::Lambda { body, .. } => walk(body, own, out),
         InterpExprKind::NamedArg { value, .. } => walk(value, own, out),
         InterpExprKind::Binary { lhs, rhs, .. } => {
@@ -234,7 +239,7 @@ mod tests {
     use crate::FUNCTIONS;
 
     fn parse(source: &str) -> InterpExpr {
-        tomet_ast_parser::parse_interpolation_str(&format!("${{{source}}}"))
+        tomet_ast_parser::parse_interpolation_str(&format!("{{$ {source} }}"))
             .unwrap()
             .expr
     }
@@ -347,7 +352,7 @@ mod tests {
     #[test]
     fn the_names_a_document_defines_are_read_from_the_document() {
         let doc = tomet_ast_parser::parse_file(
-            "::macro(gh: \"https://x/${1}\")\n::var(topic: { type: string })\n",
+            "::macro(gh: \"https://x/$(1)\")\n::var(topic: { type: string })\n",
         )
         .unwrap();
         let own = OwnNames::of_document(&doc);

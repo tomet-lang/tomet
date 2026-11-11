@@ -2,7 +2,7 @@
 
 text `//` not comment and `/*` not comment `*/`
 
-`@`name(x) and `$`{x} and <?slot> and \\*em*
+`@`name(x) and `$`(x) and `$`f(x) and {`$` x } and <?slot> and \\*em*
 
 ## ; not break
 = not section

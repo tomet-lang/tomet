@@ -19,7 +19,9 @@ pub(crate) fn raw_content_text(blocks: &[Block]) -> Option<String> {
             Inline::Raw(r) => out.push_str(&r.value),
             Inline::Text(t) => out.push_str(&t.value),
             Inline::SoftBreak(_) | Inline::LineBreak(_) => out.push('\n'),
-            Inline::Interp(_) | Inline::Element(_) | Inline::Hole(_) => return None,
+            Inline::Interp(_) | Inline::Element(_) | Inline::Hole(_) | Inline::TypeSeat(_) => {
+                return None;
+            }
         }
     }
     Some(out)
@@ -48,7 +50,9 @@ pub(crate) fn render_inlines(inlines: &[Inline], config: &PrinterConfig) -> Stri
                 | Inline::Raw(_)
                 | Inline::SoftBreak(_)
                 | Inline::LineBreak(_)
-                | Inline::Interp(_) => false,
+                | Inline::Interp(_)
+                // Nothing attaches to a type seat: it takes no group, so what follows it is text.
+                | Inline::TypeSeat(_) => false,
             };
         match &inlines[idx] {
             Inline::Text(t) => {
@@ -90,6 +94,7 @@ pub(crate) fn render_inlines(inlines: &[Inline], config: &PrinterConfig) -> Stri
             // into always-one-line output.
             Inline::SoftBreak(_) | Inline::LineBreak(_) => s.push('\n'),
             Inline::Interp(interp) => s.push_str(&crate::element::render_interp(interp)),
+            Inline::TypeSeat(seat) => s.push_str(&crate::element::render_type_seat(seat)),
             Inline::Element(el) => push_node(
                 &mut s,
                 el.placement == Placement::Block,
@@ -114,7 +119,8 @@ fn text_or_raw_str(inline: &Inline) -> Option<&str> {
         | Inline::LineBreak(_)
         | Inline::Interp(_)
         | Inline::Element(_)
-        | Inline::Hole(_) => None,
+        | Inline::Hole(_)
+        | Inline::TypeSeat(_) => None,
     }
 }
 
@@ -308,6 +314,13 @@ fn escape_and_push_text(s: &mut String, text: &str, prev_was_form: bool, rest_in
             continue;
         }
 
+        // `{$` opens `{$ expr }`; the brace is what is escaped, as the `$` is for the others.
+        if b == b'{' && text[i + 1..].starts_with('$') {
+            s.push_str("\\{");
+            i += 1;
+            continue;
+        }
+
         if b == b'$' {
             if is_dollar_interp_trigger(&text[i + 1..]) {
                 s.push_str("\\$");
@@ -324,6 +337,17 @@ fn escape_and_push_text(s: &mut String, text: &str, prev_was_form: bool, rest_in
             continue;
         }
 
+        // `<$` opens a type seat; the `<` is what is escaped, so the `$` after it is still looked
+        // at on its own (`<$f(x)>` is `\<` and then a `\$f(x)`). The text may also end in the `<`,
+        // with the `$` the start of the interpolation that follows it.
+        if text[i..].starts_with("<$")
+            || (b == b'<' && i + 1 == bytes.len() && next_inline_starts_with_dollar(rest_inlines))
+        {
+            s.push_str("\\<");
+            i += 1;
+            continue;
+        }
+
         if matches!(b, b'[' | b']') && unmatched.as_ref().is_some_and(|u| u[i]) {
             s.push('\\');
             s.push(b as char);
@@ -335,6 +359,15 @@ fn escape_and_push_text(s: &mut String, text: &str, prev_was_form: bool, rest_in
         s.push(ch);
         i += ch.len_utf8();
     }
+}
+
+/// Is the next inline an interpolation that is written with a `$` first, `$name(...)` or `$(ref)`?
+/// After a `<` it would read as the head of a type seat.
+fn next_inline_starts_with_dollar(rest_inlines: &[Inline]) -> bool {
+    matches!(
+        rest_inlines.first(),
+        Some(Inline::Interp(interp)) if crate::element::render_interp(interp).starts_with('$')
+    )
 }
 
 /// Returns the byte offset within `line` (after leading spaces/tabs) if `line`
@@ -462,7 +495,7 @@ fn starts_with_form_group_or_connect(s: &str, next_line: bool) -> bool {
 }
 
 fn is_dollar_interp_trigger(after_dollar: &str) -> bool {
-    if after_dollar.starts_with('{') {
+    if after_dollar.starts_with('(') {
         return true;
     }
     skip_tomet_name(after_dollar).is_some_and(|after_name| after_name.starts_with('('))
@@ -517,7 +550,7 @@ fn rest_inlines_have_backtick_on_line(rest: &[Inline]) -> bool {
                     return false;
                 }
             }
-            Inline::Interp(_) | Inline::Element(_) | Inline::Hole(_) => {}
+            Inline::Interp(_) | Inline::Element(_) | Inline::Hole(_) | Inline::TypeSeat(_) => {}
         }
     }
     false

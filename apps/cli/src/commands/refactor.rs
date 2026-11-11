@@ -139,7 +139,7 @@ mod tests {
   title: "My Title"
 )
 ::macro(
-  gh: "https://github.com/${1}"
+  gh: "https://github.com/$(1)"
 )
 
 - @link("https://github.com/tomet/tomet")[Repo]

@@ -77,10 +77,13 @@
 (document_element "::" @tag)
 (document_element name: (identifier) @tag)
 
-; `${...}` / `$call(...)` interpolation
-(interpolation "${" @punctuation.special)
+; `{$ ... }` / `$(...)` / `$call(...)` interpolation
+(interpolation "{$" @punctuation.special)
+(interpolation "$(" @punctuation.special)
 (interpolation "}" @punctuation.special)
-(interpolation "$" @function)
+(interpolation ")" @punctuation.special)
+(interp_dollar_head) @function
+(interp_dollar_call ")" @function)
 (interp_call name: (identifier) @function)
 (interp_call member: (identifier) @function)
 (interp_call "(" @function)
@@ -144,6 +147,14 @@
 (hole_open) @keyword.operator @keyword
 (hole_close) @keyword.operator @keyword
 
+; A type seat (`<$uuid(default: auto)>`) is a place for a value of that type, so it is
+; drawn as a type: the `<$` with the type's name, and the closing `>`. The arguments
+; between them keep the colours of an expression.
+(type_seat_open) @type
+(type_seat_close) @type
+(type_seat "(" @punctuation.bracket)
+(type_seat ")" @punctuation.bracket)
+
 ; Bare double colons on inline elements and sections (::(), ::{}) use distinct keyword color.
 ; A declaration's own `::` is its sigil, coloured as a tag above, and it takes no connect.
 (inline_element "::" @keyword.control)
@@ -162,7 +173,7 @@
 (punctuation) @punctuation.delimiter
 
 ; Expressions: operators, lambdas, `doc#id`, `addr(...)`, named arguments
-(interp_binary ["||" "&&" "==" "!=" "<=" ">=" "<" ">"] @punctuation.special)
+(interp_binary ["||" "&&" "==" "!=" "<=" ">=" "<" ">" "+" "-"] @punctuation.special)
 (interp_lambda "=>" @punctuation.special)
 (interp_lambda params: (identifier) @variable.parameter)
 (interp_hash "#" @punctuation.special)
@@ -171,3 +182,4 @@
 (interp_member member: (identifier) @function)
 (interp_group "(" @punctuation.bracket)
 (interp_group ")" @punctuation.bracket)
+(interp_group "," @punctuation.delimiter)

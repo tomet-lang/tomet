@@ -7,6 +7,7 @@ use tomet_style::{BracketSpacing, ParagraphSeparator, stands_like_a_paragraph};
 
 use crate::element::{
     render_connects, render_declaration, render_element, render_hole, render_interp,
+    render_type_seat,
 };
 use crate::id::render_id;
 use crate::inline::{render_content_blocks, render_inlines};
@@ -71,7 +72,11 @@ fn flows(block: &Block, config: &PrinterConfig) -> bool {
             }
             Block::Element(el) => classify_std_lenient(el.as_view()) != ElementKind::Heading,
             // No exception of their own; a section and a list are already out.
-            Block::Hole(_) | Block::Interp(_) | Block::Section(_) | Block::List(_) => true,
+            Block::Hole(_)
+            | Block::Interp(_)
+            | Block::TypeSeat(_)
+            | Block::Section(_)
+            | Block::List(_) => true,
         }
 }
 
@@ -134,6 +139,10 @@ pub(crate) fn render_block(block: &Block, config: &PrinterConfig, out: &mut Stri
         Block::List(list) => render_list(list, config, out),
         Block::Interp(interp) => {
             out.push_str(&render_interp(interp));
+            out.push('\n');
+        }
+        Block::TypeSeat(seat) => {
+            out.push_str(&render_type_seat(seat));
             out.push('\n');
         }
     }

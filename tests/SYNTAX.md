@@ -38,8 +38,9 @@ TOMET_UPDATE_REF=1 cargo test -p tomet-tests --test syntax_report  # 更新
 - [リスト](#リスト)
 - [インライン記法](#インライン記法)
 - [区切りとコードブロック](#区切りとコードブロック)
-- [補間 `${...}`](#補間-)
+- [補間 `{$ ... }` `$(...)` `$name(...)`](#補間-----name)
 - [式の部品](#式の部品)
+- [型の座 `<$type(args)>`](#型の座-<typeargs>)
 - [コネクト `::`](#コネクト-)
 - [名前付きコネクト `::name(...)`](#名前付きコネクト-name)
 - [id `#(...)`](#id-)
@@ -375,12 +376,12 @@ Block  @memo
 unknown element `memo`: only `std` and this document's own `::kind` may be written bare; namespace it (`ns.memo`), or declare the vocabulary that has it and bind it with `::use`
 ```
 
-### `${...}` は展開されず逐語で残る
+### `{$ ... }` は展開されず逐語で残る
 
 ```tmt
 ::config[
 ```
-{"gh": "x/${1}"}
+{"gh": "x/$(1)"}
 ```
 ]
 ```
@@ -391,7 +392,7 @@ Declaration ::config
     Block  @raw
       content
         Paragraph
-          Raw "{\"gh\": \"x/${1}\"}"
+          Raw "{\"gh\": \"x/$(1)\"}"
 ```
 
 検証:
@@ -1439,12 +1440,23 @@ Block  @raw
       Raw "let y = @T; *ptr"
 ```
 
-## 補間 `${...}`
+## 補間 `{$ ... }` `$(...)` `$name(...)`
 
-### 識別子
+### `$( )` は単一の参照
 
 ```tmt
-${name}
+$(name)
+```
+
+```
+Interp $
+  interp  name
+```
+
+### `{$ }` は式の全体。参照だけでも書ける
+
+```tmt
+{$ name }
 ```
 
 ```
@@ -1455,7 +1467,7 @@ Interp $
 ### メンバ参照
 
 ```tmt
-${a.b.c}
+$(a.b.c)
 ```
 
 ```
@@ -1463,10 +1475,21 @@ Interp $
   interp  a.b.c
 ```
 
+### 場所の番号
+
+```tmt
+$(1)
+```
+
+```
+Interp $
+  interp  1
+```
+
 ### `::` はノードから、そこに付く物（`id` `name` `meta`、文書の `path`）へ渡る。`.` はノードの中のデータ key を読む
 
 ```tmt
-${#u1::meta.tag}
+$(#u1::meta.tag)
 ```
 
 ```
@@ -1477,7 +1500,7 @@ Interp $
 ### 関数呼び出し
 
 ```tmt
-${sum(1, 2)}
+$sum(1, 2)
 ```
 
 ```
@@ -1501,7 +1524,7 @@ Interp $
 ### `true` `false` `null` は値
 
 ```tmt
-${true}
+{$ true }
 ```
 
 ```
@@ -1512,7 +1535,7 @@ Interp $
 ### `null`
 
 ```tmt
-${null}
+{$ null }
 ```
 
 ```
@@ -1523,7 +1546,7 @@ Interp $
 ### 比較は連鎖しない。`==` `!=` `<` `<=` `>` `>=`
 
 ```tmt
-${a >= 1}
+{$ a >= 1 }
 ```
 
 ```
@@ -1534,7 +1557,7 @@ Interp $
 ### `&&` は `||` より強く結びつく
 
 ```tmt
-${a || b && c}
+{$ a || b && c }
 ```
 
 ```
@@ -1542,10 +1565,52 @@ Interp $
   interp  (a || (b && c))
 ```
 
+### `+` `-` は前後に空白があるときだけ演算子。比較より強く結びつく
+
+```tmt
+{$ a + b - c == d }
+```
+
+```
+Interp $
+  interp  (((a + b) - c) == d)
+```
+
+### 空白の無い `-` は名前の一部
+
+```tmt
+{$ daily-note - a-b }
+```
+
+```
+Interp $
+  interp  (daily-note - a-b)
+```
+
+### `$( )` に参照以外は書けない
+
+```tmt
+$(a + b)
+```
+
+```
+parse error: 1:1: '$(...)' holds one reference: a name, '#id', a '.member' or '::connect' chain, or a place number. Write any other expression as '{$ ... }', and a call as '$name(...)'
+```
+
+### `+` `-` の前後に空白が無いのは誤り
+
+```tmt
+{$ a -b }
+```
+
+```
+parse error: 1:6: '-' is an operator only with white space on both sides: write 'a - b'
+```
+
 ### 括弧は木に残る
 
 ```tmt
-${(a || b) && c}
+{$ (a || b) && c }
 ```
 
 ```
@@ -1556,7 +1621,7 @@ Interp $
 ### 無名関数
 
 ```tmt
-${xs.filter(d => d.n == 1)}
+$xs.filter(d => d.n == 1)
 ```
 
 ```
@@ -1567,7 +1632,7 @@ Interp $
 ### 引数が複数の無名関数は括弧で囲む
 
 ```tmt
-${(a, b) => a < b}
+{$ (a, b) => a < b }
 ```
 
 ```
@@ -1578,7 +1643,7 @@ Interp $
 ### `#` の左に文書。左を省くと `self`
 
 ```tmt
-${tmt("a.tmt")#intro.title}
+{$ tmt("a.tmt")#intro.title }
 ```
 
 ```
@@ -1589,12 +1654,379 @@ Interp $
 ### `addr(` は中身を生の文字列として読む
 
 ```tmt
-${addr(tmt:docs/a.tmt#intro)}
+$addr(tmt:docs/a.tmt#intro)
 ```
 
 ```
 Interp $
   interp  addr(tmt:docs/a.tmt#intro)
+```
+
+## 型の座 `<$type(args)>`
+
+### `<$` と型の名前と `>`。値の入る場所を、その型といっしょに書く。名前は ASCII の一語で、`.` は含まない。`(args)` は省ける
+
+```tmt
+<$uuid>
+```
+
+```
+TypeSeat <$
+  type    uuid
+```
+
+検証:
+
+```
+`<$uuid>` is a type seat, and type seats belong in a blueprint (`::blueprint(...)`): a document made from one has none
+```
+
+### 空の `()` は空の呼び出しとして残る。名前だけの `<$uuid>` とは木が違う
+
+```tmt
+<$uuid()>
+```
+
+```
+TypeSeat <$
+  type    uuid()
+```
+
+検証:
+
+```
+`<$uuid()>` is a type seat, and type seats belong in a blueprint (`::blueprint(...)`): a document made from one has none
+```
+
+### `(args)` は型の引数。名前付きの引数も、入れ子の型も書ける
+
+```tmt
+<$list(string, length: 6)>
+```
+
+```
+TypeSeat <$
+  type    list(string, length: 6)
+```
+
+検証:
+
+```
+`<$list(string, length: 6)>` is a type seat, and type seats belong in a blueprint (`::blueprint(...)`): a document made from one has none
+```
+
+### `default: auto` や文字列の引数
+
+```tmt
+<$nanoid(length: 8, prefix: "note-", default: auto)>
+```
+
+```
+TypeSeat <$
+  type    nanoid(length: 8, prefix: "note-", default: auto)
+```
+
+検証:
+
+```
+`<$nanoid(length: 8, prefix: "note-", default: auto)>` is a type seat, and type seats belong in a blueprint (`::blueprint(...)`): a document made from one has none
+```
+
+### 引数は行をまたげる
+
+```tmt
+<$list(
+  string,
+  length: 6
+)>
+```
+
+```
+TypeSeat <$
+  type    list(string, length: 6)
+```
+
+検証:
+
+```
+`<$list(string, length: 6)>` is a type seat, and type seats belong in a blueprint (`::blueprint(...)`): a document made from one has none
+```
+
+### 地の文の中にも置ける。行の頭でなければ段落の一部
+
+```tmt
+id は <$uuid> と書く。
+```
+
+```
+Paragraph
+  Text "id は "
+  TypeSeat <$
+    type    uuid
+  Text " と書く。"
+```
+
+検証:
+
+```
+`<$uuid>` is a type seat, and type seats belong in a blueprint (`::blueprint(...)`): a document made from one has none
+```
+
+### 見出しの中にも置ける
+
+```tmt
+=[ 題 <$string> ]
+```
+
+```
+Section level=1
+  Title:
+    Text "題 "
+    TypeSeat <$
+      type    string
+```
+
+検証:
+
+```
+`<$string>` is a type seat, and type seats belong in a blueprint (`::blueprint(...)`): a document made from one has none
+```
+
+### 値の位置の座: `(args)` の値
+
+```tmt
+@memo(<$int>)
+```
+
+```
+Block  @memo
+  args    <$int>
+```
+
+検証:
+
+```
+unknown element `memo`: only `std` and this document's own `::kind` may be written bare; namespace it (`ns.memo`), or declare the vocabulary that has it and bind it with `::use`
+`<$int>` is a type seat, and type seats belong in a blueprint (`::blueprint(...)`): a document made from one has none
+```
+
+### 値の位置の座: `key: value` の値
+
+```tmt
+@memo(id: <$uuid(default: auto)>)
+```
+
+```
+Block  @memo
+  args    {id: <$uuid(default: auto)>}
+```
+
+検証:
+
+```
+unknown element `memo`: only `std` and this document's own `::kind` may be written bare; namespace it (`ns.memo`), or declare the vocabulary that has it and bind it with `::use`
+`<$uuid(default: auto)>` is a type seat, and type seats belong in a blueprint (`::blueprint(...)`): a document made from one has none
+```
+
+### 値の位置の座: `{value}` の中と列の中
+
+```tmt
+@memo(){ name: <$string>, tags: (<$string>, <$int>) }
+```
+
+```
+Block  @memo
+  args    {}
+  group
+    name: <$string>
+    tags: (<$string>, <$int>)
+```
+
+検証:
+
+```
+unknown element `memo`: only `std` and this document's own `::kind` may be written bare; namespace it (`ns.memo`), or declare the vocabulary that has it and bind it with `::use`
+`<$string>` is a type seat, and type seats belong in a blueprint (`::blueprint(...)`): a document made from one has none
+`<$string>` is a type seat, and type seats belong in a blueprint (`::blueprint(...)`): a document made from one has none
+`<$int>` is a type seat, and type seats belong in a blueprint (`::blueprint(...)`): a document made from one has none
+```
+
+### 値の位置の座: 文書の宣言の中
+
+```tmt
+::meta(title: <$string>)
+```
+
+```
+Declaration ::meta
+  args    {title: <$string>}
+```
+
+検証:
+
+```
+`<$string>` is a type seat, and type seats belong in a blueprint (`::blueprint(...)`): a document made from one has none
+```
+
+### 閉じるのは `()` と文字列の外の最初の `>`。文字列の中の `>` は何も閉じない
+
+```tmt
+<$string(prefix: ">", suffix: ")>")>
+```
+
+```
+TypeSeat <$
+  type    string(prefix: ">", suffix: ")>")
+```
+
+検証:
+
+```
+`<$string(prefix: ">", suffix: ")>")>` is a type seat, and type seats belong in a blueprint (`::blueprint(...)`): a document made from one has none
+```
+
+### `()` の中の `>` は比較で、これも何も閉じない
+
+```tmt
+<$int(min: a > b)>
+```
+
+```
+TypeSeat <$
+  type    int(min: (a > b))
+```
+
+検証:
+
+```
+`<$int(min: a > b)>` is a type seat, and type seats belong in a blueprint (`::blueprint(...)`): a document made from one has none
+```
+
+### 最初の `>` で座は終わり、そのあとは文字
+
+```tmt
+<$x>y> と <$x(a)> > <$y>
+```
+
+```
+Paragraph
+  TypeSeat <$
+    type    x
+  Text "y> と "
+  TypeSeat <$
+    type    x(a)
+  Text " > "
+  TypeSeat <$
+    type    y
+```
+
+検証:
+
+```
+`<$x>` is a type seat, and type seats belong in a blueprint (`::blueprint(...)`): a document made from one has none
+`<$x(a)>` is a type seat, and type seats belong in a blueprint (`::blueprint(...)`): a document made from one has none
+`<$y>` is a type seat, and type seats belong in a blueprint (`::blueprint(...)`): a document made from one has none
+```
+
+### 内容は取らない。`>` の直後の `[...]` は座のものではない（穴 `<?x>[...]` とは違う）
+
+```tmt
+<$x>[ t ]
+```
+
+```
+Paragraph
+  TypeSeat <$
+    type    x
+  Text "[ t ]"
+```
+
+検証:
+
+```
+`<$x>` is a type seat, and type seats belong in a blueprint (`::blueprint(...)`): a document made from one has none
+```
+
+### 名前が無ければ文字
+
+```tmt
+<$> <$ x>
+```
+
+```
+Paragraph
+  Text "<$> <$ x>"
+```
+
+### 名前は文字か `_` で始まる ASCII。数字や非 ASCII では文字
+
+```tmt
+<$5> <$-x> <$é>
+```
+
+```
+Paragraph
+  Text "<$5> <$-x> <$é>"
+```
+
+### 名前に `.` は含まない。文字のまま
+
+```tmt
+<$x.y>
+```
+
+```
+Paragraph
+  Text "<$x.y>"
+```
+
+### `>` の前に空白があれば座ではなく文字。`(args)` の後なら、`$x(a)` が補間として読まれる
+
+```tmt
+<$x > と <$x(a) >
+```
+
+```
+Paragraph
+  Text "<$x > と <"
+  Interp $
+    interp  x(a)
+  Text " >"
+```
+
+### `{value}` や二つ目の `(args)` は取らない。座にならず文字のまま（ここでも `$x(a)` は補間）
+
+```tmt
+<$x{a: 1}> <$x(a)(b)>
+```
+
+```
+Paragraph
+  Text "<$x{a: 1}> <"
+  Interp $
+    interp  x(a)
+  Text "(b)>"
+```
+
+### 閉じない `(` では座にならず、`$x(` が補間の呼び出しとして読まれ、閉じないので誤りになる
+
+```tmt
+<$x(a>
+```
+
+```
+parse error: 2:1: expected a value, a name or a call in an expression
+```
+
+### `\` で逃がせば、座の形の文字を書ける
+
+```tmt
+\<$uuid>
+```
+
+```
+Paragraph
+  Text "<$uuid>"
 ```
 
 ## コネクト `::`
@@ -1995,7 +2427,7 @@ unknown element `x`: only `std` and this document's own `::kind` may be written 
 
 ```tmt
 ::meta(title: "x")
-::macro(gh: "https://x/${1}")
+::macro(gh: "https://x/$(1)")
 ::var(a: { type: string })
 ::format(table: { max_col_width: 50 })
 ::field(created: { type: datetime })
@@ -2012,7 +2444,7 @@ unknown element `x`: only `std` and this document's own `::kind` may be written 
 Declaration ::meta
   args    {title: "x"}
 Declaration ::macro
-  args    {gh: "https://x/${1}"}
+  args    {gh: "https://x/$(1)"}
 Declaration ::var
   args    {a: {type: "string"}}
 Declaration ::format
@@ -2576,7 +3008,7 @@ parse error: 2:1: unterminated, expected ']'
 ### 入れ子の呼び出し（`docs/spec/builtin-functions.tmt`）
 
 ```tmt
-${ref(id(asdf).contents(default))}
+$ref(id(asdf).contents(default))
 ```
 
 ```
@@ -2593,7 +3025,7 @@ $regex(/*.svg/g)
 ```
 
 ```
-parse error: 1:8: expected a value, identifier, or call in '${...}'
+parse error: 1:8: expected a value, a name or a call in an expression
 ```
 
 ---

@@ -2,9 +2,9 @@
 //!
 //! Evaluation for cotomet (`.ctmt`) data files.
 //!
-//! Evaluates `${macro....}` and `${var....}` expressions within `.ctmt` data files
-//! while enforcing data constraints: pure output phase, no vault access, and
-//! reporting all expression errors with source line and column.
+//! Evaluates `{$ macro.... }` and `{$ var.... }` expressions within `.ctmt` data files
+//! while enforcing data constraints: no vault access, and reporting all expression
+//! errors with source line and column.
 //!
 //! =[ Architecture & Responsibilities ]
 //!
@@ -13,9 +13,9 @@
 //!   | expressions with their evaluated data values (`Value::String`, `Value::Int`,
 //!   | `Value::Float`, `Value::Bool`, `Value::Seq`, `Value::Map`, `Value::Null`).
 //! - (No vault access)
-//!   | Pure evaluation runs in `Phase::Output` with `NoResolver`. Address expressions
-//!   | (`${tmt(...)}`, `${addr(...)}`, `${ref(...)}`, `${include(...)}`) and generator
-//!   | functions (`generate.now`, `generate.uuid`) are rejected.
+//!   | Evaluation runs with `NoResolver`. Address expressions (`$tmt(...)`, `$addr(...)`,
+//!   | `$ref(...)`, `$include(...)`) are rejected, and so is a type (`$list(string)`):
+//!   | it is a value of the expression language, not data.
 //! - (Header declarations)
 //!   | Declarations `::macro` and `::var` in the file header provide macro templates
 //!   | and variable defaults. Caller-supplied variables override defaults.
@@ -27,7 +27,7 @@
 //!
 //! - Address resolution: address checking in `.ctmt` requires a vault and is out of scope.
 //! - Map-returning macros: a macro is a parameterized string template. A list comes from a
-//!   variable declared `type: list`; `::var` has no `map` type, so a map reaches `${var.name}`
+//!   variable declared `type: list`; `::var` has no `map` type, so a map reaches `$(var.name)`
 //!   only as a value the caller passes for a declared name.
 //! - Grammar parsing: expression parsing is delegated to `tomet-parser`'s `CotometValueHook`.
 
@@ -37,7 +37,7 @@ use std::fmt;
 pub type File = tomet_ast::File<Value>;
 use tomet_ast::Value;
 use tomet_declaration::{DeclKind, Declaration, Host, Problem, check_declarations};
-use tomet_expr::{DocRef, EvalContext, Generate, NoResolver, Phase};
+use tomet_expr::{DocRef, EvalContext, NoResolver};
 use tomet_position::LineIndex;
 use tomet_span::Span;
 
@@ -62,20 +62,7 @@ impl fmt::Display for Error {
 
 impl std::error::Error for Error {}
 
-/// A dummy generator for pure evaluation. In `Phase::Output`, `generate.*`
-/// is rejected before calling the generator.
-struct PureGenerate;
-
-impl Generate for PureGenerate {
-    fn now(&self) -> time::OffsetDateTime {
-        time::OffsetDateTime::UNIX_EPOCH
-    }
-    fn uuid(&self) -> String {
-        String::new()
-    }
-}
-
-/// Evaluates a `.ctmt` source string, resolving `${...}` expressions.
+/// Evaluates a `.ctmt` source string, resolving `{$ ... }` expressions.
 ///
 /// Declarations `::macro` and `::var` in the header provide macro templates
 /// and variable defaults. Values in `vars` override declared variable defaults.
@@ -94,7 +81,7 @@ pub fn eval_str(src: &str, vars: &[(String, Value)]) -> Result<File, Vec<Error>>
     eval_file(file, src, vars)
 }
 
-/// Evaluates a pre-parsed [`File`], resolving `${...}` expressions against `src`.
+/// Evaluates a pre-parsed [`File`], resolving `{$ ... }` expressions against `src`.
 pub fn eval_file(file: File, src: &str, vars: &[(String, Value)]) -> Result<File, Vec<Error>> {
     let lines = LineIndex::new(src);
     let mut errors = Vec::new();
@@ -108,7 +95,7 @@ pub fn eval_file(file: File, src: &str, vars: &[(String, Value)]) -> Result<File
         };
         if matches!(d.kind(), Some(DeclKind::Macro | DeclKind::Var)) {
             // An entry the shared check refuses would otherwise vanish, and a later
-            // `${macro.x}` or `${var.x}` would complain of something unrelated.
+            // `$(macro.x)` or `$(var.x)` would complain of something unrelated.
             let at = lines.line_col(decl.span.start);
             for (_, problem) in check_declarations(std::slice::from_ref(&d), Host::Ctmt) {
                 if matches!(problem, Problem::InvalidDefinition { .. }) {
@@ -145,11 +132,8 @@ pub fn eval_file(file: File, src: &str, vars: &[(String, Value)]) -> Result<File
         }
     };
 
-    let generate = PureGenerate;
     let cx = EvalContext {
-        phase: Phase::Output,
         resolver: &NoResolver,
-        generate: &generate,
         self_doc: DocRef(String::new()),
         macros: &macros,
         var: &var_scope.values,
@@ -227,11 +211,11 @@ mod tests {
     fn macro_with_positional_and_named_arguments() {
         let src = r#"
 ::macro(
-  vocab: "vocabularies/${1}/${1}@${2}.vocabulary.tmt"
-  named: "hello ${who}"
+  vocab: "vocabularies/$(1)/$(1)@$(2).vocabulary.tmt"
+  named: "hello $(who)"
 )
-pos: ${macro.vocab("writ", "1.0.0")}
-nam: ${macro.named(who: "world")}
+pos: $macro.vocab("writ", "1.0.0")
+nam: $macro.named(who: "world")
 "#;
         let file = eval_str(src, &[]).unwrap();
         let Value::Map(entries) = file.body else {
@@ -252,7 +236,7 @@ nam: ${macro.named(who: "world")}
 
     #[test]
     fn unknown_macro_error() {
-        let src = "a: ${macro.nosuch(1)}\n";
+        let src = "a: $macro.nosuch(1)\n";
         let errs = eval_str(src, &[]).unwrap_err();
         assert_eq!(errs.len(), 1);
         assert_eq!(errs[0].line, 1);
@@ -262,7 +246,7 @@ nam: ${macro.named(who: "world")}
 
     #[test]
     fn wrong_macro_arity_error() {
-        let src = "::macro(vocab: \"vocabularies/${1}/${1}@${2}.vocabulary.tmt\")\na: ${macro.vocab(\"writ\")}\n";
+        let src = "::macro(vocab: \"vocabularies/$(1)/$(1)@$(2).vocabulary.tmt\")\na: $macro.vocab(\"writ\")\n";
         let errs = eval_str(src, &[]).unwrap_err();
         assert_eq!(errs.len(), 1);
         assert_eq!(errs[0].line, 2);
@@ -275,7 +259,7 @@ nam: ${macro.named(who: "world")}
 
     #[test]
     fn uncalled_macro_error() {
-        let src = "::macro(vocab: \"x\")\na: ${macro.vocab}\n";
+        let src = "::macro(vocab: \"x\")\na: $(macro.vocab)\n";
         let errs = eval_str(src, &[]).unwrap_err();
         assert_eq!(errs.len(), 1);
         assert_eq!(errs[0].line, 2);
@@ -288,7 +272,7 @@ nam: ${macro.named(who: "world")}
 
     #[test]
     fn bare_word_macro_argument_is_unknown_name() {
-        let src = "::macro(vocab: \"x/${1}\")\npath: ${macro.vocab(writ, \"1.0.0\")}\n";
+        let src = "::macro(vocab: \"x/$(1)\")\npath: $macro.vocab(writ, \"1.0.0\")\n";
         let errs = eval_str(src, &[]).unwrap_err();
         assert_eq!(errs.len(), 1);
         assert_eq!(errs[0].line, 2);
@@ -298,7 +282,7 @@ nam: ${macro.named(who: "world")}
 
     #[test]
     fn var_default() {
-        let src = "::var(rev: { type: string, default: \"main\" })\na: ${var.rev}\n";
+        let src = "::var(rev: { type: string, default: \"main\" })\na: $(var.rev)\n";
         let file = eval_str(src, &[]).unwrap();
         let Value::Map(entries) = file.body else {
             panic!("expected map");
@@ -311,7 +295,7 @@ nam: ${macro.named(who: "world")}
 
     #[test]
     fn var_that_holds_a_list_giving_a_list() {
-        let src = "::var(tags: { type: list, default: (\"a\", \"b\") })\na: ${var.tags}\n";
+        let src = "::var(tags: { type: list, default: (\"a\", \"b\") })\na: $(var.tags)\n";
         let file = eval_str(src, &[]).unwrap();
         let Value::Map(entries) = file.body else {
             panic!("expected map");
@@ -331,7 +315,7 @@ nam: ${macro.named(who: "world")}
     #[test]
     fn a_map_comes_from_the_caller_not_from_a_declared_default() {
         // `::var` has no `map` type: a declared default that is a map is refused...
-        let src = "::var(cfg: { default: { host: \"localhost\" } })\na: ${var.cfg}\n";
+        let src = "::var(cfg: { default: { host: \"localhost\" } })\na: $(var.cfg)\n";
         let errs = eval_str(src, &[]).unwrap_err();
         assert!(
             errs[0].message.starts_with("`cfg` in `::var`"),
@@ -340,7 +324,7 @@ nam: ${macro.named(who: "world")}
         );
 
         // ...and a value the caller passes for a declared name is used as it is.
-        let src = "::var(cfg: { type: string, default: \"none\" })\na: ${var.cfg}\n";
+        let src = "::var(cfg: { type: string, default: \"none\" })\na: $(var.cfg)\n";
         let passed = Value::Map(vec![(
             "host".to_string(),
             Value::String("localhost".to_string()),
@@ -354,7 +338,7 @@ nam: ${macro.named(who: "world")}
 
     #[test]
     fn var_given_by_caller() {
-        let src = "::var(rev: { type: string, default: \"main\" })\na: ${var.rev}\n";
+        let src = "::var(rev: { type: string, default: \"main\" })\na: $(var.rev)\n";
         let file = eval_str(
             src,
             &[("rev".to_string(), Value::String("feature".to_string()))],
@@ -372,7 +356,7 @@ nam: ${macro.named(who: "world")}
     #[test]
     fn undeclared_var_access_and_caller_pass() {
         // Accessing undeclared var in expression
-        let src = "a: ${var.undeclared}\n";
+        let src = "a: $(var.undeclared)\n";
         let errs = eval_str(src, &[]).unwrap_err();
         assert_eq!(errs.len(), 1);
         assert_eq!(errs[0].line, 1);
@@ -396,7 +380,7 @@ nam: ${macro.named(who: "world")}
 
     #[test]
     fn unset_var_with_no_default_error() {
-        let src = "::var(required: { type: string })\na: ${var.required}\n";
+        let src = "::var(required: { type: string })\na: $(var.required)\n";
         let errs = eval_str(src, &[]).unwrap_err();
         assert_eq!(errs.len(), 1);
         assert_eq!(errs[0].line, 2);
@@ -410,7 +394,7 @@ nam: ${macro.named(who: "world")}
 
     #[test]
     fn built_in_add() {
-        let src = "a: ${add(1, 2)}\n";
+        let src = "a: $add(1, 2)\n";
         let file = eval_str(src, &[]).unwrap();
         let Value::Map(entries) = file.body else {
             panic!("expected map");
@@ -419,8 +403,8 @@ nam: ${macro.named(who: "world")}
     }
 
     #[test]
-    fn vault_functions_and_generate_as_errors() {
-        let src = "a: ${tmt(\"a\")}\nb: ${generate.uuid()}\n";
+    fn vault_functions_and_types_as_errors() {
+        let src = "a: $tmt(\"a\")\nb: $list(string)\n";
         let errs = eval_str(src, &[]).unwrap_err();
         assert_eq!(errs.len(), 2);
         assert_eq!(errs[0].line, 1);
@@ -429,16 +413,12 @@ nam: ${macro.named(who: "world")}
 
         assert_eq!(errs[1].line, 2);
         assert_eq!(errs[1].column, 4);
-        assert!(
-            errs[1]
-                .message
-                .contains("can only be used when a document is being created")
-        );
+        assert_eq!(errs[1].message, "a type cannot be stored as data");
     }
 
     #[test]
     fn expression_nested_in_map_in_list() {
-        let src = "items: ({ num: ${add(10, 20)} })\n";
+        let src = "items: ({ num: $add(10, 20) })\n";
         let file = eval_str(src, &[]).unwrap();
         let Value::Map(entries) = file.body else {
             panic!("expected map");
@@ -454,7 +434,7 @@ nam: ${macro.named(who: "world")}
 
     #[test]
     fn quoted_expression_left_as_text() {
-        let src = "a: \"${macro.vocab(\\\"writ\\\")}\"\n";
+        let src = "a: \"$macro.vocab(\\\"writ\\\")\"\n";
         let file = eval_str(src, &[]).unwrap();
         let Value::Map(entries) = file.body else {
             panic!("expected map");
@@ -463,14 +443,14 @@ nam: ${macro.named(who: "world")}
             entries[0],
             (
                 "a".to_string(),
-                Value::String("${macro.vocab(\"writ\")}".to_string())
+                Value::String("$macro.vocab(\"writ\")".to_string())
             )
         );
     }
 
     #[test]
     fn expression_in_key_and_declaration_errors() {
-        let src_key = "${macro.vocab(\"writ\")}: 1\n";
+        let src_key = "$macro.vocab(\"writ\"): 1\n";
         let errs_key = eval_str(src_key, &[]).unwrap_err();
         assert_eq!(errs_key.len(), 1);
         assert!(
@@ -479,7 +459,7 @@ nam: ${macro.named(who: "world")}
                 .contains("an expression cannot be a key")
         );
 
-        let src_decl = "::kind(${var.x})\n";
+        let src_decl = "::kind($(var.x))\n";
         let errs_decl = eval_str(src_decl, &[]).unwrap_err();
         assert_eq!(errs_decl.len(), 1);
         assert!(
@@ -491,7 +471,7 @@ nam: ${macro.named(who: "world")}
 
     #[test]
     fn several_errors_in_one_file_all_reported() {
-        let src = "a: ${macro.nosuch(1)}\nb: ${add(1)}\nc: ${tmt(\"x\")}\n";
+        let src = "a: $macro.nosuch(1)\nb: $add(1)\nc: $tmt(\"x\")\n";
         let errs = eval_str(src, &[]).unwrap_err();
         assert_eq!(errs.len(), 3);
         assert_eq!(errs[0].line, 1);
@@ -509,31 +489,31 @@ nam: ${macro.named(who: "world")}
 
     #[test]
     fn vault_references_in_ctmt_say_no_vault() {
-        let tmt_err = eval_str("a: ${tmt(\"a\")}\n", &[]).unwrap_err();
+        let tmt_err = eval_str("a: $tmt(\"a\")\n", &[]).unwrap_err();
         assert_eq!(tmt_err[0].message, NO_VAULT);
 
-        let ref_err = eval_str("a: ${ref(\"n\")}\n", &[]).unwrap_err();
+        let ref_err = eval_str("a: $ref(\"n\")\n", &[]).unwrap_err();
         assert_eq!(
             ref_err[0].message,
             "note `n`: no vault to find the note `n` in"
         );
 
-        let self_err = eval_str("a: ${self}\n", &[]).unwrap_err();
+        let self_err = eval_str("a: $(self)\n", &[]).unwrap_err();
         assert_eq!(self_err[0].message, NO_VAULT);
 
-        let vault_err = eval_str("a: ${vault::docs}\n", &[]).unwrap_err();
+        let vault_err = eval_str("a: $(vault::docs)\n", &[]).unwrap_err();
         assert_eq!(
             vault_err[0].message,
             "no vault to list the vault root's documents in"
         );
 
-        let fn_err = eval_str("a: ${x => x}\n", &[]).unwrap_err();
+        let fn_err = eval_str("a: {$ x => x }\n", &[]).unwrap_err();
         assert_eq!(fn_err[0].message, "a function cannot be stored as data");
     }
 
     #[test]
     fn bad_var_decl_is_reported_with_line_and_col() {
-        let src = "::var(bad: 123)\na: ${add(1, 2)}\n";
+        let src = "::var(bad: 123)\na: $add(1, 2)\n";
         let errs = eval_str(src, &[]).unwrap_err();
         assert_eq!(errs.len(), 1);
         assert_eq!(errs[0].line, 1);

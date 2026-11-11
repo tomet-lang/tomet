@@ -30,7 +30,7 @@
 //! =[ A fifth step, for output ]
 //!
 //! The four steps above produce the document @em[as written]. Something that
-//! is about to render it needs one more: every `${...}` in it put back as
+//! is about to render it needs one more: every `{$ ... }` in it put back as
 //! what it stands for -- text, a list of links, another file's content --
 //! before any converter sees the tree, so that a converter never has to
 //! decide what an expression means.
@@ -219,7 +219,7 @@ impl Vault {
         })
     }
 
-    /// The fifth step: resolves every `${...}` in `doc`, so it is the shape
+    /// The fifth step: resolves every `{$ ... }` in `doc`, so it is the shape
     /// a converter should see. What that means is
     /// `tomet_vault::Vault::prepare`'s doc; this supplies the files the
     /// expressions ask about.
@@ -418,7 +418,7 @@ mod tests {
         root
     }
 
-    const QUERY: &str = "- ${vault::docs\n    .filter(d => d::meta.tags.contains(\"rust\"))\n    .sort(d => d::meta.created, \"desc\")\n    .map(d => d.link())}\n";
+    const QUERY: &str = "- {$ vault::docs\n    .filter(d => d::meta.tags.contains(\"rust\"))\n    .sort(d => d::meta.created, \"desc\")\n    .map(d => d.link()) }\n";
 
     #[test]
     fn prepared_document_answers_a_query_from_the_vault() {
@@ -442,7 +442,7 @@ mod tests {
     #[test]
     fn reading_a_document_does_not_evaluate_it() {
         let root = vault_fixture("tomet_test_load_as_written");
-        fs::write(root.join("plain.tmt"), "sum ${add(1, 2)}\n").expect("plain");
+        fs::write(root.join("plain.tmt"), "sum $add(1, 2)\n").expect("plain");
 
         let vault = Vault::discover(&root);
         let (doc, _) = vault.file(&root.join("plain.tmt")).expect("read");
@@ -488,7 +488,7 @@ mod tests {
         let root = vault_fixture("tomet_test_load_bad_expression");
         fs::write(
             root.join("index.tmt"),
-            "${vault::docs.filter(d => d::meta.tgs.contains(\"x\"))}\n",
+            "{$ vault::docs.filter(d => d::meta.tgs.contains(\"x\")) }\n",
         )
         .expect("index");
 
@@ -502,7 +502,7 @@ mod tests {
             prepared.unresolved[0].reason
         );
         assert!(
-            flat(&doc)[0].starts_with("${vault::docs"),
+            flat(&doc)[0].starts_with("{$ vault::docs"),
             "{:?}",
             flat(&doc)
         );
@@ -841,11 +841,11 @@ mod tests {
             &[
                 (
                     "host.tmt",
-                    "=[ Host ]\n\nhere is ${self::path}\n\n${include(tmt(\"parts/a.tmt\"))}\n",
+                    "=[ Host ]\n\nhere is $(self::path)\n\n$include(tmt(\"parts/a.tmt\"))\n",
                 ),
                 (
                     "parts/a.tmt",
-                    "::meta(title: A)\n\n=[ A ]\n\nI am ${self::path} (${self::meta.title})\n",
+                    "::meta(title: A)\n\n=[ A ]\n\nI am $(self::path) ($(self::meta.title))\n",
                 ),
             ],
         );
@@ -870,8 +870,8 @@ mod tests {
         let root = include_vault(
             "tomet_test_load_include_nest",
             &[
-                ("top.tmt", "=[ Top ]\n\n${include(tmt(\"mid.tmt\"))}\n"),
-                ("mid.tmt", "=[ Mid ]\n\n${include(tmt(\"leaf.tmt\"))}\n"),
+                ("top.tmt", "=[ Top ]\n\n$include(tmt(\"mid.tmt\"))\n"),
+                ("mid.tmt", "=[ Mid ]\n\n$include(tmt(\"leaf.tmt\"))\n"),
                 ("leaf.tmt", "=[ Leaf ]\n\nleaf text\n"),
             ],
         );
@@ -886,8 +886,8 @@ mod tests {
         let root = include_vault(
             "tomet_test_load_include_cycle",
             &[
-                ("a.tmt", "=[ A ]\n\n${include(tmt(\"b.tmt\"))}\n"),
-                ("b.tmt", "=[ B ]\n\n${include(tmt(\"a.tmt\"))}\n"),
+                ("a.tmt", "=[ A ]\n\n$include(tmt(\"b.tmt\"))\n"),
+                ("b.tmt", "=[ B ]\n\n$include(tmt(\"a.tmt\"))\n"),
             ],
         );
         let vault = Vault::discover(&root);
@@ -897,7 +897,7 @@ mod tests {
         // the cycle, and it stays as written inside `b`. `a` itself, which
         // only includes `b`, resolved -- and says that what it brought in
         // from `b` has one thing left unresolved, which `b` reports in full.
-        assert_eq!(outline(&doc), ["1:A", "2:B", "${include(tmt(\"a.tmt\"))}"]);
+        assert_eq!(outline(&doc), ["1:A", "2:B", "$include(tmt(\"a.tmt\"))"]);
         assert_eq!(prepared.unresolved.len(), 1, "{:?}", prepared.unresolved);
         assert!(
             prepared.unresolved[0]
@@ -916,7 +916,7 @@ mod tests {
         let root = include_vault(
             "tomet_test_load_include_buffer",
             &[
-                ("host.tmt", "=[ Host ]\n\n${include(tmt(\"lib.tmt\"))}\n"),
+                ("host.tmt", "=[ Host ]\n\n$include(tmt(\"lib.tmt\"))\n"),
                 ("lib.tmt", "=[ Saved ]\n"),
             ],
         );
@@ -956,7 +956,7 @@ mod tests {
         let host = root.join("host.tmt");
         let (doc, _) = vault.file(&host).unwrap();
         let eval = |src: &str| {
-            let expr = tomet_ast_parser::parse_interpolation_str(&format!("${{{src}}}"))
+            let expr = tomet_ast_parser::parse_interpolation_str(&format!("{{$ {src} }}"))
                 .unwrap()
                 .expr;
             vault.evaluate(&doc, &host, &expr)
@@ -976,9 +976,6 @@ mod tests {
             eval("tmt(\"other.tmt\")::meta.title").unwrap(),
             text("Edited")
         );
-
-        // As when rendering, what exists only when creating is not there.
-        assert!(eval("generate.uuid()").is_err());
         let _ = fs::remove_dir_all(&root);
     }
 
@@ -989,7 +986,7 @@ mod tests {
             &[
                 (
                     "host.tmt",
-                    "=[ Host ]\n\n${include(tmt(\"lib.tmt\")#shared, heading: false)}\n",
+                    "=[ Host ]\n\n$include(tmt(\"lib.tmt\")#shared, heading: false)\n",
                 ),
                 (
                     "lib.tmt",

@@ -5,7 +5,7 @@
 //! how a group reads, and writes the `[content]` of an embedded element through the printer's own
 //! block renderer ([`render_content_blocks`]).
 
-use crate::element::render_interp;
+use crate::element::{render_interp, render_type_seat};
 use crate::inline::render_content_blocks;
 use tomet_ast::{Block, Declaration, Entry, Group, Value};
 use tomet_config::{FieldConfig, PrinterConfig};
@@ -117,6 +117,7 @@ pub(crate) fn render_value_inner_with_config(v: &Value, config: &PrinterConfig) 
             config,
         ),
         Value::Hole(hole) => render_embedded_hole(hole, config),
+        Value::TypeSeat(seat) => render_type_seat(seat),
         Value::Blocks(blocks) => format!("[{}]", render_content_blocks(blocks, config)),
     }
 }
@@ -234,8 +235,8 @@ fn render_meta_field_value(
                 || cfg
                     .field_type
                     .as_deref()
-                    .and_then(tomet_type::Type::from_name)
-                    == Some(tomet_type::Type::Datetime))
+                    .and_then(|ty| ty.parse::<tomet_type::Type>().ok())
+                    .is_some_and(|ty| ty.kind() == tomet_type::Kind::Datetime))
             && let Some(rfc3339) = tomet_type::datetime::to_rfc3339(s, cfg.offset.as_deref())
         {
             return rfc3339;

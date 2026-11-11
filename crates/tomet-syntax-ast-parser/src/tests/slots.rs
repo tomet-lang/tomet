@@ -1,4 +1,5 @@
-//! The `<…>` box in the CST: which texts are one, and what a name tag lowers to.
+//! The `<…>` box in the CST: which texts are one, and what a name tag lowers to. (A hole is
+//! `holes`'s, and a type seat `type_seats`'s.)
 //! See `tmtroot/spec/syntax/slot.tmt`.
 
 use super::*;
@@ -43,6 +44,34 @@ fn a_marked_box_is_a_box() {
 }
 
 #[test]
+fn a_type_seat_is_a_box() {
+    assert_eq!(boxes("<$uuid>"), ["<$uuid>"]);
+    assert_eq!(boxes("<$uuid()>"), ["<$uuid()>"]);
+    assert_eq!(
+        boxes("id <$nanoid(length: 8)> at <$date(default: auto)>"),
+        ["<$nanoid(length: 8)>", "<$date(default: auto)>"]
+    );
+}
+
+#[test]
+fn a_type_seat_that_does_not_fit_is_text() {
+    for src in [
+        "<$>",
+        "<$ x>",
+        "<$5>",
+        "<$x >",
+        "<$x",
+        "<$x.y>",
+        "<$x{a: 1}>",
+        "<$x[t]>",
+        "<$x(a)(b)>",
+    ] {
+        assert_eq!(boxes(src), Vec::<String>::new(), "`{src}` has no box");
+        assert!(parse_file(src).is_ok(), "`{src}` is never an error");
+    }
+}
+
+#[test]
 fn a_shape_that_does_not_fit_is_text() {
     for src in [
         "a < b",
@@ -80,8 +109,9 @@ fn html_shaped_text_is_not_a_box() {
 }
 
 #[test]
-fn only_a_marked_box_takes_content() {
+fn only_a_hole_takes_content() {
     assert_eq!(boxes("<PATH>[x]"), ["<PATH>"], "a tag, then text");
+    assert_eq!(boxes("<$x>[x]"), ["<$x>"], "a seat, then text");
     assert_eq!(boxes("<?>[x]"), ["<?>[x]"]);
     assert_eq!(
         boxes("<?(id)>[adr-<?int(n)>]"),
@@ -93,6 +123,8 @@ fn only_a_marked_box_takes_content() {
 fn a_closer_inside_a_group_or_a_string_closes_nothing() {
     for src in [
         r#"<?regex("a>b")>"#,
+        r#"<$nanoid(prefix: ">")>"#,
+        "<$x(a > b)>",
         "<?alt(a, ([x>y]))>",
         "<?(n){min: 1}>",
         "<?(n){gt: 1 > 0}>",

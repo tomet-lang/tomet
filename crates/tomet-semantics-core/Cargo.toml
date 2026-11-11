@@ -9,3 +9,6 @@ repository.workspace = true
 [dependencies]
 tomet-ast  = { workspace = true }
 tomet-type = { workspace = true }
+
+[dev-dependencies]
+tomet-ast-parser = { workspace = true }

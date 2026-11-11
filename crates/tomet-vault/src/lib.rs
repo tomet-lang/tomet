@@ -39,7 +39,7 @@
 //!
 //! =[ Preparing ]
 //!
-//! [`Vault::prepare`] resolves every `${...}` in a document, once, against a
+//! [`Vault::prepare`] resolves every `{$ ... }` in a document, once, against a
 //! [`Resolver`] the caller supplies. What the vault adds is what only it
 //! knows: the macros in scope, the settings' `type:` declarations that make
 //! `.meta` typed, and the document being prepared standing for its own path
@@ -51,9 +51,7 @@ use std::sync::Arc;
 
 use tomet_ast::{Block, File};
 use tomet_config::PrinterConfig;
-use tomet_expr::{
-    DocRef, EvalContext, EvalError, EvalValue, Phase, PreparedBlocks, SystemGenerate,
-};
+use tomet_expr::{DocRef, EvalContext, EvalError, EvalValue, PreparedBlocks};
 use tomet_semantics::{Bindings, LoadedDictionaries, LoadedVocabularies};
 use tomet_span::Span;
 
@@ -72,7 +70,7 @@ fn reads_alone(doc: &File) -> bool {
 /// What [`Vault::prepare`] could not do.
 ///
 /// `unresolved` is not an error: an expression with no value is left in
-/// the output as written, so a document showing `${...}` as an example
+/// the output as written, so a document showing `{$ ... }` as an example
 /// still renders. `tomet check` reports the list as warnings, which is
 /// what tells a typo apart from an example.
 #[derive(Debug, Default)]
@@ -138,9 +136,7 @@ struct Scope<'a> {
 impl Scope<'_> {
     fn context(&self) -> EvalContext<'_> {
         EvalContext {
-            phase: Phase::Output,
             resolver: &self.overlay,
-            generate: &SystemGenerate,
             self_doc: self.self_doc.clone(),
             macros: &self.macros,
             var: &self.var,
@@ -156,12 +152,12 @@ impl Scope<'_> {
 ///
 /// "Vault" is the directory the config file sits in. Whether `root` names
 /// a directory that exists is not this type's concern; it only decides
-/// what `${self::path}` is measured from.
+/// what `$(self::path)` is measured from.
 pub struct Vault {
     /// The config governing this vault, or the defaults when there is none.
     pub config: PrinterConfig,
     /// The directory declared vocabulary paths are relative to, and the
-    /// one `${self::path}` is measured from.
+    /// one `$(self::path)` is measured from.
     pub root: PathBuf,
     /// Vocabularies that were declared but could not be accepted. Not
     /// fatal: a caller reports them and carries on, because one bad
@@ -370,7 +366,7 @@ impl Vault {
         Ok((doc, bindings))
     }
 
-    /// Resolves every `${...}` in `doc`, so it is the shape a converter
+    /// Resolves every `{$ ... }` in `doc`, so it is the shape a converter
     /// should see.
     ///
     /// `path` is where the document sits, which is what `self` is.
@@ -391,7 +387,7 @@ impl Vault {
         prepared
     }
 
-    /// [`Vault::prepare`] for only the `${...}` that `selected` picks, by the exact position of the
+    /// [`Vault::prepare`] for only the `{$ ... }` that `selected` picks, by the exact position of the
     /// [`Interpolation`](tomet_ast::Interpolation) in `doc` as it is passed in
     /// ([`Span::exact_eq`](tomet_span::Span::exact_eq): `==` on a span is always true). The others are
     /// left as interpolations, and `@term` mentions are left as they are: this is for changing a
@@ -456,8 +452,8 @@ impl Vault {
     /// is what the output will show.
     ///
     /// The document is read as written (`#id`, `self.meta`), everything else
-    /// is asked of `resolver`. `generate.*` and `vars` fail, as they do when
-    /// rendering: they exist only when a document is created.
+    /// is asked of `resolver`. A variable is at its `default`: only
+    /// `tomet new` gives one a value.
     pub fn evaluate(
         &self,
         doc: &File,
@@ -523,9 +519,7 @@ impl Vault {
         let vars = vault.vars_in_scope(&config, doc);
         let macros = config.macros;
         let cx = EvalContext {
-            phase: Phase::Output,
             resolver: &overlay,
-            generate: &SystemGenerate,
             self_doc: doc.clone(),
             macros: &macros,
             var: &vars.values,
@@ -666,7 +660,7 @@ mod tests {
                 .is_empty()
         );
         assert!(
-            validate_sources("${tmt(\"other.tmt\")::meta.title}\n", &[], None, &[])
+            validate_sources("{$ tmt(\"other.tmt\")::meta.title }\n", &[], None, &[])
                 .unwrap()
                 .is_empty()
         );
@@ -800,7 +794,7 @@ mod tests {
         let vault = Vault::from_sources(PrinterConfig::default(), "/v", &[]);
         let targets = |host: &str| {
             let (mut doc, _) = vault
-                .parse("${include(tmt(\"docs/guide.tmt\"))}\n")
+                .parse("$include(tmt(\"docs/guide.tmt\"))\n")
                 .expect("parses");
             vault.prepare(&mut doc, Path::new(host), &resolver);
             let mut found = Vec::new();
@@ -855,7 +849,7 @@ mod tests {
         let (doc, prepared) = prepared(
             &vault,
             "/v/notes/a.tmt",
-            "at ${self::path} (${self::filename})\n",
+            "at $(self::path) ($(self::filename))\n",
         );
         assert!(prepared.unresolved.is_empty(), "{:?}", prepared.unresolved);
         assert_eq!(text_of(&doc), "at notes/a.tmt (a.tmt)");
@@ -876,7 +870,7 @@ mod tests {
         let (doc, prepared) = prepared(
             &vault,
             "/v/a.tmt",
-            "::meta(title: A)\n\nrust? ${self::meta.tags.contains(\"rust\")}\n",
+            "::meta(title: A)\n\nrust? {$ self::meta.tags.contains(\"rust\") }\n",
         );
         assert!(prepared.unresolved.is_empty(), "{:?}", prepared.unresolved);
         assert_eq!(text_of(&doc), "rust? false");
@@ -885,14 +879,14 @@ mod tests {
     #[test]
     fn macros_from_the_vault_and_the_document_are_both_in_scope() {
         let config = tomet_config::load_config_from_str(
-            "::macro(gh: \"https://gh/${1}\", site: \"vault\")\n",
+            "::macro(gh: \"https://gh/$(1)\", site: \"vault\")\n",
         )
         .unwrap();
         let vault = Vault::from_sources(config, "/v", &[]);
         let (doc, prepared) = prepared(
             &vault,
             "/v/a.tmt",
-            "::macro(site: \"doc\")\n\n${macro.gh(1)} ${macro.site()}\n",
+            "::macro(site: \"doc\")\n\n$macro.gh(1) $macro.site()\n",
         );
         assert!(prepared.unresolved.is_empty(), "{:?}", prepared.unresolved);
         // The document wins a collision.
@@ -907,10 +901,10 @@ mod tests {
         let (doc, prepared) = prepared(
             &vault,
             "/v/a.tmt",
-            "@card(n: ${add(1, 2)})#(c1)\n\nn is ${#c1.n}\n",
+            "@card(n: $add(1, 2))#(c1)\n\nn is $(#c1.n)\n",
         );
         assert_eq!(prepared.unresolved.len(), 1, "{:?}", prepared.unresolved);
-        assert_eq!(text_of(&doc), "n is ${#c1.n}");
+        assert_eq!(text_of(&doc), "n is $(#c1.n)");
     }
     // ---- a document that declares `::profile(standalone)` is read without the vault ---------
 
@@ -918,7 +912,7 @@ mod tests {
 
     fn vault_with_a_macro() -> Vault {
         let config = tomet_config::load_config_from_str(
-            "::macro(gh: \"https://gh/${1}\")\n::field(n: { type: uuid })\n",
+            "::macro(gh: \"https://gh/$(1)\")\n::field(n: { type: uuid })\n",
         )
         .unwrap();
         Vault::from_sources(config, "/v", &[("acme.tmt", ACME)])
@@ -927,21 +921,17 @@ mod tests {
     #[test]
     fn a_standalone_document_does_not_get_the_vaults_macros() {
         let vault = vault_with_a_macro();
-        let (_, with) = prepared(&vault, "/v/a.tmt", "${macro.gh(1)}\n");
+        let (_, with) = prepared(&vault, "/v/a.tmt", "$macro.gh(1)\n");
         assert!(with.unresolved.is_empty());
 
-        let (doc, alone) = prepared(
-            &vault,
-            "/v/a.tmt",
-            &format!("{PROMISE}\n${{macro.gh(1)}}\n"),
-        );
+        let (doc, alone) = prepared(&vault, "/v/a.tmt", &format!("{PROMISE}\n$macro.gh(1)\n"));
         assert_eq!(alone.unresolved.len(), 1, "{:?}", alone.unresolved);
-        assert!(text_of(&doc).contains("${macro.gh(1)}"));
+        assert!(text_of(&doc).contains("$macro.gh(1)"));
         // Its own definition is its own.
         let (doc, own) = prepared(
             &vault,
             "/v/a.tmt",
-            &format!("{PROMISE}::macro(gh: \"mine/${{1}}\")\n\n${{macro.gh(1)}}\n"),
+            &format!("{PROMISE}::macro(gh: \"mine/$(1)\")\n\n$macro.gh(1)\n"),
         );
         assert!(own.unresolved.is_empty(), "{:?}", own.unresolved);
         assert_eq!(text_of(&doc), "mine/1");
@@ -967,9 +957,9 @@ mod tests {
             let prepared = vault.prepare(&mut doc, Path::new("/v/a.tmt"), &resolver);
             (text_of(&doc), prepared.unresolved.len())
         };
-        let (text, unresolved) = run("${include(tmt(\"docs/b.tmt\"))}\n");
+        let (text, unresolved) = run("$include(tmt(\"docs/b.tmt\"))\n");
         assert_eq!((text.as_str(), unresolved), ("Body of B.", 0));
-        let (_, unresolved) = run(&format!("{PROMISE}\n${{include(tmt(\"docs/b.tmt\"))}}\n"));
+        let (_, unresolved) = run(&format!("{PROMISE}\n$include(tmt(\"docs/b.tmt\"))\n"));
         assert_eq!(unresolved, 1);
     }
 

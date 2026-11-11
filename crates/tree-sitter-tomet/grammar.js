@@ -26,7 +26,17 @@ module.exports = grammar({
   // unbounded lookahead past that whitespace, which a `token()` regex
   // can't backtrack out of once `extras`/precedence has already
   // committed to one interpretation.
-  externals: ($) => [$._scalar_token, $._list_marker_token, $._list_marker_gap],
+  //
+  // `type_seat_open` (see `type_seat`'s comment below) is external because a
+  // seat is only a seat if it closes: the scanner reads ahead past `<$name`
+  // and emits the token only when the `>` (or the `(args)` and then the `>`)
+  // is there, which no regex can say and no token can be taken back from.
+  externals: ($) => [
+    $._scalar_token,
+    $._list_marker_token,
+    $._list_marker_gap,
+    $.type_seat_open,
+  ],
 
   // `heading`'s optional `{attrs}` can follow `]` either on the same
   // line or after exactly one newline (see the real fixture examples in
@@ -325,6 +335,7 @@ module.exports = grammar({
         $.element,
         $.label,
         $.hole,
+        $.type_seat,
         $.interpolation,
         $.punctuation,
       ),
@@ -341,6 +352,7 @@ module.exports = grammar({
         $.element,
         $.label,
         $.hole,
+        $.type_seat,
         $.interpolation,
         alias($._punctuation_not_semi, $.punctuation),
       ),
@@ -437,6 +449,7 @@ module.exports = grammar({
         $.element,
         $.label,
         $.hole,
+        $.type_seat,
         $.interpolation,
         $._newline,
         $.punctuation,
@@ -451,6 +464,7 @@ module.exports = grammar({
         $.element,
         $.label,
         $.hole,
+        $.type_seat,
         $.interpolation,
         $._newline,
         $.punctuation,
@@ -466,27 +480,44 @@ module.exports = grammar({
         $.element,
         $.label,
         $.hole,
+        $.type_seat,
         $.interpolation,
         $._newline,
         $.punctuation,
         alias(/[^\n\\`*_=~<@$()\[{\]/|]+/, $.text),
       ),
 
-    // ---- `${...}` interpolation ---------------------------------------
-    // Grammar-only recognition of `tomet-parser::document.rs`'s
-    // `parse_interp` -- see `docs/design/decisions/2026-08-17-interpolation-syntax.md`
-    // for the decided v1 grammar (Path/Call/literal, no infix operators).
+    // ---- `$` interpolation: `{$ expr }`, `$(ref)`, `$name(args)` -------
+    // Grammar-only recognition of the three spellings `tomet-syntax-lowering`'s
+    // `parse_interpolation` reads. `{$ expr }` takes the whole expression
+    // language, `$(...)` one reference and `$name(...)` one call; here `$(...)`
+    // reads the whole expression language too, since telling a reference from
+    // another expression is the real parser's check (it refuses the others).
     // `Path` (`a.b.c`) reuses the existing `identifier` token as one
     // opaque span rather than exposing dot-separated segments -- this
     // grammar is highlighting-only and doesn't need a structured `Path`
     // AST, just to recognize the whole span and not fall into `ERROR`.
     interpolation: ($) =>
       choice(
-        seq(token(prec(1, "${")), $._interp_expr, "}"),
-        seq("$", $.interp_call),
+        seq(token(prec(1, "{$")), $._interp_expr, "}"),
+        seq(token(prec(1, "$(")), $._interp_expr, ")"),
+        $.interp_dollar_call,
+        // `$addr(text)`: raw text up to the `)`, as `addr(...)` is inside an expression.
+        alias(token(prec(3, seq("$addr(", /[^)\n]*/, ")"))), $.interp_addr),
+      ),
+    // `$name(args)`. Its head is one token, `$name(`, so that it is longer than the
+    // scalar a value position would read `$name` as, and wins.
+    interp_dollar_call: ($) =>
+      seq($.interp_dollar_head, optional($._interp_args), ")"),
+    interp_dollar_head: (_$) =>
+      token(
+        prec(
+          1,
+          /\$[A-Za-z_][A-Za-z0-9_-]*(\.[A-Za-z_][A-Za-z0-9_-]*)*\(/,
+        ),
       ),
     // The expression language, as far as highlighting needs it: operators
-    // (`==` `!=` `<` `<=` `>` `>=` `&&` `||`), `( expr )`, lambdas
+    // (`+` `-` `==` `!=` `<` `<=` `>` `>=` `&&` `||`), `( expr )`, lambdas
     // (`x => body`, `(a, b) => body`), `doc#id`, and `addr(...)`. See
     // `tmtroot/spec/expressions/`. Precedence is only here to keep the tree
     // unambiguous; the real parser (`tomet-parser/src/interp.rs`) is the
@@ -519,8 +550,22 @@ module.exports = grammar({
             $._interp_expr,
           ),
         ),
+        // `+` and `-` need white space on both sides in the real parser (`a-b` is a name);
+        // here the spaces are `extras`, and the identifier token already takes `a-b` whole.
+        prec.left(4, seq($._interp_expr, choice("+", "-"), $._interp_expr)),
       ),
-    interp_group: ($) => seq("(", $._interp_expr, ")"),
+    interp_group: ($) =>
+      seq(
+        "(",
+        optional(
+          seq(
+            $._interp_expr,
+            repeat(seq(",", $._interp_expr)),
+            optional(","),
+          ),
+        ),
+        ")",
+      ),
     // A call's arguments: expressions, or `name: expr`.
     _interp_args: ($) => seq($._interp_arg, repeat(seq(",", $._interp_arg))),
     _interp_arg: ($) => choice($.interp_named_arg, $._interp_expr),
@@ -620,7 +665,7 @@ module.exports = grammar({
     // balances nested parentheses; this approximation does not.
     interp_addr: (_$) => token(prec(3, seq("addr(", /[^)\n]*/, ")"))),
     // A call's callee may itself be a call followed by `.name`, which
-    // is how `${ref(id(x).contents(y))}` reads: member access binds to
+    // is how `{$ ref(id(x).contents(y)) }` reads: member access binds to
     // whatever precedes it, then takes its own argument list.
     interp_call: ($) =>
       prec.left(
@@ -671,6 +716,30 @@ module.exports = grammar({
       ),
     hole_open: (_$) => token(prec(2, /<\?([A-Za-z_][A-Za-z0-9_.\-]*)?/)),
     hole_close: (_$) => token(prec(1, ">")),
+    // A type seat, `<$type(args)>`: a place that takes a value of that type. Unlike a hole
+    // it has no data and no content, and its `>` ends it. The head, `<$` and the name, is
+    // the external `type_seat_open` (see `scanner.c`): it is emitted only when the seat
+    // really closes -- the `>` right after the name or after the `(args)`, so no white space
+    // stands before it -- and `<$x >`, `<$5>` and `<$x{a: 1}>` stay text, here as in
+    // `tomet-parser`. (A `(` that never closes, `<$x(a>`, is no seat either, but then `$x(`
+    // is an interpolation call head that never closes: an `ERROR` here, a parse error there.)
+    // A seat takes the place of a value as well as of running text (`::id(<$uuid>)`,
+    // `key: <$string>`), which is why the scanner also tries it before `scalar`. The
+    // arguments are the expression language's (`list(string, length: 6)`, `default: auto`,
+    // strings), where a `>` is an operator and closes nothing.
+    type_seat: ($) =>
+      seq(
+        $.type_seat_open,
+        optional(
+          seq("(", choice($._blank_gap, optional($._seat_args)), ")"),
+        ),
+        alias($.hole_close, $.type_seat_close),
+      ),
+    // The arguments may run over lines, as the real parser's do: a line break goes around
+    // each argument, where the comma is.
+    _seat_args: ($) => seq($._seat_arg, repeat(seq(",", $._seat_arg))),
+    _seat_arg: ($) =>
+      seq(optional($._blank_gap), $._interp_arg, optional($._blank_gap)),
     // ---- `::name` declarations ------------------------------------------
     //
     // A declaration about the document, not content in it. It is only
@@ -945,7 +1014,8 @@ module.exports = grammar({
     // why `@id(list(a, b))`/`::meta(list(a, b))` -- a bare `list(...)`
     // occupying the *whole* `(args)`/`{value}` -- still errors,
     // unlike `a: list(...)` under a named key).
-    value: ($) => choice($.map, $.string, $.interpolation, $.scalar),
+    value: ($) =>
+      choice($.map, $.string, $.type_seat, $.interpolation, $.scalar),
     // Entries are separated by a comma, one-or-more newlines, or both --
     // but never consumed by `map_entry` itself (unlike a trailing comma
     // after the *last* entry, which belongs to whatever encloses the
@@ -1071,6 +1141,7 @@ module.exports = grammar({
         $.sequence,
         $.string,
         $.braced_map,
+        $.type_seat,
         $.interpolation,
         $._value_scalar,
         alias(/[A-Za-z_][A-Za-z0-9_-]*(\.[A-Za-z_][A-Za-z0-9_-]*)*/, $.scalar),

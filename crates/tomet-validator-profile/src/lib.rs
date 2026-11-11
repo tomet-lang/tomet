@@ -31,7 +31,7 @@ use tomet_validator_core::Diagnostic;
 /// What a document takes from outside itself.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Dirt {
-    /// Part of a `${...}` that is answered by something other than the file.
+    /// Part of a `{$ ... }` that is answered by something other than the file.
     Expression(Reach),
     /// An element that only a vocabulary gives a meaning to. `name` is as written, with its
     /// namespace when it has one.
@@ -60,7 +60,7 @@ impl std::fmt::Display for Dirt {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Finding {
     pub dirt: Dirt,
-    /// The `${...}` or the element or mention that takes it.
+    /// The `{$ ... }` or the element or mention that takes it.
     pub span: Span,
 }
 

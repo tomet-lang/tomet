@@ -312,7 +312,7 @@ fn is_tm_file(p: &Path) -> bool {
 }
 
 /// One file's queryable facts, keyed by the dotted paths a
-/// `${filter(...)}` predicate writes: `path`, `filename`, `kind`, `meta`
+/// `$filter(...)` predicate writes: `path`, `filename`, `kind`, `meta`
 /// and everything under it.
 ///
 /// The distinction from [`extract_metadata`] is the value type.
@@ -341,7 +341,7 @@ pub struct FileMetadata {
 /// reported, and failing the whole index for one bad file elsewhere in
 /// the vault would be the wrong trade.
 ///
-/// This is the only part of `${filter(...)}` that touches the disk. The
+/// This is the only part of `$filter(...)` that touches the disk. The
 /// pass that consumes the table is pure and lives a layer below, in
 /// `tomet-transform`.
 pub fn collect_metadata_table(
@@ -453,7 +453,8 @@ fn value_to_string(v: &Value) -> String {
         return text.into_owned();
     }
     match v {
-        Value::Null | Value::Hole(_) => String::new(),
+        // A hole and a type seat are a blueprint's, and have no value to index.
+        Value::Null | Value::Hole(_) | Value::TypeSeat(_) => String::new(),
         Value::Seq(items) => {
             let s: Vec<_> = items.iter().map(value_to_string).collect();
             format!("[{}]", s.join(", "))
@@ -476,7 +477,7 @@ fn value_to_string(v: &Value) -> String {
                 None => format!("@{name}"),
             }
         }
-        Value::Interp(interp) => format!("${{{}}}", interp.expr),
+        Value::Interp(interp) => interp.to_string(),
         Value::Blocks(blocks) => format!("<{} block(s)>", blocks.len()),
         _ => String::new(),
     }

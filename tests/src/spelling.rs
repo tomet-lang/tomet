@@ -58,7 +58,7 @@ const SCALARS: &[&str] = &[
     "inf",
     "2024-01-02",
     "2024-01-02T03:04:05Z",
-    "${x}",
+    "$(x)",
     "$f(x)",
     "$macro.gh(1)",
     "a$b",
@@ -89,6 +89,8 @@ const SCALARS: &[&str] = &[
     "日本語",
     "é",
     "$5",
+    "<$date>",
+    "a <$list(int)> b",
     "2024-01-02 03:04",
     "2024-01-02T03:04:05+09:00",
 ];
@@ -278,29 +280,29 @@ fn cotomet_writes_every_string_so_it_reads_back() {
 }
 
 /// Interpolations as the grammar reads them, each written in the form that is not the printer's: a
-/// call is `${f(x)}` here and the printer is to write `$f(x)`; the rest are `${...}` either way.
+/// call is `$f(x)` here and the printer is to write `$f(x)`; the rest are `{$ ... }` either way.
 const INTERPOLATIONS: &[&str] = &[
-    "${f(x)}",
-    "${macro.gh(1)}",
-    "${macro.gh(\"tomet/tomet\")}",
-    "${macro.gh(\"a)b\")}",
-    "${a.b.c(1, \"two\", three)}",
-    "${f()}",
-    "${f(g(x))}",
-    "${x}",
-    "${a.b}",
-    "${f(x).g}",
-    "${f(x).g(y)}",
-    "${a::b}",
-    "${self::path}",
-    "${f(x) == 1}",
-    "${x => f(x)}",
-    "${(f(x))}",
-    "${tmt(\"b.tmt\")::meta.title}",
-    "${true}",
-    "${1}",
-    "${#id}",
-    "${doc#id}",
+    "$f(x)",
+    "$macro.gh(1)",
+    "$macro.gh(\"tomet/tomet\")",
+    "$macro.gh(\"a)b\")",
+    "$a.b.c(1, \"two\", three)",
+    "$f()",
+    "$f(g(x))",
+    "$(x)",
+    "$(a.b)",
+    "{$ f(x).g }",
+    "{$ f(x).g(y) }",
+    "$(a::b)",
+    "$(self::path)",
+    "{$ f(x) == 1 }",
+    "{$ x => f(x) }",
+    "{$ (f(x)) }",
+    "{$ tmt(\"b.tmt\")::meta.title }",
+    "{$ true }",
+    "$(1)",
+    "$(#id)",
+    "$(doc#id)",
 ];
 
 /// The places an interpolation stands: a value, running text, a line of its own, an element's args.
@@ -328,28 +330,28 @@ fn the_printer_writes_every_interpolation_so_it_reads_back() {
 
 #[test]
 fn the_printer_writes_a_call_as_a_call_and_anything_else_in_braces() {
-    // The call form is `$callee(args)`; `${...}` opens an expression space, so what is not a call
+    // The call form is `$callee(args)`; `{$ ... }` opens an expression space, so what is not a call
     // of a name has no other form.
     let printed =
         |src: &str| tomet_printer::document_to_tm(&tomet_ast_parser::parse_file(src).unwrap());
     let mut bad = Vec::new();
     for (src, written) in [
-        ("::x(v: ${macro.gh(1)})\n", "::x(v: $macro.gh(1))\n"),
+        ("::x(v: $macro.gh(1))\n", "::x(v: $macro.gh(1))\n"),
         (
-            "see ${macro.gh(\"a)b\")} now\n",
+            "see $macro.gh(\"a)b\") now\n",
             "see $macro.gh(\"a)b\") now\n",
         ),
-        ("${f(x)}\n", "$f(x)\n"),
+        ("$f(x)\n", "$f(x)\n"),
         (
-            "@link(${a.b(1, \"two\")})[T]\n",
+            "@link($a.b(1, \"two\"))[T]\n",
             "@link($a.b(1, \"two\"))[T]\n",
         ),
         ("::x(v: $macro.gh(1))\n", "::x(v: $macro.gh(1))\n"),
-        ("see ${x} now\n", "see ${x} now\n"),
-        ("see ${a.b} now\n", "see ${a.b} now\n"),
-        ("see ${f(x).g(y)} now\n", "see ${f(x).g(y)} now\n"),
-        ("see ${self::path} now\n", "see ${self::path} now\n"),
-        ("see ${f(x) == 1} now\n", "see ${f(x) == 1} now\n"),
+        ("see $(x) now\n", "see $(x) now\n"),
+        ("see $(a.b) now\n", "see $(a.b) now\n"),
+        ("see {$ f(x).g(y) } now\n", "see {$ f(x).g(y) } now\n"),
+        ("see $(self::path) now\n", "see $(self::path) now\n"),
+        ("see {$ f(x) == 1 } now\n", "see {$ f(x) == 1 } now\n"),
     ] {
         let got = printed(src);
         if got != written {
@@ -361,13 +363,14 @@ fn the_printer_writes_a_call_as_a_call_and_anything_else_in_braces() {
 
 #[test]
 fn a_call_is_written_as_a_call_exactly_when_the_parser_reads_the_name() {
-    // The callee is any run of the pieces a name has a rule about. Where `${name(1)}` parses, the
+    // The callee is any run of the pieces a name has a rule about. Where `$name(1)` parses, the
     // printer's text reads back as the same document, and it is `$name(1)` exactly when the parser
     // reads `$name(1)` as that same call: braces for a name it reads otherwise would corrupt the
     // document, and braces kept for a name it reads would be braces for nothing.
     let (mut wrong, mut needless, mut tried) = (Vec::new(), Vec::new(), 0usize);
     for name in runs(PARTS, MAX_PARTS) {
-        let Ok(before) = tomet_ast_parser::parse_file(&format!("see ${{{name}(1)}} now\n")) else {
+        let Ok(before) = tomet_ast_parser::parse_file(&format!("see {{$ {name}(1) }} now\n"))
+        else {
             continue;
         };
         tried += 1;
@@ -401,20 +404,21 @@ const OUTSIDE_PARTS: &[&str] = &["a", "é", "名", "_", "-", ".", "1"];
 #[test]
 fn a_name_with_a_letter_outside_ascii_is_read_as_no_name_anywhere() {
     // A name is ASCII wherever the grammar reads one: an element's `@name(`, a call's `$name(`, a
-    // box's `<?name>`, a declaration's `::name(` and an identifier in `${...}`. With a letter
-    // outside ASCII in it, the first four are text and the last is no expression.
+    // box's `<?name>` or `<$name>`, a declaration's `::name(` and an identifier in `{$ ... }`. With
+    // a letter outside ASCII in it, the first five are text and the last is no expression.
     let mut bad = Vec::new();
     for name in runs(OUTSIDE_PARTS, 3).into_iter().filter(|n| !n.is_ascii()) {
         for (what, marker, src) in [
             ("element", "Element(", format!("see @{name}(1) now\n")),
             ("call", "Interp(", format!("see ${name}(1) now\n")),
             ("box", "Hole(", format!("see <?{name}> now\n")),
+            ("type seat", "TypeSeat(", format!("see <${name}> now\n")),
             ("declaration", "Declaration {", format!("::{name}(1)\n")),
-            ("expression", "Interp(", format!("see ${{{name}}} now\n")),
+            ("expression", "Interp(", format!("see $({name}) now\n")),
             (
                 "expression call",
                 "Interp(",
-                format!("see ${{{name}(1)}} now\n"),
+                format!("see {{$ {name}(1) }} now\n"),
             ),
         ] {
             let Ok(file) = tomet_ast_parser::parse_file(&src) else {

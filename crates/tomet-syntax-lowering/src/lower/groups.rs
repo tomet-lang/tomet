@@ -61,8 +61,8 @@ pub(crate) fn lower_group_list(nodes: impl IntoIterator<Item = SyntaxNode>) -> R
     Ok(read)
 }
 
-/// What a value embeds at `node`, and where it ends: an element or a hole
-/// (`@name...`, `?matcher(...)`), or `[content]` / a `|` run as blocks.
+/// What a value embeds at `node`, and where it ends: an element, a hole or a type seat
+/// (`@name...`, `<?matcher(...)>`, `<$type(...)>`), or `[content]` / a `|` run as blocks.
 pub(crate) fn lower_embedded(node: &SyntaxNode) -> Result<(Value, usize)> {
     match node.kind() {
         K::CONTENT => {
@@ -71,9 +71,8 @@ pub(crate) fn lower_embedded(node: &SyntaxNode) -> Result<(Value, usize)> {
         }
         _ if slot_of(node).is_some() => {
             let slot = slot_of(node).expect("checked");
-            let hole = lower_slot(&slot)?;
-            let end = hole.span.end;
-            Ok((Value::Hole(Box::new(hole)), end))
+            let (_, end) = range_of(&slot);
+            Ok((lower_slot(&slot)?.into_value(), end))
         }
         _ => {
             let element = lower_element(node)?;

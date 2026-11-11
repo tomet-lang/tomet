@@ -51,7 +51,7 @@ fn parse_content_layout(value: &Value) -> Option<ContentLayout> {
 #[config(group = "format")]
 pub struct FormatConfig {
     /// How a paragraph is separated from the block after it (`blank` or `semicolon`). Applies
-    /// between paragraphs and the elements, holes and interpolations that stand like one; a
+    /// between paragraphs and the elements, holes, type seats and interpolations that stand like one; a
     /// heading, a list or a code block keeps the blank line it has. Unset, the formatter leaves
     /// each separator as written and the printer, which has none to keep, writes a blank line.
     #[config(

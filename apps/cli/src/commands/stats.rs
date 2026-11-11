@@ -381,7 +381,7 @@ fn render(report: &Report) -> String {
     notes.push((
         "Elements",
         format!(
-            "@ {} / :: {} / ${{}} {} / - {}",
+            "@ {} / :: {} / $ {} / - {}",
             group(stats.named),
             group(stats.document),
             group(stats.dollar),
@@ -524,7 +524,7 @@ mod tests {
 
     #[test]
     fn each_sigil_is_counted_on_its_own() {
-        let stats = measure_src("@note[ ${meta.title} ]\n\n- あ\n- い\n");
+        let stats = measure_src("@note[ $(meta.title) ]\n\n- あ\n- い\n");
         assert_eq!(stats.dollar, 1);
         assert_eq!(stats.bare, 2);
         // Just `@note` -- the list itself is `Block::List`, not a
@@ -616,14 +616,14 @@ mod tests {
 
     /// What the report calls failed and warned is what `check` says of the
     /// same directory: a document that parses but does not validate is
-    /// measured and failed, and a `@draft` or an unresolved `${...}` is a
+    /// measured and failed, and a `@draft` or an unresolved `{$ ... }` is a
     /// warning that fails nothing.
     #[test]
     fn failed_and_warnings_are_what_check_reports() {
         let root = scratch("check");
         fs::write(root.join("ok.tmt"), "@callout[ a ]\n").unwrap();
         fs::write(root.join("draft.tmt"), "@draft[ later ]\n").unwrap();
-        fs::write(root.join("unresolved.tmt"), "@callout[ ${missing_id} ]\n").unwrap();
+        fs::write(root.join("unresolved.tmt"), "@callout[ $(missing_id) ]\n").unwrap();
         fs::write(root.join("invalid.tmt"), "@nonesuch[ x ]\n").unwrap();
         fs::write(root.join("bad.tmt"), "@callout[ unterminated\n").unwrap();
 
@@ -718,13 +718,13 @@ mod tests {
 
     #[test]
     fn the_breakdowns_sit_under_the_total() {
-        let mut report = report_of(&[("", "@note[ a ${x} ]\n\n@note[ b ]\n")]);
+        let mut report = report_of(&[("", "@note[ a $(x) ]\n\n@note[ b ]\n")]);
         report.warnings = 12;
         report.invalid = 3;
         let text = render(&report);
         let after_total = text.split("Total").nth(1).expect("has a total row");
         // A symbol for each kind of element: the sigil it is written with.
-        assert!(after_total.contains("@ 2 / :: 0 / ${} 1 / - 0"), "{text}");
+        assert!(after_total.contains("@ 2 / :: 0 / $ 1 / - 0"), "{text}");
         assert!(after_total.contains("file 0 / dir 0 / embed 0 / tmt 0 / ref 0"));
         assert!(after_total.contains("deepest level 0"));
         assert!(

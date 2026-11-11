@@ -1,4 +1,5 @@
-//! Forms: `@name` and `::name` with the groups they take, and `${ ... }`.
+//! Forms: `@name` and `::name` with the groups they take, and the three `$` forms: `{$ expr }`,
+//! `$(ref)` and `$name(args)`.
 //!
 //! How a line that opens with one is told to be a block or the start of a paragraph, where a form
 //! ends, and what makes a bare `@name` text. The groups themselves are [`super::group`]'s.
@@ -46,7 +47,7 @@ impl<'a, 't> CstParser<'a, 't> {
                 let free = match self.kind_at(k) {
                     Some(K::L_PAREN) => !seen[0],
                     Some(K::L_BRACKET) => !seen[1],
-                    Some(K::L_BRACE) => !seen[2],
+                    Some(K::L_BRACE) => !seen[2] && !self.gate_at(k),
                     Some(K::HASH) => !seen_id && self.id_follows(k),
                     Some(K::COLON) => self.connect_follows_on_next_line(k),
                     _ => false,
@@ -156,7 +157,8 @@ impl<'a, 't> CstParser<'a, 't> {
     fn group_opens_after(&self, newline: usize) -> bool {
         let k = self.skip_ws_from(newline + 1);
         match self.kind_at(k) {
-            Some(K::L_PAREN | K::L_BRACKET | K::L_BRACE) => true,
+            Some(K::L_BRACE) => !self.gate_at(k),
+            Some(K::L_PAREN | K::L_BRACKET) => true,
             Some(K::HASH) => self.id_follows(k),
             Some(K::COLON) => self.allow_connect && self.connect_follows_on_next_line(k),
             Some(K::PIPE) => self.pipe_follows_line(newline),
@@ -226,7 +228,7 @@ impl<'a, 't> CstParser<'a, 't> {
                 let n = self.name_tokens_at(p + 1);
                 n > 0 && (self.groups_follow(p + 1 + n) || self.bare_name_stands_alone(p + 1 + n))
             }
-            Some(K::LT) => matches!(self.slot_at(p), Some((true, _))),
+            Some(K::LT) => self.slot_at(p).is_some_and(|(mark, _)| mark.is_form()),
             _ => false,
         };
         if !form {
@@ -259,11 +261,11 @@ impl<'a, 't> CstParser<'a, 't> {
     pub(super) fn try_parse_inline_form(&mut self) -> bool {
         let p = self.pos;
         if self.current_kind() == Some(K::LT) {
-            let Some((marked, _)) = self.slot_at(p) else {
+            let Some((mark, _)) = self.slot_at(p) else {
                 return false;
             };
-            // A marked box is a form of the tree; a name tag stays running text.
-            if marked {
+            // A hole and a type seat are forms of the tree; a name tag stays running text.
+            if mark.is_form() {
                 self.builder.start_node(K::INLINE_FORM.into());
                 self.parse_slot();
                 self.builder.finish_node();
@@ -277,8 +279,12 @@ impl<'a, 't> CstParser<'a, 't> {
                 let n = self.name_tokens_at(p + 1);
                 n > 0 && self.groups_follow(p + 1 + n)
             }
+            // `{$ expr }`: the brace and the mark touch, so a map that begins with a `$` form
+            // (`{ $f(x) }`) is still a map.
+            Some(K::L_BRACE) => self.gate_at(p),
+            // `$(ref)` and `$name(args)`.
             Some(K::DOLLAR) => {
-                self.kind_at(p + 1) == Some(K::L_BRACE)
+                self.kind_at(p + 1) == Some(K::L_PAREN)
                     || (self.name_at(p + 1)
                         && self.kind_at(p + 1 + self.name_tokens_at(p + 1)) == Some(K::L_PAREN))
             }
@@ -289,14 +295,13 @@ impl<'a, 't> CstParser<'a, 't> {
         }
         self.builder.start_node(K::INLINE_FORM.into());
         let dollar = self.current_kind() == Some(K::DOLLAR);
-        self.parse_sigil();
-        if dollar {
-            match self.current_kind() {
-                Some(K::L_BRACE) => self.parse_interp_expr(),
-                Some(K::L_PAREN) => self.parse_args_group(),
-                _ => {}
-            }
+        if self.gate_at(p) || (dollar && self.kind_at(p + 1) == Some(K::L_PAREN)) {
+            self.parse_interp_expr();
+        } else if dollar {
+            self.parse_sigil();
+            self.parse_args_group();
         } else {
+            self.parse_sigil();
             // Like a block form's, an inline form's groups may begin on the next line.
             self.parse_groups(true, true);
         }
@@ -336,14 +341,32 @@ impl<'a, 't> CstParser<'a, 't> {
         self.builder.finish_node();
     }
 
+    /// Is there a `{$` at `i`, the opening of `{$ expr }`? The brace and the mark touch.
+    pub(super) fn gate_at(&self, i: usize) -> bool {
+        self.kind_at(i) == Some(K::L_BRACE) && self.kind_at(i + 1) == Some(K::DOLLAR)
+    }
+
+    /// `{$ expr }` or `$(ref)`, at its first token: one `INTERP_EXPR` node for the whole form,
+    /// opening mark and closing bracket included.
+    ///
+    /// It ends at the bracket that closes the one it opened, and counts only that pair: braces
+    /// for `{$ ... }`, parentheses for `$( ... )`. A bracket of the other pair is just a
+    /// character of the expression, so an unclosed `(` in `{$ (a }` does not swallow the `}`,
+    /// and a stray `}` in `$( ... )` closes nothing. A `"..."` string never closes anything.
     fn parse_interp_expr(&mut self) {
+        let (open, close) = if self.gate_at(self.pos) {
+            (K::L_BRACE, K::R_BRACE)
+        } else {
+            (K::L_PAREN, K::R_PAREN)
+        };
         self.builder.start_node(K::INTERP_EXPR.into());
-        self.bump(); // '{'
+        self.bump(); // '{' or '$'
+        self.bump(); // '$' or '('
         let mut depth = 1usize;
         while let Some(k) = self.current_kind() {
             match k {
-                K::L_BRACE => depth += 1,
-                K::R_BRACE => {
+                k if k == open => depth += 1,
+                k if k == close => {
                     depth -= 1;
                     if depth == 0 {
                         self.bump();

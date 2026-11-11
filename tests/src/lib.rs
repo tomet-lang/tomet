@@ -155,7 +155,7 @@ pub const KNOWN_TS_ERRORS: &[(&str, &[&str])] = &[
             "(tomet.dict.tmt",
         ],
     ),
-    // A block where a `{...}` group's value goes (`card: [ @card[ ${2} ] ]`, the body of a block
+    // A block where a `{...}` group's value goes (`card: [ @card[ $(2) ] ]`, the body of a block
     // macro in `::macro(...)`): `grammar.js` reads a `[ ... ]` value in `(args)` but not as the
     // value of a pair in `{...}`, even when it holds a single paragraph. `tomet-parser` reads it
     // (`syntax/block-macro.tmt` is in the corpus for that); highlighting it is the grammar's to

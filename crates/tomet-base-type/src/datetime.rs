@@ -1,10 +1,11 @@
 //! What text reads as a date, or a date and a time.
 //!
-//! The one definition of what a `datetime` field holds. The evaluator reads a
-//! field with it, `tomet check` checks a field with it, and `tomet format`
-//! decides with it what to rewrite as RFC 3339. It gives the parts and
-//! nothing else -- no clock type -- so a crate that only needs to know
-//! whether text reads as a datetime does not carry one.
+//! The one definition of what a `datetime` field holds, and of the calendar
+//! date a `date` field holds ([`is_date`]). The evaluator reads a field with
+//! it, `tomet check` checks a field with it, and `tomet format` decides with
+//! it what to rewrite as RFC 3339. It gives the parts and nothing else -- no
+//! clock type -- so a crate that only needs to know whether text reads as a
+//! datetime does not carry one.
 
 /// A date, or a date and a time, as written.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -57,6 +58,14 @@ pub fn parse_datetime_parts(text: &str) -> Option<DateTimeParts> {
     }
     (parts.hour, parts.minute, parts.second, parts.nanosecond) = parse_clock(clock)?;
     Some(parts)
+}
+
+/// Whether `text` is a calendar date and nothing else: `YYYY-MM-DD`, with a
+/// month of 1 to 12 and a day the month has. Surrounding whitespace is not
+/// part of it. A date with a time after it is a datetime
+/// ([`parse_datetime_parts`]), not a date.
+pub fn is_date(text: &str) -> bool {
+    parse_date(text.trim()).is_some()
 }
 
 /// Reads a UTC offset written `+09:00`, `-05:30` or `Z`, as seconds east of
@@ -310,6 +319,29 @@ mod tests {
         assert!(parse_datetime_parts("2000-02-29").is_some());
         assert!(parse_datetime_parts("2026-04-31").is_none());
         assert!(parse_datetime_parts("2026-04-30").is_some());
+    }
+
+    #[test]
+    fn a_date_is_a_calendar_day_and_nothing_after_it() {
+        for text in ["2026-10-25", "2024-02-29", " 2026-10-25 ", "0001-01-01"] {
+            assert!(is_date(text), "{text:?}");
+        }
+        for text in [
+            "",
+            "2026-10",
+            "2026-1-05",
+            "26-10-25",
+            "2026-13-01",
+            "2026-00-10",
+            "2026-02-29",
+            "2026-04-31",
+            "2026-10-25T09:00",
+            "2026-10-25 09:00",
+            "2026/10/25",
+            "２０２６-10-25",
+        ] {
+            assert!(!is_date(text), "{text:?}");
+        }
     }
 
     #[test]

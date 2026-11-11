@@ -24,8 +24,9 @@ use std::sync::Arc;
 use anyhow::{Context, Result, bail};
 use tomet_ast::Value;
 use tomet_config::PrinterConfig;
-use tomet_expr::{DocRef, EvalContext, Generate, MemoryResolver, OffsetGenerate, Phase};
-use tomet_transform::instantiate_blueprint;
+use tomet_expr::{DocRef, EvalContext, MemoryResolver};
+use tomet_position::{LineCol, LineIndex};
+use tomet_transform::{SeatProblem, Source, SystemSource, instantiate_blueprint};
 
 /// Every blueprint `config` declares, as `(name, path)`, sorted by name.
 ///
@@ -99,7 +100,7 @@ fn blueprint_name(path: &Path) -> Option<String> {
 /// document as written.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Unfilled {
-    /// The expression as written, without the surrounding `${` and `}`.
+    /// The expression as written, without the surrounding `{$ ` and ` }`.
     pub source: String,
     /// The 1-based line it is written on in the blueprint file.
     pub line: usize,
@@ -129,34 +130,117 @@ pub struct Created {
     pub unfilled: Vec<Unfilled>,
 }
 
+/// A blueprint that cannot be made into a document, because some of its type seats cannot be
+/// filled. Nothing is made from it and nothing is written.
+///
+/// This is the error [`instantiate_blueprint_file`] and [`create_file_from_blueprint`] fail with
+/// for that cause, found with `downcast_ref` on the [`anyhow::Error`]; its `Display` is every
+/// problem on a line of its own, in the form `tomet check` reports them, and a last line that
+/// counts them.
+#[derive(Debug, Clone, PartialEq)]
+pub struct SeatsNotFilled {
+    /// The blueprint file the seats are written in.
+    pub blueprint: PathBuf,
+    /// Every seat that cannot be filled, in the order the blueprint has them.
+    pub problems: Vec<LocatedSeatProblem>,
+}
+
+/// A seat that cannot be filled, and where it is written in the blueprint file.
+#[derive(Debug, Clone, PartialEq)]
+pub struct LocatedSeatProblem {
+    /// Where the seat begins: a 1-based line and column.
+    pub at: LineCol,
+    pub problem: SeatProblem,
+}
+
+impl SeatsNotFilled {
+    fn new(blueprint: &Path, src: &str, problems: Vec<SeatProblem>) -> Self {
+        let index = LineIndex::new(src);
+        SeatsNotFilled {
+            blueprint: blueprint.to_path_buf(),
+            problems: problems
+                .into_iter()
+                .map(|problem| LocatedSeatProblem {
+                    at: index.line_col(problem.span.start),
+                    problem,
+                })
+                .collect(),
+        }
+    }
+}
+
+impl std::fmt::Display for SeatsNotFilled {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let blueprint = self.blueprint.display();
+        for found in &self.problems {
+            writeln!(
+                f,
+                "{blueprint}:{}:{}: error: {}",
+                found.at.line, found.at.column, found.problem
+            )?;
+        }
+        write!(
+            f,
+            "{} of {blueprint} cannot be filled; no document was made",
+            match self.problems.len() {
+                1 => "1 type seat".to_string(),
+                n => format!("{n} type seats"),
+            }
+        )
+    }
+}
+
+impl std::error::Error for SeatsNotFilled {}
+
+/// The clock and the random source a blueprint's `default: auto` is made from: the real ones, with
+/// the moment written in the offset the settings give `created` (or `modified`), UTC if neither
+/// has one.
+pub fn source_for(config: &PrinterConfig) -> SystemSource {
+    ["created", "modified"]
+        .iter()
+        .find_map(|field| {
+            let offset = config.meta.fields.get(*field)?.offset.as_deref()?;
+            SystemSource::in_offset(offset)
+        })
+        .unwrap_or_else(SystemSource::utc)
+}
+
 /// Instantiates a blueprint file into formatted Tomet source text for the new
-/// document `target`, a path relative to the vault.
+/// document `target`, a path relative to the vault, with the real clock and random source
+/// ([`source_for`]).
 ///
-/// `vars` are the values passed to `tomet new --var key=value`, read in the
-/// blueprint as `${var.key}`. A name nothing declares is refused, and so is a
-/// variable that has neither a value nor a `default`: the blueprint's `::var`
-/// (over the vault's) says which there are. The document being created is `self`, so `${self::filename}` is the new file's
-/// name. `${generate.now()}` is written in the offset the settings give
-/// `created` (or `modified`), UTC if neither has one.
-///
-/// An expression that has no value stays in the new document as written, so
-/// the person who made it can see what was left to fill in; each one is also
-/// returned in [`Instantiation::unfilled`], so the caller can say so.
+/// See [`instantiate_blueprint_file_with`], which is this with the source given.
 pub fn instantiate_blueprint_file(
     blueprint_path: &Path,
     target: &Path,
     vars: &HashMap<String, Value>,
     config: &PrinterConfig,
 ) -> Result<Instantiation> {
-    instantiate_blueprint_file_with(blueprint_path, target, vars, config, &generator_for(config))
+    instantiate_blueprint_file_with(blueprint_path, target, vars, config, &source_for(config))
 }
 
-fn instantiate_blueprint_file_with(
+/// Instantiates a blueprint file into formatted Tomet source text for the new
+/// document `target`, a path relative to the vault.
+///
+/// `vars` are the values passed to `tomet new --var key=value`, read in the
+/// blueprint as `$(var.key)`. A name nothing declares is refused, and so is a
+/// variable that has neither a value nor a `default`: the blueprint's `::var`
+/// (over the vault's) says which there are. The document being created is
+/// `self`, so `$(self::filename)` is the new file's name.
+///
+/// Every type seat (`<$uuid(default: auto)>`) is filled from its own source, and `source` is
+/// where the `default: auto` ones come from. A seat that cannot be filled fails the making with
+/// [`SeatsNotFilled`], which says every one of them.
+///
+/// An expression that has no value stays in the new document as written, so
+/// the person who made it can see what was left to fill in; each one is also
+/// returned in [`Instantiation::unfilled`], so the caller can say so.
+pub fn instantiate_blueprint_file_with(
     blueprint_path: &Path,
     target: &Path,
     vars: &HashMap<String, Value>,
     config: &PrinterConfig,
-    generate: &dyn Generate,
+    source: &dyn Source,
 ) -> Result<Instantiation> {
     let src = fs::read_to_string(blueprint_path)
         .with_context(|| format!("failed to read blueprint at {}", blueprint_path.display()))?;
@@ -200,9 +284,7 @@ fn instantiate_blueprint_file_with(
     }
 
     let cx = EvalContext {
-        phase: Phase::Create,
         resolver: &resolver,
-        generate,
         self_doc,
         macros: &macros,
         var: &scope.values,
@@ -211,7 +293,8 @@ fn instantiate_blueprint_file_with(
         heading_level: 0,
         notes: Default::default(),
     };
-    let instantiated = instantiate_blueprint(&mut doc, &cx);
+    let instantiated = instantiate_blueprint(&mut doc, &cx, source)
+        .map_err(|problems| SeatsNotFilled::new(blueprint_path, &src, problems))?;
 
     // The spans belong to the blueprint as it was read, not to the document
     // about to be printed, so the line is a line of the blueprint.
@@ -232,23 +315,10 @@ fn instantiate_blueprint_file_with(
     })
 }
 
-/// The clock `generate.now()` reads: the real one, in the offset the settings
-/// give a creation date.
-fn generator_for(config: &PrinterConfig) -> OffsetGenerate {
-    ["created", "modified"]
-        .iter()
-        .find_map(|field| {
-            let offset = config.meta.fields.get(*field)?.offset.as_deref()?;
-            OffsetGenerate::from_offset_text(offset)
-        })
-        .unwrap_or_else(OffsetGenerate::utc)
-}
-
-/// Creates a new document from a blueprint and writes it to disk.
+/// Creates a new document from a blueprint and writes it to disk, with the real clock and random
+/// source ([`source_for`]).
 ///
-/// What the document was left to fill in is in [`Created::unfilled`]; it is
-/// written anyway, since the expressions are still there to be filled in by
-/// hand.
+/// See [`create_file_from_blueprint_with`], which is this with the source given.
 pub fn create_file_from_blueprint(
     root: &Path,
     blueprint_name: &str,
@@ -256,6 +326,32 @@ pub fn create_file_from_blueprint(
     vars: &HashMap<String, Value>,
     config: &PrinterConfig,
     overwrite: bool,
+) -> Result<Created> {
+    create_file_from_blueprint_with(
+        root,
+        blueprint_name,
+        target_rel_path,
+        vars,
+        config,
+        overwrite,
+        &source_for(config),
+    )
+}
+
+/// Creates a new document from a blueprint and writes it to disk.
+///
+/// What the document was left to fill in is in [`Created::unfilled`]; it is
+/// written anyway, since the expressions are still there to be filled in by
+/// hand. A type seat that cannot be filled is not like that: it fails the making with
+/// [`SeatsNotFilled`], and then nothing is written -- no file, and no directory made for one.
+pub fn create_file_from_blueprint_with(
+    root: &Path,
+    blueprint_name: &str,
+    target_rel_path: &Path,
+    vars: &HashMap<String, Value>,
+    config: &PrinterConfig,
+    overwrite: bool,
+    source: &dyn Source,
 ) -> Result<Created> {
     let blueprint_file = find_blueprint(root, blueprint_name, config).ok_or_else(|| {
         let known = list_blueprints(root, config)
@@ -281,12 +377,14 @@ pub fn create_file_from_blueprint(
         bail!("target file already exists: {}", target_abs_path.display());
     }
 
+    // Made first: a document that cannot be made leaves nothing behind, not even its directory.
+    let made =
+        instantiate_blueprint_file_with(&blueprint_file, target_rel_path, vars, config, source)?;
+
     if let Some(parent) = target_abs_path.parent() {
         fs::create_dir_all(parent)
             .with_context(|| format!("failed to create directories for {}", parent.display()))?;
     }
-
-    let made = instantiate_blueprint_file(&blueprint_file, target_rel_path, vars, config)?;
     fs::write(&target_abs_path, made.content)
         .with_context(|| format!("failed to write file {}", target_abs_path.display()))?;
 
@@ -300,6 +398,7 @@ pub fn create_file_from_blueprint(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use tomet_transform::{FixedSource, SystemSource};
 
     fn vault(name: &str) -> PathBuf {
         let dir = std::env::temp_dir().join(format!("tm_blueprint_{name}_{}", std::process::id()));
@@ -307,7 +406,7 @@ mod tests {
         fs::create_dir_all(dir.join(".tomet/blueprints")).unwrap();
         fs::write(
             dir.join(".tomet/blueprints/daily-note.blueprint.tmt"),
-            "::kind(blueprint)\n::blueprint(daily-note)\n::var(\n  title: { type: string }\n)\n::id(${generate.uuid()})\n::meta(\n  title: ${var.title}\n)\n\n=[ Tasks for ${var.title} ]#(tasks)\n",
+            "::kind(blueprint)\n::blueprint(daily-note)\n::var(\n  title: { type: string }\n)\n::meta(\n  title: $(var.title)\n)\n\n=[ Tasks for $(var.title) ]#(tasks)\n",
         )
         .unwrap();
         dir
@@ -400,18 +499,6 @@ mod tests {
         let _ = fs::remove_dir_all(&root);
     }
 
-    /// A clock stopped at the epoch and a UUID that is always the same.
-    struct Fixed;
-
-    impl Generate for Fixed {
-        fn now(&self) -> time::OffsetDateTime {
-            time::OffsetDateTime::UNIX_EPOCH
-        }
-        fn uuid(&self) -> String {
-            "00000000-0000-0000-0000-000000000000".to_string()
-        }
-    }
-
     fn blueprint_file(name: &str, src: &str) -> PathBuf {
         let dir =
             std::env::temp_dir().join(format!("tm_blueprint_src_{name}_{}", std::process::id()));
@@ -423,29 +510,23 @@ mod tests {
     }
 
     #[test]
-    fn generated_values_come_from_the_injected_clock_and_random_source() {
+    fn self_is_the_new_document_and_var_is_what_was_passed() {
         let file = blueprint_file(
-            "fixed",
-            "::blueprint(note)\n::var(\n  author: { type: string }\n)\n::id(${generate.uuid()})\n::meta(\n  day: ${generate.now().format(\"YYYY-MM-DD\")}\n  file: ${self::filename}\n  by: ${var.author}\n)\n",
+            "self",
+            "::blueprint(note)\n::var(\n  author: { type: string }\n)\n::meta(\n  file: $(self::filename)\n  by: $(var.author)\n)\n",
         );
         let mut vars = HashMap::new();
         vars.insert("author".to_string(), Value::String("Ann".into()));
 
-        let content = instantiate_blueprint_file_with(
+        let content = instantiate_blueprint_file(
             &file,
             Path::new("notes/idea.tmt"),
             &vars,
             &PrinterConfig::default(),
-            &Fixed,
         )
         .unwrap()
         .content;
 
-        assert!(
-            content.contains("::id(00000000-0000-0000-0000-000000000000)"),
-            "{content}"
-        );
-        assert!(content.contains("day: 1970-01-01"), "{content}");
         assert!(content.contains("file: idea.tmt"), "{content}");
         assert!(content.contains("by: Ann"), "{content}");
         let _ = fs::remove_dir_all(file.parent().unwrap());
@@ -455,19 +536,13 @@ mod tests {
     fn a_variable_takes_its_default_and_a_passed_value_wins() {
         let file = blueprint_file(
             "title",
-            "::blueprint(note)\n::var(\n  title: { default: \"Untitled\" }\n)\n\n=[ ${var.title} ]\n",
+            "::blueprint(note)\n::var(\n  title: { default: \"Untitled\" }\n)\n\n=[ $(var.title) ]\n",
         );
         let config = PrinterConfig::default();
         let made = |vars: &HashMap<String, Value>| {
-            instantiate_blueprint_file_with(
-                &file,
-                Path::new("a/my-note.tmt"),
-                vars,
-                &config,
-                &Fixed,
-            )
-            .unwrap()
-            .content
+            instantiate_blueprint_file(&file, Path::new("a/my-note.tmt"), vars, &config)
+                .unwrap()
+                .content
         };
         assert!(made(&HashMap::new()).contains("Untitled"));
         let mut vars = HashMap::new();
@@ -478,16 +553,15 @@ mod tests {
 
     #[test]
     fn an_expression_with_no_value_is_left_in_the_new_document() {
-        let file = blueprint_file("left", "::blueprint(note)\n::meta(by: ${var.author})\n");
-        let made = instantiate_blueprint_file_with(
+        let file = blueprint_file("left", "::blueprint(note)\n::meta(by: $(var.author))\n");
+        let made = instantiate_blueprint_file(
             &file,
             Path::new("n.tmt"),
             &HashMap::new(),
             &PrinterConfig::default(),
-            &Fixed,
         )
         .unwrap();
-        assert!(made.content.contains("${var.author}"), "{}", made.content);
+        assert!(made.content.contains("$(var.author)"), "{}", made.content);
         let _ = fs::remove_dir_all(file.parent().unwrap());
     }
 
@@ -498,14 +572,13 @@ mod tests {
     fn an_expression_with_no_value_is_reported_with_its_line_in_the_blueprint() {
         let file = blueprint_file(
             "reported",
-            "::blueprint(note)\n\n::meta(\n  by: ${var.author}\n  on: ${generate.uuid()}\n)\n",
+            "::blueprint(note)\n\n::meta(\n  by: $(var.author)\n)\n",
         );
-        let made = instantiate_blueprint_file_with(
+        let made = instantiate_blueprint_file(
             &file,
             Path::new("n.tmt"),
             &HashMap::new(),
             &PrinterConfig::default(),
-            &Fixed,
         )
         .unwrap();
         assert_eq!(made.unfilled.len(), 1, "{:?}", made.unfilled);
@@ -525,20 +598,15 @@ mod tests {
             .iter()
             .map(|(k, v)| (k.to_string(), Value::String(v.to_string())))
             .collect();
-        let made = instantiate_blueprint_file_with(
-            &file,
-            Path::new("n.tmt"),
-            &vars,
-            &PrinterConfig::default(),
-            &Fixed,
-        );
+        let made =
+            instantiate_blueprint_file(&file, Path::new("n.tmt"), &vars, &PrinterConfig::default());
         let _ = fs::remove_dir_all(file.parent().unwrap());
         made.map(|m| m.content)
     }
 
     #[test]
     fn a_required_variable_that_is_not_passed_stops_the_creation() {
-        let src = "::blueprint(note)\n::var(\n  title: { type: string }\n)\n\n=[ ${var.title} ]\n";
+        let src = "::blueprint(note)\n::var(\n  title: { type: string }\n)\n\n=[ $(var.title) ]\n";
         let err = made_with("required", src, &[]).unwrap_err().to_string();
         assert!(
             err.contains("title") && err.contains("--var title"),
@@ -566,7 +634,7 @@ mod tests {
     #[test]
     fn a_passed_value_is_converted_to_the_declared_type() {
         let src =
-            "::blueprint(note)\n::var(\n  n: { type: int }\n)\n::meta(count: ${add(var.n, 1)})\n";
+            "::blueprint(note)\n::var(\n  n: { type: int }\n)\n::meta(count: $add(var.n, 1))\n";
         assert!(
             made_with("typed", src, &[("n", "41")])
                 .unwrap()
@@ -581,7 +649,7 @@ mod tests {
     #[test]
     fn the_blueprints_vars_do_not_go_into_the_new_document() {
         let src =
-            "::blueprint(note)\n::var(\n  title: { default: \"x\" }\n)\n\n=[ ${var.title} ]\n";
+            "::blueprint(note)\n::var(\n  title: { default: \"x\" }\n)\n\n=[ $(var.title) ]\n";
         let content = made_with("dropped", src, &[]).unwrap();
         assert!(!content.contains("::var"), "{content}");
         assert!(content.contains("::kind(note)"), "{content}");
@@ -592,7 +660,7 @@ mod tests {
         let root = vault("unfilled");
         fs::write(
             root.join(".tomet/blueprints/daily-note.blueprint.tmt"),
-            "::blueprint(daily-note)\n::meta(by: ${var.author})\n",
+            "::blueprint(daily-note)\n::meta(by: $(var.author))\n",
         )
         .unwrap();
         let config = declaring(&[".tomet/blueprints/daily-note.blueprint.tmt"]);
@@ -614,10 +682,267 @@ mod tests {
         let _ = fs::remove_dir_all(&root);
     }
 
+    // ---- type seats ----------------------------------------------------------------------
+
+    const NOW: &str = "2026-11-11T09:30:00+09:00";
+    const UUID: &str = "00000000-0000-0000-0000-000000000000";
+
+    /// A clock stopped at [`NOW`] and the ids to draw, in order.
+    fn fixed(ids: &[&str]) -> FixedSource {
+        FixedSource::at(NOW)
+            .expect("a datetime")
+            .with_ids(ids.iter().copied())
+    }
+
+    fn instantiated(name: &str, src: &str, source: &dyn Source) -> Result<String> {
+        let file = blueprint_file(name, src);
+        let made = instantiate_blueprint_file_with(
+            &file,
+            Path::new("notes/idea.tmt"),
+            &HashMap::new(),
+            &PrinterConfig::default(),
+            source,
+        );
+        let _ = fs::remove_dir_all(file.parent().unwrap());
+        made.map(|m| m.content)
+    }
+
     #[test]
-    fn now_is_written_in_the_offset_the_settings_give_created() {
+    fn seats_are_filled_from_the_injected_clock_and_random_source() {
+        let content = instantiated(
+            "seats-fixed",
+            "::blueprint(note)\n::id(<$uuid(default: auto)>)\n::meta(\n  created: <$datetime(default: auto)>\n  day: <$date(default: auto)>\n  file: $(self::filename)\n)\n",
+            &fixed(&[UUID]),
+        )
+        .unwrap();
+
+        assert!(content.contains(&format!("::id({UUID})")), "{content}");
+        assert!(
+            content.contains("created: 2026-11-11T09:30:00+09:00"),
+            "{content}"
+        );
+        assert!(content.contains("day: 2026-11-11"), "{content}");
+        assert!(content.contains("file: idea.tmt"), "{content}");
+        assert!(!content.contains("<$"), "{content}");
+    }
+
+    #[test]
+    fn a_nanoid_seat_is_drawn_with_the_length_and_the_prefix_it_is_written_with() {
+        let content = instantiated(
+            "seats-nanoid",
+            "::blueprint(note)\n::meta(\n  short: <$nanoid(length: 8, prefix: \"note-\", default: auto)>\n)\n",
+            &fixed(&["note-ab12cd34"]),
+        )
+        .unwrap();
+        assert!(content.contains("short: note-ab12cd34"), "{content}");
+
+        // Drawn for real, it has the shape the type gives.
+        let content = instantiated(
+            "seats-nanoid-real",
+            "::blueprint(note)\n::meta(\n  short: <$nanoid(length: 8, prefix: \"note-\", default: auto)>\n)\n",
+            &SystemSource::utc(),
+        )
+        .unwrap();
+        let id = content
+            .split("short: ")
+            .nth(1)
+            .and_then(|after| after.split([')', ',', '\n']).next())
+            .expect("a short id");
+        assert!(
+            id.starts_with("note-") && id.len() == "note-".len() + 8,
+            "{id}"
+        );
+    }
+
+    #[test]
+    fn a_default_written_out_is_the_value_of_its_seat() {
+        let content = instantiated(
+            "seats-given",
+            "::blueprint(note)\n::var(\n  tags: { type: list(string), default: (\"a\", \"b\") }\n)\n::meta(\n  count: <$int(default: 3)>\n  title: <$string(default: \"Untitled\")>\n  tags: <$list(string, length: 2, default: var.tags)>\n)\n",
+            &fixed(&[]),
+        )
+        .unwrap();
+        assert!(content.contains("count: 3"), "{content}");
+        assert!(content.contains("title: Untitled"), "{content}");
+        assert!(content.contains("tags: (a, b)"), "{content}");
+    }
+
+    #[test]
+    fn a_seat_in_a_heading_and_in_prose_is_its_text() {
+        let content = instantiated(
+            "seats-text",
+            "::blueprint(note)\n\n=[ Notes of <$date(default: auto)> ]#(notes)\n\nWritten on <$date(default: auto)> at <$datetime(default: auto)>.\n",
+            &fixed(&[]),
+        )
+        .unwrap();
+        assert!(
+            content.contains("=[Notes of 2026-11-11] #(notes)"),
+            "{content}"
+        );
+        assert!(
+            content.contains("Written on 2026-11-11 at 2026-11-11T09:30:00+09:00."),
+            "{content}"
+        );
+    }
+
+    /// A seat with no value source stops the making, and the blueprint's own line and column
+    /// are in what is said, for every one of them.
+    #[test]
+    fn seats_that_cannot_be_filled_are_all_reported_with_their_place() {
+        let src = "::blueprint(note)\n::meta(\n  title: <$string>\n  kind: <$person>\n  id: <$uuid(default: auto)>\n)\n\n=[ <$int(default: \"x\")> ]\n";
+        let err = instantiated("seats-stop", src, &fixed(&[UUID])).unwrap_err();
+        let stopped = err
+            .downcast_ref::<SeatsNotFilled>()
+            .unwrap_or_else(|| panic!("a SeatsNotFilled, got {err:?}"));
+        let places: Vec<(usize, usize)> = stopped
+            .problems
+            .iter()
+            .map(|found| (found.at.line, found.at.column))
+            .collect();
+        assert_eq!(places, [(3, 10), (4, 9), (8, 4)]);
+
+        let shown = err.to_string();
+        let lines: Vec<&str> = shown.lines().collect();
+        assert_eq!(lines.len(), 4, "{shown}");
+        assert!(lines[0].ends_with(":3:10: error: type seat `<$string>`: this seat has no value source: it has no `default`, so nothing says what goes in it"), "{shown}");
+        assert!(
+            lines[1].contains(
+                ":4:9: error: type seat `<$person>`: `person` is not a type; the types are `string`, `int`"
+            ),
+            "{shown}"
+        );
+        assert!(
+            lines[2].ends_with(
+                ":8:4: error: type seat `<$int(default: \"x\")>`: `default`: `x` is not an integer"
+            ),
+            "{shown}"
+        );
+        assert!(lines[3].starts_with("3 type seats of "), "{shown}");
+        assert!(
+            lines[3].ends_with("cannot be filled; no document was made"),
+            "{shown}"
+        );
+    }
+
+    #[test]
+    fn the_seats_not_filled_message_names_the_file_and_counts() {
+        let problem = |seat: &str, offset: usize, reason: tomet_transform::SeatReason| {
+            tomet_transform::SeatProblem {
+                seat: seat.to_string(),
+                span: tomet_span::Span::new(offset, offset + seat.len()),
+                reason,
+            }
+        };
+        let src = "::blueprint(note)\n::meta(a: <$string>)\n";
+        let one = SeatsNotFilled::new(
+            Path::new("bp/note.blueprint.tmt"),
+            src,
+            vec![problem(
+                "<$string>",
+                src.find("<$string>").unwrap(),
+                tomet_transform::SeatReason::NoValueSource,
+            )],
+        );
+        assert_eq!(
+            one.to_string(),
+            "bp/note.blueprint.tmt:2:11: error: type seat `<$string>`: this seat has no value \
+             source: it has no `default`, so nothing says what goes in it\n\
+             1 type seat of bp/note.blueprint.tmt cannot be filled; no document was made"
+        );
+    }
+
+    /// The failure is the cause and not a message: `tomet new` can tell it from the rest.
+    #[test]
+    fn a_stop_for_a_seat_is_told_from_one_for_a_variable() {
+        let seat = instantiated(
+            "seats-kind",
+            "::blueprint(note)\n::meta(a: <$string>)\n",
+            &fixed(&[]),
+        )
+        .unwrap_err();
+        assert!(seat.downcast_ref::<SeatsNotFilled>().is_some());
+        let var = instantiated(
+            "seats-kind-var",
+            "::blueprint(note)\n::var(\n  title: { type: string }\n)\n::meta(a: $(var.title))\n",
+            &fixed(&[]),
+        )
+        .unwrap_err();
+        assert!(var.downcast_ref::<SeatsNotFilled>().is_none());
+    }
+
+    #[test]
+    fn creating_from_a_blueprint_with_seats_writes_the_filled_document() {
+        let root = vault("seats-create");
+        fs::write(
+            root.join(".tomet/blueprints/daily-note.blueprint.tmt"),
+            "::kind(blueprint)\n::blueprint(daily-note)\n::id(<$uuid(default: auto)>)\n::meta(\n  uuid: <$uuid(default: auto)>\n  created: <$datetime(default: auto)>\n)\n\n=[ Notes of <$date(default: auto)> ]#(notes)\n",
+        )
+        .unwrap();
+        let config = declaring(&[".tomet/blueprints/daily-note.blueprint.tmt"]);
+
+        let created = create_file_from_blueprint_with(
+            &root,
+            "daily-note",
+            Path::new("notes/2026-11-11.tmt"),
+            &HashMap::new(),
+            &config,
+            false,
+            &fixed(&[UUID, "11111111-1111-1111-1111-111111111111"]),
+        )
+        .unwrap();
+
+        let content = fs::read_to_string(&created.path).unwrap();
+        assert!(content.contains("::kind(daily-note)"), "{content}");
+        assert!(content.contains(&format!("::id({UUID})")), "{content}");
+        assert!(
+            content.contains("uuid: 11111111-1111-1111-1111-111111111111"),
+            "{content}"
+        );
+        assert!(
+            content.contains("created: 2026-11-11T09:30:00+09:00"),
+            "{content}"
+        );
+        assert!(
+            content.contains("=[Notes of 2026-11-11] #(notes)"),
+            "{content}"
+        );
+        assert!(!content.contains("<$"), "{content}");
+        assert!(created.unfilled.is_empty());
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    /// A document that cannot be made leaves nothing behind: no file, and no directory made for it.
+    #[test]
+    fn a_failed_creation_writes_nothing() {
+        let root = vault("seats-nothing");
+        fs::write(
+            root.join(".tomet/blueprints/daily-note.blueprint.tmt"),
+            "::blueprint(daily-note)\n::meta(title: <$string>)\n",
+        )
+        .unwrap();
+        let config = declaring(&[".tomet/blueprints/daily-note.blueprint.tmt"]);
+
+        let err = create_file_from_blueprint_with(
+            &root,
+            "daily-note",
+            Path::new("deeper/notes/n.tmt"),
+            &HashMap::new(),
+            &config,
+            false,
+            &fixed(&[]),
+        )
+        .unwrap_err();
+
+        assert!(err.downcast_ref::<SeatsNotFilled>().is_some(), "{err:?}");
+        assert!(!root.join("deeper").exists(), "no directory was made");
+        assert!(!root.join("deeper/notes/n.tmt").exists());
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn the_real_source_is_written_in_the_offset_the_settings_give_created() {
         let mut config = PrinterConfig::default();
-        assert_eq!(generator_for(&config).now().offset().whole_hours(), 0);
+        assert_eq!(source_for(&config).now().offset().whole_hours(), 0);
         config.meta.fields.insert(
             "created".to_string(),
             tomet_config::FieldConfig {
@@ -625,6 +950,23 @@ mod tests {
                 ..Default::default()
             },
         );
-        assert_eq!(generator_for(&config).now().offset().whole_hours(), 9);
+        assert_eq!(source_for(&config).now().offset().whole_hours(), 9);
+        // `modified` is the fallback, and what is no offset is passed over.
+        let mut config = PrinterConfig::default();
+        config.meta.fields.insert(
+            "created".to_string(),
+            tomet_config::FieldConfig {
+                offset: Some("later".to_string()),
+                ..Default::default()
+            },
+        );
+        config.meta.fields.insert(
+            "modified".to_string(),
+            tomet_config::FieldConfig {
+                offset: Some("-05:00".to_string()),
+                ..Default::default()
+            },
+        );
+        assert_eq!(source_for(&config).now().offset().whole_hours(), -5);
     }
 }

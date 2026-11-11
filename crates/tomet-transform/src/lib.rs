@@ -1,8 +1,13 @@
 //! Pure in-memory AST refactoring and structural transformations for Tomet documents.
 //!
 //! Provides:
-//! - (expressions)| Every `${...}` in a document resolved once, in one pass, with the
+//! - (expressions)| Every `{$ ... }` in a document resolved once, in one pass, with the
 //!                | evaluator's typed values put back according to where each expression sits.
+//! - (source)     | The clock and the random source a blueprint's `default: auto` is made from, behind
+//!                | one trait: the real ones, and a fixed one for a test. Nothing else in the crate
+//!                | reads a clock or draws.
+//! - (seats)      | Every type seat (`<$type(...)>`) of a blueprint filled from its source, or each
+//!                | one that cannot be reported, so a document made from a blueprint has none.
 //! - (macro_rewrite) Reverse URL-to-macro pattern matching and rewriting.
 //! - (directive) Directive promotion (`::meta.type` -> `::kind`) and Value DSL normalization.
 //! - (structural) Structural AST query matching and in-place transformations (rename tag, rename key, replace value).
@@ -16,6 +21,8 @@ pub mod expressions;
 pub mod links;
 pub mod macro_rewrite;
 pub mod meta;
+pub mod seats;
+pub mod source;
 pub mod structural;
 
 pub use blueprint::*;
@@ -24,6 +31,8 @@ pub use expressions::{Unresolved, UnresolvedKind, resolve_expressions, resolve_e
 pub use links::*;
 pub use macro_rewrite::*;
 pub use meta::*;
+pub use seats::{SeatProblem, SeatReason};
+pub use source::{FixedSource, Source, SystemSource};
 pub use structural::*;
 
 #[cfg(test)]
@@ -50,7 +59,7 @@ mod tests {
 
     #[test]
     fn an_argument_stays_an_integer_only_when_it_is_written_as_one() {
-        let macros = HashMap::from([("p".to_string(), Value::String("https://x/${1}".into()))]);
+        let macros = HashMap::from([("p".to_string(), Value::String("https://x/$(1)".into()))]);
         let set = MacroSet::from_map(&macros);
         for (url, call) in [
             ("https://x/7", "$macro.p(7)"),
@@ -69,10 +78,10 @@ mod tests {
     #[test]
     fn test_macro_pattern_and_set() {
         let mut macros = HashMap::new();
-        macros.insert("gh".into(), Value::String("https://github.com/${1}".into()));
+        macros.insert("gh".into(), Value::String("https://github.com/$(1)".into()));
         macros.insert(
             "gh_issue".into(),
-            Value::String("https://github.com/${1}/issues/${2}".into()),
+            Value::String("https://github.com/$(1)/issues/$(2)".into()),
         );
 
         let set = MacroSet::from_map(&macros);

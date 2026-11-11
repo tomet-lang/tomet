@@ -7,6 +7,8 @@ use tomet_semantics::{ElementKind, classify_declaration_lenient, normalized_decl
 use tomet_tree::{ValueExt, for_each_declaration, for_each_declaration_mut};
 
 use crate::expressions::{Unresolved, resolve_expressions};
+use crate::seats::{SeatProblem, fill_seats, seats_left};
+use crate::source::Source;
 
 /// What a `::blueprint` directive says about the blueprint. Its variables are
 /// not here: the blueprint declares them with `::var`.
@@ -71,11 +73,26 @@ pub struct Instantiated {
 }
 
 /// Instantiates a blueprint `doc` in-place by:
-/// 1. Promoting/converting `::blueprint(target)` to `::kind(target)` and stripping schema blocks.
-/// 2. Resolving every `${...}` in it, with `cx` -- which is a creating context
-///    (`Phase::Create`), the only place `generate.*` exists.
-pub fn instantiate_blueprint(doc: &mut File, cx: &EvalContext) -> Instantiated {
-    let mut changed = false;
+/// 1. Filling every type seat (`<$type(...)>`) from its source: `default: auto` from `source`, a
+///    `default` written out as itself. A seat with no source stops the instantiation.
+/// 2. Promoting/converting `::blueprint(target)` to `::kind(target)` and stripping schema blocks.
+/// 3. Resolving every `{$ ... }` in it, with `cx`.
+///
+/// A document made from a blueprint holds no type seat. Every seat that cannot be filled -- it is
+/// not a type, its `default` is not of its type, it has no `default`, it stands in running text and
+/// its value has none -- comes back as a [`SeatProblem`], all of them and not the first, and then `doc`
+/// is left as it was: nothing is made. An expression with no value is no such stop; it stays in the
+/// document as written and is reported in [`Instantiated::unresolved`].
+///
+/// `source` is the clock and the random source `default: auto` is made from; nothing else here reads
+/// either.
+pub fn instantiate_blueprint(
+    doc: &mut File,
+    cx: &EvalContext,
+    source: &dyn Source,
+) -> Result<Instantiated, Vec<SeatProblem>> {
+    let filled = fill_seats(doc, cx, source)?;
+    let mut changed = filled > 0;
 
     // Step 0: drop the blueprint's own `::kind(blueprint)`.
     //
@@ -141,39 +158,31 @@ pub fn instantiate_blueprint(doc: &mut File, cx: &EvalContext) -> Instantiated {
     let unresolved = resolve_expressions(doc, cx);
     changed |= *doc != promoted;
 
-    Instantiated {
+    // The seats are all filled by now. One that is still here -- brought in by an expression, say
+    // -- would be a seat in a document, which is no document of a blueprint's making.
+    let left = seats_left(doc);
+    if !left.is_empty() {
+        return Err(left);
+    }
+
+    Ok(Instantiated {
         changed,
         unresolved,
-    }
+    })
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::FixedSource;
     use std::collections::HashMap;
-    use time::OffsetDateTime;
-    use tomet_expr::{DocRef, EvalValue, Generate, NoResolver, Phase};
-
-    /// A clock stopped at the epoch and a UUID that is always the same, so a
-    /// blueprint's output is the same every time.
-    struct Fixed;
-
-    impl Generate for Fixed {
-        fn now(&self) -> OffsetDateTime {
-            OffsetDateTime::UNIX_EPOCH
-        }
-        fn uuid(&self) -> String {
-            "00000000-0000-0000-0000-000000000000".to_string()
-        }
-    }
+    use tomet_expr::{DocRef, EvalValue, NoResolver};
 
     fn instantiate(src: &str, vars: EvalValue) -> (File, Instantiated) {
         let mut doc = tomet_ast_parser::parse_file(src).unwrap();
         let macros = HashMap::new();
         let cx = EvalContext {
-            phase: Phase::Create,
             resolver: &NoResolver,
-            generate: &Fixed,
             self_doc: DocRef("notes/plan.tmt".into()),
             macros: &macros,
             var: &vars,
@@ -182,7 +191,9 @@ mod tests {
             heading_level: 0,
             notes: Default::default(),
         };
-        let report = instantiate_blueprint(&mut doc, &cx);
+        let source = FixedSource::at("2026-11-11T09:30:00+09:00").expect("a datetime");
+        let report =
+            instantiate_blueprint(&mut doc, &cx, &source).expect("no type seat to stop it");
         (doc, report)
     }
 
@@ -223,7 +234,7 @@ mod tests {
 
     #[test]
     fn instantiates_blueprint_to_kind_and_resolves_expressions() {
-        let src = "::blueprint(daily-note)\n::id(${generate.uuid()})\n::meta(\n  date: ${generate.now().format(\"YYYY-MM-DD\")}\n  file: ${self::filename}\n  title: ${var.title}\n)\n\n=[ Plan for ${var.title} ]#(plan)\n";
+        let src = "::blueprint(daily-note)\n::meta(\n  file: $(self::filename)\n  title: $(var.title)\n)\n\n=[ Plan for $(var.title) ]#(plan)\n";
         let vars = EvalValue::Map(vec![(
             "title".to_string(),
             EvalValue::String("Sprint 42".into()),
@@ -241,15 +252,6 @@ mod tests {
             .expect("expected a ::kind declaration");
         assert_eq!(kind.data.args, Some(Value::String("daily-note".into())));
 
-        let id = top_level
-            .iter()
-            .find(|d| classify_declaration_lenient(d) == ElementKind::Declaration(DeclKind::Id))
-            .expect("expected an ::id declaration");
-        assert_eq!(
-            id.data.args,
-            Some(Value::String("00000000-0000-0000-0000-000000000000".into()))
-        );
-
         let meta = top_level
             .iter()
             .find(|d| classify_declaration_lenient(d) == ElementKind::Declaration(DeclKind::Meta))
@@ -258,7 +260,6 @@ mod tests {
             panic!("expected meta map");
         };
         let get = |key: &str| entries.iter().find(|(k, _)| k == key).unwrap().1.clone();
-        assert_eq!(get("date"), Value::String("1970-01-01".into()));
         assert_eq!(get("file"), Value::String("plan.tmt".into()));
         assert_eq!(get("title"), Value::String("Sprint 42".into()));
     }
@@ -266,7 +267,7 @@ mod tests {
     #[test]
     fn an_expression_with_no_value_is_left_and_reported() {
         let (doc, report) = instantiate(
-            "::blueprint(note)\n::meta(title: ${var.title})\n",
+            "::blueprint(note)\n::meta(title: $(var.title))\n",
             EvalValue::Map(vec![]),
         );
         assert_eq!(report.unresolved.len(), 1);

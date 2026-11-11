@@ -69,7 +69,7 @@ pub enum Command {
     /// Characters are the prose a reader sees -- text inside `[...]`,
     /// headings included, whitespace and code block bodies left out.
     /// `(args)` and `{value}` are data and are not counted. Elements are
-    /// split by sigil (named, `${}`, `^`, and list items) and the named ones
+    /// split by sigil (named, `$`, `^`, and list items) and the named ones
     /// by name. Links are the ones `check-links` looks at. A directory is
     /// swept the way `check` sweeps one, and an unreadable file does not stop
     /// the sweep; the run exits non-zero at the end.
@@ -170,8 +170,8 @@ pub enum Command {
     ///
     /// What the file takes from its vault is dealt with: a macro or variable
     /// the vault defines is written into the file, and what depends on where
-    /// the file sits or on other files (`${self::path}`, `${include(...)}`,
-    /// `${vault...}`) is replaced by the value it has there. The result
+    /// the file sits or on other files (`$(self::path)`, `$include(...)`,
+    /// `{$ vault... }`) is replaced by the value it has there. The result
     /// declares `::profile(standalone)`.
     ///
     /// The file is printed to standard output, or written to `--out`; what was
@@ -187,7 +187,7 @@ pub enum Command {
         /// file keeps its name there).
         #[arg(short, long)]
         out: Option<PathBuf>,
-        /// Also replace `${self::meta.x}` by its value. Without it the
+        /// Also replace `$(self::meta.x)` by its value. Without it the
         /// expression is left, because a file cannot hold the vault's
         /// `::field` that give a metadata field its type.
         #[arg(long)]

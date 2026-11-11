@@ -18,6 +18,7 @@ mod paragraphs;
 mod sections;
 mod slots;
 mod thematic;
+mod type_seats;
 mod urls;
 mod values;
 

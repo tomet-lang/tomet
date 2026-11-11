@@ -141,7 +141,7 @@ pub fn parse_interpolation(cur: &mut tomet_lexer::Cursor) -> Result<tomet_ast::I
     tomet_lowering::interp::parse_interpolation(cur)
 }
 
-/// Parse a `$func(args)` or `${expr}` interpolation directly from a string slice.
+/// Parse a `$func(args)` or `$(expr)` interpolation directly from a string slice.
 pub fn parse_interpolation_str(source: &str) -> Result<tomet_ast::Interpolation> {
     let mut cur = tomet_lexer::Cursor::new(source);
     parse_interpolation(&mut cur).map_err(|e| e.located_in(source))

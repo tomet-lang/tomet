@@ -83,7 +83,7 @@ fn setup_vault(guard: &mut TempVaultGuard) -> bool {
 
         fs::write(
             root.join(format!("04-warn-unresolved-{suffix}.tmt")),
-            format!("# Warning Document {suffix}\n\nHere is an unresolved expression: ${{unknown_id_{suffix}}}.\n"),
+            format!("# Warning Document {suffix}\n\nHere is an unresolved expression: $(unknown_id_{suffix}).\n"),
         )
         .unwrap();
 

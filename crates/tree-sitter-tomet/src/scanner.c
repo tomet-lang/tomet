@@ -46,12 +46,24 @@
 // acceptable gap for this approximation grammar: well-formed value
 // markers (`- (T)`, `- ("?")`, ...) are the real-world case that matters,
 // per `docs/cheatsheet.tmt`.
+//
+// `TYPE_SEAT_OPEN` is the head of a type seat (`<$uuid>`, `<$list(string, length: 6)>`):
+// the `<$` and its name. Whether that is a seat at all is not decided by the head --
+// `<$x >` and `<$x(a>` are text -- but by what follows it: the `>` right after the name, or
+// one `(args)` group and then the `>` right after it. No regex can say that (the group has
+// nesting and strings), and a plain token for the head would make `a <$x >` an `ERROR`
+// the moment `<$x` was taken, since a token cannot be taken back. So the scanner reads
+// ahead past the head, marks the token's end after the name, and emits it only when the seat
+// closes; otherwise it declines and the `<` is read as it always was. It is the one token
+// that is also tried where a value stands (`key: <$string>`, `@x(<$int>)`): there it must
+// win over `scalar`, which would take `<$string>` whole (and `<$uuid` up to its `(`).
 #include "tree_sitter/parser.h"
 
 enum TokenType {
   SCALAR,
   LIST_MARKER_TOKEN,
   LIST_MARKER_GAP,
+  TYPE_SEAT_OPEN,
 };
 
 void *tree_sitter_tomet_external_scanner_create(void) { return NULL; }
@@ -93,6 +105,92 @@ static bool is_scalar_terminator(int32_t c) {
     default:
       return false;
   }
+}
+
+// A type's name: an ASCII letter or `_` first, then letters, digits, `_` and `-`. Unlike an
+// element's name it has no `.`.
+static bool is_seat_name_continue(int32_t c) {
+  return is_ident_start(c) || (c >= '0' && c <= '9') || c == '-';
+}
+
+// What `scan_type_seat` found.
+enum SeatProbe {
+  // A seat: `result_symbol` is set and the token ends after the name.
+  SEAT,
+  // Not a seat. The lexer stands inside what a scalar would read, so a scalar may go on from
+  // there.
+  NOT_A_SEAT,
+  // Not a seat, and the lexer has gone past where a scalar would stop (the `(` after the
+  // name): the token's end is marked after `<$name` and a scalar is that much.
+  NOT_A_SEAT_MARKED,
+};
+
+// Reads the `(args)` group the lexer stands at, to just after its `)`: `(`/`)` nest, a
+// quoted string holds either, and a backslash takes the next character with it -- the same
+// closer `tomet-parser` finds for the group. False if it does not close.
+static bool skip_args_group(TSLexer *lexer) {
+  int depth = 0;
+  while (!lexer->eof(lexer)) {
+    int32_t c = lexer->lookahead;
+    if (c == '\\') {
+      lexer->advance(lexer, false);
+      if (!lexer->eof(lexer) && lexer->lookahead != '\n') {
+        lexer->advance(lexer, false);
+      }
+      continue;
+    }
+    if (c == '"' || c == '\'') {
+      lexer->advance(lexer, false);
+      while (!lexer->eof(lexer) && lexer->lookahead != '\n' && lexer->lookahead != c) {
+        if (lexer->lookahead == '\\') {
+          lexer->advance(lexer, false);
+          if (lexer->eof(lexer) || lexer->lookahead == '\n') {
+            break;
+          }
+        }
+        lexer->advance(lexer, false);
+      }
+      if (lexer->lookahead == c) {
+        lexer->advance(lexer, false);
+      }
+      continue;
+    }
+    lexer->advance(lexer, false);
+    if (c == '(') {
+      depth++;
+    } else if (c == ')') {
+      depth--;
+      if (depth == 0) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+// `TYPE_SEAT_OPEN`: the lexer stands at a `<`. See this file's module doc.
+static enum SeatProbe scan_type_seat(TSLexer *lexer) {
+  lexer->advance(lexer, false); // '<'
+  if (lexer->lookahead != '$') {
+    return NOT_A_SEAT;
+  }
+  lexer->advance(lexer, false);
+  if (!is_ident_start(lexer->lookahead)) {
+    return NOT_A_SEAT;
+  }
+  while (is_seat_name_continue(lexer->lookahead)) {
+    lexer->advance(lexer, false);
+  }
+  lexer->mark_end(lexer);
+  if (lexer->lookahead == '(') {
+    if (!skip_args_group(lexer) || lexer->lookahead != '>') {
+      return NOT_A_SEAT_MARKED;
+    }
+  } else if (lexer->lookahead != '>') {
+    return NOT_A_SEAT;
+  }
+  lexer->result_symbol = TYPE_SEAT_OPEN;
+  return SEAT;
 }
 
 // Handles both `LIST_MARKER_TOKEN` and `LIST_MARKER_GAP` in one pass --
@@ -151,7 +249,8 @@ bool tree_sitter_tomet_external_scanner_scan(void *payload, TSLexer *lexer,
     return scan_list_marker_gap(lexer, valid_symbols);
   }
 
-  if (!valid_symbols[SCALAR]) {
+  bool want_seat = valid_symbols[TYPE_SEAT_OPEN];
+  if (!valid_symbols[SCALAR] && !want_seat) {
     return false;
   }
 
@@ -168,6 +267,34 @@ bool tree_sitter_tomet_external_scanner_scan(void *payload, TSLexer *lexer,
     lexer->advance(lexer, true);
   }
 
+  if (want_seat && lexer->lookahead == '<') {
+    switch (scan_type_seat(lexer)) {
+      case SEAT:
+        return true;
+      case NOT_A_SEAT_MARKED:
+        if (!valid_symbols[SCALAR]) {
+          return false;
+        }
+        lexer->result_symbol = SCALAR;
+        return true;
+      case NOT_A_SEAT:
+        if (!valid_symbols[SCALAR]) {
+          return false;
+        }
+        // A scalar goes on from here, to the next terminator.
+        while (!lexer->eof(lexer) && !is_scalar_terminator(lexer->lookahead)) {
+          lexer->advance(lexer, false);
+        }
+        lexer->mark_end(lexer);
+        lexer->result_symbol = SCALAR;
+        return true;
+    }
+  }
+
+  if (!valid_symbols[SCALAR]) {
+    return false;
+  }
+
   if (lexer->eof(lexer) || is_scalar_terminator(lexer->lookahead)) {
     // The old regex required at least one character (`+`), and never
     // matched starting on a terminator (or `:`, also excluded); an empty
@@ -175,13 +302,16 @@ bool tree_sitter_tomet_external_scanner_scan(void *payload, TSLexer *lexer,
     return false;
   }
 
-  // `${...}` is an interpolation, not a scalar that ends at its `{`: left to
-  // the grammar's own `interpolation` rule, which is valid wherever a value
-  // is. Without this the `$` alone would be taken as the scalar and the
-  // `{...}` after it read as a second group.
+  // `$(ref)` and `$name(args)` are interpolations, not scalars that end at their
+  // `(`: left to the grammar's own `interpolation` rule, which is valid wherever
+  // a value is. Without this the `$` or `$name` alone would be taken as the
+  // scalar and the `(...)` after it read as a group. (`{$ expr }` starts with
+  // the `{`, which is a scalar terminator already.)
+  bool after_dollar = false;
   if (lexer->lookahead == '$') {
     lexer->advance(lexer, false);
-    if (lexer->lookahead == '{') {
+    after_dollar = true;
+    if (lexer->lookahead == '(') {
       return false;
     }
   }
@@ -196,6 +326,9 @@ bool tree_sitter_tomet_external_scanner_scan(void *payload, TSLexer *lexer,
   if (is_ident_start(lexer->lookahead)) {
     while (is_ident_continue(lexer->lookahead)) {
       lexer->advance(lexer, false);
+    }
+    if (after_dollar && lexer->lookahead == '(') {
+      return false;
     }
     if (lexer->lookahead == ':') {
       return false;

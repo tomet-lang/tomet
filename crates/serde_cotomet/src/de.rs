@@ -84,8 +84,9 @@ impl<'de> de::Deserializer<'de> for ValueDeserializer {
             ))),
             Value::Hole(_) => Err(Error::msg("a hole (`?...`) has no serde equivalent")),
             Value::Interp(_) => Err(Error::msg(
-                "an interpolation (`${...}`) has no serde equivalent",
+                "an interpolation (`$(...)`) has no serde equivalent",
             )),
+            Value::TypeSeat(_) => Err(Error::msg("a type seat (`<$...>`) has no serde equivalent")),
             Value::Element(el) => Err(Error::msg(format!(
                 "an embedded element (`@{}(...)`) has no serde equivalent",
                 el.name.to_string()

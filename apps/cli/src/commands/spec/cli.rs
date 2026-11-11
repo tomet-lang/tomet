@@ -71,7 +71,7 @@ mod tests {
                     Block::Paragraph(_) => *paragraphs += 1,
                     Block::Element(_) => {}
                     Block::List(_) => {}
-                    Block::Interp(_) | Block::Hole(_) => {}
+                    Block::Interp(_) | Block::Hole(_) | Block::TypeSeat(_) => {}
                 }
             }
         }
@@ -149,7 +149,7 @@ mod tests {
                         }
                     }
                     Block::List(list) => walk_list(list, found),
-                    Block::Interp(_) | Block::Hole(_) => {}
+                    Block::Interp(_) | Block::Hole(_) | Block::TypeSeat(_) => {}
                 }
             }
         }

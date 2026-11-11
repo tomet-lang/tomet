@@ -2,7 +2,7 @@ use tomet_semantics::DeclKind;
 
 use lsp_types::{Hover, HoverContents, MarkupContent, MarkupKind, Position, Range, Uri};
 use tomet_ast::{Declaration, Element, File, InterpExpr, Value};
-use tomet_expr::{DocRef, EvalContext, EvalValue, MemoryResolver, Phase, SystemGenerate, evaluate};
+use tomet_expr::{DocRef, EvalContext, EvalValue, MemoryResolver, evaluate};
 use tomet_semantics::{
     ElementKind, classify_declaration_lenient, classify_std_lenient, heading_level,
     normalized_declaration_args, normalized_element_args,
@@ -511,8 +511,7 @@ fn is_web_url(s: &str) -> bool {
 /// Evaluates `expr` the way rendering would, against this one document.
 ///
 /// The editor has the document and its settings and nothing else, so what
-/// reaches for another file fails and says so; `generate.*` fails too,
-/// because rendering never runs it. A variable is at its `default`.
+/// reaches for another file fails and says so. A variable is at its `default`.
 fn evaluate_for_hover(
     doc: &File,
     expr: &tomet_ast::InterpExpr,
@@ -524,9 +523,7 @@ fn evaluate_for_hover(
     let vars = tomet_expr::var_scope(&config.vars, &DocRef(here.to_string()), &[])
         .expect("nothing is passed, so nothing is undeclared or mistyped");
     let cx = EvalContext {
-        phase: Phase::Output,
         resolver: &resolver,
-        generate: &SystemGenerate,
         self_doc: DocRef(here.to_string()),
         macros: &config.macros,
         var: &vars.values,
@@ -568,6 +565,7 @@ fn render_value(value: &EvalValue) -> String {
         EvalValue::Fragment(blocks) => format!("fragment of {} block(s)", blocks.len()),
         EvalValue::Function(_) => "function".to_string(),
         EvalValue::Namespace(_) => "namespace".to_string(),
+        EvalValue::Type(ty) => ty.to_string(),
         EvalValue::Call(name, args) => {
             let args: Vec<String> = args.iter().map(render_value).collect();
             format!("{name}({})", args.join(", "))

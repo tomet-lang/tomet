@@ -72,9 +72,13 @@ fn render_block(cx: &TypstCtx, block: &Block, out: &mut String) {
             out.push_str(&render_interp(interp));
             out.push_str("\n\n");
         }
-        // A hole is shown as it was written.
+        // A hole and a type seat are shown as they were written.
         Block::Hole(hole) => {
             out.push_str(&escape_text(&tomet_printer::hole_to_tm(hole)));
+            out.push_str("\n\n");
+        }
+        Block::TypeSeat(seat) => {
+            out.push_str(&escape_text(&seat.to_string()));
             out.push_str("\n\n");
         }
     }
@@ -159,6 +163,7 @@ fn inline_to_typst(cx: &TypstCtx, inlines: &[Inline]) -> String {
             Inline::Element(el) => out.push_str(&element_to_typst(cx, el.as_view(), true)),
             Inline::Interp(interp) => out.push_str(&render_interp(interp)),
             Inline::Hole(hole) => out.push_str(&escape_text(&tomet_printer::hole_to_tm(hole))),
+            Inline::TypeSeat(seat) => out.push_str(&escape_text(&seat.to_string())),
         }
     }
     out
@@ -600,12 +605,12 @@ fn render_embed(el: ElementView<'_>) -> String {
     }
 }
 
-/// Re-renders an interpolation back to `${...}`-shaped source text, wrapped
-/// in a raw span (`` `${...}` ``) so Typst's own `$`-prefixed math mode
-/// never tries to parse it -- see the module doc's note on why `${...}`
-/// is kept inert here rather than evaluated.
+/// Re-renders an interpolation back to its source text, wrapped in a raw
+/// span so Typst's own `$`-delimited math mode never tries to parse it --
+/// see the module doc's note on why an interpolation is kept inert here
+/// rather than evaluated.
 fn render_interp(interp: &Interpolation) -> String {
-    format!("`${{{}}}`", interp.expr)
+    format!("`{interp}`")
 }
 
 /// Anything with no dedicated Typst mapping (a hand-authored `<T>`/`@name`
@@ -675,6 +680,7 @@ fn inlines_to_plain(inlines: &[Inline]) -> String {
             }
             Inline::Interp(_) => {}
             Inline::Hole(hole) => s.push_str(&tomet_printer::hole_to_tm(hole)),
+            Inline::TypeSeat(seat) => s.push_str(&seat.to_string()),
         }
     }
     s
@@ -700,6 +706,7 @@ fn blocks_to_plain(blocks: &[Block]) -> String {
             }
             Block::Interp(_) => {}
             Block::Hole(hole) => s.push_str(&tomet_printer::hole_to_tm(hole)),
+            Block::TypeSeat(seat) => s.push_str(&seat.to_string()),
         }
     }
     s
@@ -761,7 +768,7 @@ fn value_to_plain(v: &Value) -> String {
         // half-rendering it out of context.
         Value::Element(_) => String::new(),
         // An interpolation is not known until it is evaluated.
-        Value::Interp(_) | Value::Hole(_) => String::new(),
+        Value::Interp(_) | Value::Hole(_) | Value::TypeSeat(_) => String::new(),
         // Block content has no scalar form either -- same as `Map`.
         Value::Blocks(_) => String::new(),
     }

@@ -289,6 +289,19 @@ pub enum Diagnostic {
         instead: &'static str,
         span: Span,
     },
+    /// A type seat (`<$uuid(default: auto)>`) in a document that is not a blueprint. A seat is
+    /// filled when a document is made from the blueprint that holds it, so a document made from
+    /// one has none and the one written elsewhere would stay a seat for good. `seat` is the seat
+    /// as written; `span` is the seat.
+    TypeSeatOutsideBlueprint { seat: String, span: Span },
+    /// A type seat in a blueprint that is not a type, or whose own `default` is not of its type.
+    /// `reason` says which, in the type crate's words; `seat` is the seat as written and `span`
+    /// is the seat.
+    InvalidTypeSeat {
+        seat: String,
+        reason: String,
+        span: Span,
+    },
 }
 
 impl Diagnostic {
@@ -328,6 +341,8 @@ impl Diagnostic {
             Diagnostic::UnexpectedDeclarationPath { span, .. } => *span,
             Diagnostic::UnexpectedDeclarationProse { span, .. } => *span,
             Diagnostic::RetiredDeclaration { span, .. } => *span,
+            Diagnostic::TypeSeatOutsideBlueprint { span, .. } => *span,
+            Diagnostic::InvalidTypeSeat { span, .. } => *span,
         }
     }
 
@@ -649,6 +664,14 @@ impl Diagnostic {
                     instead
                 }
             ),
+            Diagnostic::TypeSeatOutsideBlueprint { seat, .. } => write!(
+                f,
+                "`{seat}` is a type seat, and type seats belong in a blueprint \
+                 (`::blueprint(...)`): a document made from one has none"
+            ),
+            Diagnostic::InvalidTypeSeat { seat, reason, .. } => {
+                write!(f, "type seat `{seat}`: {reason}")
+            }
         }
     }
 }

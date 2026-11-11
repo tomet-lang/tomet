@@ -80,21 +80,16 @@ fn definition_follows_the_references_the_language_writes() {
             8,
         ),
         ("link by scheme", format!("{target}@link(id:intro)\n"), 2, 8),
-        (
-            "id in an expression",
-            format!("{target}${{#intro}}\n"),
-            2,
-            3,
-        ),
+        ("id in an expression", format!("{target}$(#intro)\n"), 2, 3),
         (
             "same document by name",
-            format!("{target}${{self#intro}}\n"),
+            format!("{target}$(self#intro)\n"),
             2,
             3,
         ),
         (
             "inside a call and a chain",
-            format!("{target}${{include(#intro).len()}}\n"),
+            format!("{target}{{$ include(#intro).len() }}\n"),
             2,
             10,
         ),
@@ -106,7 +101,7 @@ fn definition_follows_the_references_the_language_writes() {
 /// With two references in one expression, the one under the cursor wins.
 #[test]
 fn definition_takes_the_reference_under_the_cursor() {
-    let text = "=[ A ]#(a)\n\n=[ B ]#(b)\n\n${add(#a, #b)}\n";
+    let text = "=[ A ]#(a)\n\n=[ B ]#(b)\n\n$add(#a, #b)\n";
     assert_eq!(definition_line(text, 4, 7), Some(0), "on #a");
     assert_eq!(definition_line(text, 4, 11), Some(2), "on #b");
 }
@@ -118,17 +113,17 @@ fn definition_takes_the_reference_under_the_cursor() {
 fn definition_does_not_jump_where_there_is_nothing_to_jump_to() {
     let target = "=[ Intro ]#(intro)\n\n";
     assert_eq!(
-        definition_line(&format!("{target}${{intro}}\n"), 2, 3),
+        definition_line(&format!("{target}$(intro)\n"), 2, 3),
         None,
         "a bare name is not an id"
     );
     assert_eq!(
-        definition_line(&format!("{target}${{#nope}}\n"), 2, 3),
+        definition_line(&format!("{target}$(#nope)\n"), 2, 3),
         None,
         "no such id"
     );
     assert_eq!(
-        definition_line(&format!("{target}${{tmt(\"b.tmt\")#intro}}\n"), 2, 20),
+        definition_line(&format!("{target}{{$ tmt(\"b.tmt\")#intro }}\n"), 2, 20),
         None,
         "another document"
     );
@@ -183,12 +178,15 @@ fn completions_trigger_prefix() {
             .all(|i| { i.label != "format" && i.label != "link" })
     );
 
-    let interp_items = completions_for("${", Position::new(0, 2));
+    let interp_items = completions_for("{$", Position::new(0, 2));
     assert!(interp_items.iter().any(|i| i.label == "add(...)"));
-    // The reserved values start an expression too, and the functions that
-    // changed from call to call are no longer offered where rendering is.
+    // The reserved values start an expression too, and so do the types, which
+    // are offered as names (`list(string)` is a name with arguments, not a function).
     assert!(interp_items.iter().any(|i| i.label == "self"));
     assert!(interp_items.iter().any(|i| i.label == "macro"));
+    assert!(!interp_items.iter().any(|i| i.label == "generate"));
+    assert!(interp_items.iter().any(|i| i.label == "list"));
+    assert!(interp_items.iter().any(|i| i.label == "uuid"));
     assert!(
         !interp_items
             .iter()
@@ -196,11 +194,11 @@ fn completions_trigger_prefix() {
     );
 }
 
-/// What is offered after `${` is what the evaluator knows, all of it -- so a
-/// function added to the language is offered without the editor being told.
+/// What is offered after `{$` is what the evaluator knows, all of it -- so a
+/// function or a type added to the language is offered without the editor being told.
 #[test]
-fn an_expression_is_offered_every_function_and_reserved_name_the_evaluator_has() {
-    let items = completions_for("${", Position::new(0, 2));
+fn an_expression_is_offered_every_function_reserved_name_and_type_the_evaluator_has() {
+    let items = completions_for("{$", Position::new(0, 2));
     for (name, _) in tomet_expr::FUNCTIONS {
         assert!(
             items.iter().any(|i| i.label == format!("{name}(...)")),
@@ -213,6 +211,12 @@ fn an_expression_is_offered_every_function_and_reserved_name_the_evaluator_has()
             "{name} is not offered"
         );
     }
+    for (name, _) in tomet_expr::type_names() {
+        assert!(
+            items.iter().any(|i| i.label == name),
+            "the type {name} is not offered"
+        );
+    }
     // `include(...)` and `addr(...)` are offered too.
     assert!(items.iter().any(|i| i.label == "include(...)"));
     assert!(items.iter().any(|i| i.label == "addr(...)"));
@@ -220,7 +224,7 @@ fn an_expression_is_offered_every_function_and_reserved_name_the_evaluator_has()
 
 /// An address starts with one of the schemes the address parser reads, under
 /// the spelling it reads (`tmt:`, not `tm:`), and a
-/// function is offered inside `${...}` only: outside it, one cannot be written.
+/// function is offered inside `{$ ... }` only: outside it, one cannot be written.
 #[test]
 fn outside_an_expression_the_address_schemes_are_offered_and_no_functions() {
     let items = completions_for("", Position::new(0, 0));
@@ -232,7 +236,7 @@ fn outside_an_expression_the_address_schemes_are_offered_and_no_functions() {
     assert!(!labels.contains(&"unresolved"), "not something to type");
     assert!(
         !labels.iter().any(|l| l.ends_with("(...)")),
-        "no function belongs outside `${{...}}`: {labels:?}"
+        "no function belongs outside `{{$ ... }}`: {labels:?}"
     );
 }
 
@@ -324,7 +328,7 @@ fn completions_with_multibyte_characters() {
 
 #[test]
 fn hover_on_macro_evaluation() {
-    let text = "::macro(\n  gh: \"https://github.com/tomet/tomet/issues/${1}\"\n  greet: \"Hello, ${1} ${2}!\"\n  copyright: \"(C) 2026 Tomet Projects\"\n)\n\n$macro.gh(42)\n\n$macro.greet(\"Alice\", \"Bob\")\n\n${macro.copyright()}\n\n$emoji(\"sparkles\")\n";
+    let text = "::macro(\n  gh: \"https://github.com/tomet/tomet/issues/$(1)\"\n  greet: \"Hello, $(1) $(2)!\"\n  copyright: \"(C) 2026 Tomet Projects\"\n)\n\n$macro.gh(42)\n\n$macro.greet(\"Alice\", \"Bob\")\n\n$macro.copyright()\n\n$emoji(\"sparkles\")\n";
 
     // Hover on $macro.gh(42) (line 6, char 2)
     let hover = hover_for(text, Position::new(6, 2), None).expect("hover found for $gh");
@@ -346,9 +350,9 @@ fn hover_on_macro_evaluation() {
         panic!("expected markup contents");
     }
 
-    // Hover on ${macro.copyright()} (line 10, char 3)
+    // Hover on $macro.copyright() (line 10, char 3)
     let hover3 =
-        hover_for(text, Position::new(10, 3), None).expect("hover found for ${macro.copyright()}");
+        hover_for(text, Position::new(10, 3), None).expect("hover found for $macro.copyright()");
     if let HoverContents::Markup(m) = hover3.contents {
         assert!(m.value.contains("Macro Result"));
         assert!(m.value.contains("(C) 2026 Tomet Projects"));
@@ -395,7 +399,7 @@ fn hover_on_macro_auto_discovered_from_workspace_config() {
     let config_path = dir.join(tomet_load_config::VAULT_CONFIG_FILE);
     std::fs::write(
         &config_path,
-        "::macro(\n  youtube_video: \"https://www.youtube.com/watch?v=${1}\"\n  twitter_post: \"https://x.com/${1}/status/${2}\"\n)\n",
+        "::macro(\n  youtube_video: \"https://www.youtube.com/watch?v=$(1)\"\n  twitter_post: \"https://x.com/$(1)/status/$(2)\"\n)\n",
     )
     .unwrap();
 

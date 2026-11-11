@@ -93,6 +93,12 @@ fn parse_table_rows_inline(inlines: &[Inline]) -> Vec<TableRow> {
                     current_cell.push(Inline::Hole(hole.clone()));
                 }
             }
+            Inline::TypeSeat(seat) => {
+                if in_cell {
+                    flush_text(&mut current_cell, &mut current_text_buf);
+                    current_cell.push(Inline::TypeSeat(seat.clone()));
+                }
+            }
         }
     }
 

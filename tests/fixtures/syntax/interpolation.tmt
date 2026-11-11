@@ -6,25 +6,25 @@
 `-` を含められる。要素の引数で `::kind(node-graph)` と書けるものが、補間の
 中でも同じように書ける。
 
-${ref(id(node-graph))}
+$ref(id(node-graph))
 
-${filename}
+$(filename)
 
-${vars.title}
+$(vars.title)
 
 =[ 呼び出し ]
 
-${sum(1, 4)}
+$sum(1, 4)
 
-${sub(1, 2)}
+$sub(1, 2)
 
 @memo[ `$name(args)` は本文の中にも置ける -- $slug-of(title) のように ]
 
 =[ 引数の中の識別子 ]
 
-${ref(id(asdf-asdfa).contents(dafault))}
+$ref(id(asdf-asdfa).contents(dafault))
 
-${outer(inner-name, "quoted-string", 42)}
+$outer(inner-name, "quoted-string", 42)
 
 =[ `-` で始まるものは識別子ではない ]
 

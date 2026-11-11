@@ -57,7 +57,7 @@ pub enum DeclKind {
     /// registered so that the vault config may carry it until the tool declares its own vocabulary.
     Migration,
     /// `::macro.name("template")`: a macro this document or vault defines. A text macro is a string;
-    /// a block macro is the `[...]` after the head, `::macro.card[ @card[ ${1} ] ]`.
+    /// a block macro is the `[...]` after the head, `::macro.card[ @card[ $(1) ] ]`.
     Macro,
     /// `::var.name(type: string, default: x)[ about ]`: a variable this document or vault declares.
     Var,
@@ -154,7 +154,7 @@ pub enum Prose {
     /// It is the declaration's `about:` entry: `::field.author(type: string)[ the author ]` is
     /// `::field.author(type: string, about: [ the author ])`.
     About,
-    /// It is the whole value: `::macro.card[ @card[ ${1} ] ]` is `::macro.card([ @card[ ${1} ] ])`.
+    /// It is the whole value: `::macro.card[ @card[ $(1) ] ]` is `::macro.card([ @card[ $(1) ] ])`.
     Value,
     /// The declaration takes none.
     None,

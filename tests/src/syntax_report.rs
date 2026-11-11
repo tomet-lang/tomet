@@ -25,7 +25,7 @@ use std::path::PathBuf;
 
 use tomet_ast::{
     Bare, Block, Connect, Data, Declaration, ElementView, Entry, File, Group, Hole, Inline,
-    InterpExpr, Interpolation, List, ListItem, Placement, Value,
+    InterpExpr, Interpolation, List, ListItem, Placement, TypeSeat, Value,
 };
 use tomet_ast_parser::parse_file;
 
@@ -130,8 +130,8 @@ const CASES: &[Case] = &[
     ),
     case(
         None,
-        "`${...}` は展開されず逐語で残る",
-        "::config[\n```\n{\"gh\": \"x/${1}\"}\n```\n]\n",
+        "`{$ ... }` は展開されず逐語で残る",
+        "::config[\n```\n{\"gh\": \"x/$(1)\"}\n```\n]\n",
     ),
     // ---- the nexus rule ---------------------------------------------
     case(
@@ -387,40 +387,154 @@ const CASES: &[Case] = &[
         "```rust\nlet y = @T; *ptr\n```\n",
     ),
     // ---- interpolation ----------------------------------------------
-    case(Some("補間 `${...}`"), "識別子", "${name}\n"),
-    case(None, "メンバ参照", "${a.b.c}\n"),
+    case(
+        Some("補間 `{$ ... }` `$(...)` `$name(...)`"),
+        "`$( )` は単一の参照",
+        "$(name)\n",
+    ),
+    case(None, "`{$ }` は式の全体。参照だけでも書ける", "{$ name }\n"),
+    case(None, "メンバ参照", "$(a.b.c)\n"),
+    case(None, "場所の番号", "$(1)\n"),
     case(
         None,
         "`::` はノードから、そこに付く物（`id` `name` `meta`、文書の `path`）へ渡る。`.` はノードの中のデータ key を読む",
-        "${#u1::meta.tag}\n",
+        "$(#u1::meta.tag)\n",
     ),
-    case(None, "関数呼び出し", "${sum(1, 2)}\n"),
+    case(None, "関数呼び出し", "$sum(1, 2)\n"),
     case(None, "`$name(...)` 形式", "$uuid()\n"),
-    case(Some("式の部品"), "`true` `false` `null` は値", "${true}\n"),
-    case(None, "`null`", "${null}\n"),
+    case(
+        Some("式の部品"),
+        "`true` `false` `null` は値",
+        "{$ true }\n",
+    ),
+    case(None, "`null`", "{$ null }\n"),
     case(
         None,
         "比較は連鎖しない。`==` `!=` `<` `<=` `>` `>=`",
-        "${a >= 1}\n",
+        "{$ a >= 1 }\n",
     ),
-    case(None, "`&&` は `||` より強く結びつく", "${a || b && c}\n"),
-    case(None, "括弧は木に残る", "${(a || b) && c}\n"),
-    case(None, "無名関数", "${xs.filter(d => d.n == 1)}\n"),
+    case(None, "`&&` は `||` より強く結びつく", "{$ a || b && c }\n"),
+    case(
+        None,
+        "`+` `-` は前後に空白があるときだけ演算子。比較より強く結びつく",
+        "{$ a + b - c == d }\n",
+    ),
+    case(
+        None,
+        "空白の無い `-` は名前の一部",
+        "{$ daily-note - a-b }\n",
+    ),
+    case(None, "`$( )` に参照以外は書けない", "$(a + b)\n"),
+    case(None, "`+` `-` の前後に空白が無いのは誤り", "{$ a -b }\n"),
+    case(None, "括弧は木に残る", "{$ (a || b) && c }\n"),
+    case(None, "無名関数", "$xs.filter(d => d.n == 1)\n"),
     case(
         None,
         "引数が複数の無名関数は括弧で囲む",
-        "${(a, b) => a < b}\n",
+        "{$ (a, b) => a < b }\n",
     ),
     case(
         None,
         "`#` の左に文書。左を省くと `self`",
-        "${tmt(\"a.tmt\")#intro.title}\n",
+        "{$ tmt(\"a.tmt\")#intro.title }\n",
     ),
     case(
         None,
         "`addr(` は中身を生の文字列として読む",
-        "${addr(tmt:docs/a.tmt#intro)}\n",
+        "$addr(tmt:docs/a.tmt#intro)\n",
     ),
+    // ---- type seat --------------------------------------------------
+    case(
+        Some("型の座 `<$type(args)>`"),
+        "`<$` と型の名前と `>`。値の入る場所を、その型といっしょに書く。\
+         名前は ASCII の一語で、`.` は含まない。`(args)` は省ける",
+        "<$uuid>\n",
+    ),
+    case(
+        None,
+        "空の `()` は空の呼び出しとして残る。名前だけの `<$uuid>` とは木が違う",
+        "<$uuid()>\n",
+    ),
+    case(
+        None,
+        "`(args)` は型の引数。名前付きの引数も、入れ子の型も書ける",
+        "<$list(string, length: 6)>\n",
+    ),
+    case(
+        None,
+        "`default: auto` や文字列の引数",
+        "<$nanoid(length: 8, prefix: \"note-\", default: auto)>\n",
+    ),
+    case(
+        None,
+        "引数は行をまたげる",
+        "<$list(\n  string,\n  length: 6\n)>\n",
+    ),
+    case(
+        None,
+        "地の文の中にも置ける。行の頭でなければ段落の一部",
+        "id は <$uuid> と書く。\n",
+    ),
+    case(None, "見出しの中にも置ける", "=[ 題 <$string> ]\n"),
+    case(None, "値の位置の座: `(args)` の値", "@memo(<$int>)\n"),
+    case(
+        None,
+        "値の位置の座: `key: value` の値",
+        "@memo(id: <$uuid(default: auto)>)\n",
+    ),
+    case(
+        None,
+        "値の位置の座: `{value}` の中と列の中",
+        "@memo(){ name: <$string>, tags: (<$string>, <$int>) }\n",
+    ),
+    case(
+        None,
+        "値の位置の座: 文書の宣言の中",
+        "::meta(title: <$string>)\n",
+    ),
+    case(
+        None,
+        "閉じるのは `()` と文字列の外の最初の `>`。文字列の中の `>` は何も閉じない",
+        "<$string(prefix: \">\", suffix: \")>\")>\n",
+    ),
+    case(
+        None,
+        "`()` の中の `>` は比較で、これも何も閉じない",
+        "<$int(min: a > b)>\n",
+    ),
+    case(
+        None,
+        "最初の `>` で座は終わり、そのあとは文字",
+        "<$x>y> と <$x(a)> > <$y>\n",
+    ),
+    case(
+        None,
+        "内容は取らない。`>` の直後の `[...]` は座のものではない（穴 `<?x>[...]` とは違う）",
+        "<$x>[ t ]\n",
+    ),
+    case(None, "名前が無ければ文字", "<$> <$ x>\n"),
+    case(
+        None,
+        "名前は文字か `_` で始まる ASCII。数字や非 ASCII では文字",
+        "<$5> <$-x> <$é>\n",
+    ),
+    case(None, "名前に `.` は含まない。文字のまま", "<$x.y>\n"),
+    case(
+        None,
+        "`>` の前に空白があれば座ではなく文字。`(args)` の後なら、`$x(a)` が補間として読まれる",
+        "<$x > と <$x(a) >\n",
+    ),
+    case(
+        None,
+        "`{value}` や二つ目の `(args)` は取らない。座にならず文字のまま（ここでも `$x(a)` は補間）",
+        "<$x{a: 1}> <$x(a)(b)>\n",
+    ),
+    case(
+        None,
+        "閉じない `(` では座にならず、`$x(` が補間の呼び出しとして読まれ、閉じないので誤りになる",
+        "<$x(a>\n",
+    ),
+    case(None, "`\\` で逃がせば、座の形の文字を書ける", "\\<$uuid>\n"),
     // ---- connect ----------------------------------------------------
     case(
         Some("コネクト `::`"),
@@ -532,7 +646,7 @@ const CASES: &[Case] = &[
          `meta` `macros` `format` `fields` `workspace` `export` `blueprints` \
          `vocabularies` `dictionaries` `migration` `vars` `elements`。\
          `::meta{ ... }` はもう書けない（下の「主グループの無いネクサス」）",
-        "::meta(title: \"x\")\n::macro(gh: \"https://x/${1}\")\n::var(a: { type: string })\n\
+        "::meta(title: \"x\")\n::macro(gh: \"https://x/$(1)\")\n::var(a: { type: string })\n\
          ::format(table: { max_col_width: 50 })\n::field(created: { type: datetime })\n\
          ::workspace(ignore: (\"a\"))\n::export(type: commonmark)\n::blueprint(b: \"b.tmt\")\n\
          ::vocabulary(v: \"v.tmt\")\n::dictionary(d: \"d.tmt\")\n::migration(m: 1)\n\
@@ -733,7 +847,7 @@ const REJECTED: &[Case] = &[
     case(
         Some("仕様にあるが未実装"),
         "入れ子の呼び出し（`docs/spec/builtin-functions.tmt`）",
-        "${ref(id(asdf).contents(default))}\n",
+        "$ref(id(asdf).contents(default))\n",
     ),
     case(
         None,
@@ -949,6 +1063,7 @@ fn dump_block(out: &mut String, block: &Block, depth: usize) {
         }
         Block::List(list) => dump_list(out, list, depth),
         Block::Hole(hole) => dump_hole(out, hole, depth),
+        Block::TypeSeat(seat) => dump_type_seat(out, seat, depth),
     }
 }
 
@@ -997,6 +1112,7 @@ fn dump_inline(out: &mut String, inline: &Inline, depth: usize) {
         Inline::Element(el) => dump_element(out, el.as_view(), depth),
         Inline::Interp(interp) => dump_interp(out, interp, depth),
         Inline::Hole(hole) => dump_hole(out, hole, depth),
+        Inline::TypeSeat(seat) => dump_type_seat(out, seat, depth),
     }
 }
 
@@ -1014,6 +1130,14 @@ fn dump_hole(out: &mut String, hole: &Hole, depth: usize) {
     indent(out, depth);
     let _ = writeln!(out, "{placement} ?{matcher}");
     dump_groups(out, &hole.data, hole.content.as_deref(), depth);
+}
+
+/// A type seat's head line, then the type as the expression it is written.
+fn dump_type_seat(out: &mut String, seat: &TypeSeat, depth: usize) {
+    indent(out, depth);
+    out.push_str("TypeSeat <$\n");
+    indent(out, depth + 1);
+    let _ = writeln!(out, "type    {}", interp_str(&seat.expr));
 }
 
 fn dump_interp(out: &mut String, interp: &Interpolation, depth: usize) {
@@ -1160,7 +1284,8 @@ fn value_str(v: &Value) -> String {
             let inner: Vec<String> = args.iter().map(value_str).collect();
             format!("{name}({})", inner.join(", "))
         }
-        Value::Interp(interp) => format!("${{{}}}", interp_str(&interp.expr)),
+        Value::Interp(interp) => interp.to_string(),
+        Value::TypeSeat(seat) => seat.to_string(),
         Value::Hole(hole) => {
             let matcher = hole
                 .matcher

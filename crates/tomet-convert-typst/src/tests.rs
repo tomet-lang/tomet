@@ -132,8 +132,8 @@ fn renders_typed_element_generically_with_a_kind_comment() {
 #[test]
 fn renders_interp_as_inert_raw_text() {
     assert_eq!(
-        typst("Footer: ${copyright}\n"),
-        "Footer: `${copyright}`\n\n"
+        typst("Footer: $(copyright)\n"),
+        "Footer: `$(copyright)`\n\n"
     );
 }
 
@@ -211,4 +211,10 @@ fn a_comment_can_neither_end_early_nor_stay_open() {
 #[test]
 fn a_comment_with_no_text_is_the_empty_comment() {
     assert_eq!(typst("@comment[]\n"), "/**/\n\n");
+}
+
+#[test]
+fn a_type_seat_is_shown_as_written() {
+    assert_eq!(typst("<$uuid>\n"), "\\<\\$uuid\\>\n\n");
+    assert_eq!(typst("id <$date> end\n"), "id \\<\\$date\\> end\n\n");
 }

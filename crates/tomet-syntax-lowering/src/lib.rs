@@ -17,6 +17,12 @@
 //!    | primary group, `(args)` or `[content]`, at the nexus, before it reads any group: a
 //!    | nameless `::(...)` connect would otherwise merge into the args and pass for them. A `::`
 //!    | declaration takes no connect. The grammar is in the `tomet-cst-parser` crate docs.
+//! - (Type Seats)
+//!   -| A `<$type(args)>` is read from the text between its `<$` and `>` by the expression parser
+//!    | the interpolations use, for a type is an expression, and is kept as written: a name or a
+//!    | call of one, nothing else. It sits where a hole does (a block, running text, a value), and
+//!    | not as an entry of a `{...}` group, which holds `key: value` entries and elements. Which
+//!    | names are types, and what their arguments mean, is not asked here.
 //! - (Connects)
 //!   -| A connect is `::name(...)` or the nameless `::{...}` / `::(...)`. The retired single-colon
 //!    | form is kept in the CST as a connect and refused here, with the spelling to write.

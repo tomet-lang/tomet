@@ -293,7 +293,7 @@ fn macro_hover_over_stdio() {
                 "uri": "file:///tmp/macro_test.tmt",
                 "languageId": "tomet",
                 "version": 1,
-                "text": "::macro(\n  gh: \"https://github.com/tomet/tomet/issues/${1}\"\n)\n\n$macro.gh(101)\n",
+                "text": "::macro(\n  gh: \"https://github.com/tomet/tomet/issues/$(1)\"\n)\n\n$macro.gh(101)\n",
             }
         }),
     );
@@ -330,7 +330,7 @@ fn macro_hover_with_workspace_auto_config_over_stdio() {
     let config_path = dir.join(tomet_load_config::VAULT_CONFIG_FILE);
     std::fs::write(
         &config_path,
-        "::macro(\n  twitter_post: \"https://x.com/${1}/status/${2}\"\n)\n",
+        "::macro(\n  twitter_post: \"https://x.com/$(1)/status/$(2)\"\n)\n",
     )
     .unwrap();
 

@@ -195,14 +195,18 @@ pub fn resolve_document_links<F>(
                         Block::Paragraph(p) => p.content.iter().any(|inline| match inline {
                             Inline::Text(t) => !t.value.trim().is_empty(),
                             Inline::Raw(r) => !r.value.trim().is_empty(),
-                            Inline::Element(_) | Inline::Interp(_) | Inline::Hole(_) => true,
+                            Inline::Element(_)
+                            | Inline::Interp(_)
+                            | Inline::Hole(_)
+                            | Inline::TypeSeat(_) => true,
                             Inline::SoftBreak(_) | Inline::LineBreak(_) => false,
                         }),
                         Block::Element(_)
                         | Block::Section(_)
                         | Block::List(_)
                         | Block::Interp(_)
-                        | Block::Hole(_) => true,
+                        | Block::Hole(_)
+                        | Block::TypeSeat(_) => true,
                     })
             });
             if !has_content {
@@ -380,6 +384,7 @@ mod tests {
                                     Inline::Element(_)
                                     | Inline::Interp(_)
                                     | Inline::Hole(_)
+                                    | Inline::TypeSeat(_)
                                     | Inline::SoftBreak(_)
                                     | Inline::LineBreak(_) => "",
                                 }))
@@ -388,7 +393,8 @@ mod tests {
                             | Block::Section(_)
                             | Block::List(_)
                             | Block::Interp(_)
-                            | Block::Hole(_) => None,
+                            | Block::Hole(_)
+                            | Block::TypeSeat(_) => None,
                         })
                         .flatten()
                         .collect::<String>()

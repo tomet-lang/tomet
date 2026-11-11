@@ -98,13 +98,13 @@ fn custom_element_hook_falling_through_matches_generic_rendering() {
     assert_eq!(with_declining_hook, without_hook);
 }
 
-/// This crate does not evaluate `${...}`, and this test is what is
+/// This crate does not evaluate `{$ ... }`, and this test is what is
 /// left of the one that said it did.
 ///
 /// Evaluation is `tomet-transform`'s `resolve_expressions`, which runs
 /// before any converter sees the tree. A converter that evaluated for
 /// itself would differ from the others: without an `EvaluationContext`
-/// or the vault's config, `${self::path}` would resolve in CommonMark
+/// or the vault's config, `$(self::path)` would resolve in CommonMark
 /// and not here. The expansion of `$gh(42)` is asserted where the
 /// evaluation happens.
 ///
@@ -112,10 +112,10 @@ fn custom_element_hook_falling_through_matches_generic_rendering() {
 /// honest rendering of that is what was written.
 #[test]
 fn an_unprepared_interpolation_renders_as_its_own_source() {
-    let doc = parse_file("Issue: $gh(42)\nFooter: ${copyright}\nMath: ${add(10, 5)}\n").unwrap();
+    let doc = parse_file("Issue: $gh(42)\nFooter: $(copyright)\nMath: $add(10, 5)\n").unwrap();
     assert_eq!(
         render_body(&doc),
-        "<p>Issue: ${gh(42)} Footer: ${copyright} Math: ${add(10, 5)}</p>\n"
+        "<p>Issue: $gh(42) Footer: $(copyright) Math: $add(10, 5)</p>\n"
     );
 }
 

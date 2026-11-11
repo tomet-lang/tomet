@@ -77,6 +77,18 @@
 //!  | is left to `scalar`, so it is not a `hole` there. A shape that is no
 //!  | box (`a < b`, `x<=1`, `<->`, `</x>`, `<x/>`) is `text` and
 //!  | `punctuation`, never an `ERROR`.
+//! -| **A type seat (`<$uuid>`, `<$list(string, length: 6)>`) is a `type_seat`
+//!  | node: `type_seat_open` (the `<$` and the name), the arguments as an
+//!  | expression's, and `type_seat_close`.** It stands wherever a hole does and
+//!  | in a value position as well (`::id(<$uuid(default: auto)>)`,
+//!  | `key: <$string>`, `@x(<$int>)`). Whether a `<$x` is a seat is only known
+//!  | at its close, so `type_seat_open` is an external token that `scanner.c`
+//!  | emits once the `>` (or the `(args)` and then the `>`) is there, and a
+//!  | `<$x >`, `<$5>`, `<$x{a: 1}>` or `\<$x>` is `text` and `punctuation`, as
+//!  | in the real parser. A seat takes no content, so in `<$x>[t]` the `[t]`
+//!  | is prose, stray `]` and all. A `(` that never closes (`<$x(a>`) is no
+//!  | seat either, but `$x(` then reads as an interpolation call that never
+//!  | closes, which is an `ERROR` here as it is a parse error there.
 //! -| **Unterminated `/* ... */` doesn't produce an `ERROR`.** The real
 //!  | parser hard-errors on a missing
 //!  | `*/` -- silently swallowing the rest of the document is a much
@@ -116,7 +128,8 @@
 //! `scanner.c` (see its own module doc) makes a bare, colon-less,
 //! identifier-shaped scalar directly inside `(...)`/`{...}` (e.g. a bare
 //! tag like `@foo(yaml)`, or `{required}`) parse as a clean `scalar`
-//! instead of an `ERROR`.
+//! instead of an `ERROR`. It also owns the head of a type seat, tried before
+//! `scalar` wherever a value stands.
 //!
 //! `_value_scalar`'s regex (see its own comment in `grammar.js`) keeps a
 //! `key: (...)` map entry (e.g. `tags: (a, b)`) from being GLR-merged
@@ -724,16 +737,16 @@ mod tests {
     #[test]
     fn parses_interpolation_connect() {
         for src in [
-            "${self::path}\n",
-            "${u1::id}\n",
-            "${self::doc::meta}\n",
-            "${self::meta.tags}\n",
-            "${self::meta.tags.join(\", \")}\n",
-            "${#u1::meta.tag}\n",
-            "${tmt(\"a.tmt\")::meta.title}\n",
-            "${vault::docs.filter(d => d::meta.draft == false).map(d => d.link())}\n",
-            "${addr(dir:docs)::docs.item(0)}\n",
-            "${a :: b}\n",
+            "$(self::path)\n",
+            "$(u1::id)\n",
+            "$(self::doc::meta)\n",
+            "$(self::meta.tags)\n",
+            "{$ self::meta.tags.join(\", \") }\n",
+            "$(#u1::meta.tag)\n",
+            "{$ tmt(\"a.tmt\")::meta.title }\n",
+            "{$ vault::docs.filter(d => d::meta.draft == false).map(d => d.link()) }\n",
+            "{$ addr(dir:docs)::docs.item(0) }\n",
+            "{$ a :: b }\n",
         ] {
             let tree = parse(src);
             assert!(
@@ -744,7 +757,7 @@ mod tests {
             assert!(find_kind(tree.root_node(), "interp_connect").is_some());
         }
         // A named argument is still `name: value`.
-        let tree = parse("${f(a: b::c)}\n");
+        let tree = parse("$f(a: b::c)\n");
         assert!(!tree.root_node().has_error());
         assert!(find_kind(tree.root_node(), "interp_named_arg").is_some());
     }
@@ -752,10 +765,10 @@ mod tests {
     #[test]
     fn parses_interpolation_path_and_call() {
         for src in [
-            "${id}\n",
-            "${a.b.c}\n",
-            "${sum(a, mul(b, c))}\n",
-            "${ 1.5 }\n",
+            "$(id)\n",
+            "$(a.b.c)\n",
+            "$sum(a, mul(b, c))\n",
+            "{$ 1.5 }\n",
         ] {
             let tree = parse(src);
             assert!(
@@ -763,26 +776,23 @@ mod tests {
                 "expected no errors for {src:?}"
             );
         }
-        let tree = parse("${sum(a, b)}\n");
+        let tree = parse("$sum(a, b)\n");
         assert!(find_kind(tree.root_node(), "interpolation").is_some());
-        assert!(find_kind(tree.root_node(), "interp_call").is_some());
+        assert!(find_kind(tree.root_node(), "interp_dollar_call").is_some());
     }
 
-    /// `${...}` is one `interpolation` wherever a value is, not a `$` scalar
+    /// `{$ ... }` is one `interpolation` wherever a value is, not a `$` scalar
     /// followed by a stray `{...}` group -- which is how a value position read
     /// it before, and with a call inside it also left an error node.
     #[test]
     fn interpolation_in_a_value_position_is_one_interpolation() {
         for (src, expected) in [
-            ("::meta(id: ${f()})\n", 1),
-            ("::meta(id: ${f})\n", 1),
-            ("::meta(${f()})\n", 1),
-            ("@x(${a.b})\n", 1),
-            ("@x(tags: list(${a}, b, ${c(1)}))\n", 2),
-            (
-                "::meta(\n  id: ${generate.uuid()}\n  by: ${var.author}\n)\n",
-                2,
-            ),
+            ("::meta(id: $f())\n", 1),
+            ("::meta(id: $(f))\n", 1),
+            ("::meta($f())\n", 1),
+            ("@x($(a.b))\n", 1),
+            ("@x(tags: list($(a), b, $c(1)))\n", 2),
+            ("::meta(\n  id: $macro.stamp()\n  by: $(var.author)\n)\n", 2),
         ] {
             let tree = parse(src);
             assert!(
@@ -1391,6 +1401,196 @@ mod tests {
             ("string.special", "<PATH>"),
             ("keyword", "<?int"),
             ("keyword", ">"),
+        ] {
+            assert!(
+                captured.contains(&(capture.to_string(), text.to_string())),
+                "{capture} on {text:?} in {captured:?}"
+            );
+        }
+    }
+
+    /// The source text of every `type_seat` node, in order.
+    fn seat_texts(src: &str) -> Vec<String> {
+        let tree = parse(src);
+        nodes_of_kind(&tree, "type_seat")
+            .into_iter()
+            .map(|n| src[n.byte_range()].to_string())
+            .collect()
+    }
+
+    #[test]
+    fn a_type_seat_is_a_head_arguments_and_a_close() {
+        let src = "<$uuid> and <$list(string, length: 6)>\n";
+        let tree = parse(src);
+        assert!(!tree.root_node().has_error());
+        assert_eq!(seat_texts(src), ["<$uuid>", "<$list(string, length: 6)>"]);
+        let text_of = |kind: &str| -> Vec<&str> {
+            nodes_of_kind(&tree, kind)
+                .into_iter()
+                .map(|n| &src[n.byte_range()])
+                .collect()
+        };
+        // The head is the `<$` and the name; the `>` is its own node.
+        assert_eq!(text_of("type_seat_open"), ["<$uuid", "<$list"]);
+        assert_eq!(text_of("type_seat_close"), [">", ">"]);
+        // The arguments are an expression's: a type, and a named argument.
+        assert_eq!(text_of("interp_named_arg"), ["length: 6"]);
+        assert_eq!(text_of("number"), ["6"]);
+        // Not a hole, though it takes a hole's `>`.
+        assert!(nodes_of_kind(&tree, "hole").is_empty());
+        assert!(nodes_of_kind(&tree, "hole_close").is_empty());
+    }
+
+    #[test]
+    fn a_type_seat_stands_where_a_hole_does_and_in_a_value() {
+        for (src, expected) in [
+            // A block, in running text and in a heading.
+            ("<$uuid>\n", 1),
+            ("id <$uuid> and <$date(default: auto)> x\n", 2),
+            ("=[ title <$string> ]\n", 1),
+            ("- item <$int>\n-. item <$int(min: 0)>\n", 2),
+            ("*em <$int>* **strong <$int>** ~~gone <$int>~~\n", 3),
+            ("@a[ <$int> ]\n@b[ x\n<$int>\ny ]\n", 2),
+            ("<?(h)>[ <$int> ]\n", 1),
+            // A value: the whole `(args)`, a pair, a sequence, a `{value}`.
+            ("::id(<$uuid(default: auto)>)\n", 1),
+            ("@x(<$int>)\n", 1),
+            ("@x(key: <$string>)\n", 1),
+            ("@x(k: (<$string>, <$int>))\n", 2),
+            ("@x(k: list(<$int>))\n", 1),
+            ("@x(){ k: <$string> }\n", 1),
+            ("@x(){ k: <$string>, l: <$int(default: 0)> }\n", 2),
+            ("::meta(\n  a: <$string>\n  b: <$list(string)>\n)\n", 2),
+            ("@x(k: <$string> )\n", 1),
+        ] {
+            let tree = parse(src);
+            assert!(
+                !tree.root_node().has_error(),
+                "an error in {src:?}: {}",
+                tree.root_node().to_sexp()
+            );
+            assert_eq!(seat_texts(src).len(), expected, "{src:?}");
+        }
+        // In a value, it is a seat and not the scalar it would otherwise read as.
+        let tree = parse("@x(k: <$string>, l: <$uuid(default: auto)>)\n");
+        assert!(nodes_of_kind(&tree, "scalar").is_empty());
+    }
+
+    #[test]
+    fn a_type_seat_closes_at_the_first_closer_outside_parentheses_and_strings() {
+        for src in [
+            "<$list(list(string), length: 6)>",
+            // A `>` in the arguments closes nothing, nested or in a string.
+            "<$x(a > b)>",
+            "<$x((a > b), c)>",
+            r#"<$nanoid(prefix: ">")>"#,
+            r#"<$nanoid(prefix: ")>")>"#,
+            r#"<$x(")")>"#,
+            // The arguments may run over lines.
+            "<$list(\n  string,\n  length: 6\n)>",
+            "<$list(\n)>",
+        ] {
+            let text = format!("{src}\n");
+            let tree = parse(&text);
+            assert!(!tree.root_node().has_error(), "an error in {src:?}");
+            assert_eq!(seat_texts(&text), [src], "{src:?}");
+        }
+        // The first `>` outside them ends it: what follows is text.
+        for (src, seats) in [
+            ("<$x>y>\n", vec!["<$x>"]),
+            ("<$x(a)> > <$y>\n", vec!["<$x(a)>", "<$y>"]),
+        ] {
+            assert!(!parse(src).root_node().has_error(), "{src:?}");
+            assert_eq!(seat_texts(src), seats, "{src:?}");
+        }
+    }
+
+    #[test]
+    fn text_that_is_no_type_seat_is_neither_a_seat_nor_an_error() {
+        for src in [
+            // No name, or no name the parser accepts.
+            "<$>\n",
+            "<$ x>\n",
+            "<$5>\n",
+            "<$-x>\n",
+            "<$é>\n",
+            "<$x.y>\n",
+            "<$x::y>\n",
+            "cost <$5> and <$> x\n",
+            // Not tight, or not closed.
+            "<$x >\n",
+            "<$x\n",
+            "a <$x b\n",
+            // Takes no `{value}` and no second `(args)`.
+            "<$x{a: 1}>\n",
+            "<$x(a)(b)>\n",
+            // Escaped.
+            "\\<$uuid> is text\n",
+            // Inside a code span.
+            "`<$uuid>`\n",
+        ] {
+            let tree = parse(src);
+            assert!(
+                !tree.root_node().has_error(),
+                "an error in {src:?}: {}",
+                tree.root_node().to_sexp()
+            );
+            assert!(seat_texts(src).is_empty(), "a seat in {src:?}");
+        }
+        // As a value, too: a scalar, as it was before there were seats.
+        for src in [
+            "@x(k: <$5>, l: <$x >)\n",
+            "@x(<$5>)\n",
+            "@x(<$>)\n",
+            "@x(<$x y>)\n",
+            "@x(k: <$x y>)\n",
+            "@x(<name>)\n",
+            "@x(a < b)\n",
+        ] {
+            let tree = parse(src);
+            assert!(!tree.root_node().has_error(), "an error in {src:?}");
+            assert!(seat_texts(src).is_empty(), "a seat in {src:?}");
+        }
+    }
+
+    #[test]
+    fn a_type_seat_takes_no_content() {
+        // The `[t]` after it is prose -- and a stray `]`, as anywhere in prose (see the module doc).
+        let tree = parse("<$x>[t]\n");
+        assert_eq!(nodes_of_kind(&tree, "type_seat").len(), 1);
+        assert!(nodes_of_kind(&tree, "content_group").is_empty());
+        // A hole takes it.
+        let tree = parse("<?x>[t]\n");
+        assert_eq!(nodes_of_kind(&tree, "content_group").len(), 1);
+    }
+
+    #[test]
+    fn highlights_colour_a_type_seat() {
+        use tree_sitter::StreamingIterator;
+        let src = "see <$uuid> and <$list(list(string), length: 6)> and <?int(n)>\n";
+        let tree = parse(src);
+        let query = tree_sitter::Query::new(&LANGUAGE.into(), HIGHLIGHTS_QUERY).unwrap();
+        let mut cursor = tree_sitter::QueryCursor::new();
+        let mut matches = cursor.matches(&query, tree.root_node(), src.as_bytes());
+        let mut captured: Vec<(String, String)> = Vec::new();
+        while let Some(m) = matches.next() {
+            for c in m.captures {
+                captured.push((
+                    query.capture_names()[c.index as usize].to_string(),
+                    src[c.node.byte_range()].to_string(),
+                ));
+            }
+        }
+        for (capture, text) in [
+            ("type", "<$uuid"),
+            ("type", "<$list"),
+            ("type", ">"),
+            ("punctuation.bracket", "("),
+            ("punctuation.bracket", ")"),
+            ("property", "length"),
+            ("function", "list"),
+            // A hole keeps its own.
+            ("keyword", "<?int"),
         ] {
             assert!(
                 captured.contains(&(capture.to_string(), text.to_string())),

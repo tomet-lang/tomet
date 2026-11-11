@@ -6,8 +6,8 @@
 //! singular declarations replaced (`::fields`) is reported with the name to write instead.
 
 use tomet_ast::Value;
-use tomet_semantics_core::admits::admits;
-use tomet_type::Type;
+use tomet_semantics_core::admits::{admits, is_placeholder};
+use tomet_type::{Kind, Type};
 
 use crate::declaration::{Declaration, EntriesError};
 use crate::kind::{Cardinality, DeclKind, Host, Shape};
@@ -368,10 +368,11 @@ fn check_declared_version(
     let Some(written) = written_version(decl, kind) else {
         return;
     };
-    if matches!(&written, Value::Interp(_)) {
+    // Not known until it is evaluated (`{$ ... }`) or filled (`<$...>`).
+    if is_placeholder(&written) {
         return;
     }
-    if let Err(mismatch) = admits(&Type::Version, &written) {
+    if let Err(mismatch) = admits(&Type::bare(Kind::Version), &written) {
         problems.push((
             idx,
             Problem::InvalidDefinition {
@@ -448,17 +449,17 @@ fn macro_problem(template: &Value) -> Option<String> {
                 None
             } else {
                 let written: Vec<String> =
-                    expressions.iter().map(|e| format!("`${{{e}}}`")).collect();
+                    expressions.iter().map(|e| format!("`{e}`")).collect();
                 Some(format!(
-                    "in a block macro `${{...}}` is where an argument goes (`${{1}}`, `${{name}}`), not an \
+                    "in a block macro `$(...)` is where an argument goes (`$(1)`, `$(name)`), not an \
                      expression; found {}",
                     written.join(", ")
                 ))
             }
         }
         _ => Some(
-            "a macro is a string template, such as `\"https://x/${1}\"`, or block content, such as \
-             `[ @card[ ${1} ] ]`"
+            "a macro is a string template, such as `\"https://x/$(1)\"`, or block content, such as \
+             `[ @card[ $(1) ] ]`"
                 .to_string(),
         ),
     }
@@ -717,9 +718,9 @@ mod tests {
     #[test]
     fn unevaluated_expressions_in_version_are_skipped() {
         for src in [
-            "::version(${expr.ver})\n",
-            "::vocabulary.deck(version: ${expr.ver})\n",
-            "::blueprint(note){ version: ${expr.ver} }\n",
+            "::version($(expr.ver))\n",
+            "::vocabulary.deck(version: $(expr.ver))\n",
+            "::blueprint(note){ version: $(expr.ver) }\n",
         ] {
             let doc = parse(src);
             let decls: Vec<_> = declarations(&doc)
@@ -733,7 +734,7 @@ mod tests {
     #[test]
     fn a_block_macro_may_hold_only_places_for_arguments() {
         let doc = parse(
-            "::macro(ok: [ @card(title: ${1})[ ${who} ] ], bad: [ ${a.b} and ${f(1)} ${1} ])\n",
+            "::macro(ok: [ @card(title: $(1))[ $(who) ] ], bad: [ $(a.b) and $f(1) $(1) ])\n",
         );
         let decls: Vec<_> = declarations(&doc)
             .into_iter()
@@ -745,8 +746,8 @@ mod tests {
             panic!("expected an invalid definition, got {:?}", problems[0].1);
         };
         assert_eq!(name, "bad");
-        // What follows "found" is the expressions, and `${1}` is a place, not one of them.
-        assert_eq!(reason.split("found ").nth(1), Some("`${a.b}`, `${f(1)}`"));
+        // What follows "found" is the expressions, and `$(1)` is a place, not one of them.
+        assert_eq!(reason.split("found ").nth(1), Some("`$(a.b)`, `$f(1)`"));
     }
 
     #[test]
@@ -763,8 +764,8 @@ mod tests {
             Problem::InvalidDefinition {
                 declaration: "macro",
                 name: "gh".into(),
-                reason: "a macro is a string template, such as `\"https://x/${1}\"`, or block \
-                         content, such as `[ @card[ ${1} ] ]`"
+                reason: "a macro is a string template, such as `\"https://x/$(1)\"`, or block \
+                         content, such as `[ @card[ $(1) ] ]`"
                     .into(),
             }
         );
@@ -979,9 +980,9 @@ mod tests {
     #[test]
     fn a_dotted_head_and_the_grouped_form_are_checked_alike() {
         for src in [
-            "::macro.gh(\"https://x/${1}\")\n",
-            "::macro(gh: \"https://x/${1}\")\n",
-            "::macro.card[ @card[ ${1} ] ]\n",
+            "::macro.gh(\"https://x/$(1)\")\n",
+            "::macro(gh: \"https://x/$(1)\")\n",
+            "::macro.card[ @card[ $(1) ] ]\n",
             "::field.url.wiki(type: list(string))[ the wiki ]\n",
             "::var.n(type: int, default: 3)[ how many ]\n",
             "::workspace.ignore(\"target\", \".git\")\n",

@@ -1,23 +1,21 @@
-//! Elements: `@name`, a block form, and the box `<?matcher...>`.
+//! Elements: `@name`, a block form, and the boxes `<?matcher...>` and `<$type...>`.
 //!
-//! Reading one form's head and its groups into an element or a hole; the primary group a nexus
-//! stands on is checked here, before any group is read.
+//! Reading one form's head and its groups into an element, a hole or a type seat; the primary
+//! group a nexus stands on is checked here, before any group is read.
 
 use super::groups::lower_groups;
 use super::{is_declaration, name_of, range_of, unsupported};
 use crate::error::Result;
 use crate::value::err;
-use tomet_ast::{Block, Element, Name, Placement};
-use tomet_cst::{AstNode, CstName, SyntaxKind as K, SyntaxNode};
+use tomet_ast::{Block, Element, Hole, Inline, Name, Placement, TypeSeat, Value};
+use tomet_cst::{AstNode, CstName, CstSlot, CstSlotMark, SyntaxKind as K, SyntaxNode};
 use tomet_span::Span;
 use tomet_tree::ElementExt;
 
 /// A block form: `@name` and the groups that follow it.
 pub(super) fn lower_block_form(node: &SyntaxNode) -> Result<Block> {
     if let Some(slot) = slot_of(node) {
-        let mut hole = lower_slot(&slot)?;
-        hole.placement = Placement::Block;
-        return Ok(Block::Hole(hole));
+        return lower_slot(&slot).map(LoweredSlot::into_block);
     }
     if is_declaration(node) {
         return Err(err(
@@ -98,14 +96,61 @@ pub(super) fn require_primary_group(node: &SyntaxNode, head: &str, at: usize) ->
     Err(err(at, message))
 }
 
-/// The box an element node holds, if it is one: `<?matcher...>` is an element of
+/// The box an element node holds, if it is one: `<?matcher...>` and `<$type...>` are elements of
 /// the tree, where a name tag (`<name>`) is a `SLOT` among the text and never wrapped.
 pub(crate) fn slot_of(node: &SyntaxNode) -> Option<SyntaxNode> {
     node.children().find(|n| n.kind() == K::SLOT)
 }
 
-/// `<?matcher(args){value}>[content]`: a hole, from the `SLOT` node of a marked box.
-pub(crate) fn lower_slot(slot: &SyntaxNode) -> Result<tomet_ast::Hole> {
+/// What a marked box lowers to. The AST has a node for each, and no node for the family: this is
+/// how the places that take either (a block, running text, a value) read one box and place it.
+pub(crate) enum LoweredSlot {
+    Hole(Hole),
+    TypeSeat(TypeSeat),
+}
+
+impl LoweredSlot {
+    /// The box standing as a block.
+    pub(crate) fn into_block(self) -> Block {
+        match self {
+            LoweredSlot::Hole(mut hole) => {
+                hole.placement = Placement::Block;
+                Block::Hole(hole)
+            }
+            LoweredSlot::TypeSeat(seat) => Block::TypeSeat(seat),
+        }
+    }
+
+    /// The box standing in running text.
+    pub(crate) fn into_inline(self) -> Inline {
+        match self {
+            LoweredSlot::Hole(hole) => Inline::Hole(hole),
+            LoweredSlot::TypeSeat(seat) => Inline::TypeSeat(seat),
+        }
+    }
+
+    /// The box standing where a value goes.
+    pub(crate) fn into_value(self) -> Value {
+        match self {
+            LoweredSlot::Hole(hole) => Value::Hole(Box::new(hole)),
+            LoweredSlot::TypeSeat(seat) => Value::TypeSeat(seat),
+        }
+    }
+}
+
+/// A marked box, from its `SLOT` node: `<?matcher(args){value}>[content]` is a hole and
+/// `<$type(args)>` a type seat. The mark says which.
+pub(crate) fn lower_slot(slot: &SyntaxNode) -> Result<LoweredSlot> {
+    let cst = CstSlot::cast(slot.clone()).expect("a SLOT node");
+    match cst.mark() {
+        CstSlotMark::Hole => lower_hole(slot).map(LoweredSlot::Hole),
+        CstSlotMark::TypeSeat => crate::interp::lower_type_seat(slot).map(LoweredSlot::TypeSeat),
+        CstSlotMark::NameTag => Err(unsupported("a name tag as a form")),
+    }
+}
+
+/// `<?matcher(args){value}>[content]`: a hole, from the `SLOT` node of a box marked with `?`.
+fn lower_hole(slot: &SyntaxNode) -> Result<Hole> {
     let (start, end) = range_of(slot);
     let matcher = slot
         .children()
@@ -116,7 +161,7 @@ pub(crate) fn lower_slot(slot: &SyntaxNode) -> Result<tomet_ast::Hole> {
             Name { namespace, name }
         });
     let read = lower_groups(slot)?;
-    Ok(tomet_ast::Hole {
+    Ok(Hole {
         matcher,
         placement: Placement::Inline,
         data: read.data,

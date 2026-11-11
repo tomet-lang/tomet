@@ -1,6 +1,8 @@
 use super::*;
 use crate::value::render_value_inner_with_config;
-use tomet_ast::{Bare, Block, Data, Entry, File, Group, Inline, Name, Paragraph, Section, Value};
+use tomet_ast::{
+    Bare, Block, Data, Entry, File, Group, Inline, Name, Paragraph, Section, Text, Value,
+};
 use tomet_config::{FieldConfig, FormatConfig, MetaConfig, load_config_from_str};
 use tomet_span::Span;
 use tomet_style::{ContentLayout, GroupOrder, ParagraphSeparator};
@@ -326,6 +328,60 @@ fn test_nanoid_force_and_overwrite_behavior() {
     ensure_document_id_with_config(&mut doc3, &cfg_no_overwrite);
     let printed3 = document_to_tm_with_config(&doc3, &cfg_no_overwrite);
     assert!(printed3.contains("::id(invalid-slug)"), "{printed3}");
+}
+
+/// The id a vault's `id` settings ask for: what they come to as a type, and nothing for what
+/// is not a form of id.
+#[test]
+fn the_id_settings_come_to_a_type_that_is_a_form_of_id() {
+    let printed = |field: FieldConfig| {
+        let cfg = PrinterConfig {
+            meta: MetaConfig {
+                fields: std::collections::BTreeMap::from([("id".to_string(), field)]),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        let mut doc = tomet_markdown::from_markdown("# Note\n");
+        ensure_document_id_with_config(&mut doc, &cfg);
+        document_to_tm_with_config(&doc, &cfg)
+    };
+    let field = |field_type: &str, prefix: Option<&str>, length: Option<usize>| FieldConfig {
+        field_type: Some(field_type.to_string()),
+        prefix: prefix.map(String::from),
+        length,
+        ..Default::default()
+    };
+
+    // The length of the id a document was given, the prefix included.
+    let id_len = |printed: &str| {
+        let id = printed.split("::id(").nth(1)?;
+        Some(id.split(')').next()?.len())
+    };
+
+    // A nanoid is as long as the vault says and 8 when it does not.
+    assert_eq!(
+        id_len(&printed(field("nanoid", Some("n-"), Some(12)))),
+        Some(2 + 12)
+    );
+    assert_eq!(id_len(&printed(field("nanoid", None, None))), Some(8));
+
+    // A uuid has no length, and a length the vault gives for it is not asked.
+    assert_eq!(
+        id_len(&printed(field("uuid", Some("u-"), Some(3)))),
+        Some(2 + 36)
+    );
+
+    // No type, a type that is no form of id, a name that is no type, or a prefix the type does
+    // not take: nothing is made.
+    for none in [
+        FieldConfig::default(),
+        field("string", None, None),
+        field("int", Some("x"), None),
+        field("person", None, None),
+    ] {
+        assert!(!printed(none.clone()).contains("::id("), "{none:?}");
+    }
 }
 
 #[test]
@@ -703,8 +759,9 @@ fn escaped_inline_constructs_round_trip() {
         "text \\// not a comment\n",
         "text \\/* not a block comment */\n",
         "call \\@name(x) and \\@tag[y]{z: 1} here\n",
-        "value \\${x} and \\$fn(1)\n",
+        "value \\$(x) and \\$fn(1)\n",
         "hole \\<?slot> and \\<?(n)>\n",
+        "seat \\<$date> and \\<$list(string, length: 6)> and \\<$5>\n",
         "@note[a \\[ b \\] c]\n",
         "literal \\\\* and \\\\\n",
         "unmarked <PATH> and snake_case_ident and me@example.com stay plain\n",
@@ -723,6 +780,116 @@ fn escaped_inline_constructs_round_trip() {
 }
 
 #[test]
+fn text_shaped_like_a_type_seat_is_printed_escaped() {
+    // Plain text, as an AST that was never source can hold it, is printed so that it reads back as
+    // the same text, and not as a seat.
+    for text in [
+        "<$date>",
+        "<$list(string, length: 6)>",
+        // The `$` of an interpolation after the `<` is escaped on its own.
+        "<$f(x)>",
+        "a <$uuid> b",
+        "<$5>",
+    ] {
+        let doc = File::new(
+            Vec::new(),
+            vec![Block::Paragraph(Paragraph::new(
+                vec![Inline::Text(Text::new(text, Span::dummy()))],
+                Span::dummy(),
+            ))],
+            Span::dummy(),
+        );
+        let printed = document_to_tm(&doc);
+        assert!(
+            printed.contains("\\<"),
+            "{text:?} is printed as {printed:?}"
+        );
+        let after = tomet_ast_parser::parse_file(&printed).unwrap_or_else(|e| {
+            panic!("{text:?} printed as {printed:?}, which failed to parse: {e}")
+        });
+        let [Block::Paragraph(p)] = after.body.as_slice() else {
+            panic!(
+                "{text:?} printed as {printed:?}, which reads as {:?}",
+                after.body
+            );
+        };
+        assert!(
+            matches!(p.content.as_slice(), [Inline::Text(t)] if t.value == text),
+            "{text:?} printed as {printed:?} and read back as {:?}",
+            p.content
+        );
+    }
+}
+
+#[test]
+fn type_seats_round_trip() {
+    for src in [
+        // A block of its own.
+        "<$uuid>\n",
+        "<$uuid()>\n",
+        "<$date(default: auto)>\n",
+        // In running text.
+        "id: <$uuid> and <$list(string, length: 6)> end\n",
+        "<$uuid> starts the line\n",
+        // After a seat the text is text: nothing attaches to it.
+        "<$x>[t] and <$x>(a) and <$x>{b: 1}\n",
+        // As a value.
+        "@card(created: <$datetime(default: auto)>, n: <$nanoid(length: 8, prefix: \"note-\")>)\n",
+        "@card(<$date>)\n",
+        "@card((<$int>, <$string>)){ tags: <$list(string)> }\n",
+        "::meta(id: <$uuid(default: auto)>)\n",
+        // In a heading, a list and the content of an element.
+        "=[ <$string> ]\n",
+        "== Name: <$string>\n",
+        "- <$int>\n- name <$string>\n- <$list(string, length: 2)> {a: 1}\n",
+        "== <$nanoid(length: 8)>\n",
+        "=[ <$x(a: 1)> ]#(id)\n",
+        "@card[\n<$string>\n\nmore <$int>\n]\n",
+        // A `>` inside the arguments.
+        "<$nanoid(prefix: \">\")>\n",
+    ] {
+        let before = tomet_ast_parser::parse_file(src)
+            .unwrap_or_else(|e| panic!("{src:?} failed to parse: {e}"));
+        let printed = document_to_tm(&before);
+        let after = tomet_ast_parser::parse_file(&printed).unwrap_or_else(|e| {
+            panic!("{src:?} printed as {printed:?}, which failed to parse: {e}")
+        });
+        assert_eq!(
+            before, after,
+            "{src:?} printed as {printed:?} and read back differently"
+        );
+        // Printed twice, the same.
+        assert_eq!(document_to_tm(&after), printed, "{src:?}");
+    }
+}
+
+#[test]
+fn a_string_shaped_like_a_type_seat_is_printed_quoted() {
+    for src in [
+        "@a(\"<$date>\")\n",
+        "@a(k: \"x <$list(int)> y\")\n",
+        "::meta(t: \"<$uuid()>\")\n",
+    ] {
+        let before = tomet_ast_parser::parse_file(src).unwrap();
+        let printed = document_to_tm(&before);
+        assert_eq!(printed, src, "{src:?}");
+        assert_eq!(tomet_ast_parser::parse_file(&printed).unwrap(), before);
+    }
+}
+
+#[test]
+fn a_name_and_a_call_with_no_arguments_stay_two_forms_when_printed() {
+    assert_eq!(
+        document_to_tm(&tomet_ast_parser::parse_file("<$uuid>").unwrap()),
+        "<$uuid>\n"
+    );
+    assert_eq!(
+        document_to_tm(&tomet_ast_parser::parse_file("<$uuid()>").unwrap()),
+        "<$uuid()>\n"
+    );
+}
+
+#[test]
 fn inline_raw_with_backtick_falls_back_to_at_raw() {
     let md = "Use `` `code` `` here.\n";
     let doc = tomet_markdown::from_markdown(md);
@@ -737,9 +904,9 @@ fn a_block_value_in_a_group_keeps_every_block_it_holds() {
     // `::macro(name: [ ... ])` is a `{...}` group, whose `key: [...]` values are printed with
     // every block they hold, not as paragraph inlines only (an element in one would come out as `[]`).
     for src in [
-        "::macro(card: [ @card(title: ${1})[ ${2} ] ])\n",
-        "::macro(two: [\none ${1}\n\n@card[ x ]\n])\n",
-        "::macro(note: [ Note: ${msg} ])\n",
+        "::macro(card: [ @card(title: $(1))[ $(2) ] ])\n",
+        "::macro(two: [\none $(1)\n\n@card[ x ]\n])\n",
+        "::macro(note: [ Note: $(msg) ])\n",
     ] {
         let before = tomet_ast_parser::parse_file(src).unwrap();
         let printed = document_to_tm(&before);
@@ -916,7 +1083,7 @@ fn a_declaration_of_entries_is_printed_in_parentheses_and_reads_back() {
     for src in [
         "::meta(title: Hello, draft: true)\n",
         "::meta()\n",
-        "::macro(gh: \"https://x/${1}\")\n",
+        "::macro(gh: \"https://x/$(1)\")\n",
         "::macro()\n",
         "::var(n: {type: int, default: 3})\n",
         "::format(link: {no_space: true})\n",

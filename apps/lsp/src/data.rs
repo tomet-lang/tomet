@@ -110,14 +110,14 @@ mod tests {
 
     #[test]
     fn valid_expression_produces_no_diagnostics() {
-        let text = "::macro(vocab: \"x/${1}\")\npath: ${macro.vocab(\"writ\")}\n";
+        let text = "::macro(vocab: \"x/$(1)\")\npath: $macro.vocab(\"writ\")\n";
         let diags = data_diagnostics_for(text);
         assert!(diags.is_empty());
     }
 
     #[test]
     fn invalid_macro_produces_diagnostic() {
-        let text = "path: ${macro.nosuch(1)}\n";
+        let text = "path: $macro.nosuch(1)\n";
         let diags = data_diagnostics_for(text);
         assert_eq!(diags.len(), 1);
         assert_eq!(diags[0].message, "unknown macro `macro.nosuch`");

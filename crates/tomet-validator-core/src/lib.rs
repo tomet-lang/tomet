@@ -1,19 +1,22 @@
 //! Core document structure and semantic validation.
 //!
 //! Validates standard and custom elements, duplicate IDs, singleton directives,
-//! regions (preamble vs body), argument declarations, and dangling intra-document anchors.
+//! regions (preamble vs body), argument declarations, dangling intra-document anchors, and type
+//! seats (`<$...>`): one outside a blueprint, or one that is not a type, is an error.
 
 pub mod diagnostic;
 pub mod id;
+pub mod seats;
 
 pub use diagnostic::{CstValidationError, Diagnostic, Severity};
 pub use id::{collect_ids, collect_ids_cst};
+pub use seats::check_type_seats;
 
 use tomet_ast::{Block, ElementView, File, Inline};
 use tomet_cst::{SyntaxNode, TextRange};
 use tomet_semantics::DeclKind;
 use tomet_semantics::{Bindings, Shape};
-use tomet_semantics_core::admits::admits;
+use tomet_semantics_core::admits::{admits, is_placeholder};
 use tomet_span::Span;
 use tomet_tree::{Node, Place, Visit};
 
@@ -62,7 +65,7 @@ pub fn shape_str(shape: Shape) -> &'static str {
     }
 }
 
-/// Runs core element, ID, region, and argument validations on `doc`.
+/// Runs core element, ID, region, argument, and type seat validations on `doc`.
 pub fn validate_core(doc: &File, bindings: &Bindings, errors: &mut Vec<Diagnostic>) {
     let mut seen: Vec<(String, Span)> = Vec::new();
 
@@ -118,6 +121,7 @@ pub fn validate_core(doc: &File, bindings: &Bindings, errors: &mut Vec<Diagnosti
     check_singletons_and_regions(doc, bindings, errors);
     check_document_declarations(doc, errors);
     check_vocabulary_params(doc, errors);
+    check_type_seats(doc, errors);
     check_arguments(doc, bindings, errors);
     check_unfinished(doc, errors);
     check_content_shape(doc, bindings, errors);
@@ -239,7 +243,7 @@ pub fn check_singletons_and_regions(doc: &File, bindings: &Bindings, errors: &mu
             Block::Section(_) | Block::List(_) => {
                 visit_all(Node::Block(block), Place::Top, &mut visit);
             }
-            Block::Interp(_) => {}
+            Block::Interp(_) | Block::TypeSeat(_) => {}
             Block::Hole(_) => visit_all(Node::Block(block), Place::Top, &mut visit),
         }
     }
@@ -358,12 +362,13 @@ fn check_arguments_of(
     }
     // An argument is held to the `type:` its parameter declares. A parameter
     // whose `type:` names no type is not checked (the vocabulary says so
-    // where it is read), and a `${...}` is not known until it is evaluated.
+    // where it is read), and a `{$ ... }` is not known until it is evaluated, nor a `<$...>`
+    // until it is filled.
     for (key, value) in entries {
         let Some(ty) = decl.param(key).and_then(|p| p.declared_type()) else {
             continue;
         };
-        if matches!(value, Value::Interp(_)) {
+        if is_placeholder(value) {
             continue;
         }
         if let Err(mismatch) = admits(&ty, value) {
@@ -630,7 +635,11 @@ fn for_each_direct_content_item<'a>(content: &'a [Block], mut f: impl FnMut(Elem
                     }
                 }
             }
-            Block::Section(_) | Block::List(_) | Block::Interp(_) | Block::Hole(_) => {}
+            Block::Section(_)
+            | Block::List(_)
+            | Block::Interp(_)
+            | Block::Hole(_)
+            | Block::TypeSeat(_) => {}
         }
     }
 }
@@ -691,7 +700,7 @@ pub fn check_vault_only_declarations(doc: &File, errors: &mut Vec<Diagnostic>) {
 ///
 /// Only a `type:` with a form can be wrong: `uuid` and `datetime`. A field the
 /// document does not write, an empty one (the state in which `tomet format`
-/// generates one), and a `${...}` not yet evaluated are not reported.
+/// generates one), and a `{$ ... }` not yet evaluated or a `<$...>` not yet filled are not reported.
 pub fn check_field_types(
     doc: &File,
     field_types: &std::collections::BTreeMap<String, String>,
@@ -756,12 +765,15 @@ fn field_value_error(
     use tomet_type::Type;
 
     let field_type = field_types.get(field)?;
-    let ty = Type::from_name(field_type).filter(|ty| ty.has_text_form())?;
+    let ty = field_type
+        .parse::<Type>()
+        .ok()
+        .filter(|ty| ty.has_text_form())?;
     let well_formed = match value {
         Value::Null => true,
-        // `${...}` keeps its place in the tree until it is evaluated,
-        // and what it comes to is not known here.
-        Value::Interp(_) => true,
+        // `{$ ... }` keeps its place in the tree until it is evaluated, and `<$...>` until it is
+        // filled, and what either comes to is not known here.
+        _ if is_placeholder(value) => true,
         // A scalar is the text it was written as: a bare `1.10` is the
         // version `1.10`, and `2026` is not a datetime.
         scalar => scalar

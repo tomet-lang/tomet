@@ -101,7 +101,7 @@ fn prepare_file(mut doc: tomet::ast::File, opts: &ProcessOptions) -> tomet::ast:
         }
     }
 
-    // 2. Resolve every `${...}`: macros, references inside the document, and
+    // 2. Resolve every `{$ ... }`: macros, references inside the document, and
     // the rest. There is no disk here, so an expression that reaches for
     // another document stays as written, which is what `NoResolver` gives.
     let here = opts.current_path.as_deref().unwrap_or("document.tmt");

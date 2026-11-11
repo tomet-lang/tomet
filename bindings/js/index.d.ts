@@ -24,7 +24,7 @@ export type Id = string;
  *
  * A map is an object; the key of a positional entry is `""`. Beyond plain data a
  * value may be what the source wrote there: a call (`{ call, args }`), a
- * `${...}` (`Interpolation`), a `?` hole, an `@element`, or `[content]`
+ * `{$ ... }` (`Interpolation`), a `?` hole, a `<$type>` seat (`TypeSeat`), an `@element`, or `[content]`
  * (`Block[]`). A reader tells them apart by their own keys.
  *
  * Only plain data and `Block[]` are read back when a `File` is passed in.
@@ -100,7 +100,17 @@ export interface Hole {
   span: Span;
 }
 
-/** An expression of `${...}`, left to the evaluator. */
+/**
+ * A `<$type(args)>` seat: the type of a value that is not there yet, as the
+ * expression it is written (`uuid` is a name, `list(string, length: 6)` a call),
+ * left to the evaluator. Which names are types is not decided here.
+ */
+export interface TypeSeat {
+  expr: InterpExpr;
+  span: Span;
+}
+
+/** The expression of an interpolation (`{$ ... }`, `$(...)`, `$name(...)`), left to the evaluator. */
 export interface InterpExpr {
   kind: unknown;
   span: Span;
@@ -121,6 +131,7 @@ export type Inline =
   | { Element: Element }
   | { Interp: Interpolation }
   | { Hole: Hole }
+  | { TypeSeat: TypeSeat }
   | { SoftBreak: { span: Span } }
   | { LineBreak: { span: Span } }
   /** Verbatim text, which may hold newlines (a code block's body). */
@@ -166,6 +177,7 @@ export type Block =
   | { Section: Section }
   | { List: List }
   | { Hole: Hole }
+  | { TypeSeat: TypeSeat }
   | { Interp: Interpolation };
 
 export interface File {

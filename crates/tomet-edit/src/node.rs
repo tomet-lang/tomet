@@ -465,7 +465,7 @@ pub enum InlineItem {
         inner_raw: String,
         raw: String,
     },
-    /// An inline form (`@link(...)`, `${...}`, `$func(...)`, `@conflict(...)`).
+    /// An inline form (`@link(...)`, `{$ ... }`, `$func(...)`, `@conflict(...)`).
     Form {
         name: String,
         raw: String,

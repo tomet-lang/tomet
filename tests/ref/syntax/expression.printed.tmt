@@ -3,57 +3,57 @@
 ::id(doc-expression)
 
 =[リテラル]
-${true} ${false} ${null} ${42} ${-3} ${1.5} ${"text"}
+{$ true } {$ false } {$ null } $(42) {$ -3 } {$ 1.5 } {$ "text" }
 
 =[比較と論理]
-${d::meta.created >= "2026-01-01" && not(d::meta.draft == true)}
+{$ d::meta.created >= "2026-01-01" && not(d::meta.draft == true) }
 
-${a == b}
+{$ a == b }
 
-${a != b || c < d}
+{$ a != b || c < d }
 
-${x <= 1 && y >= 2}
+{$ x <= 1 && y >= 2 }
 
-${(a || b) && c}
+{$ (a || b) && c }
 
 =[無名関数]
 $xs.filter(d => d::meta.tags.contains("rust"))
 
-${xs.sort(d => d::meta.created, "desc").map(d => d.link())}
+{$ xs.sort(d => d::meta.created, "desc").map(d => d.link()) }
 
 $xs.filter((a, b) => a > b)
 
 =[文書とアドレス]
-${#intro.tags}
+$(#intro.tags)
 
-${self#intro.tags.item(2)}
+{$ self#intro.tags.item(2) }
 
-${tmt("docs/a.tmt")#intro}
+{$ tmt("docs/a.tmt")#intro }
 
-${tmt("docs/a.tmt")#intro.title}
+{$ tmt("docs/a.tmt")#intro.title }
 
-${#note.source.addr().title}
+{$ #note.source.addr().title }
 
 =[ノードからノードへ（::）とデータ（.）]
-${#u1::id} ${#u1.id}
+$(#u1::id) $(#u1.id)
 
-${#u1::meta.tag}
+$(#u1::meta.tag)
 
-${self::doc::meta.title}
+$(self::doc::meta.title)
 
-${self::meta.tags.join(", ")}
+{$ self::meta.tags.join(", ") }
 
-${vault::docs.filter(d => d::path == "docs/a.tmt").map(d => d.link())}
+{$ vault::docs.filter(d => d::path == "docs/a.tmt").map(d => d.link()) }
 
 =[addr]
-${addr(tmt:docs/a.tmt#intro)}
+$addr(tmt:docs/a.tmt#intro)
 
-${addr(dir:docs/my-notes)::docs}
+{$ addr(dir:docs/my-notes)::docs }
 
 $include(addr(tmt:docs/a.tmt#intro), heading: false)
 
 $include(addr(tmt:docs/a.tmt))
 
-${addr(dir:docs)}
+$addr(dir:docs)
 
-本文の中にも置ける -- ${a == b} や $slug-of(title) のように。
+本文の中にも置ける -- {$ a == b } や $slug-of(title) のように。

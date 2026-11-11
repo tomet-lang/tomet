@@ -21,12 +21,16 @@ pub fn lower_data_file(root: &SyntaxNode, src: &str) -> Result<File<Value>> {
     ))
 }
 
-/// Shifts spans of all interpolations in `value` by `delta`.
+/// Shifts spans of all interpolations and type seats in `value` by `delta`.
 pub fn shift_spans(value: &mut Value, delta: usize) {
     match value {
         Value::Interp(interp) => {
             interp.span.start += delta;
             interp.span.end += delta;
+        }
+        Value::TypeSeat(seat) => {
+            seat.span.start += delta;
+            seat.span.end += delta;
         }
         Value::Map(entries) => {
             for (_, v) in entries {

@@ -22,9 +22,9 @@ impl MacroPattern {
         let mut rest = template;
 
         let mut idx = 1;
-        while let Some(pos) = rest.find(&format!("${{{idx}}}")) {
+        while let Some(pos) = rest.find(&format!("$({idx})")) {
             segments.push(rest[..pos].to_string());
-            rest = &rest[pos + format!("${{{idx}}}").len()..];
+            rest = &rest[pos + format!("$({idx})").len()..];
             idx += 1;
         }
         segments.push(rest.to_string());

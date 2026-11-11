@@ -47,7 +47,7 @@ pub(super) fn lower_section(node: &SyntaxNode) -> Result<Block> {
 
 /// The inline content of a `[title]`. Empty content is an empty title; one plain
 /// paragraph is that paragraph's own inline content; a single element, hole or
-/// `${...}` (`=[ ${x} ]`) is demoted to inline and is the title's only node.
+/// interpolation (`=[ $(x) ]`) is demoted to inline and is the title's only node.
 /// Anything else has no place in `Section.title`, which holds inlines.
 fn title_from_content(at: usize, mut blocks: Vec<Block>) -> Result<Vec<Inline>> {
     let only = |what: &str| {
@@ -69,6 +69,7 @@ fn title_from_content(at: usize, mut blocks: Vec<Block>) -> Result<Vec<Inline>> 
                 hole.placement = Placement::Inline;
                 Ok(vec![Inline::Hole(hole)])
             }
+            Some(Block::TypeSeat(seat)) => Ok(vec![Inline::TypeSeat(seat)]),
             Some(Block::Section(_)) => Err(only("a nested section")),
             Some(Block::List(_)) => Err(only("a list")),
             None => unreachable!(),

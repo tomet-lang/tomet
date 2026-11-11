@@ -26,6 +26,7 @@ pub(crate) fn inlines_to_plain(inlines: &[Inline]) -> String {
             }
             Inline::Interp(_) => {}
             Inline::Hole(hole) => s.push_str(&tomet_printer::hole_to_tm(hole)),
+            Inline::TypeSeat(seat) => s.push_str(&seat.to_string()),
         }
     }
     s
@@ -54,6 +55,7 @@ pub(crate) fn blocks_to_plain(blocks: &[Block]) -> String {
             }
             Block::Interp(_) => {}
             Block::Hole(hole) => s.push_str(&tomet_printer::hole_to_tm(hole)),
+            Block::TypeSeat(seat) => s.push_str(&seat.to_string()),
         }
     }
     s

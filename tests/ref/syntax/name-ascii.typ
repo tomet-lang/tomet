@@ -8,7 +8,7 @@ Not boxes: \<?aé\> \<?a-é\> \<?名前\>.
 
 Elements:  and .
 
-Calls: `${a-e(1)}` and `${a.e(1)}`.
+Calls: `$a-e(1)` and `$a.e(1)`.
 
 Boxes: \<?a-e\> and \<?a\>.
 

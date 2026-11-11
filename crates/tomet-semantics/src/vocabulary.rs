@@ -65,8 +65,8 @@ pub enum Region {
 pub struct ParamDecl {
     pub name: String,
     /// The declared type: `None` when `type:` is not written, `Some(Err(_))`
-    /// when it is written and is not a type (an unknown name, or a spelling
-    /// such as `list(string)` that has no meaning yet).
+    /// when it is written and is not a type (an unknown name, or a call the
+    /// type does not take, such as `list(string, string)`).
     pub ty: Option<Result<Type, TypeError>>,
     pub required: bool,
     /// Whether this parameter may be filled by position rather than by
@@ -188,7 +188,7 @@ pub fn is_reserved_element_name(name: &str) -> bool {
 /// which is a limit of the vocabulary format, not a permanent design.
 ///
 /// `doc.index` declares no elements: an index document's body is `std`
-/// (`ul`/`ol`/`@link`) plus `${filter(...)}`/`${by(...)}`, which are neither
+/// (`ul`/`ol`/`@link`) plus `$filter(...)`/`$by(...)`, which are neither
 /// elements nor registered functions -- `tomet-transform::index_query`
 /// pattern-matches them directly, with no dependency on `Bindings` at all.
 /// This vocabulary exists purely so `::kind(doc.index)` resolves instead of
@@ -739,6 +739,7 @@ fn params_from_value(args: &Value) -> Vec<ParamDecl> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use tomet_type::Kind;
 
     fn vocab(src: &str) -> Vocabulary {
         let doc = tomet_ast_parser::parse_file(src).expect("vocabulary parses");
@@ -823,17 +824,15 @@ mod tests {
         let id = card.param("id").expect("declared");
         assert!(id.required);
         assert!(id.positional);
-        assert_eq!(id.ty, Some(Ok(Type::Uint)));
-        assert_eq!(id.declared_type(), Some(Type::Uint));
+        assert_eq!(id.ty, Some(Ok(Type::bare(Kind::Uint))));
+        assert_eq!(id.declared_type(), Some(Type::bare(Kind::Uint)));
 
         let tags = card.param("tags").expect("declared");
         assert!(!tags.required);
         assert!(!tags.positional);
-        assert_eq!(tags.ty, Some(Ok(Type::List(Some(Box::new(Type::String))))));
-        assert_eq!(
-            tags.declared_type(),
-            Some(Type::List(Some(Box::new(Type::String))))
-        );
+        let list_of_strings: Type = "list(string)".parse().unwrap();
+        assert_eq!(tags.ty, Some(Ok(list_of_strings.clone())));
+        assert_eq!(tags.declared_type(), Some(list_of_strings));
     }
 
     #[test]
@@ -984,9 +983,11 @@ mod tests {
                 .find(|x| x.param == p)
                 .map(|x| x.reason.as_str())
         };
-        // `set(string)` has no spelling yet, `person` is no type
+        // `set(string)` and `person` are no types
         assert!(
-            by_param("unsupported").unwrap().contains("no spelling yet"),
+            by_param("unsupported")
+                .unwrap()
+                .contains("`set` is not a type"),
             "{problems:?}"
         );
         assert!(

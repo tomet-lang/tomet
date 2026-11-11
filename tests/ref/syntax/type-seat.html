@@ -1,0 +1,31 @@
+<h1>行に座だけ（ブロック）</h1>
+<p>&lt;$uuid&gt;</p>
+<p>&lt;$list(string, length: 6)&gt;</p>
+<h1>地の文の中</h1>
+<p>文書の id は &lt;$uuid&gt; で、題は &lt;$string(length: 40)&gt; と書く。</p>
+<ul>
+<li>リストの項目の座は &lt;$int&gt; と &lt;$date(default: auto)&gt; 。</li>
+</ul>
+<p><em>強調の中の &lt;$string&gt; も</em>、<strong>強い強調の中の &lt;$int&gt; も</strong>座。</p>
+<h1>見出しの座 &lt;$string&gt;</h1>
+<h1>値の位置</h1>
+<div class="tm-element tm-memo" data-tomet-data="{&quot;args&quot;:{&quot;type_seat&quot;:&quot;int&quot;}}"></div>
+<div class="tm-element tm-memo" data-tomet-data="{&quot;args&quot;:{&quot;key&quot;:{&quot;type_seat&quot;:&quot;string&quot;}}}"></div>
+<div class="tm-element tm-memo" data-tomet-data="{&quot;args&quot;:{&quot;id&quot;:{&quot;type_seat&quot;:&quot;uuid(default: auto)&quot;},&quot;tags&quot;:[{&quot;type_seat&quot;:&quot;string&quot;},{&quot;type_seat&quot;:&quot;int&quot;}]}}"></div>
+<div class="tm-element tm-memo" data-tomet-data="{&quot;args&quot;:{&quot;name&quot;:{&quot;type_seat&quot;:&quot;string&quot;},&quot;size&quot;:{&quot;type_seat&quot;:&quot;int(default: 0)&quot;}}}"></div>
+<h1>引数</h1>
+<p>&lt;$string(length: 80)&gt;</p>
+<p>&lt;$nanoid(length: 8, prefix: "note-", default: auto)&gt;</p>
+<p>&lt;$list(list(string), length: 6)&gt;</p>
+<p>&lt;$list(string, length: 6)&gt;</p>
+<h1><code>&gt;</code> を含む引数</h1>
+<p>&lt;$string(prefix: "&gt;")&gt;</p>
+<p>&lt;$string(prefix: ")&gt;")&gt;</p>
+<p>&lt;$int(min: a &gt; b)&gt; と &lt;$int((min &gt; 0), max: 9)&gt;</p>
+<p>&lt;$x&gt;y&gt; は座のあとに文字 <code>y&gt;</code> が続く。&lt;$x(a)&gt; &gt; &lt;$y&gt; も同じ。</p>
+<h1>引数の有無</h1>
+<p>&lt;$uuid&gt; と &lt;$uuid()&gt; はどちらも座。</p>
+<h1>座にならないもの</h1>
+<p>&lt;$&gt; &lt;$5&gt; &lt;$ x&gt; &lt;$-x&gt; &lt;$x.y&gt; &lt;$x &gt;</p>
+<p>&lt;$x(a) &gt; と &lt;$x{a: 1}&gt; と &lt;$x(a)(b)&gt; も文字のまま。</p>
+<p>&lt;$uuid&gt; は座ではない。</p>

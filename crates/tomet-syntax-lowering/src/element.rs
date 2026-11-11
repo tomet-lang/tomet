@@ -6,7 +6,7 @@
 
 use crate::error::{Error, Result};
 use crate::lower::error_node::lower_error;
-use crate::lower::form::{lower_element, lower_slot, slot_of};
+use crate::lower::form::{LoweredSlot, lower_element, lower_slot, slot_of};
 use crate::lower::groups::{lower_content, lower_embedded, lower_group_list};
 use tomet_ast::{Bare, Block, Connect, Data, Entry, Group, Id, Placement, Value};
 use tomet_cst::{SyntaxElement, SyntaxKind as K, SyntaxNode, SyntaxToken};
@@ -336,6 +336,15 @@ pub(crate) fn lower_value_group(node: &SyntaxNode) -> Result<Group> {
                             } else {
                                 *element
                             }),
+                            // A seat is a value, and a `{...}` group holds entries.
+                            Value::TypeSeat(seat) => {
+                                return Err(err(
+                                    seat.span.start,
+                                    "a '{...}' group holds 'key: value' entries or elements, \
+                                     not a type seat; write it as the value of a key \
+                                     (`key: <$type>`) or in '(args)'",
+                                ));
+                            }
                             _ => unreachable!("lower_embedded of an element node"),
                         };
                         entries.push(entry);
@@ -621,7 +630,7 @@ fn lower_single_value_from_children(
             }
             let is_expr = first.kind() == K::INTERP_EXPR
                 || (first.kind() == K::INLINE_FORM
-                    && first.as_node().is_some_and(opens_with_dollar));
+                    && first.as_node().is_some_and(is_interpolation));
             if is_expr && next_elem.kind() == K::COLON {
                 return Err(err(
                     usize::from(first.text_range().start()),
@@ -640,10 +649,10 @@ fn lower_single_value_from_children(
                 K::CONTENT => return Ok(Value::Blocks(lower_content(n)?)),
                 K::SLOT => return Ok(Value::String(n.text().to_string())),
                 K::INLINE_FORM | K::BLOCK_FORM => {
-                    return if opens_with_dollar(n) {
+                    return if is_interpolation(n) {
                         Ok(Value::Interp(crate::interp::lower_interpolation(n)?))
                     } else if let Some(slot) = slot_of(n) {
-                        Ok(Value::Hole(Box::new(lower_slot(&slot)?)))
+                        lower_slot(&slot).map(LoweredSlot::into_value)
                     } else {
                         Ok(Value::Element(Box::new(lower_element(n)?)))
                     };
@@ -803,12 +812,15 @@ pub(crate) fn unescape_quoted_string(text: &str, offset: usize) -> Result<String
     Ok(out)
 }
 
-/// Whether `node` starts with `$`.
-fn opens_with_dollar(node: &SyntaxNode) -> bool {
-    node.children()
-        .find(|n| n.kind() == K::SIGIL)
-        .and_then(|n| n.first_token())
-        .is_some_and(|t| t.kind() == K::DOLLAR)
+/// Whether `node` is an interpolation: `{$ expr }` and `$(ref)` are an `INTERP_EXPR`, and
+/// `$name(args)` is a sigil that opens with `$`.
+pub(crate) fn is_interpolation(node: &SyntaxNode) -> bool {
+    node.children().any(|n| n.kind() == K::INTERP_EXPR)
+        || node
+            .children()
+            .find(|n| n.kind() == K::SIGIL)
+            .and_then(|n| n.first_token())
+            .is_some_and(|t| t.kind() == K::DOLLAR)
 }
 
 /// Whether an element inside a `{...}` group stands as a block on its own line.

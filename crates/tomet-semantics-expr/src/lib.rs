@@ -1,19 +1,18 @@
 //! =[ tomet-expr ]
 //!
-//! Expression evaluation for the `${...}` expressions of a Tomet document
+//! Expression evaluation for the `{$ ... }` expressions of a Tomet document
 //! ([`InterpExpr`]), following `tmtroot/spec/expressions/`.
 //!
 //! =[ Architecture & Responsibilities ]
 //!
 //! - (Pure Boundary (Zero I/O))
 //!   | Evaluation performs no I/O and reads no clock. What it cannot know by
-//!   | itself -- another document, a directory, the vault's settings, the
-//!   | time -- comes through [`Resolver`] and [`Generate`], which the layers
-//!   | above implement.
+//!   | itself -- another document, a directory, the vault's settings -- comes
+//!   | through [`Resolver`], which the layers above implement.
 //! - (Typed values)
 //!   | [`EvalValue`] is not the `.tmt` data model ([`tomet_ast::Value`]): it
-//!   | also holds documents, directories, functions and datetimes, which can
-//!   | be the result of an expression and never data. A fragment (`link`,
+//!   | also holds documents, directories, functions, types and datetimes, which
+//!   | can be the result of an expression and never data. A fragment (`link`,
 //!   | `include`) is the one non-scalar value that can be placed in output.
 //!   | Structured document parts are owned [`Part`]s (Layer 2), converted from
 //!   | Layer 1 [`tomet_tree::Node`] via [`Part::from_tree_node`].
@@ -25,20 +24,30 @@
 //!   | `.prop` is a retired spelling, and reports where to write what it meant
 //!   | ([`EvalError::Retired`]).
 //! - (Names by position)
-//!   | A name is looked up in the one table its position selects: a call in
-//!   | the builtin functions, a bare name in the lambda parameters and then
-//!   | the reserved values ([`RESERVED_VALUES`]). There is no fall through,
-//!   | and an unknown name is an error.
+//!   | A name is looked up in the tables its position selects: a call in the
+//!   | builtin functions ([`FUNCTIONS`]) and then the types, a bare name in the
+//!   | lambda parameters, the reserved values ([`RESERVED_VALUES`]) and then the
+//!   | types. Never the table of another position, and an unknown name is an
+//!   | error.
+//! - (Types are values)
+//!   | A type is a value ([`EvalValue::Type`]), written in the same language:
+//!   | `string` is a type, and a call of a type name builds one --
+//!   | `list(string, length: 6)`, `nanoid(length: 8, default: auto)` -- under the
+//!   | rules of [`tomet_type::Type::build`], whose refusals are reported as
+//!   | [`EvalError::BadType`]. A function of the same name wins over the type
+//!   | (`version("1.10")` is a version). `auto` is no name and no value: it is
+//!   | read only as the value of `default` in the arguments of a type. What a type
+//!   | seat holds is read by [`evaluate_type`], with the types first, so a name it
+//!   | does not know is an unknown type ([`tomet_type::TypeError::Unknown`]) and not
+//!   | an unknown name of the expression language.
 //! - (No conversions)
 //!   | Operators and methods use the values they are given and convert none
 //!   | of them. `&&` and `||` skip their right side once the left decides,
 //!   | and take booleans only.
-//! - (When it runs)
-//!   | [`Phase::Output`] is rendering; the same expression gives the same
-//!   | result every time. [`Phase::Create`] is making a document from a
-//!   | blueprint, and is the only place `generate.*` exists. `var` exists in both:
-//!   | the variables a document or a vault declares, filled in by `tomet new --var`
-//!   | when creating.
+//! - (One mode)
+//!   | The same expression gives the same result every time: nothing in the
+//!   | language draws a value or reads a clock. `var` is the variables a document
+//!   | or a vault declares, filled in by `tomet new --var` when creating.
 //! - (Macros)
 //!   | Macros defined by `::macro` are called as `macro.name(...)`. Macro
 //!   | arguments are ordinary expressions. Calls check argument counts and
@@ -66,21 +75,20 @@ mod methods;
 mod ops;
 mod outside;
 mod parts;
+mod types;
 mod value;
 mod vars;
 
 #[cfg(test)]
 mod tests;
 
-pub use context::{
-    EvalContext, Generate, NoResolver, Note, Notes, OffsetGenerate, Phase, PreparedBlocks,
-    Resolver, SystemGenerate,
-};
+pub use context::{EvalContext, NoResolver, Note, Notes, PreparedBlocks, Resolver};
 pub use datetime::{format_datetime, parse_datetime, parse_offset};
 pub use error::EvalError;
 pub use include::MAX_INCLUDE_DEPTH;
 pub use memory::MemoryResolver;
 pub use outside::{OwnNames, Reach, Reaching, reaches_outside};
+pub use types::{evaluate_type, type_names};
 pub use value::{Closure, DirRef, DocRef, Env, EvalValue, Namespace, Part, scalar_text};
 pub use vars::{VarError, VarScope, shaped, typed_value, var_scope};
 
@@ -90,8 +98,7 @@ use args::Args;
 use ops::{arithmetic, compare, values_equal};
 
 /// The names that stand for a value and that no lambda parameter may take.
-/// `generate` exists only while a document is being created.
-pub const RESERVED_VALUES: [&str; 5] = ["self", "macro", "var", "vault", "generate"];
+pub const RESERVED_VALUES: [&str; 4] = ["self", "macro", "var", "vault"];
 
 /// Evaluates `expr` in `cx`.
 pub fn evaluate(expr: &InterpExpr, cx: &EvalContext) -> Result<EvalValue, EvalError> {
@@ -152,6 +159,13 @@ fn eval(expr: &InterpExpr, cx: &EvalContext, env: &Env) -> Result<EvalValue, Eva
             Literal::Null => EvalValue::Null,
         }),
         InterpExprKind::Group(inner) => eval(inner, cx, env),
+        InterpExprKind::Seq(items) => {
+            let mut values = Vec::with_capacity(items.len());
+            for item in items {
+                values.push(eval(item, cx, env)?);
+            }
+            Ok(EvalValue::Seq(values))
+        }
         InterpExprKind::Identifier(name) => name_value(name, cx, env),
         InterpExprKind::Lambda { params, body } => {
             if let Some(reserved) = params
@@ -198,7 +212,7 @@ fn eval(expr: &InterpExpr, cx: &EvalContext, env: &Env) -> Result<EvalValue, Eva
     }
 }
 
-/// A name written as a value: a lambda parameter, else a reserved value.
+/// A name written as a value: a lambda parameter, else a reserved value, else a type.
 fn name_value(name: &str, cx: &EvalContext, env: &Env) -> Result<EvalValue, EvalError> {
     if let Some(bound) = env.get(name) {
         return Ok(bound.clone());
@@ -208,9 +222,9 @@ fn name_value(name: &str, cx: &EvalContext, env: &Env) -> Result<EvalValue, Eval
         "macro" => Ok(EvalValue::Namespace(Namespace::Macro)),
         "vault" => Ok(EvalValue::Directory(DirRef(String::new()))),
         "var" => Ok(cx.var.clone()),
-        "generate" if cx.phase == Phase::Output => Err(EvalError::PhaseOnly(name.to_string())),
-        "generate" => Ok(EvalValue::Namespace(Namespace::Generate)),
-        _ => Err(EvalError::UnknownName(name.to_string())),
+        _ => types::named(name)
+            .map(EvalValue::Type)
+            .ok_or_else(|| EvalError::UnknownName(name.to_string())),
     }
 }
 
@@ -247,9 +261,6 @@ fn member_value(value: EvalValue, member: &str) -> Result<EvalValue, EvalError> 
         EvalValue::Namespace(Namespace::Macro) => Err(EvalError::message(format!(
             "the macro `{member}` has to be called: `macro.{member}(...)`"
         ))),
-        EvalValue::Namespace(Namespace::Generate) => Err(EvalError::message(format!(
-            "`generate.{member}` has to be called: `generate.{member}()`"
-        ))),
         _ => Err(EvalError::UnknownMember {
             on: value.type_name(),
             member: member.to_string(),
@@ -280,6 +291,10 @@ fn call(
     env: &Env,
 ) -> Result<EvalValue, EvalError> {
     match &callee.kind {
+        // A type is built from the arguments as written (`default: auto` is not evaluated).
+        InterpExprKind::Identifier(name) if types::is_constructor(name) => {
+            types::construct(name, args, cx, env).map(EvalValue::Type)
+        }
         InterpExprKind::Identifier(name) => {
             let args = eval_args(args, cx, env)?;
             builtin(name, args, cx)
@@ -298,7 +313,6 @@ fn call(
             let args = eval_args(args, cx, env)?;
             match receiver {
                 EvalValue::Namespace(Namespace::Macro) => macro_call(member, args, cx),
-                EvalValue::Namespace(Namespace::Generate) => generate_call(member, args, cx),
                 EvalValue::Part { doc, part } => parts::part_method(&doc, &part, member, args),
                 EvalValue::Document(doc) => parts::document_method(&doc, member, args, cx),
                 EvalValue::String(text) if member == "addr" => {
@@ -315,25 +329,12 @@ fn call(
     }
 }
 
-/// `generate.now()` and `generate.uuid()`.
-fn generate_call(name: &str, args: Args, cx: &EvalContext) -> Result<EvalValue, EvalError> {
-    if cx.phase == Phase::Output {
-        return Err(EvalError::PhaseOnly(format!("generate.{name}")));
-    }
-    args.exactly(&format!("generate.{name}"), 0)?;
-    match name {
-        "now" => Ok(EvalValue::DateTime(cx.generate.now())),
-        "uuid" => Ok(EvalValue::String(cx.generate.uuid())),
-        _ => Err(EvalError::UnknownFunction(format!("generate.{name}"))),
-    }
-}
-
 /// `macro.name(args)`: the template with its places filled in.
 ///
 /// A template is a [`Value`] ([`tomet_declaration::Arity`] says what its places are). A string is
-/// a text macro: `${1}`, `${2}`, ... take positional arguments, `${ident}` takes a named one, any
-/// other `${...}` in it is plain text, and the call is a string. A `[ ... ]` is a block macro: the
-/// same places, written as the interpolations `${1}` and `${name}` in its blocks, are filled in on
+/// a text macro: `$(1)`, `$(2)`, ... take positional arguments, `$(ident)` takes a named one, any
+/// other `{$ ... }` in it is plain text, and the call is a string. A `[ ... ]` is a block macro: the
+/// same places, written as the interpolations `$(1)` and `$(name)` in its blocks, are filled in on
 /// the tree, and the call is a fragment ([`EvalValue::Fragment`]) of those blocks.
 ///
 /// Arguments are ordinary expressions. Missing or excess arguments report arity
@@ -351,11 +352,11 @@ fn macro_call(name: &str, args: Args, cx: &EvalContext) -> Result<EvalValue, Eva
             let mut text = template.clone();
             for (key, value) in &args.named {
                 if is_ident_placeholder(key) {
-                    text = text.replace(&format!("${{{key}}}"), &methods::scalar_text(value)?);
+                    text = text.replace(&format!("$({key})"), &methods::scalar_text(value)?);
                 }
             }
             for (i, value) in args.positional.iter().enumerate() {
-                text = text.replace(&format!("${{{}}}", i + 1), &methods::scalar_text(value)?);
+                text = text.replace(&format!("$({})", i + 1), &methods::scalar_text(value)?);
             }
             Ok(EvalValue::String(text))
         }
@@ -427,12 +428,15 @@ fn macro_args_fit(name: &str, arity: &Arity, args: &Args) -> Result<(), EvalErro
 }
 
 /// The functions an expression can call by a bare name, each with a line
-/// saying what it does -- what an editor offers when `${` is typed.
+/// saying what it does -- what an editor offers when `{$` is typed.
 ///
 /// `addr` is read by the parser rather than called, and is listed because it
 /// is written like a call. Every other name is one [`builtin`] answers, which
 /// a test holds to; a function added there is added here, so the editor does
 /// not offer the language of last month.
+///
+/// A name listed here is a function even where a type has the same name:
+/// `version("1.10")` is a version and not a call of the type `version`.
 pub const FUNCTIONS: &[(&str, &str)] = &[
     ("tmt", "A document by its path `tmt(\"path\")`"),
     ("ref", "A document by its note name `ref(\"name\")`"),
@@ -473,11 +477,12 @@ pub const RESERVED_NAMES: &[(&str, &str)] = &[
         "The variables declared by `::var`: `var.name` (`tomet new --var` fills them in)",
     ),
     ("vault", "The vault's root directory: `vault::docs`"),
-    (
-        "generate",
-        "`generate.uuid()` and `generate.now()` (only when creating a document)",
-    ),
 ];
+
+/// Whether `name` is a function called by a bare name, as [`FUNCTIONS`] lists them.
+fn is_function(name: &str) -> bool {
+    FUNCTIONS.iter().any(|(function, _)| *function == name)
+}
 
 /// The functions that are called by a bare name. Keep [`FUNCTIONS`] in step.
 fn builtin(name: &str, args: Args, cx: &EvalContext) -> Result<EvalValue, EvalError> {
@@ -609,6 +614,11 @@ fn binary(
                 eval(rhs, cx, env)?,
             )?))
         }
+        BinaryOp::Add | BinaryOp::Sub => {
+            let (l, r) = (eval(lhs, cx, env)?, eval(rhs, cx, env)?);
+            let function = if op == BinaryOp::Add { "add" } else { "sub" };
+            arithmetic(function, &l, &r)
+        }
         _ => {
             let (l, r) = (eval(lhs, cx, env)?, eval(rhs, cx, env)?);
             Ok(EvalValue::Bool(match op {
@@ -618,7 +628,9 @@ fn binary(
                 BinaryOp::Le => compare(&l, &r)?.is_le(),
                 BinaryOp::Gt => compare(&l, &r)?.is_gt(),
                 BinaryOp::Ge => compare(&l, &r)?.is_ge(),
-                BinaryOp::And | BinaryOp::Or => unreachable!("handled above"),
+                BinaryOp::Add | BinaryOp::Sub | BinaryOp::And | BinaryOp::Or => {
+                    unreachable!("handled above")
+                }
             }))
         }
     }

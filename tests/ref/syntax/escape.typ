@@ -2,7 +2,7 @@
 
 text // not comment and /\* not comment \*/
 
-\@name(x) and \${x} and \<?slot\> and \\_em_
+\@name(x) and \$(x) and \$f(x) and {\$ x } and \<?slot\> and \\_em_
 
 ; not break = not section --- - not list \`\` not line raw \`\`\` not fence ::decl(x)
 

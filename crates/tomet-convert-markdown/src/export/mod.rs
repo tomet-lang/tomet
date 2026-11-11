@@ -28,8 +28,8 @@ struct MarkdownCtx<'a> {
 
 /// Renders `doc` as CommonMark.
 ///
-/// Takes no evaluation context: no converter evaluates `${...}`. What a
-/// `${...}` means is settled before any of them sees the tree, by
+/// Takes no evaluation context: no converter evaluates `{$ ... }`. What a
+/// `{$ ... }` means is settled before any of them sees the tree, by
 /// `tomet-transform`'s `resolve_expressions` (reached through
 /// `tomet_load::Vault::prepare`), because converters deciding it
 /// independently would produce different answers for the same document.
@@ -73,9 +73,13 @@ fn render_block(cx: &MarkdownCtx, block: &Block, out: &mut String) {
             out.push_str(&render_interp(interp));
             out.push_str("\n\n");
         }
-        // A hole is shown as it was written.
+        // A hole and a type seat are shown as they were written.
         Block::Hole(hole) => {
             out.push_str(&escape_text(&tomet_printer::hole_to_tm(hole)));
+            out.push_str("\n\n");
+        }
+        Block::TypeSeat(seat) => {
+            out.push_str(&escape_text(&seat.to_string()));
             out.push_str("\n\n");
         }
     }
@@ -171,6 +175,7 @@ fn inline_to_md(cx: &MarkdownCtx, inlines: &[Inline]) -> String {
             Inline::Element(el) => out.push_str(&element_to_md(cx, el.as_view(), true)),
             Inline::Interp(interp) => out.push_str(&render_interp(interp)),
             Inline::Hole(hole) => out.push_str(&escape_text(&tomet_printer::hole_to_tm(hole))),
+            Inline::TypeSeat(seat) => out.push_str(&escape_text(&seat.to_string())),
         }
     }
     out
@@ -280,7 +285,7 @@ fn render_table(cx: &MarkdownCtx, el: ElementView<'_>) -> String {
     lines.join("\n")
 }
 
-/// A `${...}` that reached here unresolved, written back as it was.
+/// A `{$ ... }` that reached here unresolved, written back as it was.
 ///
 /// Reaching here at all means the document was not prepared -- a caller
 /// that went straight to this crate rather than through
@@ -288,7 +293,7 @@ fn render_table(cx: &MarkdownCtx, el: ElementView<'_>) -> String {
 /// spelling: rendering nothing would hide it, and evaluating it here is
 /// not this crate's job.
 fn render_interp(interp: &Interpolation) -> String {
-    format!("${{{}}}", interp.expr)
+    interp.to_string()
 }
 
 /// `@ruby[漢字](rt:"かんじ")` -- no CommonMark ruby syntax exists, so this
@@ -548,6 +553,7 @@ fn blocks_to_plain(blocks: &[Block]) -> String {
             }
             Block::Interp(_) => {}
             Block::Hole(hole) => s.push_str(&tomet_printer::hole_to_tm(hole)),
+            Block::TypeSeat(seat) => s.push_str(&seat.to_string()),
         }
     }
     s
@@ -573,6 +579,7 @@ fn inlines_to_plain(inlines: &[Inline]) -> String {
             }
             Inline::Interp(_) => {}
             Inline::Hole(hole) => s.push_str(&tomet_printer::hole_to_tm(hole)),
+            Inline::TypeSeat(seat) => s.push_str(&seat.to_string()),
         }
     }
     s
@@ -735,7 +742,7 @@ fn value_to_plain(v: &Value) -> String {
         // An embedded element has no scalar form either -- same as `Map`.
         Value::Element(_) => String::new(),
         // An interpolation is not known until it is evaluated.
-        Value::Interp(_) | Value::Hole(_) => String::new(),
+        Value::Interp(_) | Value::Hole(_) | Value::TypeSeat(_) => String::new(),
         // Block content has no scalar form either -- same as `Map`.
         Value::Blocks(_) => String::new(),
     }

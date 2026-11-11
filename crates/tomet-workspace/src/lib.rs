@@ -5,7 +5,8 @@
 //! - (refactor) Refactoring pipeline across `.tmt` files.
 //! - (structural) Structural search & replace engine across a workspace.
 //! - (batch_meta) Batch metadata update engine.
-//! - (blueprint) Blueprint discovery and document instantiation.
+//! - (blueprint) Blueprint discovery and document instantiation, its type seats filled from the vault's
+//!   clock and random source ([`source_for`]).
 
 pub mod batch_meta;
 pub mod blueprint;
@@ -32,7 +33,7 @@ mod tests {
   created: 2026-04-12T18:00:00+09:00
 )
 ::macro(
-  youtube_ch: "https://www.youtube.com/${1}"
+  youtube_ch: "https://www.youtube.com/$(1)"
 )
 
 - @link("https://www.youtube.com/@realakibaboyz")[REAL AKIBA BOYZ]

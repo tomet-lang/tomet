@@ -2,7 +2,7 @@
 
 ::meta(key: value, type: person)
 
-${some_id}
+$(some_id)
 
 $sum(a, b)
 

@@ -42,7 +42,7 @@ fn write_value(value: &Value, out: &mut String, top_level: bool) {
             out.push(')');
         }
         Value::Interp(interp) => {
-            out.push_str(&format!("${{{}}}", interp.expr));
+            out.push_str(&interp.to_string());
         }
         Value::Hole(hole) => {
             out.push_str("<?");
@@ -55,6 +55,9 @@ fn write_value(value: &Value, out: &mut String, top_level: bool) {
                 out.push(')');
             }
             out.push('>');
+        }
+        Value::TypeSeat(seat) => {
+            out.push_str(&seat.to_string());
         }
         Value::Element(el) => {
             out.push_str(&format!("@{}", el.name));
@@ -88,7 +91,7 @@ fn write_block_plain_text(block: &tomet_ast::Block, out: &mut String) {
             Inline::Raw(r) => out.push_str(&r.value),
             Inline::SoftBreak(_) => out.push(' '),
             Inline::LineBreak(_) => out.push('\n'),
-            Inline::Element(_) | Inline::Interp(_) | Inline::Hole(_) => {}
+            Inline::Element(_) | Inline::Interp(_) | Inline::Hole(_) | Inline::TypeSeat(_) => {}
         }
     }
 }

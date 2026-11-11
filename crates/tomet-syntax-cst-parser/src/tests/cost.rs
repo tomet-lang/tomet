@@ -32,6 +32,11 @@ fn a_long_line_cst_is_read_in_time_proportional_to_it() {
             format!("- a {} z\n", ": {x}".repeat(n)),
         ),
         ("a heading", format!("= {}\n", "a: ".repeat(n))),
+        (
+            "type seats that close",
+            format!("{}\n", "<$a(b)> ".repeat(n)),
+        ),
+        ("type seats that do not", format!("{}\n", "<$a(".repeat(n))),
     ];
     for (name, src) in &cases {
         within_the_limit(name, src);

@@ -1,4 +1,4 @@
-//! Resolving every `${...}` in a document, once, before anything renders it.
+//! Resolving every `{$ ... }` in a document, once, before anything renders it.
 //!
 //! This is the single place where an expression's value is put back into a
 //! document. It replaces three passes that each handled some positions: the
@@ -12,22 +12,21 @@
 //!   spliced in, anything else is a mismatch;
 //! - on a line of its own: a scalar is a paragraph, a fragment is its blocks;
 //! - as a list item: a list gives one item per element, a scalar gives one;
-//! - a document, an element, a directory, a function or a datetime has no
-//!   place in output at all.
+//! - a document, an element, a directory, a function, a datetime or a type has
+//!   no place in output at all.
 //!
 //! =[ A value that does not fit ]
 //!
 //! Nothing is dropped and nothing is fatal. An expression that cannot be
 //! evaluated, or whose value has no place at its position, is written back
-//! as its own source (`${...}`) and reported in the returned [`Unresolved`]
+//! as its own source (`{$ ... }`) and reported in the returned [`Unresolved`]
 //! list, so `tomet check` can warn about it. That keeps a document that
-//! shows `${...}` as an example working, and still gives a typo somewhere
+//! shows `{$ ... }` as an example working, and still gives a typo somewhere
 //! to surface.
 //!
 //! =[ What an expression sees ]
 //!
-//! The caller's [`EvalContext`] decides: which phase, which documents, which
-//! macros. References resolve through its resolver, so a caller that wants
+//! The caller's [`EvalContext`] decides: which documents, which macros. References resolve through its resolver, so a caller that wants
 //! them answered from the document **as written** -- and it should -- hands
 //! in a resolver that returns the document from before this pass rewrote it.
 
@@ -43,24 +42,25 @@ use tomet_tree::list_item;
 #[derive(Debug, Clone, PartialEq)]
 pub struct Unresolved {
     pub kind: UnresolvedKind,
-    /// What it was, as written: the expression without the surrounding `${`
-    /// and `}`, or the id as `#(x)`.
+    /// What it was, as written: the expression without the surrounding `{$ `
+    /// and ` }`, or the id as `#(x)`.
     pub source: String,
     /// Where it sits in the document that was passed in.
     pub span: Span,
     /// Why: what the evaluator said, what the value could not be placed as,
     /// or what was done with the id.
     pub reason: String,
-    /// Whether the expression only has a value when a document is being created
-    /// from a blueprint: `generate.*`, or a variable that has no `default`. In a
-    /// blueprint that is as it should be, so `tomet check` leaves it out there.
-    pub creation_only: bool,
+    /// Whether the expression has no value only because a variable it reads has
+    /// none yet: declared in `::var` with no `default`, and not given one (`tomet
+    /// new --var` does). A blueprint is written to be filled in, so there that is as it
+    /// should be, and `tomet check` leaves it out.
+    pub awaits_input: bool,
 }
 
 /// What an [`Unresolved`] is about.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum UnresolvedKind {
-    /// A `${...}` that has no value, and is left in the output as written.
+    /// A `{$ ... }` that has no value, and is left in the output as written.
     Expression,
     /// An id that a node already had earlier in the document, so this one was
     /// dropped. Not an expression: it is found after splicing, where a file
@@ -74,19 +74,19 @@ impl Unresolved {
     pub fn message(&self) -> String {
         match self.kind {
             UnresolvedKind::Expression => {
-                format!("unresolved ${{{}}} -- {}", self.source, self.reason)
+                format!("unresolved {{$ {} }} -- {}", self.source, self.reason)
             }
             UnresolvedKind::DroppedId => self.reason.clone(),
         }
     }
 }
 
-/// Replaces every `${...}` in `doc` with what it stands for.
+/// Replaces every `{$ ... }` in `doc` with what it stands for.
 pub fn resolve_expressions(doc: &mut File, cx: &EvalContext) -> Vec<Unresolved> {
     resolve(doc, cx, None)
 }
 
-/// [`resolve_expressions`] for the `${...}` that `selected` picks, by the span of the
+/// [`resolve_expressions`] for the `{$ ... }` that `selected` picks, by the span of the
 /// [`Interpolation`](tomet_ast::Interpolation) in `doc` as it is passed in. The others are left
 /// as the interpolations they are, not as text, and are not reported.
 ///
@@ -176,7 +176,7 @@ impl Pass<'_> {
                         if unresolved == 1 { "item" } else { "items" },
                         from.0
                     ),
-                    creation_only: false,
+                    awaits_input: false,
                 }),
             }
         }
@@ -185,10 +185,7 @@ impl Pass<'_> {
             Err(reason) => {
                 self.fail(expr, span, reason.to_string());
                 if let Some(last) = self.unresolved.last_mut() {
-                    last.creation_only = matches!(
-                        reason,
-                        tomet_expr::EvalError::PhaseOnly(_) | tomet_expr::EvalError::NoValue(_)
-                    );
+                    last.awaits_input = matches!(reason, tomet_expr::EvalError::NoValue(_));
                 }
                 None
             }
@@ -201,14 +198,14 @@ impl Pass<'_> {
             source: expr.to_string(),
             span,
             reason,
-            creation_only: false,
+            awaits_input: false,
         });
     }
 
     /// The expression as it was written, for when it has no value.
     fn source_text(expr: &InterpExpr, span: Span) -> Text {
         Text {
-            value: format!("${{{expr}}}"),
+            value: expr.interpolation_source(),
             span,
         }
     }
@@ -231,6 +228,9 @@ impl Pass<'_> {
             Block::Element(el) => vec![Block::Element(self.element(el))],
             // A hole exists only in a pattern, which has no expressions to resolve.
             Block::Hole(hole) => vec![Block::Hole(hole)],
+            // A type seat exists only in a blueprint, and what is written in it is a type and no
+            // expression to resolve.
+            Block::TypeSeat(seat) => vec![Block::TypeSeat(seat)],
             Block::Interp(interp) if !self.is_selected(interp.span) => vec![Block::Interp(interp)],
             Block::Interp(interp) => self.block_expression(&interp.expr, interp.span),
             Block::Section(mut sec) => {
@@ -246,7 +246,7 @@ impl Pass<'_> {
         }
     }
 
-    /// A `${...}` standing alone on its line.
+    /// A `{$ ... }` standing alone on its line.
     fn block_expression(&mut self, expr: &InterpExpr, span: Span) -> Vec<Block> {
         let fallback = || {
             vec![Block::Paragraph(Paragraph::new(
@@ -282,7 +282,8 @@ impl Pass<'_> {
                 | Inline::Raw(_)
                 | Inline::SoftBreak(_)
                 | Inline::LineBreak(_)
-                | Inline::Hole(_)) => vec![other],
+                | Inline::Hole(_)
+                | Inline::TypeSeat(_)) => vec![other],
             })
             .collect()
     }
@@ -348,7 +349,7 @@ impl Pass<'_> {
         )
     }
 
-    /// A `${...}` where data goes: it keeps its value, whatever the type
+    /// A `{$ ... }` where data goes: it keeps its value, whatever the type
     /// allows to be kept as data.
     #[deny(clippy::wildcard_enum_match_arm)]
     fn value(&mut self, value: Value) -> Value {
@@ -377,7 +378,8 @@ impl Pass<'_> {
             | Value::Float(_)
             | Value::Number(_)
             | Value::String(_)
-            | Value::Hole(_)) => other,
+            | Value::Hole(_)
+            | Value::TypeSeat(_)) => other,
         }
     }
 
@@ -420,7 +422,7 @@ impl Pass<'_> {
             return vec![item];
         };
 
-        // The item is nothing but one `${...}`: a list of values becomes a
+        // The item is nothing but one `{$ ... }`: a list of values becomes a
         // list of items. What was nested under the item goes with the last
         // new one, and an empty result removes the item and its nest.
         let fallback = |this: &mut Self, item: ListItem| {
@@ -447,7 +449,7 @@ impl Pass<'_> {
     }
 }
 
-/// The expression of an item whose whole content is exactly one `${...}`.
+/// The expression of an item whose whole content is exactly one `{$ ... }`.
 fn item_expression(item: &ListItem) -> Option<(&InterpExpr, Span)> {
     let [Block::Paragraph(p)] = item.content.as_slice() else {
         return None;
@@ -558,7 +560,7 @@ impl Ids {
             reason: format!(
                 "the id `{taken}` is already used earlier in the document; this one was dropped"
             ),
-            creation_only: false,
+            awaits_input: false,
         });
     }
 }

@@ -11,7 +11,7 @@
 //! - [`write_scalar_string`] / [`scalar_text`]: a string value, bare when no other value could be
 //!   read from the same text.
 //! - [`write_quoted`] / [`quoted_text`]: a string inside `"..."`, whatever it holds.
-use tomet_type::Type;
+use tomet_type::{Kind, Type};
 
 /// Whether `key` is read back as itself when written without quotes.
 ///
@@ -125,9 +125,10 @@ pub fn quoted_text(s: &str) -> String {
 
 /// Writes a string value: bare where the same text could be read as nothing else, inside `"..."`
 /// where it could be a number, a keyword, an empty or padded text, or holds a delimiter, a quote or
-/// a control character, or opens with a character that starts something.
+/// a control character, or opens with a character that starts something, or holds a `<$`, which
+/// begins a type seat wherever it stands.
 pub fn write_scalar_string(s: &str, out: &mut String) {
-    if Type::Datetime.holds_text(s) == Some(true) {
+    if Type::bare(Kind::Datetime).holds_text(s) == Some(true) {
         out.push_str(s);
         return;
     }
@@ -143,6 +144,7 @@ pub fn write_scalar_string(s: &str, out: &mut String) {
         || is_keyword_or_number
         || s.trim() != s
         || starts_with_special
+        || s.contains("<$")
         || s.contains([
             '"', '\'', ':', ',', '(', ')', '[', ']', '{', '}', '\n', '\r', '\t', ' ',
         ]);
@@ -268,8 +270,12 @@ mod tests {
         }
         // Text shaped like an interpolation is a string like any other: quoted, never read as the
         // interpolation.
-        assert_eq!(scalar_text("${x}"), "\"${x}\"");
+        assert_eq!(scalar_text("$(x)"), "\"$(x)\"");
         assert_eq!(scalar_text("$f(x)"), "\"$f(x)\"");
+        // Likewise text shaped like a type seat, wherever in the string it is; a name tag is text.
+        assert_eq!(scalar_text("<$date>"), "\"<$date>\"");
+        assert_eq!(scalar_text("a<$list(int)>b"), "\"a<$list(int)>b\"");
+        assert_eq!(scalar_text("<name>"), "<name>");
         assert_eq!(scalar_text("hello \"world\""), "\"hello \\\"world\\\"\"");
         assert_eq!(scalar_text("line1\nline2"), "\"line1\\nline2\"");
     }

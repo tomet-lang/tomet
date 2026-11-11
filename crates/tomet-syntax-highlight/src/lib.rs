@@ -32,7 +32,9 @@
 
 use std::collections::HashSet;
 
-use tomet_cst::{NodeOrToken, SyntaxKind as K, SyntaxNode, SyntaxToken, WalkEvent};
+use tomet_cst::{
+    AstNode, CstSlot, CstSlotMark, NodeOrToken, SyntaxKind as K, SyntaxNode, SyntaxToken, WalkEvent,
+};
 
 /// What a range of the text is.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -44,6 +46,9 @@ pub enum Tag {
     /// The head of a hole, `<?int` and the `>` that closes it. The groups inside keep their own
     /// tags, so the whole box reads as one range: `<?int(n)>`.
     Hole,
+    /// The head of a type seat, `<$list` and the `>` that closes it, as for a hole: the `(args)`
+    /// inside keep their own tags, so the box reads as one range, `<$uuid>`.
+    TypeSeat,
     /// A name tag, `<PATH>`: a label for the reader that tomet gives no meaning.
     Label,
     /// A list item's `-` (and the `.` of an ordered one).
@@ -87,6 +92,7 @@ impl Tag {
             Tag::Heading => "heading",
             Tag::TagName => "tagName",
             Tag::Hole => "hole",
+            Tag::TypeSeat => "typeSeat",
             Tag::Label => "label",
             Tag::List => "list",
             Tag::String => "string",
@@ -220,22 +226,14 @@ fn own_tag(token: &SyntaxToken, fences: &HashSet<usize>) -> Option<Tag> {
             if let Some(p) = parent.parent() {
                 match p.kind() {
                     K::SIGIL => return Some(Tag::TagName),
-                    K::SLOT => {
-                        let marked = p.children_with_tokens().any(|e| e.kind() == K::QUESTION);
-                        return Some(if marked { Tag::Hole } else { Tag::Label });
-                    }
+                    K::SLOT => return Some(slot_tag(&p)),
                     _ => {}
                 }
             }
             return None;
         }
         // The tokens of a box's own head; its groups are nodes of their own.
-        K::SLOT => {
-            let marked = parent
-                .children_with_tokens()
-                .any(|e| e.kind() == K::QUESTION);
-            return Some(if marked { Tag::Hole } else { Tag::Label });
-        }
+        K::SLOT => return Some(slot_tag(&parent)),
         _ => {}
     }
 
@@ -265,6 +263,15 @@ fn own_tag(token: &SyntaxToken, fences: &HashSet<usize>) -> Option<Tag> {
         K::INT_NUMBER | K::FLOAT_NUMBER if in_value(token) => Some(Tag::Number),
         K::TRUE_KW | K::FALSE_KW | K::NULL_KW if in_value(token) => Some(Tag::Atom),
         _ => None,
+    }
+}
+
+/// The tag of the head of the box `slot`, which its mark tells: a hole, a type seat or a label.
+fn slot_tag(slot: &SyntaxNode) -> Tag {
+    match CstSlot::cast(slot.clone()).map(|slot| slot.mark()) {
+        Some(CstSlotMark::Hole) => Tag::Hole,
+        Some(CstSlotMark::TypeSeat) => Tag::TypeSeat,
+        Some(CstSlotMark::NameTag) | None => Tag::Label,
     }
 }
 
@@ -462,6 +469,39 @@ mod tests {
     }
 
     #[test]
+    fn a_type_seat_is_its_box_and_its_mark_is_no_label() {
+        // As a hole: the head is one range with the `>`, and the arguments keep their own tags.
+        assert_eq!(
+            tagged("a <$list(string, length: 6)> b\n"),
+            [
+                ("<$list", "typeSeat"),
+                ("(", "bracket"),
+                (",", "punctuation"),
+                ("length", "propertyName"),
+                (":", "punctuation"),
+                ("6", "number"),
+                (")", "bracket"),
+                (">", "typeSeat"),
+            ]
+        );
+        assert!(has("<$uuid>\n", "<$uuid>", "typeSeat"));
+        // A seat is neither a hole nor a label, whichever way the mark is read.
+        for (src, text) in [
+            ("<$uuid>\n", "<$uuid>"),
+            ("a <$date(default: auto)> b\n", "<$date"),
+        ] {
+            assert!(has(src, text, "typeSeat"), "{src:?}");
+            assert!(
+                !tagged(src)
+                    .iter()
+                    .any(|(t, tag)| t.contains('$') && matches!(*tag, "hole" | "label"))
+            );
+        }
+        // What follows its `>` is not its: the brackets are prose.
+        assert_eq!(tagged("<$x>[a]\n"), [("<$x>", "typeSeat")]);
+    }
+
+    #[test]
     fn text_that_is_no_box_has_no_tag() {
         for src in [
             "a < b\n",
@@ -471,6 +511,8 @@ mod tests {
             "</x>\n",
             "<x/>\n",
             "<?int and\n",
+            "<$x and\n",
+            "<$ x>\n",
         ] {
             assert!(highlight(src).is_empty(), "`{src}` is plain text");
         }

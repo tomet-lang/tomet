@@ -16,7 +16,7 @@
 //!   | `::macro` / `::var`. The expressions that use it stay expressions.
 //! - (Freeze what is a place)
 //!   | What depends on where the file sits or on other files -- `self.path`, `vault`, `include`,
-//!   | an address into another document -- has no definition to carry. The `${...}` is replaced by
+//!   | an address into another document -- has no definition to carry. The `{$ ... }` is replaced by
 //!   | the value it has in the vault. That loses the expression, so the change is always reported.
 //!   | An expression that is frozen as a whole is not also carried: a macro called with `self.path`
 //!   | in it needs no definition once the call is a value.
@@ -46,7 +46,7 @@ use tomet_vault::Vault;
 /// What more than the minimum a conversion may do. The default does none of it.
 #[derive(Debug, Clone, Copy, Default)]
 pub struct Options {
-    /// Freeze `${self::meta.x}` to its value. Without it the expression is left, because the
+    /// Freeze `$(self::meta.x)` to its value. Without it the expression is left, because the
     /// vault's `::field` that type it cannot be carried into a file yet.
     pub freeze_fields: bool,
 }
@@ -153,7 +153,7 @@ pub fn make_standalone(
     }
 }
 
-/// The findings that sit in one place: every part of one `${...}` is one group, and anything else
+/// The findings that sit in one place: every part of one `{$ ... }` is one group, and anything else
 /// is a group of its own.
 struct Place<'a> {
     span: Span,
@@ -299,10 +299,7 @@ fn carry(vault: &Vault, groups: &[Place<'_>], decisions: &[Decision], document: 
 
 /// A variable as `::var` writes it: `{ type, default, about }`.
 fn var_declaration(decl: &tomet_declaration::VarDecl) -> Value {
-    let mut fields = vec![(
-        "type".to_string(),
-        Value::String(decl.ty.name().to_string()),
-    )];
+    let mut fields = vec![("type".to_string(), Value::String(decl.ty.to_string()))];
     if let Some(default) = &decl.default {
         fields.push(("default".to_string(), default.clone()));
     }

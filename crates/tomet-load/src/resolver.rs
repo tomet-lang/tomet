@@ -201,7 +201,7 @@ mod tests {
     #[test]
     fn the_evaluator_runs_over_the_disk_through_this_resolver() {
         use std::collections::HashMap;
-        use tomet_expr::{EvalContext, Phase, SystemGenerate, evaluate};
+        use tomet_expr::{EvalContext, evaluate};
 
         let root = fixture("tomet_test_disk_resolver_eval");
         let vault = Vault::discover(&root);
@@ -209,9 +209,7 @@ mod tests {
         let macros = HashMap::new();
         let var = EvalValue::Null;
         let cx = EvalContext {
-            phase: Phase::Output,
             resolver: &resolver,
-            generate: &SystemGenerate,
             self_doc: DocRef("index.tmt".into()),
             macros: &macros,
             var: &var,
@@ -221,7 +219,7 @@ mod tests {
             notes: Default::default(),
         };
         let interp = tomet_ast_parser::parse_interpolation_str(
-            "${vault::docs.filter(d => d::meta.tags.contains(\"rust\")).map(d => d::path)}",
+            "{$ vault::docs.filter(d => d::meta.tags.contains(\"rust\")).map(d => d::path) }",
         )
         .unwrap();
         assert_eq!(

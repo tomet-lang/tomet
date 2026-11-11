@@ -328,7 +328,7 @@ fn to_text(vault: &Vault, src: &str, path: &Path, target: &Target) -> Result<Str
     let (mut doc, _bindings) = vault
         .parse(src)
         .map_err(|e| anyhow!("{}", format_parse_error(path, src, &e)))?;
-    // The vault settles what a `${macro.…}` or a `${self.…}` means, so this and
+    // The vault settles what a `{$ macro.… }` or a `{$ self.… }` means, so this and
     // `export` cannot disagree about it.
     vault.prepare(&mut doc, path);
     Ok(match target {

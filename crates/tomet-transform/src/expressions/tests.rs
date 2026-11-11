@@ -1,9 +1,7 @@
 use std::collections::HashMap;
 
-use tomet_ast::{Block, Group, Inline, Value};
-use tomet_expr::{
-    DocRef, EvalContext, EvalValue, MemoryResolver, NoResolver, Phase, Resolver, SystemGenerate,
-};
+use tomet_ast::{Block, Inline, Value};
+use tomet_expr::{DocRef, EvalContext, EvalValue, MemoryResolver, NoResolver, Resolver};
 
 use super::*;
 
@@ -40,35 +38,28 @@ fn block_macro(name: &str, body: &str) -> Value {
 }
 
 /// Resolves `src` as the document `here.tmt` of the small vault above.
-fn run_with(src: &str, phase: Phase, vars: &EvalValue) -> (File, Vec<Unresolved>) {
+fn run_with(src: &str, vars: &EvalValue) -> (File, Vec<Unresolved>) {
     let resolver = vault();
-    run_in(src, &resolver, phase, vars)
+    run_in(src, &resolver, vars)
 }
 
-fn run_in(
-    src: &str,
-    resolver: &dyn Resolver,
-    phase: Phase,
-    vars: &EvalValue,
-) -> (File, Vec<Unresolved>) {
+fn run_in(src: &str, resolver: &dyn Resolver, vars: &EvalValue) -> (File, Vec<Unresolved>) {
     let mut macros = HashMap::new();
     macros.insert(
         "gh".to_string(),
-        Value::String("https://x/issues/${1}".to_string()),
+        Value::String("https://x/issues/$(1)".to_string()),
     );
-    macros.insert("note".to_string(), block_macro("note", "Note: ${1}"));
+    macros.insert("note".to_string(), block_macro("note", "Note: $(1)"));
     macros.insert(
         "card".to_string(),
-        block_macro("card", "\n@card(title: ${1})[ ${2} ]\n"),
+        block_macro("card", "\n@card(title: $(1))[ $(2) ]\n"),
     );
     macros.insert(
         "pair".to_string(),
-        block_macro("pair", "\none ${1}\n\ntwo ${1}\n"),
+        block_macro("pair", "\none $(1)\n\ntwo $(1)\n"),
     );
     let cx = EvalContext {
-        phase,
         resolver,
-        generate: &SystemGenerate,
         self_doc: DocRef("here.tmt".to_string()),
         macros: &macros,
         var: vars,
@@ -83,7 +74,7 @@ fn run_in(
 }
 
 fn run(src: &str) -> (File, Vec<Unresolved>) {
-    run_with(src, Phase::Output, &EvalValue::Null)
+    run_with(src, &EvalValue::Null)
 }
 
 /// Every text node in the document, in order, joined with `|` between blocks.
@@ -103,7 +94,8 @@ fn text_of(doc: &File) -> String {
                 Inline::SoftBreak(_)
                 | Inline::LineBreak(_)
                 | Inline::Interp(_)
-                | Inline::Hole(_) => {}
+                | Inline::Hole(_)
+                | Inline::TypeSeat(_) => {}
             }
         }
     }
@@ -134,8 +126,8 @@ fn text_of(doc: &File) -> String {
                 Block::Element(el) => {
                     out.push_str(&format!("<{}>", el.name));
                 }
-                Block::Interp(interp) => out.push_str(&format!("${{{}}}", interp.expr)),
-                Block::Hole(_) => {}
+                Block::Interp(interp) => out.push_str(&interp.to_string()),
+                Block::Hole(_) | Block::TypeSeat(_) => {}
             }
         }
     }
@@ -150,86 +142,87 @@ fn reasons(unresolved: &[Unresolved]) -> Vec<&str> {
 
 #[test]
 fn a_scalar_in_a_paragraph_becomes_text() {
-    let (doc, unresolved) = run("Sum is ${add(1, 2)} and ${\"x\"} and ${true}.\n");
+    let (doc, unresolved) = run("Sum is $add(1, 2) and {$ \"x\" } and {$ true }.\n");
     assert_eq!(text_of(&doc), "Sum is 3 and x and true.");
     assert!(unresolved.is_empty());
 }
 
 #[test]
 fn a_scalar_on_its_own_line_becomes_a_paragraph() {
-    let (doc, unresolved) = run("${add(1, 2)}\n");
+    let (doc, unresolved) = run("$add(1, 2)\n");
     assert_eq!(text_of(&doc), "3");
     assert!(unresolved.is_empty());
 }
 
 #[test]
 fn null_is_empty_text() {
-    let (doc, _) = run("a${null}b\n");
+    let (doc, _) = run("a{$ null }b\n");
     assert_eq!(text_of(&doc), "ab");
 }
 
 #[test]
 fn a_heading_title_is_a_paragraph_position() {
-    let (doc, _) = run("=[ Title ${add(1, 1)} ]\n\nBody\n");
+    let (doc, _) = run("=[ Title $add(1, 1) ]\n\nBody\n");
     assert_eq!(text_of(&doc), "Title 2{Body}");
 }
 
 #[test]
 fn a_fragment_of_one_paragraph_is_spliced_into_a_paragraph() {
-    let (doc, unresolved) = run("See ${#top.link()} now.\n");
+    let (doc, unresolved) = run("See {$ #top.link() } now.\n");
     assert_eq!(text_of(&doc), "See <link> now.");
     assert!(unresolved.is_empty(), "{unresolved:?}");
 }
 
 #[test]
 fn a_fragment_on_its_own_line_is_its_blocks() {
-    let (doc, unresolved) = run("${#c1.link()}\n");
+    let (doc, unresolved) = run("{$ #c1.link() }\n");
     assert_eq!(text_of(&doc), "<link>");
     assert!(unresolved.is_empty());
 }
 
 #[test]
 fn a_list_item_that_is_one_expression_becomes_an_item_per_element() {
-    let (doc, unresolved) = run("- first\n- ${addr(dir:docs)::docs.map(d => d.link())}\n- last\n");
+    let (doc, unresolved) =
+        run("- first\n- {$ addr(dir:docs)::docs.map(d => d.link()) }\n- last\n");
     assert_eq!(text_of(&doc), "[first,<link>,<link>,last]");
     assert!(unresolved.is_empty(), "{unresolved:?}");
 }
 
 #[test]
 fn a_list_of_scalars_becomes_items_of_text() {
-    let (doc, _) = run("- ${addr(dir:docs)::docs.map(d => d::path)}\n");
+    let (doc, _) = run("- {$ addr(dir:docs)::docs.map(d => d::path) }\n");
     assert_eq!(text_of(&doc), "[docs/a.tmt,docs/b.tmt]");
 }
 
 #[test]
 fn a_list_item_with_more_than_the_expression_keeps_it_inline() {
-    let (doc, _) = run("- n is ${add(1, 1)}\n");
+    let (doc, _) = run("- n is $add(1, 1)\n");
     assert_eq!(text_of(&doc), "[n is 2]");
 }
 
 #[test]
 fn an_empty_result_removes_the_item() {
-    let (doc, unresolved) = run("- a\n- ${addr(dir:docs)::docs.filter(d => false)}\n- b\n");
+    let (doc, unresolved) = run("- a\n- {$ addr(dir:docs)::docs.filter(d => false) }\n- b\n");
     assert_eq!(text_of(&doc), "[a,b]");
     assert!(unresolved.is_empty());
 }
 
 #[test]
 fn a_list_in_the_text_is_a_mismatch_that_says_to_join_it() {
-    let (doc, unresolved) = run("Tags: ${#c1.prop}\n");
+    let (doc, unresolved) = run("Tags: $(#c1.prop)\n");
     // A map, not a list, but equally not text.
-    assert_eq!(text_of(&doc), "Tags: ${#c1.prop}");
+    assert_eq!(text_of(&doc), "Tags: $(#c1.prop)");
     assert_eq!(unresolved.len(), 1);
 
-    let (doc, unresolved) = run("Docs: ${addr(dir:docs)::docs}\n");
-    assert_eq!(text_of(&doc), "Docs: ${addr(dir:docs)::docs}");
+    let (doc, unresolved) = run("Docs: {$ addr(dir:docs)::docs }\n");
+    assert_eq!(text_of(&doc), "Docs: {$ addr(dir:docs)::docs }");
     assert!(reasons(&unresolved)[0].contains(".join"), "{unresolved:?}");
 }
 
 #[test]
 fn a_document_in_the_text_says_to_use_include_or_link() {
-    let (doc, unresolved) = run("Look: ${self}\n");
-    assert_eq!(text_of(&doc), "Look: ${self}");
+    let (doc, unresolved) = run("Look: $(self)\n");
+    assert_eq!(text_of(&doc), "Look: $(self)");
     let reason = reasons(&unresolved)[0];
     assert!(
         reason.contains("include") && reason.contains(".link()"),
@@ -239,7 +232,9 @@ fn a_document_in_the_text_says_to_use_include_or_link() {
 
 #[test]
 fn a_datetime_in_the_text_says_to_format_it() {
-    let (_, unresolved) = run_with("When: ${generate.now()}\n", Phase::Create, &EvalValue::Null);
+    let when = tomet_expr::parse_datetime("2026-11-11T09:30:00+09:00").expect("a datetime");
+    let vars = EvalValue::Map(vec![("when".into(), EvalValue::DateTime(when))]);
+    let (_, unresolved) = run_with("When: $(var.when)\n", &vars);
     assert!(
         reasons(&unresolved)[0].contains(".format"),
         "{unresolved:?}"
@@ -247,23 +242,33 @@ fn a_datetime_in_the_text_says_to_format_it() {
 }
 
 #[test]
+fn a_type_in_the_text_has_no_place_there() {
+    let (doc, unresolved) = run("Kind: {$ list(string) }\n");
+    assert_eq!(text_of(&doc), "Kind: $list(string)");
+    assert!(
+        reasons(&unresolved)[0].contains("a type cannot be placed in the text"),
+        "{unresolved:?}"
+    );
+}
+
+#[test]
 fn an_expression_that_fails_is_written_back_as_its_own_source() {
-    let (doc, unresolved) = run("Hi ${nope} there ${gh(1)}.\n");
-    assert_eq!(text_of(&doc), "Hi ${nope} there ${gh(1)}.");
+    let (doc, unresolved) = run("Hi $(nope) there $gh(1).\n");
+    assert_eq!(text_of(&doc), "Hi $(nope) there $gh(1).");
     assert_eq!(unresolved.len(), 2);
     assert_eq!(unresolved[0].source, "nope");
     assert!(unresolved[0].reason.contains("unknown name"));
     assert_eq!(unresolved[0].kind, UnresolvedKind::Expression);
     assert_eq!(
         unresolved[0].message(),
-        format!("unresolved ${{nope}} -- {}", unresolved[0].reason)
+        format!("unresolved {{$ nope }} -- {}", unresolved[0].reason)
     );
     assert!(unresolved[1].reason.contains("unknown function"));
 }
 
 #[test]
 fn a_macro_is_called_through_its_namespace() {
-    let (doc, unresolved) = run("Issue ${macro.gh(12)}.\n");
+    let (doc, unresolved) = run("Issue $macro.gh(12).\n");
     assert_eq!(text_of(&doc), "Issue https://x/issues/12.");
     assert!(unresolved.is_empty());
 }
@@ -273,16 +278,14 @@ fn macro_table_cases() {
     let mut macros = HashMap::new();
     macros.insert(
         "gh".to_string(),
-        Value::String("https://x/${1}".to_string()),
+        Value::String("https://x/$(1)".to_string()),
     );
-    macros.insert("two".to_string(), Value::String("${1}-${2}".to_string()));
-    macros.insert("named".to_string(), Value::String("hi ${who}".to_string()));
+    macros.insert("two".to_string(), Value::String("$(1)-$(2)".to_string()));
+    macros.insert("named".to_string(), Value::String("hi $(who)".to_string()));
     macros.insert("none".to_string(), Value::String("const".to_string()));
     let resolver = vault();
     let cx = EvalContext {
-        phase: Phase::Output,
         resolver: &resolver,
-        generate: &SystemGenerate,
         self_doc: DocRef("here.tmt".to_string()),
         macros: &macros,
         var: &EvalValue::Null,
@@ -298,39 +301,39 @@ fn macro_table_cases() {
         (text_of(&doc), unresolved)
     };
 
-    assert!(test_run("${macro.gh(12)}").1.is_empty());
-    assert!(test_run("${macro.gh(\"a/b\")}").1.is_empty());
-    assert!(test_run("${macro.named(who: \"w\")}").1.is_empty());
+    assert!(test_run("$macro.gh(12)").1.is_empty());
+    assert!(test_run("$macro.gh(\"a/b\")").1.is_empty());
+    assert!(test_run("$macro.named(who: \"w\")").1.is_empty());
 
-    let unres = test_run("${macro.gh(tomet)}").1;
+    let unres = test_run("$macro.gh(tomet)").1;
     assert_eq!(unres.len(), 1);
     assert!(unres[0].reason.contains("unknown name `tomet`"));
 
-    let unres = test_run("${macro.gh(1, 2)}").1;
+    let unres = test_run("$macro.gh(1, 2)").1;
     assert_eq!(unres.len(), 1);
     assert_eq!(unres[0].reason, "`macro.gh` expects 1 argument(s), got 2");
 
-    let unres = test_run("${macro.gh()}").1;
+    let unres = test_run("$macro.gh()").1;
     assert_eq!(unres.len(), 1);
     assert_eq!(unres[0].reason, "`macro.gh` expects 1 argument(s), got 0");
 
-    let unres = test_run("${macro.two(1)}").1;
+    let unres = test_run("$macro.two(1)").1;
     assert_eq!(unres.len(), 1);
     assert_eq!(unres[0].reason, "`macro.two` expects 2 argument(s), got 1");
 
-    let unres = test_run("${macro.none(1)}").1;
+    let unres = test_run("$macro.none(1)").1;
     assert_eq!(unres.len(), 1);
     assert_eq!(unres[0].reason, "`macro.none` expects 0 argument(s), got 1");
 
-    let unres = test_run("${macro.named()}").1;
+    let unres = test_run("$macro.named()").1;
     assert_eq!(unres.len(), 1);
     assert_eq!(unres[0].reason, "macro.named expects named argument `who`");
 
-    let unres = test_run("${macro.nosuch(1)}").1;
+    let unres = test_run("$macro.nosuch(1)").1;
     assert_eq!(unres.len(), 1);
     assert_eq!(unres[0].reason, "unknown macro `macro.nosuch`");
 
-    let unres = test_run("${macro.gh}").1;
+    let unres = test_run("$(macro.gh)").1;
     assert_eq!(unres.len(), 1);
     assert_eq!(
         unres[0].reason,
@@ -340,7 +343,7 @@ fn macro_table_cases() {
 
 #[test]
 fn a_value_in_an_element_argument_keeps_its_type() {
-    let (doc, unresolved) = run("@card(n: ${add(1, 2)}, label: ${\"x\"})\n");
+    let (doc, unresolved) = run("@card(n: $add(1, 2), label: {$ \"x\" })\n");
     assert!(unresolved.is_empty(), "{unresolved:?}");
     let Block::Element(el) = &doc.body[0] else {
         panic!("an element block");
@@ -357,7 +360,7 @@ fn a_value_in_an_element_argument_keeps_its_type() {
 #[test]
 fn a_value_in_a_value_group_keeps_its_type_and_a_list_stays_a_list() {
     let (doc, unresolved) =
-        run("::meta(n: ${add(1, 1)}, names: ${addr(dir:docs)::docs.map(d => d::path)})\n");
+        run("::meta(n: $add(1, 1), names: {$ addr(dir:docs)::docs.map(d => d::path) })\n");
     assert!(unresolved.is_empty(), "{unresolved:?}");
     let declaration = &doc.header[0];
     let Some(Value::Map(entries)) = &declaration.data.args else {
@@ -380,7 +383,7 @@ fn a_value_in_a_value_group_keeps_its_type_and_a_list_stays_a_list() {
 
 #[test]
 fn a_document_cannot_be_stored_as_data_and_the_expression_stays() {
-    let (doc, unresolved) = run("@card(doc: ${self})\n");
+    let (doc, unresolved) = run("@card(doc: $(self))\n");
     assert!(reasons(&unresolved)[0].contains("cannot be stored as data"));
     let Block::Element(el) = &doc.body[0] else {
         panic!("an element block");
@@ -394,7 +397,7 @@ fn a_document_cannot_be_stored_as_data_and_the_expression_stays() {
 
 #[test]
 fn expressions_inside_an_elements_content_are_resolved_too() {
-    let (doc, _) = run("@callout[ value is ${add(2, 3)} ]\n");
+    let (doc, _) = run("@callout[ value is $add(2, 3) ]\n");
     let Block::Element(el) = &doc.body[0] else {
         panic!("an element block");
     };
@@ -412,17 +415,16 @@ fn expressions_inside_an_elements_content_are_resolved_too() {
 fn a_reference_is_answered_from_the_document_the_resolver_holds() {
     // `#c1` is looked up through the resolver, which holds `here.tmt` as it
     // was written -- not through the document this pass is rewriting.
-    let (doc, unresolved) = run("n=${#c1.n} extra=${#c1.extra}\n");
+    let (doc, unresolved) = run("n=$(#c1.n) extra=$(#c1.extra)\n");
     assert_eq!(text_of(&doc), "n=1 extra=yes");
     assert!(unresolved.is_empty());
 }
 
 #[test]
-fn creating_a_document_reads_var_and_generates() {
+fn a_document_reads_var() {
     let vars = EvalValue::Map(vec![("title".into(), EvalValue::String("Plan".into()))]);
     let (doc, unresolved) = run_with(
-        "::meta(id: ${generate.uuid()}, title: ${var.title})\n\nPlan for ${var.title}\n",
-        Phase::Create,
+        "::meta(title: $(var.title))\n\nPlan for $(var.title)\n",
         &vars,
     );
     assert!(unresolved.is_empty(), "{unresolved:?}");
@@ -430,35 +432,46 @@ fn creating_a_document_reads_var_and_generates() {
     let Some(Value::Map(entries)) = &declaration.data.args else {
         panic!("the entries of `::meta(...)`");
     };
-    let (_, Value::String(id)) = &entries[0] else {
-        panic!("a string id, got {entries:?}");
-    };
-    assert_eq!(id.len(), 36, "a UUID: {id}");
-    assert_eq!(entries[1], ("title".into(), Value::String("Plan".into())));
+    assert_eq!(entries[0], ("title".into(), Value::String("Plan".into())));
     assert_eq!(text_of(&doc), "Plan for Plan");
 }
 
+/// A variable that has no value yet is not a mistake in a blueprint, which is
+/// filled in later; `awaits_input` is what tells it from a mistake.
 #[test]
-fn creation_only_names_are_refused_when_rendering() {
-    let (doc, unresolved) = run("::meta(id: ${generate.uuid()})\n");
-    assert!(reasons(&unresolved)[0].contains("when a document is being created"));
-    let declaration = &doc.header[0];
-    // The expression is still there.
-    let Some(Value::Map(entries)) = &declaration.data.args else {
-        panic!("the entries of `::meta(...)`");
+fn only_a_variable_that_has_no_value_yet_awaits_input() {
+    let resolver = vault();
+    let macros = HashMap::new();
+    let vars = EvalValue::Map(vec![]);
+    let cx = EvalContext {
+        resolver: &resolver,
+        self_doc: DocRef("here.tmt".to_string()),
+        macros: &macros,
+        var: &vars,
+        var_unset: &["title".to_string()],
+        includes: &[],
+        heading_level: 0,
+        notes: Default::default(),
     };
-    assert!(matches!(&entries[0], (_, Value::Interp(_))));
+    let mut doc = tomet_ast_parser::parse_file("$(var.title) $(nope) $(var.other)\n").unwrap();
+    let unresolved = resolve_expressions(&mut doc, &cx);
+    let awaiting: Vec<(&str, bool)> = unresolved
+        .iter()
+        .map(|u| (u.source.as_str(), u.awaits_input))
+        .collect();
+    assert_eq!(
+        awaiting,
+        [("var.title", true), ("nope", false), ("var.other", false)]
+    );
 }
 
 #[test]
 fn with_no_vault_a_reference_to_another_document_fails_and_stays() {
-    let mut doc = tomet_ast_parser::parse_file("see ${tmt(\"x.tmt\")#a::id}\n").unwrap();
+    let mut doc = tomet_ast_parser::parse_file("see {$ tmt(\"x.tmt\")#a::id }\n").unwrap();
     let macros = HashMap::new();
     let vars = EvalValue::Null;
     let cx = EvalContext {
-        phase: Phase::Output,
         resolver: &NoResolver,
-        generate: &SystemGenerate,
         self_doc: DocRef("here.tmt".into()),
         macros: &macros,
         var: &vars,
@@ -469,13 +482,13 @@ fn with_no_vault_a_reference_to_another_document_fails_and_stays() {
     };
     let unresolved = resolve_expressions(&mut doc, &cx);
     assert_eq!(unresolved.len(), 1);
-    assert_eq!(text_of(&doc), "see ${tmt(\"x.tmt\")#a::id}");
+    assert_eq!(text_of(&doc), "see {$ tmt(\"x.tmt\")#a::id }");
 }
 
 #[test]
 fn a_macro_in_an_element_argument_is_expanded_and_stays_text() {
     // What `expand_document_macros` did, for the one binding that called it.
-    let (doc, unresolved) = run("- @link(${macro.gh(7)})\n");
+    let (doc, unresolved) = run("- @link($macro.gh(7))\n");
     assert!(unresolved.is_empty(), "{unresolved:?}");
     let Block::List(list) = &doc.body[0] else {
         panic!("a list");
@@ -498,7 +511,7 @@ fn a_macro_in_an_element_argument_is_expanded_and_stays_text() {
 #[test]
 fn an_id_used_twice_after_an_include_keeps_the_first_and_reports_the_later() {
     // `here.tmt` has `#(c1)` and includes a copy of itself's `c1` element.
-    let (doc, unresolved) = run("@card(n: 5)#(c1)\n\n${include(tmt(\"here.tmt\")#c1)}\n");
+    let (doc, unresolved) = run("@card(n: 5)#(c1)\n\n$include(tmt(\"here.tmt\")#c1)\n");
     assert_eq!(unresolved.len(), 1, "{unresolved:?}");
     assert_eq!(unresolved[0].source, "#(c1)");
     assert!(
@@ -508,7 +521,7 @@ fn an_id_used_twice_after_an_include_keeps_the_first_and_reports_the_later() {
     // It is not an expression, and does not read as one.
     assert_eq!(unresolved[0].kind, UnresolvedKind::DroppedId);
     assert_eq!(unresolved[0].message(), unresolved[0].reason);
-    assert!(!unresolved[0].message().contains("${"), "{unresolved:?}");
+    assert!(!unresolved[0].message().contains("$("), "{unresolved:?}");
 
     let ids: Vec<Option<String>> = doc
         .body
@@ -568,7 +581,7 @@ fn a_section_id_is_claimed_too() {
 
 #[test]
 fn an_include_lands_one_heading_below_the_section_it_sits_in() {
-    let (doc, unresolved) = run("=[ Host ]\n\n${include(tmt(\"here.tmt\")#top)}\n");
+    let (doc, unresolved) = run("=[ Host ]\n\n$include(tmt(\"here.tmt\")#top)\n");
     assert!(unresolved.is_empty(), "{unresolved:?}");
     let Block::Section(host) = &doc.body[0] else {
         panic!("a section");
@@ -585,16 +598,14 @@ fn an_include_lands_one_heading_below_the_section_it_sits_in() {
     assert_eq!(included, [2]);
 }
 
-/// Only the picked `${...}` are resolved; the rest stay interpolations (not text) and are not reported.
+/// Only the picked `{$ ... }` are resolved; the rest stay interpolations (not text) and are not reported.
 #[test]
 fn only_the_selected_expressions_are_resolved() {
-    let src = "a ${self::path} b ${macro.gh(1)} c\n\n${self::filename}\n\n- ${self::path}\n\n@card(n: ${self::path}){ k: ${self::path} }\n";
+    let src = "a $(self::path) b $macro.gh(1) c\n\n$(self::filename)\n\n- $(self::path)\n\n@card(n: $(self::path)){ k: $(self::path) }\n";
     let resolver = vault();
     let macros = HashMap::new();
     let cx = EvalContext {
-        phase: Phase::Output,
         resolver: &resolver,
-        generate: &SystemGenerate,
         self_doc: DocRef("here.tmt".to_string()),
         macros: &macros,
         var: &EvalValue::Null,
@@ -627,13 +638,11 @@ fn written_number_in_metadata_interpolates_as_written() {
     let resolver = MemoryResolver::new()
         .with_source(
             "doc.tmt",
-            "::meta(rev: 1.10)\n\nVersion is ${self::meta.rev}.\n",
+            "::meta(rev: 1.10)\n\nVersion is $(self::meta.rev).\n",
         )
         .unwrap();
     let cx = EvalContext {
-        phase: Phase::Output,
         resolver: &resolver,
-        generate: &SystemGenerate,
         self_doc: DocRef("doc.tmt".to_string()),
         macros: &HashMap::new(),
         var: &EvalValue::Null,
@@ -643,7 +652,7 @@ fn written_number_in_metadata_interpolates_as_written() {
         notes: Default::default(),
     };
     let mut doc =
-        tomet_ast_parser::parse_file("::meta(rev: 1.10)\n\nVersion is ${self::meta.rev}.\n")
+        tomet_ast_parser::parse_file("::meta(rev: 1.10)\n\nVersion is $(self::meta.rev).\n")
             .unwrap();
     let unresolved = resolve_expressions(&mut doc, &cx);
     assert!(unresolved.is_empty());
@@ -654,7 +663,7 @@ fn written_number_in_metadata_interpolates_as_written() {
 
 #[test]
 fn a_block_macro_on_its_own_line_is_its_blocks() {
-    let (doc, unresolved) = run("${macro.card(\"Title\", \"words\")}\n");
+    let (doc, unresolved) = run("$macro.card(\"Title\", \"words\")\n");
     assert_eq!(text_of(&doc), "<card>");
     assert!(unresolved.is_empty(), "{unresolved:?}");
     let Block::Element(card) = &doc.body[0] else {
@@ -671,25 +680,25 @@ fn a_block_macro_on_its_own_line_is_its_blocks() {
 
 #[test]
 fn a_block_macro_of_one_paragraph_is_spliced_into_a_paragraph() {
-    let (doc, unresolved) = run("before ${macro.note(\"x\")} after\n");
+    let (doc, unresolved) = run("before $macro.note(\"x\") after\n");
     assert_eq!(text_of(&doc), "before Note: x after");
     assert!(unresolved.is_empty(), "{unresolved:?}");
 }
 
 #[test]
 fn a_block_macro_of_several_blocks_has_no_place_in_a_paragraph() {
-    let (doc, unresolved) = run("before ${macro.pair(\"x\")} after\n");
+    let (doc, unresolved) = run("before $macro.pair(\"x\") after\n");
     // Written back as it was, and reported: nothing is lost and nothing is fatal.
     assert_eq!(unresolved.len(), 1, "{unresolved:?}");
-    assert_eq!(text_of(&doc), "before ${macro.pair(\"x\")} after");
-    let (doc, unresolved) = run("${macro.pair(\"x\")}\n");
+    assert_eq!(text_of(&doc), "before $macro.pair(\"x\") after");
+    let (doc, unresolved) = run("$macro.pair(\"x\")\n");
     assert!(unresolved.is_empty(), "{unresolved:?}");
     assert_eq!(text_of(&doc), "one x|two x");
 }
 
 #[test]
 fn a_block_macro_called_wrongly_is_reported_and_kept() {
-    let (doc, unresolved) = run("${macro.card(\"only one\")}\n");
+    let (doc, unresolved) = run("$macro.card(\"only one\")\n");
     assert_eq!(unresolved.len(), 1, "{unresolved:?}");
-    assert_eq!(text_of(&doc), "${macro.card(\"only one\")}");
+    assert_eq!(text_of(&doc), "$macro.card(\"only one\")");
 }

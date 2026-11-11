@@ -3,7 +3,7 @@
 
 ::macro.copyright("(C) 2026 Tomet Projects")
 ::macro.generated_by[
-@comment[ Generated from ${1}. Edit that, then `tomet export .`. ]
+@comment[ Generated from $(1). Edit that, then `tomet export .`. ]
 ]
 
 ::format.meta(always_newline: true)

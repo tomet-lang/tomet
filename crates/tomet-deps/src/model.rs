@@ -19,7 +19,7 @@ pub fn fnv1a_hash(bytes: &[u8]) -> u64 {
 pub enum DependencyKind {
     /// A normal hypertext or reference link (e.g. `[[target]]`, `@link("target")`, `ref:target`).
     Link,
-    /// An embedded transclusion (e.g. `@embed("target")`, `![]`, `${...}`).
+    /// An embedded transclusion (e.g. `@embed("target")`, `![]`, `{$ ... }`).
     /// Content alterations in the target directly invalidate the referencing document.
     Embed,
     /// A metadata-level dependency (referencing another document's exported title/metadata).

@@ -8,11 +8,11 @@
 //!  | dropped, same as `tomet-convert-markdown`'s heading handling.
 //! -| `mark` renders as `#highlight[...]`, a Typst builtin only available
 //!  | since Typst 0.13 -- older Typst versions will fail to compile it.
-//! -| `${...}` interpolation round-trips as inert raw text (\`\${...}\`)
-//!  | rather than being evaluated: Typst has its own `#`/`{}` expression
-//!  | syntax with unrelated semantics, so naively emitting `${...}`
-//!  | unescaped would risk Typst trying (and failing) to parse it as its
-//!  | own code.
+//! -| An interpolation (`{$ ... }`, `$(...)`, `$name(...)`) round-trips as
+//!  | inert raw text rather than being evaluated: Typst has its own
+//!  | `#`/`{}`/`$` expression syntax with unrelated semantics, so naively
+//!  | emitting it unescaped would risk Typst trying (and failing) to parse
+//!  | it as its own code.
 //! -| Any `<T>`/`@name` element with no dedicated mapping below (including
 //!  | `icon`, `bare`, and anything a hand-authored `.tmt` file might use
 //!  | that the mapping doesn't special-case) falls back to rendering just

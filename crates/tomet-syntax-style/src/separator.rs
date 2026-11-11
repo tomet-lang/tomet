@@ -25,12 +25,16 @@ impl ParagraphSeparator {
 }
 
 /// Whether `block` stands like a paragraph, so that a blank line and a `;` set it off alike: a
-/// paragraph, and the element, hole or interpolation that stands as one. A section and a list are
+/// paragraph, and the element, hole, type seat or interpolation that stands as one. A section and a list are
 /// set off by their own text.
 #[deny(clippy::wildcard_enum_match_arm)]
 pub fn stands_like_a_paragraph(block: &Block) -> bool {
     match block {
-        Block::Paragraph(_) | Block::Element(_) | Block::Hole(_) | Block::Interp(_) => true,
+        Block::Paragraph(_)
+        | Block::Element(_)
+        | Block::Hole(_)
+        | Block::TypeSeat(_)
+        | Block::Interp(_) => true,
         Block::Section(_) | Block::List(_) => false,
     }
 }

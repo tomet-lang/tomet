@@ -336,9 +336,9 @@ export function evaluateInterpExpr(
 
       if (macros && calleeName in macros) {
         let tmpl = macros[calleeName];
-        // Positional placeholders: ${1}, ${2}, etc.
+        // Positional placeholders: $(1), $(2), etc.
         for (let i = 0; i < evaluatedArgs.length; i++) {
-          tmpl = tmpl.replaceAll(`\${${i + 1}}`, evaluatedArgs[i]);
+          tmpl = tmpl.replaceAll(`$(${i + 1})`, evaluatedArgs[i]);
         }
         // Named placeholders
         for (const arg of args) {
@@ -346,7 +346,7 @@ export function evaluateInterpExpr(
           if (aKind && typeof aKind === "object" && "NamedArg" in aKind) {
             const { name, value } = aKind.NamedArg;
             const valStr = evaluateInterpExpr(value, macros);
-            tmpl = tmpl.replaceAll(`\${${name}}`, valStr);
+            tmpl = tmpl.replaceAll(`$(${name})`, valStr);
           }
         }
         return tmpl;

@@ -191,6 +191,16 @@ pub fn value_to_json(v: &Value) -> serde_json::Value {
             );
             serde_json::Value::Object(obj)
         }
+        // A type seat exists only in a blueprint, which is not data: only the type, as written,
+        // is kept.
+        Value::TypeSeat(seat) => {
+            let mut obj = serde_json::Map::new();
+            obj.insert(
+                "type_seat".to_string(),
+                serde_json::Value::String(seat.expr.to_string()),
+            );
+            serde_json::Value::Object(obj)
+        }
         Value::Element(el) => {
             let mut obj = serde_json::Map::new();
             let name = el.name.to_string();

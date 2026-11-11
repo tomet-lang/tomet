@@ -31,7 +31,7 @@ fn post_process_block_wikilinks(block: &mut Block) {
             }
         }
         Block::List(list) => post_process_list_wikilinks(list),
-        Block::Interp(_) | Block::Hole(_) => {}
+        Block::Interp(_) | Block::Hole(_) | Block::TypeSeat(_) => {}
     }
 }
 
@@ -76,7 +76,8 @@ fn post_process_inlines_wikilinks(inlines: Vec<Inline>) -> Vec<Inline> {
             other @ (Inline::SoftBreak(_)
             | Inline::LineBreak(_)
             | Inline::Raw(_)
-            | Inline::Interp(_)) => {
+            | Inline::Interp(_)
+            | Inline::TypeSeat(_)) => {
                 new_inlines.push(other);
             }
             Inline::Hole(_) => {}

@@ -2,6 +2,8 @@
 
 use std::fmt;
 
+use tomet_type::TypeError;
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum EvalError {
     /// A name that no table has. Names are looked up by position and never
@@ -35,9 +37,10 @@ pub enum EvalError {
         right: &'static str,
     },
     DivisionByZero,
-    /// A name that exists only while a document is being created, used
-    /// while rendering one.
-    PhaseOnly(String),
+    /// What was written as a type is not one: an unknown name, an argument the
+    /// type does not take, or `default: auto` for a type that makes no value up.
+    /// The type crate's own words, which name the type and the argument.
+    BadType(TypeError),
     /// A variable that is declared, has no `default`, and was given no value.
     NoValue(String),
     /// A document, a note, a directory or an id that could not be found.
@@ -106,10 +109,7 @@ impl fmt::Display for EvalError {
                 write!(f, "cannot order a {left} against a {right}")
             }
             EvalError::DivisionByZero => f.write_str("division by zero"),
-            EvalError::PhaseOnly(name) => write!(
-                f,
-                "`{name}` can only be used when a document is being created, not when it is rendered"
-            ),
+            EvalError::BadType(error) => fmt::Display::fmt(error, f),
             EvalError::NoValue(name) => write!(
                 f,
                 "`var.{name}` is declared but has no value: give it a `default` in `::var`, \

@@ -1,20 +1,8 @@
 use std::collections::HashMap;
 
-use time::OffsetDateTime;
+use tomet_type::{AutoFill, DefaultValue, Kind, Type, TypeError};
 
 use super::*;
-
-/// A clock stopped at the epoch and a UUID that is always the same.
-struct Fixed;
-
-impl Generate for Fixed {
-    fn now(&self) -> OffsetDateTime {
-        OffsetDateTime::UNIX_EPOCH
-    }
-    fn uuid(&self) -> String {
-        "00000000-0000-0000-0000-000000000000".to_string()
-    }
-}
 
 fn int(i: i64) -> EvalValue {
     EvalValue::Int(i)
@@ -38,21 +26,18 @@ fn map(entries: Vec<(&str, EvalValue)>) -> EvalValue {
 }
 
 fn parse(src: &str) -> tomet_ast::InterpExpr {
-    tomet_ast_parser::parse_interpolation_str(&format!("${{{src}}}"))
+    tomet_ast_parser::parse_interpolation_str(&format!("{{$ {src} }}"))
         .unwrap_or_else(|e| panic!("`{src}` does not parse: {e}"))
         .expr
 }
 
 fn run_with(
     src: &str,
-    phase: Phase,
     var: &EvalValue,
     macros: &HashMap<String, Value>,
 ) -> Result<EvalValue, EvalError> {
     let cx = EvalContext {
-        phase,
         resolver: &NoResolver,
-        generate: &Fixed,
         self_doc: DocRef("here.tmt".to_string()),
         macros,
         var,
@@ -64,14 +49,14 @@ fn run_with(
     evaluate(&parse(src), &cx)
 }
 
-/// Evaluates when rendering, with nothing in `var`.
+/// Evaluates with nothing in `var`.
 fn out(src: &str) -> Result<EvalValue, EvalError> {
-    run_with(src, Phase::Output, &EvalValue::Null, &HashMap::new())
+    run_with(src, &EvalValue::Null, &HashMap::new())
 }
 
-/// Evaluates when creating a document, with `var` set.
-fn create(src: &str, vars: EvalValue) -> Result<EvalValue, EvalError> {
-    run_with(src, Phase::Create, &vars, &HashMap::new())
+/// Evaluates with `var` set.
+fn with_var(src: &str, vars: EvalValue) -> Result<EvalValue, EvalError> {
+    run_with(src, &vars, &HashMap::new())
 }
 
 #[test]
@@ -83,6 +68,14 @@ fn literals_evaluate_to_themselves() {
     assert_eq!(out("true").unwrap(), EvalValue::Bool(true));
     assert_eq!(out("null").unwrap(), EvalValue::Null);
     assert_eq!(out("(1)").unwrap(), int(1));
+    assert_eq!(out("()").unwrap(), seq(vec![]));
+    assert_eq!(out("(\"a\",)").unwrap(), seq(vec![text("a")]));
+    assert_eq!(
+        out("(\"a\", \"b\")").unwrap(),
+        seq(vec![text("a"), text("b")])
+    );
+    assert_eq!(out("(\"a\", \"b\").len()").unwrap(), int(2));
+    assert_eq!(out("(\"a\", \"b\").join(\", \")").unwrap(), text("a, b"));
 }
 
 #[test]
@@ -107,26 +100,27 @@ fn reserved_values_resolve() {
 }
 
 #[test]
-fn generate_exists_only_when_creating_and_var_in_both() {
+fn var_is_the_variables_in_scope() {
+    let var = map(vec![("title", text("T"))]);
+    assert_eq!(with_var("var.title", var).unwrap(), text("T"));
+}
+
+#[test]
+fn generate_is_not_a_name() {
+    // The namespace is gone: nothing reserves it, and nothing answers to it.
     assert_eq!(
         out("generate"),
-        Err(EvalError::PhaseOnly("generate".to_string()))
+        Err(EvalError::UnknownName("generate".to_string()))
     );
-    // `var` is a value of the document, so it reads when rendering too.
-    let var = map(vec![("title", text("T"))]);
-    assert_eq!(
-        run_with("var.title", Phase::Output, &var, &HashMap::new()).unwrap(),
-        text("T")
-    );
-    assert_eq!(create("var.title", var).unwrap(), text("T"));
+    assert!(out("generate.uuid()").is_err());
+    assert!(!RESERVED_VALUES.contains(&"generate"));
+    assert!(RESERVED_NAMES.iter().all(|(name, _)| *name != "generate"));
 }
 
 #[test]
 fn a_declared_variable_with_no_value_says_how_to_give_it_one() {
     let cx = EvalContext {
-        phase: Phase::Output,
         resolver: &NoResolver,
-        generate: &Fixed,
         self_doc: DocRef("here.tmt".to_string()),
         macros: &HashMap::new(),
         var: &map(vec![("other", text("O"))]),
@@ -151,30 +145,10 @@ fn a_declared_variable_with_no_value_says_how_to_give_it_one() {
 }
 
 #[test]
-fn generate_runs_through_the_injected_clock_and_random_source() {
-    assert_eq!(
-        create("generate.uuid()", EvalValue::Null).unwrap(),
-        text("00000000-0000-0000-0000-000000000000")
-    );
-    assert_eq!(
-        create("generate.now()", EvalValue::Null).unwrap(),
-        EvalValue::DateTime(OffsetDateTime::UNIX_EPOCH)
-    );
-}
-
-#[test]
-fn generate_called_when_rendering_names_the_function() {
-    assert_eq!(
-        out("generate.uuid()"),
-        Err(EvalError::PhaseOnly("generate".to_string()))
-    );
-}
-
-#[test]
 fn a_member_that_does_not_exist_is_named() {
     let vars = map(vec![("title", text("T"))]);
     assert_eq!(
-        create("var.nope", vars),
+        with_var("var.nope", vars),
         Err(EvalError::UnknownMember {
             on: "map",
             member: "nope".to_string()
@@ -297,6 +271,24 @@ fn arithmetic_functions_keep_integers_and_promote_on_overflow() {
 }
 
 #[test]
+fn plus_and_minus_are_the_functions_add_and_sub() {
+    assert_eq!(out("1 + 2").unwrap(), int(3));
+    assert_eq!(out("5 - 7").unwrap(), int(-2));
+    assert_eq!(out("1 + 1.5").unwrap(), EvalValue::Float(2.5));
+    assert_eq!(out("10 - 2 - 3").unwrap(), int(5));
+    assert_eq!(out("1 + 2 == 3").unwrap(), EvalValue::Bool(true));
+    assert_eq!(out("add(1, 2) - 1").unwrap(), int(2));
+    assert!(matches!(
+        out("9223372036854775807 + 1").unwrap(),
+        EvalValue::Float(_)
+    ));
+    assert!(matches!(
+        out("1 + \"a\""),
+        Err(EvalError::TypeMismatch { got: "string", .. })
+    ));
+}
+
+#[test]
 fn an_unknown_function_is_named_and_a_wrong_count_is_reported() {
     assert_eq!(
         out("frobnicate(1)"),
@@ -330,7 +322,7 @@ fn xs() -> EvalValue {
 #[test]
 fn a_lambda_is_a_value_and_can_be_applied_by_a_method() {
     assert_eq!(
-        create("var.xs.map(x => add(x, 1))", xs()).unwrap(),
+        with_var("var.xs.map(x => add(x, 1))", xs()).unwrap(),
         seq(vec![int(4), int(2), int(3)])
     );
 }
@@ -338,7 +330,7 @@ fn a_lambda_is_a_value_and_can_be_applied_by_a_method() {
 #[test]
 fn filter_keeps_what_the_function_says_yes_to() {
     assert_eq!(
-        create("var.xs.filter(x => x > 1)", xs()).unwrap(),
+        with_var("var.xs.filter(x => x > 1)", xs()).unwrap(),
         seq(vec![int(3), int(2)])
     );
 }
@@ -346,7 +338,7 @@ fn filter_keeps_what_the_function_says_yes_to() {
 #[test]
 fn filter_needs_a_bool_from_its_function() {
     assert!(matches!(
-        create("var.xs.filter(x => x)", xs()),
+        with_var("var.xs.filter(x => x)", xs()),
         Err(EvalError::TypeMismatch { got: "int", .. })
     ));
 }
@@ -354,11 +346,11 @@ fn filter_needs_a_bool_from_its_function() {
 #[test]
 fn sort_orders_by_a_key_and_is_stable() {
     assert_eq!(
-        create("var.xs.sort(x => x)", xs()).unwrap(),
+        with_var("var.xs.sort(x => x)", xs()).unwrap(),
         seq(vec![int(1), int(2), int(3)])
     );
     assert_eq!(
-        create("var.xs.sort(x => x, \"desc\")", xs()).unwrap(),
+        with_var("var.xs.sort(x => x, \"desc\")", xs()).unwrap(),
         seq(vec![int(3), int(2), int(1)])
     );
     // Equal keys keep their original order.
@@ -371,7 +363,7 @@ fn sort_orders_by_a_key_and_is_stable() {
         ]),
     )]);
     assert_eq!(
-        create("var.xs.sort(p => p.k).map(p => p.n)", pairs).unwrap(),
+        with_var("var.xs.sort(p => p.k).map(p => p.n)", pairs).unwrap(),
         seq(vec![text("b"), text("a"), text("c")])
     );
 }
@@ -380,13 +372,13 @@ fn sort_orders_by_a_key_and_is_stable() {
 fn sort_refuses_keys_that_have_no_common_order() {
     let mixed = map(vec![("xs", seq(vec![int(1), text("a")]))]);
     assert_eq!(
-        create("var.xs.sort(x => x)", mixed),
+        with_var("var.xs.sort(x => x)", mixed),
         Err(EvalError::NotComparable {
             left: "int",
             right: "string"
         })
     );
-    assert!(create("var.xs.sort(x => x, \"sideways\")", xs()).is_err());
+    assert!(with_var("var.xs.sort(x => x, \"sideways\")", xs()).is_err());
 }
 
 #[test]
@@ -401,47 +393,47 @@ fn an_item_with_no_key_goes_last_whichever_way_the_rest_are_ordered() {
         ]),
     )]);
     assert_eq!(
-        create("var.xs.sort(p => p.k).map(p => p.n)", xs.clone()).unwrap(),
+        with_var("var.xs.sort(p => p.k).map(p => p.n)", xs.clone()).unwrap(),
         seq(vec![text("b"), text("a"), text("none1"), text("none2")])
     );
     assert_eq!(
-        create("var.xs.sort(p => p.k, \"desc\").map(p => p.n)", xs).unwrap(),
+        with_var("var.xs.sort(p => p.k, \"desc\").map(p => p.n)", xs).unwrap(),
         seq(vec![text("a"), text("b"), text("none1"), text("none2")])
     );
     // Only keys that exist have to agree: a number and a string still clash.
     let clash = map(vec![("xs", seq(vec![int(1), EvalValue::Null, text("a")]))]);
-    assert!(create("var.xs.sort(x => x)", clash).is_err());
+    assert!(with_var("var.xs.sort(x => x)", clash).is_err());
 }
 
 #[test]
 fn join_len_contains_and_item_on_a_list() {
     assert_eq!(
-        create("var.xs.join(\", \")", xs()).unwrap(),
+        with_var("var.xs.join(\", \")", xs()).unwrap(),
         text("3, 1, 2")
     );
-    assert_eq!(create("var.xs.len()", xs()).unwrap(), int(3));
+    assert_eq!(with_var("var.xs.len()", xs()).unwrap(), int(3));
     assert_eq!(
-        create("var.xs.contains(2)", xs()).unwrap(),
+        with_var("var.xs.contains(2)", xs()).unwrap(),
         EvalValue::Bool(true)
     );
     assert_eq!(
-        create("var.xs.contains(9)", xs()).unwrap(),
+        with_var("var.xs.contains(9)", xs()).unwrap(),
         EvalValue::Bool(false)
     );
-    assert_eq!(create("var.xs.item(1)", xs()).unwrap(), int(1));
-    assert!(create("var.xs.item(7)", xs()).is_err());
-    assert!(create("var.xs.item(-1)", xs()).is_err());
+    assert_eq!(with_var("var.xs.item(1)", xs()).unwrap(), int(1));
+    assert!(with_var("var.xs.item(7)", xs()).is_err());
+    assert!(with_var("var.xs.item(-1)", xs()).is_err());
 }
 
 #[test]
 fn join_takes_scalars_only() {
     let nested = map(vec![("xs", seq(vec![seq(vec![int(1)])]))]);
     assert!(matches!(
-        create("var.xs.join(\",\")", nested),
+        with_var("var.xs.join(\",\")", nested),
         Err(EvalError::TypeMismatch { got: "list", .. })
     ));
     let nulls = map(vec![("xs", seq(vec![EvalValue::Null]))]);
-    assert!(create("var.xs.join(\",\")", nulls).is_err());
+    assert!(with_var("var.xs.join(\",\")", nulls).is_err());
 }
 
 #[test]
@@ -449,7 +441,7 @@ fn an_empty_list_answers_contains_with_no_instead_of_failing() {
     // What a document with no tags gives for a `list` field.
     let empty = map(vec![("tags", seq(vec![]))]);
     assert_eq!(
-        create("var.tags.contains(\"rust\")", empty).unwrap(),
+        with_var("var.tags.contains(\"rust\")", empty).unwrap(),
         EvalValue::Bool(false)
     );
 }
@@ -458,11 +450,11 @@ fn an_empty_list_answers_contains_with_no_instead_of_failing() {
 fn maps_and_strings_have_their_own_contains_and_get() {
     let m = map(vec![("m", map(vec![("a", int(1))]))]);
     assert_eq!(
-        create("var.m.contains(\"a\")", m.clone()).unwrap(),
+        with_var("var.m.contains(\"a\")", m.clone()).unwrap(),
         EvalValue::Bool(true)
     );
-    assert_eq!(create("var.m.get(\"a\", 0)", m.clone()).unwrap(), int(1));
-    assert_eq!(create("var.m.get(\"z\", 0)", m).unwrap(), int(0));
+    assert_eq!(with_var("var.m.get(\"a\", 0)", m.clone()).unwrap(), int(1));
+    assert_eq!(with_var("var.m.get(\"z\", 0)", m).unwrap(), int(0));
     assert_eq!(
         out("\"hello\".contains(\"ell\")").unwrap(),
         EvalValue::Bool(true)
@@ -494,7 +486,7 @@ fn a_method_on_the_wrong_type_or_on_null_is_an_error() {
 #[test]
 fn a_lambda_sees_the_names_around_it() {
     assert_eq!(
-        create("var.xs.map(x => var.xs.filter(y => y > x).len())", xs()).unwrap(),
+        with_var("var.xs.map(x => var.xs.filter(y => y > x).len())", xs()).unwrap(),
         seq(vec![int(0), int(2), int(1)])
     );
 }
@@ -510,7 +502,7 @@ fn a_lambda_cannot_take_a_reserved_name_as_a_parameter() {
 #[test]
 fn a_lambda_called_with_the_wrong_number_of_arguments_is_reported() {
     assert!(matches!(
-        create("var.xs.sort((a, b) => a)", xs()),
+        with_var("var.xs.sort((a, b) => a)", xs()),
         Err(EvalError::WrongArgCount { .. })
     ));
 }
@@ -525,10 +517,10 @@ fn a_macro_fills_positional_and_named_placeholders() {
     let mut macros = HashMap::new();
     macros.insert(
         "gh".to_string(),
-        Value::String("https://x/issues/${1}".to_string()),
+        Value::String("https://x/issues/$(1)".to_string()),
     );
-    macros.insert("who".to_string(), Value::String("hi ${name}".to_string()));
-    let run = |src: &str| run_with(src, Phase::Output, &EvalValue::Null, &macros);
+    macros.insert("who".to_string(), Value::String("hi $(name)".to_string()));
+    let run = |src: &str| run_with(src, &EvalValue::Null, &macros);
     assert_eq!(run("macro.gh(12)").unwrap(), text("https://x/issues/12"));
     assert_eq!(run("macro.who(name: \"ann\")").unwrap(), text("hi ann"));
     assert_eq!(
@@ -542,9 +534,9 @@ fn macro_bare_word_argument_is_unknown_name() {
     let mut macros = HashMap::new();
     macros.insert(
         "gh".to_string(),
-        Value::String("https://x/issues/${1}".to_string()),
+        Value::String("https://x/issues/$(1)".to_string()),
     );
-    let run = |src: &str| run_with(src, Phase::Output, &EvalValue::Null, &macros);
+    let run = |src: &str| run_with(src, &EvalValue::Null, &macros);
     assert_eq!(
         run("macro.gh(tomet)"),
         Err(EvalError::UnknownName("tomet".to_string()))
@@ -556,12 +548,12 @@ fn macro_non_placeholder_in_template_treated_as_plain_text() {
     let mut macros = HashMap::new();
     macros.insert(
         "env".to_string(),
-        Value::String("${HOME}/bin:${PATH:-/bin}:${}".to_string()),
+        Value::String("$(HOME)/bin:$(PATH:-/bin):$()".to_string()),
     );
-    let run = |src: &str| run_with(src, Phase::Output, &EvalValue::Null, &macros);
+    let run = |src: &str| run_with(src, &EvalValue::Null, &macros);
     assert_eq!(
         run("macro.env(HOME: \"/root\")").unwrap(),
-        text("/root/bin:${PATH:-/bin}:${}")
+        text("/root/bin:$(PATH:-/bin):$()")
     );
 }
 
@@ -569,7 +561,7 @@ fn macro_non_placeholder_in_template_treated_as_plain_text() {
 fn a_macro_cannot_be_named_without_being_called_and_has_no_bare_form() {
     let mut macros = HashMap::new();
     macros.insert("gh".to_string(), Value::String("x".to_string()));
-    let run = |src: &str| run_with(src, Phase::Output, &EvalValue::Null, &macros);
+    let run = |src: &str| run_with(src, &EvalValue::Null, &macros);
     assert!(run("macro.gh").is_err());
     // The bare name is not a macro and not a function.
     assert_eq!(
@@ -623,19 +615,17 @@ fn vault() -> MemoryResolver {
         .unwrap()
 }
 
-/// Evaluates when rendering `here.tmt` in the small vault above.
+/// Evaluates as written in `here.tmt` of the small vault above.
 fn in_vault(src: &str) -> Result<EvalValue, EvalError> {
     in_resolver(&vault(), src)
 }
 
-/// Evaluates when rendering `here.tmt` in `resolver`.
+/// Evaluates as written in `here.tmt` of `resolver`.
 fn in_resolver(resolver: &MemoryResolver, src: &str) -> Result<EvalValue, EvalError> {
     let macros = HashMap::new();
     let vars = EvalValue::Null;
     let cx = EvalContext {
-        phase: Phase::Output,
         resolver,
-        generate: &Fixed,
         self_doc: DocRef("here.tmt".to_string()),
         macros: &macros,
         var: &vars,
@@ -1005,11 +995,11 @@ fn with_dates() -> EvalValue {
 #[test]
 fn a_datetime_formats_with_the_shared_symbols() {
     assert_eq!(
-        create("var.late.format(\"YYYY-MM-DD HH:mm\")", with_dates()).unwrap(),
+        with_var("var.late.format(\"YYYY-MM-DD HH:mm\")", with_dates()).unwrap(),
         text("2026-06-01 12:30")
     );
     assert_eq!(
-        create("var.late.format(\"YYYY年MM月DD日\")", with_dates()).unwrap(),
+        with_var("var.late.format(\"YYYY年MM月DD日\")", with_dates()).unwrap(),
         text("2026年06月01日")
     );
 }
@@ -1018,7 +1008,7 @@ fn a_datetime_formats_with_the_shared_symbols() {
 fn format_keeps_the_values_own_offset() {
     // 12:30 at +09:00 is 03:30 UTC; the value is written as it is, not converted.
     assert_eq!(
-        create("var.late.format(\"HH\")", with_dates()).unwrap(),
+        with_var("var.late.format(\"HH\")", with_dates()).unwrap(),
         text("12")
     );
 }
@@ -1026,15 +1016,15 @@ fn format_keeps_the_values_own_offset() {
 #[test]
 fn datetimes_order_and_compare() {
     assert_eq!(
-        create("var.early < var.late", with_dates()).unwrap(),
+        with_var("var.early < var.late", with_dates()).unwrap(),
         EvalValue::Bool(true)
     );
     assert_eq!(
-        create("var.late >= var.early", with_dates()).unwrap(),
+        with_var("var.late >= var.early", with_dates()).unwrap(),
         EvalValue::Bool(true)
     );
     assert_eq!(
-        create("var.early == var.early", with_dates()).unwrap(),
+        with_var("var.early == var.early", with_dates()).unwrap(),
         EvalValue::Bool(true)
     );
     // The same instant at two offsets is the same datetime.
@@ -1043,7 +1033,7 @@ fn datetimes_order_and_compare() {
         ("b", when("2026-01-01T00:00:00Z")),
     ]);
     assert_eq!(
-        create("var.a == var.b", same).unwrap(),
+        with_var("var.a == var.b", same).unwrap(),
         EvalValue::Bool(true)
     );
 }
@@ -1052,7 +1042,7 @@ fn datetimes_order_and_compare() {
 fn a_datetime_does_not_order_against_a_string() {
     let mixed = map(vec![("d", when("2026-01-01T00:00:00Z"))]);
     assert_eq!(
-        create("var.d < \"2026-02-01\"", mixed),
+        with_var("var.d < \"2026-02-01\"", mixed),
         Err(EvalError::NotComparable {
             left: "datetime",
             right: "string"
@@ -1071,7 +1061,7 @@ fn datetimes_sort() {
         ]),
     )]);
     assert_eq!(
-        create(
+        with_var(
             "var.xs.sort(d => d, \"desc\").map(d => d.format(\"MM\"))",
             list
         )
@@ -1083,11 +1073,11 @@ fn datetimes_sort() {
 #[test]
 fn format_wants_a_string_and_a_datetime_has_no_other_members() {
     assert!(matches!(
-        create("var.late.format(1)", with_dates()),
+        with_var("var.late.format(1)", with_dates()),
         Err(EvalError::TypeMismatch { got: "int", .. })
     ));
     assert_eq!(
-        create("var.late.century", with_dates()),
+        with_var("var.late.century", with_dates()),
         Err(EvalError::UnknownMember {
             on: "datetime",
             member: "century".to_string()
@@ -1107,21 +1097,21 @@ fn a_datetime_has_its_parts_in_its_own_offset() {
         ("second", 0),
     ] {
         assert_eq!(
-            create(&format!("var.late.{expr}"), with_dates()).unwrap(),
+            with_var(&format!("var.late.{expr}"), with_dates()).unwrap(),
             int(want),
             "{expr}"
         );
     }
     assert_eq!(
-        create("var.late.offset", with_dates()).unwrap(),
+        with_var("var.late.offset", with_dates()).unwrap(),
         text("+09:00")
     );
     assert_eq!(
-        create("var.early.offset", with_dates()).unwrap(),
+        with_var("var.early.offset", with_dates()).unwrap(),
         text("+00:00")
     );
     assert_eq!(
-        create("var.late.year == 2026", with_dates()).unwrap(),
+        with_var("var.late.year == 2026", with_dates()).unwrap(),
         EvalValue::Bool(true)
     );
 }
@@ -1130,11 +1120,11 @@ fn a_datetime_has_its_parts_in_its_own_offset() {
 fn at_gives_the_same_instant_in_another_offset() {
     // 12:30 at +09:00 is 03:30 UTC.
     assert_eq!(
-        create("var.late.at(\"Z\").format(\"HH:mm\")", with_dates()).unwrap(),
+        with_var("var.late.at(\"Z\").format(\"HH:mm\")", with_dates()).unwrap(),
         text("03:30")
     );
     assert_eq!(
-        create(
+        with_var(
             "var.early.at(\"-05:30\").format(\"YYYY-MM-DD HH:mm\")",
             with_dates()
         )
@@ -1142,12 +1132,12 @@ fn at_gives_the_same_instant_in_another_offset() {
         text("2025-12-31 18:30")
     );
     assert_eq!(
-        create("var.late.at(\"-05:00\").offset", with_dates()).unwrap(),
+        with_var("var.late.at(\"-05:00\").offset", with_dates()).unwrap(),
         text("-05:00")
     );
     // The instant is the same, so it compares equal.
     assert_eq!(
-        create("var.late.at(\"Z\") == var.late", with_dates()).unwrap(),
+        with_var("var.late.at(\"Z\") == var.late", with_dates()).unwrap(),
         EvalValue::Bool(true)
     );
 }
@@ -1155,18 +1145,10 @@ fn at_gives_the_same_instant_in_another_offset() {
 #[test]
 fn at_wants_an_offset() {
     assert!(matches!(
-        create("var.late.at(1)", with_dates()),
+        with_var("var.late.at(1)", with_dates()),
         Err(EvalError::TypeMismatch { got: "int", .. })
     ));
-    assert!(create("var.late.at(\"Tokyo\")", with_dates()).is_err());
-}
-
-#[test]
-fn generate_now_formats_like_any_datetime() {
-    assert_eq!(
-        create("generate.now().format(\"YYYY-MM-DD\")", EvalValue::Null).unwrap(),
-        text("1970-01-01")
-    );
+    assert!(with_var("var.late.at(\"Tokyo\")", with_dates()).is_err());
 }
 
 // ---- fragments, emoji, unicode ----------------------------------------------
@@ -1321,9 +1303,7 @@ fn include_in(
     let macros = HashMap::new();
     let vars = EvalValue::Null;
     let cx = EvalContext {
-        phase: Phase::Output,
         resolver: &resolver,
-        generate: &Fixed,
         self_doc: DocRef(host.to_string()),
         macros: &macros,
         var: &vars,
@@ -1569,9 +1549,7 @@ fn in_list_vault(src: &str) -> Result<EvalValue, EvalError> {
     let macros = HashMap::new();
     let vars = EvalValue::Null;
     let cx = EvalContext {
-        phase: Phase::Output,
         resolver: &resolver,
-        generate: &Fixed,
         self_doc: DocRef("here.tmt".to_string()),
         macros: &macros,
         var: &vars,
@@ -1676,9 +1654,7 @@ fn no_function_is_listed_twice() {
 fn evaluate_data_returns_ast_value_or_fails_when_not_storable() {
     let empty_map = HashMap::new();
     let cx = EvalContext {
-        phase: Phase::Output,
         resolver: &NoResolver,
-        generate: &Fixed,
         self_doc: DocRef("here.tmt".to_string()),
         macros: &empty_map,
         var: &EvalValue::Null,
@@ -1710,9 +1686,7 @@ fn a_list_of_documents_is_a_list_that_cannot_be_stored_as_data() {
     let macros = HashMap::new();
     let vars = EvalValue::Null;
     let cx = EvalContext {
-        phase: Phase::Output,
         resolver: &resolver,
-        generate: &Fixed,
         self_doc: DocRef("here.tmt".to_string()),
         macros: &macros,
         var: &vars,
@@ -1765,11 +1739,11 @@ fn eval_value_number_preserves_written_representation_and_computes_numerically()
 
     // Interpolation / expression value access preserves exact text
     assert_eq!(
-        create("var.rev", vars.clone()).unwrap(),
+        with_var("var.rev", vars.clone()).unwrap(),
         EvalValue::Number("1.10".into())
     );
     assert_eq!(
-        create("var.rev", vars.clone())
+        with_var("var.rev", vars.clone())
             .unwrap()
             .scalar_text()
             .as_deref(),
@@ -1778,51 +1752,51 @@ fn eval_value_number_preserves_written_representation_and_computes_numerically()
 
     // Arithmetic via add / sub / mul
     assert_eq!(
-        create("add(var.rev, 1)", vars.clone()).unwrap(),
+        with_var("add(var.rev, 1)", vars.clone()).unwrap(),
         EvalValue::Float(2.1)
     );
     assert_eq!(
-        create("add(1, var.rev)", vars.clone()).unwrap(),
+        with_var("add(1, var.rev)", vars.clone()).unwrap(),
         EvalValue::Float(2.1)
     );
     assert_eq!(
-        create("sub(var.rev, 0.1)", vars.clone()).unwrap(),
+        with_var("sub(var.rev, 0.1)", vars.clone()).unwrap(),
         EvalValue::Float(1.0)
     );
     assert_eq!(
-        create("mul(var.rev, 2)", vars.clone()).unwrap(),
+        with_var("mul(var.rev, 2)", vars.clone()).unwrap(),
         EvalValue::Float(2.2)
     );
 
     // Equality
     assert_eq!(
-        create("var.rev == 1.1", vars.clone()).unwrap(),
+        with_var("var.rev == 1.1", vars.clone()).unwrap(),
         EvalValue::Bool(true)
     );
     assert_eq!(
-        create("var.rev == 1.10", vars.clone()).unwrap(),
+        with_var("var.rev == 1.10", vars.clone()).unwrap(),
         EvalValue::Bool(true)
     );
     assert_eq!(
-        create("var.rev != 1.2", vars.clone()).unwrap(),
+        with_var("var.rev != 1.2", vars.clone()).unwrap(),
         EvalValue::Bool(true)
     );
 
     // Ordering
     assert_eq!(
-        create("var.rev > 1.0", vars.clone()).unwrap(),
+        with_var("var.rev > 1.0", vars.clone()).unwrap(),
         EvalValue::Bool(true)
     );
     assert_eq!(
-        create("var.rev < 1.2", vars.clone()).unwrap(),
+        with_var("var.rev < 1.2", vars.clone()).unwrap(),
         EvalValue::Bool(true)
     );
     assert_eq!(
-        create("var.rev >= 1.1", vars.clone()).unwrap(),
+        with_var("var.rev >= 1.1", vars.clone()).unwrap(),
         EvalValue::Bool(true)
     );
     assert_eq!(
-        create("var.rev <= 1.1", vars.clone()).unwrap(),
+        with_var("var.rev <= 1.1", vars.clone()).unwrap(),
         EvalValue::Bool(true)
     );
 
@@ -1836,7 +1810,7 @@ fn eval_value_number_preserves_written_representation_and_computes_numerically()
         ]),
     )]);
     assert_eq!(
-        create("var.items.sort(x => x)", list_vars).unwrap(),
+        with_var("var.items.sort(x => x)", list_vars).unwrap(),
         seq(vec![
             EvalValue::Float(0.5),
             EvalValue::Number("1.10".into()),
@@ -1868,14 +1842,14 @@ fn a_block_macro_is_its_blocks_with_the_places_filled_in() {
     let macros = macros_of(&[
         (
             "card",
-            block_macro("::macro(card: [\n@card(title: ${1})[ ${2} ]\n])\n"),
+            block_macro("::macro(card: [\n@card(title: $(1))[ $(2) ]\n])\n"),
         ),
         (
             "notice",
-            block_macro("::macro(notice: [ Notice: ${msg} ])\n"),
+            block_macro("::macro(notice: [ Notice: $(msg) ])\n"),
         ),
     ]);
-    let run = |src: &str| run_with(src, Phase::Output, &EvalValue::Null, &macros);
+    let run = |src: &str| run_with(src, &EvalValue::Null, &macros);
 
     let EvalValue::Fragment(blocks) = run("macro.card(\"Welcome\", \"Hello\")").unwrap() else {
         panic!("a block macro is a fragment");
@@ -1911,8 +1885,8 @@ fn a_block_macro_is_its_blocks_with_the_places_filled_in() {
 
 #[test]
 fn a_number_given_to_a_block_macro_stays_a_number_in_data() {
-    let macros = macros_of(&[("n", block_macro("::macro(n: [\n@meter(of: ${1})\n])\n"))]);
-    let run = |src: &str| run_with(src, Phase::Output, &EvalValue::Null, &macros);
+    let macros = macros_of(&[("n", block_macro("::macro(n: [\n@meter(of: $(1))\n])\n"))]);
+    let run = |src: &str| run_with(src, &EvalValue::Null, &macros);
     let EvalValue::Fragment(blocks) = run("macro.n(7)").unwrap() else {
         panic!("a block macro is a fragment");
     };
@@ -1930,15 +1904,15 @@ fn a_block_macro_checks_its_arguments_as_a_text_macro_does() {
     let macros = macros_of(&[
         (
             "card",
-            block_macro("::macro(card: [\n@card(title: ${1})[ ${2} ]\n])\n"),
+            block_macro("::macro(card: [\n@card(title: $(1))[ $(2) ]\n])\n"),
         ),
         (
             "notice",
-            block_macro("::macro(notice: [ Notice: ${msg} ])\n"),
+            block_macro("::macro(notice: [ Notice: $(msg) ])\n"),
         ),
         ("none", block_macro("::macro(none: [ plain ])\n")),
     ]);
-    let run = |src: &str| run_with(src, Phase::Output, &EvalValue::Null, &macros);
+    let run = |src: &str| run_with(src, &EvalValue::Null, &macros);
     assert_eq!(
         run("macro.card(\"only one\")"),
         Err(EvalError::WrongArgCount {
@@ -1967,9 +1941,511 @@ fn a_block_macro_checks_its_arguments_as_a_text_macro_does() {
 #[test]
 fn a_template_that_is_neither_a_string_nor_blocks_cannot_be_called() {
     let macros = macros_of(&[("three", Value::Int(3))]);
-    let run = |src: &str| run_with(src, Phase::Output, &EvalValue::Null, &macros);
+    let run = |src: &str| run_with(src, &EvalValue::Null, &macros);
     let Err(error) = run("macro.three()") else {
         panic!("a number is not a template");
     };
     assert!(error.to_string().contains("macro.three"), "{error}");
+}
+
+// ---- types are values --------------------------------------------------------
+
+/// The type written as text (`list(string, length: 6)`), as a value.
+fn ty(written: &str) -> EvalValue {
+    EvalValue::Type(
+        written
+            .parse()
+            .unwrap_or_else(|e| panic!("`{written}`: {e}")),
+    )
+}
+
+/// What a type seat holds, when `src` is written in one.
+fn seat(src: &str) -> Result<Type, EvalError> {
+    let cx = EvalContext {
+        resolver: &NoResolver,
+        self_doc: DocRef("here.tmt".to_string()),
+        macros: &HashMap::new(),
+        var: &EvalValue::Null,
+        var_unset: &[],
+        includes: &[],
+        heading_level: 0,
+        notes: Default::default(),
+    };
+    evaluate_type(&parse(src), &cx)
+}
+
+fn bad(error: TypeError) -> EvalError {
+    EvalError::BadType(error)
+}
+
+#[test]
+fn a_bare_type_name_is_that_type() {
+    for kind in Kind::ALL {
+        assert_eq!(
+            out(kind.name()).unwrap(),
+            EvalValue::Type(Type::bare(kind)),
+            "{kind}"
+        );
+    }
+    assert_eq!(out("list").unwrap().type_name(), "type");
+}
+
+#[test]
+fn a_lambda_parameter_comes_before_a_type_name() {
+    // `int` is the parameter here, so the numbers come back as they are.
+    assert_eq!(
+        with_var("var.xs.map(int => int)", xs()).unwrap(),
+        seq(vec![int(3), int(1), int(2)])
+    );
+    assert_eq!(
+        with_var("var.xs.map(x => int)", xs()).unwrap(),
+        seq(vec![ty("int"), ty("int"), ty("int")])
+    );
+}
+
+#[test]
+fn a_call_of_a_type_name_builds_the_type() {
+    assert_eq!(out("list(string)").unwrap(), ty("list(string)"));
+    assert_eq!(
+        out("list(string, length: 6)").unwrap(),
+        ty("list(string, length: 6)")
+    );
+    assert_eq!(
+        out("list(string, default: (\"a\", \"b\"))").unwrap(),
+        ty("list(string, default: (\"a\", \"b\"))")
+    );
+    assert_eq!(
+        out("list(string, default: ())").unwrap(),
+        ty("list(string, default: ())")
+    );
+    assert_eq!(
+        out("list(string, default: (\"a\",))").unwrap(),
+        ty("list(string, default: (\"a\",))")
+    );
+    assert_eq!(
+        out("list(string, default: (\"a\"))").unwrap(),
+        ty("list(string, default: (\"a\",))")
+    );
+    assert_eq!(
+        out("nanoid(length: 8, prefix: \"note-\", default: auto)").unwrap(),
+        ty("nanoid(length: 8, prefix: \"note-\", default: auto)")
+    );
+    assert_eq!(
+        out("date(default: auto)").unwrap(),
+        ty("date(default: auto)")
+    );
+    assert_eq!(
+        out("uuid(prefix: \"id-\")").unwrap(),
+        ty("uuid(prefix: \"id-\")")
+    );
+    assert_eq!(
+        out("string(default: \"x\")").unwrap(),
+        ty("string(default: \"x\")")
+    );
+    assert_eq!(out("int(default: 3)").unwrap(), ty("int(default: 3)"));
+    // A type is its arguments, however they were written.
+    assert_eq!(
+        out("list(string, length: 6)").unwrap(),
+        out("list(length: 6, string)").unwrap()
+    );
+}
+
+#[test]
+fn types_nest() {
+    assert_eq!(
+        out("list(list(string), length: 6)").unwrap(),
+        ty("list(list(string), length: 6)")
+    );
+    assert_eq!(
+        out("list(list(list(int)))").unwrap(),
+        ty("list(list(list(int)))")
+    );
+}
+
+#[test]
+fn a_function_wins_over_a_type_of_the_same_name() {
+    // `version(...)` is the function; `version` alone is the type.
+    assert_eq!(
+        out("version(\"1.10\")").unwrap(),
+        EvalValue::Version(tomet_type::Version::parse("1.10").unwrap())
+    );
+    assert_eq!(out("version").unwrap(), ty("version"));
+    // So a type of that name cannot be built with arguments in an expression.
+    assert!(matches!(
+        out("version(default: \"1.0\")"),
+        Err(EvalError::Message(_))
+    ));
+}
+
+#[test]
+fn auto_is_read_as_the_default_of_a_type_and_nowhere_else() {
+    // Not a name, not a value.
+    assert_eq!(out("auto"), Err(EvalError::UnknownName("auto".to_string())));
+    assert_eq!(
+        out("add(1, auto)"),
+        Err(EvalError::UnknownName("auto".to_string()))
+    );
+    // Not as another argument of a type, nor by position.
+    assert_eq!(
+        out("nanoid(length: auto)"),
+        Err(EvalError::UnknownName("auto".to_string()))
+    );
+    assert_eq!(
+        out("list(auto)"),
+        Err(EvalError::UnknownName("auto".to_string()))
+    );
+    // Not as the default of anything but a type.
+    assert_eq!(
+        out("add(default: auto)"),
+        Err(EvalError::UnknownName("auto".to_string()))
+    );
+    // As the default of a type it is the type's `auto`, not evaluated.
+    let EvalValue::Type(made) = out("uuid(default: auto)").unwrap() else {
+        panic!("a type");
+    };
+    assert_eq!(made.default(), Some(&DefaultValue::Auto));
+    assert_eq!(made.auto(), Some(AutoFill::Id));
+}
+
+#[test]
+fn auto_is_admitted_for_the_kinds_that_make_a_value_up_and_refused_for_the_rest() {
+    // `version` is a function in an expression, and its arguments are values; a seat has it as a
+    // type (`a_type_seat_admits_auto_only_for_the_kinds_that_make_a_value_up`).
+    assert_eq!(
+        out("version(default: auto)"),
+        Err(EvalError::UnknownName("auto".to_string()))
+    );
+    for kind in Kind::ALL
+        .into_iter()
+        .filter(|kind| kind.name() != "version")
+    {
+        let written = format!("{kind}(default: auto)");
+        match kind.auto() {
+            Some(_) => assert!(
+                matches!(out(&written), Ok(EvalValue::Type(made)) if made.kind() == kind),
+                "{written}"
+            ),
+            None => assert_eq!(
+                out(&written),
+                Err(bad(TypeError::AutoNotAllowed { ty: kind })),
+                "{written}"
+            ),
+        }
+    }
+}
+
+#[test]
+fn a_type_that_is_not_well_formed_is_refused_in_the_type_crates_words() {
+    let refused = [
+        (
+            "list(string, string)",
+            TypeError::TooManyArguments {
+                ty: Kind::List,
+                takes: 1,
+                given: 2,
+            },
+        ),
+        (
+            "string(prefix: \"x\")",
+            TypeError::UnknownArgument {
+                ty: Kind::String,
+                argument: "prefix".to_string(),
+            },
+        ),
+        (
+            "nanoid(length: 4, length: 5)",
+            TypeError::DuplicateArgument {
+                ty: Kind::Nanoid,
+                argument: "length".to_string(),
+            },
+        ),
+    ];
+    for (written, error) in refused {
+        let got = out(written);
+        assert_eq!(got, Err(bad(error.clone())), "{written}");
+        // The message is the type crate's own, not a paraphrase of it.
+        assert_eq!(got.unwrap_err().to_string(), error.to_string());
+    }
+    assert!(matches!(
+        out("nanoid(length: 0)"),
+        Err(EvalError::BadType(TypeError::WrongArgument {
+            ty: Kind::Nanoid,
+            argument: "length",
+            ..
+        }))
+    ));
+    assert!(matches!(
+        out("list(1)"),
+        Err(EvalError::BadType(TypeError::WrongArgument {
+            ty: Kind::List,
+            argument: "item",
+            ..
+        }))
+    ));
+}
+
+#[test]
+fn an_unknown_type_name_is_not_a_type() {
+    assert_eq!(
+        out("person"),
+        Err(EvalError::UnknownName("person".to_string()))
+    );
+    assert_eq!(
+        out("person(1)"),
+        Err(EvalError::UnknownFunction("person".to_string()))
+    );
+}
+
+#[test]
+fn an_argument_of_a_type_is_a_type_or_plain_data() {
+    // A number that was kept as written is the number it is, and a version is its text.
+    let vars = map(vec![
+        ("n", EvalValue::Number("8".to_string())),
+        (
+            "v",
+            EvalValue::Version(tomet_type::Version::parse("1.2").unwrap()),
+        ),
+        (
+            "doc",
+            seq(vec![EvalValue::Document(DocRef("a.tmt".into()))]),
+        ),
+    ]);
+    assert_eq!(
+        with_var("nanoid(length: var.n)", vars.clone()).unwrap(),
+        ty("nanoid(length: 8)")
+    );
+    assert_eq!(
+        with_var("string(default: var.v)", vars.clone()).unwrap(),
+        ty("string(default: \"1.2\")")
+    );
+    // Documents, functions and the like are not plain data.
+    for written in [
+        "nanoid(length: self)",
+        "nanoid(length: x => x)",
+        "string(default: vault)",
+        "string(default: var.doc)",
+    ] {
+        let err = with_var(written, vars.clone()).unwrap_err();
+        assert!(
+            matches!(&err, EvalError::TypeMismatch { what, .. } if what.starts_with("an argument of the type")),
+            "{written}: {err:?}"
+        );
+        assert!(err.to_string().contains("plain data"), "{err}");
+    }
+}
+
+#[test]
+fn types_are_equal_when_they_are_the_same_type_and_have_no_order() {
+    assert_eq!(
+        out("list(string) == list(string)").unwrap(),
+        EvalValue::Bool(true)
+    );
+    assert_eq!(
+        out("list(string) == list(string, length: 2)").unwrap(),
+        EvalValue::Bool(false)
+    );
+    assert_eq!(out("string != int").unwrap(), EvalValue::Bool(true));
+    // Not the type's name as text, and not the text form.
+    assert_eq!(out("string == \"string\"").unwrap(), EvalValue::Bool(false));
+    assert_eq!(
+        out("string < int"),
+        Err(EvalError::NotComparable {
+            left: "type",
+            right: "type"
+        })
+    );
+    assert_eq!(
+        out("string < 1"),
+        Err(EvalError::NotComparable {
+            left: "type",
+            right: "int"
+        })
+    );
+}
+
+#[test]
+fn a_type_is_not_data_and_not_text() {
+    let made = out("list(string)").unwrap();
+    assert_eq!(made.to_ast(), None);
+    assert_eq!(made.scalar_text(), None);
+    // One anywhere inside makes the whole thing not data.
+    assert_eq!(seq(vec![int(1), made.clone()]).to_ast(), None);
+
+    let cx = EvalContext {
+        resolver: &NoResolver,
+        self_doc: DocRef("here.tmt".to_string()),
+        macros: &HashMap::new(),
+        var: &EvalValue::Null,
+        var_unset: &[],
+        includes: &[],
+        heading_level: 0,
+        notes: Default::default(),
+    };
+    let err = evaluate_data(&parse("list(string)"), &cx).unwrap_err();
+    assert_eq!(
+        err,
+        EvalError::NotData {
+            type_name: "type",
+            is_vault_ref: false
+        }
+    );
+    assert_eq!(err.to_string(), "a type cannot be stored as data");
+}
+
+#[test]
+fn a_type_has_no_members() {
+    assert_eq!(
+        out("list(string).length"),
+        Err(EvalError::UnknownMember {
+            on: "type",
+            member: "length".to_string()
+        })
+    );
+    assert!(out("string.len()").is_err());
+}
+
+#[test]
+fn a_type_seat_holds_the_type_it_is_written_as() {
+    for kind in Kind::ALL {
+        assert_eq!(seat(kind.name()), Ok(Type::bare(kind)), "{kind}");
+    }
+    assert_eq!(seat("list(string, length: 6)").unwrap().length(), Some(6));
+    assert_eq!(
+        seat("nanoid(length: 8, prefix: \"note-\", default: auto)"),
+        Ok("nanoid(length: 8, prefix: \"note-\", default: auto)"
+            .parse()
+            .unwrap())
+    );
+    assert_eq!(
+        seat("list(list(string), length: 6)"),
+        Ok("list(list(string), length: 6)".parse().unwrap())
+    );
+    assert_eq!(
+        seat("date(default: auto)").unwrap().auto(),
+        Some(AutoFill::Now)
+    );
+}
+
+#[test]
+fn a_type_seat_reads_the_types_first() {
+    // Where an expression has a function `version(...)`, a seat has the type.
+    assert_eq!(seat("version"), Ok(Type::bare(Kind::Version)));
+    assert_eq!(
+        seat("version(default: \"1.0\")"),
+        Ok("version(default: \"1.0\")".parse().unwrap())
+    );
+    assert_eq!(
+        seat("version(\"1.10\")"),
+        Err(bad(TypeError::TooManyArguments {
+            ty: Kind::Version,
+            takes: 0,
+            given: 1
+        }))
+    );
+    assert_eq!(seat("list(version)"), Ok("list(version)".parse().unwrap()));
+}
+
+#[test]
+fn a_type_seat_admits_auto_only_for_the_kinds_that_make_a_value_up() {
+    for kind in Kind::ALL {
+        let written = format!("{kind}(default: auto)");
+        match kind.auto() {
+            Some(fill) => assert_eq!(seat(&written).unwrap().auto(), Some(fill), "{written}"),
+            None => assert_eq!(
+                seat(&written),
+                Err(bad(TypeError::AutoNotAllowed { ty: kind })),
+                "{written}"
+            ),
+        }
+    }
+    // And `auto` is nothing outside `default`.
+    assert_eq!(
+        seat("nanoid(length: auto)"),
+        Err(EvalError::UnknownName("auto".to_string()))
+    );
+    assert_eq!(
+        seat("auto"),
+        Err(bad(TypeError::Unknown("auto".to_string())))
+    );
+}
+
+#[test]
+fn a_type_seat_with_an_unknown_name_or_bad_arguments_is_refused() {
+    // What a seat holds is a type, so an unknown name is an unknown type, in the type crate's words.
+    assert_eq!(
+        seat("person"),
+        Err(bad(TypeError::Unknown("person".to_string())))
+    );
+    assert_eq!(
+        seat("person(string)"),
+        Err(bad(TypeError::Unknown("person".to_string())))
+    );
+    assert!(
+        seat("person")
+            .unwrap_err()
+            .to_string()
+            .starts_with("`person` is not a type; the types are")
+    );
+    assert!(matches!(
+        seat("nanoid(length: \"long\")"),
+        Err(EvalError::BadType(TypeError::WrongArgument { .. }))
+    ));
+    assert!(matches!(
+        seat("nanoid(length: self)"),
+        Err(EvalError::TypeMismatch { .. })
+    ));
+    assert_eq!(
+        seat("string(prefix: \"x\")"),
+        Err(bad(TypeError::UnknownArgument {
+            ty: Kind::String,
+            argument: "prefix".to_string()
+        }))
+    );
+}
+
+#[test]
+fn a_type_seat_holds_a_type_and_nothing_else() {
+    for written in [
+        "1",
+        "\"string\"",
+        "1 + 1",
+        "self",
+        "x => x",
+        "add(1, 2)",
+        "var",
+    ] {
+        let err = seat(written).unwrap_err();
+        assert!(
+            err.to_string().contains("a type seat holds a type"),
+            "{written}: {err}"
+        );
+    }
+}
+
+#[test]
+fn the_type_names_are_the_kinds_and_every_one_is_answered() {
+    let listed = type_names();
+    let names: Vec<&str> = listed.iter().map(|(name, _)| *name).collect();
+    let kinds: Vec<&str> = Kind::ALL.iter().map(|kind| kind.name()).collect();
+    assert_eq!(names, kinds);
+    for (name, detail) in &listed {
+        assert!(!detail.is_empty(), "{name} has no description");
+        assert!(
+            matches!(out(name), Ok(EvalValue::Type(_))),
+            "`{name}` is listed as a type and is not one"
+        );
+        // A type name is no reserved value, so a lambda may not be told apart from it.
+        assert!(!RESERVED_VALUES.contains(name), "{name}");
+        assert!(RESERVED_NAMES.iter().all(|(reserved, _)| reserved != name));
+    }
+}
+
+#[test]
+fn only_version_is_both_a_function_and_a_type() {
+    let both: Vec<&str> = type_names()
+        .into_iter()
+        .map(|(name, _)| name)
+        .filter(|name| FUNCTIONS.iter().any(|(function, _)| function == name))
+        .collect();
+    assert_eq!(both, ["version"]);
 }

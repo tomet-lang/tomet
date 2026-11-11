@@ -90,6 +90,10 @@
         {
           "type": "string",
           "named": true
+        },
+        {
+          "type": "type_seat",
+          "named": true
         }
       ]
     }
@@ -209,6 +213,10 @@
         },
         {
           "type": "text",
+          "named": true
+        },
+        {
+          "type": "type_seat",
           "named": true
         }
       ]
@@ -377,6 +385,10 @@
         },
         {
           "type": "text",
+          "named": true
+        },
+        {
+          "type": "type_seat",
           "named": true
         }
       ]
@@ -816,12 +828,83 @@
     }
   },
   {
+    "type": "interp_dollar_call",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "identifier",
+          "named": true
+        },
+        {
+          "type": "interp_addr",
+          "named": true
+        },
+        {
+          "type": "interp_binary",
+          "named": true
+        },
+        {
+          "type": "interp_call",
+          "named": true
+        },
+        {
+          "type": "interp_connect",
+          "named": true
+        },
+        {
+          "type": "interp_connect_call",
+          "named": true
+        },
+        {
+          "type": "interp_dollar_head",
+          "named": true
+        },
+        {
+          "type": "interp_group",
+          "named": true
+        },
+        {
+          "type": "interp_hash",
+          "named": true
+        },
+        {
+          "type": "interp_hash_call",
+          "named": true
+        },
+        {
+          "type": "interp_lambda",
+          "named": true
+        },
+        {
+          "type": "interp_member",
+          "named": true
+        },
+        {
+          "type": "interp_named_arg",
+          "named": true
+        },
+        {
+          "type": "number",
+          "named": true
+        },
+        {
+          "type": "string",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
     "type": "interp_group",
     "named": true,
     "fields": {},
     "children": {
-      "multiple": false,
-      "required": true,
+      "multiple": true,
+      "required": false,
       "types": [
         {
           "type": "identifier",
@@ -1229,6 +1312,10 @@
           "named": true
         },
         {
+          "type": "interp_dollar_call",
+          "named": true
+        },
+        {
           "type": "interp_group",
           "named": true
         },
@@ -1348,6 +1435,10 @@
           {
             "type": "string",
             "named": true
+          },
+          {
+            "type": "type_seat",
+            "named": true
           }
         ]
       }
@@ -1407,6 +1498,10 @@
         },
         {
           "type": "text",
+          "named": true
+        },
+        {
+          "type": "type_seat",
           "named": true
         }
       ]
@@ -1517,6 +1612,10 @@
         {
           "type": "text",
           "named": true
+        },
+        {
+          "type": "type_seat",
+          "named": true
         }
       ]
     }
@@ -1575,6 +1674,10 @@
         },
         {
           "type": "text",
+          "named": true
+        },
+        {
+          "type": "type_seat",
           "named": true
         }
       ]
@@ -1679,6 +1782,10 @@
           {
             "type": "text",
             "named": true
+          },
+          {
+            "type": "type_seat",
+            "named": true
           }
         ]
       },
@@ -1750,6 +1857,10 @@
         {
           "type": "string",
           "named": true
+        },
+        {
+          "type": "type_seat",
+          "named": true
         }
       ]
     }
@@ -1804,6 +1915,10 @@
         },
         {
           "type": "text",
+          "named": true
+        },
+        {
+          "type": "type_seat",
           "named": true
         }
       ]
@@ -1860,6 +1975,10 @@
         },
         {
           "type": "text",
+          "named": true
+        },
+        {
+          "type": "type_seat",
           "named": true
         }
       ]
@@ -1939,6 +2058,10 @@
           {
             "type": "text",
             "named": true
+          },
+          {
+            "type": "type_seat",
+            "named": true
           }
         ]
       },
@@ -1952,6 +2075,81 @@
           }
         ]
       }
+    }
+  },
+  {
+    "type": "type_seat",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "identifier",
+          "named": true
+        },
+        {
+          "type": "interp_addr",
+          "named": true
+        },
+        {
+          "type": "interp_binary",
+          "named": true
+        },
+        {
+          "type": "interp_call",
+          "named": true
+        },
+        {
+          "type": "interp_connect",
+          "named": true
+        },
+        {
+          "type": "interp_connect_call",
+          "named": true
+        },
+        {
+          "type": "interp_group",
+          "named": true
+        },
+        {
+          "type": "interp_hash",
+          "named": true
+        },
+        {
+          "type": "interp_hash_call",
+          "named": true
+        },
+        {
+          "type": "interp_lambda",
+          "named": true
+        },
+        {
+          "type": "interp_member",
+          "named": true
+        },
+        {
+          "type": "interp_named_arg",
+          "named": true
+        },
+        {
+          "type": "number",
+          "named": true
+        },
+        {
+          "type": "string",
+          "named": true
+        },
+        {
+          "type": "type_seat_close",
+          "named": true
+        },
+        {
+          "type": "type_seat_open",
+          "named": true
+        }
+      ]
     }
   },
   {
@@ -2059,6 +2257,10 @@
         {
           "type": "text",
           "named": true
+        },
+        {
+          "type": "type_seat",
+          "named": true
         }
       ]
     }
@@ -2085,6 +2287,10 @@
         },
         {
           "type": "string",
+          "named": true
+        },
+        {
+          "type": "type_seat",
           "named": true
         }
       ]
@@ -2122,7 +2328,7 @@
     "named": false
   },
   {
-    "type": "${",
+    "type": "$(",
     "named": false
   },
   {
@@ -2143,6 +2349,10 @@
   },
   {
     "type": "**",
+    "named": false
+  },
+  {
+    "type": "+",
     "named": false
   },
   {
@@ -2258,6 +2468,10 @@
     "named": true
   },
   {
+    "type": "interp_dollar_head",
+    "named": true
+  },
+  {
     "type": "label",
     "named": true
   },
@@ -2282,7 +2496,19 @@
     "named": true
   },
   {
+    "type": "type_seat_close",
+    "named": true
+  },
+  {
+    "type": "type_seat_open",
+    "named": true
+  },
+  {
     "type": "{",
+    "named": false
+  },
+  {
+    "type": "{$",
     "named": false
   },
   {

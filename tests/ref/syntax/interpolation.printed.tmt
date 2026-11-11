@@ -8,9 +8,9 @@
 
 $ref(id(node-graph))
 
-${filename}
+$(filename)
 
-${vars.title}
+$(vars.title)
 
 =[呼び出し]
 $sum(1, 4)

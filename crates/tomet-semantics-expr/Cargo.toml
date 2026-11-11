@@ -15,4 +15,3 @@ tomet-type        = { workspace = true }
 tomet-tree        = { workspace = true }
 #--- Crates.io ---
 time = { workspace = true }
-uuid = { workspace = true }

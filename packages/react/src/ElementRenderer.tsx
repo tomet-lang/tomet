@@ -34,7 +34,7 @@ export const ElementRenderer: FC<ElementRendererProps> = ({
     return null;
   }
 
-  // 2. Interpolation / macro expressions ($name(...) or ${...})
+  // 2. Interpolation / macro expressions ($name(...), $(...) or {$ ... })
   const isDollar =
     kindInfo.isDollar ||
     normalizedName === "$" ||

@@ -23,7 +23,7 @@ pub fn kind_name(declaration: &Declaration) -> Option<String> {
 
 /// The identity a `::id(...)` declares: `::id(std.config)` or `::id(id: std.config)`.
 ///
-/// `None` when it is not written as text, such as `::id(${uuid()})` before it is evaluated.
+/// `None` when it is not written as text, such as `::id($uuid())` before it is evaluated.
 pub fn id_name(declaration: &Declaration) -> Option<String> {
     let args = declaration.bound_args()?;
     args.get("id").and_then(text).or_else(|| text(&args))
@@ -137,6 +137,13 @@ pub fn document_id<B>(doc: &File<B>) -> Option<String> {
 /// The kind a blueprint document is for; `None` for a document that is not a blueprint.
 pub fn document_blueprint<B>(doc: &File<B>) -> Option<String> {
     blueprint_target(&first(doc, DeclKind::Blueprint)?)
+}
+
+/// Whether this document is a blueprint: it says so itself with `::kind(blueprint)`, or it is the
+/// header of one, `::blueprint(X)`. A document that only registers a blueprint file
+/// (`::blueprint.x(@file(...))`) is not.
+pub fn is_blueprint<B>(doc: &File<B>) -> bool {
+    document_kind(doc).as_deref() == Some("blueprint") || document_blueprint(doc).is_some()
 }
 
 /// The name of the dictionary a document is, from its `::dictionary(name)` header; `None` for a
@@ -350,6 +357,24 @@ mod tests {
     }
 
     #[test]
+    fn a_blueprint_says_so_by_its_kind_or_by_naming_what_it_is_for() {
+        for src in [
+            "::kind(blueprint)\n",
+            "::blueprint(daily-note)\n",
+            "::kind(blueprint)\n::blueprint(daily-note)\n",
+        ] {
+            assert!(is_blueprint(&parse(src)), "{src:?}");
+        }
+        for src in [
+            "::kind(note)\n",
+            "::meta(title: x)\n\n=[ A ]\n",
+            "::blueprint.daily-note(@file(daily-note.blueprint.tmt))\n",
+        ] {
+            assert!(!is_blueprint(&parse(src)), "{src:?}");
+        }
+    }
+
+    #[test]
     fn a_version_is_the_text_it_was_written_as() {
         for (src, want) in [
             ("::version(1.0)\n", "1.0"),
@@ -388,12 +413,12 @@ mod tests {
     #[test]
     fn macros_are_the_entries_of_every_macros_declaration() {
         let doc =
-            parse("::macro(gh: \"https://x/${1}\", n: 3, wiki: \"w/${1}\", blk: [ hello ])\n");
+            parse("::macro(gh: \"https://x/$(1)\", n: 3, wiki: \"w/$(1)\", blk: [ hello ])\n");
         let read = document_macros(&doc);
         let names: Vec<&str> = read.iter().map(|(name, _)| name.as_str()).collect();
         // A template of any kind is read; refusing a kind is `check`'s.
         assert_eq!(names, ["gh", "n", "wiki", "blk"]);
-        assert_eq!(read[0].1, Value::String("https://x/${1}".to_string()));
+        assert_eq!(read[0].1, Value::String("https://x/$(1)".to_string()));
         assert_eq!(read[1].1, Value::Int(3));
         assert!(matches!(read[3].1, Value::Blocks(_)));
         // no entries, no macros

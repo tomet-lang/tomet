@@ -1,0 +1,76 @@
+::kind(fixture)
+::id(doc-type-seat)
+::meta(title: <$string>, tags: <$list(string)>)
+
+// `<$type(args)>` は型の座。値の入る場所を、その型といっしょに書く。
+// 名前は ASCII の一語（`.` は含まない）、`(args)` は一つまで。内容も `{value}` も取らず、`>` で終わる。
+
+=[ 行に座だけ（ブロック） ]
+
+<$uuid>
+
+<$list(string, length: 6)>
+
+=[ 地の文の中 ]
+
+文書の id は <$uuid> で、題は <$string(length: 40)> と書く。
+
+- リストの項目の座は <$int> と <$date(default: auto)> 。
+
+*強調の中の <$string> も*、**強い強調の中の <$int> も**座。
+
+=[ 見出しの座 <$string> ]
+
+=[ 値の位置 ]
+
+// `(args)` の中、`key: value` の値、`{value}` の中、列の中、文書の宣言（先頭の `::meta`）の中。
+
+@memo(<$int>)
+
+@memo(key: <$string>)
+
+@memo(id: <$uuid(default: auto)>, tags: (<$string>, <$int>))
+
+@memo(){ name: <$string>, size: <$int(default: 0)> }
+
+=[ 引数 ]
+
+<$string(length: 80)>
+
+<$nanoid(length: 8, prefix: "note-", default: auto)>
+
+<$list(list(string), length: 6)>
+
+<$list(
+  string,
+  length: 6
+)>
+
+=[ `>` を含む引数 ]
+
+// 閉じるのは `()` と文字列の外の最初の `>` 。引数の中の `>` は何も閉じない。
+
+<$string(prefix: ">")>
+
+<$string(prefix: ")>")>
+
+<$int(min: a > b)> と <$int((min > 0), max: 9)>
+
+<$x>y> は座のあとに文字 `y>` が続く。<$x(a)> > <$y> も同じ。
+
+=[ 引数の有無 ]
+
+<$uuid> と <$uuid()> はどちらも座。
+
+=[ 座にならないもの ]
+
+// 名前が無い、名前でない、`>` の前に空白がある、`{...}` が続く、名前に `.` がある。これらは座にならず、文字のまま。
+// （`(args)` のあとでは、座にならない `$x(a)` は補間として読まれる。）
+
+<$> <$5> <$ x> <$-x> <$x.y> <$x >
+
+<$x(a) > と <$x{a: 1}> と <$x(a)(b)> も文字のまま。
+
+// `<` を `\` で逃がせば、座の形をした文字を地の文に書ける。
+
+\<$uuid> は座ではない。

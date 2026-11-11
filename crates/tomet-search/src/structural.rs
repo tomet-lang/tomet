@@ -115,6 +115,7 @@ fn value_contains_str(v: &Value, sub: &str) -> bool {
             name.contains(sub) || args.iter().any(|item| value_contains_str(item, sub))
         }
         Value::Interp(it) => it.expr.to_string().contains(sub),
+        Value::TypeSeat(seat) => seat.expr.to_string().contains(sub),
         Value::Map(entries) => entries
             .iter()
             .any(|(k, val)| k.contains(sub) || value_contains_str(val, sub)),
@@ -182,7 +183,7 @@ mod tests {
     #[test]
     fn matches_query_by_value_contains_in_call_and_interp() {
         let doc =
-            parse_file("::meta(rule: allow:(\"special-item\"), expr: ${vault.name})\n").unwrap();
+            parse_file("::meta(rule: allow:(\"special-item\"), expr: $(vault.name))\n").unwrap();
         let q_call = StructuralQuery {
             value_contains: Some("special".to_string()),
             ..Default::default()

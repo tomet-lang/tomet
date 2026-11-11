@@ -193,10 +193,10 @@ mod tests {
 
     #[test]
     fn file_with_expressions_is_formatted() {
-        let src = "::macro(vocab: \"x\")   \r\n\r\n\r\nkey: ${macro.vocab}   \r\n";
+        let src = "::macro(vocab: \"x\")   \r\n\r\n\r\nkey: $(macro.vocab)   \r\n";
         assert_eq!(
             format_data_source(src),
-            "::macro(vocab: \"x\")\n\nkey: ${macro.vocab}\n"
+            "::macro(vocab: \"x\")\n\nkey: $(macro.vocab)\n"
         );
         let before = tomet_ast_parser::parse_data_file(src).unwrap();
         let after = tomet_ast_parser::parse_data_file(&format_data_source(src)).unwrap();

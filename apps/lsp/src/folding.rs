@@ -98,7 +98,7 @@ fn collect_block_folding_ranges(
                 });
             }
         }
-        Block::Hole(_) => {}
+        Block::Hole(_) | Block::TypeSeat(_) => {}
     }
 }
 
@@ -191,6 +191,7 @@ fn block_end_line(index: &LineIndex<'_>, block: &Block) -> u32 {
         Block::List(list) => span_end_line(index, &list.span),
         Block::Interp(interp) => span_end_line(index, &interp.span),
         Block::Hole(hole) => span_end_line(index, &hole.span),
+        Block::TypeSeat(seat) => span_end_line(index, &seat.span),
     }
 }
 

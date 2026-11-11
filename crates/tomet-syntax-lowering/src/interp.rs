@@ -1,5 +1,7 @@
 use crate::error::Result;
-use tomet_ast::{BinaryOp, InterpExpr, InterpExprKind, Interpolation, Literal};
+use tomet_ast::{
+    BinaryOp, InterpExpr, InterpExprKind, InterpSpelling, Interpolation, Literal, TypeSeat,
+};
 use tomet_cst::SyntaxNode;
 use tomet_lexer::Cursor;
 use tomet_span::Span;
@@ -62,6 +64,47 @@ pub(crate) fn lower_interpolation(node: &SyntaxNode) -> Result<Interpolation> {
     Ok(interp)
 }
 
+/// Lowers the `SLOT` node of a type seat, `<$type>` or `<$type(args)>`, into a [`TypeSeat`].
+///
+/// The text between the `<$` and the `>` is read as the expression it is, by the expression
+/// parser the interpolations use: types and expressions are one language. The seat holds that
+/// expression as written and no more. Which names are types and what their arguments mean is not
+/// asked here.
+pub(crate) fn lower_type_seat(slot: &SyntaxNode) -> Result<TypeSeat> {
+    const WHAT: &str = "a type seat holds a type: a name or a call of one, \
+                        as in `<$uuid>` and `<$list(string, length: 6)>`";
+    let text = slot.text().to_string();
+    let base = usize::from(slot.text_range().start());
+    let Some(written) = text.strip_prefix("<$").and_then(|t| t.strip_suffix('>')) else {
+        return Err(err(base, format!("this type seat does not close: {WHAT}")));
+    };
+    let inner = base + "<$".len();
+    let mut cur = Cursor::new(written);
+    let mut expr = parse_interp_expr(&mut cur).map_err(|e| err(inner + e.offset, e.message))?;
+    skip_expr_ws(&mut cur);
+    if !cur.is_eof() {
+        return Err(err(
+            inner + cur.pos(),
+            format!("unexpected content: {WHAT}"),
+        ));
+    }
+    let is_type = match &expr.kind {
+        InterpExprKind::Identifier(_) => true,
+        InterpExprKind::Call { callee, .. } => {
+            matches!(callee.kind, InterpExprKind::Identifier(_))
+        }
+        _ => false,
+    };
+    if !is_type {
+        return Err(err(base, WHAT));
+    }
+    offset_expr(&mut expr, inner);
+    Ok(TypeSeat {
+        expr,
+        span: Span::new(base, base + text.len()),
+    })
+}
+
 fn offset_interpolation(interp: &mut Interpolation, base: usize) {
     interp.span = Span::new(base + interp.span.start, base + interp.span.end);
     offset_expr(&mut interp.expr, base);
@@ -79,6 +122,11 @@ fn offset_expr(expr: &mut InterpExpr, base: usize) {
         }
         InterpExprKind::DocId { doc, .. } => offset_expr(doc, base),
         InterpExprKind::Group(inner) => offset_expr(inner, base),
+        InterpExprKind::Seq(items) => {
+            for item in items {
+                offset_expr(item, base);
+            }
+        }
         InterpExprKind::Call { callee, args } => {
             offset_expr(callee, base);
             for arg in args {
@@ -94,80 +142,116 @@ fn offset_expr(expr: &mut InterpExpr, base: usize) {
     }
 }
 
-/// `${ Expr }` or `$func(args)` or `$macro.func(args)`.
+/// One of the three spellings of an interpolation: `{$ expr }`, `$(ref)` or `$name(args)`.
+///
+/// The first takes the whole expression grammar. `$(...)` takes one reference
+/// ([`InterpSpelling::Reference`]) and `$name(...)` one call, so that an operator in either is
+/// refused with the gate that would take it, and not read as something else.
 pub fn parse_interpolation(cur: &mut Cursor) -> Result<Interpolation> {
     let start_pos = cur.pos();
-    cur.eat_str("$");
-    if cur.peek() == Some('{') {
-        cur.eat_str("{");
-        skip_expr_ws(cur);
-        if cur.peek() == Some('}') {
-            return Err(err(
-                cur.pos(),
-                "empty interpolation, expected an expression",
-            ));
-        }
-        let expr = parse_interp_expr(cur)?;
+    let expr = if cur.eat_str("{$") {
+        let expr = parse_gate(cur)?;
         skip_expr_ws(cur);
         if !cur.eat_str("}") {
-            return Err(err(cur.pos(), "unterminated '${', expected '}'"));
+            return Err(err(cur.pos(), "unterminated '{$', expected '}'"));
         }
-        Ok(Interpolation {
-            expr,
-            span: cur.span_from(start_pos),
-        })
+        expr
+    } else if cur.eat_str("$(") {
+        let expr = parse_reference(cur, start_pos)?;
+        skip_expr_ws(cur);
+        if !cur.eat_str(")") {
+            return Err(err(cur.pos(), "unterminated '$(', expected ')'"));
+        }
+        expr
+    } else if cur.eat_str("$") {
+        parse_call_form(cur, start_pos)?
     } else {
-        let ident_start = cur.pos();
-        let name = eat_interp_ident(cur)?.to_string();
-        let mut expr = if name == "addr" && cur.peek() == Some('(') {
-            parse_addr_literal(cur, ident_start)?
-        } else {
-            InterpExpr {
-                kind: InterpExprKind::Identifier(name),
-                span: cur.span_from(ident_start),
-            }
-        };
-        loop {
-            let mut look = *cur;
-            skip_expr_ws(&mut look);
-            match look.peek() {
-                Some('.') => {
-                    look.bump();
-                    skip_expr_ws(&mut look);
-                    *cur = look;
-                    let member = eat_interp_ident(cur)?.to_string();
-                    expr = InterpExpr {
-                        kind: InterpExprKind::Member {
-                            object: Box::new(expr),
-                            member,
-                        },
-                        span: cur.span_from(start_pos),
-                    };
-                }
-                Some('(') => {
-                    *cur = look;
-                    let args = parse_interp_call_args(cur)?;
-                    expr = InterpExpr {
-                        kind: InterpExprKind::Call {
-                            callee: Box::new(expr),
-                            args,
-                        },
-                        span: cur.span_from(start_pos),
-                    };
-                }
-                _ => break,
-            }
-        }
-        Ok(Interpolation {
-            expr,
-            span: cur.span_from(start_pos),
-        })
+        return Err(err(start_pos, "expected '{$', '$(' or '$name('"));
+    };
+    Ok(Interpolation {
+        expr,
+        span: cur.span_from(start_pos),
+    })
+}
+
+/// The expression inside `{$ ... }`, with the cursor after the `{$`.
+fn parse_gate(cur: &mut Cursor) -> Result<InterpExpr> {
+    skip_expr_ws(cur);
+    if cur.peek() == Some('}') {
+        return Err(err(
+            cur.pos(),
+            "empty interpolation, expected an expression",
+        ));
     }
+    parse_interp_expr(cur)
+}
+
+/// The reference inside `$( ... )`, with the cursor after the `$(`.
+fn parse_reference(cur: &mut Cursor, start_pos: usize) -> Result<InterpExpr> {
+    skip_expr_ws(cur);
+    if cur.peek() == Some(')') {
+        return Err(err(cur.pos(), "empty '$()', expected a reference"));
+    }
+    let expr = parse_interp_expr(cur)?;
+    if expr.spelling() != InterpSpelling::Reference {
+        return Err(err(
+            start_pos,
+            "'$(...)' holds one reference: a name, '#id', a '.member' or '::connect' chain, or a \
+             place number. Write any other expression as '{$ ... }', and a call as '$name(...)'",
+        ));
+    }
+    Ok(expr)
+}
+
+/// `name(args)` or `macro.name(args)`, with the cursor after the `$`.
+fn parse_call_form(cur: &mut Cursor, start_pos: usize) -> Result<InterpExpr> {
+    let ident_start = cur.pos();
+    let name = eat_interp_ident(cur)?.to_string();
+    let mut expr = if name == "addr" && cur.peek() == Some('(') {
+        parse_addr_literal(cur, ident_start)?
+    } else {
+        InterpExpr {
+            kind: InterpExprKind::Identifier(name),
+            span: cur.span_from(ident_start),
+        }
+    };
+    loop {
+        let mut look = *cur;
+        skip_expr_ws(&mut look);
+        match look.peek() {
+            Some('.') => {
+                look.bump();
+                skip_expr_ws(&mut look);
+                *cur = look;
+                let member = eat_interp_ident(cur)?.to_string();
+                expr = InterpExpr {
+                    kind: InterpExprKind::Member {
+                        object: Box::new(expr),
+                        member,
+                    },
+                    span: cur.span_from(start_pos),
+                };
+            }
+            Some('(') => {
+                *cur = look;
+                let args = parse_interp_call_args(cur)?;
+                expr = InterpExpr {
+                    kind: InterpExprKind::Call {
+                        callee: Box::new(expr),
+                        args,
+                    },
+                    span: cur.span_from(start_pos),
+                };
+            }
+            _ => break,
+        }
+    }
+    Ok(expr)
 }
 
 /// `Lambda | NamedArg | Or`, the whole of an expression.
 ///
-/// Precedence, loosest first: `=>`, `||`, `&&`, comparison, then the
+/// Precedence, loosest first: `=>`, `||`, `&&`, comparison, additive (`+`, `-`), then the
 /// postfix forms (`.name`, `::name`, `(args)`). The grammar has no keywords, so
 /// `true`, `false` and `null` are the only words that mean anything on
 /// their own, and they are values.
@@ -353,15 +437,15 @@ fn take_comparison(cur: &mut Cursor) -> Result<Option<BinaryOp>> {
     Ok(Some(op))
 }
 
-/// `Postfix (CompareOp Postfix)?` -- comparisons do not chain.
+/// `Additive (CompareOp Additive)?` -- comparisons do not chain.
 fn parse_interp_comparison(cur: &mut Cursor) -> Result<InterpExpr> {
     skip_expr_ws(cur);
     let start_pos = cur.pos();
-    let lhs = parse_interp_postfix(cur)?;
+    let lhs = parse_interp_additive(cur)?;
     let Some(op) = take_comparison(cur)? else {
         return Ok(lhs);
     };
-    let rhs = parse_interp_postfix(cur)?;
+    let rhs = parse_interp_additive(cur)?;
     let mut look = *cur;
     if take_comparison(&mut look)?.is_some() {
         return Err(err(
@@ -370,6 +454,44 @@ fn parse_interp_comparison(cur: &mut Cursor) -> Result<InterpExpr> {
         ));
     }
     Ok(binary(op, lhs, rhs, cur, start_pos))
+}
+
+/// `Postfix (('+' | '-') Postfix)*`, left to right.
+///
+/// A `-` is also a letter of a name (`daily-note`), so the operator is told from it by white space:
+/// `a - b` subtracts and `a-b` is one name. The same white space is asked of `+`, so that the two
+/// are written alike. A `+` or `-` that stands after an operand without it is an error that says so;
+/// reading `a -b` as `a` followed by `-b` would only fail later with a worse message.
+fn parse_interp_additive(cur: &mut Cursor) -> Result<InterpExpr> {
+    skip_expr_ws(cur);
+    let start_pos = cur.pos();
+    let mut lhs = parse_interp_postfix(cur)?;
+    loop {
+        let mut look = *cur;
+        skip_expr_ws(&mut look);
+        let op = match look.peek() {
+            Some('+') => BinaryOp::Add,
+            Some('-') => BinaryOp::Sub,
+            _ => return Ok(lhs),
+        };
+        let space_before = look.pos() > cur.pos();
+        let space_after = look
+            .peek_at(1)
+            .is_none_or(|c| matches!(c, ' ' | '\t' | '\n' | '\r'));
+        if !(space_before && space_after) {
+            return Err(err(
+                look.pos(),
+                format!(
+                    "'{0}' is an operator only with white space on both sides: write 'a {0} b'",
+                    op.symbol()
+                ),
+            ));
+        }
+        bump_symbol(&mut look, op);
+        *cur = look;
+        let rhs = parse_interp_postfix(cur)?;
+        lhs = binary(op, lhs, rhs, cur, start_pos);
+    }
 }
 
 /// `primary (. Ident | :: Ident | ( Args ))*`
@@ -530,15 +652,55 @@ fn parse_interp_primary(cur: &mut Cursor, start_pos: usize) -> Result<InterpExpr
         }
         Some('(') => {
             cur.bump();
-            let inner = parse_interp_expr(cur)?;
             skip_expr_ws(cur);
-            if !cur.eat_str(")") {
-                return Err(err(cur.pos(), "expected ')'"));
+            if cur.eat_str(")") {
+                return Ok(InterpExpr {
+                    kind: InterpExprKind::Seq(Vec::new()),
+                    span: cur.span_from(start_pos),
+                });
             }
-            Ok(InterpExpr {
-                kind: InterpExprKind::Group(Box::new(inner)),
-                span: cur.span_from(start_pos),
-            })
+            let first = parse_interp_expr(cur)?;
+            skip_expr_ws(cur);
+            if cur.peek() == Some(',') {
+                cur.bump();
+                skip_expr_ws(cur);
+                let mut items = vec![first];
+                if cur.eat_str(")") {
+                    return Ok(InterpExpr {
+                        kind: InterpExprKind::Seq(items),
+                        span: cur.span_from(start_pos),
+                    });
+                }
+                loop {
+                    items.push(parse_interp_expr(cur)?);
+                    skip_expr_ws(cur);
+                    match cur.peek() {
+                        Some(',') => {
+                            cur.bump();
+                            skip_expr_ws(cur);
+                            if cur.eat_str(")") {
+                                break;
+                            }
+                        }
+                        Some(')') => {
+                            cur.bump();
+                            break;
+                        }
+                        _ => return Err(err(cur.pos(), "expected ',' or ')'")),
+                    }
+                }
+                Ok(InterpExpr {
+                    kind: InterpExprKind::Seq(items),
+                    span: cur.span_from(start_pos),
+                })
+            } else if cur.eat_str(")") {
+                Ok(InterpExpr {
+                    kind: InterpExprKind::Group(Box::new(first)),
+                    span: cur.span_from(start_pos),
+                })
+            } else {
+                Err(err(cur.pos(), "expected ')'"))
+            }
         }
         Some(c) if is_interp_ident_start(c) => {
             let name = eat_interp_ident(cur)?.to_string();
@@ -561,7 +723,7 @@ fn parse_interp_primary(cur: &mut Cursor, start_pos: usize) -> Result<InterpExpr
         }
         _ => Err(err(
             cur.pos(),
-            "expected a value, identifier, or call in '${...}'",
+            "expected a value, a name or a call in an expression",
         )),
     }
 }
@@ -629,7 +791,7 @@ fn eat_interp_ident<'a>(cur: &mut Cursor<'a>) -> Result<&'a str> {
 }
 
 /// Whitespace inside an expression, line breaks included. A chain of calls
-/// reads best with one call to a line, so `${...}` and a call's arguments may
+/// reads best with one call to a line, so a `{$ ... }` and a call's arguments may
 /// run over several lines. (Everywhere else in a `.tmt` value a line break
 /// ends the thing being read, which is why this is not `skip_inline_ws`.)
 fn skip_expr_ws(cur: &mut Cursor) {

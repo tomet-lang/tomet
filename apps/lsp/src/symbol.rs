@@ -64,7 +64,7 @@ fn collect_block_symbols(
         }
         Block::List(list) => collect_list_symbol(positions, list, symbols),
         Block::Interp(interp) => collect_interp_symbol(positions, interp, symbols),
-        Block::Hole(_) => {}
+        Block::Hole(_) | Block::TypeSeat(_) => {}
     }
 }
 
@@ -216,7 +216,7 @@ fn collect_interp_symbol(
     let range = positions.range(&interp.span);
     #[allow(deprecated)]
     symbols.push(DocumentSymbol {
-        name: "${...}".to_string(),
+        name: "{$ ... }".to_string(),
         detail: None,
         kind: SymbolKind::OBJECT,
         tags: None,
@@ -263,7 +263,8 @@ pub(crate) fn extract_blocks_text(blocks: &[Block]) -> String {
                     out.push_str(&extract_blocks_text(&item.content));
                 }
             }
-            Block::Interp(_) => out.push_str("${...}"),
+            Block::Interp(_) => out.push_str("{$ ... }"),
+            Block::TypeSeat(seat) => out.push_str(&seat.to_string()),
             Block::Hole(_) => {}
         }
     }
@@ -283,7 +284,8 @@ pub(crate) fn extract_inlines_text(inlines: &[Inline]) -> String {
             }
             Inline::LineBreak(_) => out.push(' '),
             Inline::Element(el) => out.push_str(&format!("@{}", el.name)),
-            Inline::Interp(_) => out.push_str("${...}"),
+            Inline::Interp(_) => out.push_str("{$ ... }"),
+            Inline::TypeSeat(seat) => out.push_str(&seat.to_string()),
             Inline::Hole(_) => {}
         }
     }

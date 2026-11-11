@@ -1,6 +1,6 @@
-${some_id}
+$(some_id)
 
-${sum(a, b)}
+$sum(a, b)
 
 https://
 

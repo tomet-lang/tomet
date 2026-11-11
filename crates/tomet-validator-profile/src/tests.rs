@@ -21,10 +21,10 @@ fn messages(source: &str) -> Vec<String> {
 fn a_document_that_needs_nothing_from_outside_has_no_findings() {
     let source = "\
 ::profile(standalone)
-::macro(gh: \"https://x/${1}\")
+::macro(gh: \"https://x/$(1)\")
 ::var(topic: { type: string, default: \"a\" })
 
-See ${macro.gh(1)} on ${var.topic}, a ${self::kind} and ${add(1, 2)}.
+See $macro.gh(1) on $(var.topic), a $(self::kind) and $add(1, 2).
 ";
     assert_eq!(findings(source), vec![]);
     assert_eq!(messages(source), Vec::<String>::new());
@@ -32,18 +32,18 @@ See ${macro.gh(1)} on ${var.topic}, a ${self::kind} and ${add(1, 2)}.
 
 #[test]
 fn a_document_that_does_not_promise_standalone_is_not_reported() {
-    let source = "a ${vault::docs}\n";
+    let source = "a $(vault::docs)\n";
     assert_eq!(findings(source).len(), 1);
     assert_eq!(messages(source), Vec::<String>::new());
     assert_eq!(
-        messages("::profile(oneline)\n\na ${vault::docs}\n"),
+        messages("::profile(oneline)\n\na $(vault::docs)\n"),
         Vec::<String>::new()
     );
 }
 
 #[test]
 fn what_the_expression_takes_is_named_in_the_report() {
-    let source = "::profile(standalone)\n\na ${macro.gh(1)} b\n";
+    let source = "::profile(standalone)\n\na $macro.gh(1) b\n";
     assert_eq!(
         findings(source),
         vec![Dirt::Expression(Reach::Macro("gh".into()))]
@@ -60,16 +60,16 @@ fn what_the_expression_takes_is_named_in_the_report() {
 #[test]
 fn an_expression_is_found_wherever_it_is_written() {
     let positions = [
-        ("running text", "a ${self::path} b\n"),
-        ("a line of its own", "${self::path}\n"),
-        ("a heading", "=[ T ${self::path} ]\n"),
-        ("a list item", "- ${self::path} x\n"),
-        ("an element's content", "@note[ ${self::path} ]\n"),
-        ("an element's value", "@note(){ k: ${self::path} }\n"),
-        ("an element's argument", "@note(k: ${self::path})\n"),
-        ("a declaration's data", "::meta(k: ${self::path})\n"),
-        ("a section's value", "=[ T ]{ k: ${self::path} }\n"),
-        ("a connect", "@note[ x ]::rule(k: ${self::path})\n"),
+        ("running text", "a $(self::path) b\n"),
+        ("a line of its own", "$(self::path)\n"),
+        ("a heading", "=[ T $(self::path) ]\n"),
+        ("a list item", "- $(self::path) x\n"),
+        ("an element's content", "@note[ $(self::path) ]\n"),
+        ("an element's value", "@note(){ k: $(self::path) }\n"),
+        ("an element's argument", "@note(k: $(self::path))\n"),
+        ("a declaration's data", "::meta(k: $(self::path))\n"),
+        ("a section's value", "=[ T ]{ k: $(self::path) }\n"),
+        ("a connect", "@note[ x ]::rule(k: $(self::path))\n"),
     ];
     for (place, body) in positions {
         let source = format!("::profile(standalone)\n\n{body}");
@@ -117,7 +117,7 @@ fn a_term_is_taken_from_outside_unless_the_file_is_the_dictionary_that_defines_i
 
 #[test]
 fn findings_come_in_the_order_they_are_written() {
-    let source = "a @term(\"w\") b ${vault::docs} c ${self::path}\n";
+    let source = "a @term(\"w\") b $(vault::docs) c $(self::path)\n";
     assert_eq!(
         findings(source),
         vec![

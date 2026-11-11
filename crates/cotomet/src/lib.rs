@@ -7,7 +7,7 @@
 //! - Top-level serde support is provided by `serde_cotomet`: [`from_str`] and
 //!   [`to_string`] read and write Rust types as cotomet.
 //! - [`parse_file`] reads standalone `.ctmt` data files into a [`File`].
-//! - [`eval`] evaluates `${macro...}` and `${var...}` expressions in `.ctmt`
+//! - [`eval`] evaluates `{$ macro... }` and `{$ var... }` expressions in `.ctmt`
 //!   files when the optional `eval` feature is enabled.
 
 use tomet_position::LineIndex;
@@ -27,13 +27,13 @@ pub use cotomet_eval as eval;
 /// Parse a standalone cotomet file (`.ctmt`): declarations, then a map of
 /// `key: value` entries.
 ///
-/// Unquoted `${...}` expressions are rejected (this reader reads data only).
+/// Unquoted `$` expressions and type seats (`<$type>`) are rejected (this reader reads data only).
 pub fn parse_file(src: &str) -> Result<File> {
     let file = tomet_ast_parser::parse_data_file(src)?;
-    if let Some(span) = find_interp(&file.body) {
+    if let Some((span, message)) = find_not_data(&file.body) {
         let at = LineIndex::new(src).line_col(span.start);
         return Err(Error {
-            message: "an expression `${...}` is not read: this reader reads data only".to_string(),
+            message: message.to_string(),
             line: at.line,
             column: at.column,
             offset: span.start,
@@ -42,18 +42,27 @@ pub fn parse_file(src: &str) -> Result<File> {
     Ok(file)
 }
 
-/// Parse a standalone cotomet file (`.ctmt`) allowing unquoted `${...}` expressions
+/// Parse a standalone cotomet file (`.ctmt`) allowing unquoted `{$ ... }` expressions
 /// (e.g. for expression evaluation or formatting).
 pub fn parse_file_with_expressions(src: &str) -> Result<File> {
     tomet_ast_parser::parse_data_file(src)
 }
 
-fn find_interp(v: &Value) -> Option<Span> {
+/// The first thing in `v` that data does not hold, where it is and what to say of it: an
+/// expression, or a type seat, which is a blueprint's.
+fn find_not_data(v: &Value) -> Option<(Span, &'static str)> {
     match v {
-        Value::Interp(interp) => Some(interp.span),
-        Value::Seq(items) => items.iter().find_map(find_interp),
-        Value::Map(entries) => entries.iter().find_map(|(_, v)| find_interp(v)),
-        Value::Call(_, args) => args.iter().find_map(find_interp),
+        Value::Interp(interp) => Some((
+            interp.span,
+            "an expression (`{$ ... }`, `$(...)`, `$name(...)`) is not read: this reader reads data only",
+        )),
+        Value::TypeSeat(seat) => Some((
+            seat.span,
+            "a type seat (`<$type>`) is not read: this reader reads data only",
+        )),
+        Value::Seq(items) => items.iter().find_map(find_not_data),
+        Value::Map(entries) => entries.iter().find_map(|(_, v)| find_not_data(v)),
+        Value::Call(_, args) => args.iter().find_map(find_not_data),
         _ => None,
     }
 }
@@ -100,21 +109,39 @@ mod tests {
 
     #[test]
     fn unquoted_expression_errors_in_data_only() {
-        let res = parse_file("a: ${macro.vocab(\"writ\", \"1.0.0\")}\n");
+        let res = parse_file("a: $macro.vocab(\"writ\", \"1.0.0\")\n");
         assert!(res.is_err());
         let err = res.unwrap_err();
         assert!(
             err.message
-                .contains("an expression `${...}` is not read: this reader reads data only"),
+                .contains("an expression (`{$ ... }`, `$(...)`, `$name(...)`) is not read: this reader reads data only"),
             "{}",
             err.message
         );
     }
 
+    #[test]
+    fn a_type_seat_is_not_data() {
+        for src in [
+            "a: <$date>\n",
+            "a: (1, <$uuid()>)\n",
+            "m: { k: <$list(string)> }\n",
+        ] {
+            let err = parse_file(src).unwrap_err();
+            assert!(
+                err.message.contains("a type seat (`<$type>`) is not read"),
+                "{src:?}: {}",
+                err.message
+            );
+        }
+        // Only a seat is refused: text shaped like one in a string is a string.
+        assert!(parse_file("a: \"<$date>\"\n").is_ok());
+    }
+
     #[cfg(feature = "eval")]
     #[test]
     fn eval_feature_evaluates_expression() {
-        let src = "::macro(vocab: \"vocabularies/${1}/${1}@${2}.vocabulary.tmt\")\na: ${macro.vocab(\"writ\", \"1.0.0\")}\n";
+        let src = "::macro(vocab: \"vocabularies/$(1)/$(1)@$(2).vocabulary.tmt\")\na: $macro.vocab(\"writ\", \"1.0.0\")\n";
         let file = eval::eval_str(src, &[]).unwrap();
         let Value::Map(entries) = file.body else {
             panic!("expected map");

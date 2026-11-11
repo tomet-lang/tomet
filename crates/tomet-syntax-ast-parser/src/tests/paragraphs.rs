@@ -81,18 +81,18 @@ fn text_after_an_element_line_folds_into_it_unless_a_semicolon_breaks() {
 
 #[test]
 fn an_interpolation_is_a_block_only_when_it_stands_alone_on_its_line() {
-    let doc = parse_file("${a}\n").unwrap();
+    let doc = parse_file("$(a)\n").unwrap();
     assert!(matches!(&doc.body[0], Block::Interp(_)));
 
     // Anything else on the line, or a following line that folds, makes it
     // running text.
-    for src in ["${a} text\n", "${a} ${b}\n", "${a}\n${b}\n", "${a}\ntext\n"] {
+    for src in ["$(a) text\n", "$(a) $(b)\n", "$(a)\n$(b)\n", "$(a)\ntext\n"] {
         let doc = parse_file(src).unwrap();
         assert_eq!(doc.body.len(), 1, "{src:?}");
         assert!(matches!(&doc.body[0], Block::Paragraph(_)), "{src:?}");
     }
 
-    let doc = parse_file(";${a}\n;${b}\n").unwrap();
+    let doc = parse_file(";$(a)\n;$(b)\n").unwrap();
     assert_eq!(doc.body.len(), 2);
     assert!(doc.body.iter().all(|b| matches!(b, Block::Interp(_))));
 }

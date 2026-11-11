@@ -7,7 +7,7 @@ use std::sync::Arc;
 use tomet_ast::{Block, File, Value};
 use tomet_config::{FieldConfig, PrinterConfig};
 use tomet_expr::{DirRef, DocRef, EvalValue, PreparedBlocks, Resolver, typed_value};
-use tomet_type::Type;
+use tomet_type::{Kind, Type};
 
 /// The document's `::meta`, typed by the settings' `meta` declarations.
 ///
@@ -50,10 +50,10 @@ fn typed(field: &FieldConfig, value: Option<(&Value, &DocRef)>) -> EvalValue {
     let ty = field
         .field_type
         .as_deref()
-        .and_then(|s| Type::parse_str(s).ok());
+        .and_then(|s| s.parse::<Type>().ok());
     match (ty, value) {
-        (Some(Type::List(_)), None) => EvalValue::Seq(Vec::new()),
-        (Some(ty), Some((value, doc))) => typed_value(ty, value, doc),
+        (Some(ty), None) if ty.kind() == Kind::List => EvalValue::Seq(Vec::new()),
+        (Some(ty), Some((value, doc))) => typed_value(&ty, value, doc),
         (None, Some((value, doc))) => EvalValue::from_ast(value, doc),
         (_, None) => EvalValue::Null,
     }
@@ -64,7 +64,7 @@ fn typed(field: &FieldConfig, value: Option<(&Value, &DocRef)>) -> EvalValue {
 ///
 /// This is how a reference is answered from the document **as written**:
 /// `prepare` rewrites the document in place, and the evaluator must not see
-/// a half-rewritten one when `${#intro}` is resolved.
+/// a half-rewritten one when `$(#intro)` is resolved.
 pub struct Overlay<'a> {
     pub path: DocRef,
     pub snapshot: Arc<File>,

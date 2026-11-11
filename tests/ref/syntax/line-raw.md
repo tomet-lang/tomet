@@ -1,5 +1,5 @@
 ```
-@name *not em* ${not.interp} // not a comment
+@name *not em* $(not.interp) // not a comment
 ```
 
 ```

@@ -223,9 +223,9 @@ fn the_cst_and_the_ast_agree_on_inline_structure() {
 fn general_backslash_escapes_lower_to_literal_text() {
     assert_eq!(
         paragraph_text(
-            "\\; \\*em\\* \\**strong\\** \\`code\\` \\// \\/* \\@name(x) \\${x} \\<slot> \\\\\n"
+            "\\; \\*em\\* \\**strong\\** \\`code\\` \\// \\/* \\@name(x) \\$(x) \\<slot> \\\\\n"
         ),
-        "; *em* **strong** `code` // /* @name(x) ${x} <slot> \\"
+        "; *em* **strong** `code` // /* @name(x) $(x) <slot> \\"
     );
     assert_eq!(paragraph_text("\\*em*\n"), "*em*");
     assert_eq!(paragraph_text("*em\\*\n"), "*em*");

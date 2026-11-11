@@ -137,7 +137,9 @@ impl<'a, 't> CstParser<'a, 't> {
     /// `- (marker)[ content ]`, `- {value}`, `- #(id)`).
     fn list_item_is_sugar(&self) -> bool {
         let opens_full = |i: usize| match self.kind_at(i) {
-            Some(K::L_BRACKET | K::L_BRACE | K::PIPE) => true,
+            Some(K::L_BRACKET | K::PIPE) => true,
+            // `- {value}`, but `- {$ expr }` is an expression in the item's text.
+            Some(K::L_BRACE) => !self.gate_at(i),
             Some(K::HASH) => self.id_follows(i),
             _ => false,
         };

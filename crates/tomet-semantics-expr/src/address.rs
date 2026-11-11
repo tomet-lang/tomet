@@ -62,7 +62,7 @@ pub(crate) fn address_value(text: &str, cx: &EvalContext) -> Result<EvalValue, E
             "`{text}`: a directory has nothing inside it to address"
         )));
     };
-    let interp = tomet_ast_parser::parse_interpolation_str(&format!("${{#{inner}}}"))
+    let interp = tomet_ast_parser::parse_interpolation_str(&format!("{{$ #{inner} }}"))
         .map_err(|_| EvalError::BadAddress(text.to_string()))?;
     super::eval(&interp.expr, cx, &Env::new().bind(ROOT, base))
 }

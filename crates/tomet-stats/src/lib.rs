@@ -14,7 +14,7 @@
 //! - (Characters with whitespace)| Same reader-visible prose text, including
 //!                               | whitespace characters.
 //! - (Words) Reader-visible prose text split by Unicode whitespace.
-//! - (Elements) Counts by sigil (`@name`, `${...}`, `^...`, `- ...`) and by element name.
+//! - (Elements) Counts by sigil (`@name`, `{$ ... }`, `^...`, `- ...`) and by element name.
 //! - (Links)| Structural internal document links (`file`, `dir`, `embed`,
 //!          | `tm`, `ref`). External web URLs and same-document `#id` links are not
 //!          | counted as workspace document links.
@@ -65,7 +65,7 @@ pub struct Stats {
     pub named: usize,
     /// Declarations about the document (`::name`).
     pub document: usize,
-    /// Dynamic substitutions (`${...}`), counted with the elements.
+    /// Dynamic substitutions (`{$ ... }`), counted with the elements.
     pub dollar: usize,
     /// Bare list item elements (`- ...`).
     pub bare: usize,

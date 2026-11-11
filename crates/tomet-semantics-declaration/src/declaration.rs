@@ -144,7 +144,7 @@ impl Declaration {
     ///   first `kind`: `::x.y("a", b: 1)` is `y: (y: "a", b: 1)`.
     /// - **Prose**: a trailing `[...]` on a dotted head is the entry's `about` for a `field`, a `var`
     ///   or an `element` (`::field.author(type: string)[ the author ]`), and the whole value of a
-    ///   `macro` (`::macro.card[ @card[ ${1} ] ]`). See [`DeclKind::prose`].
+    ///   `macro` (`::macro.card[ @card[ $(1) ] ]`). See [`DeclKind::prose`].
     ///
     /// `::name()` has no entries, and is not an error.
     pub fn entries(&self) -> Result<Vec<(String, Value)>, EntriesError> {
@@ -391,12 +391,12 @@ mod tests {
 
     #[test]
     fn the_prose_of_a_macro_is_the_macro() {
-        let entries = entries_of("::macro.card[ @card[ ${1} ] ]\n");
+        let entries = entries_of("::macro.card[ @card[ $(1) ] ]\n");
         assert_eq!(entries[0].0, "card");
         assert!(matches!(entries[0].1, Value::Blocks(_)));
         assert_eq!(
-            entries_of("::macro.card[ @card[ ${1} ] ]\n"),
-            entries_of("::macro(card: [ @card[ ${1} ] ])\n")
+            entries_of("::macro.card[ @card[ $(1) ] ]\n"),
+            entries_of("::macro(card: [ @card[ $(1) ] ])\n")
         );
     }
 

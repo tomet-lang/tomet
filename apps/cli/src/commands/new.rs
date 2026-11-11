@@ -96,6 +96,7 @@ pub fn new_cmd(
 mod tests {
     use super::*;
     use std::fs;
+    use std::path::PathBuf;
     use tomet_config::RegistryConfig;
 
     #[test]
@@ -109,7 +110,7 @@ mod tests {
         let tmpl_file = tmpl_dir.join("rfc.blueprint.tmt");
         fs::write(
             &tmpl_file,
-            "::kind(blueprint)\n::blueprint(rfc)\n::var(\n  title: { type: string }\n  author: { type: string }\n)\n::id(${generate.uuid()})\n::meta(\n  title: ${var.title}\n  author: ${var.author}\n)\n\n=[ Motivation for ${var.title} ]#(motivation)\n",
+            "::kind(blueprint)\n::blueprint(rfc)\n::var(\n  title: { type: string }\n  author: { type: string }\n)\n::meta(\n  title: $(var.title)\n  author: $(var.author)\n)\n\n=[ Motivation for $(var.title) ]#(motivation)\n",
         )
         .unwrap();
 
@@ -143,5 +144,89 @@ mod tests {
         assert!(content.contains("::kind(rfc)"));
         assert!(content.contains("New Auth Protocol"));
         assert!(content.contains("Bob"));
+    }
+
+    /// The vault `name` under the temp dir, declaring one blueprint, `note`, with the text `src`.
+    fn vault_with_note(name: &str, src: &str) -> (PathBuf, PrinterConfig) {
+        let root =
+            std::env::temp_dir().join(format!("tm_test_cli_new_{name}_{}", std::process::id()));
+        let _ = fs::remove_dir_all(&root);
+        fs::create_dir_all(root.join(".tomet/blueprints")).unwrap();
+        fs::write(root.join(".tomet/blueprints/note.blueprint.tmt"), src).unwrap();
+        let config = PrinterConfig {
+            registry: RegistryConfig {
+                blueprints: vec![".tomet/blueprints/note.blueprint.tmt".to_string()],
+                ..Default::default()
+            },
+            ..PrinterConfig::default()
+        };
+        (root, config)
+    }
+
+    #[test]
+    fn a_blueprint_with_type_seats_makes_a_document_with_none() {
+        let (root, config) = vault_with_note(
+            "seats",
+            "::kind(blueprint)\n::blueprint(note)\n::id(<$uuid(default: auto)>)\n::meta(\n  created: <$datetime(default: auto)>\n  count: <$int(default: 3)>\n)\n\n=[ Notes of <$date(default: auto)> ]#(notes)\n",
+        );
+
+        let created = create_file_from_blueprint(
+            &root,
+            "note",
+            Path::new("notes/a.tmt"),
+            &HashMap::new(),
+            &config,
+            false,
+        )
+        .unwrap();
+
+        let content = fs::read_to_string(&created.path).unwrap();
+        assert!(!content.contains("<$"), "{content}");
+        assert!(content.contains("::kind(note)"), "{content}");
+        assert!(content.contains("count: 3"), "{content}");
+        let id = content
+            .split("::id(")
+            .nth(1)
+            .and_then(|after| after.split(')').next())
+            .expect("an id");
+        assert!(uuid::Uuid::parse_str(id).is_ok(), "{id}");
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    /// A seat that cannot be filled stops `tomet new`: it fails with every one of them, and no file
+    /// and no directory is left.
+    #[test]
+    fn a_type_seat_with_no_value_source_stops_the_command_and_writes_nothing() {
+        let (root, config) = vault_with_note(
+            "seat-stop",
+            "::blueprint(note)\n::meta(\n  title: <$string>\n  kind: <$person>\n  id: <$uuid(default: auto)>\n)\n",
+        );
+
+        let err = create_file_from_blueprint(
+            &root,
+            "note",
+            Path::new("fresh/notes/a.tmt"),
+            &HashMap::new(),
+            &config,
+            false,
+        )
+        .unwrap_err();
+
+        let stopped = err
+            .downcast_ref::<tomet_workspace::SeatsNotFilled>()
+            .expect("the seats are the cause");
+        assert_eq!(stopped.problems.len(), 2);
+        let said = err.to_string();
+        assert!(
+            said.contains(":3:10: error: type seat `<$string>`"),
+            "{said}"
+        );
+        assert!(
+            said.contains(":4:9: error: type seat `<$person>`"),
+            "{said}"
+        );
+        assert!(said.contains("2 type seats of "), "{said}");
+        assert!(!root.join("fresh").exists(), "nothing was written");
+        let _ = fs::remove_dir_all(&root);
     }
 }

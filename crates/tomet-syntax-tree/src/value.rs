@@ -39,7 +39,7 @@ pub trait ValueExt {
 
     /// Returns the flat scalar string projection of this value, joining sequences with `", "`,
     /// or `None` when this value (or any nested element of a sequence) cannot project to text
-    /// (such as maps, calls, holes, or blocks).
+    /// (such as maps, calls, holes, type seats, or blocks).
     fn scalar_string(&self) -> Option<String>;
 
     /// Returns the plain text representation of this value, or an empty string if it cannot project.
@@ -133,7 +133,7 @@ impl ValueExt for Value {
 ///
 /// Bare scalars delegate to [`Value::scalar_text`]; `Value::Null` projects to an empty string.
 /// Sequences project if every element projects. Structured nodes (`Map`, `Call`, `Element`, `Blocks`,
-/// `Interp`, `Hole`) return `None`.
+/// `Interp`, `Hole`, `TypeSeat`) return `None`.
 pub fn scalar_string(v: &Value) -> Option<String> {
     if let Some(text) = v.scalar_text() {
         return Some(text.into_owned());

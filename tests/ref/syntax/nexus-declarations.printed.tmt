@@ -2,7 +2,7 @@
 
 ::meta(title: "nexus declarations", tags: (a, b))
 
-::macro(gh: "https://github.com/tomet/tomet/issues/${1}")
+::macro(gh: "https://github.com/tomet/tomet/issues/$(1)")
 
 ::var(title: {type: string, default: Daily})
 

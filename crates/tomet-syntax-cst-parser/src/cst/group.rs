@@ -96,7 +96,7 @@ impl<'a, 't> CstParser<'a, 't> {
                 let free = match self.kind_at(k) {
                     Some(K::L_PAREN) => !args,
                     Some(K::L_BRACKET) => !content,
-                    Some(K::L_BRACE) => !value,
+                    Some(K::L_BRACE) => !value && !self.gate_at(k),
                     Some(K::HASH) => !id && self.id_follows(k),
                     Some(K::COLON) => self.allow_connect && self.connect_follows_on_next_line(k),
                     _ => false,
@@ -130,7 +130,8 @@ impl<'a, 't> CstParser<'a, 't> {
                     self.bump_while(K::WHITESPACE);
                     self.parse_args_group();
                 }
-                Some(K::L_BRACE) if !value => {
+                // `{$ expr }` is an expression, not a value group.
+                Some(K::L_BRACE) if !value && !self.gate_at(j) => {
                     value = true;
                     self.bump_while(K::WHITESPACE);
                     self.parse_value_group();
@@ -156,6 +157,7 @@ impl<'a, 't> CstParser<'a, 't> {
                 Some(k @ (K::L_PAREN | K::L_BRACKET | K::L_BRACE | K::PIPE | K::HASH))
                     if strict
                         && j == self.pos
+                        && !self.gate_at(j)
                         && match k {
                             K::L_PAREN => args,
                             K::L_BRACE => value,

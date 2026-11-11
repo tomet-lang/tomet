@@ -70,9 +70,13 @@ pub(crate) fn render_block(
         Block::Section(sec) => render_section(cx, sec, out, state),
         Block::List(list) => render_list(cx, list, out),
         Block::Interp(interp) => render_interp(interp, out),
-        // A hole is shown as it was written, in a paragraph of its own.
+        // A hole and a type seat are shown as they were written, in a paragraph of their own.
         Block::Hole(hole) => {
             let para = Paragraph::new(vec![Inline::Hole(hole.clone())], hole.span);
+            render_block(cx, &Block::Paragraph(para), out, state)
+        }
+        Block::TypeSeat(seat) => {
+            let para = Paragraph::new(vec![Inline::TypeSeat(seat.clone())], seat.span);
             render_block(cx, &Block::Paragraph(para), out, state)
         }
     }
@@ -166,7 +170,7 @@ fn splice_span_attrs(out: &mut String, start: usize, span: Span) {
 
 /// Called only from `render_block`'s top-level dispatch, never from
 /// `render_element`'s recursive `kind.as_str()` match -- a nested/inline
-/// `@heading(...)` (e.g. inside a blockquote's content, or `${...}`-free
+/// `@heading(...)` (e.g. inside a blockquote's content, or `{$ ... }`-free
 /// prose) falls through to `render_generic_element` instead, since
 /// CommonMark/Tomet headings are both block-position-only by grammar.
 fn render_heading_element(
@@ -312,6 +316,7 @@ pub(crate) fn render_inlines(cx: &RenderCtx, inlines: &[Inline], out: &mut Strin
             Inline::Element(el) => render_element(cx, el.as_view(), out, true),
             Inline::Interp(interp) => render_interp(interp, out),
             Inline::Hole(hole) => out.push_str(&escape_html(&tomet_printer::hole_to_tm(hole))),
+            Inline::TypeSeat(seat) => out.push_str(&escape_html(&seat.to_string())),
         }
     }
 }

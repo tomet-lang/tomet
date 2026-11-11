@@ -340,9 +340,43 @@ impl CstSigil {
     }
 }
 
+/// What a box (`SLOT`) is, told by what stands right after its `<`: nothing, `?` or `$`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum CstSlotMark {
+    /// `<PATH>`: no mark. A label for the reader, which is running text.
+    NameTag,
+    /// `<?matcher(args){data}>[content]`: the `?` mark. A hole.
+    Hole,
+    /// `<$type(args)>`: the `$` mark. A seat for a value of the type written.
+    TypeSeat,
+}
+
+impl CstSlotMark {
+    /// The mark that a token of `kind` right after a `<` makes: no token of a mark is no mark.
+    pub fn of_token(kind: Option<SyntaxKind>) -> Self {
+        match kind {
+            Some(SyntaxKind::QUESTION) => Self::Hole,
+            Some(SyntaxKind::DOLLAR) => Self::TypeSeat,
+            _ => Self::NameTag,
+        }
+    }
+
+    /// Whether a box with this mark is a form of the tree, standing in an `INLINE_FORM` or a
+    /// `BLOCK_FORM` like `@name(...)`; a name tag is a span of running text.
+    pub fn is_form(self) -> bool {
+        self != Self::NameTag
+    }
+}
+
 impl CstSlot {
     pub fn name(&self) -> Option<CstName> {
         self.syntax().children().find_map(CstName::cast)
+    }
+
+    /// The box's mark: what follows its `<`.
+    pub fn mark(&self) -> CstSlotMark {
+        let after_lt = self.syntax().children_with_tokens().nth(1);
+        CstSlotMark::of_token(after_lt.map(|e| e.kind()))
     }
 }
 

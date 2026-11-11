@@ -2,7 +2,7 @@
 
 use tomet_ast::{
     Bare, Block, Connect, Data, Declaration, ElementView, Entry, Group, Hole, InterpExpr,
-    InterpExprKind, Interpolation, Placement, Value,
+    InterpExprKind, Interpolation, Placement, TypeSeat, Value,
 };
 use tomet_config::PrinterConfig;
 use tomet_spelling::{is_name, key_text};
@@ -258,17 +258,28 @@ pub(crate) fn render_element_value(value: &Group, config: &PrinterConfig) -> Str
     format!("{{{}}}", render_group_entries(entries, config))
 }
 
-/// Renders an interpolation: `$callee(args)` for a call of a name (`$macro.gh(1)`), `${expr}` for
-/// anything else, since `${` opens an expression space and a call needs none.
+/// Renders an interpolation in its canonical spelling: `$callee(args)`, `$(ref)` or `{$ expr }`,
+/// as the expression calls for ([`tomet_ast::InterpSpelling`]).
+///
+/// The AST says what an expression is made of; whether a name in it reads back as a name is
+/// `tomet-spelling`'s rule, and a tree that was not read from source (the parser only makes
+/// names) can hold one that does not. A call whose callee is not read as a name stays in the gate,
+/// which reads it as the expression it is.
 pub(crate) fn render_interp(interp: &Interpolation) -> String {
     match &interp.expr.kind {
         InterpExprKind::Call { callee, .. }
-            if callee_name(callee).is_some_and(|name| is_name(&name)) =>
+            if callee_name(callee).is_none_or(|name| !is_name(&name)) =>
         {
-            format!("${}", interp.expr)
+            format!("{{$ {} }}", interp.expr)
         }
-        _ => format!("${{{}}}", interp.expr),
+        _ => interp.to_string(),
     }
+}
+
+/// Renders a type seat as the box it is written as, `<$type(args)>`. A seat sits in a block, in
+/// running text and in a value, and all three print it so.
+pub(crate) fn render_type_seat(seat: &TypeSeat) -> String {
+    seat.to_string()
 }
 
 /// The dotted name `callee` spells (`macro.gh`), if it is only identifiers joined by `.`.

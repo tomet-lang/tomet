@@ -121,3 +121,12 @@ fn test_renders_separated_footnote_with_multiple_references() {
             "expected shared footnote item with multiple backlinks: {html}"
         );
 }
+
+#[test]
+fn a_type_seat_is_shown_as_written() {
+    let doc = parse_file("<$list(string, length: 6)>\n\nid <$uuid> end\n").unwrap();
+    assert_eq!(
+        render_body(&doc),
+        "<p>&lt;$list(string, length: 6)&gt;</p>\n<p>id &lt;$uuid&gt; end</p>\n"
+    );
+}

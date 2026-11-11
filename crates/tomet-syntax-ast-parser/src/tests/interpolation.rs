@@ -1,14 +1,14 @@
 use super::*;
 
-/// `${...}` parses to an `Interpolation`, not an `Element`. A standalone
-/// `${x}` line is a `Block::Interp` of its own (what it evaluates to may be
+/// `{$ ... }` parses to an `Interpolation`, not an `Element`. A standalone
+/// `$(x)` line is a `Block::Interp` of its own (what it evaluates to may be
 /// blocks), which is why these tests destructure `Block::Interp` rather than
 /// `Block::Paragraph`.
 fn interp_expr(block: &Block) -> &InterpExpr {
     match block {
         Block::Interp(interp) => &interp.expr,
         other => {
-            panic!("expected a standalone ${{...}} to be a Block::Interp, got {other:?}")
+            panic!("expected a standalone interpolation to be a Block::Interp, got {other:?}")
         }
     }
 }
@@ -18,7 +18,7 @@ fn interp_expr(block: &Block) -> &InterpExpr {
 /// against a plain string instead of hand-building an expected tree
 /// with matching spans (which `derive(PartialEq)` would otherwise
 /// require field-for-field, spans included).
-fn describe(expr: &InterpExpr) -> String {
+pub(super) fn describe(expr: &InterpExpr) -> String {
     match &expr.kind {
         InterpExprKind::Identifier(name) => format!("Identifier({name})"),
         InterpExprKind::Id(name) => format!("Id({name})"),
@@ -31,6 +31,10 @@ fn describe(expr: &InterpExpr) -> String {
             format!("({} {} {})", describe(lhs), op.symbol(), describe(rhs))
         }
         InterpExprKind::Group(inner) => format!("Group({})", describe(inner)),
+        InterpExprKind::Seq(items) => {
+            let items: Vec<_> = items.iter().map(describe).collect();
+            format!("Seq([{}])", items.join(", "))
+        }
         InterpExprKind::DocId { doc, id } => format!("DocId({}, {id})", describe(doc)),
         InterpExprKind::Addr { text, raw } => format!("Addr({text:?}, raw={raw})"),
         InterpExprKind::Lambda { params, body } => {
@@ -54,19 +58,19 @@ fn describe(expr: &InterpExpr) -> String {
 
 #[test]
 fn parses_hash_id_interpolation() {
-    let doc1 = parse_file("${#intro}\n").unwrap();
+    let doc1 = parse_file("$(#intro)\n").unwrap();
     assert_eq!(describe(interp_expr(&doc1.body[0])), "Id(intro)");
 
-    let doc2 = parse_file("${#(intro)}\n").unwrap();
+    let doc2 = parse_file("$(#(intro))\n").unwrap();
     assert_eq!(describe(interp_expr(&doc2.body[0])), "Id(intro)");
 
-    let doc3 = parse_file("${#intro.tags}\n").unwrap();
+    let doc3 = parse_file("$(#intro.tags)\n").unwrap();
     assert_eq!(
         describe(interp_expr(&doc3.body[0])),
         "Member(Id(intro), tags)"
     );
 
-    let doc4 = parse_file("${#intro.tags.item(0)}\n").unwrap();
+    let doc4 = parse_file("{$ #intro.tags.item(0) }\n").unwrap();
     assert_eq!(
         describe(interp_expr(&doc4.body[0])),
         "Call(Member(Member(Id(intro), tags), item), [Int(0)])"
@@ -76,20 +80,20 @@ fn parses_hash_id_interpolation() {
 #[test]
 fn a_double_colon_goes_from_a_node_and_a_dot_reads_inside_it() {
     for (source, expected) in [
-        ("${u1::id}", "Connect(Identifier(u1), id)"),
-        ("${#u1::meta.tag}", "Member(Connect(Id(u1), meta), tag)"),
+        ("$(u1::id)", "Connect(Identifier(u1), id)"),
+        ("$(#u1::meta.tag)", "Member(Connect(Id(u1), meta), tag)"),
         (
-            "${self::doc::meta}",
+            "$(self::doc::meta)",
             "Connect(Connect(Identifier(self), doc), meta)",
         ),
         (
-            "${self::meta.tags.join(\", \")}",
+            "{$ self::meta.tags.join(\", \") }",
             "Call(Member(Member(Connect(Identifier(self), meta), tags), join), [String(\", \")])",
         ),
         // Space around the sigil is space, as it is around a dot.
-        ("${a :: b}", "Connect(Identifier(a), b)"),
+        ("{$ a :: b }", "Connect(Identifier(a), b)"),
         (
-            "${vault::docs.item(0)}",
+            "{$ vault::docs.item(0) }",
             "Call(Member(Connect(Identifier(vault), docs), item), [Int(0)])",
         ),
     ] {
@@ -97,23 +101,23 @@ fn a_double_colon_goes_from_a_node_and_a_dot_reads_inside_it() {
         assert_eq!(describe(interp_expr(&doc.body[0])), expected, "{source}");
     }
     // A single colon is still not an operator, and `::` needs a name after it.
-    assert!(parse_file("${a:}\n").is_err());
-    assert!(parse_file("${a::}\n").is_err());
-    assert!(parse_file("${a::1}\n").is_err());
+    assert!(parse_file("{$ a: }\n").is_err());
+    assert!(parse_file("{$ a:: }\n").is_err());
+    assert!(parse_file("{$ a::1 }\n").is_err());
     // The printed expression reads back as the same tree.
-    let doc = parse_file("${#u1::meta.tag}\n").unwrap();
+    let doc = parse_file("$(#u1::meta.tag)\n").unwrap();
     assert_eq!(interp_expr(&doc.body[0]).to_string(), "#u1::meta.tag");
 }
 
 #[test]
 fn parses_bare_identifier_interpolation() {
-    let doc = parse_file("${id}\n").unwrap();
+    let doc = parse_file("$(id)\n").unwrap();
     assert_eq!(describe(interp_expr(&doc.body[0])), "Identifier(id)");
 }
 
 #[test]
 fn parses_dotted_member_interpolation() {
-    let doc = parse_file("${a.b.c}\n").unwrap();
+    let doc = parse_file("$(a.b.c)\n").unwrap();
     assert_eq!(
         describe(interp_expr(&doc.body[0])),
         "Member(Member(Identifier(a), b), c)"
@@ -122,7 +126,7 @@ fn parses_dotted_member_interpolation() {
 
 #[test]
 fn parses_call_interpolation_with_nested_call() {
-    let doc = parse_file("${sum(a, mul(b, c))}\n").unwrap();
+    let doc = parse_file("$sum(a, mul(b, c))\n").unwrap();
     assert_eq!(
         describe(interp_expr(&doc.body[0])),
         "Call(Identifier(sum), [Identifier(a), Call(Identifier(mul), [Identifier(b), Identifier(c)])])"
@@ -136,7 +140,7 @@ fn parses_member_access_on_a_calls_result() {
     // (access a member of a call's return value) needs a `Call` node
     // nested *inside* a `Member`'s `object`, which a flat `Path`
     // couldn't represent at all.
-    let doc = parse_file("${b(x).id}\n").unwrap();
+    let doc = parse_file("{$ b(x).id }\n").unwrap();
     assert_eq!(
         describe(interp_expr(&doc.body[0])),
         "Member(Call(Identifier(b), [Identifier(x)]), id)"
@@ -146,7 +150,7 @@ fn parses_member_access_on_a_calls_result() {
 #[test]
 fn parses_call_on_a_members_result() {
     // The other direction: `a.b(x)` -- call member `b` of `a`.
-    let doc = parse_file("${a.b(x)}\n").unwrap();
+    let doc = parse_file("$a.b(x)\n").unwrap();
     assert_eq!(
         describe(interp_expr(&doc.body[0])),
         "Call(Member(Identifier(a), b), [Identifier(x)])"
@@ -156,10 +160,10 @@ fn parses_call_on_a_members_result() {
 #[test]
 fn parses_literals_in_interpolation() {
     let cases = [
-        ("${1}", "Int(1)"),
-        ("${1.5}", "Float(1.5)"),
-        ("${-3}", "Int(-3)"),
-        ("${\"hi\"}", "String(\"hi\")"),
+        ("$(1)", "Int(1)"),
+        ("{$ 1.5 }", "Float(1.5)"),
+        ("{$ -3 }", "Int(-3)"),
+        ("{$ \"hi\" }", "String(\"hi\")"),
     ];
     for (src, expected) in cases {
         let doc = parse_file(&format!("{src}\n")).unwrap();
@@ -208,13 +212,13 @@ fn bare_dollar_without_parens_is_plain_text() {
 
 #[test]
 fn interpolation_allows_inline_whitespace() {
-    let doc = parse_file("${ sum(a, b) }\n").unwrap();
+    let doc = parse_file("$sum(a, b)\n").unwrap();
     assert_eq!(
         describe(interp_expr(&doc.body[0])),
         "Call(Identifier(sum), [Identifier(a), Identifier(b)])"
     );
 
-    let doc = parse_file("${ a . b }\n").unwrap();
+    let doc = parse_file("{$ a . b }\n").unwrap();
     assert_eq!(
         describe(interp_expr(&doc.body[0])),
         "Member(Identifier(a), b)"
@@ -223,17 +227,17 @@ fn interpolation_allows_inline_whitespace() {
 
 #[test]
 fn unclosed_interpolation_is_an_error() {
-    assert!(parse_file("${id\n").is_err());
+    assert!(parse_file("{$ id\n").is_err());
 }
 
 #[test]
 fn empty_interpolation_is_an_error() {
-    assert!(parse_file("${}\n").is_err());
+    assert!(parse_file("{$ }\n").is_err());
 }
 
 #[test]
 fn interpolation_with_bad_leading_char_is_an_error() {
-    assert!(parse_file("${+x}\n").is_err());
+    assert!(parse_file("{$ +x }\n").is_err());
 }
 
 #[test]
@@ -252,12 +256,12 @@ fn dollar_not_followed_by_brace_is_plain_text() {
 
 #[test]
 fn interp_trigger_on_next_line_does_not_end_paragraph() {
-    // `${...}` does not start a block of its own mid-prose: one embedded
+    // `{$ ... }` does not start a block of its own mid-prose: one embedded
     // with text before/after it on the same line stays inline content in
     // the running paragraph. This case has trailing text
-    // after `${id}`, so it is not a standalone line, which is the only
-    // place `${...}` becomes a `Block::Interp`.
-    let doc = parse_file("first line\n${id} second line\n").unwrap();
+    // after `$(id)`, so it is not a standalone line, which is the only
+    // place `{$ ... }` becomes a `Block::Interp`.
+    let doc = parse_file("first line\n$(id) second line\n").unwrap();
     match &doc.body[0] {
         Block::Paragraph(p) => {
             assert_eq!(p.content.len(), 4);
@@ -272,7 +276,7 @@ fn interp_trigger_on_next_line_does_not_end_paragraph() {
 
 #[test]
 fn interpolation_inside_element_content_and_section() {
-    let doc = parse_file("@memo[ total: ${sum(a, b)} ]\n\n=[ ${x} ]\n").unwrap();
+    let doc = parse_file("@memo[ total: $sum(a, b) ]\n\n=[ $(x) ]\n").unwrap();
     match &doc.body[0] {
         Block::Element(el) => {
             let content = first_para(el.content.as_ref().expect("content"));
@@ -288,15 +292,15 @@ fn interpolation_inside_element_content_and_section() {
     }
 }
 
-/// Parses `${src}` as a standalone line and returns its description.
+/// Parses `{$ src }` as a standalone line and returns its description.
 fn described(src: &str) -> String {
-    let doc = parse_file(&format!("${{{src}}}\n")).unwrap();
+    let doc = parse_file(&format!("{{$ {src} }}\n")).unwrap();
     describe(interp_expr(&doc.body[0]))
 }
 
-/// Parses `${src}` and prints the expression back with `Display`.
+/// Parses `{$ src }` and prints the expression back with `Display`.
 fn printed(src: &str) -> String {
-    let doc = parse_file(&format!("${{{src}}}\n")).unwrap();
+    let doc = parse_file(&format!("{{$ {src} }}\n")).unwrap();
     interp_expr(&doc.body[0]).to_string()
 }
 
@@ -346,6 +350,137 @@ fn comparison_needs_no_spaces_to_be_unambiguous() {
 }
 
 #[test]
+fn plus_and_minus_are_binary_operators_with_white_space_around_them() {
+    assert_eq!(described("a + b"), "(Identifier(a) + Identifier(b))");
+    assert_eq!(described("a - b"), "(Identifier(a) - Identifier(b))");
+    // Left to right.
+    assert_eq!(
+        described("a - b - c"),
+        "((Identifier(a) - Identifier(b)) - Identifier(c))"
+    );
+    assert_eq!(described("n - 1"), "(Identifier(n) - Int(1))");
+    // A `-` glued to digits is a negative number, also after an operator.
+    assert_eq!(described("-3"), "Int(-3)");
+    assert_eq!(described("n - -3"), "(Identifier(n) - Int(-3))");
+    // A line break is white space.
+    assert_eq!(described("a\n  + b"), "(Identifier(a) + Identifier(b))");
+}
+
+#[test]
+fn a_dash_without_white_space_is_part_of_a_name() {
+    assert_eq!(described("daily-note"), "Identifier(daily-note)");
+    assert_eq!(described("a-b"), "Identifier(a-b)");
+    assert_eq!(
+        described("a-b - c-d"),
+        "(Identifier(a-b) - Identifier(c-d))"
+    );
+}
+
+#[test]
+fn plus_and_minus_without_white_space_on_both_sides_are_refused_with_the_fix() {
+    for src in ["a +b", "a+ b", "a+b", "a -b", "a- b - c", "1 -1", "n -3"] {
+        let err = parse_file(&format!("{{$ {src} }}\n")).unwrap_err();
+        // `a- b` reads as the name `a-` followed by `b`, which is not an expression;
+        // every other one names the white space.
+        if src != "a- b - c" {
+            assert!(
+                err.message.contains("white space on both sides"),
+                "{src}: {}",
+                err.message
+            );
+        }
+    }
+}
+
+#[test]
+fn additive_binds_tighter_than_comparison_and_looser_than_postfix() {
+    assert_eq!(
+        described("a + b == c - d"),
+        "((Identifier(a) + Identifier(b)) == (Identifier(c) - Identifier(d)))"
+    );
+    assert_eq!(
+        described("a.n + f(x) - 1"),
+        "((Member(Identifier(a), n) + Call(Identifier(f), [Identifier(x)])) - Int(1))"
+    );
+    assert_eq!(
+        described("x => x + 1"),
+        "Lambda([x], (Identifier(x) + Int(1)))"
+    );
+    assert_eq!(
+        described("a + 1 > 2 && b"),
+        "(((Identifier(a) + Int(1)) > Int(2)) && Identifier(b))"
+    );
+}
+
+#[test]
+fn the_three_spellings_each_take_what_their_role_allows() {
+    let spelled = |src: &str| {
+        let doc = parse_file(&format!("{src}\n")).unwrap();
+        match &doc.body[0] {
+            Block::Interp(interp) => interp.to_string(),
+            other => panic!("{src}: {other:?}"),
+        }
+    };
+    // A reference, written with or without the gate, is printed as `$(...)`.
+    assert_eq!(spelled("$(var.title)"), "$(var.title)");
+    assert_eq!(spelled("{$ var.title }"), "$(var.title)");
+    assert_eq!(spelled("$(self::filename)"), "$(self::filename)");
+    assert_eq!(spelled("$(#intro.tags)"), "$(#intro.tags)");
+    assert_eq!(spelled("$(doc#id::meta.key)"), "$(doc#id::meta.key)");
+    assert_eq!(spelled("$(1)"), "$(1)");
+    // A call of a name is `$name(args)`.
+    assert_eq!(spelled("$macro.gh(1)"), "$macro.gh(1)");
+    assert_eq!(spelled("{$ macro.gh(1) }"), "$macro.gh(1)");
+    assert_eq!(
+        spelled("$addr(tmt:docs/a.tmt#intro)"),
+        "$addr(tmt:docs/a.tmt#intro)"
+    );
+    assert_eq!(spelled("$emoji(\"sparkles\")"), "$emoji(\"sparkles\")");
+    // Anything else keeps the gate.
+    assert_eq!(spelled("{$ a + b }"), "{$ a + b }");
+    assert_eq!(spelled("{$ \"text\" }"), "{$ \"text\" }");
+    assert_eq!(
+        spelled("{$ xs.map(x => x).len() }"),
+        "{$ xs.map(x => x).len() }"
+    );
+    assert_eq!(spelled("{$ -1 }"), "{$ -1 }");
+    assert_eq!(spelled("{$ true }"), "{$ true }");
+    assert_eq!(spelled("{$ (a) }"), "{$ (a) }");
+}
+
+#[test]
+fn a_reference_form_refuses_what_is_not_a_reference_and_says_where_it_goes() {
+    for src in [
+        "$(a + b)",
+        "$(f(x))",
+        "$(\"s\")",
+        "$(x => x)",
+        "$(true)",
+        "$(-1)",
+        "$((a))",
+        "$()",
+    ] {
+        let err = parse_file(&format!("{src}\n")).unwrap_err();
+        assert!(
+            err.message.contains("reference") || err.message.contains("empty"),
+            "{src}: {}",
+            err.message
+        );
+    }
+    assert!(
+        parse_file("$(a + b)\n")
+            .unwrap_err()
+            .message
+            .contains("{$ ... }")
+    );
+}
+
+#[test]
+fn a_gate_holds_a_closing_brace_that_is_inside_a_string() {
+    assert_eq!(described("\"}\" == x"), "(String(\"}\") == Identifier(x))");
+}
+
+#[test]
 fn comparison_binds_tighter_than_and_which_binds_tighter_than_or() {
     assert_eq!(
         described("a == 1 && b != 2 || c"),
@@ -372,7 +507,7 @@ fn postfix_binds_tighter_than_any_operator() {
 
 #[test]
 fn comparisons_do_not_chain() {
-    let err = parse_file("${a < b < c}\n").unwrap_err();
+    let err = parse_file("{$ a < b < c }\n").unwrap_err();
     assert!(err.to_string().contains("chained"), "got: {err}");
     // Grouping one side is the way out.
     assert_eq!(
@@ -386,7 +521,7 @@ fn every_binary_operator_is_read_from_its_own_symbol() {
     // The symbol is the node's own (`BinaryOp::symbol`); the parser has to read each one back as
     // that operator, and nothing else, or a printed expression reads as another.
     for op in tomet_ast::BinaryOp::ALL {
-        let doc = parse_file(&format!("${{a {} b}}\n", op.symbol())).unwrap();
+        let doc = parse_file(&format!("{{$ a {} b }}\n", op.symbol())).unwrap();
         match &interp_expr(&doc.body[0]).kind {
             InterpExprKind::Binary { op: read, .. } => {
                 assert_eq!(*read, op, "{}", op.symbol());
@@ -398,7 +533,11 @@ fn every_binary_operator_is_read_from_its_own_symbol() {
 
 #[test]
 fn a_lone_equals_ampersand_or_bar_is_an_error_that_names_the_fix() {
-    for (src, hint) in [("${a = b}", "=="), ("${a & b}", "&&"), ("${a | b}", "||")] {
+    for (src, hint) in [
+        ("{$ a = b }", "=="),
+        ("{$ a & b }", "&&"),
+        ("{$ a | b }", "||"),
+    ] {
         let err = parse_file(&format!("{src}\n")).unwrap_err();
         assert!(err.to_string().contains(hint), "{src}: got {err}");
     }
@@ -452,7 +591,7 @@ fn a_lambda_head_is_not_confused_with_a_named_argument_or_a_group() {
 fn the_arrow_is_not_a_comparison() {
     // `=>` is the lambda arrow; `>=` is a comparison. A stray arrow in an
     // operand position is a plain syntax error, not a silent comparison.
-    assert!(parse_file("${a => }\n").is_err());
+    assert!(parse_file("{$ a => }\n").is_err());
     assert_eq!(described("a >= b"), "(Identifier(a) >= Identifier(b))");
 }
 
@@ -486,7 +625,7 @@ fn display_gives_back_the_canonical_spelling() {
 
 #[test]
 fn an_operator_inside_a_table_cell_does_not_split_the_cell() {
-    let doc = parse_file("@table\n|[ a ][ ${x || y} ]\n|[ b ][ ${p && q} ]\n").unwrap();
+    let doc = parse_file("@table\n|[ a ][ {$ x || y } ]\n|[ b ][ {$ p && q } ]\n").unwrap();
     let rendered = format!("{doc:?}");
     assert!(
         rendered.contains("Or") || rendered.contains("||"),
@@ -529,7 +668,7 @@ fn the_leading_hash_is_still_an_id_on_its_own() {
 
 #[test]
 fn a_hash_after_a_space_is_not_a_document_boundary() {
-    assert!(parse_file("${self #intro}\n").is_err());
+    assert!(parse_file("{$ self #intro }\n").is_err());
 }
 
 #[test]
@@ -606,9 +745,9 @@ fn addr_works_in_the_braceless_call_form() {
 
 #[test]
 fn addr_that_is_unterminated_or_empty_is_an_error() {
-    assert!(parse_file("${addr(tmt:docs/a.tmt}\n").is_err());
-    assert!(parse_file("${addr()}\n").is_err());
-    assert!(parse_file("${addr(\"\")}\n").is_err());
+    assert!(parse_file("{$ addr(tmt:docs/a.tmt }\n").is_err());
+    assert!(parse_file("$addr()\n").is_err());
+    assert!(parse_file("$addr(\"\")\n").is_err());
 }
 
 #[test]
@@ -635,7 +774,7 @@ fn addr_prints_back_in_the_spelling_it_was_written() {
 
 #[test]
 fn an_expression_may_run_over_several_lines() {
-    let doc = parse_file("${xs\n    .filter(d => d.n > 1)\n    .map(d => d.n)}\n").unwrap();
+    let doc = parse_file("{$ xs\n    .filter(d => d.n > 1)\n    .map(d => d.n) }\n").unwrap();
     assert_eq!(
         describe(interp_expr(&doc.body[0])),
         "Call(Member(Call(Member(Identifier(xs), filter), [Lambda([d], (Member(Identifier(d), n) > Int(1)))]), map), [Lambda([d], Member(Identifier(d), n))])"
@@ -644,7 +783,7 @@ fn an_expression_may_run_over_several_lines() {
 
 #[test]
 fn a_call_may_put_its_arguments_on_separate_lines() {
-    let doc = parse_file("${f(\n  1,\n  2\n)}\n").unwrap();
+    let doc = parse_file("$f(\n  1,\n  2\n)\n").unwrap();
     assert_eq!(
         describe(interp_expr(&doc.body[0])),
         "Call(Identifier(f), [Int(1), Int(2)])"
@@ -653,7 +792,7 @@ fn a_call_may_put_its_arguments_on_separate_lines() {
 
 #[test]
 fn a_multi_line_expression_in_a_list_item_is_still_one_item() {
-    let doc = parse_file("- ${xs\n    .len()}\n- next\n").unwrap();
+    let doc = parse_file("- {$ xs\n    .len() }\n- next\n").unwrap();
     let Block::List(list) = &doc.body[0] else {
         panic!("a list, got {:?}", doc.body[0]);
     };
@@ -662,24 +801,29 @@ fn a_multi_line_expression_in_a_list_item_is_still_one_item() {
 
 #[test]
 fn an_unterminated_multi_line_expression_is_still_an_error() {
-    assert!(parse_file("${xs\n    .len()\n\nmore text\n").is_err());
+    assert!(parse_file("{$ xs\n    .len()\n\nmore text\n").is_err());
 }
 
 #[test]
 fn a_raw_address_still_ends_at_the_line() {
-    assert!(parse_file("${addr(tmt:a\n.tmt)}\n").is_err());
+    assert!(parse_file("$addr(tmt:a\n.tmt)\n").is_err());
 }
 
-/// The CST ends `${...}` at its own closing `}`: braces inside it are
+/// The CST ends `{$ ... }` at its own closing `}`: braces inside it are
 /// counted, and a string literal is one token, so a `}` in a string does not
 /// end the expression early.
 #[test]
 fn the_cst_keeps_a_brace_inside_an_interpolation_within_it() {
     use tomet_cst::SyntaxKind;
     for (src, expected) in [
-        ("${\"a}b\"} tail #(x)\n", "{\"a}b\"}"),
-        ("${addr(tmt:a.tmt#x)} tail #(x)\n", "{addr(tmt:a.tmt#x)}"),
-        ("${f(\"{\")} tail\n", "{f(\"{\")}"),
+        ("{$ \"a}b\" } tail #(x)\n", "{$ \"a}b\" }"),
+        (
+            "{$ addr(tmt:a.tmt#x) } tail #(x)\n",
+            "{$ addr(tmt:a.tmt#x) }",
+        ),
+        ("{$ f(\"{\") } tail\n", "{$ f(\"{\") }"),
+        ("$(a.b) tail #(x)\n", "$(a.b)"),
+        ("$(\"}\") tail\n", "$(\"}\")"),
     ] {
         let root = tomet_cst_parser::parse_cst(src);
         let interps: Vec<String> = root
@@ -688,5 +832,34 @@ fn the_cst_keeps_a_brace_inside_an_interpolation_within_it() {
             .map(|n| n.text().to_string())
             .collect();
         assert_eq!(interps, [expected], "{src:?}");
+    }
+}
+
+#[test]
+fn sequence_literals_in_expressions() {
+    for (src, expected_desc, expected_print) in [
+        ("{$ () }\n", "Seq([])", "{$ () }"),
+        ("{$ (a,) }\n", "Seq([Identifier(a)])", "{$ (a,) }"),
+        ("{$ (a, b) }\n", "Seq([Identifier(a), Identifier(b)])", "{$ (a, b) }"),
+        ("{$ (a, b,) }\n", "Seq([Identifier(a), Identifier(b)])", "{$ (a, b) }"),
+        ("{$ (a) }\n", "Group(Identifier(a))", "{$ (a) }"),
+        (
+            "{$ (\"a\", \"b\") }\n",
+            r#"Seq([String("a"), String("b")])"#,
+            r#"{$ ("a", "b") }"#,
+        ),
+        (
+            "{$ ((1, 2), (3, 4)) }\n",
+            "Seq([Seq([Int(1), Int(2)]), Seq([Int(3), Int(4)])])",
+            "{$ ((1, 2), (3, 4)) }",
+        ),
+    ] {
+        let doc = parse_file(src).unwrap();
+        let expr = interp_expr(&doc.body[0]);
+        assert_eq!(describe(expr), expected_desc, "{src}");
+        let Block::Interp(interp) = &doc.body[0] else {
+            panic!("expected Block::Interp");
+        };
+        assert_eq!(interp.to_string(), expected_print, "{src}");
     }
 }

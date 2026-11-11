@@ -1,11 +1,11 @@
 //! ID generation and rendering helpers.
 
 use tomet_ast::{Declaration, File, Id, Value};
-use tomet_config::PrinterConfig;
+use tomet_config::{FieldConfig, PrinterConfig};
 use tomet_id::IdSpec;
 use tomet_spelling::scalar_text;
 use tomet_tree::{ValueExt, declaration_new};
-use tomet_type::Type;
+use tomet_type::{Arg, Datum, Kind, Type};
 
 /// Ensures that a document has an `::id(...)` declaration if configured to do so.
 ///
@@ -17,10 +17,7 @@ pub fn ensure_document_id_with_config(doc: &mut File, config: &PrinterConfig) {
         return;
     };
     // Nothing is made for a vault that asks for no type of id, or for a type that is not one.
-    let Some(ty) = id_cfg.field_type.as_deref().and_then(Type::from_name) else {
-        return;
-    };
-    let Some(spec) = IdSpec::new(&ty, id_cfg.prefix.as_deref(), id_cfg.length) else {
+    let Some(spec) = id_type(id_cfg).and_then(|ty| IdSpec::new(&ty)) else {
         return;
     };
     let force = id_cfg.force.unwrap_or(true);
@@ -47,6 +44,25 @@ pub fn ensure_document_id_with_config(doc: &mut File, config: &PrinterConfig) {
         declaration.data.args = Some(Value::String(spec.generate()));
         doc.header.insert(at, declaration);
     }
+}
+
+/// The type the vault's `id` field settings come to: `type` with the `prefix` it gives and,
+/// for a `nanoid`, the `length` (a `uuid` has none, and a `length` set for it is not asked).
+///
+/// `None` when the vault names no type or one that is not a type, or when the settings are not
+/// what the type takes (a `prefix` on an `int`).
+fn id_type(id_cfg: &FieldConfig) -> Option<Type> {
+    let name = id_cfg.field_type.as_deref()?;
+    let mut named = Vec::new();
+    if let Some(prefix) = &id_cfg.prefix {
+        named.push(("prefix", Arg::Datum(Datum::Text(prefix.clone()))));
+    }
+    if Kind::from_name(name) == Some(Kind::Nanoid)
+        && let Some(length) = id_cfg.length.and_then(|n| i64::try_from(n).ok())
+    {
+        named.push(("length", Arg::Datum(Datum::Int(length))));
+    }
+    Type::build(name, &[], &named).ok()
 }
 
 /// The identity an `::id(...)` declaration holds: `::id(x)` or `::id(id: x)`.

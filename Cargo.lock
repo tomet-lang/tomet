@@ -286,7 +286,6 @@ dependencies = [
 name = "cotomet-eval"
 version = "0.5.0"
 dependencies = [
- "time",
  "tomet-ast",
  "tomet-ast-parser",
  "tomet-declaration",
@@ -1974,7 +1973,6 @@ dependencies = [
  "tomet-span",
  "tomet-tree",
  "tomet-type",
- "uuid",
 ]
 
 [[package]]
@@ -2276,6 +2274,7 @@ name = "tomet-semantics-core"
 version = "0.5.0"
 dependencies = [
  "tomet-ast",
+ "tomet-ast-parser",
  "tomet-type",
 ]
 
@@ -2397,10 +2396,13 @@ dependencies = [
  "tomet-ast",
  "tomet-ast-parser",
  "tomet-expr",
+ "tomet-id",
  "tomet-search",
  "tomet-semantics",
+ "tomet-semantics-core",
  "tomet-span",
  "tomet-tree",
+ "tomet-type",
 ]
 
 [[package]]
@@ -2469,6 +2471,7 @@ dependencies = [
  "tomet-ast-parser",
  "tomet-cst",
  "tomet-declaration",
+ "tomet-expr",
  "tomet-position",
  "tomet-semantics",
  "tomet-semantics-core",
@@ -2526,7 +2529,6 @@ name = "tomet-workspace"
 version = "0.5.0"
 dependencies = [
  "anyhow",
- "time",
  "tomet-ast",
  "tomet-ast-parser",
  "tomet-config",
@@ -2534,9 +2536,11 @@ dependencies = [
  "tomet-expr",
  "tomet-indexer",
  "tomet-load-config",
+ "tomet-position",
  "tomet-printer",
  "tomet-search",
  "tomet-semantics",
+ "tomet-span",
  "tomet-transform",
  "tomet-tree",
 ]

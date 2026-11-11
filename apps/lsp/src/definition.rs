@@ -199,6 +199,11 @@ fn references_in(expr: &InterpExpr, out: &mut Vec<(Span, Reference)>) {
             references_in(rhs, out);
         }
         InterpExprKind::Group(inner) => references_in(inner, out),
+        InterpExprKind::Seq(items) => {
+            for item in items {
+                references_in(item, out);
+            }
+        }
         InterpExprKind::Lambda { body, .. } => references_in(body, out),
         InterpExprKind::Identifier(_)
         | InterpExprKind::Literal(_)
@@ -262,7 +267,7 @@ pub(crate) fn find_def_in_blocks(blocks: &[Block], target_id: &str) -> Option<Sp
                     return Some(span);
                 }
             }
-            Block::Interp(_) | Block::Hole(_) => {}
+            Block::Interp(_) | Block::Hole(_) | Block::TypeSeat(_) => {}
         }
     }
     None

@@ -78,10 +78,11 @@ pub fn completions_for_with_uri(
         return items;
     }
 
-    if prefix.ends_with("${") || prefix.ends_with("${ ") {
+    if prefix.ends_with("{$") || prefix.ends_with("{$ ") || prefix.ends_with("$(") {
         // What may start an expression: the functions called by a bare name,
-        // and the reserved values with the members worth offering first. Both
-        // lists are the evaluator's own, so what is offered is what exists.
+        // the reserved values with the members worth offering first, and the
+        // types. All three lists are the evaluator's own, so what is offered is
+        // what exists.
         for (func, detail) in tomet_expr::FUNCTIONS {
             items.push(CompletionItem {
                 label: format!("{func}(...)"),
@@ -97,6 +98,15 @@ pub fn completions_for_with_uri(
                 insert_text: Some(name.to_string()),
                 kind: Some(CompletionItemKind::VARIABLE),
                 detail: Some(detail.to_string()),
+                ..CompletionItem::default()
+            });
+        }
+        for (name, detail) in tomet_expr::type_names() {
+            items.push(CompletionItem {
+                label: name.to_string(),
+                insert_text: Some(name.to_string()),
+                kind: Some(CompletionItemKind::CLASS),
+                detail: Some(detail),
                 ..CompletionItem::default()
             });
         }

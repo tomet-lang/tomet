@@ -52,6 +52,7 @@ pub(crate) fn values_equal(a: &EvalValue, b: &EvalValue) -> bool {
         (V::Document(x), V::Document(y)) => x == y,
         (V::Directory(x), V::Directory(y)) => x == y,
         (V::Namespace(x), V::Namespace(y)) => x == y,
+        (V::Type(x), V::Type(y)) => x == y,
         (V::Part { doc: d1, part: p1 }, V::Part { doc: d2, part: p2 }) => d1 == d2 && p1 == p2,
         (V::Fragment(x), V::Fragment(y)) => x == y,
         (V::Function(x), V::Function(y)) => x == y,

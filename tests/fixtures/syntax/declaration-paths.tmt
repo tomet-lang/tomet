@@ -9,7 +9,7 @@
 ::id(declaration-paths)
 
 ::macro.copyright("(C) 2026 Tomet Projects")
-::macro.generated_by[ @comment[ Generated from ${1}. ] ]
+::macro.generated_by[ @comment[ Generated from $(1). ] ]
 
 ::format.meta(always_newline: true)
 ::format.table(adjust_width: auto, max_col_width: 50)

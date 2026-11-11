@@ -61,6 +61,7 @@ pub use profile::Profile;
 pub use read::{
     blueprint_target, dictionary_name, document_blueprint, document_dictionary, document_entries,
     document_id, document_kind, document_macros, document_meta, document_profiles, document_vars,
-    document_version, id_name, kind_name, macros, meta, profile_names, version_string,
+    document_version, id_name, is_blueprint, kind_name, macros, meta, profile_names,
+    version_string,
 };
 pub use vars::{VAR_KEYS, VarDecl, read_var_decls};

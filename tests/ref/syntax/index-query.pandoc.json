@@ -1,5 +1,9 @@
 {
-  "pandoc-api-version": [1, 23, 1],
+  "pandoc-api-version": [
+    1,
+    23,
+    1
+  ],
   "meta": {
     "id": {
       "t": "MetaInlines",
@@ -16,7 +20,11 @@
       "t": "Header",
       "c": [
         1,
-        ["", [], []],
+        [
+          "",
+          [],
+          []
+        ],
         [
           {
             "t": "Str",
@@ -30,7 +38,14 @@
       "c": [
         {
           "t": "Code",
-          "c": [["", [], []], "${filter(...)}"]
+          "c": [
+            [
+              "",
+              [],
+              []
+            ],
+            "$filter(...)"
+          ]
         },
         {
           "t": "Space"
@@ -51,7 +66,14 @@
         },
         {
           "t": "Code",
-          "c": [["", [], []], "${some_id}"]
+          "c": [
+            [
+              "",
+              [],
+              []
+            ],
+            "$(some_id)"
+          ]
         },
         {
           "t": "Space"
@@ -72,7 +94,14 @@
         },
         {
           "t": "Code",
-          "c": [["", [], []], "syntax/interpolation.tmt"]
+          "c": [
+            [
+              "",
+              [],
+              []
+            ],
+            "syntax/interpolation.tmt"
+          ]
         },
         {
           "t": "Space"
@@ -130,7 +159,14 @@
         },
         {
           "t": "Code",
-          "c": [["", [], []], "tomet-workspace"]
+          "c": [
+            [
+              "",
+              [],
+              []
+            ],
+            "tomet-workspace"
+          ]
         },
         {
           "t": "Space"
@@ -144,7 +180,14 @@
         },
         {
           "t": "Code",
-          "c": [["", [], []], "index"]
+          "c": [
+            [
+              "",
+              [],
+              []
+            ],
+            "index"
+          ]
         },
         {
           "t": "Space"
@@ -159,7 +202,11 @@
       "t": "Header",
       "c": [
         2,
-        ["", [], []],
+        [
+          "",
+          [],
+          []
+        ],
         [
           {
             "t": "Str",
@@ -173,7 +220,14 @@
       "c": [
         {
           "t": "Code",
-          "c": [["", [], []], "${filter(contains(meta.tags, \"rust\"))}"]
+          "c": [
+            [
+              "",
+              [],
+              []
+            ],
+            "$filter(contains(meta.tags, \"rust\"))"
+          ]
         }
       ]
     },
@@ -181,7 +235,11 @@
       "t": "Header",
       "c": [
         2,
-        ["", [], []],
+        [
+          "",
+          [],
+          []
+        ],
         [
           {
             "t": "Str",
@@ -203,8 +261,12 @@
         {
           "t": "Code",
           "c": [
-            ["", [], []],
-            "${filter(contains(meta.tags, \"rust\"), not(exists(meta.draft)))}"
+            [
+              "",
+              [],
+              []
+            ],
+            "$filter(contains(meta.tags, \"rust\"), not(exists(meta.draft)))"
           ]
         }
       ]
@@ -213,7 +275,11 @@
       "t": "Header",
       "c": [
         2,
-        ["", [], []],
+        [
+          "",
+          [],
+          []
+        ],
         [
           {
             "t": "Str",
@@ -236,7 +302,14 @@
       "c": [
         {
           "t": "Code",
-          "c": [["", [], []], "${filter(by(meta.created))}"]
+          "c": [
+            [
+              "",
+              [],
+              []
+            ],
+            "$filter(by(meta.created))"
+          ]
         }
       ]
     },
@@ -246,8 +319,12 @@
         {
           "t": "Code",
           "c": [
-            ["", [], []],
-            "${filter(contains(meta.tags, \"rust\"), by(meta.created, \"desc\"))}"
+            [
+              "",
+              [],
+              []
+            ],
+            "$filter(contains(meta.tags, \"rust\"), by(meta.created, \"desc\"))"
           ]
         }
       ]
@@ -256,7 +333,11 @@
       "t": "Header",
       "c": [
         2,
-        ["", [], []],
+        [
+          "",
+          [],
+          []
+        ],
         [
           {
             "t": "Str",
@@ -287,8 +368,12 @@
         {
           "t": "Code",
           "c": [
-            ["", [], []],
-            "${filter(gte(meta.created, \"2026-01-01\"), lt(meta.created, \"2027-01-01\"))}"
+            [
+              "",
+              [],
+              []
+            ],
+            "$filter(gte(meta.created, \"2026-01-01\"), lt(meta.created, \"2027-01-01\"))"
           ]
         }
       ]
@@ -297,7 +382,11 @@
       "t": "Header",
       "c": [
         2,
-        ["", [], []],
+        [
+          "",
+          [],
+          []
+        ],
         [
           {
             "t": "Str",
@@ -312,8 +401,12 @@
         {
           "t": "Code",
           "c": [
-            ["", [], []],
-            "${filter(or(contains(meta.tags, \"rust\"), contains(meta.tags, \"go\")))}"
+            [
+              "",
+              [],
+              []
+            ],
+            "$filter(or(contains(meta.tags, \"rust\"), contains(meta.tags, \"go\")))"
           ]
         }
       ]
@@ -322,7 +415,11 @@
       "t": "Header",
       "c": [
         1,
-        ["", [], []],
+        [
+          "",
+          [],
+          []
+        ],
         [
           {
             "t": "Str",
@@ -350,7 +447,14 @@
         },
         {
           "t": "Code",
-          "c": [["", [], []], "tomet fmt"]
+          "c": [
+            [
+              "",
+              [],
+              []
+            ],
+            "tomet fmt"
+          ]
         },
         {
           "t": "Space"
@@ -378,7 +482,14 @@
         },
         {
           "t": "Code",
-          "c": [["", [], []], "${filter(...)}"]
+          "c": [
+            [
+              "",
+              [],
+              []
+            ],
+            "$filter(...)"
+          ]
         },
         {
           "t": "Space"

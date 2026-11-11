@@ -13,7 +13,7 @@
 //!
 //! What it reads from text rather than from nodes is not shape: how a run of
 //! source text becomes `Text` and `SoftBreak` items, and the grammars of the leaves --
-//! `${...}` expressions and a group's values, which hand back to the CST
+//! `{$ ... }` expressions and a group's values, which hand back to the CST
 //! whatever they embed.
 //!
 //! The fold is split by construct, one file each; the entry points and the block

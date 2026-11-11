@@ -20,8 +20,8 @@ use tomet_tree::{Node, Place, Visit, element_new, walk_node_scoped};
 ///   A paragraph inside an inline element is not a block of its own and is not separated.
 /// - A line break, soft or hard, is a newline: the author wrapped the line there.
 /// - A code span keeps its backticks, with a fence long enough for what is in it.
-/// - An `${...}` nobody evaluated is written as it was, the way a reader of the source would
-///   find it. A hole is left out: it has no text until it is filled.
+/// - An `{$ ... }` nobody evaluated is written as it was, the way a reader of the source would
+///   find it. A hole and a type seat are left out: they have no text until they are filled.
 /// - Markup around text (`@em[x]`) contributes its text. `(args)`, `{value}` and `::connect`s are
 ///   not part of what the content says, and are not read.
 ///
@@ -45,16 +45,17 @@ pub fn comment_text(el: ElementView<'_>) -> String {
         }
         let mut state = state.borrow_mut();
         match node {
-            Node::Block(Block::Hole(_)) | Node::Inline(Inline::Hole(_)) => return Visit::Skip,
+            Node::Block(Block::Hole(_) | Block::TypeSeat(_))
+            | Node::Inline(Inline::Hole(_) | Inline::TypeSeat(_)) => return Visit::Skip,
             Node::Block(Block::Interp(interp)) => {
                 state.block_starts();
-                state.push(&format!("${{{}}}", interp.expr));
+                state.push(&interp.to_string());
             }
             Node::Block(_) | Node::Item(_) | Node::List(_) => state.block_starts(),
             Node::Inline(Inline::Text(text)) => state.push(&text.value),
             Node::Inline(Inline::Raw(raw)) => state.push(&code_span(&raw.value)),
             Node::Inline(Inline::SoftBreak(_) | Inline::LineBreak(_)) => state.push("\n"),
-            Node::Inline(Inline::Interp(interp)) => state.push(&format!("${{{}}}", interp.expr)),
+            Node::Inline(Inline::Interp(interp)) => state.push(&interp.to_string()),
             Node::Inline(Inline::Element(_)) => state.inline_elements += 1,
             Node::Declaration(_) | Node::Value(_) | Node::Entry(_) | Node::Connect(_) => {}
         }
@@ -291,8 +292,8 @@ mod tests {
     #[test]
     fn an_unevaluated_interpolation_is_written_as_it_was() {
         assert_eq!(
-            text_of("@comment[ from ${macro.x(1)} ]\n"),
-            "from ${macro.x(1)}"
+            text_of("@comment[ from $macro.x(1) ]\n"),
+            "from $macro.x(1)"
         );
     }
 

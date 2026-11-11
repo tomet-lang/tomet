@@ -13,14 +13,15 @@
 //! `::connect`s. The AST keeps no order of groups, so this is the order of every walker.
 //!
 //! The one exception to "one recursion" is the mutable walk ([`for_each_element_mut`],
-//! [`for_each_id_mut`], [`fill_interpolations`]): a mutable walk cannot share the borrow with
+//! [`for_each_id_mut`], [`fill_interpolations`], [`fill_type_seats`], [`fill_type_seats_in_file`]): a mutable walk cannot share the borrow with
 //! [`children`], so it lists the children again, and a test holds the two to the
 //! same reach.
 
+use std::marker::PhantomData;
 use std::ops::ControlFlow;
 use tomet_ast::{
     Block, Connect, Data, Declaration, Element, ElementView, Entry, File, Group, Hole, Id, Inline,
-    Interpolation, List, ListItem, Paragraph, Section, Text, Value,
+    Interpolation, List, ListItem, Paragraph, Section, Text, TypeSeat, Value,
 };
 use tomet_span::Span;
 
@@ -119,6 +120,7 @@ impl<'a> Node<'a> {
             Node::Value(Value::Element(e)) => Some(e.span),
             Node::Value(Value::Hole(h)) => Some(h.span),
             Node::Value(Value::Interp(it)) => Some(it.span),
+            Node::Value(Value::TypeSeat(t)) => Some(t.span),
             Node::Value(_) => None,
         }
     }
@@ -177,6 +179,16 @@ impl<'a> Node<'a> {
             _ => None,
         }
     }
+
+    /// The type seat this node is, wherever it stands.
+    pub fn type_seat(self) -> Option<&'a TypeSeat> {
+        match self {
+            Node::Block(Block::TypeSeat(t))
+            | Node::Inline(Inline::TypeSeat(t))
+            | Node::Value(Value::TypeSeat(t)) => Some(t),
+            _ => None,
+        }
+    }
 }
 
 /// What a walk does after it has been shown a node.
@@ -213,7 +225,7 @@ pub fn children<'a>(node: Node<'a>, f: &mut dyn FnMut(Node<'a>, Place)) {
                 connects(&s.connects, f);
             }
             Block::List(l) => list(l, f),
-            Block::Interp(_) => {}
+            Block::Interp(_) | Block::TypeSeat(_) => {}
         },
         Node::Inline(inline) => match inline {
             Inline::Element(el) => element(el, f),
@@ -222,7 +234,8 @@ pub fn children<'a>(node: Node<'a>, f: &mut dyn FnMut(Node<'a>, Place)) {
             | Inline::Raw(_)
             | Inline::SoftBreak(_)
             | Inline::LineBreak(_)
-            | Inline::Interp(_) => {}
+            | Inline::Interp(_)
+            | Inline::TypeSeat(_) => {}
         },
         Node::Value(value) => match value {
             Value::Element(el) => element(el, f),
@@ -244,6 +257,7 @@ pub fn children<'a>(node: Node<'a>, f: &mut dyn FnMut(Node<'a>, Place)) {
             }
             Value::Null
             | Value::Interp(_)
+            | Value::TypeSeat(_)
             | Value::Bool(_)
             | Value::Int(_)
             | Value::Float(_)
@@ -454,11 +468,24 @@ pub fn for_each_section(file: &File, mut f: impl FnMut(&Section)) {
 /// Visits every [`Interpolation`] in `file`, in document order, wherever it sits.
 ///
 /// An interpolation is not an [`Element`], so the element walkers never pass one to their
-/// visitor; this is the walker to ask for "every `${...}` in the document".
+/// visitor; this is the walker to ask for "every `{$ ... }` in the document".
 pub fn for_each_interpolation(file: &File, mut f: impl FnMut(&Interpolation)) {
     for_each_node(file, |node| {
         if let Some(interp) = node.interpolation() {
             f(interp);
+        }
+    });
+}
+
+/// Visits every [`TypeSeat`] in `file`, in document order, wherever it sits: as a block, in
+/// running text or as a value.
+///
+/// A type seat is not an [`Element`] either, so the element walkers never pass one to their
+/// visitor.
+pub fn for_each_type_seat(file: &File, mut f: impl FnMut(&TypeSeat)) {
+    for_each_node(file, |node| {
+        if let Some(seat) = node.type_seat() {
+            f(seat);
         }
     });
 }
@@ -502,7 +529,11 @@ pub fn for_each_top_level_element(file: &File, mut f: impl FnMut(&Element)) {
                     }
                 }
             }
-            Block::Section(_) | Block::List(_) | Block::Hole(_) | Block::Interp(_) => {}
+            Block::Section(_)
+            | Block::List(_)
+            | Block::Hole(_)
+            | Block::Interp(_)
+            | Block::TypeSeat(_) => {}
         }
     }
 }
@@ -643,7 +674,7 @@ impl<S: Sink> MutWalk<'_, S> {
                 self.connects(&mut s.connects);
             }
             Block::List(l) => self.list(l),
-            Block::Interp(_) => {}
+            Block::Interp(_) | Block::TypeSeat(_) => {}
         }
     }
 
@@ -658,7 +689,8 @@ impl<S: Sink> MutWalk<'_, S> {
                 | Inline::SoftBreak(_)
                 | Inline::LineBreak(_)
                 | Inline::Raw(_)
-                | Inline::Interp(_) => {}
+                | Inline::Interp(_)
+                | Inline::TypeSeat(_) => {}
             }
         }
     }
@@ -741,6 +773,7 @@ impl<S: Sink> MutWalk<'_, S> {
             }
             Value::Null
             | Value::Interp(_)
+            | Value::TypeSeat(_)
             | Value::Bool(_)
             | Value::Int(_)
             | Value::Float(_)
@@ -809,6 +842,138 @@ pub fn for_each_interpolation_in_value(value: &Value, mut f: impl FnMut(&Interpo
     });
 }
 
+/// [`for_each_interpolation_in_value`] for [`TypeSeat`]s: every one under `value`, in document
+/// order, wherever it sits, `(args)`, the values of `key: value` entries and `::connect`s included.
+pub fn for_each_type_seat_in_value(value: &Value, mut f: impl FnMut(&TypeSeat)) {
+    let _ = walk_node(Node::Value(value), Place::Part, &mut |node, _| {
+        if let Some(seat) = node.type_seat() {
+            f(seat);
+        }
+        Visit::<()>::Descend
+    });
+}
+
+/// A node that stands where a value, a block or running text does, and is replaced, where it
+/// stands, by a value that fills it: an [`Interpolation`] and a [`TypeSeat`]. What the value
+/// becomes depends on the place, which is what [`Filling`] knows and its two callers do not.
+trait Fillable: Sized {
+    fn inline(inline: &Inline) -> Option<&Self>;
+    fn block(block: &Block) -> Option<&Self>;
+    fn value(value: &Value) -> Option<&Self>;
+    fn span(&self) -> Span;
+}
+
+impl Fillable for Interpolation {
+    fn inline(inline: &Inline) -> Option<&Self> {
+        match inline {
+            Inline::Interp(i) => Some(i),
+            _ => None,
+        }
+    }
+    fn block(block: &Block) -> Option<&Self> {
+        match block {
+            Block::Interp(i) => Some(i),
+            _ => None,
+        }
+    }
+    fn value(value: &Value) -> Option<&Self> {
+        match value {
+            Value::Interp(i) => Some(i),
+            _ => None,
+        }
+    }
+    fn span(&self) -> Span {
+        self.span
+    }
+}
+
+impl Fillable for TypeSeat {
+    fn inline(inline: &Inline) -> Option<&Self> {
+        match inline {
+            Inline::TypeSeat(t) => Some(t),
+            _ => None,
+        }
+    }
+    fn block(block: &Block) -> Option<&Self> {
+        match block {
+            Block::TypeSeat(t) => Some(t),
+            _ => None,
+        }
+    }
+    fn value(value: &Value) -> Option<&Self> {
+        match value {
+            Value::TypeSeat(t) => Some(t),
+            _ => None,
+        }
+    }
+    fn span(&self) -> Span {
+        self.span
+    }
+}
+
+/// The sink of [`fill_interpolations`] and [`fill_type_seats`]: what `fill` answers for a node of
+/// kind `T`, as the place the node stands in takes it.
+struct Filling<T, F> {
+    fill: F,
+    node: PhantomData<fn(&T)>,
+}
+
+impl<T: Fillable, F: FnMut(&T) -> Option<Value>> Filling<T, F> {
+    /// What the node becomes in running text: the scalar text of its value, if it has any.
+    fn text(&mut self, node: &T) -> Option<Text> {
+        let filled = (self.fill)(node)?;
+        let text = filled.scalar_text()?.into_owned();
+        Some(Text::new(text, node.span()))
+    }
+}
+
+impl<T: Fillable, F: FnMut(&T) -> Option<Value>> Sink for Filling<T, F> {
+    fn inline(&mut self, inline: &mut Inline) {
+        if let Some(node) = T::inline(inline)
+            && let Some(text) = self.text(node)
+        {
+            *inline = Inline::Text(text);
+        }
+    }
+    fn block(&mut self, block: &mut Block) {
+        if let Some(node) = T::block(block)
+            && let Some(text) = self.text(node)
+        {
+            let span = node.span();
+            *block = Block::Paragraph(Paragraph::new(vec![Inline::Text(text)], span));
+        }
+    }
+    fn value(&mut self, value: &mut Value) {
+        if let Some(node) = T::value(value)
+            && let Some(filled) = (self.fill)(node)
+        {
+            *value = filled;
+        }
+    }
+}
+
+fn fill_nodes<T: Fillable>(value: &mut Value, fill: impl FnMut(&T) -> Option<Value>) {
+    MutWalk {
+        sink: &mut Filling {
+            fill,
+            node: PhantomData,
+        },
+        connects: true,
+    }
+    .value(value);
+}
+
+fn fill_nodes_in_file<T: Fillable>(file: &mut File, fill: impl FnMut(&T) -> Option<Value>) {
+    walk_mut(
+        file,
+        &mut Filling {
+            fill,
+            node: PhantomData,
+        },
+        true,
+    );
+}
+
 /// Replaces, in place, each interpolation under `value` that `fill` has a value for. It is shown
 /// them in the order [`for_each_interpolation_in_value`] shows them, and an interpolation it answers
 /// `None` for is left as written.
@@ -824,43 +989,23 @@ pub fn for_each_interpolation_in_value(value: &Value, mut f: impl FnMut(&Interpo
 /// A value with no scalar text (a map, a list) has no place in text, so there the interpolation is
 /// left as written too.
 pub fn fill_interpolations(value: &mut Value, fill: impl FnMut(&Interpolation) -> Option<Value>) {
-    struct Fill<F>(F);
-    impl<F: FnMut(&Interpolation) -> Option<Value>> Fill<F> {
-        fn text(&mut self, interp: &Interpolation) -> Option<Text> {
-            let filled = (self.0)(interp)?;
-            let text = filled.scalar_text()?.into_owned();
-            Some(Text::new(text, interp.span))
-        }
-    }
-    impl<F: FnMut(&Interpolation) -> Option<Value>> Sink for Fill<F> {
-        fn inline(&mut self, inline: &mut Inline) {
-            if let Inline::Interp(interp) = inline
-                && let Some(text) = self.text(interp)
-            {
-                *inline = Inline::Text(text);
-            }
-        }
-        fn block(&mut self, block: &mut Block) {
-            if let Block::Interp(interp) = block
-                && let Some(text) = self.text(interp)
-            {
-                let span = interp.span;
-                *block = Block::Paragraph(Paragraph::new(vec![Inline::Text(text)], span));
-            }
-        }
-        fn value(&mut self, value: &mut Value) {
-            if let Value::Interp(interp) = value
-                && let Some(filled) = (self.0)(interp)
-            {
-                *value = filled;
-            }
-        }
-    }
-    MutWalk {
-        sink: &mut Fill(fill),
-        connects: true,
-    }
-    .value(value);
+    fill_nodes(value, fill);
+}
+
+/// [`fill_interpolations`] for [`TypeSeat`]s: replaces, in place, each type seat under `value`
+/// that `fill` has a value for, in the order [`for_each_type_seat_in_value`] shows them. A seat it
+/// answers `None` for is left as written, and where the seat sits says what the value becomes: the
+/// value itself as a value, its scalar text in running text and as a paragraph where the seat is
+/// a block of its own, and no place in text for a value with no scalar text.
+pub fn fill_type_seats(value: &mut Value, fill: impl FnMut(&TypeSeat) -> Option<Value>) {
+    fill_nodes(value, fill);
+}
+
+/// [`fill_type_seats`] for a whole [`File`]: replaces, in place, each type seat of its header and
+/// its body that `fill` has a value for, in the order [`for_each_type_seat`] shows them, `::connect`s
+/// included. What the value becomes depends on where the seat sits, as it does there.
+pub fn fill_type_seats_in_file(file: &mut File, fill: impl FnMut(&TypeSeat) -> Option<Value>) {
+    fill_nodes_in_file(file, fill);
 }
 
 #[cfg(test)]
@@ -967,8 +1112,8 @@ mod tests {
         &mut entries[0].1
     }
 
-    /// Two blocks: an element on a line of its own, then a `${2}` on a line of its own.
-    const BODY: &str = "::macro(m: [\n@card(title: ${1}, n: ${3})[ hi ${name} ]\n\n${2}\n])\n";
+    /// Two blocks: an element on a line of its own, then a `$(2)` on a line of its own.
+    const BODY: &str = "::macro(m: [\n@card(title: $(1), n: $(3))[ hi $(name) ]\n\n$(2)\n])\n";
 
     fn interpolations(value: &Value) -> Vec<String> {
         let mut found = Vec::new();
@@ -1052,15 +1197,15 @@ mod tests {
 
     #[test]
     fn every_interpolation_is_found_wherever_it_sits() {
-        let src = "=[ ${title} ]::rule(allow: ${conn})\n\
+        let src = "=[ $(title) ]::rule(allow: $(conn))\n\
                    \n\
-                   ${block}\n\
+                   $(block)\n\
                    \n\
-                   text ${inline} more\n\
+                   text $(inline) more\n\
                    \n\
-                   @x(a: ${arg}, b: (${nested})){ k: ${val} }[ ${content} ]::as(${connect})\n\
+                   @x(a: $(arg), b: ($(nested))){ k: $(val) }[ $(content) ]::as($(connect))\n\
                    \n\
-                   - item ${item}\n";
+                   - item $(item)\n";
         let file = tomet_ast_parser::parse_file(src).unwrap();
         let mut found = Vec::new();
         for_each_interpolation(&file, |i| found.push(i.expr.to_string()));
@@ -1071,5 +1216,213 @@ mod tests {
         ];
         expected.sort();
         assert_eq!(found, expected);
+    }
+    /// A seat in every position a value, a block or running text can sit in, named by where.
+    const SEATS: &str = "\
+::meta(k: <$t_decl_value>)
+
+<$t_block>
+
+text <$t_inline> more
+
+@host(a: <$t_args>, b: (<$t_seq>)){ d: <$t_pair> }[ <$t_content_block>\n\ntext <$t_content_inline> ]::rule(allow: (<$t_connect>))
+
+=[ title <$t_title> ]{ k: <$t_sec_data> }::rule(allow: (<$t_sec_connect>))
+
+- item <$t_item>
+";
+
+    const SEAT_ORDER: [&str; 12] = [
+        "t_decl_value",
+        "t_block",
+        "t_inline",
+        "t_args",
+        "t_seq",
+        "t_pair",
+        "t_content_block",
+        "t_content_inline",
+        "t_connect",
+        "t_title",
+        "t_sec_data",
+        "t_item",
+    ];
+
+    fn seat_names(file: &File) -> Vec<String> {
+        let mut found = Vec::new();
+        for_each_type_seat(file, |t| found.push(t.expr.to_string()));
+        found
+    }
+
+    #[test]
+    fn every_type_seat_is_found_wherever_it_sits() {
+        let file = tomet_ast_parser::parse_file(SEATS).unwrap();
+        let found = seat_names(&file);
+        // A `::connect` is reached, and comes last in its owner.
+        let mut expected: Vec<&str> = SEAT_ORDER.to_vec();
+        expected.insert(9, "t_sec_connect");
+        expected.sort_unstable();
+        let mut sorted = found.clone();
+        sorted.sort_unstable();
+        assert_eq!(sorted, expected);
+        // Document order, each owner's connects after what else it holds.
+        assert_eq!(found[..3], ["t_decl_value", "t_block", "t_inline"]);
+        let host = found.iter().position(|n| n == "t_args").unwrap();
+        assert_eq!(
+            found[host..host + 6],
+            [
+                "t_args",
+                "t_seq",
+                "t_pair",
+                "t_content_block",
+                "t_content_inline",
+                "t_connect"
+            ]
+        );
+    }
+
+    #[test]
+    fn a_type_seat_is_not_an_element_nor_an_interpolation_to_the_walkers() {
+        let file = tomet_ast_parser::parse_file(SEATS).unwrap();
+        let mut interpolations = 0;
+        for_each_interpolation(&file, |_| interpolations += 1);
+        assert_eq!(interpolations, 0);
+        let mut elements = Vec::new();
+        for_each_element(&file, |el| elements.push(el.name.name.clone()));
+        assert_eq!(elements, ["host"]);
+    }
+
+    #[test]
+    fn the_mutable_walk_reaches_the_type_seats_the_immutable_walks_do() {
+        struct Seats(Vec<String>);
+        impl Sink for Seats {
+            fn inline(&mut self, inline: &mut Inline) {
+                if let Inline::TypeSeat(t) = inline {
+                    self.0.push(t.expr.to_string());
+                }
+            }
+            fn block(&mut self, block: &mut Block) {
+                if let Block::TypeSeat(t) = block {
+                    self.0.push(t.expr.to_string());
+                }
+            }
+            fn value(&mut self, value: &mut Value) {
+                if let Value::TypeSeat(t) = value {
+                    self.0.push(t.expr.to_string());
+                }
+            }
+        }
+        let mut file = tomet_ast_parser::parse_file(SEATS).unwrap();
+        let mut sink = Seats(Vec::new());
+        walk_mut(&mut file, &mut sink, true);
+        assert_eq!(sink.0, seat_names(&file));
+        assert_eq!(sink.0.len(), SEAT_ORDER.len() + 1);
+    }
+
+    /// Two blocks: an element on a line of its own, then a seat on a line of its own.
+    const SEAT_BODY: &str =
+        "::macro(m: [\n@card(title: <$string>, n: <$int>)[ hi <$name> ]\n\n<$date>\n])\n";
+
+    fn seats(value: &Value) -> Vec<String> {
+        let mut found = Vec::new();
+        for_each_type_seat_in_value(value, |t| found.push(t.expr.to_string()));
+        found
+    }
+
+    #[test]
+    fn the_type_seats_under_a_value_include_arguments_and_entries() {
+        let mut file = tomet_ast_parser::parse_file(SEAT_BODY).unwrap();
+        assert_eq!(
+            seats(macro_body(&mut file)),
+            ["string", "int", "name", "date"]
+        );
+    }
+
+    #[test]
+    fn a_filled_type_seat_is_a_value_in_data_and_text_in_text() {
+        let mut file = tomet_ast_parser::parse_file(SEAT_BODY).unwrap();
+        let body = macro_body(&mut file);
+        fill_type_seats(body, |t| match t.expr.to_string().as_str() {
+            "string" => Some(Value::String("Welcome".to_string())),
+            "int" => Some(Value::Int(5)),
+            "name" => Some(Value::Int(7)),
+            "date" => Some(Value::String("end".to_string())),
+            _ => None,
+        });
+        assert!(seats(body).is_empty(), "{:?}", seats(body));
+        let Value::Blocks(blocks) = &*body else {
+            panic!("expected blocks");
+        };
+        let Block::Element(card) = &blocks[0] else {
+            panic!("expected the card, got {:?}", blocks[0]);
+        };
+        let Some(Value::Map(args)) = &card.data.args else {
+            panic!("expected named arguments, got {:?}", card.data.args);
+        };
+        assert_eq!(args[0].1, Value::String("Welcome".to_string()));
+        assert_eq!(args[1].1, Value::Int(5), "a number stays a number in data");
+        let Some([Block::Paragraph(p)]) = card.content.as_deref() else {
+            panic!("expected one paragraph, got {:?}", card.content);
+        };
+        assert!(
+            matches!(&p.content[..], [Inline::Text(a), Inline::Text(b)]
+                if a.value == "hi " && b.value == "7"),
+            "{:?}",
+            p.content
+        );
+        let Block::Paragraph(last) = &blocks[1] else {
+            panic!(
+                "a block of its own becomes a paragraph, got {:?}",
+                blocks[1]
+            );
+        };
+        assert!(matches!(&last.content[..], [Inline::Text(t)] if t.value == "end"));
+    }
+
+    #[test]
+    fn a_type_seat_nothing_fills_is_left_as_written() {
+        let mut file = tomet_ast_parser::parse_file(SEAT_BODY).unwrap();
+        let body = macro_body(&mut file);
+        fill_type_seats(body, |t| {
+            (t.expr.to_string() == "date").then_some(Value::Int(1))
+        });
+        assert_eq!(seats(body), ["string", "int", "name"]);
+        // A value with no scalar text has no place in text; data takes it as it is.
+        fill_type_seats(body, |_| Some(Value::Map(Vec::new())));
+        assert_eq!(seats(body), ["name"]);
+    }
+
+    #[test]
+    fn the_type_seats_of_a_file_are_filled_in_the_order_they_are_shown() {
+        let mut file = tomet_ast_parser::parse_file(SEATS).unwrap();
+        let shown = seat_names(&file);
+        let mut asked = Vec::new();
+        fill_type_seats_in_file(&mut file, |t| {
+            asked.push(t.expr.to_string());
+            Some(Value::String("x".to_string()))
+        });
+        assert_eq!(asked, shown);
+        assert_eq!(asked.len(), SEAT_ORDER.len() + 1);
+        assert_eq!(seat_names(&file), Vec::<String>::new());
+    }
+
+    #[test]
+    fn a_type_seat_of_a_file_nothing_fills_is_left_as_written() {
+        let mut file = tomet_ast_parser::parse_file(SEATS).unwrap();
+        fill_type_seats_in_file(&mut file, |t| {
+            (t.expr.to_string() != "t_block").then(|| Value::String("x".to_string()))
+        });
+        assert_eq!(seat_names(&file), ["t_block"]);
+    }
+
+    #[test]
+    fn filling_type_seats_leaves_interpolations_and_the_reverse() {
+        let src = "::macro(m: [\n@card(title: <$string>, n: $(1))[ hi <$name> $(2) ]\n])\n";
+        let mut file = tomet_ast_parser::parse_file(src).unwrap();
+        let body = macro_body(&mut file);
+        fill_type_seats(body, |_| Some(Value::Int(9)));
+        assert!(seats(body).is_empty());
+        assert_eq!(interpolations(body), ["1", "2"]);
+        fill_interpolations(body, |_| Some(Value::Int(3)));
+        assert!(interpolations(body).is_empty());
     }
 }

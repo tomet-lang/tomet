@@ -7,6 +7,13 @@
 //! the data model would make it carry values that can never be saved.
 //! [`EvalValue::from_ast`] and [`EvalValue::to_ast`] cross between the two.
 //!
+//! =[ Types ]
+//!
+//! A [`Type`] is a value too ([`EvalValue::Type`]): `string` and
+//! `list(string, length: 6)` are written in the expression language and
+//! evaluate to one. A type is not data, so it has no `.tmt` form to cross
+//! to, and it is not text, so it is not placed in output.
+//!
 //! =[ References and fragments ]
 //!
 //! A [`DocRef`], [`DirRef`] and [`EvalValue::Part`] point at something in the
@@ -19,7 +26,7 @@ use std::rc::Rc;
 
 use time::OffsetDateTime;
 use tomet_ast::{Block, Connect, Declaration, Element, InterpExpr, List, ListItem, Section, Value};
-use tomet_type::Version;
+use tomet_type::{Type, Version};
 
 /// A document, by vault-relative path with `/` separators. A reference: the
 /// content is fetched through the [`super::Resolver`] when it is needed.
@@ -80,9 +87,6 @@ impl Part {
 pub enum Namespace {
     /// `macro`: the macros defined by `::macro`.
     Macro,
-    /// `generate`: the functions whose result changes from call to call.
-    /// Only available when a document is being created.
-    Generate,
 }
 
 /// A lambda together with the names it closed over.
@@ -186,6 +190,9 @@ pub enum EvalValue {
     Version(Version),
     Function(Closure),
     Namespace(Namespace),
+    /// A type: `string`, `list(string, length: 6)`. It is a value of the expression language
+    /// and not of the data model, so it has no data form.
+    Type(Type),
 }
 
 impl EvalValue {
@@ -209,6 +216,7 @@ impl EvalValue {
             EvalValue::Version(_) => "version",
             EvalValue::Function(_) => "function",
             EvalValue::Namespace(_) => "namespace",
+            EvalValue::Type(_) => "type",
         }
     }
 
@@ -244,12 +252,15 @@ impl EvalValue {
             Value::Interp(interp) => EvalValue::Fragment(vec![Block::Interp(interp.clone())]),
             // A hole exists only in a pattern; kept as the block that holds it.
             Value::Hole(hole) => EvalValue::Fragment(vec![Block::Hole((**hole).clone())]),
+            // A type seat exists only in a blueprint, and is inert like a hole until a later
+            // step fills it; kept as the block that holds it.
+            Value::TypeSeat(seat) => EvalValue::Fragment(vec![Block::TypeSeat(seat.clone())]),
         }
     }
 
     /// Writes the value back as `.tmt` data. `None` for the values that only
-    /// exist while evaluating: documents, directories, functions, datetimes
-    /// and namespaces, and a section or a list (which are not elements).
+    /// exist while evaluating: documents, directories, functions, datetimes,
+    /// namespaces and types, and a section or a list (which are not elements).
     pub fn to_ast(&self) -> Option<Value> {
         Some(match self {
             EvalValue::Null => Value::Null,
@@ -287,7 +298,8 @@ impl EvalValue {
             | EvalValue::Directory(_)
             | EvalValue::DateTime(_)
             | EvalValue::Function(_)
-            | EvalValue::Namespace(_) => return None,
+            | EvalValue::Namespace(_)
+            | EvalValue::Type(_) => return None,
         })
     }
 
@@ -298,7 +310,7 @@ impl EvalValue {
     /// empty text (`""`).
     ///
     /// Returns `None` for non-scalar values (such as sequences, maps, parts,
-    /// documents, directories, fragments, functions, or namespaces).
+    /// documents, directories, fragments, functions, namespaces, or types).
     pub fn scalar_text(&self) -> Option<String> {
         Some(match self {
             EvalValue::Null => String::new(),
@@ -323,6 +335,7 @@ pub fn scalar_text(value: &EvalValue) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use tomet_type::Kind;
 
     fn doc() -> DocRef {
         DocRef("a.tmt".to_string())
@@ -368,6 +381,7 @@ mod tests {
         assert_eq!(EvalValue::Document(doc()).to_ast(), None);
         assert_eq!(EvalValue::Directory(DirRef("d".into())).to_ast(), None);
         assert_eq!(EvalValue::Namespace(Namespace::Macro).to_ast(), None);
+        assert_eq!(EvalValue::Type(Type::bare(Kind::String)).to_ast(), None);
         // One of them anywhere inside makes the whole thing not data.
         assert_eq!(
             EvalValue::Seq(vec![EvalValue::Int(1), EvalValue::Document(doc())]).to_ast(),
@@ -413,5 +427,9 @@ mod tests {
         assert_eq!(EvalValue::Seq(vec![]).scalar_text(), None);
         assert_eq!(EvalValue::Map(vec![]).scalar_text(), None);
         assert_eq!(EvalValue::Document(doc()).scalar_text(), None);
+        assert_eq!(
+            EvalValue::Type(Type::bare(Kind::String)).scalar_text(),
+            None
+        );
     }
 }

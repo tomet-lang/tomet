@@ -34,7 +34,7 @@
               [],
               []
             ],
-            "${macro.card(\"Welcome\", \"Hello from a block macro\")}"
+            "$macro.card(\"Welcome\", \"Hello from a block macro\")"
           ]
         }
       ]
@@ -50,7 +50,7 @@
               [],
               []
             ],
-            "${macro.notice(msg: \"Important\")}"
+            "$macro.notice(msg: \"Important\")"
           ]
         }
       ]
@@ -73,7 +73,7 @@
               [],
               []
             ],
-            "${macro.notice(msg: \"ここ\")}"
+            "$macro.notice(msg: \"ここ\")"
           ]
         },
         {
@@ -103,7 +103,7 @@
               [],
               []
             ],
-            "${macro.plain(\"x\")}"
+            "$macro.plain(\"x\")"
           ]
         }
       ]

@@ -492,7 +492,7 @@ fn backslash_escapes_ascii_punctuation_runs_and_not_words_or_spaces() {
 #[test]
 fn backslash_escapes_prevent_inline_and_block_triggers() {
     for src in [
-        "\\@name(x) \\${x} \\<slot>\n",
+        "\\@name(x) \\$(x) \\<slot>\n",
         "\\*not em*\n",
         "*not em\\*\n",
         "\\**not strong**\n",

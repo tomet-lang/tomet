@@ -3,7 +3,7 @@
 //!
 //! The text alone can follow a reference to a node of its own document
 //! ([`definition_for`](crate::definition_for)). A reference to another one --
-//! `@link(tmt:path#x)`, `@link(ref:Name)`, `${tmt("p")#x}` -- needs the vault
+//! `@link(tmt:path#x)`, `@link(ref:Name)`, `{$ tmt("p")#x }` -- needs the vault
 //! to say which document that is, and the target's text to say where in it.
 
 use std::collections::HashMap;

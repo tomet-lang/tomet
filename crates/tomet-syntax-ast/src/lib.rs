@@ -2,7 +2,7 @@
 //!
 //! Shared AST and `Value` data models for the Tomet toolchain ([`File`], [`Block`],
 //! [`Inline`], [`Element`], [`ElementView`], [`BodyView`], [`Declaration`], [`Interpolation`],
-//! [`Hole`], [`ListItem`], [`Value`], [`Span`]).
+//! [`Hole`], [`TypeSeat`], [`ListItem`], [`Value`], [`Span`]).
 //!
 //! =[ Design Policy ]
 //!
@@ -12,19 +12,26 @@
 //!   | It contains only struct/enum definitions and pure inherent methods for construction
 //!   | (`new`, `with_*`) and structural inspection (`as_str()`, `get()`, `is_null()`).
 //! - (A Node's Role Is Its Type)
-//!   | A `${...}` is an [`Interpolation`] (an expression and a span), not an [`Element`]:
+//!   | A `{$ ... }`, `$(...)` or `$name(...)` is an [`Interpolation`] (an expression and a span), not an [`Element`]:
 //!   | it has no name, no groups and no connects, so it is a variant of [`Block`],
 //!   | [`Inline`] and [`Value`] and no walker over elements ever meets one. Reach every
-//!   | interpolation of a file through `tomet_tree::for_each_interpolation`.
+//!   | interpolation of a file through `tomet_tree::for_each_interpolation`, and every type seat
+//!   | through `tomet_tree::for_each_type_seat`.
 //!   | A `::name(...)` is a [`Declaration`]: sits in the file preamble header ([`File::header`]),
 //!   | about the file and attached to nothing, so it has no placement and takes no connect.
 //!   | A `::name(...)` is a [`Connect`]: metadata about its owner, with no id, no connects of its own
 //!   | and no placement. A `<?matcher(...)>` is a [`Hole`] (a matcher, optional, in place of a name).
+//!   | A `<$type(...)>` is a [`TypeSeat`]: the type as the expression it is written (`uuid`,
+//!   | `list(string, length: 6)`), and nothing else; it is not a [`Hole`], which has a matcher and
+//!   | groups, and not an [`Interpolation`], which is evaluated where it stands. `tomet-ast` never
+//!   | says which type names are valid, nor what `auto` in `default: auto` is: those are
+//!   | `tomet-type`'s and the semantics'.
 //!   | `<...>` is one family in the *syntax* (the CST has one `SLOT` node, whatever the mark inside); the
 //!   | AST has no node for the family. It names nodes by role, never by spelling, and has a node only
-//!   | for what tomet interprets or what carries structure to walk: a hole is a [`Hole`], a name tag
-//!   | (`<PATH>`) is text. Merging nodes of different structure into one type with a field to tell
-//!   | them apart is what split `Element` before; a new kind of seat is judged by that rule.
+//!   | for what tomet interprets or what carries structure to walk: a hole is a [`Hole`], a type seat
+//!   | a [`TypeSeat`], a name tag (`<PATH>`) is text. Merging nodes of different structure into one
+//!   | type with a field to tell them apart is what split `Element` before; a new kind of seat is
+//!   | judged by that rule.
 //!   | A list item is a [`ListItem`] and a nameless `(marker)[content]` entry of a `{...}` group is a
 //!   | [`Bare`]: neither has a name, so neither is an [`Element`], whose name is mandatory.
 //!   | [`ListItem::as_element_view`] gives a zero-copy [`ElementView`] of the element a `-@name(...)`
@@ -89,18 +96,20 @@ pub enum Value {
     /// which of those are real. `list(a, b)` is not a sequence: write
     /// `(a, b)`.
     ///
-    /// Deliberately not the same mechanism as `${func(args)}`'s
+    /// Deliberately not the same mechanism as `$func(args)`'s
     /// `InterpExprKind::Call`: that callee can itself be a path
     /// expression and is evaluated later, while this is a literal fixed
     /// at parse time. Sharing surface syntax (`name(args)`) is coincidence,
     /// not kinship -- conflating the two would blur which one is
     /// evaluated for a reader of either.
     Call(String, Vec<Value>),
-    /// `${...}` / `$name(...)` sitting where a value goes -- evaluated later,
+    /// `{$ ... }` / `$name(...)` sitting where a value goes -- evaluated later,
     /// so `tomet-semantics` never looks inside it as data. See [`Interpolation`].
     Interp(Interpolation),
     /// A `<?matcher(...)>` hole sitting where a value goes. See [`Hole`].
     Hole(Box<Hole>),
+    /// A `<$type(...)>` seat sitting where a value goes. See [`TypeSeat`].
+    TypeSeat(TypeSeat),
     /// A real, `@`-sigiled element sitting where a value goes --
     /// `::meta(icon: @doc.icon("triangle"))`. Unlike [`Value::Call`], this
     /// is the same [`Element`] any other position produces: it has a
@@ -216,6 +225,7 @@ impl Serialize for Value {
             }
             Value::Interp(interp) => interp.serialize(serializer),
             Value::Hole(hole) => hole.serialize(serializer),
+            Value::TypeSeat(seat) => seat.serialize(serializer),
             Value::Element(el) => el.serialize(serializer),
             Value::Blocks(blocks) => {
                 use serde::ser::SerializeSeq;
@@ -229,10 +239,10 @@ impl Serialize for Value {
     }
 }
 
-// Deliberately no `Value::Call`, `Value::Interp`, `Value::Hole`,
-// `Value::Element`, or `Value::Blocks` arm below: all five are only ever produced by
-// `tomet-syntax-parser` reading source text (`name(...)` / `${...}` /
-// `@name(...)` / `key: [...]`), never by
+// Deliberately no `Value::Call`, `Value::Interp`, `Value::Hole`, `Value::TypeSeat`,
+// `Value::Element`, or `Value::Blocks` arm below: all six are only ever produced by
+// `tomet-syntax-parser` reading source text (`name(...)` / `{$ ... }` /
+// `<$type>` / `@name(...)` / `key: [...]`), never by
 // deserializing inbound data -- there is no `visit_call` and nothing in
 // serde's data model looks like an `Element` or a `Vec<Block>` either. This
 // is not an oversight.
@@ -319,7 +329,9 @@ pub enum Block {
     List(List),
     /// A `<?matcher(...)>` hole standing as a block. See [`Hole`].
     Hole(Hole),
-    /// A `${...}` that stands alone on its line, in block context. It is a
+    /// A `<$type(...)>` seat standing as a block. See [`TypeSeat`].
+    TypeSeat(TypeSeat),
+    /// A `{$ ... }` that stands alone on its line, in block context. It is a
     /// block of its own, and not a one-item paragraph, because what it
     /// evaluates to may be blocks (an include, a generated table).
     Interp(Interpolation),
@@ -333,6 +345,7 @@ impl Block {
             Block::Section(s) => s.span,
             Block::List(l) => l.span,
             Block::Hole(h) => h.span,
+            Block::TypeSeat(t) => t.span,
             Block::Interp(i) => i.span,
         }
     }
@@ -468,10 +481,12 @@ impl Paragraph {
 pub enum Inline {
     Text(Text),
     Element(Element),
-    /// `${...}` / `$name(...)` inside running text. See [`Interpolation`].
+    /// `{$ ... }` / `$name(...)` inside running text. See [`Interpolation`].
     Interp(Interpolation),
     /// A `<?matcher(...)>` hole inside running text. See [`Hole`].
     Hole(Hole),
+    /// A `<$type(...)>` seat inside running text. See [`TypeSeat`].
+    TypeSeat(TypeSeat),
     /// A source line break that is semantically whitespace. Unlike
     /// folding it into a literal `' '` (or nothing, between two
     /// East-Asian-wide characters) at parse time, this keeps the break's
@@ -492,7 +507,7 @@ pub enum Inline {
 
 impl Inline {
     /// The first character of this node's own text, if it has one -- `Text`
-    /// and `Raw` do, `Element`/`Interp`/`SoftBreak`/`LineBreak` don't.
+    /// and `Raw` do, `Element`/`Interp`/`Hole`/`TypeSeat`/`SoftBreak`/`LineBreak` don't.
     ///
     /// Used by renderers reproducing [`softbreak_join`]'s wide-character
     /// check against whatever inline follows a `SoftBreak`: only the
@@ -506,6 +521,7 @@ impl Inline {
             Inline::Element(_)
             | Inline::Interp(_)
             | Inline::Hole(_)
+            | Inline::TypeSeat(_)
             | Inline::SoftBreak(_)
             | Inline::LineBreak(_) => None,
         }
@@ -517,6 +533,7 @@ impl Inline {
             Inline::Element(e) => e.span,
             Inline::Interp(i) => i.span,
             Inline::Hole(h) => h.span,
+            Inline::TypeSeat(t) => t.span,
             Inline::SoftBreak(b) => b.span,
             Inline::LineBreak(b) => b.span,
             Inline::Raw(t) => t.span,
@@ -832,6 +849,37 @@ impl Hole {
     }
 }
 
+/// A `<$type(args)>` seat: the type of a value that is not there yet, written where the value
+/// goes. `<$date(default: auto)>`, `<$list(string, length: 6)>`, `<$uuid>`.
+///
+/// It is a box, `<...>`, whose head is the `$` mark and the type, as the expression it is: a
+/// bare name (`uuid`) or a call of one (`list(string, length: 6)`), with its arguments in `()`
+/// and nowhere else. `<$uuid>` and `<$uuid()>` are two written forms, a name and a call with no
+/// arguments, and stay two here. It takes no `{value}`, no `[content]`, no `#(id)` and no
+/// `::connect`, so it holds the type and a span and nothing else: it is not a [`Hole`], which
+/// has a matcher and groups, and not an [`Interpolation`], which is evaluated where it stands.
+///
+/// `tomet-ast` never interprets the expression: which type names are valid, what their arguments
+/// mean, and that `auto` in `default: auto` is not a variable, are for `tomet-type` and the
+/// semantics. To the AST `auto` is a name like any other.
+///
+/// A seat sits where a value, a block or running text does, so it is a variant of [`Block`],
+/// [`Inline`] and [`Value`], and not of [`Entry`]: a `{...}` group holds `key: value` entries
+/// and elements, and a seat is neither.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct TypeSeat {
+    pub expr: InterpExpr,
+    pub span: Span,
+}
+
+/// Displays the seat as source: `<$`, the type as [`InterpExpr`] writes it, and `>`. The text
+/// reads back as the same seat.
+impl fmt::Display for TypeSeat {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "<${}>", self.expr)
+    }
+}
+
 /// A `::name(...)` connect stacked after an element, a section or a list
 /// (`@x(...)::as(y)::rule(...)`): metadata about its owner, not content of the
 /// document. It takes `(args)`, `[content]` and `{value}` like an element does,
@@ -1133,8 +1181,9 @@ impl Group {
     }
 }
 
-/// A `${...}` (or `$name(...)`) interpolation: an expression to be evaluated
-/// where it stands.
+/// An interpolation: an expression to be evaluated where it stands. It is written in one of three
+/// spellings, told apart by what the expression is ([`InterpSpelling`]): `{$ expr }` for any
+/// expression, `$(ref)` for one reference, `$name(args)` for one call.
 ///
 /// It is not an [`Element`]: it has no name, no `(args)` / `[content]` and no
 /// `#(id)`, and it never takes a `::connect`. It holds an expression and the
@@ -1146,7 +1195,29 @@ pub struct Interpolation {
     pub span: Span,
 }
 
-/// One node of a `${...}` interpolation's parsed expression tree.
+/// Displays the interpolation in its canonical spelling, the one [`InterpExpr::spelling`] says: the
+/// source text that reads back as the same expression. The three forms are one AST, so a document
+/// that spelled `{$ x }` where `$(x)` is canonical is printed as `$(x)`.
+impl fmt::Display for Interpolation {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.expr.write_interpolation(f)
+    }
+}
+
+/// The three ways an interpolation is written, each for one kind of expression. The spelling is not
+/// kept in the AST: it follows from the expression, which is what makes the printed form canonical.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum InterpSpelling {
+    /// `$name(args)`: one call whose callee is a plain name (`include`, `macro.gh`), or an `addr`.
+    Call,
+    /// `$(ref)`: one reference -- a name, `#id`, `doc#id`, or a `.member` / `::connect` chain on
+    /// those -- or a place number, `$(1)`.
+    Reference,
+    /// `{$ expr }`: anything else, which is where operators, lambdas, literals and groups live.
+    Gate,
+}
+
+/// One node of an interpolation's parsed expression tree.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct InterpExpr {
     pub kind: InterpExprKind,
@@ -1180,8 +1251,7 @@ pub enum InterpExprKind {
         name: String,
         value: Box<InterpExpr>,
     },
-    /// `lhs op rhs`. Comparison and `&&` / `||` only; see
-    /// `tmtroot/spec/expressions/operators.expr.tmt`.
+    /// `lhs op rhs`: `+`, `-`, a comparison, `&&` or `||`; see [`BinaryOp`] for the precedence.
     Binary {
         op: BinaryOp,
         lhs: Box<InterpExpr>,
@@ -1206,6 +1276,9 @@ pub enum InterpExprKind {
     /// `( expr )`. Kept as a node, not dropped, so printing a parsed
     /// expression gives back the parentheses the author wrote.
     Group(Box<InterpExpr>),
+    /// `()` (empty), `(a,)` (one item), or `(a, b, ...)` (two or more items). Kept as a sequence
+    /// expression. `(a)` with no comma is [`InterpExprKind::Group`].
+    Seq(Vec<InterpExpr>),
     /// `x => body` or `(a, b) => body`. The body is one expression.
     Lambda {
         params: Vec<String>,
@@ -1215,13 +1288,16 @@ pub enum InterpExprKind {
 
 /// A binary operator in an expression.
 ///
-/// There is no arithmetic and no `!`: both are deliberately functions
-/// (`add`, `not`), because `-` already means a list marker and part of an
-/// identifier, and the expression language keeps symbols to the minimum.
-/// `&&` and `||` are the only operators that may skip their right-hand
-/// side, which is why they are symbols and not functions.
+/// `+` and `-` are written with white space on both sides: `-` is also part of a name
+/// (`daily-note`), so `a-b` is one name and `a - b` is a subtraction. The other arithmetic is
+/// functions (`mul`, `div`, `mod`), and there is no `!` (`not`). `&&` and `||` are the only
+/// operators that may skip their right-hand side, which is why they are symbols and not functions.
+///
+/// Precedence, tightest first: the postfix forms, additive, comparison, `&&`, `||`, then `=>`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum BinaryOp {
+    Add,
+    Sub,
     Eq,
     Ne,
     Lt,
@@ -1234,7 +1310,9 @@ pub enum BinaryOp {
 
 impl BinaryOp {
     /// Every operator, so that a reader can look for the one spelled at a position.
-    pub const ALL: [BinaryOp; 8] = [
+    pub const ALL: [BinaryOp; 10] = [
+        BinaryOp::Add,
+        BinaryOp::Sub,
         BinaryOp::Eq,
         BinaryOp::Ne,
         BinaryOp::Lt,
@@ -1249,6 +1327,8 @@ impl BinaryOp {
     /// operator at a position by these symbols, longest first (`<=` over `<`).
     pub fn symbol(self) -> &'static str {
         match self {
+            BinaryOp::Add => "+",
+            BinaryOp::Sub => "-",
             BinaryOp::Eq => "==",
             BinaryOp::Ne => "!=",
             BinaryOp::Lt => "<",
@@ -1260,15 +1340,77 @@ impl BinaryOp {
         }
     }
 
+    /// Whether this is `+` or `-`, which chain to the left and need white space around them.
+    pub fn is_additive(self) -> bool {
+        matches!(self, BinaryOp::Add | BinaryOp::Sub)
+    }
+
     /// Whether this is one of the six comparisons, which do not chain.
     pub fn is_comparison(self) -> bool {
-        !matches!(self, BinaryOp::And | BinaryOp::Or)
+        matches!(
+            self,
+            BinaryOp::Eq | BinaryOp::Ne | BinaryOp::Lt | BinaryOp::Le | BinaryOp::Gt | BinaryOp::Ge
+        )
     }
 }
 
-/// The source spelling of an interpolation expression -- the interior of
-/// `${...}`, without the surrounding `${` and `}`. The caller adds those,
-/// because `$name(args)` writes the same expression with no braces at all.
+impl InterpExpr {
+    /// The interpolation of this expression as source, in the spelling [`InterpExpr::spelling`]
+    /// says. For when there is only the expression and no [`Interpolation`] around it.
+    pub fn interpolation_source(&self) -> String {
+        struct Source<'a>(&'a InterpExpr);
+        impl fmt::Display for Source<'_> {
+            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                self.0.write_interpolation(f)
+            }
+        }
+        Source(self).to_string()
+    }
+
+    fn write_interpolation(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self.spelling() {
+            InterpSpelling::Call => write!(f, "${self}"),
+            InterpSpelling::Reference => write!(f, "$({self})"),
+            InterpSpelling::Gate => write!(f, "{{$ {self} }}"),
+        }
+    }
+
+    /// How an interpolation of this expression is written; see [`InterpSpelling`].
+    pub fn spelling(&self) -> InterpSpelling {
+        match &self.kind {
+            InterpExprKind::Addr { .. } => InterpSpelling::Call,
+            InterpExprKind::Call { callee, .. } if callee.is_name_chain() => InterpSpelling::Call,
+            InterpExprKind::Literal(Literal::Int(n)) if *n >= 0 => InterpSpelling::Reference,
+            _ if self.is_reference() => InterpSpelling::Reference,
+            _ => InterpSpelling::Gate,
+        }
+    }
+
+    /// A name, or `.member`s of one: what `$name(...)` can take as its callee.
+    fn is_name_chain(&self) -> bool {
+        match &self.kind {
+            InterpExprKind::Identifier(_) => true,
+            InterpExprKind::Member { object, .. } => object.is_name_chain(),
+            _ => false,
+        }
+    }
+
+    /// A name, `#id`, or a `.member`, `::connect` or `#id` on one: what `$(...)` can hold.
+    fn is_reference(&self) -> bool {
+        match &self.kind {
+            InterpExprKind::Identifier(_) | InterpExprKind::Id(_) => true,
+            InterpExprKind::Member { object, .. } | InterpExprKind::Connect { object, .. } => {
+                object.is_reference()
+            }
+            InterpExprKind::DocId { doc, .. } => doc.is_reference(),
+            _ => false,
+        }
+    }
+}
+
+/// The source spelling of an interpolation expression, without the `$`-form around it. To print
+/// an interpolation, display the [`Interpolation`], which adds the form its expression calls for
+/// (`$name(args)` writes a call with no gate at all).
 ///
 /// This belongs to the node rather than to any consumer. It was written
 /// five times -- once in the printer and once in each of the four convert
@@ -1317,6 +1459,20 @@ impl fmt::Display for InterpExpr {
                 }
             }
             InterpExprKind::Group(inner) => write!(f, "({inner})"),
+            InterpExprKind::Seq(items) => match items.as_slice() {
+                [] => f.write_str("()"),
+                [only] => write!(f, "({only},)"),
+                items => {
+                    f.write_str("(")?;
+                    for (i, item) in items.iter().enumerate() {
+                        if i > 0 {
+                            f.write_str(", ")?;
+                        }
+                        write!(f, "{item}")?;
+                    }
+                    f.write_str(")")
+                }
+            },
             InterpExprKind::Lambda { params, body } => {
                 match params.as_slice() {
                     [only] => f.write_str(only)?,
@@ -1526,5 +1682,58 @@ mod tests {
                 id: None,
             }
         );
+    }
+
+    fn name_expr(name: &str) -> InterpExpr {
+        InterpExpr {
+            kind: InterpExprKind::Identifier(name.to_string()),
+            span: Span::dummy(),
+        }
+    }
+
+    fn int_expr(n: i64) -> InterpExpr {
+        InterpExpr {
+            kind: InterpExprKind::Literal(Literal::Int(n)),
+            span: Span::dummy(),
+        }
+    }
+
+    fn call_expr(name: &str, args: Vec<InterpExpr>) -> InterpExpr {
+        InterpExpr {
+            kind: InterpExprKind::Call {
+                callee: Box::new(name_expr(name)),
+                args,
+            },
+            span: Span::dummy(),
+        }
+    }
+
+    fn seat(expr: InterpExpr) -> TypeSeat {
+        TypeSeat {
+            expr,
+            span: Span::dummy(),
+        }
+    }
+
+    #[test]
+    fn a_type_seat_displays_as_the_source_it_reads_back_from() {
+        // A bare name and a call with no arguments are two written forms, and stay two.
+        assert_eq!(seat(name_expr("uuid")).to_string(), "<$uuid>");
+        assert_eq!(seat(call_expr("uuid", vec![])).to_string(), "<$uuid()>");
+
+        let named = |name: &str, value: InterpExpr| InterpExpr {
+            kind: InterpExprKind::NamedArg {
+                name: name.to_string(),
+                value: Box::new(value),
+            },
+            span: Span::dummy(),
+        };
+        let list = call_expr(
+            "list",
+            vec![name_expr("string"), named("length", int_expr(6))],
+        );
+        assert_eq!(seat(list).to_string(), "<$list(string, length: 6)>");
+        let date = call_expr("date", vec![named("default", name_expr("auto"))]);
+        assert_eq!(seat(date).to_string(), "<$date(default: auto)>");
     }
 }

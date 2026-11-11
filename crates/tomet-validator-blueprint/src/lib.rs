@@ -305,7 +305,7 @@ mod tests {
     #[test]
     fn validates_matching_document_successfully() {
         let blueprint = parse(
-            "::blueprint(daily-note)\n::id(${uuid()})\n::meta(\n  date: ${date()}\n)\n\n=[ Plan ] {id: plan}\n\n=[ Review ] {id: review}\n",
+            "::blueprint(daily-note)\n::id($uuid())\n::meta(\n  date: $date()\n)\n\n=[ Plan ] {id: plan}\n\n=[ Review ] {id: review}\n",
         );
         let doc = parse(
             "::kind(daily-note)\n::id(doc-123)\n::meta(\n  date: 2026-09-01\n)\n\n=[ Plan ] {id: plan}\n- ( ) My task\n\n=[ Review ] {id: review}\nGood day.\n",
@@ -317,7 +317,7 @@ mod tests {
 
     #[test]
     fn a_blueprint_with_an_id_requires_the_document_to_declare_one() {
-        let blueprint = parse("::blueprint(daily-note)\n::id(${uuid()})\n\n=[ Plan ]#(plan)\n");
+        let blueprint = parse("::blueprint(daily-note)\n::id($uuid())\n\n=[ Plan ]#(plan)\n");
         let without = parse("::kind(daily-note)\n\n=[ Plan ]#(plan)\n");
         let errors = validate_against_blueprint(&without, &blueprint);
         assert!(
@@ -335,7 +335,7 @@ mod tests {
     #[test]
     fn reports_missing_meta_key_and_missing_section() {
         let blueprint = parse(
-            "::blueprint(daily-note)\n::id(${uuid()})\n::meta(\n  date: ${date()}\n)\n\n=[ Plan ]#(plan)\n\n=[ Review ]#(review)\n",
+            "::blueprint(daily-note)\n::id($uuid())\n::meta(\n  date: $date()\n)\n\n=[ Plan ]#(plan)\n\n=[ Review ]#(review)\n",
         );
         let doc = parse("::kind(daily-note)\n::id(doc-123)\n\n=[ Plan ]#(plan)\n- ( ) My task\n");
 

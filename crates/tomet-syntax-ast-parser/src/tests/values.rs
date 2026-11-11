@@ -352,7 +352,7 @@ fn a_number_reading_would_change_keeps_its_text_in_an_argument() {
 
 #[test]
 fn parse_value_accepts_interpolation_with_span() {
-    let src = "key: ${macro.vocab(\"writ\", \"1.0.0\")}\n";
+    let src = "key: $macro.vocab(\"writ\", \"1.0.0\")\n";
     let file = parse_value(src).unwrap();
     let Value::Map(entries) = file else {
         panic!("expected a map, got {:?}", file);
@@ -363,7 +363,7 @@ fn parse_value_accepts_interpolation_with_span() {
         panic!("expected an interpolation, got {:?}", entries[0].1);
     };
     assert_eq!(interp.span.start, 5);
-    assert_eq!(interp.span.end, 36);
+    assert_eq!(interp.span.end, 34);
 
     let src2 = "key: $f(1, 2)\n";
     let file2 = parse_value(src2).unwrap();

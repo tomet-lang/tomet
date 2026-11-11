@@ -25,9 +25,9 @@ fn test_cst_lossless_roundtrip_all_syntaxes() {
         "::config{ format: json }\n",
         "- item 1\n- item 2\n-. ordered 1\n\n```rust\nfn main() {}\n```\n",
         "// Comment line\n@card(id: 123){ priority: high }[ Note ]\n",
-        "=[ A ]=\n== B ==\n=\n---\n---[ x ]---\n\ntext ${a.b} $f(x) @l[t](ref:y)::rule(a)\n",
+        "=[ A ]=\n== B ==\n=\n---\n---[ x ]---\n\ntext $(a.b) $f(x) @l[t](ref:y)::rule(a)\n",
         // Unterminated everything: still lossless.
-        "@a(b: {c: [1, 2\n=[ open\n${ x\n@f[ never closed",
+        "@a(b: {c: [1, 2\n=[ open\n{$ x\n@f[ never closed",
         "",
         "\n\n  \n",
     ];
@@ -125,26 +125,70 @@ fn thematic_breaks() {
 
 #[test]
 fn inline_forms_are_structured() {
-    let src = "See @link[label](ref:x) and @ftn(1) and ${a.b} and $sum(1, 2).\n";
+    let src = "See @link[label](ref:x) and @ftn(1) and $(a.b) and $sum(1, 2) and {$ a + b }.\n";
     let root = parse_cst(src);
     let para = find(&root, K::PARAGRAPH).unwrap();
     let forms: Vec<_> = para
         .children()
         .filter(|n| n.kind() == K::INLINE_FORM)
         .collect();
-    assert_eq!(forms.len(), 4);
+    assert_eq!(forms.len(), 5);
 
     assert_eq!(child_kinds(&forms[0]), [K::SIGIL, K::CONTENT, K::ARGS]);
     assert_eq!(forms[0].text().to_string(), "@link[label](ref:x)");
     assert_eq!(child_kinds(&forms[1]), [K::SIGIL, K::ARGS]);
     assert_eq!(forms[1].text().to_string(), "@ftn(1)");
-    assert_eq!(child_kinds(&forms[2]), [K::SIGIL, K::INTERP_EXPR]);
-    assert_eq!(forms[2].text().to_string(), "${a.b}");
+    // `$(ref)` and `{$ expr }` are one `INTERP_EXPR`, the whole form.
+    assert_eq!(child_kinds(&forms[2]), [K::INTERP_EXPR]);
+    assert_eq!(forms[2].text().to_string(), "$(a.b)");
     assert_eq!(child_kinds(&forms[3]), [K::SIGIL, K::ARGS]);
+    assert_eq!(child_kinds(&forms[4]), [K::INTERP_EXPR]);
+    assert_eq!(forms[4].text().to_string(), "{$ a + b }");
 
     // `ref:x` is a structured entry.
     let entry = find(&forms[0], K::MAP_ENTRY).unwrap();
     assert_eq!(entry.text().to_string(), "ref:x");
+}
+
+#[test]
+fn an_expression_closes_at_the_bracket_that_opened_it_and_counts_only_that_pair() {
+    // In `{$ ... }` only braces count: an unclosed `(` does not swallow the `}`.
+    let root = parse_cst("a {$ (a } b\n");
+    let form = find(&root, K::INTERP_EXPR).unwrap();
+    assert_eq!(form.text().to_string(), "{$ (a }");
+    // A nested brace pair is counted, and a `)` closes nothing.
+    let root = parse_cst("a {$ f({x}) } b\n");
+    let form = find(&root, K::INTERP_EXPR).unwrap();
+    assert_eq!(form.text().to_string(), "{$ f({x}) }");
+
+    // In `$( ... )` only parentheses count: a stray `}` closes nothing.
+    let root = parse_cst("a $(x } y) b\n");
+    let form = find(&root, K::INTERP_EXPR).unwrap();
+    assert_eq!(form.text().to_string(), "$(x } y)");
+    // A nested pair is counted.
+    let root = parse_cst("a $(f(x)) b\n");
+    let form = find(&root, K::INTERP_EXPR).unwrap();
+    assert_eq!(form.text().to_string(), "$(f(x))");
+
+    // A string closes nothing, whichever bracket it holds.
+    for (src, form_text) in [
+        ("a {$ \"}\" } b\n", "{$ \"}\" }"),
+        ("a $(\")\") b\n", "$(\")\")"),
+        ("a $(\"(\") b\n", "$(\"(\")"),
+    ] {
+        let root = parse_cst(src);
+        let form = find(&root, K::INTERP_EXPR).unwrap();
+        assert_eq!(form.text().to_string(), form_text, "{src:?}");
+    }
+
+    // Two forms on a line stay two.
+    let root = parse_cst("{$ (a } and {$ b }\n");
+    let texts: Vec<String> = root
+        .descendants()
+        .filter(|n| n.kind() == K::INTERP_EXPR)
+        .map(|n| n.text().to_string())
+        .collect();
+    assert_eq!(texts, ["{$ (a }", "{$ b }"]);
 }
 
 #[test]
@@ -154,6 +198,7 @@ fn plain_at_and_dollar_are_text() {
         "a@b.com\n",
         "x ^ y\n",
         "cost $5\n",
+        "braces {x} and { $ x } and $ (x)\n",
         "@name\n\n",
     ] {
         let root = parse_cst(src);

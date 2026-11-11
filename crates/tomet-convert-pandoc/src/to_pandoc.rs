@@ -83,7 +83,9 @@ fn meta_value(v: &Value) -> MetaValue {
         Value::Element(_) => MetaValue::MetaString(String::new()),
         // Same treatment again: an interpolation is not known until it is
         // evaluated, and Pandoc has no place to keep it unevaluated.
-        Value::Interp(_) | Value::Hole(_) => MetaValue::MetaString(String::new()),
+        Value::Interp(_) | Value::Hole(_) | Value::TypeSeat(_) => {
+            MetaValue::MetaString(String::new())
+        }
         // Same treatment as `Element`/`Call`: no metadata concept for
         // block content either.
         Value::Blocks(_) => MetaValue::MetaString(String::new()),
@@ -101,6 +103,7 @@ fn block_to_pandoc(block: &TmBlock) -> Vec<Block> {
         TmBlock::Element(el) => element_to_blocks(el.as_view()),
         TmBlock::Interp(interp) => vec![Block::Para(vec![interp_inline(interp)])],
         TmBlock::Hole(hole) => vec![Block::Para(vec![hole_inline(hole)])],
+        TmBlock::TypeSeat(seat) => vec![Block::Para(vec![type_seat_inline(seat)])],
         TmBlock::Section(sec) => {
             let mut blocks = if !sec.title.is_empty() {
                 vec![Block::Header(
@@ -317,6 +320,7 @@ fn blocks_to_inlines_lossy(blocks: &[TmBlock]) -> Vec<Inline> {
             TmBlock::Element(el) => out.extend(element_to_inlines(el.as_view())),
             TmBlock::Interp(interp) => out.push(interp_inline(interp)),
             TmBlock::Hole(hole) => out.push(hole_inline(hole)),
+            TmBlock::TypeSeat(seat) => out.push(type_seat_inline(seat)),
             TmBlock::Section(sec) => out.extend(inlines_to_pandoc(&sec.title)),
             TmBlock::List(list) => {
                 for item in &list.items {
@@ -359,6 +363,7 @@ fn content_to_blocks(inlines: &[TmInline]) -> Vec<Block> {
             TmInline::SoftBreak(_) => run.push(Inline::SoftBreak),
             TmInline::LineBreak(_) => run.push(Inline::LineBreak),
             TmInline::Hole(hole) => run.push(hole_inline(hole)),
+            TmInline::TypeSeat(seat) => run.push(type_seat_inline(seat)),
         }
     }
     flush_run(&mut run, &mut blocks);
@@ -400,6 +405,7 @@ fn element_content_to_blocks(blocks: &[TmBlock]) -> Vec<Block> {
             TmBlock::Element(el) => out.extend(element_to_blocks(el.as_view())),
             TmBlock::Interp(interp) => out.push(Block::Para(vec![interp_inline(interp)])),
             TmBlock::Hole(hole) => out.push(Block::Para(vec![hole_inline(hole)])),
+            TmBlock::TypeSeat(seat) => out.push(Block::Para(vec![type_seat_inline(seat)])),
             // No direct Pandoc equivalent for a nested section; a header
             // plus its own blocks is the closest shape.
             TmBlock::Section(sec) => {
@@ -438,6 +444,7 @@ fn blocks_to_pandoc_inlines(blocks: &[TmBlock]) -> Vec<Inline> {
             TmBlock::Element(el) => out.extend(element_to_inlines(el.as_view())),
             TmBlock::Interp(interp) => out.push(interp_inline(interp)),
             TmBlock::Hole(hole) => out.push(hole_inline(hole)),
+            TmBlock::TypeSeat(seat) => out.push(type_seat_inline(seat)),
             TmBlock::Section(sec) => out.extend(inlines_to_pandoc(&sec.title)),
             TmBlock::List(list) => {
                 for item in &list.items {
@@ -461,6 +468,7 @@ fn inlines_to_pandoc(inlines: &[TmInline]) -> Vec<Inline> {
             TmInline::Element(el) => out.extend(element_to_inlines(el.as_view())),
             TmInline::Interp(interp) => out.push(interp_inline(interp)),
             TmInline::Hole(hole) => out.push(hole_inline(hole)),
+            TmInline::TypeSeat(seat) => out.push(type_seat_inline(seat)),
         }
     }
     out
@@ -597,6 +605,7 @@ fn blocks_plain_text(blocks: &[TmBlock]) -> String {
             TmBlock::Element(el) => out.push_str(&blocks_plain_text(content_of(el.as_view()))),
             TmBlock::Interp(_) => {}
             TmBlock::Hole(hole) => out.push_str(&tomet_printer::hole_to_tm(hole)),
+            TmBlock::TypeSeat(seat) => out.push_str(&seat.to_string()),
             TmBlock::Section(sec) => out.push_str(&plain_text(&sec.title)),
             TmBlock::List(list) => {
                 for item in &list.items {
@@ -624,12 +633,13 @@ fn plain_text(inlines: &[TmInline]) -> String {
             TmInline::Element(el) => out.push_str(&blocks_plain_text(content_of(el.as_view()))),
             TmInline::Interp(_) => {}
             TmInline::Hole(hole) => out.push_str(&tomet_printer::hole_to_tm(hole)),
+            TmInline::TypeSeat(seat) => out.push_str(&seat.to_string()),
         }
     }
     out
 }
 
-/// `${...}` is emitted as its own source text rather than evaluated:
+/// `{$ ... }` is emitted as its own source text rather than evaluated:
 /// resolving it needs the document and its config, and the Typst writer
 /// already sets this precedent.
 /// A hole nobody filled, shown as it was written, as an interpolation is.
@@ -637,8 +647,13 @@ fn hole_inline(hole: &tomet_ast::Hole) -> Inline {
     Inline::Code(Attr::empty(), tomet_printer::hole_to_tm(hole))
 }
 
+/// A type seat shown as it was written, as a hole is.
+fn type_seat_inline(seat: &tomet_ast::TypeSeat) -> Inline {
+    Inline::Code(Attr::empty(), seat.to_string())
+}
+
 fn interp_inline(interp: &Interpolation) -> Inline {
-    Inline::Code(Attr::empty(), format!("${{{}}}", interp.expr))
+    Inline::Code(Attr::empty(), interp.to_string())
 }
 
 // ---- lists ---------------------------------------------------------
@@ -1171,6 +1186,23 @@ mod tests {
     #[test]
     fn an_empty_table_produces_no_block() {
         assert!(convert("@table()[]{}\n").is_empty());
+    }
+
+    #[test]
+    fn a_type_seat_is_shown_as_written_in_code() {
+        assert_eq!(
+            convert("<$uuid>\n\nid <$date(default: auto)> end\n"),
+            vec![
+                Block::Para(vec![Inline::Code(Attr::empty(), "<$uuid>".into())]),
+                Block::Para(vec![
+                    Inline::Str("id".into()),
+                    Inline::Space,
+                    Inline::Code(Attr::empty(), "<$date(default: auto)>".into()),
+                    Inline::Space,
+                    Inline::Str("end".into()),
+                ]),
+            ]
+        );
     }
 
     #[test]

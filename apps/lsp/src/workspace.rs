@@ -103,7 +103,7 @@ impl Workspace {
     /// Where the reference at `pos` in the document open at `path` is defined.
     ///
     /// A reference to a node of the same document, and one into another --
-    /// `@link(tmt:path#x)`, `@link(ref:Name)`, `${tmt("p")#x}`, a bare
+    /// `@link(tmt:path#x)`, `@link(ref:Name)`, `{$ tmt("p")#x }`, a bare
     /// `tmt("p")` (the document's start). The target is read as the editor has
     /// it if it is open. Nothing open at `path`, or nothing to follow, gives
     /// nothing.
@@ -351,11 +351,11 @@ mod tests {
         let root = vault(
             "include",
             "::kind(config)\n",
-            &[("b.tmt", "Mine: ${nope}.\n")],
+            &[("b.tmt", "Mine: $(nope).\n")],
         );
         let (a, b) = (root.join("a.tmt"), root.join("b.tmt"));
         let mut ws = Workspace::new();
-        ws.set_buffer(a.clone(), "${include(tmt(\"b.tmt\"))}\n".to_string());
+        ws.set_buffer(a.clone(), "$include(tmt(\"b.tmt\"))\n".to_string());
 
         let diags = ws.findings_diagnostics(&a);
         assert_eq!(diags.len(), 1, "{:?}", messages(&diags));
@@ -375,11 +375,11 @@ mod tests {
     /// A buffer opened before its vault was built is told to it when it is.
     #[test]
     fn buffers_are_told_to_a_vault_built_after_them() {
-        let root = vault("late", "::kind(config)\n", &[("b.tmt", "Mine: ${nope}.\n")]);
+        let root = vault("late", "::kind(config)\n", &[("b.tmt", "Mine: $(nope).\n")]);
         let (a, b) = (root.join("a.tmt"), root.join("b.tmt"));
         let mut ws = Workspace::new();
         ws.set_buffer(b.clone(), "Mine: fine.\n".to_string());
-        ws.set_buffer(a.clone(), "${include(tmt(\"b.tmt\"))}\n".to_string());
+        ws.set_buffer(a.clone(), "$include(tmt(\"b.tmt\"))\n".to_string());
         ws.files_changed();
         assert!(ws.findings_diagnostics(&a).is_empty());
         let _ = fs::remove_dir_all(&root);
@@ -473,14 +473,14 @@ mod tests {
     fn hover_evaluates_an_expression_in_the_vault() {
         let root = vault(
             "hover",
-            "::kind(config)\n::macro(gh: \"https://github.com/o/r/issues/${1}\")\n",
+            "::kind(config)\n::macro(gh: \"https://github.com/o/r/issues/$(1)\")\n",
             &[("b.tmt", "::meta(title: Saved)\n")],
         );
         let (a, b) = (root.join("a.tmt"), root.join("b.tmt"));
         let mut ws = Workspace::new();
         ws.set_buffer(
             a.clone(),
-            "${tmt(\"b.tmt\")::meta.title}\n\n${macro.gh(7)}\n".to_string(),
+            "{$ tmt(\"b.tmt\")::meta.title }\n\n$macro.gh(7)\n".to_string(),
         );
         let at = |line| lsp_types::Position::new(line, 4);
 
@@ -495,14 +495,13 @@ mod tests {
         let _ = fs::remove_dir_all(&root);
     }
 
-    /// What exists only when a document is created is not there when it is
-    /// rendered, so it is not on hover either.
+    /// An expression that has no value is an error on hover, as it is when rendered.
     #[test]
-    fn hover_does_not_know_what_rendering_does_not() {
-        let root = vault("hover_create", "::kind(config)\n", &[]);
+    fn hover_on_an_expression_with_no_value_is_an_error() {
+        let root = vault("hover_unknown", "::kind(config)\n", &[]);
         let a = root.join("a.tmt");
         let mut ws = Workspace::new();
-        ws.set_buffer(a.clone(), "${generate.uuid()}\n".to_string());
+        ws.set_buffer(a.clone(), "$(nope)\n".to_string());
         let text = hover_text(ws.hover(&a, lsp_types::Position::new(0, 4)));
         assert!(text.contains("Error"), "{text}");
         let _ = fs::remove_dir_all(&root);
@@ -568,7 +567,7 @@ mod tests {
     #[test]
     fn a_reference_is_offered_the_ids_of_the_document() {
         let root = vault("ids", "::kind(config)\n", &[]);
-        for typing in ["${#", "@link(#"] {
+        for typing in ["{$ #", "@link(#"] {
             let items = completions_at_the_end(
                 &root,
                 &format!("=[ A ]#(alpha)\n\n=[ B ]#(beta)\n\n{typing}"),
@@ -595,7 +594,7 @@ mod tests {
             "::kind(config)\n",
             &[("b.tmt", "=[ One ]#(one)\n\n=[ Two ]#(two)\n")],
         );
-        for typing in ["${tmt(\"b.tmt\")#", "@link(tmt:b.tmt#"] {
+        for typing in ["{$ tmt(\"b.tmt\")#", "@link(tmt:b.tmt#"] {
             let items = completions_at_the_end(&root, &format!("=[ Mine ]#(mine)\n\n{typing}"));
             assert_eq!(labels(&items), ["one", "two"], "{typing}");
         }
@@ -609,7 +608,7 @@ mod tests {
         let root = vault("paths", "::kind(config)\n", &[("b.tmt", "text\n")]);
         fs::create_dir_all(root.join("sub")).unwrap();
         fs::write(root.join("sub/c.tmt"), "text\n").unwrap();
-        for typing in ["${tmt(\"", "@link(tmt:"] {
+        for typing in ["$tmt(\"", "@link(tmt:"] {
             let items = completions_at_the_end(&root, typing);
             let names = labels(&items);
             assert!(names.contains(&"b.tmt"), "{typing}: {names:?}");
@@ -656,7 +655,7 @@ mod tests {
         let mut ws = Workspace::new();
         ws.set_buffer(
             root.join("a.tmt"),
-            "@link(tmt:b.tmt#two)\n\n${tmt(\"b.tmt\")#one}\n".to_string(),
+            "@link(tmt:b.tmt#two)\n\n{$ tmt(\"b.tmt\")#one }\n".to_string(),
         );
 
         assert_eq!(jump(&mut ws, &root, 0, 14), Some(("b.tmt".into(), 4)));
@@ -678,7 +677,7 @@ mod tests {
         let mut ws = Workspace::new();
         ws.set_buffer(
             root.join("a.tmt"),
-            "@link(tmt:b.tmt)\n\n${include(tmt(\"b.tmt\"))}\n".to_string(),
+            "@link(tmt:b.tmt)\n\n$include(tmt(\"b.tmt\"))\n".to_string(),
         );
         assert_eq!(jump(&mut ws, &root, 0, 10), Some(("b.tmt".into(), 0)));
         assert_eq!(jump(&mut ws, &root, 2, 14), Some(("b.tmt".into(), 0)));
@@ -736,7 +735,7 @@ mod tests {
         let mut ws = Workspace::new();
         ws.set_buffer(
             root.join("a.tmt"),
-            "@link(tmt:missing.tmt#x)\n\n@link(tmt:b.tmt#nope)\n\n${#nope}\n".to_string(),
+            "@link(tmt:missing.tmt#x)\n\n@link(tmt:b.tmt#nope)\n\n$(#nope)\n".to_string(),
         );
         assert_eq!(jump(&mut ws, &root, 0, 14), None, "no such document");
         assert_eq!(jump(&mut ws, &root, 2, 14), None, "no such id in it");
@@ -751,7 +750,7 @@ mod tests {
         let mut ws = Workspace::new();
         ws.set_buffer(
             root.join("a.tmt"),
-            "=[ Intro ]#(intro)\n\n${#intro}\n".to_string(),
+            "=[ Intro ]#(intro)\n\n$(#intro)\n".to_string(),
         );
         assert_eq!(jump(&mut ws, &root, 2, 3), Some(("a.tmt".into(), 0)));
         let _ = fs::remove_dir_all(&root);
@@ -776,5 +775,47 @@ mod tests {
         // Due once, then nothing waits.
         assert!(!d.due(start + Duration::from_millis(600)));
         assert_eq!(d.wait(start + Duration::from_millis(600)), None);
+    }
+
+    /// A type seat is the blueprint's: in another document the editor marks the seat itself.
+    #[test]
+    fn a_type_seat_outside_a_blueprint_is_marked_at_the_seat() {
+        let root = vault("seat-outside", "::kind(config)\n", &[]);
+        let path = root.join("a.tmt");
+        let mut ws = Workspace::new();
+        ws.set_buffer(
+            path.clone(),
+            "::kind(note)\n\nWritten on <$date(default: auto)>.\n".to_string(),
+        );
+        let diags = ws.findings_diagnostics(&path);
+        assert_eq!(diags.len(), 1, "{:?}", messages(&diags));
+        assert_eq!(diags[0].severity, Some(DiagnosticSeverity::ERROR));
+        assert!(
+            diags[0]
+                .message
+                .contains("type seats belong in a blueprint")
+        );
+        assert_eq!(diags[0].range.start, lsp_types::Position::new(2, 11));
+        assert_eq!(diags[0].range.end, lsp_types::Position::new(2, 33));
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn a_type_seat_in_a_blueprint_is_marked_only_when_it_is_not_a_type() {
+        let root = vault("seat-blueprint", "::kind(config)\n", &[]);
+        let path = root.join("note.blueprint.tmt");
+        let blueprint =
+            |seat: &str| format!("::kind(blueprint)\n::blueprint(note)\n::meta(x: {seat})\n");
+        let mut ws = Workspace::new();
+        ws.set_buffer(path.clone(), blueprint("<$date(default: auto)>"));
+        assert!(ws.findings_diagnostics(&path).is_empty());
+
+        ws.set_buffer(path.clone(), blueprint("<$person>"));
+        let diags = ws.findings_diagnostics(&path);
+        assert_eq!(diags.len(), 1, "{:?}", messages(&diags));
+        assert!(diags[0].message.contains("`person` is not a type"));
+        assert_eq!(diags[0].range.start, lsp_types::Position::new(2, 10));
+        assert_eq!(diags[0].range.end, lsp_types::Position::new(2, 19));
+        let _ = fs::remove_dir_all(&root);
     }
 }

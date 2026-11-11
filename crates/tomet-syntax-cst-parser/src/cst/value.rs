@@ -168,6 +168,10 @@ impl<'a, 't> CstParser<'a, 't> {
                 break;
             }
             match k {
+                // `{$ expr }` is an expression; any other `{` opens a map.
+                K::L_BRACE if self.gate_at(self.pos) => {
+                    self.try_parse_inline_form();
+                }
                 K::L_BRACE => {
                     self.builder.start_node(K::MAP_LITERAL.into());
                     self.bump();

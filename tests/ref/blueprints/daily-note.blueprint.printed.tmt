@@ -2,7 +2,7 @@
 
 ::blueprint(daily-note)
 
-::meta(uuid: $generate.uuid())
+::meta(uuid: <$uuid(default: auto)>)
 
 =[TODO] #(todo)
 

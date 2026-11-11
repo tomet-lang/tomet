@@ -7,7 +7,7 @@
 
 use tomet_ast::{Block, Inline, Value};
 use tomet_semantics_core::parse_type_spec;
-use tomet_type::Type;
+use tomet_type::{Kind, Type};
 
 use crate::declaration::Declaration;
 
@@ -41,7 +41,7 @@ impl VarDecl {
             );
         };
         let mut decl = VarDecl {
-            ty: Type::String,
+            ty: Type::bare(Kind::String),
             default: None,
             about: None,
         };
@@ -126,11 +126,11 @@ mod tests {
             "::var(\n  title: {\n    type: string\n    about: | 題。\n  }\n  n: { type: int, default: 3 }\n)\n",
         );
         let title = found[0].1.as_ref().unwrap();
-        assert_eq!(title.ty, Type::String);
+        assert_eq!(title.ty, Type::bare(Kind::String));
         assert!(title.is_required());
         assert_eq!(title.about.as_deref(), Some("題。"));
         let n = found[1].1.as_ref().unwrap();
-        assert_eq!(n.ty, Type::Int);
+        assert_eq!(n.ty, Type::bare(Kind::Int));
         assert_eq!(n.default, Some(Value::Int(3)));
         assert!(!n.is_required());
     }
@@ -138,15 +138,17 @@ mod tests {
     #[test]
     fn the_type_is_a_string_when_it_is_left_out() {
         let found = decls("::var(\n  who: { default: \"me\" }\n)\n");
-        assert_eq!(found[0].1.as_ref().unwrap().ty, Type::String);
+        assert_eq!(found[0].1.as_ref().unwrap().ty, Type::bare(Kind::String));
     }
 
     #[test]
     fn a_type_that_is_not_one_is_refused_with_the_types_there_are() {
-        let found = decls("::var(\n  title: { type: date }\n)\n");
+        let found = decls("::var(\n  title: { type: person }\n)\n");
         let reason = found[0].1.as_ref().unwrap_err();
         assert!(
-            reason.contains("`date`") && reason.contains("`datetime`"),
+            reason.contains("`person` is not a type")
+                && reason.contains("`date`")
+                && reason.contains("`datetime`"),
             "{reason}"
         );
     }

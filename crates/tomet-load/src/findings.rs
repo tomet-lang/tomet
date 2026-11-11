@@ -12,7 +12,7 @@ use tomet_ast::File;
 use crate::{Unresolved, Vault};
 
 /// What checking finds in one document that parsed: the validator's
-/// diagnostics, and the `${...}` that had no value.
+/// diagnostics, and the `{$ ... }` that had no value.
 ///
 /// It is what `check` reports and what `stats` counts, so the two agree
 /// about which documents fail and how many warnings there are.
@@ -78,7 +78,7 @@ impl Vault {
 
         diagnostics.extend(self.registry_name_mismatches(doc));
 
-        // A `${...}` with no value is not an error: a document showing one
+        // A `{$ ... }` with no value is not an error: a document showing one
         // as an example is a legitimate document, and `export` leaves it
         // in the output as written. Saying so here is what tells that
         // apart from a typo, which otherwise renders as itself and is
@@ -88,11 +88,11 @@ impl Vault {
         // `prepare` rewrites the tree.
         let mut prepared = doc.clone();
         let mut unresolved = self.prepare(&mut prepared, path).unresolved;
-        // A blueprint is written to be filled in: what only has a value when a
-        // document is being created from it (`generate.*`, a variable with no
-        // default) is not a mistake there.
+        // A blueprint is written to be filled in: a variable with no default has
+        // no value until the document is created from it, and that is not a
+        // mistake there.
         if tomet_declaration::document_kind(doc).as_deref() == Some("blueprint") {
-            unresolved.retain(|u| !u.creation_only);
+            unresolved.retain(|u| !u.awaits_input);
         }
 
         Findings {

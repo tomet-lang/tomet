@@ -1,7 +1,7 @@
 ::kind(fixture)
 
-::macro(card: [@card(title: ${1})[${2}
-]], notice: [Notice: ${msg}], plain: "https://example.com/${1}")
+::macro(card: [@card(title: $(1))[$(2)
+]], notice: [Notice: $(msg)], plain: "https://example.com/$(1)")
 
 =[ブロックマクロ]
 $macro.card("Welcome", "Hello from a block macro")

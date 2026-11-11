@@ -10,7 +10,8 @@
 //!   | by `tomet-address` and `tomet-links`), and no AST mutations.
 //! - (Facade Architecture)
 //!   | Re-exports and unifies:
-//!   | - `tomet-validator-core`: Base semantic element, ID duplicate, and argument checks.
+//!   | - `tomet-validator-core`: Base semantic element, ID duplicate, and argument checks, and the
+//!   |   type seats (`<$...>`): one outside a blueprint, or that is not a type, is an error.
 //!   | - `tomet-validator-rule`: Node constraint and `::rule` connect validation engine.
 //!   | - `tomet-validator-blueprint`: Document structural blueprint extraction and conformance.
 //!   | - `tomet-validator-profile`: Whether a document keeps the promise of its `::profile(...)`.

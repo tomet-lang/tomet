@@ -121,16 +121,17 @@ pub enum SyntaxKind {
     /// ASCII punctuation character, such as `\;`, `\*`, `\**`, `` \` ``, `\//`):
     /// the leading `\` is omitted and the escaped characters are read as literal text.
     ESCAPE,
-    /// `<name>`, `<?matcher(args){data}>` and the `[content]` a marked one takes
-    /// after its `>`: a seat for a value that is not there yet. The head is
-    /// inside the angle brackets; one family in the syntax whatever its mark.
-    /// The AST gives it a node only where tomet interprets it (a hole is a
-    /// `Hole`); a plain name tag lowers to text.
+    /// `<name>`, `<?matcher(args){data}>` with the `[content]` it takes after its `>`, and
+    /// `<$type(args)>`: a seat for a value that is not there yet. The head is inside the angle
+    /// brackets; one family in the syntax whatever its mark ([`crate::CstSlotMark`]). The AST
+    /// gives it a node only where tomet interprets it (a hole is a `Hole`, a type seat a
+    /// `TypeSeat`); a plain name tag lowers to text.
     ///
-    /// A marked box is a form in the tree, so it stands in an `INLINE_FORM` or a
-    /// `BLOCK_FORM` like `@name(...)` does; a name tag is a span of running text, like an
-    /// `EMPHASIS` or a `CODE_SPAN`, and stands bare among the text. That is why the two are not
-    /// wrapped alike.
+    /// A marked box (a hole, a type seat) is a form in the tree, so it stands in an
+    /// `INLINE_FORM` or a `BLOCK_FORM` like `@name(...)` does; a name tag is a span of running
+    /// text, like an `EMPHASIS` or a `CODE_SPAN`, and stands bare among the text. That is why the
+    /// two are not wrapped alike. A type seat has a `DOLLAR` token for its mark, a `NAME`, an
+    /// optional `ARGS` and no `[content]`: what follows its `>` is not its.
     SLOT,
     /// A mistake of shape the tree keeps instead of refusing: the tree never fails, lowering turns
     /// the node into an error with the same message and offset. These include: a second group of a

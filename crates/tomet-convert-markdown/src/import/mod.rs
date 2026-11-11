@@ -279,6 +279,7 @@ fn structure_sections(blocks: Vec<Block>) -> Vec<Block> {
             | Block::Element(_)
             | Block::List(_)
             | Block::Hole(_)
+            | Block::TypeSeat(_)
             | Block::Interp(_) => {
                 if let Some(top) = stack.last_mut() {
                     top.blocks.push(block);
@@ -762,6 +763,7 @@ fn push_block(stack: &mut [Frame], block: Block) {
             | Block::Element(_)
             | Block::Section(_)
             | Block::Hole(_)
+            | Block::TypeSeat(_)
             | Block::Interp(_) => merge_block_into(content, block),
         },
         _ => {}
@@ -817,7 +819,7 @@ fn merge_block_into(content: &mut Vec<Inline>, block: Block) {
             content.push(Inline::Interp(interp));
         }
         // What a document says about itself is not content to flatten.
-        Block::Hole(_) => {}
+        Block::Hole(_) | Block::TypeSeat(_) => {}
         Block::Section(sec) => {
             extend_spaced(content, sec.title);
             for child in sec.blocks {

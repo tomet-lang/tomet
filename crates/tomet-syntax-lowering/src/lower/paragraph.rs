@@ -4,7 +4,7 @@
 //! inline nodes in it: emphasis and its kin, code spans, autolinks and inline forms.
 
 use super::error_node::lower_error;
-use super::form::{lower_element, lower_slot, slot_of};
+use super::form::{LoweredSlot, lower_element, lower_slot, slot_of};
 use super::{range_of, unsupported};
 use crate::error::Result;
 use crate::inline::{DELIMITERS, push_soft_break, push_text, trim_edges};
@@ -69,7 +69,7 @@ pub(super) fn lower_paragraph(node: &SyntaxNode) -> Result<Option<Block>> {
     if content.is_empty() {
         return Ok(None);
     }
-    // A `${...}` that is the whole of its line, with nothing folded into it, is
+    // An interpolation that is the whole of its line, with nothing folded into it, is
     // a block of its own.
     if matches!(content.as_slice(), [Inline::Interp(_)]) {
         let Some(Inline::Interp(interp)) = content.pop() else {
@@ -282,10 +282,13 @@ fn lower_inline(node: &SyntaxNode) -> Result<Inline> {
     }
 }
 
-/// `@name(...)[...]` in running text, or a `${...}` interpolation.
+/// `@name(...)[...]` in running text, or an interpolation.
 fn lower_inline_form(node: &SyntaxNode) -> Result<Inline> {
     if let Some(slot) = slot_of(node) {
-        return lower_slot(&slot).map(Inline::Hole);
+        return lower_slot(&slot).map(LoweredSlot::into_inline);
+    }
+    if crate::element::is_interpolation(node) {
+        return crate::interp::lower_interpolation(node).map(Inline::Interp);
     }
     let sigil = node
         .children()
@@ -294,10 +297,6 @@ fn lower_inline_form(node: &SyntaxNode) -> Result<Inline> {
         .map(|t| t.kind());
     match sigil {
         Some(K::AT) => lower_element(node).map(Inline::Element),
-        Some(K::DOLLAR) => {
-            let interp = crate::interp::lower_interpolation(node)?;
-            Ok(Inline::Interp(interp))
-        }
         _ => Err(unsupported("an inline form with this sigil")),
     }
 }

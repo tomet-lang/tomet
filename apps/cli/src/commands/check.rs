@@ -528,11 +528,11 @@ mod tests {
     #[test]
     fn an_include_says_it_brought_in_what_the_included_file_left_unresolved() {
         let root = vault("include");
-        fs::write(root.join("b.tmt"), "One ${nope}, two ${#missing}.\n").unwrap();
-        fs::write(root.join("a.tmt"), "${include(tmt(\"b.tmt\"))}\n").unwrap();
-        fs::write(root.join("c.tmt"), "${include(tmt(\"a.tmt\"))}\n").unwrap();
+        fs::write(root.join("b.tmt"), "One $(nope), two $(#missing).\n").unwrap();
+        fs::write(root.join("a.tmt"), "$include(tmt(\"b.tmt\"))\n").unwrap();
+        fs::write(root.join("c.tmt"), "$include(tmt(\"a.tmt\"))\n").unwrap();
         fs::write(root.join("clean.tmt"), "Nothing to resolve.\n").unwrap();
-        fs::write(root.join("d.tmt"), "${include(tmt(\"clean.tmt\"))}\n").unwrap();
+        fs::write(root.join("d.tmt"), "$include(tmt(\"clean.tmt\"))\n").unwrap();
 
         let vault = tomet_load::Vault::discover(&root);
         let unresolved = |name: &str| {
@@ -729,15 +729,15 @@ mod tests {
             }
         }
 
-        // 1. .ctmt with ${macro.vocab("writ", "1.0.0")} passes check
-        let good_src = "::macro(vocab: \"vocabularies/${1}/${1}@${2}.vocabulary.tmt\")\npath: ${macro.vocab(\"writ\", \"1.0.0\")}\n";
+        // 1. .ctmt with $macro.vocab("writ", "1.0.0") passes check
+        let good_src = "::macro(vocab: \"vocabularies/$(1)/$(1)@$(2).vocabulary.tmt\")\npath: $macro.vocab(\"writ\", \"1.0.0\")\n";
         let good_file = root.join("good.ctmt");
         fs::write(&good_file, good_src).unwrap();
         assert_eq!(ctmt_errors(&good_file, good_src), Vec::<String>::new());
         check(&good_file, false, true, false).expect("valid expression passes");
 
-        // 2. .ctmt with ${macro.nosuch(1)} fails check, message contains line, col, and "unknown macro `macro.nosuch`"
-        let bad_macro_src = "path: ${macro.nosuch(1)}\n";
+        // 2. .ctmt with $macro.nosuch(1) fails check, message contains line, col, and "unknown macro `macro.nosuch`"
+        let bad_macro_src = "path: $macro.nosuch(1)\n";
         let bad_macro_file = root.join("bad_macro.ctmt");
         fs::write(&bad_macro_file, bad_macro_src).unwrap();
         let errs = ctmt_errors(&bad_macro_file, bad_macro_src);
@@ -750,8 +750,8 @@ mod tests {
         let err = check(&bad_macro_file, false, true, false).expect_err("unknown macro fails");
         assert!(err.to_string().contains("1 of 1 file(s) failed"));
 
-        // 3. .ctmt with ${macro.vocab("writ")} fails check, message contains arity error
-        let bad_arity_src = "::macro(vocab: \"vocabularies/${1}/${1}@${2}.vocabulary.tmt\")\npath: ${macro.vocab(\"writ\")}\n";
+        // 3. .ctmt with $macro.vocab("writ") fails check, message contains arity error
+        let bad_arity_src = "::macro(vocab: \"vocabularies/$(1)/$(1)@$(2).vocabulary.tmt\")\npath: $macro.vocab(\"writ\")\n";
         let bad_arity_file = root.join("bad_arity.ctmt");
         fs::write(&bad_arity_file, bad_arity_src).unwrap();
         let errs = ctmt_errors(&bad_arity_file, bad_arity_src);
@@ -764,8 +764,8 @@ mod tests {
         let err = check(&bad_arity_file, false, true, false).expect_err("wrong arity fails");
         assert!(err.to_string().contains("1 of 1 file(s) failed"));
 
-        // 4. .ctmt with ${tmt("a.tmt")} fails check with clear error (address checking out of scope)
-        let addr_src = "path: ${tmt(\"a.tmt\")}\n";
+        // 4. .ctmt with $tmt("a.tmt") fails check with clear error (address checking out of scope)
+        let addr_src = "path: $tmt(\"a.tmt\")\n";
         let addr_file = root.join("addr.ctmt");
         fs::write(&addr_file, addr_src).unwrap();
         let errs = ctmt_errors(&addr_file, addr_src);

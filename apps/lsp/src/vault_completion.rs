@@ -20,7 +20,7 @@ use crate::position::get_line_prefix;
 /// What is being typed decides what is offered, from the line up to the cursor:
 ///
 /// - after `tmt("` or `tmt:`, the documents of the vault;
-/// - after `#` where a reference is written (in `${...}`, after `@link(`), the
+/// - after `#` where a reference is written (in `{$ ... }`, after `@link(`), the
 ///   ids of this document, or of the one named on the left of the `#`
 ///   (`tmt("p")#`, `tmt:p#`);
 /// - after `@`, the built-in elements and those of the vocabularies in scope;
@@ -50,13 +50,24 @@ pub(crate) fn completions(
     items
 }
 
-/// Whether the cursor is inside a `${ ... }` that has not been closed.
+/// Whether the cursor is inside a `{$ ... }` or a `$( ... )` that has not been closed.
 fn in_expression(prefix: &str) -> bool {
-    match (prefix.rfind("${"), prefix.rfind('}')) {
-        (Some(open), Some(close)) => open > close,
-        (Some(_), None) => true,
-        _ => false,
+    let mut end = prefix.len();
+    while let Some(dollar) = prefix[..end].rfind('$') {
+        let rest = &prefix[dollar + 1..];
+        // `{$ expr }` stays open until its `}`.
+        if prefix[..dollar].ends_with('{') {
+            return !rest.contains('}');
+        }
+        // `$(ref)` and `$name(args)` stay open until their parenthesis closes.
+        let after_name =
+            rest.trim_start_matches(|c: char| c.is_alphanumeric() || matches!(c, '_' | '-' | '.'));
+        if let Some(inside) = after_name.strip_prefix('(') {
+            return 1 + inside.matches('(').count() > inside.matches(')').count();
+        }
+        end = dollar;
     }
+    false
 }
 
 /// If the cursor is on the id after a `#` that writes a reference: `Some(None)`
@@ -230,12 +241,12 @@ mod tests {
     #[test]
     fn a_hash_that_writes_a_reference_is_told_from_one_that_declares() {
         // A reference: in an expression, or the target of a link.
-        assert_eq!(id_reference("${#"), Some(None));
-        assert_eq!(id_reference("see ${add(#"), Some(None));
+        assert_eq!(id_reference("{$ #"), Some(None));
+        assert_eq!(id_reference("see $add(#"), Some(None));
         assert_eq!(id_reference("@link(#in"), Some(None));
         // Another document's: the one named on the left.
         assert_eq!(
-            id_reference("${tmt(\"docs/a.tmt\")#"),
+            id_reference("{$ tmt(\"docs/a.tmt\")#"),
             Some(Some("docs/a.tmt".to_string()))
         );
         assert_eq!(
@@ -247,16 +258,16 @@ mod tests {
         assert_eq!(id_reference("#["), None);
         assert_eq!(id_reference("plain prose #tag"), None);
         // An expression that has been closed is over.
-        assert_eq!(id_reference("${x} then #"), None);
+        assert_eq!(id_reference("$(x) then #"), None);
     }
 
     #[test]
     fn the_cursor_is_on_a_document_path_only_inside_one() {
-        assert!(is_document_path("${tmt(\""));
-        assert!(is_document_path("${tmt(\"docs/"));
+        assert!(is_document_path("$tmt(\""));
+        assert!(is_document_path("{$ tmt(\"docs/"));
         assert!(is_document_path("@link(tmt:"));
         assert!(is_document_path("@link(tmt:docs/a"));
-        assert!(!is_document_path("${tmt(\"docs/a.tmt\""));
+        assert!(!is_document_path("$tmt(\"docs/a.tmt\""));
         assert!(!is_document_path("@link(tmt:docs/a.tmt#"));
         assert!(!is_document_path("@link(file:"));
     }

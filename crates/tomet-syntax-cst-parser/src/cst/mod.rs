@@ -19,7 +19,8 @@
 //! its groups -- `ARGS` `( )`, `VALUE_DATA` `{ }`, `CONTENT` `[ ]`, at most
 //! one of each -- then any `CONNECT` (`::name(...)`). A form is a nexus, which stands on
 //! `ARGS` or `CONTENT`; see the crate docs for the grammar of one, and for what is text.
-//! `${ ... }` is an `INTERP_EXPR`. Inside `ARGS`/`VALUE_DATA` an entry is a
+//! `{$ expr }` and `$(ref)` are each one `INTERP_EXPR`, the whole form, in an `INLINE_FORM`; `$name(args)`
+//! is a `SIGIL` and its `ARGS`. Inside `ARGS`/`VALUE_DATA` an entry is a
 //! `MAP_ENTRY` (`key: value`) or a `SEQ_ITEM`, and nested groups are
 //! `MAP_LITERAL`, `CONTENT` (a value written `[ ... ]` is blocks, as in the AST
 //! parser; there is no list literal) or `ARGS` -- a bare `(a, b)` is a sequence,

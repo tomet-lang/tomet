@@ -139,7 +139,7 @@ fn export_one(
         .parse(&src)
         .map_err(|e| anyhow::anyhow!("{}", format_parse_error(file_path, &src, &e)))?;
 
-    // Every `${...}` is resolved before anything renders, so every converter
+    // Every `{$ ... }` is resolved before anything renders, so every converter
     // is handed its value and none of them needs to know expressions exist.
     vault.prepare(&mut doc, file_path);
 

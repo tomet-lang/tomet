@@ -514,7 +514,7 @@ fn table_exports_to_markdown() {
     );
 }
 
-/// This crate does not evaluate `${...}`, and this test is what is
+/// This crate does not evaluate `{$ ... }`, and this test is what is
 /// left of the one that said it did.
 ///
 /// The expanded macro is asserted where the expansion happens, in
@@ -531,11 +531,11 @@ fn an_unprepared_interpolation_renders_as_its_own_source() {
     // not a space -- see its own comment) rather than being folded
     // into one long line.
     let doc =
-        tomet_ast_parser::parse_file("Issue: $gh(42)\nFooter: ${copyright}\nMath: ${add(10, 5)}\n")
+        tomet_ast_parser::parse_file("Issue: $gh(42)\nFooter: $(copyright)\nMath: $add(10, 5)\n")
             .unwrap();
     assert_eq!(
         to_markdown(&doc),
-        "Issue: ${gh(42)}\nFooter: ${copyright}\nMath: ${add(10, 5)}\n\n"
+        "Issue: $gh(42)\nFooter: $(copyright)\nMath: $add(10, 5)\n\n"
     );
 }
 
@@ -632,4 +632,16 @@ fn a_comment_written_in_std_exports_the_same() {
 fn a_comment_cannot_end_early() {
     let doc = tomet_ast_parser::parse_file("@comment[ foo --> bar ]\n").unwrap();
     assert_eq!(to_markdown(&doc), "<!-- foo -- > bar -->\n\n");
+}
+
+#[test]
+fn a_type_seat_is_shown_as_written_in_a_block_and_in_text() {
+    let doc =
+        tomet_ast_parser::parse_file("<$list(string, length: 6)>\n\nid <$uuid> and <$date>\n")
+            .unwrap();
+    // The `<` is no HTML tag's, so it needs no escape; `_` and the like are Markdown's.
+    assert_eq!(
+        to_markdown(&doc),
+        "<$list(string, length: 6)>\n\nid <$uuid> and <$date>\n\n"
+    );
 }
