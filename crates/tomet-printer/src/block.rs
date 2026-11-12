@@ -148,21 +148,30 @@ pub(crate) fn render_block(block: &Block, config: &PrinterConfig, out: &mut Stri
     }
 }
 
-/// The spaces inside a heading's brackets: none unless asked for.
-fn heading_spacing(config: &PrinterConfig) -> BracketSpacing {
+/// The spaces inside a section's brackets: none unless asked for.
+fn section_spacing(config: &PrinterConfig) -> BracketSpacing {
     config
         .format
-        .heading_brackets
+        .section_brackets
         .unwrap_or(BracketSpacing::Tight)
 }
 
 pub(crate) fn render_section(sec: &Section, config: &PrinterConfig, out: &mut String) {
     let level = sec.level.max(1);
     out.push_str(&"=".repeat(level));
+    let is_bare = config.format.section_title == Some(tomet_style::SectionTitleStyle::Bare);
     if !sec.title.is_empty() {
-        out.push_str(&heading_spacing(config).wrap(&render_inlines(&sec.title, config)));
+        if is_bare {
+            out.push(' ');
+            out.push_str(&render_inlines(&sec.title, config));
+        } else {
+            out.push_str(&section_spacing(config).wrap(&render_inlines(&sec.title, config)));
+        }
     }
     if let Some(args) = &sec.data.args {
+        if is_bare && !sec.title.is_empty() {
+            out.push(' ');
+        }
         out.push('(');
         out.push_str(&render_args(args, config));
         out.push(')');
@@ -194,7 +203,7 @@ pub(crate) fn render_heading_element(el: &Element, config: &PrinterConfig, out: 
     let level = heading_level(el.as_view()).unwrap_or(1) as usize;
     let content = el.content.as_deref().unwrap_or(&[]);
     out.push_str(&"#".repeat(level));
-    out.push_str(&heading_spacing(config).wrap(&render_content_blocks(content, config)));
+    out.push_str(&section_spacing(config).wrap(&render_content_blocks(content, config)));
     if let Some(v) = el.data.value.as_ref().map(|v| v.as_data()) {
         out.push(' ');
         out.push_str(&render_value(&v));

@@ -31,6 +31,7 @@ pub(crate) fn line_prefix(src: &str, at: usize) -> &str {
 }
 
 /// Whether `form` is an element form (with `@`) named `name`.
+#[allow(dead_code)]
 pub(crate) fn is_element_named(form: &SyntaxNode, name: &str) -> bool {
     let Some(sigil) = form.children().find(|child| child.kind() == K::SIGIL) else {
         return false;
@@ -55,7 +56,9 @@ pub(crate) fn is_declaration_named(form: &SyntaxNode, name: &str) -> bool {
     let Some(sigil) = form.children().find(|child| child.kind() == K::SIGIL) else {
         return false;
     };
-    sigil.first_token().is_some_and(|tok| tok.kind() == K::COLON)
+    sigil
+        .first_token()
+        .is_some_and(|tok| tok.kind() == K::COLON)
         && sigil
             .children()
             .find(|child| child.kind() == K::NAME)

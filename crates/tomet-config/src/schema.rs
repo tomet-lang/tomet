@@ -5,7 +5,7 @@ use crate::groups::{FormatConfig, MetaConfig, RegistryConfig, WorkspaceConfig};
 /// Specification of a single configuration key/entry.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ConfigEntrySpec {
-    /// Full dot-delimited key path (e.g. `"heading.space_inside_brackets"`).
+    /// Full dot-delimited key path (e.g. `"section.space_inside_brackets"`).
     pub key: &'static str,
     /// Value type as a human-readable string (e.g. `"bool"`, `"string"`, `"list(string)"`, `"usize"`).
     pub value_type: &'static str,

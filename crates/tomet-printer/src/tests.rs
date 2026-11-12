@@ -13,13 +13,27 @@ fn test_printer_config_space_inside_brackets() {
     let doc = tomet_ast_parser::parse_file("=[Title]\n").unwrap();
     let cfg = PrinterConfig {
         format: FormatConfig {
-            heading_brackets: Some(tomet_style::BracketSpacing::Padded),
+            section_brackets: Some(tomet_style::BracketSpacing::Padded),
             ..Default::default()
         },
         ..Default::default()
     };
     let printed = document_to_tm_with_config(&doc, &cfg);
     assert!(printed.contains("=[ Title ]"));
+}
+
+#[test]
+fn test_printer_config_section_title_bare() {
+    let doc = tomet_ast_parser::parse_file("=[Title]\n").unwrap();
+    let cfg = PrinterConfig {
+        format: FormatConfig {
+            section_title: Some(tomet_style::SectionTitleStyle::Bare),
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+    let printed = document_to_tm_with_config(&doc, &cfg);
+    assert!(printed.contains("= Title"));
 }
 
 #[test]

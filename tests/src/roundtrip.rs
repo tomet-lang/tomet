@@ -173,15 +173,15 @@ fn aligning_values_does_not_change_the_parsed_document() {
 }
 
 #[test]
-fn heading_blank_lines_do_not_change_the_parsed_document() {
+fn section_blank_lines_do_not_change_the_parsed_document() {
     use tomet_config::{FormatConfig, PrinterConfig};
 
     for before_opt in [Some(true), Some(false)] {
         for after_opt in [Some(true), Some(false)] {
             let config = PrinterConfig {
                 format: FormatConfig {
-                    heading_blank_before: before_opt,
-                    heading_blank_after: after_opt,
+                    section_blank_before: before_opt,
+                    section_blank_after: after_opt,
                     ..Default::default()
                 },
                 ..Default::default()
@@ -208,7 +208,9 @@ fn heading_blank_lines_do_not_change_the_parsed_document() {
                     "heading blank formatting ({before_opt:?}, {after_opt:?}) is not idempotent for {}",
                     rel.display()
                 );
-                if once != tomet_formatter::format_source_with_config(&src, &PrinterConfig::default()) {
+                if once
+                    != tomet_formatter::format_source_with_config(&src, &PrinterConfig::default())
+                {
                     changed += 1;
                 }
             }
@@ -256,7 +258,9 @@ fn declaration_blank_lines_do_not_change_the_parsed_document() {
                     "declaration blank formatting ({between_opt:?}, {after_opt:?}) is not idempotent for {}",
                     rel.display()
                 );
-                if once != tomet_formatter::format_source_with_config(&src, &PrinterConfig::default()) {
+                if once
+                    != tomet_formatter::format_source_with_config(&src, &PrinterConfig::default())
+                {
                     changed += 1;
                 }
             }
@@ -307,15 +311,15 @@ fn laying_out_content_does_not_change_the_parsed_document() {
 }
 
 #[test]
-fn spacing_a_heading_and_a_link_does_not_change_the_parsed_document() {
-    // Only the spaces inside a heading's brackets and after the colon of a link's `target` move, and
+fn spacing_a_section_and_a_link_does_not_change_the_parsed_document() {
+    // Only the spaces inside a section's brackets and after the colon of a link's `target` move, and
     // what is written is what would be written again.
     use tomet_config::PrinterConfig;
 
     let mut changed = 0;
     for on in [true, false] {
         let mut config = PrinterConfig::default();
-        config.format.heading_brackets = Some(if on {
+        config.format.section_brackets = Some(if on {
             tomet_style::BracketSpacing::Padded
         } else {
             tomet_style::BracketSpacing::Tight
@@ -431,6 +435,10 @@ fn config_fixtures_load() {
     assert_eq!(
         cfg.meta.fields.get("created").unwrap().offset.as_deref(),
         Some("+09:00")
+    );
+    assert_eq!(
+        cfg.format.section_brackets,
+        Some(tomet_style::BracketSpacing::Padded)
     );
     assert_eq!(
         cfg.format.link_target_colon,

@@ -77,13 +77,14 @@ mod tests {
             .collect();
 
         // Check format keys
-        assert!(all_keys.contains("heading.space_inside_brackets"));
-        assert!(all_keys.contains("link.no_space"));
-        assert!(all_keys.contains("link.group_order"));
-        assert!(all_keys.contains("callout.style.content"));
+        assert!(all_keys.contains("section.title"));
+        assert!(all_keys.contains("section.space_inside_brackets"));
+        assert!(all_keys.contains("element.link.no_space"));
+        assert!(all_keys.contains("element.link.group_order"));
+        assert!(all_keys.contains("element.callout.style.content"));
         assert!(all_keys.contains("list.multiline.style.content"));
-        assert!(all_keys.contains("table.adjust_width"));
-        assert!(all_keys.contains("table.max_col_width"));
+        assert!(all_keys.contains("element.table.adjust_width"));
+        assert!(all_keys.contains("element.table.max_col_width"));
 
         // Check meta keys
         assert!(all_keys.contains("meta.always_newline"));

@@ -16,21 +16,18 @@
 
 - [ `/tests` — `tomet-tests` パッケージ。凍結された `.tmt` コーパス、クレート
     横断の不変条件、変換のスナップショット。ここの fixture は @dir(docs/) の文書を
-    複製したところから始まったが、同期は取っていない。@file(tests/README.md) を見る。
-  ]
+    複製したところから始まったが、同期は取っていない。@file(tests/README.md) を見る。 ]
 - [ @link[`/tests/SYNTAX.md`](file:../tests/SYNTAX.md) — パーサが今受け付ける
     構文の全部。例と、それが作る AST つき。`tomet-parser` 自身から生成され
     `cargo test` で検証されるので、`spec/` と違って乖離しようがない。`spec/` は
     規範的（言語が何を受け付ける*べき*か）で手書き、こちらは記述的（実装が何を
     受け付ける*か*）で生成物。並べて読むこと。食い違っていたら、その食い違い
-    自体が読み取るべき情報。
-  ]
+    自体が読み取るべき情報。 ]
 - [ `/default.config.tmt` — このリポジトリが実際に使っている設定。
     @file(docs/examples/config.tmt) は `@version`/`@kind` ヘッダの書き方を見せる
     *見本*であって、同じファイルではない。名前を `default.config.tmt` から
     変えたのは、`find_config_file` が名前で vault の境界を探すので、見本が
-    本物として拾われて @dir(docs/examples/) が独立した vault になっていたため。
-  ]
+    本物として拾われて @dir(docs/examples/) が独立した vault になっていたため。 ]
 
 =[ ここから読む ]
 

@@ -202,9 +202,10 @@ mod tests {
     #[test]
     fn the_inner_layer_wins_key_by_key() {
         let outer = layer(
-            "::format(table: { max_col_width: 50 }, link: { no_space: true }, meta: { always_newline: true })\n::macro(a: \"outer-a\", b: \"outer-b\")\n",
+            "::format(element: { table: { max_col_width: 50 }, link: { no_space: true } }, meta: { always_newline: true })\n::macro(a: \"outer-a\", b: \"outer-b\")\n",
         );
-        let inner = layer("::format(table: { max_col_width: 80 })\n::macro(b: \"inner-b\")\n");
+        let inner =
+            layer("::format(element: { table: { max_col_width: 80 } })\n::macro(b: \"inner-b\")\n");
         let cfg = Config::from_layers([&outer, &inner]);
         // Replaced where the inner layer says something ...
         assert_eq!(cfg.format.table_max_col_width, Some(80));
@@ -271,7 +272,9 @@ mod tests {
 
     #[test]
     fn the_workspace_is_dropped_from_a_layer_that_may_not_declare_it() {
-        let mut l = layer("::workspace(ignore: (\"a\"))\n::format(link: { no_space: true })\n");
+        let mut l = layer(
+            "::workspace(ignore: (\"a\"))\n::format(element: { link: { no_space: true } })\n",
+        );
         assert_eq!(l.strip_vault_only(), vec![DeclKind::Workspace]);
         assert!(l.strip_vault_only().is_empty());
         let cfg = Config::from_layers([&l]);

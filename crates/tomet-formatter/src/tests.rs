@@ -108,7 +108,8 @@ fn test_format_fence_lines_marked_and_bare() {
     use tomet_style::FenceLines;
 
     let bare_src = "```rust\nfn foo() {\n    let a = 1;\n\n    let b = 2;\n}\n```\n";
-    let marked_src = "```rust\n`` fn foo() {\n``     let a = 1;\n``\n``     let b = 2;\n`` }\n```\n";
+    let marked_src =
+        "```rust\n`` fn foo() {\n``     let a = 1;\n``\n``     let b = 2;\n`` }\n```\n";
 
     let config_marked = PrinterConfig {
         format: FormatConfig {
@@ -127,17 +128,26 @@ fn test_format_fence_lines_marked_and_bare() {
 
     let formatted_marked = format_source_with_config(bare_src, &config_marked);
     assert_eq!(formatted_marked, marked_src);
-    assert_eq!(parse_file(&formatted_marked).unwrap(), parse_file(bare_src).unwrap());
+    assert_eq!(
+        parse_file(&formatted_marked).unwrap(),
+        parse_file(bare_src).unwrap()
+    );
 
     let formatted_bare = format_source_with_config(marked_src, &config_bare);
     assert_eq!(formatted_bare, bare_src);
-    assert_eq!(parse_file(&formatted_bare).unwrap(), parse_file(marked_src).unwrap());
+    assert_eq!(
+        parse_file(&formatted_bare).unwrap(),
+        parse_file(marked_src).unwrap()
+    );
 
     // Lines that start with `` or closing fence keep their marker in Bare
     let collision_marked = "```\n`` `` code\n`` ```\n`` normal\n```\n";
     let collision_bare = format_source_with_config(collision_marked, &config_bare);
     assert_eq!(collision_bare, "```\n`` `` code\n`` ```\nnormal\n```\n");
-    assert_eq!(parse_file(&collision_bare).unwrap(), parse_file(collision_marked).unwrap());
+    assert_eq!(
+        parse_file(&collision_bare).unwrap(),
+        parse_file(collision_marked).unwrap()
+    );
 }
 
 #[test]
@@ -724,15 +734,31 @@ fn document_metadata_is_aligned_like_any_other_group() {
 }
 
 #[test]
-fn heading_blank_lines_format_source_with_config() {
+fn section_blank_lines_format_source_with_config() {
     let mut config = PrinterConfig::default();
-    config.format.heading_blank_before = Some(true);
-    config.format.heading_blank_after = Some(false);
+    config.format.section_blank_before = Some(true);
+    config.format.section_blank_after = Some(false);
 
     let src = "intro\n=[ Heading 1 ]\n\nbody text 1\n==[ Heading 1.1 ]\n\nbody text 1.1\n";
     let formatted = format_source_with_config(src, &config);
     let expected = "intro\n\n=[ Heading 1 ]\nbody text 1\n\n==[ Heading 1.1 ]\nbody text 1.1\n";
     assert_eq!(formatted, expected);
+}
+
+#[test]
+fn section_title_format_source_with_config() {
+    let mut config = PrinterConfig::default();
+    config.format.section_title = Some(tomet_style::SectionTitleStyle::Bare);
+
+    let src = "intro\n\n=[ Heading 1 ]\n\nbody text 1\n";
+    let formatted = format_source_with_config(src, &config);
+    assert_eq!(formatted, "intro\n\n= Heading 1\n\nbody text 1\n");
+
+    let mut config_bracketed = PrinterConfig::default();
+    config_bracketed.format.section_title = Some(tomet_style::SectionTitleStyle::Bracketed);
+    let src2 = "intro\n\n= Heading 1\n\nbody text 1\n";
+    let formatted2 = format_source_with_config(src2, &config_bracketed);
+    assert_eq!(formatted2, "intro\n\n=[ Heading 1 ]\n\nbody text 1\n");
 }
 
 #[test]

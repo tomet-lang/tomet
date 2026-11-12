@@ -9,7 +9,8 @@
 //! - [`ParagraphSeparator`]: how one paragraph is set off from the next, and
 //!   [`stands_like_a_paragraph`], the constructs that choice applies to.
 //! - [`ValueAlignment`]: how the values of consecutive `key: value` lines are lined up.
-//! - [`BracketSpacing`] and [`ColonSpacing`]: the spaces inside a heading's brackets and after the
+//! - [`SectionTitleStyle`]: how the title of a section heading is written (`bracketed` or `bare`).
+//! - [`BracketSpacing`] and [`ColonSpacing`]: the spaces inside a section heading's brackets and after the
 //!   colon of an element's lone `target` argument.
 //! - [`GroupLayout`]: how the entries of a `(...)` group are laid out over lines.
 //! - [`ContentLayout`]: how content that runs over several lines is laid out between its brackets.
@@ -20,6 +21,7 @@ mod content;
 mod fence;
 mod group;
 mod group_order;
+mod section;
 mod separator;
 mod spacing;
 
@@ -28,5 +30,6 @@ pub use content::ContentLayout;
 pub use fence::FenceLines;
 pub use group::GroupLayout;
 pub use group_order::GroupOrder;
+pub use section::SectionTitleStyle;
 pub use separator::{ParagraphSeparator, stands_like_a_paragraph};
 pub use spacing::{BracketSpacing, ColonSpacing};

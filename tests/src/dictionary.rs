@@ -154,14 +154,14 @@ fn the_formatter_lays_content_out_as_the_printer_does() {
     }
 }
 
-// ---- the spaces inside a heading's brackets and after the colon of a link's target -----------------
+// ---- the spaces inside a section's brackets and after the colon of a link's target -----------------
 
 #[test]
-fn the_formatter_spaces_a_heading_as_the_printer_does() {
+fn the_formatter_spaces_a_section_as_the_printer_does() {
     let sources = ["=[ Title ]\n", "==[Title]\n", "=[  Title  ](a: 1)\n"];
     for padded in [true, false] {
         let mut config = tomet_config::PrinterConfig::default();
-        config.format.heading_brackets = Some(if padded {
+        config.format.section_brackets = Some(if padded {
             tomet_style::BracketSpacing::Padded
         } else {
             tomet_style::BracketSpacing::Tight

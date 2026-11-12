@@ -1517,7 +1517,7 @@ fn a_dotted_declaration_is_checked_like_the_grouped_one() {
         "::macro.gh(\"https://x/$(1)\")\n",
         "::var.n(type: int, default: 3)[ how many ]\n",
         "::workspace.ignore(\"target\", \".git\")\n",
-        "::format.table(max_col_width: 50)\n::format.meta(always_newline: true)\n",
+        "::format.element.table(max_col_width: 50)\n::format.meta(always_newline: true)\n",
     ] {
         let errors = validate_document(&parse(src));
         assert!(errors.is_empty(), "{src}: {errors:?}");

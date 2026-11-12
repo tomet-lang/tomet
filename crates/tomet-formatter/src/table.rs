@@ -1,18 +1,14 @@
-//! Table layout formatting according to `table.adjust_width`, `table.max_col_width`, and `table.align`.
+//! Table layout formatting according to `element.table.adjust_width`, `element.table.max_col_width`, and `element.table.align`.
 
 use tomet_config::PrinterConfig;
 
-/// Formats tables in `src` according to `table.adjust_width`, `table.max_col_width`, and `table.align`.
+/// Formats tables in `src` according to `element.table.adjust_width`, `element.table.max_col_width`, and `element.table.align`.
 pub fn format_tables_with_config(src: &str, config: &PrinterConfig) -> String {
-    let mode = config
-        .format
-        .table_adjust_width
-        .as_deref()
-        .unwrap_or("auto");
+    let mode = config.format.table_adjust_width().unwrap_or("auto");
     if mode == "false" || mode == "off" {
         return src.to_string();
     }
-    let max_col_width_limit = config.format.table_max_col_width.unwrap_or(20);
+    let max_col_width_limit = config.format.table_max_col_width().unwrap_or(20);
 
     let lines: Vec<&str> = src.lines().collect();
     let mut out_lines = Vec::new();
@@ -79,7 +75,7 @@ pub fn format_tables_with_config(src: &str, config: &PrinterConfig) -> String {
                 i += 1;
             }
 
-            let aligns = extract_table_alignments(line, config.format.table_align.as_deref());
+            let aligns = extract_table_alignments(line, config.format.table_align());
 
             if !table_rows.is_empty() {
                 let mut col_count = 0;

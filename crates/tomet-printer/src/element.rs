@@ -113,10 +113,8 @@ pub fn render_element(el: ElementView<'_>, config: &PrinterConfig) -> String {
         }
     }
 
-    if el.name.is_bare_named("callout")
-        && let Some(layout) = config.format.callout_content_style
-    {
-        let mut out = String::from("@callout");
+    if let Some(layout) = config.format.element_content_style(&el.name.name) {
+        let mut out = format!("@{}", el.name.name);
         out.push_str(empty_primary_group(
             el.data.args.is_some(),
             el.content.is_some(),

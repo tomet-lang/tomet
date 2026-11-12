@@ -108,7 +108,7 @@ enum Frame {
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct ImportOptions {
-    /// Align column widths by adding spaces inside table cells (`table.adjust_width`).
+    /// Align column widths by adding spaces inside table cells (`element.table.adjust_width`).
     pub adjust_table_width: bool,
     /// Mode for table width adjustment ("true", "false", "auto").
     pub table_adjust_width_mode: Option<String>,

@@ -12,7 +12,7 @@ pub mod meta;
 pub mod registry;
 pub mod workspace;
 
-pub use format::FormatConfig;
+pub use format::{ElementConfig, FormatConfig};
 pub use meta::{FieldConfig, MetaConfig};
 pub use registry::RegistryConfig;
 pub use workspace::WorkspaceConfig;

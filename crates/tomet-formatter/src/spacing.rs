@@ -1,70 +1,48 @@
-//! The spaces inside the brackets of a heading's title (`heading.space_inside_brackets`) and after
-//! the colon of a `target` that is the only argument of an element (`link.no_space`).
+//! The spaces inside the brackets of a section's title (`section.space_inside_brackets`) and after
+//! the colon of a `target` that is the only argument of an element (`element.link.no_space`).
 
 use tomet_config::PrinterConfig;
 use tomet_cst::{SyntaxElement, SyntaxKind as K, SyntaxNode};
 use tomet_cst_parser::parse_cst;
-use tomet_style::{BracketSpacing, ColonSpacing};
 
 use crate::edit::{Edit, apply_keeping_the_document, is_element};
+pub use crate::section::format_section_brackets;
 
-/// Spaces the title of each heading written between brackets (`=[ title ]`) the way
-/// `heading.space_inside_brackets` asks. Unset, `src` is returned as written; so is a heading that
-/// is not between brackets (`== title`), one with no title, and one whose title runs over lines.
-///
-/// Only the white space inside the brackets changes, and that is checked, not assumed.
+/// Legacy alias for [`format_section_brackets`].
 pub fn format_heading_brackets(src: &str, config: &PrinterConfig) -> String {
-    let Some(spacing) = config.format.heading_brackets else {
-        return src.to_string();
-    };
-    let root = parse_cst(src);
-    let edits: Vec<Edit> = root
-        .descendants()
-        .filter(|node| node.kind() == K::SECTION_HEADING)
-        .filter_map(|heading| heading_edit(&heading, spacing))
-        .collect();
-    apply(src, edits)
-}
-
-fn heading_edit(heading: &SyntaxNode, spacing: BracketSpacing) -> Option<Edit> {
-    let content = heading
-        .children()
-        .find(|child| child.kind() == K::CONTENT)?;
-    let text = content.text().to_string();
-    let title = text.strip_prefix('[')?.strip_suffix(']')?;
-    if title.contains('\n') || title.trim().is_empty() {
-        return None;
-    }
-    let spaced = spacing.wrap(title.trim());
-    let range = content.text_range();
-    (spaced != text).then(|| (usize::from(range.start()), usize::from(range.end()), spaced))
+    format_section_brackets(src, config)
 }
 
 /// Spaces the colon of each `target` that is the only argument of an element (`@link(target: x)`)
-/// the way `link.no_space` asks.
+/// the way `element.link.no_space` asks.
 /// Unset, `src` is returned as written; so is a `target` whose value is on the next line.
 ///
 /// Only the white space after the colon changes, and that is checked, not assumed.
 pub fn format_link_targets(src: &str, config: &PrinterConfig) -> String {
-    let Some(spacing) = config.format.link_target_colon else {
-        return src.to_string();
-    };
     let root = parse_cst(src);
     let edits: Vec<Edit> = root
         .descendants()
         .filter(|node| node.kind() == K::ARGS)
-        .filter_map(|args| target_edit(&args, spacing))
+        .filter_map(|args| target_edit(&args, config))
         .collect();
     apply(src, edits)
 }
 
 /// The change to the space after the colon of the only entry of `args`, when it is `target` and
 /// `args` are an element's.
-fn target_edit(args: &SyntaxNode, spacing: ColonSpacing) -> Option<Edit> {
+fn target_edit(args: &SyntaxNode, config: &PrinterConfig) -> Option<Edit> {
     let element = args.parent()?;
     if !matches!(element.kind(), K::BLOCK_FORM | K::INLINE_FORM) || !is_element(&element) {
         return None;
     }
+    let name_node = element
+        .children()
+        .find(|child| child.kind() == K::SIGIL)?
+        .children()
+        .find(|child| child.kind() == K::NAME)?;
+    let elem_name = name_node.text().to_string();
+    let spacing = config.format.element_target_colon(&elem_name)?;
+
     let mut entries = args.children();
     let entry = entries.next()?;
     if entries.next().is_some() || entry.kind() != K::MAP_ENTRY {
@@ -106,15 +84,16 @@ fn apply(src: &str, edits: Vec<Edit>) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use tomet_style::{BracketSpacing, ColonSpacing};
 
     fn headings(spacing: bool, src: &str) -> String {
         let mut config = PrinterConfig::default();
-        config.format.heading_brackets = Some(if spacing {
+        config.format.section_brackets = Some(if spacing {
             BracketSpacing::Padded
         } else {
             BracketSpacing::Tight
         });
-        format_heading_brackets(src, &config)
+        format_section_brackets(src, &config)
     }
 
     fn links(tight: bool, src: &str) -> String {
@@ -131,7 +110,7 @@ mod tests {
     fn unset_the_source_is_returned_as_written() {
         let config = PrinterConfig::default();
         let src = "=[title]\n\n@link(target:\"a\")[T]\n";
-        assert_eq!(format_heading_brackets(src, &config), src);
+        assert_eq!(format_section_brackets(src, &config), src);
         assert_eq!(format_link_targets(src, &config), src);
     }
 

@@ -62,7 +62,9 @@ pub fn format_declaration_blank_lines(src: &str, config: &PrinterConfig) -> Stri
         for i in 0..ranges.len().saturating_sub(1) {
             let a = ranges[i].end + 1;
             let b = ranges[i + 1].start;
-            if a <= b && let Some(edit) = make_gap_edit(src, a, b, want_blank) {
+            if a <= b
+                && let Some(edit) = make_gap_edit(src, a, b, want_blank)
+            {
                 edits.push(edit);
             }
         }
@@ -74,14 +76,16 @@ pub fn format_declaration_blank_lines(src: &str, config: &PrinterConfig) -> Stri
     {
         let a = last.end + 1;
         if let Some(next_non_ws) = find_next_non_whitespace(src, a) {
-            // If the next non-whitespace is a heading and heading.blank_before is explicitly configured,
-            // heading.blank_before takes precedence; skip it here.
+            // If the next non-whitespace is a section heading and section.blank_before is explicitly configured,
+            // section.blank_before takes precedence; skip it here.
             let next_is_heading = is_heading_at(src, next_non_ws, &root);
-            let heading_before_configured = config.format.heading_blank_before.is_some();
+            let heading_before_configured = config.format.section_blank_before.is_some();
 
             if !(next_is_heading && heading_before_configured) {
                 let b = find_content_start(src, next_non_ws);
-                if a <= b && let Some(edit) = make_gap_edit(src, a, b, want_blank) {
+                if a <= b
+                    && let Some(edit) = make_gap_edit(src, a, b, want_blank)
+                {
                     edits.push(edit);
                 }
             }
@@ -125,7 +129,10 @@ fn is_heading_at(src: &str, pos: usize, root: &SyntaxNode) -> bool {
 fn find_content_start(src: &str, next_non_ws: usize) -> usize {
     let root = parse_cst(src);
     // If the next content is a heading, start at its leading comments if any.
-    for h in root.descendants().filter(|n| n.kind() == K::SECTION_HEADING) {
+    for h in root
+        .descendants()
+        .filter(|n| n.kind() == K::SECTION_HEADING)
+    {
         let h_start = usize::from(h.text_range().start());
         let (start, _) = find_leading_comments(src, h_start);
         if next_non_ws >= start && next_non_ws <= usize::from(h.text_range().end()) {
@@ -252,14 +259,14 @@ mod tests {
         let tight = "::kind(fixture)\n=[ Title ]\n";
         let spaced = "::kind(fixture)\n\n=[ Title ]\n";
 
-        // When heading.blank_before is Some, it takes precedence (declaration.blank_after is ignored).
+        // When section.blank_before is Some, it takes precedence (declaration.blank_after is ignored).
         let mut cfg = PrinterConfig::default();
-        cfg.format.heading_blank_before = Some(true);
+        cfg.format.section_blank_before = Some(true);
         cfg.format.declaration_blank_after = Some(false);
-        // format_declaration_blank_lines skips because heading_blank_before is configured
+        // format_declaration_blank_lines skips because section_blank_before is configured
         assert_eq!(format_declaration_blank_lines(tight, &cfg), tight);
 
-        // When heading.blank_before is None, declaration.blank_after applies.
+        // When section.blank_before is None, declaration.blank_after applies.
         assert_eq!(format_with(None, Some(true), tight), spaced);
         assert_eq!(format_with(None, Some(false), spaced), tight);
     }
@@ -271,7 +278,10 @@ mod tests {
             for after in [None, Some(true), Some(false)] {
                 let once = format_with(between, after, src);
                 let twice = format_with(between, after, &once);
-                assert_eq!(once, twice, "idempotent for between={between:?}, after={after:?}");
+                assert_eq!(
+                    once, twice,
+                    "idempotent for between={between:?}, after={after:?}"
+                );
             }
         }
     }

@@ -840,8 +840,16 @@ fn sequence_literals_in_expressions() {
     for (src, expected_desc, expected_print) in [
         ("{$ () }\n", "Seq([])", "{$ () }"),
         ("{$ (a,) }\n", "Seq([Identifier(a)])", "{$ (a,) }"),
-        ("{$ (a, b) }\n", "Seq([Identifier(a), Identifier(b)])", "{$ (a, b) }"),
-        ("{$ (a, b,) }\n", "Seq([Identifier(a), Identifier(b)])", "{$ (a, b) }"),
+        (
+            "{$ (a, b) }\n",
+            "Seq([Identifier(a), Identifier(b)])",
+            "{$ (a, b) }",
+        ),
+        (
+            "{$ (a, b,) }\n",
+            "Seq([Identifier(a), Identifier(b)])",
+            "{$ (a, b) }",
+        ),
         ("{$ (a) }\n", "Group(Identifier(a))", "{$ (a) }"),
         (
             "{$ (\"a\", \"b\") }\n",

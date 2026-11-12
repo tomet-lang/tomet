@@ -31,8 +31,8 @@ pub mod tree;
 
 pub use discovery::{ConfigError, load_config_from_str};
 pub use groups::{
-    FieldConfig, FormatConfig, MetaConfig, RegistryConfig, WorkspaceConfig, format, meta, registry,
-    workspace,
+    ElementConfig, FieldConfig, FormatConfig, MetaConfig, RegistryConfig, WorkspaceConfig, format,
+    meta, registry, workspace,
 };
 pub use layer::{ConfigLayer, registered_by, registry_entries};
 pub use schema::{ConfigEntrySpec, ConfigGroupSpec, ConfigSpecProvider, all_config_specs};
@@ -81,6 +81,11 @@ impl Config {
     /// falling back to the global `group_order`.
     pub fn element_group_order(&self, element_name: &str) -> Option<GroupOrder> {
         self.format.element_group_order(element_name)
+    }
+
+    /// Configuration for a specific element.
+    pub fn element(&self, name: &str) -> Option<&ElementConfig> {
+        self.format.element(name)
     }
 
     /// Reads the typed groups off one value tree assembled from the declarations: `::format` is
@@ -151,8 +156,8 @@ mod tests {
     }
 
     #[test]
-    fn callout_style_is_read_from_format_and_no_longer_from_elements() {
-        let live = r#"::format(callout: { style: { content: block } })
+    fn callout_style_is_read_from_element_callout() {
+        let live = r#"::format(element: { callout: { style: { content: block } } })
 "#;
         assert_eq!(
             load_config_from_str(live)
@@ -162,7 +167,7 @@ mod tests {
             Some(ContentLayout::Block)
         );
 
-        let retired = r#"::format(elements: { callout: { style: { content: block } } })
+        let retired = r#"::format(callout: { style: { content: block } })
 "#;
         assert_eq!(
             load_config_from_str(retired)
@@ -204,20 +209,24 @@ mod tests {
     }
 
     #[test]
-    fn test_heading_and_link_spacing_config() {
+    fn test_section_and_link_spacing_config() {
         let src = r#"::format(
-  heading: { space_inside_brackets: true, blank_before: true, blank_after: false }
+  section: { title: "bare", space_inside_brackets: true, blank_before: true, blank_after: false }
   declaration: { blank_between: false, blank_after: true }
-  link: { no_space: true }
+  element: { link: { no_space: true } }
 )
 "#;
         let cfg = load_config_from_str(src).expect("failed to parse format");
         assert_eq!(
-            cfg.format.heading_brackets,
+            cfg.format.section_title,
+            Some(tomet_style::SectionTitleStyle::Bare)
+        );
+        assert_eq!(
+            cfg.format.section_brackets,
             Some(tomet_style::BracketSpacing::Padded)
         );
-        assert_eq!(cfg.format.heading_blank_before, Some(true));
-        assert_eq!(cfg.format.heading_blank_after, Some(false));
+        assert_eq!(cfg.format.section_blank_before, Some(true));
+        assert_eq!(cfg.format.section_blank_after, Some(false));
         assert_eq!(cfg.format.declaration_blank_between, Some(false));
         assert_eq!(cfg.format.declaration_blank_after, Some(true));
         assert_eq!(
@@ -287,7 +296,7 @@ mod tests {
         assert_eq!(cfg3.format.group_order, Some(GroupOrder::ArgsFirst));
 
         let src4 = r#"::format(
-  link: { group_order: "content_first" }
+  element: { link: { group_order: "content_first" } }
 )
 "#;
         let cfg4 = load_config_from_str(src4).expect("failed to parse format");
@@ -300,8 +309,10 @@ mod tests {
         assert_eq!(cfg4.element_group_order("other"), None);
 
         let src5 = r#"::format(
-  element: { group_order: "args_first" }
-  link: { group_order: "[]()" }
+  element: {
+    group_order: "args_first"
+    link: { group_order: "[]()" }
+  }
 )
 "#;
         let cfg5 = load_config_from_str(src5).expect("failed to parse format");
@@ -320,11 +331,11 @@ mod tests {
     #[test]
     fn test_dot_notation_variants() {
         let src_deep_dot = r#"::format(
-  callout.style.content: "expanded"
+  element.callout.style.content: "expanded"
   list.multiline.style.content: "box"
-  table.adjust_width: true
-  table.max_col_width: 80
-  table.align: "center"
+  element.table.adjust_width: true
+  element.table.max_col_width: 80
+  element.table.align: "center"
 )
 "#;
         let cfg = load_config_from_str(src_deep_dot).expect("failed to parse deep dot format");
@@ -341,7 +352,7 @@ mod tests {
         assert_eq!(cfg.format.table_align.as_deref(), Some("center"));
 
         let src_mixed = r#"::format(
-  callout: {
+  element.callout: {
     style.content: "block"
   }
   list.multiline: {
@@ -363,7 +374,7 @@ mod tests {
     #[test]
     fn a_content_layout_that_is_not_one_is_unset() {
         let src = r#"::format(
-  callout.style.content: "quote"
+  element.callout.style.content: "quote"
   list.multiline.style.content: "bullet"
 )
 "#;
@@ -403,7 +414,7 @@ mod tests {
         let dotted = load_config_from_str(
             r#"::macro.copyright("(C) 2026")
 ::format.meta(always_newline: true)
-::format.link(no_space: true, group_order: "[]()")
+::format.element.link(no_space: true, group_order: "[]()")
 ::field.aliases(type: list, always_newline: true)
 ::field.url.wiki(type: list, always_newline: true)
 ::field.title(length: 70)[ the title ]
@@ -417,7 +428,7 @@ mod tests {
         .expect("dotted heads");
         let grouped = load_config_from_str(
             r#"::macro(copyright: "(C) 2026")
-::format(meta: { always_newline: true }, link: { no_space: true, group_order: "[]()" })
+::format(meta: { always_newline: true }, element: { link: { no_space: true, group_order: "[]()" } })
 ::field(
   aliases: { type: list, always_newline: true }
   url.wiki: { type: list, always_newline: true }
@@ -445,6 +456,50 @@ mod tests {
         assert_eq!(dotted.workspace.ignore, vec!["target", "build"]);
         assert_eq!(dotted.workspace.unswept, vec!["tests/fixtures"]);
         assert_eq!(dotted.registry, grouped.registry);
+    }
+
+    #[test]
+    fn test_arbitrary_element_configuration() {
+        let src = r#"::format(
+  element.note: {
+    group_order: "[]()"
+    no_space: true
+    style.content: "expanded"
+    badge: "important"
+  }
+  element.custom: {
+    color: "blue"
+    count: 5
+  }
+)
+"#;
+        let cfg = load_config_from_str(src).expect("parses custom elements");
+        let note = cfg.element("note").expect("note exists");
+        assert_eq!(note.group_order, Some(GroupOrder::ContentFirst));
+        assert_eq!(note.no_space, Some(tomet_style::ColonSpacing::Tight));
+        assert_eq!(note.content_style, Some(ContentLayout::Expanded));
+        assert_eq!(note.get("badge"), Some(&Value::String("important".into())));
+        assert_eq!(
+            note.get("style.content"),
+            Some(&Value::String("expanded".into()))
+        );
+
+        let custom = cfg.element("custom").expect("custom exists");
+        assert_eq!(custom.get("color"), Some(&Value::String("blue".into())));
+        assert_eq!(custom.get("count"), Some(&Value::Int(5)));
+
+        assert_eq!(
+            cfg.element_group_order("note"),
+            Some(GroupOrder::ContentFirst)
+        );
+        assert_eq!(
+            cfg.format.element_target_colon("note"),
+            Some(tomet_style::ColonSpacing::Tight)
+        );
+        assert_eq!(
+            cfg.format.element_content_style("note"),
+            Some(ContentLayout::Expanded)
+        );
     }
 
     #[test]

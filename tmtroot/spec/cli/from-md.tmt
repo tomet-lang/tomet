@@ -12,7 +12,7 @@ TUI の Migration タブ（@file(tmtroot/spec/cli/tui.tmt)）も、Markdown を 
 
 どの Markdown も、同じ設定で変換する。設定は `PATH` から祖先を辿って見つけ、なければ既定。
 
-- 表の幅の整え方は、設定（`format.table_adjust_width`、`format.table_max_col_width`、`format.table_align`）に従う。
+- 表の幅の整え方は、設定（`element.table.adjust_width`、`element.table.max_col_width`、`element.table.align`）に従う。
 - 設定が文書に `id` を求めていれば、足す。
 - 出力は、設定に従って整えた `.tmt`。
 - 出力した `.tmt` を、もう一度読んでみて、読めなければ、その文書の変換は失敗にする（`generated .tmt has parse error: ...`）。書き込む前の検査なので、読めない `.tmt` はできない。

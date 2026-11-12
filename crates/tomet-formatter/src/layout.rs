@@ -7,9 +7,7 @@ use tomet_cst::{SyntaxKind as K, SyntaxNode};
 use tomet_cst_parser::parse_cst;
 use tomet_style::ContentLayout;
 
-use crate::edit::{
-    Edit, apply_keeping_the_document, is_element_named, leading_indent, line_prefix,
-};
+use crate::edit::{Edit, apply_keeping_the_document, is_element, leading_indent, line_prefix};
 
 /// Outer-first nesting layout:
 /// Formatting an outer form (such as `@callout[...]`) shifts the indentation base for all lines
@@ -22,9 +20,9 @@ use crate::edit::{
 /// a safe ceiling bounded by the parser's nesting depth.
 const MAX_PASSES: usize = tomet_cst_parser::MAX_DEPTH;
 
-/// Lays out, in `src`, the `[content]` of each `@callout` standing on its own lines and of each
-/// list item, whose content already runs over several lines, the way the layout asked for. Unset,
-/// `src` is returned as written.
+/// Lays out, in `src`, the `[content]` of each `@callout` (or any element configured via `element.<name>.style.content`)
+/// standing on its own lines and of each list item, whose content already runs over several lines,
+/// the way the layout asked for. Unset, `src` is returned as written.
 ///
 /// Content of one line is left as it is. The lines of the content are taken out of the text, the
 /// ones after the first without the indentation they have in common, and written again by
@@ -33,9 +31,14 @@ const MAX_PASSES: usize = tomet_cst_parser::MAX_DEPTH;
 /// Only the white space inside and around the brackets changes, and that is checked, not assumed:
 /// if a pass writes text that does not parse to the `File` it started from, it is not kept.
 pub fn format_content_layouts(src: &str, config: &PrinterConfig) -> String {
-    let callout = config.format.callout_content_style;
+    let has_element_layouts = config.format.callout_content_style.is_some()
+        || config
+            .format
+            .elements
+            .values()
+            .any(|e| e.content_style.is_some());
     let list = config.format.list_multiline_style_content;
-    if callout.is_none() && list.is_none() {
+    if !has_element_layouts && list.is_none() {
         return src.to_string();
     }
     if parse_file(src).is_err() {
@@ -44,7 +47,7 @@ pub fn format_content_layouts(src: &str, config: &PrinterConfig) -> String {
 
     let mut text = src.to_string();
     for _ in 0..MAX_PASSES {
-        let edits = collect(&text, callout, list);
+        let edits = collect(&text, config, list);
         if edits.is_empty() {
             break;
         }
@@ -59,7 +62,7 @@ pub fn format_content_layouts(src: &str, config: &PrinterConfig) -> String {
 /// The edits of one pass, in the order of the text. Inner forms contained within an outer form's
 /// edit range are deferred to the next pass to avoid overlapping replacement ranges, and because
 /// their indentation base is determined only after the outer form is laid out.
-fn collect(src: &str, callout: Option<ContentLayout>, list: Option<ContentLayout>) -> Vec<Edit> {
+fn collect(src: &str, config: &PrinterConfig, list: Option<ContentLayout>) -> Vec<Edit> {
     let root = parse_cst(src);
     let mut edits: Vec<Edit> = Vec::new();
     let mut taken_until = 0;
@@ -68,8 +71,15 @@ fn collect(src: &str, callout: Option<ContentLayout>, list: Option<ContentLayout
             continue;
         }
         let edit = match node.kind() {
-            K::BLOCK_FORM if is_element_named(&node, "callout") => {
-                callout.and_then(|l| callout_edit(src, &node, l))
+            K::BLOCK_FORM if is_element(&node) => {
+                let name = node
+                    .children()
+                    .find(|child| child.kind() == K::SIGIL)
+                    .and_then(|sigil| sigil.children().find(|child| child.kind() == K::NAME))
+                    .map(|n| n.text().to_string());
+                name.as_deref()
+                    .and_then(|name| config.format.element_content_style(name))
+                    .and_then(|l| callout_edit(src, &node, l))
             }
             K::LIST_ITEM => list.and_then(|l| list_edit(src, &node, l)),
             _ => None,

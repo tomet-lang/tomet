@@ -22,16 +22,16 @@ tomet の設定は、三つの層を重ねて決まる。外側から順に、@t
 - マクロ、変数、登録された名前(ブループリント、語彙、辞書)は、名前ごとに置き換わる。
 
 ```tm
-::format(table: { max_col_width: 50 }, link: { no_space: true })
+::format(element: { table: { max_col_width: 50 }, link: { no_space: true } })
 ```
 
 これが @term(tomet#vault-config) に書かれ、あるフォルダの @term(tomet#folder-config) が次を書くと、
 
 ```tm
-::format(table: { max_col_width: 80 })
+::format(element: { table: { max_col_width: 80 } })
 ```
 
-そのフォルダでは `table.max_col_width` が 80 になり、`link.no_space` は `true` のままになる。
+そのフォルダでは `element.table.max_col_width` が 80 になり、`element.link.no_space` は `true` のままになる。
 
 =[ vault の見つけ方 ]
 

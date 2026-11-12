@@ -20,14 +20,14 @@
 //! The bug class is excluded by construction rather than by exception.
 //!
 //! [`format_source_with_config`] formats tables according to `PrinterConfig`
-//! (e.g. `table.adjust_width`, `table.max_col_width`, `table.align`), sets paragraphs
+//! (e.g. `element.table.adjust_width`, `element.table.max_col_width`, `element.table.align`), sets paragraphs
 //! off by a blank line or a `;` (`paragraph.separator`, [`format_paragraph_separators`]),
 //! aligns the values of a multi-line `(...)` group (`map.align_values`,
 //! [`format_map_alignment`]), lays out the content of a callout or a list item that runs over several
-//! lines (`callout.style.content`, `list.multiline.style.content`, [`format_content_layouts`]), spaces
-//! the brackets of a heading and the colon of a link's `target` (`heading.space_inside_brackets`,
-//! `link.no_space`, [`format_heading_brackets`], [`format_link_targets`]), spaces blank lines around
-//! headings (`heading.blank_before`, `heading.blank_after`, [`format_heading_blank_lines`]) and
+//! lines (`element.callout.style.content`, `list.multiline.style.content`, [`format_content_layouts`]), formats
+//! section titles and bracket spacing (`section.title`, `section.space_inside_brackets`, [`format_section_titles`],
+//! [`format_section_brackets`]), spaces the colon of a link's `target` (`element.link.no_space`, [`format_link_targets`]),
+//! spaces blank lines around sections (`section.blank_before`, `section.blank_after`, [`format_section_blank_lines`]) and
 //! preamble declarations (`declaration.blank_between`, `declaration.blank_after`, [`format_declaration_blank_lines`]),
 //! formats fenced code block body lines (`code.fence.lines`, [`format_fence_lines`]),
 //! lays the fields of a `::meta` out (`meta.always_newline`, [`format_meta_layout`]) and applies
@@ -45,6 +45,7 @@ pub mod layout;
 pub mod meta;
 pub mod paragraph;
 pub mod reorder;
+pub mod section;
 pub mod spacing;
 pub mod table;
 
@@ -61,6 +62,7 @@ pub use layout::format_content_layouts;
 pub use meta::format_meta_layout;
 pub use paragraph::format_paragraph_separators;
 pub use reorder::format_element_group_order;
+pub use section::{format_section_blank_lines, format_section_brackets, format_section_titles};
 pub use spacing::{format_heading_brackets, format_link_targets};
 pub use table::format_tables_with_config;
 
@@ -89,9 +91,10 @@ pub fn format_source_with_config(src: &str, config: &PrinterConfig) -> String {
     let metad = meta::format_meta_layout(&fenced, config);
     let separated = paragraph::format_paragraph_separators(&metad, config);
     let aligned = align::format_map_alignment(&separated, config);
-    let headed = spacing::format_heading_brackets(&aligned, config);
+    let titled = section::format_section_titles(&aligned, config);
+    let headed = section::format_section_brackets(&titled, config);
     let linked = spacing::format_link_targets(&headed, config);
     let decl_blanks = declaration::format_declaration_blank_lines(&linked, config);
-    let heading_blanks = heading::format_heading_blank_lines(&decl_blanks, config);
+    let heading_blanks = section::format_section_blank_lines(&decl_blanks, config);
     format_source(&heading_blanks)
 }

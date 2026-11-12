@@ -254,19 +254,30 @@ fn an_argument_must_be_of_the_sort_the_parameter_takes() {
     );
     assert_eq!(
         Type::build("nanoid", &[], &[("overwrite", int(1))]),
-        wrong(Kind::Nanoid, "overwrite", "true or false", "the integer `1`")
+        wrong(
+            Kind::Nanoid,
+            "overwrite",
+            "true or false",
+            "the integer `1`"
+        )
     );
     assert_eq!(
         Type::build("nanoid", &[], &[("overwrite", text("true"))]),
-        wrong(Kind::Nanoid, "overwrite", "true or false", "the text \"true\"")
+        wrong(
+            Kind::Nanoid,
+            "overwrite",
+            "true or false",
+            "the text \"true\""
+        )
     );
     assert_eq!(
-        Type::build(
-            "nanoid",
-            &[],
-            &[("overwrite", Arg::Type(bare(Kind::Bool)))]
-        ),
-        wrong(Kind::Nanoid, "overwrite", "true or false", "the type `bool`")
+        Type::build("nanoid", &[], &[("overwrite", Arg::Type(bare(Kind::Bool)))]),
+        wrong(
+            Kind::Nanoid,
+            "overwrite",
+            "true or false",
+            "the type `bool`"
+        )
     );
 }
 

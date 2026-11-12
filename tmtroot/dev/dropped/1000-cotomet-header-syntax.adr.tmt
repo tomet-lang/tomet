@@ -54,7 +54,7 @@
 ``source: { upstream: origiri-mobile, path: "nix/base.nix" }
 ```
 
-==[`:head:`]
+==[ `:head:` ]
 
 ```(tmt)
 ::upstreams{

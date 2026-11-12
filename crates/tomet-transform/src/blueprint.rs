@@ -243,9 +243,10 @@ pub fn apply_blueprint(
     let info = extract_blueprint_info(blueprint);
 
     // 1. Check ::kind
-    let has_kind = doc.header.iter().any(|d| {
-        classify_declaration_lenient(d) == ElementKind::Declaration(DeclKind::Kind)
-    });
+    let has_kind = doc
+        .header
+        .iter()
+        .any(|d| classify_declaration_lenient(d) == ElementKind::Declaration(DeclKind::Kind));
     let add_kind = if !has_kind {
         info.as_ref().map(|i| i.target_kind.clone())
     } else {
@@ -253,12 +254,14 @@ pub fn apply_blueprint(
     };
 
     // 2. Check ::id
-    let bp_id_decl = blueprint.header.iter().find(|d| {
-        classify_declaration_lenient(d) == ElementKind::Declaration(DeclKind::Id)
-    });
-    let doc_id_decl = doc.header.iter().find(|d| {
-        classify_declaration_lenient(d) == ElementKind::Declaration(DeclKind::Id)
-    });
+    let bp_id_decl = blueprint
+        .header
+        .iter()
+        .find(|d| classify_declaration_lenient(d) == ElementKind::Declaration(DeclKind::Id));
+    let doc_id_decl = doc
+        .header
+        .iter()
+        .find(|d| classify_declaration_lenient(d) == ElementKind::Declaration(DeclKind::Id));
 
     let mut add_id = false;
     let mut overwrite_id = false;
@@ -293,12 +296,14 @@ pub fn apply_blueprint(
     }
 
     // 3. Check ::meta
-    let bp_meta_decl = blueprint.header.iter().find(|d| {
-        classify_declaration_lenient(d) == ElementKind::Declaration(DeclKind::Meta)
-    });
-    let doc_meta_decl = doc.header.iter().find(|d| {
-        classify_declaration_lenient(d) == ElementKind::Declaration(DeclKind::Meta)
-    });
+    let bp_meta_decl = blueprint
+        .header
+        .iter()
+        .find(|d| classify_declaration_lenient(d) == ElementKind::Declaration(DeclKind::Meta));
+    let doc_meta_decl = doc
+        .header
+        .iter()
+        .find(|d| classify_declaration_lenient(d) == ElementKind::Declaration(DeclKind::Meta));
 
     let mut meta_patch_entries = Vec::new();
     if let Some(bp_meta) = bp_meta_decl {
@@ -401,18 +406,22 @@ pub fn apply_blueprint(
     let mut changed = false;
 
     if add_kind.is_some() {
-        if let Some(patch_kind) = patch.header.iter().find(|d| {
-            classify_declaration_lenient(d) == ElementKind::Declaration(DeclKind::Kind)
-        }) {
+        if let Some(patch_kind) = patch
+            .header
+            .iter()
+            .find(|d| classify_declaration_lenient(d) == ElementKind::Declaration(DeclKind::Kind))
+        {
             doc.header.insert(0, patch_kind.clone());
             changed = true;
         }
     }
 
     if add_id {
-        if let Some(patch_id) = patch.header.iter().find(|d| {
-            classify_declaration_lenient(d) == ElementKind::Declaration(DeclKind::Id)
-        }) {
+        if let Some(patch_id) = patch
+            .header
+            .iter()
+            .find(|d| classify_declaration_lenient(d) == ElementKind::Declaration(DeclKind::Id))
+        {
             let insert_idx = doc
                 .header
                 .iter()
@@ -429,21 +438,27 @@ pub fn apply_blueprint(
             changed = true;
         }
     } else if overwrite_id {
-        if let Some(patch_id) = patch.header.iter().find(|d| {
-            classify_declaration_lenient(d) == ElementKind::Declaration(DeclKind::Id)
-        }) {
-            if let Some(doc_id) = doc.header.iter_mut().find(|d| {
-                classify_declaration_lenient(d) == ElementKind::Declaration(DeclKind::Id)
-            }) {
+        if let Some(patch_id) = patch
+            .header
+            .iter()
+            .find(|d| classify_declaration_lenient(d) == ElementKind::Declaration(DeclKind::Id))
+        {
+            if let Some(doc_id) = doc
+                .header
+                .iter_mut()
+                .find(|d| classify_declaration_lenient(d) == ElementKind::Declaration(DeclKind::Id))
+            {
                 doc_id.data.args = patch_id.data.args.clone();
                 changed = true;
             }
         }
     }
 
-    if let Some(patch_meta) = patch.header.iter().find(|d| {
-        classify_declaration_lenient(d) == ElementKind::Declaration(DeclKind::Meta)
-    }) {
+    if let Some(patch_meta) = patch
+        .header
+        .iter()
+        .find(|d| classify_declaration_lenient(d) == ElementKind::Declaration(DeclKind::Meta))
+    {
         let filled_entries = tomet_semantics::data::declaration_entries(patch_meta)
             .and_then(|v| match v {
                 Value::Map(entries) => Some(entries),
@@ -648,7 +663,9 @@ mod tests {
         // Body has existing paragraph and added section
         assert_eq!(doc.body.len(), 2);
         assert!(matches!(&doc.body[0], Block::Paragraph(_)));
-        assert!(matches!(&doc.body[1], Block::Section(s) if s.id.as_ref().map(|i| i.0.as_str()) == Some("details")));
+        assert!(
+            matches!(&doc.body[1], Block::Section(s) if s.id.as_ref().map(|i| i.0.as_str()) == Some("details"))
+        );
     }
 
     #[test]
@@ -663,7 +680,8 @@ mod tests {
 
     #[test]
     fn apply_preserves_existing_valid_id_and_meta_with_overwrite_true() {
-        let doc_src = "::kind(task)\n::id(123e4567-e89b-12d3-a456-426614174000)\n::meta(\n  count: 42\n)\n";
+        let doc_src =
+            "::kind(task)\n::id(123e4567-e89b-12d3-a456-426614174000)\n::meta(\n  count: 42\n)\n";
         let bp_src = "::kind(blueprint)\n::blueprint(task)\n::id(<$uuid(default: auto, overwrite: true)>)\n::meta(\n  count: <$int(default: 0, overwrite: true)>\n)\n";
         let (doc, outcome) = apply_test(doc_src, bp_src, &[UUID]).unwrap();
         assert!(!outcome.changed);

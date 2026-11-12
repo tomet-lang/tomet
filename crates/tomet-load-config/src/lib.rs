@@ -238,15 +238,15 @@ mod tests {
         let dir = Dir::new("stack");
         dir.write(
             VAULT_CONFIG_FILE,
-            "::format(table: { max_col_width: 50 }, link: { no_space: true })\n::macro(m: \"vault\", v: \"vault\")\n",
+            "::format(element: { table: { max_col_width: 50 }, link: { no_space: true } })\n::macro(m: \"vault\", v: \"vault\")\n",
         );
         dir.write(
             "a/self.tmt",
-            "::format(table: { max_col_width: 60 })\n::macro(m: \"outer\")\n",
+            "::format(element: { table: { max_col_width: 60 } })\n::macro(m: \"outer\")\n",
         );
         dir.write(
             "a/b/self.tmt",
-            "::format(table: { max_col_width: 70 })\n::macro(m: \"inner\")\n",
+            "::format(element: { table: { max_col_width: 70 } })\n::macro(m: \"inner\")\n",
         );
         let deep = dir.write("a/b/note.tmt", "");
         let shallow = dir.write("a/note.tmt", "");
@@ -280,9 +280,12 @@ mod tests {
         let dir = Dir::new("rootfolder");
         dir.write(
             VAULT_CONFIG_FILE,
-            "::format(table: { max_col_width: 50 })\n",
+            "::format(element: { table: { max_col_width: 50 } })\n",
         );
-        dir.write("self.tmt", "::format(table: { max_col_width: 90 })\n");
+        dir.write(
+            "self.tmt",
+            "::format(element: { table: { max_col_width: 90 } })\n",
+        );
         let note = dir.write("note.tmt", "");
         let (cfg, _, _) = find_config_file(&note).unwrap();
         assert_eq!(cfg.format.table_max_col_width, Some(90));
@@ -291,10 +294,13 @@ mod tests {
     #[test]
     fn a_folder_entry_file_is_an_ordinary_document_that_is_also_a_layer() {
         let dir = Dir::new("entry_document");
-        dir.write(VAULT_CONFIG_FILE, "::format(link: { no_space: true })\n");
+        dir.write(
+            VAULT_CONFIG_FILE,
+            "::format(element: { link: { no_space: true } })\n",
+        );
         let entry = dir.write(
             "a/self.tmt",
-            "::format(table: { max_col_width: 60 })\n\n=[ Folder A ]\n\nIts own body.\n",
+            "::format(element: { table: { max_col_width: 60 } })\n\n=[ Folder A ]\n\nIts own body.\n",
         );
         let (cfg, _, _) = find_config_file(&entry).unwrap();
         assert_eq!(cfg.format.table_max_col_width, Some(60));
@@ -309,10 +315,16 @@ mod tests {
         let dir = Dir::new("entry_custom");
         dir.write(
             VAULT_CONFIG_FILE,
-            "::workspace(folder: { entry: index.tmt })\n::format(table: { max_col_width: 50 })\n",
+            "::workspace(folder: { entry: index.tmt })\n::format(element: { table: { max_col_width: 50 } })\n",
         );
-        dir.write("a/index.tmt", "::format(table: { max_col_width: 61 })\n");
-        dir.write("b/self.tmt", "::format(table: { max_col_width: 62 })\n");
+        dir.write(
+            "a/index.tmt",
+            "::format(element: { table: { max_col_width: 61 } })\n",
+        );
+        dir.write(
+            "b/self.tmt",
+            "::format(element: { table: { max_col_width: 62 } })\n",
+        );
         let named = dir.write("a/note.tmt", "");
         let default_name = dir.write("b/note.tmt", "");
         let (cfg, _, _) = find_config_file(&named).unwrap();
@@ -332,10 +344,16 @@ mod tests {
         dir.write(VAULT_CONFIG_FILE, "::kind(config)\n");
         dir.write(
             "a/self.tmt",
-            "::workspace(folder: { entry: other.tmt })\n::format(table: { max_col_width: 61 })\n",
+            "::workspace(folder: { entry: other.tmt })\n::format(element: { table: { max_col_width: 61 } })\n",
         );
-        dir.write("a/b/other.tmt", "::format(table: { max_col_width: 99 })\n");
-        dir.write("a/b/self.tmt", "::format(table: { max_col_width: 62 })\n");
+        dir.write(
+            "a/b/other.tmt",
+            "::format(element: { table: { max_col_width: 99 } })\n",
+        );
+        dir.write(
+            "a/b/self.tmt",
+            "::format(element: { table: { max_col_width: 62 } })\n",
+        );
         let note = dir.write("a/b/note.tmt", "");
         let (cfg, _, _) = find_config_file(&note).unwrap();
         assert_eq!(cfg.workspace.folder_entry(), "self.tmt");
@@ -349,7 +367,10 @@ mod tests {
             VAULT_CONFIG_FILE,
             "::workspace(folder: { entry: \"../self.tmt\" })\n",
         );
-        dir.write("a/self.tmt", "::format(table: { max_col_width: 61 })\n");
+        dir.write(
+            "a/self.tmt",
+            "::format(element: { table: { max_col_width: 61 } })\n",
+        );
         let note = dir.write("a/note.tmt", "");
         let (cfg, _, _) = find_config_file(&note).unwrap();
         assert_eq!(cfg.workspace.folder_entry(), "self.tmt");
@@ -359,7 +380,10 @@ mod tests {
     #[test]
     fn the_nearest_vault_config_ends_the_walk() {
         let dir = Dir::new("nested");
-        dir.write(VAULT_CONFIG_FILE, "::format(link: { no_space: true })\n");
+        dir.write(
+            VAULT_CONFIG_FILE,
+            "::format(element: { link: { no_space: true } })\n",
+        );
         dir.write("inner/vault.config.tmt", "::kind(config)\n");
         let note = dir.write("inner/note.tmt", "");
         let (cfg, file, root) = find_config_file(&note).unwrap();
@@ -377,7 +401,7 @@ mod tests {
         dir.write(VAULT_CONFIG_FILE, "::workspace(ignore: (\"target\"))\n");
         dir.write(
             "a/self.tmt",
-            "::workspace(ignore: (\"elsewhere\"))\n::format(link: { no_space: true })\n",
+            "::workspace(ignore: (\"elsewhere\"))\n::format(element: { link: { no_space: true } })\n",
         );
         let note = dir.write("a/note.tmt", "");
         let (cfg, _, _) = find_config_file(&note).unwrap();
@@ -394,10 +418,10 @@ mod tests {
         let dir = Dir::new("document");
         dir.write(
             VAULT_CONFIG_FILE,
-            "::format(table: { max_col_width: 50 }, link: { no_space: true })\n",
+            "::format(element: { table: { max_col_width: 50 }, link: { no_space: true } })\n",
         );
         let note = dir.write("note.tmt", "");
-        let src = "::format(table: { max_col_width: 99 })\n";
+        let src = "::format(element: { table: { max_col_width: 99 } })\n";
         let cfg = config_for(Some(&note), src);
         assert_eq!(cfg.format.table_max_col_width, Some(99));
         assert_eq!(
@@ -410,7 +434,10 @@ mod tests {
     fn without_a_vault_the_document_config_alone_applies() {
         let dir = Dir::new("lone");
         let note = dir.write("note.tmt", "");
-        let cfg = config_for(Some(&note), "::format(link: { no_space: true })\n");
+        let cfg = config_for(
+            Some(&note),
+            "::format(element: { link: { no_space: true } })\n",
+        );
         assert_eq!(
             cfg.format.link_target_colon,
             Some(tomet_style::ColonSpacing::Tight)

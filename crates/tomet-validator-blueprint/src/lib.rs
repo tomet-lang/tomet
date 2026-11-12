@@ -534,9 +534,8 @@ mod tests {
 
     #[test]
     fn reports_missing_id_and_meta_key_with_type_seats() {
-        let blueprint = parse(
-            "::blueprint(task)\n::id(<$uuid>)\n::meta(count: <$int>)\n\n=[ Body ]\n",
-        );
+        let blueprint =
+            parse("::blueprint(task)\n::id(<$uuid>)\n::meta(count: <$int>)\n\n=[ Body ]\n");
         let doc = parse("::kind(task)\n\n=[ Body ]\n");
         let errors = validate_against_blueprint(&doc, &blueprint);
         assert_eq!(errors.len(), 2, "{errors:?}");

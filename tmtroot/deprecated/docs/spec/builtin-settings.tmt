@@ -31,9 +31,9 @@
 ときには `format` は取り除かれている。したがって次の三つは同じ意味になる。
 
 ```tm
-@settings{ format: { callout: { style: { content: block } } } }
-@settings{ format.callout.style.content: block }
-@settings{ callout: { style: { content: block } } }
+@settings{ format: { element: { callout: { style: { content: block } } } } }
+@settings{ format.element.callout.style.content: block }
+@settings{ element: { callout: { style: { content: block } } } }
 ```
 
 ドット記法は入れ子形へ機械的に展開できる省略形であり、`explicit-form-first`
@@ -43,16 +43,16 @@
 #[ 整形 ]
 
 @table[
-[ キー                            ][ 値                       ][ 何を決めるか                                    ]
-[ `meta.always_newline`           ][ `bool`                   ][ `@meta` の各フィールドを改行で分ける            ]
-[ `meta.format`                   ][ `json` / `toml` / `yaml` ][ `@meta` の埋め込み形式                          ]
-[ `heading.space_inside_brackets` ][ `bool`                   ][ `#[ 見出し ]` の括弧内の空白                    ]
-[ `link.no_space`                 ][ `bool`                   ][ `@link` の引数の空白を詰める。`wikilink` は別名 ]
-[ `callout.style.content`         ][ `block` ほか             ][ `@callout` の内容の並べ方                       ]
-[ `list.multiline.style.content`  ][ `box` ほか               ][ 複数行のリスト項目の並べ方                      ]
-[ `table.adjust_width`            ][ `auto` / `bool`          ][ 表の桁を揃えるか                                ]
-[ `table.max_col_width`           ][ `int`                    ][ 揃えるときの一列の上限                          ]
-[ `table.align`                   ][ `string`                 ][ 表の既定の寄せ                                  ]
+[ キー                            ][ 値                       ][ 何を決めるか                         ]
+[ `meta.always_newline`           ][ `bool`                   ][ `@meta` の各フィールドを改行で分ける ]
+[ `meta.format`                   ][ `json` / `toml` / `yaml` ][ `@meta` の埋め込み形式               ]
+[ `section.space_inside_brackets` ][ `bool`                   ][ `=[ 見出し ]` の括弧内の空白         ]
+[ `element.link.no_space`         ][ `bool`                   ][ `@link` の引数の空白を詰める         ]
+[ `element.callout.style.content` ][ `block` ほか             ][ `@callout` の内容の並べ方            ]
+[ `list.multiline.style.content`  ][ `box` ほか               ][ 複数行のリスト項目の並べ方           ]
+[ `element.table.adjust_width`    ][ `auto` / `bool`          ][ 表の桁を揃えるか                     ]
+[ `element.table.max_col_width`   ][ `int`                    ][ 揃えるときの一列の上限               ]
+[ `element.table.align`           ][ `string`                 ][ 表の既定の寄せ                       ]
 ]
 
 ##[ meta のフィールドごとの規則 ]

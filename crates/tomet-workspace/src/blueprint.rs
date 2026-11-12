@@ -442,11 +442,17 @@ pub fn apply_blueprint_to_file_with(
     dry_run: bool,
     source: &dyn Source,
 ) -> Result<Applied> {
-    let rel_path = target_rel_path.strip_prefix(root).unwrap_or(target_rel_path);
+    let rel_path = target_rel_path
+        .strip_prefix(root)
+        .unwrap_or(target_rel_path);
     let target_abs_path = root.join(rel_path);
 
-    let doc_src = fs::read_to_string(&target_abs_path)
-        .with_context(|| format!("failed to read target document at {}", target_abs_path.display()))?;
+    let doc_src = fs::read_to_string(&target_abs_path).with_context(|| {
+        format!(
+            "failed to read target document at {}",
+            target_abs_path.display()
+        )
+    })?;
 
     let mut doc = tomet_ast_parser::parse_file(&doc_src)
         .map_err(|e| anyhow::anyhow!("failed to parse document: {e}"))?;
@@ -533,7 +539,9 @@ pub fn apply_blueprint_to_file_with(
         .unresolved
         .into_iter()
         .map(|u| Unfilled {
-            line: 1 + bp_src[..u.span.start.min(bp_src.len())].matches('\n').count(),
+            line: 1 + bp_src[..u.span.start.min(bp_src.len())]
+                .matches('\n')
+                .count(),
             message: u.message(),
             source: u.source,
             reason: u.reason,
@@ -1245,7 +1253,10 @@ mod tests {
 
         assert!(applied.changed);
         let content = fs::read_to_string(&doc_path).unwrap();
-        assert_eq!(content, original, "file on disk must remain unchanged on dry-run");
+        assert_eq!(
+            content, original,
+            "file on disk must remain unchanged on dry-run"
+        );
 
         let _ = fs::remove_dir_all(&root);
     }

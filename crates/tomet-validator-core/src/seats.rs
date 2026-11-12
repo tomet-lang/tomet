@@ -85,6 +85,9 @@ mod tests {
         let file = tomet_ast_parser::parse_file(bad_src).unwrap();
         let mut errors = Vec::new();
         check_type_seats(&file, &mut errors);
-        assert!(!errors.is_empty(), "expected mismatch error for string in int list default");
+        assert!(
+            !errors.is_empty(),
+            "expected mismatch error for string in int list default"
+        );
     }
 }

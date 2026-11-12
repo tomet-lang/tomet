@@ -34,9 +34,9 @@ struct CalloutConfig {
 #[derive(Debug, Clone, Default, PartialEq, Config)]
 #[config(group = "format")]
 struct FormatConfig {
-    /// Space inside brackets for headings.
-    #[config(key = "heading.space_inside_brackets", default = false)]
-    heading_space: bool,
+    /// Space inside brackets for sections.
+    #[config(key = "section.space_inside_brackets", default = false)]
+    section_space: bool,
 
     /// Link order rule.
     #[config(
@@ -61,17 +61,17 @@ fn test_flatten_and_custom_parser() {
     assert_eq!(
         spec.entries[0],
         ConfigEntrySpec {
-            key: "heading.space_inside_brackets",
+            key: "section.space_inside_brackets",
             value_type: "bool",
             default_value: Some("false"),
-            description: "Space inside brackets for headings.",
+            description: "Space inside brackets for sections.",
             aliases: &[],
         }
     );
 
     let root = Value::Map(vec![
         (
-            "heading".to_string(),
+            "section".to_string(),
             Value::Map(vec![(
                 "space_inside_brackets".to_string(),
                 Value::Bool(true),
@@ -97,7 +97,7 @@ fn test_flatten_and_custom_parser() {
     ]);
 
     let cfg = FormatConfig::from_root(&root);
-    assert!(cfg.heading_space);
+    assert!(cfg.section_space);
     assert_eq!(cfg.link_order, CustomOrder::ContentFirst);
     assert_eq!(cfg.callout.style.as_deref(), Some("quote"));
 }
@@ -113,19 +113,19 @@ fn test_all_config_specs_coverage() {
         format_group
             .entries
             .iter()
-            .any(|e| e.key == "heading.space_inside_brackets")
+            .any(|e| e.key == "section.space_inside_brackets")
     );
     assert!(
         format_group
             .entries
             .iter()
-            .any(|e| e.key == "link.no_space")
+            .any(|e| e.key == "element.link.no_space")
     );
     assert!(
         format_group
             .entries
             .iter()
-            .any(|e| e.key == "table.adjust_width")
+            .any(|e| e.key == "element.table.adjust_width")
     );
 
     let meta_group = specs.iter().find(|g| g.name == "meta").unwrap();
