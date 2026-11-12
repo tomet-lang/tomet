@@ -40,7 +40,7 @@
 |[ `/**/` ][ comment zone ][ mean ]
 |[ `//`   ][ comment line ][ mean ]
 |[ ` `    ][ raw inline   ][ mean ]
-|[ ``     ][ raw line     ][ mean ]
+|[ ``     ][ raw line / line marker ][ mean ]
 |[ ```    ][ raw block    ][ mean ]
 
 =[ Compound ]

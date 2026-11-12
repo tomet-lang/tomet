@@ -89,6 +89,8 @@ pub enum SyntaxKind {
     INFO_STRING,
     /// A line of the body of a fenced code block or line raw.
     CODE_LINE,
+    /// A line marker (the two backticks `` that mark a raw line in a fenced code block or line raw).
+    LINE_MARKER,
     /// The running text of a bracket-less sugar body (in a list item or section heading).
     BODY,
     ARGS,

@@ -217,6 +217,12 @@ fn own_tag(token: &SyntaxToken, fences: &HashSet<usize>) -> Option<Tag> {
             }
             return None;
         }
+        K::LINE_MARKER => {
+            if kind == K::BACKTICK {
+                return Some(Tag::ProcessingInstruction);
+            }
+            return None;
+        }
         K::CODE_BLOCK => {
             let at = usize::from(token.text_range().start());
             return fences.contains(&at).then_some(Tag::ProcessingInstruction);

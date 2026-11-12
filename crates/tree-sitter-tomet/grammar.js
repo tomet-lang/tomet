@@ -195,27 +195,44 @@ module.exports = grammar({
       ),
 
     // ---- fenced code blocks ----------------------------------------------
-    // CommonMark-style ``` fence, sugar for `<codeblock>(lang:xxx)[code]`
-    // (see `document.rs::parse_fenced_code_block`). Unlike the real
-    // parser (which accepts 3-or-more backticks, and requires the
-    // closing fence to have at least as many as the opening one -- see
-    // that function's doc comment), this grammar only recognizes a
-    // fixed 3-backtick fence, the same "known-narrow" simplification
-    // `thematic_break` above makes for dash runs (always exactly 3,
-    // never fewer/more consumed specially). Matching a real variable-
-    // length, opening-tracks-closing fence would need a stateful
-    // external scanner (remembering the opening run's length across the
-    // body) -- left as a known gap rather than implemented here.
-    // `content`'s regex borrows `block_comment`'s "exclude the closer"
-    // trick just above/below: it matches any run of text that can't
-    // contain 3 consecutive backticks, so the lexer can't swallow past
-    // a real closing fence.
+    // CommonMark-style ``` fence, sugar for `@raw(lang:xxx)[code]`.
+    // Inside the body, lines may be marked with `` (line_marker, the canonical
+    // form) or written bare. Marked lines never close the fence.
     fenced_code_block: ($) =>
       seq(
         alias(token(prec(3, "```")), $.fence_marker),
         optional(field("lang", alias(/[^\n]+/, $.text))),
         $._newline,
-        optional(field("content", alias(/(?:[^`]|`[^`]|``[^`])+/, $.text))),
+        optional(
+          field(
+            "content",
+            repeat1(
+              choice(
+                seq(
+                  alias("``", $.line_marker),
+                  optional(seq(token.immediate(" "), optional(alias(/[^\n]+/, $.text)))),
+                  $._newline,
+                ),
+                seq(
+                  alias(
+                    token(
+                      prec(
+                        1,
+                        choice(
+                          /`{3,}[^\s\n][^\n]*/,
+                          /(?:[^`\n]|`[^`\n])[^\n]*/,
+                        ),
+                      ),
+                    ),
+                    $.text,
+                  ),
+                  $._newline,
+                ),
+                $._newline,
+              ),
+            ),
+          ),
+        ),
         alias(token(prec(3, "```")), $.fence_marker),
       ),
 

@@ -187,6 +187,23 @@ mod tests {
     }
 
     #[test]
+    fn test_code_fence_lines_config() {
+        let src = r#"::format(code: { fence: { lines: "marked" } })"#;
+        let cfg = load_config_from_str(src).expect("parse code.fence.lines");
+        assert_eq!(
+            cfg.format.code_fence_lines,
+            Some(tomet_style::FenceLines::Marked)
+        );
+
+        let src_bare = r#"::format(code: { fence: { lines: "bare" } })"#;
+        let cfg_bare = load_config_from_str(src_bare).expect("parse bare");
+        assert_eq!(
+            cfg_bare.format.code_fence_lines,
+            Some(tomet_style::FenceLines::Bare)
+        );
+    }
+
+    #[test]
     fn test_heading_and_link_spacing_config() {
         let src = r#"::format(
   heading: { space_inside_brackets: true, blank_before: true, blank_after: false }

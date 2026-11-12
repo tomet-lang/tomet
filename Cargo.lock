@@ -1996,6 +1996,7 @@ dependencies = [
  "tomet-config",
  "tomet-cst",
  "tomet-cst-parser",
+ "tomet-spelling",
  "tomet-style",
  "tomet-tree",
  "unicode-width",

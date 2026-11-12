@@ -73,6 +73,18 @@ pub fn splice_node(source: &str, target: &SyntaxNode, replacement: &str) -> Stri
     replace_range(source, target.text_range(), replacement)
 }
 
+/// How many `|` runs `node` stands inside: each one folds the marker at the start
+/// of a line away with the line break before it.
+pub fn pipe_depth(node: &SyntaxNode) -> usize {
+    node.ancestors()
+        .filter(|a| {
+            a.kind() == SyntaxKind::CONTENT
+                && a.children_with_tokens()
+                    .any(|e| e.kind() == SyntaxKind::PIPE && e.as_token().is_some())
+        })
+        .count()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -5,7 +5,7 @@
 //! ones built from Markdown or edited purely at the AST level). Uses
 //! `tomet_config::PrinterConfig` (see that crate for config
 //! loading/discovery) to drive formatting choices: meta format
-//! (yaml/json/toml), link-key spacing, callout/list style.
+//! (yaml/json/toml), link-key spacing, callout/list style, and code block line markers.
 
 pub mod block;
 pub mod element;

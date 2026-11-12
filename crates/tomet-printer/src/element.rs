@@ -76,20 +76,37 @@ pub fn render_element(el: ElementView<'_>, config: &PrinterConfig) -> String {
                     .map(|content| render_content_blocks(content, config))
                     .unwrap_or_default()
             });
-            let longest = body
-                .lines()
-                .map(|l| l.trim_end())
-                .filter(|l| !l.is_empty() && l.chars().all(|c| c == '`'))
-                .map(str::len)
-                .max()
-                .unwrap_or(0);
-            let fence = "`".repeat(longest.max(2) + 1);
-            let mut out = format!("{fence}{lang}\n");
-            out.push_str(&body);
-            if !body.is_empty() && !body.ends_with('\n') {
-                out.push('\n');
+            let fence_style = config
+                .format
+                .code_fence_lines
+                .unwrap_or(tomet_style::FenceLines::Marked);
+            let mut out = format!("```{lang}\n");
+            if !body.is_empty() {
+                for line in body.split('\n') {
+                    match fence_style {
+                        tomet_style::FenceLines::Marked => {
+                            if line.is_empty() {
+                                out.push_str("``\n");
+                            } else {
+                                out.push_str("`` ");
+                                out.push_str(line);
+                                out.push('\n');
+                            }
+                        }
+                        tomet_style::FenceLines::Bare => {
+                            if tomet_spelling::fence_line_requires_marker(line, 3) {
+                                out.push_str("`` ");
+                                out.push_str(line);
+                                out.push('\n');
+                            } else {
+                                out.push_str(line);
+                                out.push('\n');
+                            }
+                        }
+                    }
+                }
             }
-            out.push_str(&fence);
+            out.push_str("```");
             out.push_str(&render_id(el.id));
             out.push_str(&render_connects(el.connects, config));
             return out;

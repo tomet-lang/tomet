@@ -163,3 +163,83 @@ fn what_has_a_primary_group_lowers() {
     let doc = file("@name\n| a\n").unwrap();
     assert!(matches!(&doc.body[0], Block::Element(el) if el.content.is_some()));
 }
+
+#[test]
+fn fenced_code_block_line_markers_lower_identically_to_legacy() {
+    use tomet_ast::Inline;
+
+    let marked = "```(rust)\n`` fn main() {\n``     println!();\n`` }\n```\n";
+    let legacy = "```(rust)\nfn main() {\n    println!();\n}\n```\n";
+
+    let doc_marked = file(marked).expect("parse marked");
+    let doc_legacy = file(legacy).expect("parse legacy");
+
+    // Both spellings produce the exact same text content
+    let extract_raw = |doc: &tomet_ast::File| -> String {
+        match &doc.body[0] {
+            Block::Element(el) => match &el.content.as_ref().unwrap()[0] {
+                Block::Paragraph(p) => match &p.content[0] {
+                    Inline::Raw(r) => r.value.clone(),
+                    other => panic!("expected raw inline, got {other:?}"),
+                },
+                other => panic!("expected paragraph, got {other:?}"),
+            },
+            other => panic!("expected element, got {other:?}"),
+        }
+    };
+
+    assert_eq!(extract_raw(&doc_marked), extract_raw(&doc_legacy));
+    assert_eq!(extract_raw(&doc_marked), "fn main() {\n    println!();\n}");
+}
+
+#[test]
+fn fenced_code_block_line_marker_rules() {
+    use tomet_ast::Inline;
+
+    let extract_raw = |src: &str| -> String {
+        let doc = file(src).unwrap_or_else(|e| panic!("{src:?}: {e}"));
+        match &doc.body[0] {
+            Block::Element(el) => match &el.content.as_ref().unwrap()[0] {
+                Block::Paragraph(p) => match &p.content[0] {
+                    Inline::Raw(r) => r.value.clone(),
+                    other => panic!("expected raw inline, got {other:?}"),
+                },
+                other => panic!("expected paragraph, got {other:?}"),
+            },
+            other => panic!("expected element, got {other:?}"),
+        }
+    };
+
+    // 1. Bare `` line is an empty line, and truly empty line is also allowed
+    let src1 = "```\n`` first\n``\n\n`` last\n```\n";
+    assert_eq!(extract_raw(src1), "first\n\n\nlast");
+
+    // 2. Exactly one space is stripped as separator; second space is content
+    let src2 = "```\n``  two spaces\n``   three spaces\n```\n";
+    assert_eq!(extract_raw(src2), " two spaces\n  three spaces");
+
+    // 3. Content starting with `` is written `` ``
+    let src3 = "```\n`` `` code\n```\n";
+    assert_eq!(extract_raw(src3), "`` code");
+
+    // 4. Marked line holding ``` does not close fence
+    let src4 = "```\n`` ```\n`` code\n```\n";
+    assert_eq!(extract_raw(src4), "```\ncode");
+
+    // 5. In a | run
+    let src5 = "@memo\n| ```\n| `` hello\n| ```\n";
+    let doc5 = file(src5).expect("parse in pipe run");
+    match &doc5.body[0] {
+        Block::Element(memo) => match &memo.content.as_ref().unwrap()[0] {
+            Block::Element(raw) => match &raw.content.as_ref().unwrap()[0] {
+                Block::Paragraph(p) => match &p.content[0] {
+                    Inline::Raw(r) => assert_eq!(r.value, "hello"),
+                    other => panic!("expected raw inline, got {other:?}"),
+                },
+                other => panic!("expected paragraph, got {other:?}"),
+            },
+            other => panic!("expected raw block, got {other:?}"),
+        },
+        other => panic!("expected memo, got {other:?}"),
+    }
+}

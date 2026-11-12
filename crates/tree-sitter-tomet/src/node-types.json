@@ -399,9 +399,17 @@
     "named": true,
     "fields": {
       "content": {
-        "multiple": false,
+        "multiple": true,
         "required": false,
         "types": [
+          {
+            "type": " ",
+            "named": false
+          },
+          {
+            "type": "line_marker",
+            "named": true
+          },
           {
             "type": "text",
             "named": true
@@ -2316,6 +2324,10 @@
     }
   },
   {
+    "type": " ",
+    "named": false
+  },
+  {
     "type": "!=",
     "named": false
   },
@@ -2477,6 +2489,10 @@
   },
   {
     "type": "line_comment",
+    "named": true
+  },
+  {
+    "type": "line_marker",
     "named": true
   },
   {

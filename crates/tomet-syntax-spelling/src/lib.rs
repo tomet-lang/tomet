@@ -11,6 +11,8 @@
 //! - [`write_scalar_string`] / [`scalar_text`]: a string value, bare when no other value could be
 //!   read from the same text.
 //! - [`write_quoted`] / [`quoted_text`]: a string inside `"..."`, whatever it holds.
+//! - [`fence_line_requires_marker`]: whether a line inside a fenced code block requires a line
+//!   marker (` `` `) to avoid being read as a line marker or closing fence.
 use tomet_type::{Kind, Type};
 
 /// Whether `key` is read back as itself when written without quotes.
@@ -203,6 +205,20 @@ fn is_number(s: &str) -> bool {
     i == b.len()
 }
 
+/// Whether `line` requires a line marker (` `` `) when written inside a fenced code block
+/// with an opening fence of length `fence_len`.
+///
+/// Written bare, a line whose leading run of backticks is:
+/// - exactly 2 (`run == 2`) would be read as a line marker, stripping the two backticks;
+/// - at least `fence_len` and followed only by whitespace (`run >= fence_len && line[run..].trim().is_empty()`)
+///   would close the fence early.
+///
+/// Every other line can be written bare.
+pub fn fence_line_requires_marker(line: &str, fence_len: usize) -> bool {
+    let run = line.chars().take_while(|c| *c == '`').count();
+    run == 2 || (run >= fence_len && line[run..].trim().is_empty())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -278,5 +294,23 @@ mod tests {
         assert_eq!(scalar_text("<name>"), "<name>");
         assert_eq!(scalar_text("hello \"world\""), "\"hello \\\"world\\\"\"");
         assert_eq!(scalar_text("line1\nline2"), "\"line1\\nline2\"");
+    }
+
+    #[test]
+    fn test_fence_line_requires_marker() {
+        // Line starting with exactly two backticks needs marker
+        assert!(fence_line_requires_marker("``", 3));
+        assert!(fence_line_requires_marker("`` code", 3));
+        assert!(!fence_line_requires_marker("` code", 3));
+        assert!(!fence_line_requires_marker("code", 3));
+
+        // Line that would close a fence of length 3 needs marker
+        assert!(fence_line_requires_marker("```", 3));
+        assert!(fence_line_requires_marker("```  ", 3));
+        assert!(fence_line_requires_marker("````", 3));
+
+        // Line starting with ``` but having text after does not close fence, so bare is safe
+        assert!(!fence_line_requires_marker("```rust", 3));
+        assert!(!fence_line_requires_marker("``` rust", 3));
     }
 }

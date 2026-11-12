@@ -13,9 +13,11 @@
 //!   colon of an element's lone `target` argument.
 //! - [`GroupLayout`]: how the entries of a `(...)` group are laid out over lines.
 //! - [`ContentLayout`]: how content that runs over several lines is laid out between its brackets.
+//! - [`FenceLines`]: how the body lines of a fenced code block are written (`Marked` or `Bare`).
 
 mod align;
 mod content;
+mod fence;
 mod group;
 mod group_order;
 mod separator;
@@ -23,6 +25,7 @@ mod spacing;
 
 pub use align::ValueAlignment;
 pub use content::ContentLayout;
+pub use fence::FenceLines;
 pub use group::GroupLayout;
 pub use group_order::GroupOrder;
 pub use separator::{ParagraphSeparator, stands_like_a_paragraph};

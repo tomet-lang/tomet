@@ -29,6 +29,7 @@
 //! `link.no_space`, [`format_heading_brackets`], [`format_link_targets`]), spaces blank lines around
 //! headings (`heading.blank_before`, `heading.blank_after`, [`format_heading_blank_lines`]) and
 //! preamble declarations (`declaration.blank_between`, `declaration.blank_after`, [`format_declaration_blank_lines`]),
+//! formats fenced code block body lines (`code.fence.lines`, [`format_fence_lines`]),
 //! lays the fields of a `::meta` out (`meta.always_newline`, [`format_meta_layout`]) and applies
 //! [`format_source`]. It never changes what document metadata (`::meta`) says -- a field's type, format
 //! or prefix is the printer's business, not its -- and injects no structural elements.
@@ -38,6 +39,7 @@ pub mod clean;
 pub mod data;
 pub mod declaration;
 mod edit;
+pub mod fence;
 pub mod heading;
 pub mod layout;
 pub mod meta;
@@ -53,6 +55,7 @@ pub use align::format_map_alignment;
 pub use clean::clean_whitespace;
 pub use data::format_data_source;
 pub use declaration::format_declaration_blank_lines;
+pub use fence::format_fence_lines;
 pub use heading::format_heading_blank_lines;
 pub use layout::format_content_layouts;
 pub use meta::format_meta_layout;
@@ -82,7 +85,8 @@ pub fn format_source_with_config(src: &str, config: &PrinterConfig) -> String {
             formatted_tables
         };
     let laid_out = layout::format_content_layouts(&formatted_elements, config);
-    let metad = meta::format_meta_layout(&laid_out, config);
+    let fenced = fence::format_fence_lines(&laid_out, config);
+    let metad = meta::format_meta_layout(&fenced, config);
     let separated = paragraph::format_paragraph_separators(&metad, config);
     let aligned = align::format_map_alignment(&separated, config);
     let headed = spacing::format_heading_brackets(&aligned, config);

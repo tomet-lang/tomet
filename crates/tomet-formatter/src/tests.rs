@@ -103,6 +103,44 @@ fn fenced_code_block_content_is_preserved_losslessly() {
 }
 
 #[test]
+fn test_format_fence_lines_marked_and_bare() {
+    use tomet_ast_parser::parse_file;
+    use tomet_style::FenceLines;
+
+    let bare_src = "```rust\nfn foo() {\n    let a = 1;\n\n    let b = 2;\n}\n```\n";
+    let marked_src = "```rust\n`` fn foo() {\n``     let a = 1;\n``\n``     let b = 2;\n`` }\n```\n";
+
+    let config_marked = PrinterConfig {
+        format: FormatConfig {
+            code_fence_lines: Some(FenceLines::Marked),
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+    let config_bare = PrinterConfig {
+        format: FormatConfig {
+            code_fence_lines: Some(FenceLines::Bare),
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+
+    let formatted_marked = format_source_with_config(bare_src, &config_marked);
+    assert_eq!(formatted_marked, marked_src);
+    assert_eq!(parse_file(&formatted_marked).unwrap(), parse_file(bare_src).unwrap());
+
+    let formatted_bare = format_source_with_config(marked_src, &config_bare);
+    assert_eq!(formatted_bare, bare_src);
+    assert_eq!(parse_file(&formatted_bare).unwrap(), parse_file(marked_src).unwrap());
+
+    // Lines that start with `` or closing fence keep their marker in Bare
+    let collision_marked = "```\n`` `` code\n`` ```\n`` normal\n```\n";
+    let collision_bare = format_source_with_config(collision_marked, &config_bare);
+    assert_eq!(collision_bare, "```\n`` `` code\n`` ```\nnormal\n```\n");
+    assert_eq!(parse_file(&collision_bare).unwrap(), parse_file(collision_marked).unwrap());
+}
+
+#[test]
 fn test_format_tables_with_config_left_align() {
     let src = "@table[\n[ 殻 ][ 主量子数 n ][ 電子数 2n² ][ 小軌道 ]\n[ K殻 ][ 1 ][ 2 ][ 1s @br(2) ]\n[ L殻 ][ 2 ][ 8 ][ 2s+2p @br(2+6) ]\n]\n";
     let config = PrinterConfig {

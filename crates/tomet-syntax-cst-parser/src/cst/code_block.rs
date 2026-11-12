@@ -19,6 +19,10 @@ impl<'a, 't> CstParser<'a, 't> {
     /// white space. A longer opening run
     /// is how a body holds a closing-looking line; a run in the middle of a
     /// line closes nothing.
+    ///
+    /// Inside the body, a line beginning with exactly two backticks (` `` `) is a
+    /// marked line: the two backticks form a [`K::LINE_MARKER`] node, and nothing
+    /// closes the fence on a marked line.
     pub(super) fn parse_code_block(&mut self) {
         self.builder.start_node(K::CODE_BLOCK.into());
         let count = self.run_len(self.pos, K::BACKTICK);
@@ -71,6 +75,15 @@ impl<'a, 't> CstParser<'a, 't> {
                 }
             }
             self.builder.start_node(K::CODE_LINE.into());
+            if run == 2 {
+                while self.pos < i {
+                    self.bump();
+                }
+                self.builder.start_node(K::LINE_MARKER.into());
+                self.bump();
+                self.bump();
+                self.builder.finish_node();
+            }
             self.bump_line();
             self.builder.finish_node();
         }
@@ -95,7 +108,7 @@ impl<'a, 't> CstParser<'a, 't> {
                 }
             }
             first = false;
-            self.builder.start_node(K::FENCE.into());
+            self.builder.start_node(K::LINE_MARKER.into());
             self.bump();
             self.bump();
             self.builder.finish_node();

@@ -1,0 +1,16 @@
+<h1>marked fence lines</h1>
+<p>コードフェンス（``<code>）の内部では、行頭の </code>` は行マーカーとして扱われる。行マーカーの直後の半角空白1つは区切りとして落とされ、2つ目以降の空白は本文に残る。</p>
+<pre><code class="language-(rust)">fn main() {
+    println!("hello");
+}</code></pre>
+<h1>empty lines</h1>
+<p>マーカーのみの行（``）および空行はいずれも空行として扱われる。</p>
+<pre><code class="language-(text)">first
+
+
+last</code></pre>
+<h1>content starting with backticks</h1>
+<p>本文自体が `<code> で始まる行は、</code><code> </code>` と記述する。また、マーカー行の中にある ``` はフェンスを閉じない。</p>
+<pre><code class="language-(tmt)">`` line raw sample
+```
+code continues</code></pre>

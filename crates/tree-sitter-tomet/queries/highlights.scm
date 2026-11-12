@@ -58,6 +58,7 @@
 ; ``` delimiters read as structural, not as part of the code.
 (fenced_code_block) @markup.raw.block @text.literal
 (fence_marker) @punctuation.special
+(line_marker) @punctuation.special
 
 (unordered_list_item) @markup.list.unnumbered @keyword.control
 (ordered_list_item) @markup.list.numbered @keyword.control

@@ -3,7 +3,9 @@
 use super::parse_flag;
 use tomet_ast::Value;
 use tomet_spec_derive::Config;
-use tomet_style::{BracketSpacing, ColonSpacing, ContentLayout, GroupOrder, ParagraphSeparator};
+use tomet_style::{
+    BracketSpacing, ColonSpacing, ContentLayout, FenceLines, GroupOrder, ParagraphSeparator,
+};
 use tomet_tree::ValueExt;
 
 fn parse_group_order(value: &Value) -> Option<GroupOrder> {
@@ -46,10 +48,24 @@ fn parse_content_layout(value: &Value) -> Option<ContentLayout> {
     ContentLayout::from_name(value.as_str()?)
 }
 
+fn parse_fence_lines(value: &Value) -> Option<FenceLines> {
+    FenceLines::from_name(value.as_str()?)
+}
+
 /// Formatting and printer rule configuration.
 #[derive(Debug, Clone, Default, PartialEq, Config)]
 #[config(group = "format")]
 pub struct FormatConfig {
+    /// How the body lines of a fenced code block are written: `marked` or `bare` ([`FenceLines`]).
+    /// The marked form (`marked`) is the canonical spelling of the language. Unset, the formatter
+    /// leaves each block as written, and the printer writes the canonical marked form.
+    #[config(
+        key = "code.fence.lines",
+        type = "string",
+        parse_with = "parse_fence_lines"
+    )]
+    pub code_fence_lines: Option<FenceLines>,
+
     /// How a paragraph is separated from the block after it (`blank` or `semicolon`). Applies
     /// between paragraphs and the elements, holes, type seats and interpolations that stand like one; a
     /// heading, a list or a code block keeps the blank line it has. Unset, the formatter leaves

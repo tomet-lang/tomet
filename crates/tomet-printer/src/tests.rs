@@ -380,6 +380,19 @@ fn test_codeblock_formatting() {
     let printed = document_to_tm(&doc);
     assert_eq!(
         printed.trim(),
+        "```shell\n`` irm \"https://christitus.com/win\" | iex\n```"
+    );
+
+    let bare_config = PrinterConfig {
+        format: tomet_config::FormatConfig {
+            code_fence_lines: Some(tomet_style::FenceLines::Bare),
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+    let printed_bare = document_to_tm_with_config(&doc, &bare_config);
+    assert_eq!(
+        printed_bare.trim(),
         "```shell\nirm \"https://christitus.com/win\" | iex\n```"
     );
 }

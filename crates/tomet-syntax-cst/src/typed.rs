@@ -68,6 +68,7 @@ define_ast_node!(CstCodeBlock, CODE_BLOCK);
 define_ast_node!(CstSigil, SIGIL);
 define_ast_node!(CstName, NAME);
 define_ast_node!(CstFence, FENCE);
+define_ast_node!(CstLineMarker, LINE_MARKER);
 define_ast_node!(CstInfoString, INFO_STRING);
 define_ast_node!(CstCodeLine, CODE_LINE);
 define_ast_node!(CstSlot, SLOT);
@@ -394,14 +395,163 @@ impl CstInfoString {
     }
 }
 
+/// The structured parts of a [`CstCodeLine`].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CodeLineParts {
+    /// Margin prefix text (container `MARGIN` tokens and indentation before line marker or content).
+    pub margin_prefix: String,
+    /// The line marker (`LINE_MARKER`), if present on this line.
+    pub line_marker: Option<CstLineMarker>,
+    /// The line's body text (after margin, marker and separator space, excluding newline).
+    pub body: String,
+    /// Byte offset where body content begins in the source, or None if body is empty.
+    pub body_start: Option<usize>,
+    /// Byte offset where body content ends in the source.
+    pub body_end: usize,
+}
+
 impl CstCodeLine {
-    /// The mark (e.g. `` `` `` in a line raw), if present.
-    pub fn fence(&self) -> Option<CstFence> {
-        self.syntax().children().find_map(CstFence::cast)
+    /// The line marker (`` `` ``), if present.
+    pub fn line_marker(&self) -> Option<CstLineMarker> {
+        self.syntax().children().find_map(CstLineMarker::cast)
+    }
+
+    /// Deconstructs this code line into its constituent parts: container margin prefix,
+    /// optional line marker, optional separator space, and body content text and offsets.
+    ///
+    /// If in a `|` run (`req_markers > 0`), requires at least `req_markers` margin tokens,
+    /// returning `None` if fewer are present.
+    pub fn parts(&self, req_markers: usize) -> Option<CodeLineParts> {
+        let node = self.syntax();
+        let range = node.text_range();
+        let line_start = usize::from(range.start());
+        let line_end = usize::from(range.end());
+        let mut elements = node.children_with_tokens();
+        let has_line_marker = self.line_marker().is_some();
+        let mut margin_prefix = String::new();
+
+        if has_line_marker {
+            let mut margin_count = 0;
+            let mut marker_end = line_start;
+            let mut marker_node = None;
+            for elem in elements.by_ref() {
+                match elem {
+                    rowan::NodeOrToken::Token(t) if t.kind() == SyntaxKind::MARGIN => {
+                        margin_count += 1;
+                        margin_prefix.push_str(t.text());
+                    }
+                    rowan::NodeOrToken::Node(n) if n.kind() == SyntaxKind::LINE_MARKER => {
+                        marker_end = usize::from(n.text_range().end());
+                        marker_node = CstLineMarker::cast(n);
+                        break;
+                    }
+                    elem => {
+                        margin_prefix.push_str(elem.to_string().as_str());
+                    }
+                }
+            }
+            if margin_count < req_markers {
+                return None;
+            }
+            let next = elements.next();
+            Some(collect_line_content(
+                margin_prefix,
+                marker_node,
+                next,
+                elements,
+                true,
+                marker_end,
+                line_end,
+            ))
+        } else {
+            let mut margin_count = 0;
+            while margin_count < req_markers {
+                let elem = elements.next()?;
+                margin_prefix.push_str(elem.to_string().as_str());
+                if elem.kind() == SyntaxKind::MARGIN {
+                    margin_count += 1;
+                }
+            }
+            let next = elements.next();
+            Some(collect_line_content(
+                margin_prefix,
+                None,
+                next,
+                elements,
+                req_markers > 0,
+                line_start,
+                line_end,
+            ))
+        }
+    }
+}
+
+fn collect_line_content(
+    margin_prefix: String,
+    line_marker: Option<CstLineMarker>,
+    first_after_marker: Option<rowan::NodeOrToken<SyntaxNode, SyntaxToken>>,
+    elements: impl Iterator<Item = rowan::NodeOrToken<SyntaxNode, SyntaxToken>>,
+    drop_one_space: bool,
+    fallback_start: usize,
+    line_end: usize,
+) -> CodeLineParts {
+    let mut body = String::new();
+    let mut body_start = None;
+    let mut next_elem = first_after_marker;
+
+    if drop_one_space
+        && let Some(rowan::NodeOrToken::Token(ref token)) = next_elem
+        && token.kind() == SyntaxKind::WHITESPACE
+        && token.text().starts_with(' ')
+    {
+        let text = token.text();
+        if text.len() > 1 {
+            body_start = Some(usize::from(token.text_range().start()) + 1);
+            body.push_str(&text[1..]);
+        }
+        next_elem = None;
+    }
+
+    let mut current = next_elem;
+    for elem in std::iter::from_fn(|| current.take()).chain(elements) {
+        if let rowan::NodeOrToken::Token(token) = elem {
+            if token.kind() == SyntaxKind::NEWLINE {
+                break;
+            }
+            if body_start.is_none() {
+                body_start = Some(usize::from(token.text_range().start()));
+            }
+            body.push_str(token.text());
+        }
+    }
+
+    let b_start = body_start.unwrap_or(fallback_start.min(line_end));
+    let body_end = body_start.map_or(b_start, |s| s + body.len());
+    CodeLineParts {
+        margin_prefix,
+        line_marker,
+        body,
+        body_start,
+        body_end,
+    }
+}
+
+impl CstLineMarker {
+    /// The backtick tokens forming the marker.
+    pub fn backticks(&self) -> impl Iterator<Item = SyntaxToken> {
+        self.syntax()
+            .children_with_tokens()
+            .filter_map(|e| e.into_token())
+            .filter(|t| t.kind() == SyntaxKind::BACKTICK)
     }
 }
 
 impl CstCodeBlock {
+    /// How many `|` runs this code block stands inside.
+    pub fn pipe_depth(&self) -> usize {
+        crate::pipe_depth(self.syntax())
+    }
+
     pub fn opening_fence(&self) -> Option<CstFence> {
         self.syntax().children().find_map(CstFence::cast)
     }

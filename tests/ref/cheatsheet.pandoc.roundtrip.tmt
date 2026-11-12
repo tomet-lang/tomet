@@ -24,11 +24,11 @@
 @embed(target: "ref:3")[alt]
 
 ```sh
-sudo whoami ls --help
+`` sudo whoami ls --help
 ```
 
 @memo[```
-don't forget: check [this] and [that]
+`` don't forget: check [this] and [that]
 ```
 ]
 
