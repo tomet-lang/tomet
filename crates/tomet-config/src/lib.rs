@@ -189,7 +189,8 @@ mod tests {
     #[test]
     fn test_heading_and_link_spacing_config() {
         let src = r#"::format(
-  heading: { space_inside_brackets: true }
+  heading: { space_inside_brackets: true, blank_before: true, blank_after: false }
+  declaration: { blank_between: false, blank_after: true }
   link: { no_space: true }
 )
 "#;
@@ -198,6 +199,10 @@ mod tests {
             cfg.format.heading_brackets,
             Some(tomet_style::BracketSpacing::Padded)
         );
+        assert_eq!(cfg.format.heading_blank_before, Some(true));
+        assert_eq!(cfg.format.heading_blank_after, Some(false));
+        assert_eq!(cfg.format.declaration_blank_between, Some(false));
+        assert_eq!(cfg.format.declaration_blank_after, Some(true));
         assert_eq!(
             cfg.format.link_target_colon,
             Some(tomet_style::ColonSpacing::Tight)

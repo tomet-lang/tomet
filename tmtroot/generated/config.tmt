@@ -10,15 +10,19 @@ Authoritative reference of all configurable settings supported in `default.confi
 
 Formatting and printer rule configuration.
 
-- `paragraph.separator` (string): How a paragraph is separated from the block after it (`blank` or `semicolon`). Applies between paragraphs and the elements, holes and interpolations that stand like one; a heading, a list or a code block keeps the blank line it has. Unset, the formatter leaves each separator as written and the printer, which has none to keep, writes a blank line.
+- `paragraph.separator` (string): How a paragraph is separated from the block after it (`blank` or `semicolon`). Applies between paragraphs and the elements, holes, type seats and interpolations that stand like one; a heading, a list or a code block keeps the blank line it has. Unset, the formatter leaves each separator as written and the printer, which has none to keep, writes a blank line.
 - `map.align_values` (bool, default: `false`): Align the values of consecutive `key: value` lines of a `(...)` group written over several lines, the colon staying on the key (`meta:    {...}` over `heading: {...}`). A blank line, a comment, or an entry whose value runs over several lines ends a run. Off, each line keeps the spacing it has.
 - `map.max_key_width` (int, default: `20`): Widest key, in display columns, that `map.align_values` pads the others to. A longer key is written `key: value` and neither widens the others nor ends the run.
-- `heading.space_inside_brackets` (bool, default: `false`): Space inside brackets for headings (`=[ title ]` vs `=[title]`).
-- `link.no_space` (bool, default: `false`): Omit spaces around link content (`@[content]` vs `@ [content]`). Aliases: `wikilink.no_space`.
-- `link.group_order` (string, default: `()[]`): Delimiter group order for links (`()[]` vs `[]()`). Aliases: `link.order`, `wikilink.group_order`, `wikilink.order`.
-- `element.group_order` (string, default: `args_first`): Default delimiter group order for all elements. Aliases: `element.order`, `group_order`.
-- `callout.style.content` (string): Callout box content style (e.g. "block", "quote").
-- `list.multiline.style.content` (string): Multiline list item content style (e.g. "box", "bullet").
+- `heading.space_inside_brackets` (bool): Whether the title of a heading has a space inside its brackets (`=[ title ]` vs `=[title]`). Unset, the formatter leaves each heading as written and the printer writes none.
+- `heading.blank_before` (bool): Whether a blank line is placed before a heading (`=[title]`). Unset, the formatter leaves each as written.
+- `heading.blank_after` (bool): Whether a blank line is placed after a heading (`=[title]`). Unset, the formatter leaves each as written.
+- `declaration.blank_between` (bool): Whether a blank line is placed between consecutive preamble declarations (`::kind(...)`). Unset, the formatter leaves each as written.
+- `declaration.blank_after` (bool): Whether a blank line is placed after the preamble declarations (`::kind(...)`), before the document body. Unset, the formatter leaves each as written.
+- `link.no_space` (bool): Whether a `target` that is the only argument of an element, as in `@link(target: x)`, has no space after its colon (`target:x` vs `target: x`). Any other argument is written with the space. Unset, the formatter leaves each as written and the printer writes the space.
+- `link.group_order` (string, default: `()[]`): Delimiter group order for links (`()[]` vs `[]()`).
+- `element.group_order` (string, default: `args_first`): Default delimiter group order for all elements.
+- `callout.style.content` (string): How the content of a `@callout` is laid out between its brackets: `expanded`, `block` or `box` (\[`ContentLayout`\]). Unset, or any other value, the printer writes it as it writes the content of any element.
+- `list.multiline.style.content` (string): How the content of a list item that runs over several lines is laid out between its brackets: `expanded`, `block` or `box` (\[`ContentLayout`\]). Unset, or any other value, the printer writes the content after the marker as it is.
 - `table.adjust_width` (string | bool, default: `auto`): Table column width alignment behavior ("auto", "true", "false").
 - `table.max_col_width` (int, default: `20`): Maximum column width threshold for table alignment.
 - `table.align` (string): Default text alignment in table cells ("left", "center", "right").
@@ -27,15 +31,13 @@ Formatting and printer rule configuration.
 
 Document metadata formatting and schema rules.
 
-- `meta.always_newline` (bool, default: `false`): Always write metadata keys on separate newlines.
+- `meta.always_newline` (bool): Whether the fields of `::meta(...)` are written one to a line (`true`) or on one line (`false`). Unset, the formatter leaves each `::meta` as written and the printer writes one line.
 - `meta.<field>.type` (string): Expected semantic data type of the metadata field (e.g. `string`, `list`, `datetime`).
 - `meta.<field>.format` (string): Datetime or string format pattern (e.g. `rfc3339`).
 - `meta.<field>.offset` (string): Fixed timezone offset string (e.g. `+09:00`).
 - `meta.<field>.always_newline` (bool, default: `false`): Force trailing newline formatting for this field in `::meta(...)`.
 - `meta.<field>.length` (int): Fixed or maximum list length.
 - `meta.<field>.prefix` (string): Static string prefix.
-- `meta.<field>.force` (bool): Force presence validation.
-- `meta.<field>.overwrite` (bool): Allow overwriting during migrations.
 
 ==[ workspace ]
 

@@ -36,7 +36,7 @@ Options:
 
 Print statistics for a `.tmt` file, or every one under a directory: how many characters, elements, links and headings it holds.
 
-Characters are the prose a reader sees -- text inside `[...]`, headings included, whitespace and code block bodies left out. `(args)` and `{value}` are data and are not counted. Elements are split by sigil (named, `${}`, `^`, and list items) and the named ones by name. Links are the ones `check-links` looks at. A directory is swept the way `check` sweeps one, and an unreadable file does not stop the sweep; the run exits non-zero at the end.
+Characters are the prose a reader sees -- text inside `[...]`, headings included, whitespace and code block bodies left out. `(args)` and `{value}` are data and are not counted. Elements are split by sigil (named, `$`, `^`, and list items) and the named ones by name. Links are the ones `check-links` looks at. A directory is swept the way `check` sweeps one, and an unreadable file does not stop the sweep; the run exits non-zero at the end.
 
 ```text
 tomet stats [OPTIONS] [PATH]
@@ -213,7 +213,7 @@ Options:
 
 Make a `.tmt` file standalone, so it can be taken out of its vault.
 
-What the file takes from its vault is dealt with: a macro or variable the vault defines is written into the file, and what depends on where the file sits or on other files (`${self.path}`, `${include(...)}`, `${vault...}`) is replaced by the value it has there. The result declares `::profile(standalone)`.
+What the file takes from its vault is dealt with: a macro or variable the vault defines is written into the file, and what depends on where the file sits or on other files (`$(self::path)`, `$include(...)`, `{$ vault... }`) is replaced by the value it has there. The result declares `::profile(standalone)`.
 
 The file is printed to standard output, or written to `--out`; what was done is reported on standard error, and the command fails if something is left that the file still takes from outside (a vocabulary, an `@term`, or a metadata field unless `--freeze-fields`). There is no `--in-place`: replacing an expression by its value in the original would take it out of the file in the vault.
 
@@ -228,7 +228,7 @@ Arguments:
 Options:
 
 - `-o, --out <OUT>`: Write to this path instead of stdout: a file, or a directory (the file keeps its name there).
-- `--freeze-fields`: Also replace `${self.meta.x}` by its value. Without it the expression is left, because a file cannot hold the vault's `::fields` that give a metadata field its type.
+- `--freeze-fields`: Also replace `$(self::meta.x)` by its value. Without it the expression is left, because a file cannot hold the vault's `::field` that give a metadata field its type.
 
 ==[ tomet format ]
 
@@ -325,4 +325,22 @@ Options:
 - `-b, --blueprint <BLUEPRINT>`: Blueprint name, as the blueprint gives it in `::blueprint(...)` (e.g. "daily-note", "rfc"). Resolved among the blueprints the vault declares in `blueprints`, never searched for on disk.
 - `-l, --list`: List the blueprints this vault declares instead of creating a file.
 - `-f, --force`: Overwrite target file if it already exists.
+- `--var <VARS>`: Pass custom variable as `key=value`. Can be specified multiple times.
+
+==[ tomet apply ]
+
+Apply a blueprint to existing .tmt document(s)
+
+```text
+tomet apply [OPTIONS] <PATHS>...
+```
+
+Arguments:
+
+- `<PATHS>...`: Target file(s) or director(y/ies) to apply to.
+
+Options:
+
+- `-b, --blueprint <BLUEPRINT>`: Blueprint name to apply (defaults to the document's `::kind`).
+- `--dry-run`: Dry-run mode without modifying files on disk.
 - `--var <VARS>`: Pass custom variable as `key=value`. Can be specified multiple times.

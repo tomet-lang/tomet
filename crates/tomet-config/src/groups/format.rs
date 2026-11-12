@@ -83,6 +83,26 @@ pub struct FormatConfig {
     )]
     pub heading_brackets: Option<BracketSpacing>,
 
+    /// Whether a blank line is placed before a heading (`=[title]`). Unset, the formatter leaves
+    /// each as written.
+    #[config(key = "heading.blank_before", type = "bool")]
+    pub heading_blank_before: Option<bool>,
+
+    /// Whether a blank line is placed after a heading (`=[title]`). Unset, the formatter leaves
+    /// each as written.
+    #[config(key = "heading.blank_after", type = "bool")]
+    pub heading_blank_after: Option<bool>,
+
+    /// Whether a blank line is placed between consecutive preamble declarations (`::kind(...)`).
+    /// Unset, the formatter leaves each as written.
+    #[config(key = "declaration.blank_between", type = "bool")]
+    pub declaration_blank_between: Option<bool>,
+
+    /// Whether a blank line is placed after the preamble declarations (`::kind(...)`), before the
+    /// document body. Unset, the formatter leaves each as written.
+    #[config(key = "declaration.blank_after", type = "bool")]
+    pub declaration_blank_after: Option<bool>,
+
     /// Whether a `target` that is the only argument of an element, as in `@link(target: x)`, has no
     /// space after its colon (`target:x` vs `target: x`). Any other argument is written with the
     /// space. Unset, the formatter leaves each as written and the printer writes the space.

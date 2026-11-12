@@ -26,15 +26,19 @@
 //! [`format_map_alignment`]), lays out the content of a callout or a list item that runs over several
 //! lines (`callout.style.content`, `list.multiline.style.content`, [`format_content_layouts`]), spaces
 //! the brackets of a heading and the colon of a link's `target` (`heading.space_inside_brackets`,
-//! `link.no_space`, [`format_heading_brackets`], [`format_link_targets`]), lays the fields of a
-//! `::meta` out (`meta.always_newline`, [`format_meta_layout`]) and applies
+//! `link.no_space`, [`format_heading_brackets`], [`format_link_targets`]), spaces blank lines around
+//! headings (`heading.blank_before`, `heading.blank_after`, [`format_heading_blank_lines`]) and
+//! preamble declarations (`declaration.blank_between`, `declaration.blank_after`, [`format_declaration_blank_lines`]),
+//! lays the fields of a `::meta` out (`meta.always_newline`, [`format_meta_layout`]) and applies
 //! [`format_source`]. It never changes what document metadata (`::meta`) says -- a field's type, format
 //! or prefix is the printer's business, not its -- and injects no structural elements.
 
 pub mod align;
 pub mod clean;
 pub mod data;
+pub mod declaration;
 mod edit;
+pub mod heading;
 pub mod layout;
 pub mod meta;
 pub mod paragraph;
@@ -48,6 +52,8 @@ mod tests;
 pub use align::format_map_alignment;
 pub use clean::clean_whitespace;
 pub use data::format_data_source;
+pub use declaration::format_declaration_blank_lines;
+pub use heading::format_heading_blank_lines;
 pub use layout::format_content_layouts;
 pub use meta::format_meta_layout;
 pub use paragraph::format_paragraph_separators;
@@ -81,5 +87,7 @@ pub fn format_source_with_config(src: &str, config: &PrinterConfig) -> String {
     let aligned = align::format_map_alignment(&separated, config);
     let headed = spacing::format_heading_brackets(&aligned, config);
     let linked = spacing::format_link_targets(&headed, config);
-    format_source(&linked)
+    let decl_blanks = declaration::format_declaration_blank_lines(&linked, config);
+    let heading_blanks = heading::format_heading_blank_lines(&decl_blanks, config);
+    format_source(&heading_blanks)
 }

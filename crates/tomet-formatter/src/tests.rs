@@ -684,3 +684,27 @@ fn document_metadata_is_aligned_like_any_other_group() {
     let src = "::meta(\n  title: T\n  id: x\n)\n\ntext\n";
     assert_eq!(aligned(src), "::meta(\n  title: T\n  id:    x\n)\n\ntext\n");
 }
+
+#[test]
+fn heading_blank_lines_format_source_with_config() {
+    let mut config = PrinterConfig::default();
+    config.format.heading_blank_before = Some(true);
+    config.format.heading_blank_after = Some(false);
+
+    let src = "intro\n=[ Heading 1 ]\n\nbody text 1\n==[ Heading 1.1 ]\n\nbody text 1.1\n";
+    let formatted = format_source_with_config(src, &config);
+    let expected = "intro\n\n=[ Heading 1 ]\nbody text 1\n\n==[ Heading 1.1 ]\nbody text 1.1\n";
+    assert_eq!(formatted, expected);
+}
+
+#[test]
+fn declaration_blank_lines_format_source_with_config() {
+    let mut config = PrinterConfig::default();
+    config.format.declaration_blank_between = Some(false);
+    config.format.declaration_blank_after = Some(true);
+
+    let src = "::kind(fixture)\n\n::meta(x: 1)\nSome paragraph text.\n";
+    let formatted = format_source_with_config(src, &config);
+    let expected = "::kind(fixture)\n::meta(x: 1)\n\nSome paragraph text.\n";
+    assert_eq!(formatted, expected);
+}

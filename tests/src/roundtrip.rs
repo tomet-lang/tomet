@@ -173,6 +173,102 @@ fn aligning_values_does_not_change_the_parsed_document() {
 }
 
 #[test]
+fn heading_blank_lines_do_not_change_the_parsed_document() {
+    use tomet_config::{FormatConfig, PrinterConfig};
+
+    for before_opt in [Some(true), Some(false)] {
+        for after_opt in [Some(true), Some(false)] {
+            let config = PrinterConfig {
+                format: FormatConfig {
+                    heading_blank_before: before_opt,
+                    heading_blank_after: after_opt,
+                    ..Default::default()
+                },
+                ..Default::default()
+            };
+            let mut changed = 0;
+            for (rel, src) in parseable_corpus() {
+                let before = tomet_ast_parser::parse_file(&src)
+                    .unwrap_or_else(|e| panic!("{} failed to parse: {e}", rel.display()));
+                let once = tomet_formatter::format_source_with_config(&src, &config);
+                let after = tomet_ast_parser::parse_file(&once).unwrap_or_else(|e| {
+                    panic!(
+                        "{} failed to parse after heading blank formatting ({before_opt:?}, {after_opt:?}): {e}",
+                        rel.display()
+                    )
+                });
+                assert!(
+                    before == after,
+                    "heading blank formatting ({before_opt:?}, {after_opt:?}) changed parsed document for {}",
+                    rel.display()
+                );
+                assert_eq!(
+                    tomet_formatter::format_source_with_config(&once, &config),
+                    once,
+                    "heading blank formatting ({before_opt:?}, {after_opt:?}) is not idempotent for {}",
+                    rel.display()
+                );
+                if once != tomet_formatter::format_source_with_config(&src, &PrinterConfig::default()) {
+                    changed += 1;
+                }
+            }
+            assert!(
+                changed > 0,
+                "no fixture was rewritten by heading blank formatting ({before_opt:?}, {after_opt:?})"
+            );
+        }
+    }
+}
+
+#[test]
+fn declaration_blank_lines_do_not_change_the_parsed_document() {
+    use tomet_config::{FormatConfig, PrinterConfig};
+
+    for between_opt in [Some(true), Some(false)] {
+        for after_opt in [Some(true), Some(false)] {
+            let config = PrinterConfig {
+                format: FormatConfig {
+                    declaration_blank_between: between_opt,
+                    declaration_blank_after: after_opt,
+                    ..Default::default()
+                },
+                ..Default::default()
+            };
+            let mut changed = 0;
+            for (rel, src) in parseable_corpus() {
+                let before = tomet_ast_parser::parse_file(&src)
+                    .unwrap_or_else(|e| panic!("{} failed to parse: {e}", rel.display()));
+                let once = tomet_formatter::format_source_with_config(&src, &config);
+                let after = tomet_ast_parser::parse_file(&once).unwrap_or_else(|e| {
+                    panic!(
+                        "{} failed to parse after declaration blank formatting ({between_opt:?}, {after_opt:?}): {e}",
+                        rel.display()
+                    )
+                });
+                assert!(
+                    before == after,
+                    "declaration blank formatting ({between_opt:?}, {after_opt:?}) changed parsed document for {}",
+                    rel.display()
+                );
+                assert_eq!(
+                    tomet_formatter::format_source_with_config(&once, &config),
+                    once,
+                    "declaration blank formatting ({between_opt:?}, {after_opt:?}) is not idempotent for {}",
+                    rel.display()
+                );
+                if once != tomet_formatter::format_source_with_config(&src, &PrinterConfig::default()) {
+                    changed += 1;
+                }
+            }
+            assert!(
+                changed > 0,
+                "no fixture was rewritten by declaration blank formatting ({between_opt:?}, {after_opt:?})"
+            );
+        }
+    }
+}
+
+#[test]
 fn laying_out_content_does_not_change_the_parsed_document() {
     // A layout only moves white space inside and around the brackets of content that already runs
     // over several lines, and what it writes is what it would write again.
