@@ -18,26 +18,23 @@ pub struct RuleArgs {
 /// Reads `connect.data.args` for a `::rule(...)` connect, or `None` if the
 /// shape isn't recognized.
 pub fn decode_rule_args(connect: &Connect) -> Option<RuleArgs> {
-    let Some(Value::Map(entries)) = &connect.data.args else {
-        return None;
-    };
-
-    let allow_value = entries.iter().find(|(k, _)| k == "allow").map(|(_, v)| v)?;
-    let items = match allow_value {
-        Value::Seq(items) => items,
+    let args = connect.data.args.as_ref()?;
+    let allow_value = args.get("allow")?;
+    let items_tuple = match allow_value {
+        Value::Tuple(t) if t.has_no_named() => t,
         // `enum(...)` is written the same way, but means nothing of its own yet.
-        Value::Call(callee, items) if callee == "enum" => items,
+        Value::Call(callee, t) if callee == "enum" && t.has_no_named() => t,
         _ => return None,
     };
-    let mut allow = Vec::with_capacity(items.len());
-    for item in items {
+    let mut allow = Vec::with_capacity(items_tuple.len());
+    for item in items_tuple.unnamed() {
         let Value::String(s) = item else {
             return None;
         };
         allow.push(name_from_dotted(s));
     }
 
-    let direct = match entries.iter().find(|(k, _)| k == "direct").map(|(_, v)| v) {
+    let direct = match args.get("direct") {
         Some(Value::Bool(b)) => *b,
         Some(_) => return None,
         None => false,

@@ -2,6 +2,13 @@
 //!
 //! Which are refused, which are the `#(x)` and `{a: 1}` of their owner written out, and how the
 //! groups of a nameless one merge into the owner's.
+//!
+//! Two tuples merge in one way ([`merge_tuples`]): entry by entry, by key, and an entry written on
+//! both sides is an error unless both values are tuples, which merge by the same rule. An unnamed
+//! entry's key is its position among the unnamed entries, so `(a)` and `(b)` clash at position 0
+//! exactly as `(k: a)` and `(k: b)` clash at `k`.
+
+use std::fmt;
 
 use super::form::require_primary_group;
 use super::groups::lower_groups;
@@ -9,7 +16,7 @@ use super::{name_of, range_of, unsupported};
 use crate::element::Groups;
 use crate::error::Result;
 use crate::value::err;
-use tomet_ast::{Connect, Entry, Value};
+use tomet_ast::{Connect, Entry, Tuple, TupleEntry, Value};
 use tomet_cst::{SyntaxKind as K, SyntaxNode};
 use tomet_span::Span;
 
@@ -82,11 +89,23 @@ pub(super) fn merge_connect(node: &SyntaxNode, read: &mut Groups) -> Result<()> 
         match child.kind() {
             K::ARGS => {
                 let args = crate::element::lower_paren_value(&child)?;
-                read.data.args = merge_values(read.data.args.as_ref(), Some(&args));
+                read.data.args = Some(match read.data.args.take() {
+                    None => args,
+                    Some(first) => merge_tuples(
+                        &first,
+                        &args,
+                        &mut Vec::new(),
+                        &Writers {
+                            earlier: &read.args_writers,
+                            second: &child,
+                        },
+                    )?,
+                });
+                read.args_writers.push(child);
             }
             K::VALUE_DATA | K::MAP_LITERAL => {
                 let value = crate::element::lower_value_group(&child)?;
-                merge_value_group(read, value);
+                merge_value_group(read, value, &child)?;
             }
             K::CONTENT => {
                 return Err(err(
@@ -101,19 +120,48 @@ pub(super) fn merge_connect(node: &SyntaxNode, read: &mut Groups) -> Result<()> 
     Ok(())
 }
 
-/// Merges `value` into the `{value}` group `read` already has, if both hold only pairs.
-fn merge_value_group(read: &mut Groups, value: tomet_ast::Group) {
-    let merged = match &read.data.value {
-        Some(existing)
-            if existing.0.iter().all(|e| matches!(e, Entry::Pair(..)))
-                && value.0.iter().all(|e| matches!(e, Entry::Pair(..))) =>
-        {
-            merge_values(Some(&existing.as_data()), Some(&value.as_data()))
-                .map(tomet_ast::Group::from_map)
+/// Merges `value`, written by `writer`, into the `{value}` group `read` already has.
+///
+/// The `key: value` pairs of the two groups merge as tuples do ([`merge_tuples`]). An entry that
+/// is not a pair (an element, a hole) has no key, so it clashes with nothing: the entries of the
+/// first group stay where they were written, and what only the second has comes after them.
+fn merge_value_group(
+    read: &mut Groups,
+    value: tomet_ast::Group,
+    writer: &SyntaxNode,
+) -> Result<()> {
+    let merged = match read.data.value.take() {
+        None => value,
+        Some(first) => {
+            let pairs = merge_tuples(
+                &first.as_data(),
+                &value.as_data(),
+                &mut Vec::new(),
+                &Writers {
+                    earlier: &read.value_writers,
+                    second: writer,
+                },
+            )?;
+            let in_first = |key: &str| first.pairs().any(|(k, _)| k == key);
+            let added: Vec<Entry> = value
+                .0
+                .iter()
+                .filter(|entry| !matches!(entry, Entry::Pair(key, _) if in_first(key)))
+                .cloned()
+                .collect();
+            let kept = first.0.iter().map(|entry| match entry {
+                Entry::Pair(key, _) => match pairs.get(key) {
+                    Some(value) => Entry::Pair(key.clone(), value.clone()),
+                    None => entry.clone(),
+                },
+                Entry::Element(_) | Entry::Hole(_) => entry.clone(),
+            });
+            tomet_ast::Group(kept.chain(added).collect())
         }
-        _ => None,
     };
-    read.data.value = Some(merged.unwrap_or(value));
+    read.data.value = Some(merged);
+    read.value_writers.push(writer.clone());
+    Ok(())
 }
 
 /// `::id(x)` is the `#(x)` of its owner and `::meta(a: 1)` its `{a: 1}`, written out: the
@@ -137,11 +185,12 @@ pub(super) fn desugar_connect(node: &SyntaxNode, read: &mut Groups) -> Result<bo
             format!("`::{written}` takes its `(...)` only: write `::{written}(...)`"),
         ));
     }
-    let args = connect.data.args.unwrap_or(Value::Map(Vec::new()));
+    let args = connect.data.args.unwrap_or_default();
     if written == "id" {
-        let id = match &args {
-            Value::Map(_) | Value::Seq(_) => None,
-            scalar => scalar.scalar_text(),
+        let id = if args.len() == 1 && args.has_no_named() {
+            args.nth_unnamed(0).and_then(Value::scalar_text)
+        } else {
+            None
         };
         let Some(id) = id.filter(|id| !id.is_empty()) else {
             return Err(err(at, "`::id` takes one id: write `::id(x)`"));
@@ -151,57 +200,149 @@ pub(super) fn desugar_connect(node: &SyntaxNode, read: &mut Groups) -> Result<bo
         }
         read.id = Some(tomet_ast::Id(id.into_owned()));
     } else {
-        let Value::Map(entries) = args else {
-            return Err(err(
-                at,
-                "`::meta` takes `key: value` pairs: write `::meta(a: 1)`",
-            ));
-        };
-        if entries.iter().any(|(k, _)| k.is_empty()) {
+        if !args.has_no_unnamed() {
             return Err(err(
                 at,
                 "`::meta` takes `key: value` pairs: write `::meta(a: 1)`",
             ));
         }
-        merge_value_group(read, tomet_ast::Group::from_map(Value::Map(entries)));
+        merge_value_group(read, tomet_ast::Group::from_map(args), node)?;
     }
     Ok(true)
 }
 
-/// `connected` merged under `direct`: maps key by key (the direct value wins a
-/// clash), sequences without repeating an item, anything else the direct one.
-fn merge_values(direct: Option<&Value>, connected: Option<&Value>) -> Option<Value> {
-    match (direct, connected) {
-        (None, None) => None,
-        (Some(d), None) => Some(d.clone()),
-        (None, Some(c)) => Some(c.clone()),
-        (Some(d), Some(c)) => Some(merge_values_inner(d, c)),
+/// One step of the way to an entry: its name, or its position among the unnamed entries of
+/// its tuple.
+#[derive(Clone, PartialEq)]
+enum Key {
+    Name(String),
+    Position(usize),
+}
+
+impl fmt::Display for Key {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Key::Name(name) => f.write_str(name),
+            Key::Position(n) => write!(f, "{n}"),
+        }
     }
 }
 
-fn merge_values_inner(direct: &Value, connected: &Value) -> Value {
-    match (direct, connected) {
-        (Value::Map(d_map), Value::Map(c_map)) => {
-            let mut merged = c_map.clone();
-            for (d_k, d_v) in d_map {
-                if let Some(pos) = merged.iter().position(|(c_k, _)| c_k == d_k) {
-                    let c_v = &merged[pos].1;
-                    merged[pos].1 = merge_values_inner(d_v, c_v);
-                } else {
-                    merged.push((d_k.clone(), d_v.clone()));
-                }
+/// `second` merged into `first`, both found at `path` from the groups being merged.
+///
+/// The entries of `first` stay where they were written, then come the entries only `second`
+/// has. An entry both have is merged if both values are tuples and is an error otherwise,
+/// equal values included: a key is written once.
+fn merge_tuples(
+    first: &Tuple,
+    second: &Tuple,
+    path: &mut Vec<Key>,
+    writers: &Writers,
+) -> Result<Tuple> {
+    let mut merged = Vec::with_capacity(first.len() + second.len());
+    let mut position = 0;
+    for entry in first.entries() {
+        let (key, other) = match entry.name() {
+            Some(name) => (Key::Name(name.to_string()), second.get(name)),
+            None => {
+                position += 1;
+                (
+                    Key::Position(position - 1),
+                    second.nth_unnamed(position - 1),
+                )
             }
-            Value::Map(merged)
-        }
-        (Value::Seq(d_seq), Value::Seq(c_seq)) => {
-            let mut merged = c_seq.clone();
-            for item in d_seq {
-                if !merged.contains(item) {
-                    merged.push(item.clone());
-                }
-            }
-            Value::Seq(merged)
-        }
-        (direct_val, _) => direct_val.clone(),
+        };
+        let Some(other) = other else {
+            merged.push(entry.clone());
+            continue;
+        };
+        path.push(key);
+        let (Value::Tuple(ours), Value::Tuple(theirs)) = (entry.value(), other) else {
+            return Err(writers.clash(path));
+        };
+        let value = Value::Tuple(merge_tuples(ours, theirs, path, writers)?);
+        path.pop();
+        merged.push(TupleEntry::new(entry.name().map(str::to_string), value));
     }
+    let unnamed_in_first = position;
+    let mut position = 0;
+    for entry in second.entries() {
+        let only_in_second = match entry.name() {
+            Some(name) => !first.contains_name(name),
+            None => {
+                position += 1;
+                position > unnamed_in_first
+            }
+        };
+        if only_in_second {
+            merged.push(entry.clone());
+        }
+    }
+    Ok(Tuple::from_entries(merged))
+}
+
+/// Who wrote the two tuples being merged: the nodes that wrote the first one, in the order
+/// they were read, and the node that writes the second. Kept as nodes because a value has no
+/// position; they are only looked into when a clash has to say where its two writers are.
+struct Writers<'a> {
+    earlier: &'a [SyntaxNode],
+    second: &'a SyntaxNode,
+}
+
+impl Writers<'_> {
+    /// The error for the entry at `path` being written twice: at the second writer, naming
+    /// the place of the first.
+    fn clash(&self, path: &[Key]) -> crate::error::Error {
+        let written: Vec<String> = path.iter().map(Key::to_string).collect();
+        let what = match path.last() {
+            Some(Key::Position(_)) => "entry",
+            _ => "key",
+        };
+        let mut message = format!("duplicate {what} `{}`", written.join("."));
+        if let Some(first) = self.earlier.iter().find_map(|node| entry_at(node, path)) {
+            let (offset, _) = range_of(&first);
+            if let Some(root) = first.ancestors().last() {
+                let source = root.text().to_string();
+                let at = tomet_position::LineIndex::new(&source).line_col(offset);
+                message.push_str(&format!(": first written at {}:{}", at.line, at.column));
+            }
+        }
+        let second = entry_at(self.second, path).unwrap_or_else(|| self.second.clone());
+        err(range_of(&second).0, message)
+    }
+}
+
+fn is_entry(node: &SyntaxNode) -> bool {
+    matches!(node.kind(), K::MAP_ENTRY | K::SEQ_ITEM)
+}
+
+/// The node of the entry at `path` in what `writer` wrote, if it wrote one there.
+fn entry_at(writer: &SyntaxNode, path: &[Key]) -> Option<SyntaxNode> {
+    let mut within = writer.clone();
+    let mut found = None;
+    for key in path {
+        let holder = std::iter::once(within.clone())
+            .chain(within.descendants())
+            .find(|node| node.children().any(|child| is_entry(&child)))?;
+        let mut position = 0;
+        let entry = holder.children().filter(is_entry).find(|entry| {
+            let name = match entry.kind() {
+                K::MAP_ENTRY => crate::element::lower_map_entry(entry)
+                    .ok()
+                    .and_then(|(name, _, _)| name),
+                _ => None,
+            };
+            match (name, key) {
+                (Some(name), Key::Name(wanted)) => name == *wanted,
+                (None, Key::Position(wanted)) => {
+                    position += 1;
+                    position - 1 == *wanted
+                }
+                _ => false,
+            }
+        })?;
+        within = entry.clone();
+        found = Some(entry);
+    }
+    found
 }

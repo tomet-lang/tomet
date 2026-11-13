@@ -5,7 +5,7 @@
 //! round-trip as literal text rather than being misread as `.tmt`
 //! syntax on export.
 
-use tomet_ast::{Block, Element, File, Inline, List, Name, Text, Value};
+use tomet_ast::{Block, Element, File, Inline, List, Name, Text, Tuple, Value};
 use tomet_span::Span;
 use tomet_tree::element_new;
 
@@ -138,7 +138,7 @@ fn parse_urls_and_wikilinks(text: &str) -> Vec<Inline> {
                 }
                 let url_str = &remaining[u_start..u_end];
                 let mut el = element_new(Name::bare("link"));
-                el.data.args = Some(Value::Map(vec![(
+                el.data.args = Some(Tuple::from_named([(
                     "target".to_string(),
                     Value::String(url_str.to_string()),
                 )]));
@@ -158,7 +158,7 @@ fn parse_urls_and_wikilinks(text: &str) -> Vec<Inline> {
                     }
                     let url_str = &remaining[u_start..u_end];
                     let mut el = element_new(Name::bare("link"));
-                    el.data.args = Some(Value::Map(vec![(
+                    el.data.args = Some(Tuple::from_named([(
                         "target".to_string(),
                         Value::String(url_str.to_string()),
                     )]));
@@ -221,7 +221,7 @@ fn parse_one_wikilink(result: &mut Vec<Inline>, remaining: &mut &str, start_idx:
             let target = target.trim();
             let display = display.trim();
             let mut el = element_new(sigil);
-            el.data.args = Some(Value::Map(vec![(
+            el.data.args = Some(Tuple::from_named([(
                 "target".to_string(),
                 Value::String(target_key_value(target)),
             )]));
@@ -236,7 +236,7 @@ fn parse_one_wikilink(result: &mut Vec<Inline>, remaining: &mut &str, start_idx:
         } else {
             let target = unescaped_inner.trim();
             let mut el = element_new(sigil);
-            el.data.args = Some(Value::Map(vec![(
+            el.data.args = Some(Tuple::from_named([(
                 "target".to_string(),
                 Value::String(target_key_value(target)),
             )]));

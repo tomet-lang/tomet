@@ -75,13 +75,16 @@ pub fn extract_blueprint_schema(blueprint: &File) -> Option<BlueprintSchema> {
         match classify_declaration_lenient(declaration) {
             ElementKind::Declaration(DeclKind::Blueprint) => {
                 found_blueprint = true;
-                if let Some(Value::String(k)) = &declaration.data.args {
-                    target_kind = k.clone();
-                } else if let Some(Value::Map(entries)) = &declaration.data.args
-                    && let Some((_, v)) = entries.iter().find(|(k, _)| k == "target" || k == "kind")
-                    && let Some(s) = v.as_str()
-                {
-                    target_kind = s.to_string();
+                if let Some(args) = &declaration.data.args {
+                    if let Some(target) = args
+                        .get("target")
+                        .or_else(|| args.get("kind"))
+                        .or_else(|| args.nth_unnamed(0))
+                    {
+                        if let Some(s) = target.as_str() {
+                            target_kind = s.to_string();
+                        }
+                    }
                 }
             }
             ElementKind::Declaration(DeclKind::Id) => {
@@ -89,7 +92,13 @@ pub fn extract_blueprint_schema(blueprint: &File) -> Option<BlueprintSchema> {
                 let seat = norm_args
                     .as_ref()
                     .and_then(|args| args.get("id"))
-                    .or(declaration.data.args.as_ref())
+                    .or_else(|| {
+                        declaration
+                            .data
+                            .args
+                            .as_ref()
+                            .and_then(|args| args.nth_unnamed(0))
+                    })
                     .and_then(find_type_seat);
                 let expected_type = seat.and_then(evaluate_type_seat);
                 required_meta_keys.push(RequiredMetaKey {
@@ -99,13 +108,13 @@ pub fn extract_blueprint_schema(blueprint: &File) -> Option<BlueprintSchema> {
                 });
             }
             ElementKind::Declaration(DeclKind::Meta) => {
-                if let Some(Value::Map(entries)) =
+                if let Some(Value::Tuple(entries)) =
                     tomet_semantics::data::declaration_entries(declaration)
                 {
-                    for (k, v) in entries {
-                        let expected_type = find_type_seat(&v).and_then(evaluate_type_seat);
+                    for (k, v) in entries.named() {
+                        let expected_type = find_type_seat(v).and_then(evaluate_type_seat);
                         required_meta_keys.push(RequiredMetaKey {
-                            key: k,
+                            key: k.to_string(),
                             span,
                             expected_type,
                         });
@@ -178,19 +187,26 @@ pub fn validate_against_schema(
     for declaration in &doc.header {
         match classify_declaration_lenient(declaration) {
             ElementKind::Declaration(DeclKind::Id) => {
-                let val = tomet_semantics::normalized_declaration_args(declaration)
+                let norm_args = tomet_semantics::normalized_declaration_args(declaration);
+                let val = norm_args
                     .as_ref()
                     .and_then(|args| args.get("id"))
-                    .or(declaration.data.args.as_ref())
+                    .or_else(|| {
+                        declaration
+                            .data
+                            .args
+                            .as_ref()
+                            .and_then(|args| args.nth_unnamed(0))
+                    })
                     .cloned();
                 doc_fields.insert("id".to_string(), (val, declaration.span));
             }
             ElementKind::Declaration(DeclKind::Meta) => {
                 doc_meta_span = declaration.span;
-                if let Some(Value::Map(entries)) =
+                if let Some(Value::Tuple(entries)) =
                     tomet_semantics::data::declaration_entries(declaration)
                 {
-                    for (k, v) in entries {
+                    for (k, v) in entries.into_named() {
                         doc_fields.insert(k, (Some(v), declaration.span));
                     }
                 }
@@ -355,8 +371,17 @@ fn describe_value(value: &Value) -> String {
         Value::Int(n) => n.to_string(),
         Value::Float(n) => n.to_string(),
         Value::Number(text) => text.clone(),
-        Value::Seq(_) => "a list".to_string(),
-        Value::Map(_) => "a map".to_string(),
+        Value::Tuple(tuple) => {
+            if tuple.is_empty() {
+                "an empty tuple".to_string()
+            } else if tuple.has_no_named() {
+                "a list".to_string()
+            } else if tuple.has_no_unnamed() {
+                "a map".to_string()
+            } else {
+                "a list with named entries".to_string()
+            }
+        }
         Value::Null => "null".to_string(),
         _ => "something else".to_string(),
     }

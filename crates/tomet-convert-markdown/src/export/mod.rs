@@ -15,7 +15,9 @@ mod tests;
 
 use escape::{escape_attr, escape_text, fence_for};
 
-use tomet_ast::{Block, ElementView, File, Inline, Interpolation, List, Placement, Section, Value};
+use tomet_ast::{
+    Block, ElementView, File, Inline, Interpolation, List, Placement, Section, Tuple, Value,
+};
 use tomet_semantics::{
     FootnoteRegistry, TargetScheme, classify_std_lenient, comment_text, extract_tags,
     heading_level, is_attribute_key, is_directive, link_target, normalized_element_args,
@@ -302,8 +304,7 @@ fn render_ruby(cx: &MarkdownCtx, el: ElementView<'_>) -> String {
     let args = normalized_element_args(el);
     let rt = args
         .as_ref()
-        .and_then(as_map)
-        .and_then(|m| map_get(m, "rt"))
+        .and_then(|a| a.get("rt"))
         .and_then(|v| match v {
             Value::String(s) => Some(s.as_str()),
             _ => None,
@@ -352,8 +353,7 @@ fn render_raw(el: ElementView<'_>, inline: bool) -> String {
             .data
             .args
             .as_ref()
-            .and_then(as_map)
-            .and_then(|m| map_get(m, "lang"))
+            .and_then(|a| a.get("lang").or_else(|| a.nth_unnamed(0)))
             .map(value_to_plain)
             .unwrap_or_default();
         let fence = fence_for(&code);
@@ -402,33 +402,13 @@ fn render_callout(cx: &MarkdownCtx, el: ElementView<'_>) -> String {
     let mut title = None;
 
     if let Some(args) = el.data.args.as_ref() {
-        match args {
-            Value::String(s) => variant = Some(s.clone()),
-            Value::Map(entries) => {
-                for (k, v) in entries {
-                    if k == "variant" {
-                        if let Value::String(s) = v {
-                            variant = Some(s.clone());
-                        }
-                    } else if k == "title"
-                        && let Value::String(s) = v
-                    {
-                        title = Some(s.clone());
-                    }
-                }
-                if variant.is_none()
-                    && !entries.is_empty()
-                    && let Value::String(s) = &entries[0].1
-                {
-                    variant = Some(s.clone());
-                }
+        if let Some(v) = args.get("variant").or_else(|| args.nth_unnamed(0)) {
+            if let Value::String(s) = v {
+                variant = Some(s.clone());
             }
-            Value::Seq(items) => {
-                if let Some(Value::String(s)) = items.first() {
-                    variant = Some(s.clone());
-                }
-            }
-            _ => {}
+        }
+        if let Some(Value::String(s)) = args.get("title") {
+            title = Some(s.clone());
         }
     }
 
@@ -622,20 +602,14 @@ fn render_task(cx: &MarkdownCtx, el: ElementView<'_>, _inline: bool) -> String {
 
 fn task_status(el: ElementView<'_>) -> Option<String> {
     let args = normalized_element_args(el)?;
-    match args {
-        Value::Map(entries) => {
-            entries
-                .into_iter()
-                .find(|(k, _)| k == "status")
-                .and_then(|(_, v)| match v {
-                    Value::String(s) => Some(s),
-                    Value::Bool(b) => Some(if b { "x".to_string() } else { " ".to_string() }),
-                    _ => None,
-                })
+    if let Some(v) = args.get("status").or_else(|| args.nth_unnamed(0)) {
+        match v {
+            Value::String(s) => Some(s.clone()),
+            Value::Bool(b) => Some(if *b { "x".to_string() } else { " ".to_string() }),
+            _ => None,
         }
-        Value::String(s) => Some(s),
-        Value::Bool(b) => Some(if b { "x".to_string() } else { " ".to_string() }),
-        _ => None,
+    } else {
+        None
     }
 }
 
@@ -697,9 +671,8 @@ fn render_conflict(cx: &MarkdownCtx, el: ElementView<'_>, inline: bool) -> Strin
 /// flatten path at all.
 fn conflict_sides(el: ElementView<'_>) -> (Vec<Block>, Vec<Block>) {
     let args = normalized_element_args(el);
-    let map = args.as_ref().and_then(as_map);
     let side = |key: &str| -> Vec<Block> {
-        match map.and_then(|m| map_get(m, key)) {
+        match args.as_ref().and_then(|a| a.get(key)) {
             Some(Value::Blocks(blocks)) => blocks.clone(),
             _ => Vec::new(),
         }
@@ -707,21 +680,18 @@ fn conflict_sides(el: ElementView<'_>) -> (Vec<Block>, Vec<Block>) {
     (side("a"), side("b"))
 }
 
-fn push_data_attrs(out: &mut String, args: &Value) {
-    if let Some(map) = as_map(args) {
-        for (k, v) in map {
-            // A key that cannot be part of an attribute name would add
-            // attributes of its own (see `tomet_semantics::is_attribute_key`).
-            if is_attribute_key(k) {
-                out.push_str(&format!(
-                    " data-{k}=\"{}\"",
-                    escape_attr(&value_to_plain(v))
-                ));
-            }
+fn push_data_attrs(out: &mut String, args: &Tuple) {
+    for (k, v) in args.named() {
+        if is_attribute_key(k) {
+            out.push_str(&format!(
+                " data-{k}=\"{}\"",
+                escape_attr(&value_to_plain(v))
+            ));
         }
     }
 }
 
+#[deny(clippy::wildcard_enum_match_arm)]
 fn value_to_plain(v: &Value) -> String {
     match v {
         Value::Null => String::new(),
@@ -730,12 +700,17 @@ fn value_to_plain(v: &Value) -> String {
         Value::Float(f) => Value::float_text(*f),
         Value::Number(text) => text.clone(),
         Value::String(s) => s.clone(),
-        Value::Seq(items) => items
-            .iter()
-            .map(value_to_plain)
-            .collect::<Vec<_>>()
-            .join(", "),
-        Value::Map(_) => String::new(),
+        Value::Tuple(tuple) => {
+            if tuple.has_no_named() {
+                tuple
+                    .unnamed()
+                    .map(value_to_plain)
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            } else {
+                String::new()
+            }
+        }
         // A call is validation-only (e.g. a `type: list(string)`)
         // and has no rendered form.
         Value::Call(..) => String::new(),
@@ -746,15 +721,4 @@ fn value_to_plain(v: &Value) -> String {
         // Block content has no scalar form either -- same as `Map`.
         Value::Blocks(_) => String::new(),
     }
-}
-
-fn as_map(v: &Value) -> Option<&Vec<(String, Value)>> {
-    match v {
-        Value::Map(m) => Some(m),
-        _ => None,
-    }
-}
-
-fn map_get<'a>(map: &'a [(String, Value)], key: &str) -> Option<&'a Value> {
-    map.iter().find(|(k, _)| k == key).map(|(_, v)| v)
 }

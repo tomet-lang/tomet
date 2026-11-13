@@ -31,7 +31,7 @@ use std::sync::Arc;
 use crate::block::render_block;
 use crate::elements::{HeadingState, render_footnotes};
 use crate::util::{escape_attr, escape_html};
-use tomet_ast::{Block, File, Value};
+use tomet_ast::{Block, File, Tuple};
 use tomet_semantics::{Bindings, FootnoteRegistry, builtin_doc_vocabularies};
 
 const DEFAULT_STYLE: &str = "\
@@ -121,7 +121,7 @@ pub struct CustomElementCtx<'a> {
     /// Whether this element sits inline in running text (`span`) or as a
     /// block (`div`) -- the same distinction `render_generic_element` uses.
     pub inline: bool,
-    normalize_args: Box<dyn Fn() -> Option<Value> + 'a>,
+    normalize_args: Box<dyn Fn() -> Option<Tuple> + 'a>,
 }
 
 impl<'a> CustomElementCtx<'a> {
@@ -129,7 +129,7 @@ impl<'a> CustomElementCtx<'a> {
         kind: &'a str,
         content: Option<&'a [Block]>,
         inline: bool,
-        normalize_args: impl Fn() -> Option<Value> + 'a,
+        normalize_args: impl Fn() -> Option<Tuple> + 'a,
     ) -> Self {
         Self {
             kind,
@@ -143,9 +143,9 @@ impl<'a> CustomElementCtx<'a> {
     /// for rendering (`builtin_doc_vocabularies`), so a positional first
     /// argument -- `doc.icon`'s `name` -- is already keyed by name rather
     /// than left under the parser's positional sentinel. Clones the args
-    /// map on every call; see the type-level doc for why that cost is
+    /// tuple on every call; see the type-level doc for why that cost is
     /// opt-in rather than paid up front for every element.
-    pub fn normalized_args(&self) -> Option<Value> {
+    pub fn normalized_args(&self) -> Option<Tuple> {
         (self.normalize_args)()
     }
 }

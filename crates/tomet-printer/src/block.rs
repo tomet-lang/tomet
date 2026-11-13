@@ -6,12 +6,12 @@ use tomet_semantics::{ElementKind, classify_std_lenient, heading_level};
 use tomet_style::{BracketSpacing, ParagraphSeparator, stands_like_a_paragraph};
 
 use crate::element::{
-    render_connects, render_declaration, render_element, render_hole, render_interp,
-    render_type_seat,
+    render_connects, render_declaration, render_element, render_element_value, render_hole,
+    render_interp, render_type_seat,
 };
 use crate::id::render_id;
 use crate::inline::{render_content_blocks, render_inlines};
-use crate::value::{render_args, render_value};
+use crate::value::render_args;
 
 pub(crate) fn render_file(file: &tomet_ast::File, config: &PrinterConfig, out: &mut String) {
     for (i, decl) in file.header.iter().enumerate() {
@@ -176,9 +176,9 @@ pub(crate) fn render_section(sec: &Section, config: &PrinterConfig, out: &mut St
         out.push_str(&render_args(args, config));
         out.push(')');
     }
-    if let Some(v) = sec.data.value.as_ref().map(|v| v.as_data()) {
+    if let Some(value) = &sec.data.value {
         out.push(' ');
-        out.push_str(&render_value(&v));
+        out.push_str(&render_element_value(value, config));
     }
     if sec.id.is_some() {
         out.push(' ');
@@ -204,9 +204,9 @@ pub(crate) fn render_heading_element(el: &Element, config: &PrinterConfig, out: 
     let content = el.content.as_deref().unwrap_or(&[]);
     out.push_str(&"#".repeat(level));
     out.push_str(&section_spacing(config).wrap(&render_content_blocks(content, config)));
-    if let Some(v) = el.data.value.as_ref().map(|v| v.as_data()) {
+    if let Some(value) = &el.data.value {
         out.push(' ');
-        out.push_str(&render_value(&v));
+        out.push_str(&render_element_value(value, config));
     }
     if el.id.is_some() {
         out.push(' ');
@@ -265,7 +265,7 @@ pub(crate) fn render_list_with_indent(
         let content_str = render_content_blocks(&item.content, config);
         let content_str = content_str.trim_end_matches('\n');
         let lines: Vec<&str> = content_str.lines().collect();
-        let item_attrs = item.data.value.as_ref().map(|v| v.as_data());
+        let item_attrs = item.data.value.as_ref();
 
         if lines.len() > 1
             && let Some(layout) = config.format.list_multiline_style_content
@@ -276,7 +276,7 @@ pub(crate) fn render_list_with_indent(
             out.push_str(&layout.render_item(&lines, &pad));
             if let Some(attrs) = item_attrs {
                 out.push(' ');
-                out.push_str(&render_value(&attrs));
+                out.push_str(&render_element_value(attrs, config));
             }
             if item.id.is_some() {
                 out.push(' ');
@@ -289,7 +289,7 @@ pub(crate) fn render_list_with_indent(
             out.push_str(content_str);
             if let Some(attrs) = item_attrs {
                 out.push(' ');
-                out.push_str(&render_value(&attrs));
+                out.push_str(&render_element_value(attrs, config));
             }
             if item.id.is_some() {
                 out.push(' ');

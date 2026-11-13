@@ -117,11 +117,11 @@ fn an_unbalanced_bracket_inside_a_content_still_errors() {
 fn empty_paren_and_brace_groups_are_a_deliberately_empty_map() {
     // `()`/`{}` written out (as opposed to the group being omitted
     // entirely, which leaves `args`/`value` as `None`) is a valid,
-    // deliberately-empty map. `()` is also what a nexus with nothing to say is written as.
+    // deliberately-empty tuple. `()` is also what a nexus with nothing to say is written as.
     let doc = parse_file("@T()\n").unwrap();
     match &doc.body[0] {
         Block::Element(el) => {
-            assert_eq!(el.data.args, Some(Value::Map(vec![])));
+            assert_eq!(el.data.args, Some(Tuple::new()));
             assert_eq!(el.content, None);
         }
         other => panic!("expected an element, got {other:?}"),
@@ -130,14 +130,14 @@ fn empty_paren_and_brace_groups_are_a_deliberately_empty_map() {
     let doc = parse_file("::meta()\n").unwrap();
     assert_eq!(doc.header.len(), 1);
     let d = &doc.header[0];
-    assert_eq!(d.data.args, Some(Value::Map(vec![])));
+    assert_eq!(d.data.args, Some(Tuple::new()));
 
     // `{}` is a group of its own, and empty, behind a primary group.
     let doc = parse_file("@T(){}\n").unwrap();
     match &doc.body[0] {
         Block::Element(el) => {
-            assert_eq!(el.data.args, Some(Value::Map(vec![])));
-            assert_eq!(el.data.value, Some(Group::from_map(Value::Map(vec![]))));
+            assert_eq!(el.data.args, Some(Tuple::new()));
+            assert_eq!(el.data.value, Some(Group::from_map(Tuple::new())));
         }
         other => panic!("expected an element, got {other:?}"),
     }
@@ -204,7 +204,7 @@ fn a_parenthesis_after_an_element_is_prose() {
         Inline::Element(el) => {
             assert_eq!(
                 el.data.args,
-                Some(Value::Map(vec![("a".into(), Value::Int(1))]))
+                Some(Tuple::from_named(vec![("a".into(), Value::Int(1))]))
             );
         }
         other => panic!("expected an element, got {other:?}"),
@@ -223,7 +223,7 @@ fn a_comment_between_groups_does_not_detach_the_next_group() {
         Block::Element(el) => {
             assert_eq!(
                 el.data.args,
-                Some(Value::Map(vec![("a".into(), Value::Int(1))]))
+                Some(Tuple::from_named(vec![("a".into(), Value::Int(1))]))
             );
             assert_eq!(el.content, wrap(vec![Inline::Text("content".into())]));
         }

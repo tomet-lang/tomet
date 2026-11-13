@@ -197,8 +197,17 @@ impl Filler<'_> {
 /// What a value is, for a sentence about where it cannot go.
 fn describe(value: &Value) -> &'static str {
     match value {
-        Value::Seq(_) => "a list",
-        Value::Map(_) => "a map",
+        Value::Tuple(tuple) => {
+            if tuple.is_empty() {
+                "an empty tuple"
+            } else if tuple.has_no_named() {
+                "a list"
+            } else if tuple.has_no_unnamed() {
+                "a map"
+            } else {
+                "a list with named entries"
+            }
+        }
         _ => "a value",
     }
 }
@@ -229,7 +238,7 @@ mod tests {
     use std::cell::Cell;
     use std::collections::HashMap;
 
-    use tomet_ast::{Block, Inline};
+    use tomet_ast::{Block, Inline, Tuple};
     use tomet_expr::{DocRef, EvalValue, NoResolver};
 
     use super::*;
@@ -272,7 +281,7 @@ mod tests {
 
     /// The `::meta` of the document, as the entries it holds.
     fn meta(doc: &File) -> Vec<(String, Value)> {
-        let Some(Value::Map(entries)) = doc
+        let Some(tuple) = doc
             .header
             .iter()
             .find(|d| d.name.to_string() == "meta")
@@ -280,7 +289,7 @@ mod tests {
         else {
             panic!("expected a ::meta with entries in {:?}", doc.header);
         };
-        entries
+        tuple.into_named().collect()
     }
 
     fn field(doc: &File, key: &str) -> Value {
@@ -314,7 +323,7 @@ mod tests {
             .iter()
             .find(|d| d.name.to_string() == "id")
             .unwrap();
-        assert_eq!(id.data.args, Some(text(UUID)));
+        assert_eq!(id.data.args, Some(Tuple::from_unnamed([text(UUID)])));
     }
 
     #[test]
@@ -430,7 +439,10 @@ mod tests {
             &fixed(&[]),
         )
         .unwrap();
-        assert_eq!(field(&doc, "tags"), Value::Seq(vec![text("a"), text("b")]));
+        assert_eq!(
+            field(&doc, "tags"),
+            Value::Tuple(Tuple::from_unnamed([text("a"), text("b")]))
+        );
     }
 
     #[test]

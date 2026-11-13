@@ -1,6 +1,6 @@
 use super::*;
 use tomet_ast::{
-    Data, Declaration, Element, File, Group, Name, Paragraph, Placement, RawText, Text,
+    Data, Declaration, Element, File, Group, Name, Paragraph, Placement, RawText, Text, Tuple,
 };
 use tomet_span::Span;
 
@@ -85,8 +85,8 @@ fn adjacent_meta_blocks_have_no_visible_output() {
     fn meta_declaration(tag: &str) -> Declaration {
         let mut declaration = tomet_tree::declaration_new("meta");
         declaration.data = Data {
-            args: Some(Value::String(tag.to_string())),
-            value: Some(Group::from_map(Value::Map(vec![(
+            args: Some(Tuple::from_unnamed([Value::String(tag.to_string())])),
+            value: Some(Group::from_map(Tuple::from_named([(
                 "key".to_string(),
                 Value::String("value".to_string()),
             )]))),
@@ -115,7 +115,7 @@ fn heading_element(level: i64, content: Vec<Inline>) -> Element {
         placement: Placement::Block,
 
         data: Data {
-            args: Some(Value::Int(level)),
+            args: Some(Tuple::from_unnamed([Value::Int(level)])),
             value: None,
         },
 
@@ -259,7 +259,7 @@ fn link_round_trips() {
         placement: Placement::Inline,
 
         data: Data {
-            args: Some(Value::Map(vec![(
+            args: Some(Tuple::from_named([(
                 "target".to_string(),
                 Value::String("https://example.com".to_string()),
             )])),
@@ -292,7 +292,7 @@ fn embed_becomes_image() {
         placement: Placement::Inline,
 
         data: Data {
-            args: Some(Value::Map(vec![(
+            args: Some(Tuple::from_named([(
                 "target".to_string(),
                 Value::String("pic.png".to_string()),
             )])),
@@ -325,7 +325,7 @@ fn raw_block_uses_fence_and_lang() {
         placement: Placement::Block,
 
         data: Data {
-            args: Some(Value::Map(vec![(
+            args: Some(Tuple::from_named([(
                 "lang".to_string(),
                 Value::String("rust".to_string()),
             )])),
@@ -392,7 +392,7 @@ fn thematic_break() {
 #[test]
 fn a_declaration_exports_as_nothing() {
     let mut declaration = tomet_tree::declaration_new("export");
-    declaration.data.args = Some(Value::Map(vec![(
+    declaration.data.args = Some(Tuple::from_named([(
         "type".to_string(),
         Value::String("commonmark".to_string()),
     )]));
@@ -421,13 +421,13 @@ fn titled_thematic_break_is_not_a_setext_heading() {
 #[test]
 fn wikilink_exports_to_markdown() {
     let mut el1 = tomet_tree::element_new(Name::bare("link"));
-    el1.data.args = Some(Value::Map(vec![(
+    el1.data.args = Some(Tuple::from_named([(
         "target".to_string(),
         Value::String("ref:name".to_string()),
     )]));
 
     let mut el2 = tomet_tree::element_new(Name::bare("link"));
-    el2.data.args = Some(Value::Map(vec![(
+    el2.data.args = Some(Tuple::from_named([(
         "target".to_string(),
         Value::String("ref:name".to_string()),
     )]));
@@ -451,7 +451,7 @@ fn wikilink_exports_to_markdown() {
 /// there is one.
 fn link_doc(target: &str, label: Option<&str>) -> File {
     let mut el = tomet_tree::element_new(Name::bare("link"));
-    el.data.args = Some(Value::Map(vec![(
+    el.data.args = Some(Tuple::from_named([(
         "target".to_string(),
         Value::String(target.to_string()),
     )]));

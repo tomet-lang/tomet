@@ -2,7 +2,7 @@
 
 use crate::RenderCtx;
 use crate::block::render_inlines;
-use crate::util::{as_map, id_attr, map_get, push_named_attrs, split_attrs};
+use crate::util::{id_attr, push_named_attrs, split_attrs};
 use tomet_ast::{ElementView, Value};
 use tomet_semantics::normalized_element_args;
 
@@ -23,8 +23,7 @@ pub(crate) fn render_table_element(cx: &RenderCtx, el: ElementView<'_>, out: &mu
     let args = normalized_element_args(el);
     let has_header = args
         .as_ref()
-        .and_then(as_map)
-        .and_then(|m| map_get(m, "header"))
+        .and_then(|a| a.get("header"))
         .map(|v| match v {
             Value::Bool(b) => *b,
             _ => true,

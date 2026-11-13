@@ -5,13 +5,16 @@ fn parses_flat_map() {
     let v = parse_value("title: value\ntags: (a, b)").unwrap();
     assert_eq!(
         v,
-        Value::Map(vec![
+        Value::Tuple(Tuple::from_named(vec![
             ("title".into(), Value::String("value".into())),
             (
                 "tags".into(),
-                Value::Seq(vec![Value::String("a".into()), Value::String("b".into())])
+                Value::Tuple(Tuple::from_unnamed(vec![
+                    Value::String("a".into()),
+                    Value::String("b".into())
+                ]))
             ),
-        ])
+        ]))
     );
 }
 
@@ -23,11 +26,11 @@ fn parses_flat_map() {
 #[test]
 fn a_bracket_value_parses_as_block_content_not_a_list() {
     let v = parse_value("tags: [a, b]").unwrap();
-    let Value::Map(entries) = v else {
-        panic!("expected a map, got {v:?}");
+    let Value::Tuple(entries) = v else {
+        panic!("expected a tuple, got {v:?}");
     };
-    let Value::Blocks(blocks) = &entries[0].1 else {
-        panic!("expected block content, got {:?}", entries[0].1);
+    let Some(Value::Blocks(blocks)) = entries.get("tags") else {
+        panic!("expected block content, got {:?}", entries.get("tags"));
     };
     match first_para(blocks) {
         [Inline::Text(t)] => assert_eq!(t.value, "a, b"),
@@ -42,18 +45,21 @@ fn a_bracket_value_parses_as_block_content_not_a_list() {
 #[test]
 fn at_sigiled_call_in_a_value_position_is_an_element() {
     let v = parse_value(r#"icon: @doc.icon("triangle", pkg:"lucide")"#).unwrap();
-    let Value::Map(entries) = v else {
-        panic!("expected a map, got {v:?}");
+    let Value::Tuple(entries) = v else {
+        panic!("expected a tuple, got {v:?}");
     };
-    let Value::Element(el) = &entries[0].1 else {
-        panic!("expected an embedded element, got {:?}", entries[0].1);
+    let Some(Value::Element(el)) = entries.get("icon") else {
+        panic!(
+            "expected an embedded element, got {:?}",
+            entries.get("icon")
+        );
     };
     assert_eq!(el.name, tomet_ast::Name::namespaced("doc", "icon"));
     assert_eq!(
         el.data.args,
-        Some(Value::Map(vec![
-            ("".to_string(), Value::String("triangle".to_string())),
-            ("pkg".to_string(), Value::String("lucide".to_string())),
+        Some(Tuple::from_entries(vec![
+            TupleEntry::unnamed(Value::String("triangle".to_string())),
+            TupleEntry::named("pkg", Value::String("lucide".to_string())),
         ]))
     );
 }
@@ -62,10 +68,10 @@ fn at_sigiled_call_in_a_value_position_is_an_element() {
 #[test]
 fn an_embedded_element_with_content_is_accepted() {
     let v = parse_value(r#"link: @link(ref:"doc")[Guide]"#).unwrap();
-    let Value::Map(entries) = v else {
-        panic!("expected map");
+    let Value::Tuple(entries) = v else {
+        panic!("expected tuple");
     };
-    let Value::Element(el) = &entries[0].1 else {
+    let Some(Value::Element(el)) = entries.get("link") else {
         panic!("expected element");
     };
     assert_eq!(el.name, Name::bare("link"));
@@ -82,17 +88,17 @@ fn an_embedded_element_with_content_is_accepted() {
 fn quoted_positional_value_parses_the_same_regardless_of_position() {
     assert_eq!(
         parse_value(r#""star", pkg:"lucide""#).unwrap(),
-        Value::Map(vec![
-            ("".into(), Value::String("star".into())),
-            ("pkg".into(), Value::String("lucide".into())),
-        ])
+        Value::Tuple(Tuple::from_entries(vec![
+            TupleEntry::unnamed(Value::String("star".into())),
+            TupleEntry::named("pkg", Value::String("lucide".into())),
+        ]))
     );
     assert_eq!(
         parse_value(r#"pkg:"lucide", "star""#).unwrap(),
-        Value::Map(vec![
-            ("pkg".into(), Value::String("lucide".into())),
-            ("".into(), Value::String("star".into())),
-        ])
+        Value::Tuple(Tuple::from_entries(vec![
+            TupleEntry::named("pkg", Value::String("lucide".into())),
+            TupleEntry::unnamed(Value::String("star".into())),
+        ]))
     );
 }
 
@@ -108,30 +114,31 @@ fn parses_scalars() {
 #[test]
 fn a_bare_paren_group_is_a_sequence() {
     let s = |t: &str| Value::String(t.into());
+    let seq = |items: Vec<Value>| Value::Tuple(Tuple::from_unnamed(items));
     // Empty, one element (no trailing comma needed), several.
-    assert_eq!(parse_value("()").unwrap(), Value::Seq(vec![]));
-    assert_eq!(parse_value("(card)").unwrap(), Value::Seq(vec![s("card")]));
+    assert_eq!(parse_value("()").unwrap(), seq(vec![]));
+    assert_eq!(parse_value("(card)").unwrap(), seq(vec![s("card")]));
     assert_eq!(
         parse_value("(card, ns.mycard)").unwrap(),
-        Value::Seq(vec![s("card"), s("ns.mycard")])
+        seq(vec![s("card"), s("ns.mycard")])
     );
     // Nested, and a map or a scalar of another type as an element.
     assert_eq!(
         parse_value("(a, (b))").unwrap(),
-        Value::Seq(vec![s("a"), Value::Seq(vec![s("b")])])
+        seq(vec![s("a"), seq(vec![s("b")])])
     );
     assert_eq!(
         parse_value("((a), (b, c), ())").unwrap(),
-        Value::Seq(vec![
-            Value::Seq(vec![s("a")]),
-            Value::Seq(vec![s("b"), s("c")]),
-            Value::Seq(vec![]),
+        seq(vec![
+            seq(vec![s("a")]),
+            seq(vec![s("b"), s("c")]),
+            seq(vec![])
         ])
     );
     assert_eq!(
         parse_value("({k: 1}, 2, \"q\")").unwrap(),
-        Value::Seq(vec![
-            Value::Map(vec![("k".into(), Value::Int(1))]),
+        seq(vec![
+            Value::Tuple(Tuple::from_named(vec![("k".into(), Value::Int(1))])),
             Value::Int(2),
             s("q"),
         ])
@@ -139,14 +146,17 @@ fn a_bare_paren_group_is_a_sequence() {
     // As the value of a key.
     assert_eq!(
         parse_value("allow: (card)").unwrap(),
-        Value::Map(vec![("allow".into(), Value::Seq(vec![s("card")]))])
+        Value::Tuple(Tuple::from_named(vec![(
+            "allow".into(),
+            seq(vec![s("card")])
+        )]))
     );
     assert_eq!(
         parse_value("a: ()\nb: (1,\n  2)").unwrap(),
-        Value::Map(vec![
-            ("a".into(), Value::Seq(vec![])),
-            ("b".into(), Value::Seq(vec![Value::Int(1), Value::Int(2)])),
-        ])
+        Value::Tuple(Tuple::from_named(vec![
+            ("a".into(), seq(vec![])),
+            ("b".into(), seq(vec![Value::Int(1), Value::Int(2)])),
+        ]))
     );
 }
 
@@ -156,14 +166,20 @@ fn a_bare_paren_group_is_a_sequence() {
 fn a_list_call_is_not_a_sequence() {
     assert_eq!(
         parse_value("list(card)").unwrap(),
-        Value::Call("list".into(), vec![Value::String("card".into())])
+        Value::Call(
+            "list".into(),
+            Tuple::from_unnamed(vec![Value::String("card".into())])
+        )
     );
     assert_eq!(
         parse_value("type: list(string)").unwrap(),
-        Value::Map(vec![(
+        Value::Tuple(Tuple::from_named(vec![(
             "type".into(),
-            Value::Call("list".into(), vec![Value::String("string".into())])
-        )])
+            Value::Call(
+                "list".into(),
+                Tuple::from_unnamed(vec![Value::String("string".into())])
+            )
+        )]))
     );
 }
 
@@ -193,15 +209,21 @@ fn a_sequence_is_a_whole_value() {
 fn only_the_literal_constructors_are_resolved() {
     assert_eq!(
         parse_value("enum(card)").unwrap(),
-        Value::Call("enum".into(), vec![Value::String("card".into())])
+        Value::Call(
+            "enum".into(),
+            Tuple::from_unnamed(vec![Value::String("card".into())])
+        )
     );
     assert_eq!(
         parse_value("k: int(\"5\")").unwrap(),
-        Value::Map(vec![("k".into(), Value::Int(5))])
+        Value::Tuple(Tuple::from_named(vec![("k".into(), Value::Int(5))]))
     );
     assert_eq!(
         parse_value("k: string(1.50)").unwrap(),
-        Value::Map(vec![("k".into(), Value::String("1.50".into()))])
+        Value::Tuple(Tuple::from_named(vec![(
+            "k".into(),
+            Value::String("1.50".into())
+        )]))
     );
 }
 
@@ -218,10 +240,10 @@ fn preserves_colon_in_url_values() {
     let v = parse_value("url: https://example.com/path").unwrap();
     assert_eq!(
         v,
-        Value::Map(vec![(
+        Value::Tuple(Tuple::from_named(vec![(
             "url".into(),
             Value::String("https://example.com/path".into())
-        )])
+        )]))
     );
 }
 
@@ -233,10 +255,10 @@ fn a_quoted_key_is_a_map_key() {
     let v = parse_value("\"tmtroot/a.tmt\": ../x\nplain: 1").unwrap();
     assert_eq!(
         v,
-        Value::Map(vec![
+        Value::Tuple(Tuple::from_named(vec![
             ("tmtroot/a.tmt".into(), Value::String("../x".into())),
             ("plain".into(), Value::Int(1)),
-        ])
+        ]))
     );
 }
 
@@ -267,19 +289,19 @@ fn a_repeated_key_is_an_error_in_args_and_in_a_group() {
 #[test]
 fn a_pipe_value_is_block_content_that_commas_do_not_end() {
     let v = parse_value("about: | One rule, with {braces} and a comma.\nnext: 1").unwrap();
-    let Value::Map(entries) = v else {
-        panic!("expected a map, got {v:?}");
+    let Value::Tuple(entries) = v else {
+        panic!("expected a tuple, got {v:?}");
     };
     assert_eq!(entries.len(), 2, "{entries:?}");
-    assert_eq!(entries[0].0, "about");
-    let Value::Blocks(blocks) = &entries[0].1 else {
-        panic!("expected block content, got {:?}", entries[0].1);
+    assert_eq!(entries.nth(0).unwrap().name(), Some("about"));
+    let Value::Blocks(blocks) = entries.nth(0).unwrap().value() else {
+        panic!("expected block content, got {:?}", entries.nth(0));
     };
     match first_para(blocks) {
         [Inline::Text(t)] => assert_eq!(t.value, "One rule, with {braces} and a comma."),
         other => panic!("expected a single text run, got {other:?}"),
     }
-    assert_eq!(entries[1].0, "next");
+    assert_eq!(entries.nth(1).unwrap().name(), Some("next"));
 }
 
 /// Continuation lines line up their `|` under the first one, as an
@@ -288,11 +310,11 @@ fn a_pipe_value_is_block_content_that_commas_do_not_end() {
 #[test]
 fn a_pipe_value_continues_on_aligned_pipe_lines() {
     let src = "about: | first line\n       | second line\nnext: 1";
-    let Value::Map(entries) = parse_value(src).unwrap() else {
-        panic!("expected a map");
+    let Value::Tuple(entries) = parse_value(src).unwrap() else {
+        panic!("expected a tuple");
     };
     assert_eq!(entries.len(), 2, "{entries:?}");
-    let Value::Blocks(blocks) = &entries[0].1 else {
+    let Value::Blocks(blocks) = entries.nth(0).unwrap().value() else {
         panic!("expected block content");
     };
     let text: String = first_para(blocks)
@@ -304,7 +326,7 @@ fn a_pipe_value_continues_on_aligned_pipe_lines() {
         })
         .collect();
     assert_eq!(text, "first line\nsecond line");
-    assert_eq!(entries[1].0, "next");
+    assert_eq!(entries.nth(1).unwrap().name(), Some("next"));
 }
 
 /// The shape a vocabulary writes: a pipe value among the keys of nested
@@ -312,20 +334,20 @@ fn a_pipe_value_continues_on_aligned_pipe_lines() {
 #[test]
 fn a_pipe_value_inside_nested_maps() {
     let src = "args: {\n  id: {\n    type: string\n    about: | The id.\n  }\n}";
-    let Value::Map(entries) = parse_value(src).unwrap() else {
-        panic!("expected a map");
+    let Value::Tuple(entries) = parse_value(src).unwrap() else {
+        panic!("expected a tuple");
     };
-    let Value::Map(args) = &entries[0].1 else {
-        panic!("expected args map");
+    let Some(Value::Tuple(args)) = entries.get("args") else {
+        panic!("expected args tuple");
     };
-    let Value::Map(id) = &args[0].1 else {
-        panic!("expected id map");
+    let Some(Value::Tuple(id)) = args.get("id") else {
+        panic!("expected id tuple");
     };
     assert_eq!(
-        id.iter().map(|(k, _)| k.as_str()).collect::<Vec<_>>(),
+        id.named().map(|(k, _)| k).collect::<Vec<_>>(),
         ["type", "about"]
     );
-    assert!(matches!(id[1].1, Value::Blocks(_)));
+    assert!(matches!(id.get("about"), Some(Value::Blocks(_))));
 }
 
 /// A number that reading would change keeps the text it was written as, in
@@ -346,7 +368,7 @@ fn a_number_reading_would_change_keeps_its_text_in_an_argument() {
         let Some(Block::Element(el)) = doc.body.first() else {
             panic!("{src}: expected an element, got {:?}", doc.body);
         };
-        assert_eq!(el.data.args, Some(want), "{src}");
+        assert_eq!(el.data.args, Some(Tuple::from_unnamed(vec![want])), "{src}");
     }
 }
 
@@ -354,23 +376,22 @@ fn a_number_reading_would_change_keeps_its_text_in_an_argument() {
 fn parse_value_accepts_interpolation_with_span() {
     let src = "key: $macro.vocab(\"writ\", \"1.0.0\")\n";
     let file = parse_value(src).unwrap();
-    let Value::Map(entries) = file else {
-        panic!("expected a map, got {:?}", file);
+    let Value::Tuple(entries) = file else {
+        panic!("expected a tuple, got {:?}", file);
     };
     assert_eq!(entries.len(), 1);
-    assert_eq!(entries[0].0, "key");
-    let Value::Interp(interp) = &entries[0].1 else {
-        panic!("expected an interpolation, got {:?}", entries[0].1);
+    let Some(Value::Interp(interp)) = entries.get("key") else {
+        panic!("expected an interpolation, got {:?}", entries.get("key"));
     };
     assert_eq!(interp.span.start, 5);
     assert_eq!(interp.span.end, 34);
 
     let src2 = "key: $f(1, 2)\n";
     let file2 = parse_value(src2).unwrap();
-    let Value::Map(entries2) = file2 else {
-        panic!("expected a map");
+    let Value::Tuple(entries2) = file2 else {
+        panic!("expected a tuple");
     };
-    let Value::Interp(interp2) = &entries2[0].1 else {
+    let Some(Value::Interp(interp2)) = entries2.get("key") else {
         panic!("expected an interpolation");
     };
     assert_eq!(interp2.span.start, 5);

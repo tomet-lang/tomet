@@ -1,6 +1,6 @@
 //! Documents, directories and the parts inside documents.
 
-use tomet_ast::{Block, Connect, File, Group, Value};
+use tomet_ast::{Block, Connect, File, Group, Tuple, Value};
 
 use super::args::Args;
 use super::context::EvalContext;
@@ -142,29 +142,27 @@ fn block_value(doc: &DocRef, block: &Block) -> EvalValue {
 /// on a conflict, since `{value}` is where a node's real data usually
 /// lives (`::meta(...)`) while `(args)` tends toward attributes. When neither is
 /// a map, whichever scalar group there is.
-fn data(doc: &DocRef, args: &Option<Value>, value: &Option<Group>) -> EvalValue {
-    let args_map = match args {
-        Some(Value::Map(entries)) => Some(entries.clone()),
-        _ => None,
-    };
-    let value_data = value.as_ref().map(|v| v.as_data());
-    let value_map = match &value_data {
-        Some(Value::Map(entries)) => Some(entries.clone()),
-        _ => None,
-    };
-    let merged = match (args_map, value_map) {
-        (Some(mut merged), Some(from_value)) => {
-            for (key, val) in from_value {
-                match merged.iter_mut().find(|(k, _)| *k == key) {
-                    Some(existing) => existing.1 = val,
-                    None => merged.push((key, val)),
+fn data(doc: &DocRef, args: &Option<Tuple>, value: &Option<Group>) -> EvalValue {
+    let value_tuple = value.as_ref().map(|v| v.as_data());
+    let merged = match (args, value_tuple) {
+        (Some(args_tuple), Some(val_tuple)) => {
+            let mut merged = args_tuple.clone();
+            for entry in val_tuple {
+                if let Some(name) = entry.name() {
+                    if let Some(existing) = merged.get_mut(name) {
+                        *existing = entry.into_value();
+                    } else {
+                        merged.push(entry);
+                    }
+                } else {
+                    merged.push(entry);
                 }
             }
-            Value::Map(merged)
+            Value::Tuple(merged)
         }
-        (Some(args), None) => Value::Map(args),
-        (None, Some(from_value)) => Value::Map(from_value),
-        (None, None) => value_data.or_else(|| args.clone()).unwrap_or(Value::Null),
+        (Some(args_tuple), None) => Value::Tuple(args_tuple.clone()),
+        (None, Some(val_tuple)) => Value::Tuple(val_tuple),
+        (None, None) => Value::Null,
     };
     EvalValue::from_ast(&merged, doc)
 }
@@ -313,7 +311,7 @@ fn part_meta(doc: &DocRef, part: &Part) -> EvalValue {
         Part::List(_) => &None,
     };
     match group {
-        Some(group) => EvalValue::from_ast(&group.as_data(), doc),
+        Some(group) => EvalValue::from_ast(&Value::Tuple(group.as_data()), doc),
         None => EvalValue::Map(Vec::new()),
     }
 }

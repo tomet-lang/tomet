@@ -90,7 +90,7 @@ Paragraph
 
 ```
 Block  @memo
-  args    {}
+  args    ()
 ```
 
 検証:
@@ -242,7 +242,7 @@ Paragraph
 Paragraph
   Text "文中の "
   Inline @deck.badge
-    args    2
+    args    (2)
     content
       Paragraph
         Text "印"
@@ -411,7 +411,7 @@ unknown element `config`: only `std` and this document's own `::kind` may be wri
 
 ```
 Block  @memo
-  args    {}
+  args    ()
 ```
 
 検証:
@@ -447,7 +447,7 @@ unknown element `memo`: only `std` and this document's own `::kind` may be writt
 
 ```
 Block  @memo
-  args    {}
+  args    ()
   group
     a: 1
   id      "first"
@@ -569,7 +569,7 @@ List ordered=false
 
 ```
 Block  @hr
-  args    {}
+  args    ()
 ```
 
 ## `{...}` グループ
@@ -582,7 +582,7 @@ Block  @hr
 
 ```
 Block  @memo
-  args    {}
+  args    ()
   group
     a: 1
     b: "two"
@@ -602,7 +602,7 @@ unknown element `memo`: only `std` and this document's own `::kind` may be writt
 
 ```
 Block  @memo
-  args    {}
+  args    ()
   group   (空)
 ```
 
@@ -620,7 +620,7 @@ unknown element `memo`: only `std` and this document's own `::kind` may be writt
 
 ```
 Block  @memo
-  args    {}
+  args    ()
   group
     a/b.tmt: 1
     plain: 2
@@ -659,7 +659,7 @@ unknown element `memo`: only `std` and this document's own `::kind` may be writt
 
 ```
 Block  @raw
-  args    "rust"
+  args    ("rust")
 ```
 
 ### 列。`(a, b)` の一つの綴りしかない -- `[...]` は撤去された
@@ -857,7 +857,7 @@ unknown element `memo`: only `std` and this document's own `::kind` may be writt
 
 ```
 Block  @quote
-  args    "A"
+  args    ("A")
   content
     Paragraph
       Text "一行目"
@@ -874,7 +874,7 @@ Block  @quote
 
 ```
 Block  @quote
-  args    "A"
+  args    ("A")
   content
     Paragraph
       Text "一行目"
@@ -906,7 +906,7 @@ Block  @quote
 List ordered=false
   Items:
     Bare
-      args    "x"
+      args    ("x")
       content
         Paragraph
           Text "一行目"
@@ -1169,13 +1169,13 @@ List ordered=false
 List ordered=false
   Items:
     Bare
-      args    {}
+      args    ()
       content
     Bare
-      args    "x"
+      args    ("x")
       content
     Bare
-      args    "y"
+      args    ("y")
       content
 ```
 
@@ -1693,7 +1693,7 @@ Section level=1
 
 ```
 Block  @memo
-  args    <$int>
+  args    (<$int>)
 ```
 
 検証:
@@ -1729,7 +1729,7 @@ unknown element `memo`: only `std` and this document's own `::kind` may be writt
 
 ```
 Block  @memo
-  args    {}
+  args    ()
   group
     name: <$string>
     tags: (<$string>, <$int>)
@@ -1947,7 +1947,7 @@ Block  @task
 
 ```
 Block  @task
-  args    {b: 2, a: 1}
+  args    {a: 1, b: 2}
 ```
 
 ## 名前付きコネクト `::name(...)`
@@ -2005,7 +2005,7 @@ Block  @x
   args    {a: 1}
   connect
     Inline @as
-      args    "y"
+      args    ("y")
   connect
     Inline @rule
       args    {allow: ("card")}
@@ -2159,7 +2159,7 @@ Block  @task
 
 ```
 Block  @task
-  args    {}
+  args    ()
   id      "has spaces"
 ```
 
@@ -2186,7 +2186,7 @@ Section level=1
 List ordered=false
   Items:
     Bare
-      args    "x"
+      args    ("x")
       content
         Paragraph
           Text "y"
@@ -2282,7 +2282,7 @@ Paragraph
 
 ```
 Declaration ::kind
-  args    "note"
+  args    ("note")
 Declaration ::meta
   args    {id: "x"}
 ```
@@ -2301,7 +2301,7 @@ Declaration ::meta
 
 ```
 Declaration ::x
-  args    "a"
+  args    ("a")
   content
     Paragraph
       Text "b"
@@ -2372,17 +2372,17 @@ Declaration ::element
 
 ```
 Declaration ::vocabulary
-  args    "ns"
+  args    ("ns")
   group
     version: "1.0.0"
 Declaration ::blueprint
-  args    "note"
+  args    ("note")
   group
     version: "1.0"
 Declaration ::dictionary
-  args    "tomet"
+  args    ("tomet")
 Block  @term
-  args    "vault"
+  args    ("vault")
   content
     Paragraph
       Text "a unit"
@@ -2403,7 +2403,7 @@ Block  @term
 
 ```
 Declaration ::meta
-  args    {}
+  args    ()
 ```
 
 ### 次の行の `::` は、前の宣言のコネクトではなく、次の宣言
@@ -2415,9 +2415,9 @@ Declaration ::meta
 
 ```
 Declaration ::kind
-  args    "note"
+  args    ("note")
 Declaration ::use
-  args    "deck"
+  args    ("deck")
 ```
 
 ### 行頭でない `::` は、ただの文字（`std::vec`）。名前が無い `::(x)` も文字
@@ -2449,14 +2449,14 @@ Paragraph
 Paragraph
   Text "参照"
   Inline @ftn
-    args    "a"
+    args    ("a")
   Text " と その場かぎり"
   Inline @ftn
     content
       Paragraph
         Text "文"
 Block  @ftn
-  args    "a"
+  args    ("a")
   content
     Paragraph
       Text "定義"
@@ -2824,7 +2824,7 @@ Paragraph
 
 ```
 Block  @id
-  args    "taskA"
+  args    ("taskA")
   group
     priority: "high"
 ```

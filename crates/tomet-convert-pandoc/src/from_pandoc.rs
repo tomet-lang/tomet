@@ -33,8 +33,8 @@
 //!   `Attr` is where data goes. Only the elements move.
 
 use tomet_ast::{
-    Block as TmBlock, Declaration, Element, File, Group, Id, Inline as TmInline,
-    LineBreak, List, Name, Paragraph, Placement, RawText, Section, SoftBreak, Text, Value,
+    Block as TmBlock, Declaration, Element, File, Group, Id, Inline as TmInline, LineBreak, List,
+    Name, Paragraph, Placement, RawText, Section, SoftBreak, Text, Tuple, Value,
 };
 use tomet_semantics::{EXACT_DATA_KEY, comment_element};
 use tomet_span::Span;
@@ -61,7 +61,7 @@ pub fn from_pandoc(doc: &PandocDoc) -> File {
         });
     if let Some(id) = id {
         let mut id_declaration = declaration_new("id");
-        id_declaration.data.args = Some(Value::String(id));
+        id_declaration.data.args = Some(Tuple::from_unnamed([Value::String(id)]));
         header.push(id_declaration);
     }
     if !meta.is_empty() {
@@ -125,12 +125,11 @@ fn structure_sections(blocks: Vec<TmBlock>) -> Vec<TmBlock> {
 
 /// Rebuilds `::meta(...)` from Pandoc's metadata map.
 fn meta_declaration(meta: &crate::ast::Meta) -> Declaration {
-    let entries: Vec<(String, Value)> = meta
+    let entries = meta
         .iter()
-        .map(|(k, v)| (k.clone(), meta_value_to_value(v)))
-        .collect();
+        .map(|(k, v)| (k.clone(), meta_value_to_value(v)));
     let mut declaration = declaration_new("meta");
-    declaration.data.args = Some(Value::Map(entries));
+    declaration.data.args = Some(Tuple::from_named(entries));
     declaration
 }
 
@@ -138,13 +137,14 @@ fn meta_value_to_value(v: &MetaValue) -> Value {
     match v {
         MetaValue::MetaString(s) => Value::String(s.clone()),
         MetaValue::MetaBool(b) => Value::Bool(*b),
-        MetaValue::MetaList(items) => Value::Seq(items.iter().map(meta_value_to_value).collect()),
-        MetaValue::MetaMap(entries) => Value::Map(
+        MetaValue::MetaList(items) => {
+            Value::Tuple(Tuple::from_unnamed(items.iter().map(meta_value_to_value)))
+        }
+        MetaValue::MetaMap(entries) => Value::Tuple(Tuple::from_named(
             entries
                 .iter()
-                .map(|(k, v)| (k.clone(), meta_value_to_value(v)))
-                .collect(),
-        ),
+                .map(|(k, v)| (k.clone(), meta_value_to_value(v))),
+        )),
         // Metadata written as inlines flattens back to its text. Tomet
         // metadata values are plain data, so nothing is lost that was
         // there to begin with.
@@ -195,7 +195,7 @@ fn block_element(block: &Block) -> Element {
     let el = match block {
         Block::Header(level, attr, inlines) => {
             let mut el = named_element("heading", attr);
-            el.data.args = Some(Value::Int(*level));
+            el.data.args = Some(Tuple::from_unnamed([Value::Int(*level)]));
             el.content = Some(wrap_inline_content(inlines_from_pandoc(inlines)));
             el
         }
@@ -205,7 +205,7 @@ fn block_element(block: &Block) -> Element {
             // The language travelled as the first class; put it back in
             // `lang:` where `to_pandoc` looks for it.
             if let Some(lang) = attr.1.iter().find(|c| !c.starts_with(CLASS_PREFIX)) {
-                el.data.args = Some(Value::Map(vec![(
+                el.data.args = Some(Tuple::from_named([(
                     "lang".to_string(),
                     Value::String(lang.clone()),
                 )]));
@@ -227,7 +227,7 @@ fn block_element(block: &Block) -> Element {
             // it lands as a code block tagged with the format rather than
             // being dropped.
             let mut el = element_new(Name::bare("raw"));
-            el.data.args = Some(Value::Map(vec![(
+            el.data.args = Some(Tuple::from_named([(
                 "lang".to_string(),
                 Value::String(format.clone()),
             )]));
@@ -352,7 +352,7 @@ fn table_element(parts: &TableParts) -> Element {
         args.push(("align".to_string(), Value::String(align.to_string())));
     }
     if !args.is_empty() {
-        el.data.args = Some(Value::Map(args));
+        el.data.args = Some(Tuple::from_named(args));
     }
     el
 }
@@ -607,15 +607,21 @@ fn class_name(attr: &Attr) -> Option<String> {
 ///
 /// When [`EXACT_DATA_KEY`] is present it wins outright: it is the whole
 /// of the original `(args)` and `{value}`, so both groups come back
-fn extract_data_from_attr(attr: &Attr) -> (Option<Value>, Option<Group>) {
+fn extract_data_from_attr(attr: &Attr) -> (Option<Tuple>, Option<Group>) {
     let exact = attr
         .2
         .iter()
         .find(|(k, _)| k == EXACT_DATA_KEY)
         .and_then(|(_, json)| serde_json::from_str(json).ok());
     if let Some(serde_json::Value::Object(obj)) = exact {
-        let args = obj.get("args").map(json_to_value);
-        let value = obj.get("value").map(|v| Group::from_map(json_to_value(v)));
+        let args = obj.get("args").and_then(|v| match json_to_value(v) {
+            Value::Tuple(t) => Some(t),
+            _ => None,
+        });
+        let value = obj.get("value").and_then(|v| match json_to_value(v) {
+            Value::Tuple(t) => Some(Group::from_map(t)),
+            _ => None,
+        });
         return (args, value);
     }
 
@@ -627,7 +633,7 @@ fn extract_data_from_attr(attr: &Attr) -> (Option<Value>, Option<Group>) {
         entries.push((k.clone(), Value::String(v.clone())));
     }
     let value = if !entries.is_empty() {
-        Some(Group::from_map(Value::Map(entries)))
+        Some(Group::from_map(Tuple::from_named(entries)))
     } else {
         None
     };
@@ -658,13 +664,12 @@ fn id_from_attr(attr: &Attr) -> Option<Id> {
 
 /// Adds a key to an element's `(args)`, keeping whatever is already there.
 fn merge_arg(el: &mut Element, key: &str, value: Value) {
-    match el.data.args.take() {
-        Some(Value::Map(mut entries)) => {
-            entries.retain(|(k, _)| k != key);
-            entries.insert(0, (key.to_string(), value));
-            el.data.args = Some(Value::Map(entries));
+    match el.data.args.as_mut() {
+        Some(tuple) => {
+            tuple.remove(key);
+            tuple.insert_named(0, key, value);
         }
-        _ => el.data.args = Some(Value::Map(vec![(key.to_string(), value)])),
+        None => el.data.args = Some(Tuple::from_named([(key.to_string(), value)])),
     }
 }
 
@@ -687,13 +692,12 @@ fn json_to_value(v: &serde_json::Value) -> Value {
             .or_else(|| n.as_f64().map(Value::Float))
             .unwrap_or(Value::Null),
         serde_json::Value::String(s) => Value::String(s.clone()),
-        serde_json::Value::Array(items) => Value::Seq(items.iter().map(json_to_value).collect()),
-        serde_json::Value::Object(entries) => Value::Map(
-            entries
-                .iter()
-                .map(|(k, v)| (k.clone(), json_to_value(v)))
-                .collect(),
-        ),
+        serde_json::Value::Array(items) => {
+            Value::Tuple(Tuple::from_unnamed(items.iter().map(json_to_value)))
+        }
+        serde_json::Value::Object(entries) => Value::Tuple(Tuple::from_named(
+            entries.iter().map(|(k, v)| (k.clone(), json_to_value(v))),
+        )),
     }
 }
 
@@ -867,7 +871,7 @@ mod tests {
         };
         assert_eq!(
             el.data.args,
-            Some(Value::Map(vec![(
+            Some(Tuple::from_named([(
                 "url".to_string(),
                 Value::String("x".to_string())
             )]))
@@ -875,11 +879,14 @@ mod tests {
         let value = el.data.value.as_ref().map(|v| v.as_data()).unwrap();
         assert_eq!(
             value,
-            Value::Map(vec![
+            Tuple::from_named([
                 ("id".to_string(), Value::String("c1".to_string())),
                 (
                     "m".to_string(),
-                    Value::Map(vec![("k".to_string(), Value::String("v".to_string()))])
+                    Value::Tuple(Tuple::from_named([(
+                        "k".to_string(),
+                        Value::String("v".to_string())
+                    )]))
                 ),
             ])
         );
@@ -897,7 +904,7 @@ mod tests {
         assert_eq!(el.data.args, None);
         assert_eq!(
             el.data.value.as_ref().map(|v| v.as_data()),
-            Some(Value::Map(vec![(
+            Some(Tuple::from_named([(
                 "a".to_string(),
                 Value::String("1".to_string())
             )]))
@@ -912,7 +919,7 @@ mod tests {
         assert!(declaration.name.is_bare_named("meta"));
         assert_eq!(
             declaration.data.args,
-            Some(Value::Map(vec![
+            Some(Tuple::from_named([
                 ("draft".to_string(), Value::Bool(true)),
                 ("title".to_string(), Value::String("Hello".to_string())),
             ]))
@@ -930,7 +937,7 @@ mod tests {
         assert!(
             tomet_declaration::document_meta(&back)
                 .and_then(|meta| match meta {
-                    Value::Map(entries) => Some(entries.iter().all(|(key, _)| key != "id")),
+                    Value::Tuple(entries) => Some(entries.named().all(|(key, _)| key != "id")),
                     _ => None,
                 })
                 .unwrap_or(false)
@@ -972,10 +979,13 @@ mod tests {
         assert_json_round_trip(&Value::Bool(true));
         assert_json_round_trip(&Value::Int(-7));
         assert_json_round_trip(&Value::String("x".into()));
-        assert_json_round_trip(&Value::Seq(vec![Value::Int(1), Value::String("a".into())]));
-        assert_json_round_trip(&Value::Map(vec![(
+        assert_json_round_trip(&Value::Tuple(Tuple::from_unnamed([
+            Value::Int(1),
+            Value::String("a".into()),
+        ])));
+        assert_json_round_trip(&Value::Tuple(Tuple::from_named([(
             "m".to_string(),
-            Value::Map(vec![("k".to_string(), Value::Int(1))]),
-        )]));
+            Value::Tuple(Tuple::from_named([("k".to_string(), Value::Int(1))])),
+        )])));
     }
 }

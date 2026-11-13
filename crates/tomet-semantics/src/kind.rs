@@ -552,8 +552,8 @@ pub enum ContentShape {
 /// paragraph.
 ///
 /// `None` means `kind` doesn't use `[content]` at all (its own slots are
-/// `{data}`/`(args)`, or it has no content concept, or -- for `Custom`,
-/// `Bare`, `Interp` -- it isn't a built-in kind in the first place, and a
+/// `{data}`/`(args)`, or it has no content concept, or -- for `Custom`
+/// -- it isn't a built-in kind in the first place, and a
 /// vocabulary's own `@content{allow:}` governs it instead). This table is
 /// the classification agreed in `.agents/tasks/
 /// conflict-element-and-content-model.md`'s "Step 1".
@@ -638,7 +638,7 @@ pub fn shape_mismatch(el: ElementView<'_>) -> Option<(Shape, Shape)> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tomet_ast::Value;
+    use tomet_ast::{Tuple, Value};
     use tomet_tree::{ElementExt, declaration_new, element_new};
 
     #[test]
@@ -752,7 +752,7 @@ mod tests {
     #[test]
     fn named_at_sigil_with_link_name_is_recognized() {
         let mut el = element_new(Name::bare("link"));
-        el.data.args = Some(Value::Map(vec![(
+        el.data.args = Some(Tuple::from_named([(
             "target".to_string(),
             Value::String("https://example.com".to_string()),
         )]));
@@ -825,7 +825,7 @@ mod tests {
     #[test]
     fn named_at_sigil_with_ruby_name_is_recognized() {
         let mut el = element_new(Name::bare("ruby"));
-        el.data.args = Some(Value::Map(vec![(
+        el.data.args = Some(Tuple::from_named([(
             "rt".to_string(),
             Value::String("かんじ".to_string()),
         )]));

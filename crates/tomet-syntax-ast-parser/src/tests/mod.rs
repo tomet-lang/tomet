@@ -25,7 +25,7 @@ mod values;
 use super::*;
 use tomet_ast::{
     Block, Element, Group, Inline, InterpExpr, InterpExprKind, Literal, Name, Paragraph, Placement,
-    SoftBreak, Value,
+    SoftBreak, Tuple, TupleEntry, Value,
 };
 pub(crate) use tomet_cst_parser::parse_cst;
 use tomet_span::Span;
@@ -60,6 +60,6 @@ fn first_para(blocks: &[Block]) -> &[Inline] {
 
 /// A list item's trailing `{value}` attrs, if any -- mirrors how
 /// `Element::list_item` stores them under `value` as `Group::Data`.
-fn item_attrs(item: &tomet_ast::ListItem) -> Option<Value> {
+fn item_attrs(item: &tomet_ast::ListItem) -> Option<Tuple> {
     item.data.value.as_ref().map(|v| v.as_data())
 }

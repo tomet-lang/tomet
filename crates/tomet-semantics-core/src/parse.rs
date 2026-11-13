@@ -7,7 +7,7 @@ use tomet_type::{Arg, Datum, Type, TypeError};
 ///
 /// Accepts a name (`string`, `list`, `datetime`) or the text form of a type
 /// (`"list(string)"`) as a string, and a call in AST form (`list(string)`, a
-/// [`Value::Call`]). A sequence `(string)` is a value, not a type.
+/// [`Value::Call`]). A tuple `(string)` is a value, not a type.
 ///
 /// A [`Value::Call`] has no named arguments, so what is written here is a
 /// type's name and the arguments it takes by position: the item type of a
@@ -21,7 +21,10 @@ pub fn parse_type_spec(spec: &Value) -> Result<Type, TypeError> {
     match spec {
         Value::String(text) => text.parse(),
         Value::Call(name, args) => {
-            let positional = args.iter().map(arg).collect::<Result<Vec<_>, _>>()?;
+            if !args.has_no_named() {
+                return Err(TypeError::NotAType);
+            }
+            let positional = args.unnamed().map(arg).collect::<Result<Vec<_>, _>>()?;
             Type::build(name, &positional, &[])
         }
         _ => Err(TypeError::NotAType),
@@ -49,6 +52,7 @@ fn arg(value: &Value) -> Result<Arg, TypeError> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use tomet_ast::Tuple;
     use tomet_type::Kind;
 
     fn string(s: &str) -> Value {
@@ -56,7 +60,7 @@ mod tests {
     }
 
     fn call(name: &str, args: Vec<Value>) -> Value {
-        Value::Call(name.to_string(), args)
+        Value::Call(name.to_string(), Tuple::from_unnamed(args))
     }
 
     #[test]
@@ -88,8 +92,8 @@ mod tests {
             Ok(list(list(Type::bare(Kind::Bool))))
         );
 
-        // A sequence is a value, not a type.
-        let seq = Value::Seq(vec![string("int")]);
+        // A tuple is a value, not a type.
+        let seq = Value::Tuple(Tuple::from_unnamed(vec![string("int")]));
         assert_eq!(parse_type_spec(&seq), Err(TypeError::NotAType));
     }
 

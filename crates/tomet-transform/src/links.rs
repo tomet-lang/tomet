@@ -1,6 +1,6 @@
 use std::path::{Path, PathBuf};
 
-use tomet_ast::{Block, Element, File, Inline, Paragraph, Text, Value};
+use tomet_ast::{Block, Element, File, Inline, Paragraph, Text, Tuple, Value};
 use tomet_semantics::{
     ElementKind, TargetScheme, classify_std_lenient, link_target, target_scheme,
 };
@@ -220,23 +220,19 @@ pub fn resolve_document_links<F>(
 }
 
 fn update_element_target(el: &mut Element, new_target: String) {
-    if let Some(Value::String(s)) = &mut el.data.args {
-        *s = new_target;
-    } else if let Some(Value::Map(entries)) = &mut el.data.args {
-        let mut found = false;
-        for (k, v) in entries.iter_mut() {
-            if k == "target" || k == "ref" {
-                *k = "target".to_string();
-                *v = Value::String(new_target.clone());
-                found = true;
-                break;
-            }
-        }
-        if !found {
-            entries.push(("target".to_string(), Value::String(new_target)));
+    if let Some(tuple) = &mut el.data.args {
+        if let Some(v) = tuple.get_mut("target") {
+            *v = Value::String(new_target);
+        } else if tuple.contains_name("ref") {
+            tuple.remove("ref");
+            tuple.push_named("target", Value::String(new_target));
+        } else if let Some(v) = tuple.nth_unnamed_mut(0) {
+            *v = Value::String(new_target);
+        } else {
+            tuple.push_named("target", Value::String(new_target));
         }
     } else {
-        el.data.args = Some(Value::String(new_target));
+        el.data.args = Some(Tuple::from_unnamed([Value::String(new_target)]));
     }
 }
 

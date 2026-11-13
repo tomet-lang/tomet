@@ -151,7 +151,10 @@ fn a_tag_in_a_value_is_its_text() {
     let [Block::Element(el)] = doc.body.as_slice() else {
         panic!("one element, got {:?}", doc.body);
     };
-    assert_eq!(el.data.args, Some(Value::String("<name>".into())));
+    assert_eq!(
+        el.data.args,
+        Some(Tuple::from_unnamed(vec![Value::String("<name>".into())]))
+    );
 
     let doc = parse_file("@opt(key: <name>)").unwrap();
     let [Block::Element(el)] = doc.body.as_slice() else {
@@ -159,7 +162,7 @@ fn a_tag_in_a_value_is_its_text() {
     };
     assert_eq!(
         el.data.args,
-        Some(Value::Map(vec![(
+        Some(Tuple::from_named(vec![(
             "key".into(),
             Value::String("<name>".into())
         )]))

@@ -38,7 +38,7 @@ pub use layer::{ConfigLayer, registered_by, registry_entries};
 pub use schema::{ConfigEntrySpec, ConfigGroupSpec, ConfigSpecProvider, all_config_specs};
 pub use tomet_spec_derive::Config;
 
-use tomet_ast::{File, Value};
+use tomet_ast::{File, Tuple, Value};
 use tomet_style::GroupOrder;
 use tree::merge_entry;
 
@@ -92,23 +92,25 @@ impl Config {
     /// the root, the `::field` are its `meta` map (beside the `meta` formatting hints), the
     /// `::workspace` its `workspace` map, and the registries lists of paths.
     fn from_merged(layer: &ConfigLayer) -> Self {
-        let mut root = Vec::new();
+        let mut root = Tuple::new();
         for (key, value) in layer.format() {
             merge_entry(&mut root, key, value);
         }
         for (name, definition) in layer.fields() {
-            let field = Value::Map(vec![(name.clone(), definition.clone())]);
+            let field = Value::Tuple(Tuple::from_named([(name.clone(), definition.clone())]));
             merge_entry(&mut root, "meta", &field);
         }
         for (key, value) in layer.workspace() {
-            let entry = Value::Map(vec![(key.clone(), value.clone())]);
+            let entry = Value::Tuple(Tuple::from_named([(key.clone(), value.clone())]));
             merge_entry(&mut root, "workspace", &entry);
         }
-        let paths = |paths: Vec<String>| Value::Seq(paths.into_iter().map(Value::String).collect());
-        root.push(("blueprints".to_string(), paths(layer.blueprint_paths())));
-        root.push(("vocabularies".to_string(), paths(layer.vocabulary_paths())));
-        root.push(("dictionaries".to_string(), paths(layer.dictionary_paths())));
-        let root = Value::Map(root);
+        let paths = |paths: Vec<String>| {
+            Value::Tuple(Tuple::from_unnamed(paths.into_iter().map(Value::String)))
+        };
+        root.push_named("blueprints", paths(layer.blueprint_paths()));
+        root.push_named("vocabularies", paths(layer.vocabulary_paths()));
+        root.push_named("dictionaries", paths(layer.dictionary_paths()));
+        let root = Value::Tuple(root);
 
         Self {
             format: FormatConfig::from_root(&root),

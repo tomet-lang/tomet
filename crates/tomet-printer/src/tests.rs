@@ -1,7 +1,7 @@
 use super::*;
 use crate::value::render_value_inner_with_config;
 use tomet_ast::{
-    Block, Data, Entry, File, Group, Inline, Name, Paragraph, Section, Text, Value,
+    Block, Data, Entry, File, Group, Inline, Name, Paragraph, Section, Text, Tuple, Value,
 };
 use tomet_config::{FieldConfig, FormatConfig, MetaConfig};
 use tomet_span::Span;
@@ -415,7 +415,7 @@ fn test_codeblock_formatting() {
 fn test_container_children_indentation() {
     let note = |marker: i64, text: &str| {
         let mut el = element_new(Name::bare("item"));
-        el.data.args = Some(Value::Int(marker));
+        el.data.args = Some(Tuple::from_unnamed([Value::Int(marker)]));
         el.content = Some(vec![Block::Paragraph(Paragraph::new(
             vec![Inline::Text(text.into())],
             Span::dummy(),
@@ -438,7 +438,9 @@ fn test_container_children_indentation() {
 #[test]
 fn test_group_order_content_first() {
     let mut el = element_new(Name::bare("link"));
-    el.data.args = Some(Value::String("https://example.com".to_string()));
+    el.data.args = Some(Tuple::from_unnamed([Value::String(
+        "https://example.com".to_string(),
+    )]));
     el.content = Some(vec![Block::Paragraph(Paragraph::new(
         vec![Inline::Text("Example".into())],
         Span::dummy(),
@@ -815,7 +817,7 @@ fn a_block_value_in_a_group_keeps_every_block_it_holds() {
 /// `{value}`, `#(id)` or a `::connect`, it would not read back.
 #[test]
 fn an_element_without_a_primary_group_is_printed_with_an_empty_one() {
-    let value = Group::from_map(Value::Map(vec![("a".to_string(), Value::Int(1))]));
+    let value = Group::from_map(Tuple::from_named([("a".to_string(), Value::Int(1))]));
 
     let bare = element_new(Name::bare("memo"));
     let mut with_value = element_new(Name::bare("memo"));
@@ -826,7 +828,7 @@ fn an_element_without_a_primary_group_is_printed_with_an_empty_one() {
     with_connect.connects.push(tomet_ast::Connect {
         name: Name::bare("rule"),
         data: Data {
-            args: Some(Value::Map(vec![("k".to_string(), Value::Int(1))])),
+            args: Some(Tuple::from_named([("k".to_string(), Value::Int(1))])),
             value: None,
         },
         content: None,
@@ -858,12 +860,12 @@ fn an_element_that_has_a_primary_group_gets_no_extra_one() {
 #[test]
 fn a_named_connect_is_printed_on_a_primary_group() {
     let mut el = element_new(Name::bare("memo"));
-    el.data.args = Some(Value::Map(vec![("a".to_string(), Value::Int(1))]));
+    el.data.args = Some(Tuple::from_named([("a".to_string(), Value::Int(1))]));
     el.connects.push(tomet_ast::Connect {
         name: Name::bare("rule"),
         data: Data {
             args: None,
-            value: Some(Group::from_map(Value::Map(vec![(
+            value: Some(Group::from_map(Tuple::from_named([(
                 "k".to_string(),
                 Value::Int(1),
             )]))),
@@ -934,7 +936,7 @@ fn a_thematic_break_is_printed_as_dashes_and_never_as_a_bare_hr() {
         assert!(matches!(&again.body[0], Block::Element(el) if el.name == Name::bare("hr")));
     }
     let mut hr = element_new(Name::bare("hr"));
-    hr.data.value = Some(Group::from_map(Value::Map(vec![(
+    hr.data.value = Some(Group::from_map(Tuple::from_named([(
         "a".to_string(),
         Value::Int(1),
     )])));
@@ -982,7 +984,7 @@ fn a_declaration_of_entries_is_printed_in_parentheses_and_reads_back() {
         "::vocabulary(deck: @file(deck.tmt))\n",
         "::dictionary(tomet: @file(dict.tmt))\n",
         "::migration(source: obsidian)\n",
-        "::element(card: {}, ref: {})\n",
+        "::element(card: (), ref: ())\n",
     ] {
         let before = tomet_ast_parser::parse_file(src).unwrap();
         let printed = document_to_tm(&before);

@@ -17,7 +17,7 @@
 //! between a nested lookup and a flat key of that name. Element @em[names]
 //! use `.` as a namespace separator, but map keys deliberately do not.
 
-use tomet_ast::{ElementView, Value};
+use tomet_ast::{ElementView, Tuple, Value};
 use tomet_tree::scalar_string;
 
 /// The attribute a consumer should read instead of the flat projection
@@ -82,39 +82,37 @@ pub fn flatten_element_data(el: ElementView<'_>) -> FlatData {
 /// Callers pass `None` for a group the surrounding mapping has already
 /// consumed -- a heading's level, a link's target -- so it is not emitted
 /// a second time as an attribute.
-pub fn flatten_data(args: Option<&Value>, value: Option<&Value>) -> FlatData {
+pub fn flatten_data(args: Option<&Tuple>, value: Option<&Tuple>) -> FlatData {
     let mut pairs = Vec::new();
     let mut positional = None;
     let mut lossy = false;
     for group in [args, value].into_iter().flatten() {
-        match group {
-            Value::Map(entries) => {
-                for (k, v) in entries {
-                    match scalar_string(v) {
-                        // A key that cannot be spliced into `data-{key}` has no
-                        // readable projection; the exact copy carries it.
-                        Some(s) if is_attribute_key(k) => pairs.push((k.clone(), s)),
-                        _ => lossy = true,
-                    }
+        for entry in group.entries() {
+            if let Some(k) = entry.name() {
+                match scalar_string(entry.value()) {
+                    // A key that cannot be spliced into `data-{key}` has no
+                    // readable projection; the exact copy carries it.
+                    Some(s) if is_attribute_key(k) => pairs.push((k.to_string(), s)),
+                    _ => lossy = true,
                 }
+            } else if positional.is_none() {
+                match scalar_string(entry.value()) {
+                    Some(s) => positional = Some(s),
+                    None => lossy = true,
+                }
+            } else {
+                lossy = true;
             }
-            // A positional group (`@icon(star)`) has no key. Its value
-            // still projects if it is scalar; only a positional *map*
-            // needs the exact copy.
-            other => match scalar_string(other) {
-                Some(s) => positional = Some(s),
-                None => lossy = true,
-            },
         }
     }
 
     let exact = lossy.then(|| {
         let mut obj = serde_json::Map::new();
         if let Some(args) = args {
-            obj.insert("args".to_string(), value_to_json(args));
+            obj.insert("args".to_string(), tuple_to_json(args));
         }
         if let Some(value) = value {
-            obj.insert("value".to_string(), value_to_json(value));
+            obj.insert("value".to_string(), tuple_to_json(value));
         }
         serde_json::Value::Object(obj).to_string()
     });
@@ -123,6 +121,34 @@ pub fn flatten_data(args: Option<&Value>, value: Option<&Value>) -> FlatData {
         pairs,
         positional,
         exact,
+    }
+}
+
+/// Converts a Tomet tuple to JSON according to the specification table:
+/// - empty: `{}`
+/// - at least one entry, none named: array
+/// - at least one entry, none unnamed: object
+/// - mixed: object, where an unnamed entry's key is its position among unnamed (`"0"`, `"1"`)
+pub fn tuple_to_json(tuple: &Tuple) -> serde_json::Value {
+    if tuple.is_empty() {
+        serde_json::Value::Object(serde_json::Map::new())
+    } else if tuple.has_no_named() {
+        serde_json::Value::Array(tuple.unnamed().map(value_to_json).collect())
+    } else {
+        let mut obj = serde_json::Map::new();
+        let mut unnamed_idx = 0usize;
+        for entry in tuple.entries() {
+            let key = match entry.name() {
+                Some(name) => name.to_string(),
+                None => {
+                    let k = unnamed_idx.to_string();
+                    unnamed_idx += 1;
+                    k
+                }
+            };
+            obj.insert(key, value_to_json(entry.value()));
+        }
+        serde_json::Value::Object(obj)
     }
 }
 
@@ -147,20 +173,11 @@ pub fn value_to_json(v: &Value) -> serde_json::Value {
             None => serde_json::Value::String(text.clone()),
         },
         Value::String(s) => serde_json::Value::String(s.clone()),
-        Value::Seq(items) => serde_json::Value::Array(items.iter().map(value_to_json).collect()),
-        Value::Map(entries) => serde_json::Value::Object(
-            entries
-                .iter()
-                .map(|(k, v)| (k.clone(), value_to_json(v)))
-                .collect(),
-        ),
+        Value::Tuple(tuple) => tuple_to_json(tuple),
         Value::Call(name, args) => {
             let mut obj = serde_json::Map::new();
             obj.insert("call".to_string(), serde_json::Value::String(name.clone()));
-            obj.insert(
-                "args".to_string(),
-                serde_json::Value::Array(args.iter().map(value_to_json).collect()),
-            );
+            obj.insert("args".to_string(), tuple_to_json(args));
             serde_json::Value::Object(obj)
         }
         // Same shape as `Call` above (a tagged object), since JSON has no
@@ -206,7 +223,7 @@ pub fn value_to_json(v: &Value) -> serde_json::Value {
             let name = el.name.to_string();
             obj.insert("element".to_string(), serde_json::Value::String(name));
             if let Some(args) = &el.data.args {
-                obj.insert("args".to_string(), value_to_json(args));
+                obj.insert("args".to_string(), tuple_to_json(args));
             }
             serde_json::Value::Object(obj)
         }
@@ -226,30 +243,32 @@ mod tests {
     use tomet_ast::{Element, Group, Name};
     use tomet_tree::element_new;
 
-    fn el_with(args: Option<Value>, value: Option<Value>) -> Element {
+    fn el_with(args: Option<Tuple>, value: Option<Tuple>) -> Element {
         let mut el = element_new(Name::bare("x"));
         el.data.args = args;
         el.data.value = value.map(Group::from_map);
         el
     }
 
+    fn tuple_named(entries: &[(&str, Value)]) -> Tuple {
+        Tuple::from_named(entries.iter().map(|(k, v)| (k.to_string(), v.clone())))
+    }
+
     fn map(entries: &[(&str, Value)]) -> Value {
-        Value::Map(
-            entries
-                .iter()
-                .map(|(k, v)| (k.to_string(), v.clone()))
-                .collect(),
-        )
+        Value::Tuple(tuple_named(entries))
     }
 
     #[test]
     fn flat_data_projects_without_an_exact_copy() {
         let el = el_with(
-            Some(map(&[
+            Some(tuple_named(&[
                 ("a", Value::Int(1)),
                 (
                     "tags",
-                    Value::Seq(vec![Value::String("p".into()), Value::String("q".into())]),
+                    Value::Tuple(Tuple::from_unnamed([
+                        Value::String("p".into()),
+                        Value::String("q".into()),
+                    ])),
                 ),
             ])),
             None,
@@ -270,7 +289,7 @@ mod tests {
         // The bug this exists for: the HTML writer must not emit
         // `data-m=""` and lose `{ k: v }` entirely.
         let el = el_with(
-            Some(map(&[
+            Some(tuple_named(&[
                 ("a", Value::Int(1)),
                 ("m", map(&[("k", Value::String("v".into()))])),
             ])),
@@ -287,8 +306,11 @@ mod tests {
     #[test]
     fn args_and_value_both_reach_the_exact_copy() {
         let el = el_with(
-            Some(map(&[("url", Value::String("https://e.com".into()))])),
-            Some(map(&[
+            Some(tuple_named(&[(
+                "url",
+                Value::String("https://e.com".into()),
+            )])),
+            Some(tuple_named(&[
                 ("id", Value::String("b1".into())),
                 ("meta", map(&[("author", Value::String("alice".into()))])),
             ])),
@@ -311,7 +333,10 @@ mod tests {
 
     #[test]
     fn into_pairs_appends_the_exact_copy() {
-        let el = el_with(Some(map(&[("m", map(&[("k", Value::Int(1))]))])), None);
+        let el = el_with(
+            Some(tuple_named(&[("m", map(&[("k", Value::Int(1))]))])),
+            None,
+        );
         let pairs = flatten_element_data(el.as_view()).into_pairs();
         assert_eq!(pairs.len(), 1);
         assert_eq!(pairs[0].0, EXACT_DATA_KEY);
@@ -320,17 +345,29 @@ mod tests {
     #[test]
     fn a_sequence_of_maps_does_not_project() {
         assert_eq!(
-            scalar_string(&Value::Seq(vec![map(&[("k", Value::Int(1))])])),
+            scalar_string(&Value::Tuple(Tuple::from_unnamed([map(&[(
+                "k",
+                Value::Int(1)
+            )])]))),
             None
         );
     }
 
     #[test]
     fn a_list_projects_like_a_sequence() {
-        let list = Value::Seq(vec![Value::String("a".into()), Value::String("b".into())]);
+        let list = Value::Tuple(Tuple::from_unnamed([
+            Value::String("a".into()),
+            Value::String("b".into()),
+        ]));
         assert_eq!(scalar_string(&list), Some("a, b".to_string()));
 
         let json = value_to_json(&list);
         assert_eq!(json, serde_json::json!(["a", "b"]));
+    }
+
+    #[test]
+    fn empty_tuple_to_json_is_object() {
+        let empty = Value::Tuple(Tuple::new());
+        assert_eq!(value_to_json(&empty), serde_json::json!({}));
     }
 }

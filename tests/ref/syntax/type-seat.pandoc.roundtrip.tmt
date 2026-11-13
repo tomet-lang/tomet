@@ -17,7 +17,7 @@
 =[見出しの座 `<$string>`]
 
 =[値の位置]
-@memo(type_seat: int)[]
+@memo({type_seat: int})[]
 
 @memo(key: {type_seat: string})[]
 

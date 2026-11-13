@@ -67,14 +67,14 @@ fn a_single_argument_is_the_value_itself() {
         panic!("expected a hole");
     };
     assert_eq!(hole.matcher, matcher("int"));
-    assert_eq!(hole.data.args, Some(string("n")));
+    assert_eq!(hole.data.args, Some(Tuple::from_unnamed(vec![string("n")])));
 }
 
 #[test]
 fn an_empty_group_is_an_empty_map() {
     let hole = hole("<?()>");
     assert_eq!(hole.matcher, None);
-    assert_eq!(hole.data.args, Some(Value::Map(Vec::new())));
+    assert_eq!(hole.data.args, Some(Tuple::new()));
     assert_eq!(hole.placement, Placement::Block);
 }
 
@@ -94,14 +94,17 @@ fn the_parens_may_be_left_out() {
 fn the_matcher_may_be_left_out() {
     let hole = hole("<?(n)>");
     assert_eq!(hole.matcher, None);
-    assert_eq!(hole.data.args, Some(string("n")));
+    assert_eq!(hole.data.args, Some(Tuple::from_unnamed(vec![string("n")])));
 }
 
 #[test]
 fn content_is_a_sub_pattern() {
     let hole = hole("<?(id)>[adr-<?int(n)>-<?(slug)>]");
     assert_eq!(hole.matcher, None);
-    assert_eq!(hole.data.args, Some(string("id")));
+    assert_eq!(
+        hole.data.args,
+        Some(Tuple::from_unnamed(vec![string("id")]))
+    );
     let content = hole.content.expect("content");
     assert_eq!(shape(first_para(&content)), r#""adr-" <?int> "-" <?>"#);
 }
@@ -112,10 +115,7 @@ fn several_arguments_are_unkeyed_entries() {
     assert_eq!(hole.matcher, matcher("int"));
     assert_eq!(
         hole.data.args,
-        Some(Value::Map(vec![
-            (String::new(), string("n")),
-            (String::new(), string("x")),
-        ]))
+        Some(Tuple::from_unnamed(vec![string("n"), string("x")]))
     );
 }
 
@@ -131,25 +131,25 @@ fn options_are_the_value_group() {
 #[test]
 fn a_content_literal_is_a_value() {
     let hole = hole("<?alt(doc, ([adr-<?int(n)>], [rfc-<?int(n)>]))>");
-    let Some(Value::Map(entries)) = &hole.data.args else {
-        panic!("expected a map, got {:?}", hole.data.args);
+    let Some(args) = &hole.data.args else {
+        panic!("expected args, got {:?}", hole.data.args);
     };
-    assert_eq!(entries[0].1, string("doc"));
-    let Value::Seq(branches) = &entries[1].1 else {
-        panic!("expected a sequence, got {:?}", entries[1].1);
+    assert_eq!(args.nth_unnamed(0), Some(&string("doc")));
+    let Some(Value::Tuple(branches)) = args.nth_unnamed(1) else {
+        panic!("expected a tuple, got {:?}", args.nth_unnamed(1));
     };
     assert_eq!(branches.len(), 2);
-    assert!(branches.iter().all(|b| matches!(b, Value::Blocks(_))));
+    assert!(branches.unnamed().all(|b| matches!(b, Value::Blocks(_))));
 }
 
 #[test]
 fn a_content_literal_is_a_value_in_positional_position_too() {
     let hole = hole("<?many(items, [ab])>");
-    let Some(Value::Map(entries)) = &hole.data.args else {
-        panic!("expected a map, got {:?}", hole.data.args);
+    let Some(args) = &hole.data.args else {
+        panic!("expected args, got {:?}", hole.data.args);
     };
-    assert_eq!(entries[0].1, string("items"));
-    assert!(matches!(entries[1].1, Value::Blocks(_)));
+    assert_eq!(args.nth_unnamed(0), Some(&string("items")));
+    assert!(matches!(args.nth_unnamed(1), Some(Value::Blocks(_))));
 }
 
 #[test]
@@ -168,12 +168,11 @@ fn a_matcher_may_be_namespaced() {
 fn a_hole_sits_inside_an_element() {
     let link = element("@link(url: <?(u)>)[ <?(text)> ]");
     assert_eq!(link.name, Name::bare("link"));
-    let Some(Value::Map(args)) = &link.data.args else {
+    let Some(args) = &link.data.args else {
         panic!("expected args, got {:?}", link.data.args);
     };
-    assert_eq!(args[0].0, "url");
-    let Value::Hole(url) = &args[0].1 else {
-        panic!("expected a hole, got {:?}", args[0].1);
+    let Some(Value::Hole(url)) = args.get("url") else {
+        panic!("expected a hole, got {:?}", args.get("url"));
     };
     assert_eq!(url.matcher, None);
     let content = link.content.expect("content");
@@ -215,7 +214,7 @@ fn the_old_spelling_is_text() {
 fn a_head_may_span_lines_like_an_elements_groups() {
     let hole = hole("<?alt(\n  a,\n  b\n){\n  min: 1\n}>");
     assert_eq!(hole.matcher, matcher("alt"));
-    assert!(matches!(&hole.data.args, Some(Value::Map(e)) if e.len() == 2));
+    assert!(matches!(&hole.data.args, Some(e) if e.len() == 2));
     assert!(hole.data.value.is_some());
 }
 
@@ -267,8 +266,14 @@ fn a_quoted_argument_is_never_formatting() {
     // `strong(init)` + `.py`) is written as a quoted argument instead.
     let first = hole(r#"<?string("__init__.py")>"#);
     assert_eq!(first.matcher, matcher("string"));
-    assert_eq!(first.data.args, Some(string("__init__.py")));
+    assert_eq!(
+        first.data.args,
+        Some(Tuple::from_unnamed(vec![string("__init__.py")]))
+    );
 
     let second = hole(r#"<?string("_private_.rs")>"#);
-    assert_eq!(second.data.args, Some(string("_private_.rs")));
+    assert_eq!(
+        second.data.args,
+        Some(Tuple::from_unnamed(vec![string("_private_.rs")]))
+    );
 }

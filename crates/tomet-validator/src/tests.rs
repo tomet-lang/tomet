@@ -1356,6 +1356,7 @@ fn checking_a_vocabulary_reports_a_type_that_names_no_type() {
 
 #[test]
 fn check_ctmt_declarations_reports_expected_diagnostics() {
+    use tomet_ast::Tuple;
     use tomet_ast::Value;
     use tomet_declaration::Declaration;
     use tomet_span::Span;
@@ -1365,22 +1366,26 @@ fn check_ctmt_declarations_reports_expected_diagnostics() {
         Declared::new(
             Declaration::new(
                 "kind",
-                Some(Value::Map(vec![
-                    ("".into(), Value::String("catalog".into())),
-                    ("".into(), Value::Int(1)),
+                Some(Tuple::from_unnamed([
+                    Value::String("catalog".into()),
+                    Value::Int(1),
                 ])),
                 None,
             ),
             Span::new(0, 10),
         ),
         Declared::new(
-            Declaration::new("version", Some(Value::String("1.0.0".into())), None),
+            Declaration::new(
+                "version",
+                Some(Tuple::from_unnamed([Value::String("1.0.0".into())])),
+                None,
+            ),
             Span::new(11, 25),
         ),
         Declared::new(
             Declaration::new(
                 "meta",
-                Some(Value::Map(vec![(
+                Some(Tuple::from_named([(
                     "author".into(),
                     Value::String("me".into()),
                 )])),
@@ -1397,20 +1402,24 @@ fn check_ctmt_declarations_reports_expected_diagnostics() {
     let decls = vec![
         Declaration::new("upstreams", None, None),
         Declaration::new("foo.bar", None, None),
-        Declaration::new("use", Some(Value::String("deck".into())), None),
+        Declaration::new(
+            "use",
+            Some(Tuple::from_unnamed([Value::String("deck".into())])),
+            None,
+        ),
         Declaration::new("meta", None, None),
         Declaration::new("meta", None, None),
         Declaration::new(
             "kind",
-            Some(Value::Map(vec![
-                ("".into(), Value::String("catalog".into())),
-                ("".into(), Value::String("abc".into())),
+            Some(Tuple::from_unnamed([
+                Value::String("catalog".into()),
+                Value::String("abc".into()),
             ])),
             None,
         ),
         Declaration::new(
             "macro",
-            Some(Value::Map(vec![("bad".into(), Value::Int(123))])),
+            Some(Tuple::from_named([("bad".into(), Value::Int(123))])),
             None,
         ),
     ];

@@ -5,7 +5,7 @@ use crate::positional::normalized_element_args;
 use std::collections::HashMap;
 use tomet_ast::{Element, ElementView, File, Placement};
 use tomet_span::Span;
-use tomet_tree::{ValueExt, for_each_element};
+use tomet_tree::for_each_element;
 
 /// An individual footnote entry resolved within a document.
 #[derive(Debug, Clone)]
@@ -169,7 +169,7 @@ fn get_element_id(el: ElementView<'_>) -> Option<String> {
     if let Some(id) = args.get("id") {
         return value_to_id(id);
     }
-    value_to_id(&args)
+    args.nth_unnamed(0).and_then(value_to_id)
 }
 
 fn value_to_id(val: &tomet_ast::Value) -> Option<String> {

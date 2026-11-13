@@ -24,8 +24,8 @@ use std::fmt::Write as _;
 use std::path::PathBuf;
 
 use tomet_ast::{
-    Block, Connect, Data, Declaration, ElementView, Entry, File, Group, Hole, Inline,
-    InterpExpr, Interpolation, List, ListItem, Placement, TypeSeat, Value,
+    Block, Connect, Data, Declaration, ElementView, Entry, File, Group, Hole, Inline, InterpExpr,
+    Interpolation, List, ListItem, Placement, Tuple, TypeSeat, Value,
 };
 use tomet_ast_parser::parse_file;
 
@@ -1004,7 +1004,7 @@ fn dump_block(out: &mut String, block: &Block, depth: usize) {
             }
             if let Some(args) = &sec.data.args {
                 indent(out, depth + 1);
-                let _ = writeln!(out, "args    {}", value_str(args));
+                let _ = writeln!(out, "args    {}", tuple_str(args));
             }
             match &sec.data.value {
                 Some(Group(entries)) => {
@@ -1178,7 +1178,7 @@ fn dump_connect(out: &mut String, connect: &Connect, depth: usize) {
 fn dump_groups(out: &mut String, data: &Data, content: Option<&[Block]>, depth: usize) {
     if let Some(args) = &data.args {
         indent(out, depth + 1);
-        let _ = writeln!(out, "args    {}", value_str(args));
+        let _ = writeln!(out, "args    {}", tuple_str(args));
     }
     if let Some(content) = content {
         indent(out, depth + 1);
@@ -1222,6 +1222,32 @@ fn element_head(el: ElementView<'_>) -> String {
     format!("{placement} @{}", el.name)
 }
 
+fn tuple_inner_str(tuple: &Tuple) -> String {
+    let inner: Vec<String> = tuple
+        .entries()
+        .map(|entry| match entry.name() {
+            Some(k) => format!("{k}: {}", value_str(entry.value())),
+            None => value_str(entry.value()),
+        })
+        .collect();
+    inner.join(", ")
+}
+
+fn tuple_str(tuple: &Tuple) -> String {
+    if tuple.is_empty() {
+        return "()".to_string();
+    }
+    if tuple.has_no_unnamed() {
+        let inner: Vec<String> = tuple
+            .named()
+            .map(|(k, v)| format!("{k}: {}", value_str(v)))
+            .collect();
+        format!("{{{}}}", inner.join(", "))
+    } else {
+        format!("({})", tuple_inner_str(tuple))
+    }
+}
+
 fn value_str(v: &Value) -> String {
     match v {
         Value::Null => "null".to_string(),
@@ -1231,29 +1257,9 @@ fn value_str(v: &Value) -> String {
         // Kept as written; named, so a report shows it was not read as a float.
         Value::Number(text) => format!("number({text})"),
         Value::String(s) => format!("{s:?}"),
-        // Written as the source spells it: `[...]` is block content here
-        // (`Value::Blocks` below), not a list.
-        Value::Seq(items) => {
-            let inner: Vec<String> = items.iter().map(value_str).collect();
-            format!("({})", inner.join(", "))
-        }
-        Value::Map(entries) => {
-            let inner: Vec<String> = entries
-                .iter()
-                .map(|(k, v)| {
-                    if k.is_empty() {
-                        // The parser's positional-entry sentinel.
-                        format!("(位置) {}", value_str(v))
-                    } else {
-                        format!("{k}: {}", value_str(v))
-                    }
-                })
-                .collect();
-            format!("{{{}}}", inner.join(", "))
-        }
+        Value::Tuple(tuple) => tuple_str(tuple),
         Value::Call(name, args) => {
-            let inner: Vec<String> = args.iter().map(value_str).collect();
-            format!("{name}({})", inner.join(", "))
+            format!("{name}({})", tuple_inner_str(args))
         }
         Value::Interp(interp) => interp.to_string(),
         Value::TypeSeat(seat) => seat.to_string(),
@@ -1264,14 +1270,14 @@ fn value_str(v: &Value) -> String {
                 .map(ToString::to_string)
                 .unwrap_or_default();
             match &hole.data.args {
-                Some(args) => format!("?{matcher}({})", value_str(args)),
+                Some(args) => format!("?{matcher}({})", tuple_inner_str(args)),
                 None => format!("?{matcher}"),
             }
         }
         Value::Element(el) => {
             let name = el.name.to_string();
             match &el.data.args {
-                Some(args) => format!("@{name}({})", value_str(args)),
+                Some(args) => format!("@{name}({})", tuple_inner_str(args)),
                 None => format!("@{name}"),
             }
         }

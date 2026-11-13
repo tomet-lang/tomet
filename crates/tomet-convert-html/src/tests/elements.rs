@@ -1,4 +1,5 @@
 use super::*;
+use tomet_ast::Value;
 
 #[test]
 fn meta_element_has_no_visible_output() {
@@ -60,13 +61,9 @@ fn custom_element_hook_renders_doc_icon() {
             }
             let args = ctx.normalized_args();
             let get = |key: &str| {
-                let Some(Value::Map(entries)) = &args else {
-                    return None;
-                };
-                entries
-                    .iter()
-                    .find(|(k, _)| k == key)
-                    .and_then(|(_, v)| match v {
+                args.as_ref()
+                    .and_then(|a| a.get(key))
+                    .and_then(|v| match v {
                         Value::String(s) => Some(s.clone()),
                         _ => None,
                     })

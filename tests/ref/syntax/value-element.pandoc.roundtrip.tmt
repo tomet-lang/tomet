@@ -10,4 +10,4 @@
 (`::meta` の `mixed` を参照)。これは要素をvalueに埋め込む機能とは独立の
 パーサ修正で、`(args)` 一般に効く。
 
-@ns.thing(icon: {element: doc.icon, args: {triangle, pkg: lucide}})[]
+@ns.thing(icon: {element: doc.icon, args: {0: triangle, pkg: lucide}})[]

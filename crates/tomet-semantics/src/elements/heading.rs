@@ -26,13 +26,13 @@ pub fn heading_level(el: ElementView<'_>) -> Option<u8> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tomet_ast::{Name, Value};
+    use tomet_ast::{Name, Tuple, Value};
     use tomet_tree::element_new;
 
     #[test]
     fn type_sigil_heading_classifies_and_extracts_level() {
         let mut el = element_new(Name::bare("heading"));
-        el.data.args = Some(Value::Int(2));
+        el.data.args = Some(Tuple::from_unnamed([Value::Int(2)]));
         assert_eq!(
             crate::classify_std_lenient(el.as_view()),
             ElementKind::Heading
@@ -43,7 +43,7 @@ mod tests {
     #[test]
     fn at_sigil_heading_classifies_and_extracts_level() {
         let mut el = element_new(Name::bare("heading"));
-        el.data.args = Some(Value::Int(3));
+        el.data.args = Some(Tuple::from_unnamed([Value::Int(3)]));
         assert_eq!(
             crate::classify_std_lenient(el.as_view()),
             ElementKind::Heading
@@ -65,32 +65,31 @@ mod tests {
 
     #[test]
     fn bare_int_arg_normalizes_into_level() {
-        // `#[x]` sugar produces a bare `Value::Int(level)` in `args`, not
-        // already wrapped in a map -- `normalized_element_args` wraps it
-        // under the single "level" positional slot before this reads it.
+        // `#[x]` sugar produces a tuple with one unnamed `Value::Int(level)` in `args` --
+        // `normalized_element_args` binds it under the single "level" positional slot before this reads it.
         let mut el = element_new(Name::bare("heading"));
-        el.data.args = Some(Value::Int(1));
+        el.data.args = Some(Tuple::from_unnamed([Value::Int(1)]));
         assert_eq!(heading_level(el.as_view()), Some(1));
     }
 
     #[test]
     fn clamps_level_above_six_down_to_six() {
         let mut el = element_new(Name::bare("heading"));
-        el.data.args = Some(Value::Int(9));
+        el.data.args = Some(Tuple::from_unnamed([Value::Int(9)]));
         assert_eq!(heading_level(el.as_view()), Some(6));
     }
 
     #[test]
     fn clamps_level_below_one_up_to_one() {
         let mut el = element_new(Name::bare("heading"));
-        el.data.args = Some(Value::Int(0));
+        el.data.args = Some(Tuple::from_unnamed([Value::Int(0)]));
         assert_eq!(heading_level(el.as_view()), Some(1));
     }
 
     #[test]
     fn non_heading_element_is_always_none() {
         let mut el = element_new(Name::bare("raw"));
-        el.data.args = Some(Value::Int(2));
+        el.data.args = Some(Tuple::from_unnamed([Value::Int(2)]));
         assert_eq!(heading_level(el.as_view()), None);
     }
 
@@ -103,7 +102,7 @@ mod tests {
     #[test]
     fn heading_with_non_int_level_is_none() {
         let mut el = element_new(Name::bare("heading"));
-        el.data.args = Some(Value::Map(vec![(
+        el.data.args = Some(Tuple::from_named([(
             "level".to_string(),
             Value::String("two".to_string()),
         )]));

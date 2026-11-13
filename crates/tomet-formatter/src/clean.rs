@@ -71,10 +71,8 @@ pub(crate) fn is_raw_element(el: ElementView<'_>) -> bool {
     if el.name.is_bare_named("raw") {
         return true;
     }
-    if let Some(Value::Map(entries)) = el.data.args.as_ref()
-        && entries
-            .iter()
-            .any(|(k, v)| k == "content" && matches!(v, Value::String(s) if s == "raw"))
+    if let Some(args) = el.data.args.as_ref()
+        && matches!(args.get("content"), Some(Value::String(s)) if s == "raw")
     {
         return true;
     }

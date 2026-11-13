@@ -1,13 +1,13 @@
 //! Extracts tags from an element (`@tag(...)`, `@tag[...]`).
 
-use tomet_ast::{Block, ElementView, Inline, List, Value};
+use tomet_ast::{Block, ElementView, Inline, List, Tuple, Value};
 
 /// Extracts a list of tag names from a tag element.
-/// Inspects `args` (as string, seq, or map) and `content` (as plain text).
+/// Inspects `args` (as tuple) and `content` (as plain text).
 pub fn extract_tags(el: ElementView<'_>) -> Vec<String> {
     let mut tags = Vec::new();
     if let Some(args) = el.args() {
-        extract_tags_from_value(args, &mut tags);
+        extract_tags_from_tuple(args, &mut tags);
     }
     if tags.is_empty()
         && let Some(content) = el.content
@@ -20,6 +20,12 @@ pub fn extract_tags(el: ElementView<'_>) -> Vec<String> {
     tags
 }
 
+fn extract_tags_from_tuple(tuple: &Tuple, tags: &mut Vec<String>) {
+    for entry in tuple {
+        extract_tags_from_value(entry.value(), tags);
+    }
+}
+
 fn extract_tags_from_value(v: &Value, tags: &mut Vec<String>) {
     match v {
         Value::String(s) => {
@@ -27,15 +33,8 @@ fn extract_tags_from_value(v: &Value, tags: &mut Vec<String>) {
                 tags.push(s.clone());
             }
         }
-        Value::Map(entries) => {
-            for (_, val) in entries {
-                extract_tags_from_value(val, tags);
-            }
-        }
-        Value::Seq(items) => {
-            for item in items {
-                extract_tags_from_value(item, tags);
-            }
+        Value::Tuple(tuple) => {
+            extract_tags_from_tuple(tuple, tags);
         }
         _ => {}
     }
@@ -106,14 +105,14 @@ mod tests {
     #[test]
     fn extracts_tags_from_args_string() {
         let mut el = element_new(Name::bare("tag"));
-        el.data.args = Some(Value::String("rust".to_string()));
+        el.data.args = Some(Tuple::from_unnamed([Value::String("rust".to_string())]));
         assert_eq!(extract_tags(el.as_view()), vec!["rust"]);
     }
 
     #[test]
     fn extracts_tags_from_args_seq() {
         let mut el = element_new(Name::bare("tag"));
-        el.data.args = Some(Value::Seq(vec![
+        el.data.args = Some(Tuple::from_unnamed([
             Value::String("rust".to_string()),
             Value::String("tomet".to_string()),
         ]));

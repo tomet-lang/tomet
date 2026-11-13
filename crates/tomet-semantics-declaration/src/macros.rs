@@ -122,10 +122,10 @@ mod tests {
 
     fn body(src: &str) -> Value {
         let file = tomet_ast_parser::parse_file(src).expect("parses");
-        let Some(Value::Map(entries)) = &file.header[0].data.args else {
+        let Some(args) = &file.header[0].data.args else {
             panic!("expected `(name: template)` entries");
         };
-        entries[0].1.clone()
+        args.nth(0).expect("first entry").value().clone()
     }
 
     #[test]

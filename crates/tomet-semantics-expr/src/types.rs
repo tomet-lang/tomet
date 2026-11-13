@@ -116,7 +116,9 @@ fn datum(value: &Value) -> Option<Datum> {
             .map(Datum::Int)
             .or_else(|| text.parse::<f64>().ok().map(Datum::Float))?,
         Value::String(text) => Datum::Text(text.clone()),
-        Value::Seq(items) => Datum::Seq(items.iter().map(datum).collect::<Option<_>>()?),
+        Value::Tuple(tuple) if tuple.has_no_named() => {
+            Datum::Seq(tuple.unnamed().map(datum).collect::<Option<_>>()?)
+        }
         _ => return None,
     })
 }

@@ -38,9 +38,9 @@ pub struct FieldConfig {
 
 fn parse_meta_fields(value: &Value) -> Option<BTreeMap<String, FieldConfig>> {
     let mut fields = BTreeMap::new();
-    if let Value::Map(map) = value {
-        for (k, v) in map {
-            if k != "always_newline" && matches!(v, Value::Map(_)) {
+    if let Value::Tuple(tuple) = value {
+        for (k, v) in tuple.named() {
+            if k != "always_newline" && matches!(v, Value::Tuple(_)) {
                 parse_meta_field_props(k, v, &mut fields);
             }
         }
@@ -86,10 +86,10 @@ fn parse_meta_field_props(
     field_val: &Value,
     fields: &mut BTreeMap<String, FieldConfig>,
 ) {
-    if let Value::Map(props) = field_val {
+    if let Value::Tuple(props) = field_val {
         let mut field_cfg = fields.get(field_name).cloned().unwrap_or_default();
-        for (pk, pv) in props {
-            match pk.as_str() {
+        for (pk, pv) in props.named() {
+            match pk {
                 "type" => {
                     field_cfg.field_type = match tomet_semantics_core::parse_type_spec(pv) {
                         Ok(ty) => Some(ty.to_string()),

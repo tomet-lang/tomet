@@ -1,8 +1,8 @@
 //! Rendering elements, values, args, and connects.
 
 use tomet_ast::{
-    Block, Connect, Data, Declaration, ElementView, Entry, Group, Hole, InterpExpr,
-    InterpExprKind, Interpolation, Placement, TypeSeat, Value,
+    Block, Connect, Data, Declaration, ElementView, Entry, Group, Hole, InterpExpr, InterpExprKind,
+    Interpolation, Placement, TypeSeat, Value,
 };
 use tomet_config::PrinterConfig;
 use tomet_spelling::{is_name, key_text};
@@ -53,22 +53,15 @@ pub fn render_element(el: ElementView<'_>, config: &PrinterConfig) -> String {
                 .args
                 .as_ref()
                 .and_then(|args| {
-                    if let Value::String(s) = args {
-                        Some(s.clone())
-                    } else if let Value::Map(entries) = args {
-                        entries
-                            .iter()
-                            .find(|(k, _)| k == "lang")
-                            .and_then(|(_, v)| {
-                                if let Value::String(s) = v {
-                                    Some(s.clone())
-                                } else {
-                                    None
-                                }
-                            })
-                    } else {
-                        None
-                    }
+                    args.get("lang")
+                        .or_else(|| args.nth_unnamed(0))
+                        .and_then(|v| {
+                            if let Value::String(s) = v {
+                                Some(s.clone())
+                            } else {
+                                None
+                            }
+                        })
                 })
                 .unwrap_or_default();
             let body = el.content.and_then(raw_content_text).unwrap_or_else(|| {

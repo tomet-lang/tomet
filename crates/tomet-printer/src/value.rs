@@ -5,9 +5,9 @@
 //! how a group reads, and writes the `[content]` of an embedded element through the printer's own
 //! block renderer ([`render_content_blocks`]).
 
-use crate::element::{render_interp, render_type_seat};
+use crate::element::{render_element_value, render_interp, render_type_seat};
 use crate::inline::render_content_blocks;
-use tomet_ast::{Block, Declaration, Entry, Group, Value};
+use tomet_ast::{Block, Declaration, Entry, Group, Tuple, Value};
 use tomet_config::{FieldConfig, PrinterConfig};
 use tomet_spelling::{key_text, scalar_text};
 use tomet_style::{ColonSpacing, GroupLayout, ValueAlignment};
@@ -21,27 +21,17 @@ fn link_colon(config: &PrinterConfig) -> &'static str {
         .after_colon()
 }
 
+#[cfg(test)]
 pub(crate) fn render_value(v: &Value) -> String {
-    format!(
-        "{{{}}}",
-        render_value_inner_with_config(v, &PrinterConfig::default())
-    )
+    render_value_inner_with_config(v, &PrinterConfig::default())
 }
 
 /// Renders a value that sits *inside* another one.
-///
-/// A map needs its own braces there. [`render_value_inner_with_config`] renders a map unwrapped,
-/// because at the top level the caller supplies the braces, and a map nested that way would print
-/// `m: { k: v }` as `m: k: v`, which reads back as the string `"k: v"`.
 pub(crate) fn render_nested(v: &Value, config: &PrinterConfig) -> String {
-    match v {
-        Value::Map(_) => format!("{{{}}}", render_value_inner_with_config(v, config)),
-        _ => render_value_inner_with_config(v, config),
-    }
+    render_value_inner_with_config(v, config)
 }
 
-/// Renders a value in a slot of its own. A map is written without braces, since the caller
-/// supplies them at the top level; [`render_nested`] is the form for a value inside another.
+/// Renders a value in a slot of its own.
 #[deny(clippy::wildcard_enum_match_arm)]
 pub(crate) fn render_value_inner_with_config(v: &Value, config: &PrinterConfig) -> String {
     match v {
@@ -52,63 +42,10 @@ pub(crate) fn render_value_inner_with_config(v: &Value, config: &PrinterConfig) 
         // As written: formatting must not turn `1.10` into `1.1`.
         Value::Number(text) => text.clone(),
         Value::String(s) => scalar_text(s),
-        // `(a, b)` is the sequence spelling -- `[...]` already means
-        // `[content]`, and `list(...)` is a type.
-        Value::Seq(items) => {
-            let rendered: Vec<_> = items
-                .iter()
-                .map(|item| render_nested(item, config))
-                .collect();
-            format!("({})", rendered.join(", "))
-        }
-        Value::Map(entries) => {
-            if entries.len() == 1 {
-                let key = &entries[0].0;
-                if key == "target" {
-                    let space = link_colon(config);
-                    format!("@({key}:{space}{})", render_nested(&entries[0].1, config))
-                } else {
-                    let mut parts = Vec::new();
-                    for (idx, (k, val)) in entries.iter().enumerate() {
-                        let val_str = render_nested(val, config);
-                        // An empty key is the parser's positional-entry
-                        // sentinel (`k.is_empty()`, since a real map key
-                        // can never be empty -- an empty quoted key is
-                        // a parse error): `(a, key:value)` mixes a bare positional
-                        // value with named ones, and the bare one prints
-                        // bare too, not as `: a`.
-                        if k.is_empty() || (idx == 0 && (k == "variant" || k == "lang")) {
-                            parts.push(val_str);
-                        } else {
-                            parts.push(format!("{}: {val_str}", key_text(k)));
-                        }
-                    }
-                    parts.join(", ")
-                }
-            } else {
-                let mut parts = Vec::new();
-                for (idx, (k, val)) in entries.iter().enumerate() {
-                    let val_str = render_nested(val, config);
-                    // See the matching comment in the single-entry branch
-                    // above -- an empty key is a positional entry, printed
-                    // bare rather than as `: value`.
-                    if k.is_empty() || (idx == 0 && (k == "variant" || k == "lang")) {
-                        parts.push(val_str);
-                    } else {
-                        parts.push(format!("{}: {val_str}", key_text(k)));
-                    }
-                }
-                parts.join(", ")
-            }
-        }
+        Value::Tuple(tuple) => render_tuple(tuple, config),
         Value::Call(name, args) => {
-            let rendered: Vec<_> = args.iter().map(|a| render_nested(a, config)).collect();
-            format!("{name}({})", rendered.join(", "))
+            format!("{name}({})", render_args(args, config))
         }
-        // `parse_entry_value` only ever produces one of these with `args`
-        // set and `content`/`value`/`children` all `None` (an MVP scope
-        // limit enforced at parse time, not just convention) -- so `args`
-        // alone is the whole element to print back.
         Value::Interp(interp) => render_interp(interp),
         Value::Element(el) => render_embedded(
             format!("@{}", el.name),
@@ -119,6 +56,32 @@ pub(crate) fn render_value_inner_with_config(v: &Value, config: &PrinterConfig) 
         Value::Hole(hole) => render_embedded_hole(hole, config),
         Value::TypeSeat(seat) => render_type_seat(seat),
         Value::Blocks(blocks) => format!("[{}]", render_content_blocks(blocks, config)),
+    }
+}
+
+fn render_tuple(tuple: &Tuple, config: &PrinterConfig) -> String {
+    if tuple.is_empty() {
+        return "()".to_string();
+    }
+    if tuple.has_no_unnamed() {
+        let parts: Vec<_> = tuple
+            .named()
+            .map(|(k, val)| format!("{}: {}", key_text(k), render_nested(val, config)))
+            .collect();
+        format!("{{{}}}", parts.join(", "))
+    } else {
+        let mut parts = Vec::new();
+        for entry in tuple.entries() {
+            match entry.name() {
+                None => parts.push(render_nested(entry.value(), config)),
+                Some(k) => parts.push(format!(
+                    "{}: {}",
+                    key_text(k),
+                    render_nested(entry.value(), config)
+                )),
+            }
+        }
+        format!("({})", parts.join(", "))
     }
 }
 
@@ -199,20 +162,25 @@ fn render_embedded_value(group: &Group, config: &PrinterConfig) -> String {
 /// `target: value`; any other value is rendered by [`render_value_inner_with_config`], with a
 /// `key: [...]` value written through the printer's block renderer, so
 /// `@conflict(a: [multi-paragraph content], ...)` keeps everything past the first paragraph.
-pub(crate) fn render_args(v: &Value, config: &PrinterConfig) -> String {
-    if let Value::Map(entries) = v
-        && entries.len() == 1
+pub(crate) fn render_args(tuple: &Tuple, config: &PrinterConfig) -> String {
+    if tuple.len() == 1
+        && let Some(val) = tuple.get("target")
     {
-        let key = &entries[0].0;
-        if key == "target" {
-            let space = link_colon(config);
-            return format!(
-                "{key}:{space}{}",
-                render_value_inner_with_config(&entries[0].1, config)
-            );
+        let space = link_colon(config);
+        return format!("target:{space}{}", render_nested(val, config));
+    }
+    let mut parts = Vec::new();
+    for entry in tuple.entries() {
+        match entry.name() {
+            None => parts.push(render_nested(entry.value(), config)),
+            Some(k) => parts.push(format!(
+                "{}: {}",
+                key_text(k),
+                render_nested(entry.value(), config)
+            )),
         }
     }
-    render_value_inner_with_config(v, config)
+    parts.join(", ")
 }
 
 fn render_meta_field_value(
@@ -236,13 +204,14 @@ fn render_meta_field_value(
             return rfc3339;
         }
         if cfg.always_newline
-            && let Value::Seq(items) = v
+            && let Value::Tuple(tuple) = v
+            && tuple.has_no_named()
         {
-            if items.is_empty() {
+            if tuple.is_empty() {
                 return "[]".to_string();
             }
             let mut s = String::new();
-            for item in items {
+            for item in tuple.unnamed() {
                 s.push_str("\n    - ");
                 s.push_str(&render_value_inner_with_config(item, config));
             }
@@ -275,11 +244,11 @@ pub(crate) fn render_meta_declaration(declaration: &Declaration, config: &Printe
     let head = "::meta";
     if config.meta.field_layout == Some(GroupLayout::OnePerLine)
         && declaration.data.value.is_none()
-        && let Some(Value::Map(entries)) = tomet_semantics::data::declaration_entries(declaration)
-        && !entries.is_empty()
+        && let Some(Value::Tuple(tuple)) = tomet_semantics::data::declaration_entries(declaration)
+        && !tuple.is_empty()
     {
-        let rows: Vec<(String, String)> = entries
-            .iter()
+        let rows: Vec<(String, String)> = tuple
+            .named()
             .map(|(k, v)| {
                 let val_str = render_meta_field_value(v, config.meta.fields.get(k), config);
                 (key_text(k), val_str)
@@ -321,10 +290,8 @@ pub(crate) fn render_meta_declaration(declaration: &Declaration, config: &Printe
         out.push_str(&render_args(args, config));
     }
     out.push(')');
-    if let Some(v) = tomet_semantics::data::declaration_data(declaration) {
-        out.push('{');
-        out.push_str(&render_value_inner_with_config(&v, config));
-        out.push('}');
+    if let Some(group) = &declaration.data.value {
+        out.push_str(&render_element_value(group, config));
     }
     out
 }
@@ -339,12 +306,9 @@ mod tests {
     }
 
     fn map(entries: &[(&str, Value)]) -> Value {
-        Value::Map(
-            entries
-                .iter()
-                .map(|(k, v)| (k.to_string(), v.clone()))
-                .collect(),
-        )
+        Value::Tuple(Tuple::from_named(
+            entries.iter().map(|(k, v)| (k.to_string(), v.clone())),
+        ))
     }
 
     #[test]
@@ -364,10 +328,10 @@ mod tests {
     #[test]
     fn a_map_inside_a_sequence_keeps_its_braces() {
         assert_eq!(
-            render_value_inner(&Value::Seq(vec![
+            render_value_inner(&Value::Tuple(Tuple::from_unnamed(vec![
                 map(&[("k", Value::Int(1))]),
                 Value::Int(2),
-            ])),
+            ]))),
             "({k: 1}, 2)"
         );
     }
@@ -382,7 +346,7 @@ mod tests {
         assert_eq!(
             render_value_inner(&Value::Call(
                 "enum".into(),
-                vec![Value::String("card".into())]
+                Tuple::from_unnamed(vec![Value::String("card".into())])
             )),
             "enum(card)"
         );
@@ -404,10 +368,8 @@ mod tests {
     #[test]
     fn render_args_handles_target() {
         let cfg = PrinterConfig::default();
-        let reference = Value::Map(vec![(
-            "target".to_string(),
-            Value::String("ref:name".to_string()),
-        )]);
+        let reference =
+            Tuple::from_named([("target".to_string(), Value::String("ref:name".to_string()))]);
         assert_eq!(render_args(&reference, &cfg), "target: \"ref:name\"");
 
         let cfg_no_space = PrinterConfig {
@@ -426,7 +388,7 @@ mod tests {
     #[test]
     fn render_meta_declaration_single_line_by_default() {
         let mut el = tomet_tree::declaration_new("meta");
-        el.data.args = Some(Value::Map(vec![(
+        el.data.args = Some(Tuple::from_named([(
             "id".to_string(),
             Value::String("doc-12345678".to_string()),
         )]));
@@ -440,7 +402,7 @@ mod tests {
     #[test]
     fn render_meta_declaration_multiline_with_a_config_that_asks_for_it() {
         let mut el = tomet_tree::declaration_new("meta");
-        el.data.args = Some(Value::Map(vec![(
+        el.data.args = Some(Tuple::from_named([(
             "id".to_string(),
             Value::String("doc-12345678".to_string()),
         )]));
@@ -459,7 +421,7 @@ mod tests {
     #[test]
     fn render_meta_declaration_multiline_when_always_newline_configured() {
         let mut el = tomet_tree::declaration_new("meta");
-        el.data.args = Some(Value::Map(vec![(
+        el.data.args = Some(Tuple::from_named([(
             "id".to_string(),
             Value::String("doc-12345678".to_string()),
         )]));
@@ -480,10 +442,13 @@ mod tests {
     fn the_fields_of_a_meta_are_aligned_when_values_are_to_be() {
         let text = |s: &str| Value::String(s.to_string());
         let mut el = tomet_tree::declaration_new("meta");
-        el.data.args = Some(Value::Map(vec![
+        el.data.args = Some(Tuple::from_named([
             ("id".to_string(), text("x")),
             ("title".to_string(), text("T")),
-            ("tags".to_string(), Value::Seq(vec![text("a"), text("b")])),
+            (
+                "tags".to_string(),
+                Value::Tuple(Tuple::from_unnamed(vec![text("a"), text("b")])),
+            ),
             ("kind".to_string(), text("k")),
             ("created".to_string(), text("c")),
         ]));
@@ -513,7 +478,7 @@ mod tests {
     fn a_meta_field_wider_than_the_limit_is_left_out_of_the_alignment() {
         let text = |s: &str| Value::String(s.to_string());
         let mut el = tomet_tree::declaration_new("meta");
-        el.data.args = Some(Value::Map(vec![
+        el.data.args = Some(Tuple::from_named([
             ("id".to_string(), text("x")),
             ("a_field_that_is_far_too_long".to_string(), text("y")),
             ("kind".to_string(), text("k")),
@@ -536,21 +501,21 @@ mod tests {
         assert_eq!(render_meta_declaration(&el, &cfg), "::meta()");
 
         let mut empty = tomet_tree::declaration_new("meta");
-        empty.data.args = Some(Value::Map(Vec::new()));
+        empty.data.args = Some(Tuple::new());
         assert_eq!(render_meta_declaration(&empty, &cfg), "::meta()");
     }
 
     #[test]
     fn the_fields_of_a_meta_keep_their_per_field_rules_on_separate_lines() {
         let mut el = tomet_tree::declaration_new("meta");
-        el.data.args = Some(Value::Map(vec![
+        el.data.args = Some(Tuple::from_named([
             ("title".to_string(), Value::String("T".to_string())),
             (
                 "tags".to_string(),
-                Value::Seq(vec![
+                Value::Tuple(Tuple::from_unnamed(vec![
                     Value::String("a".to_string()),
                     Value::String("b".to_string()),
-                ]),
+                ])),
             ),
         ]));
         let mut cfg = PrinterConfig::default();
@@ -576,20 +541,20 @@ mod tests {
     #[test]
     fn a_brace_body_on_a_meta_is_printed_not_dropped() {
         let mut el = tomet_tree::declaration_new("meta");
-        el.data.args = Some(Value::Map(vec![("a".to_string(), Value::Int(1))]));
-        el.data.value = Some(Group::from_map(Value::Map(vec![(
+        el.data.args = Some(Tuple::from_named([("a".to_string(), Value::Int(1))]));
+        el.data.value = Some(Group::from_map(Tuple::from_named([(
             "b".to_string(),
             Value::Int(2),
         )])));
         let mut cfg = PrinterConfig::default();
         cfg.meta.field_layout = Some(tomet_style::GroupLayout::OnePerLine);
-        assert_eq!(render_meta_declaration(&el, &cfg), "::meta(a: 1){b: 2}");
+        assert_eq!(render_meta_declaration(&el, &cfg), "::meta(a: 1){ b: 2 }");
     }
 
     #[test]
     fn render_meta_declaration_quotes_keys_that_are_not_identifiers() {
         let mut el = tomet_tree::declaration_new("meta");
-        el.data.args = Some(Value::Map(vec![
+        el.data.args = Some(Tuple::from_named([
             ("plain.key".to_string(), Value::Int(1)),
             ("tmtroot/a b.tmt".to_string(), Value::Int(2)),
         ]));

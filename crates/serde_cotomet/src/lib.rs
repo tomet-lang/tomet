@@ -126,11 +126,147 @@ mod tests {
     fn call_syntax_has_no_serde_equivalent() {
         let err = de::from_value::<i32>(Value::Call(
             "enum".into(),
-            vec![Value::String("card".into())],
+            tomet_ast::Tuple::from_unnamed(vec![Value::String("card".into())]),
         ))
         .unwrap_err();
         let msg = err.to_string();
         assert!(msg.contains("call syntax"), "unexpected message: {msg}");
+    }
+
+    #[test]
+    fn deserialize_seq_and_tuple_take_unnamed_entries() {
+        use tomet_ast::{Tuple, TupleEntry};
+        let mixed = Value::Tuple(Tuple::from_entries(vec![
+            TupleEntry::unnamed(Value::Int(10)),
+            TupleEntry::named("a", Value::String("x".into())),
+            TupleEntry::unnamed(Value::Int(20)),
+        ]));
+        let seq: Vec<i64> = from_value(mixed.clone()).expect("seq takes unnamed entries");
+        assert_eq!(seq, vec![10, 20]);
+        let pair: (i64, i64) = from_value(mixed).expect("tuple takes unnamed entries");
+        assert_eq!(pair, (10, 20));
+    }
+
+    #[test]
+    fn deserialize_map_and_struct_take_named_entries() {
+        use std::collections::BTreeMap;
+        use tomet_ast::{Tuple, TupleEntry};
+        let mixed = Value::Tuple(Tuple::from_entries(vec![
+            TupleEntry::unnamed(Value::Int(10)),
+            TupleEntry::named("label", Value::String("Inbox".into())),
+            TupleEntry::named("path", Value::String("notes/inbox".into())),
+        ]));
+        let bm: Bookmark = from_value(mixed.clone()).expect("struct takes named entries");
+        assert_eq!(
+            bm,
+            Bookmark {
+                label: "Inbox".into(),
+                path: "notes/inbox".into(),
+            }
+        );
+        let map: BTreeMap<String, String> = from_value(mixed).expect("map takes named entries");
+        assert_eq!(map.len(), 2);
+        assert_eq!(map.get("label").map(String::as_str), Some("Inbox"));
+        assert_eq!(map.get("path").map(String::as_str), Some("notes/inbox"));
+    }
+
+    #[test]
+    fn empty_tuple_deserializes_into_vec_and_into_map() {
+        use std::collections::BTreeMap;
+        use tomet_ast::Tuple;
+        let empty = Value::Tuple(Tuple::new());
+        let vec: Vec<i32> = from_value(empty.clone()).expect("empty tuple into Vec");
+        assert!(vec.is_empty());
+        let map: BTreeMap<String, i32> = from_value(empty).expect("empty tuple into map");
+        assert!(map.is_empty());
+        assert!(from_str::<Vec<i32>>("()").unwrap().is_empty());
+        assert!(from_str::<Vec<i32>>("{}").unwrap().is_empty());
+        assert!(from_str::<BTreeMap<String, i32>>("()").unwrap().is_empty());
+        assert!(from_str::<BTreeMap<String, i32>>("{}").unwrap().is_empty());
+    }
+
+    #[test]
+    fn deserialize_any_dispatches_by_shape() {
+        use tomet_ast::{Tuple, TupleEntry};
+
+        #[derive(Debug, PartialEq)]
+        enum AnyShape {
+            Seq(Vec<i64>),
+            Map(Vec<(String, String)>),
+        }
+
+        impl<'de> Deserialize<'de> for AnyShape {
+            fn deserialize<D: serde::Deserializer<'de>>(
+                deserializer: D,
+            ) -> std::result::Result<Self, D::Error> {
+                struct AnyVisitor;
+                impl<'de> serde::de::Visitor<'de> for AnyVisitor {
+                    type Value = AnyShape;
+                    fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+                        write!(f, "seq or map")
+                    }
+                    fn visit_seq<A: serde::de::SeqAccess<'de>>(
+                        self,
+                        mut seq: A,
+                    ) -> std::result::Result<Self::Value, A::Error> {
+                        let mut v = Vec::new();
+                        while let Some(item) = seq.next_element()? {
+                            v.push(item);
+                        }
+                        Ok(AnyShape::Seq(v))
+                    }
+                    fn visit_map<A: serde::de::MapAccess<'de>>(
+                        self,
+                        mut map: A,
+                    ) -> std::result::Result<Self::Value, A::Error> {
+                        let mut v = Vec::new();
+                        while let Some((k, val)) = map.next_entry()? {
+                            v.push((k, val));
+                        }
+                        Ok(AnyShape::Map(v))
+                    }
+                }
+                deserializer.deserialize_any(AnyVisitor)
+            }
+        }
+
+        // Empty -> empty map
+        assert_eq!(
+            from_value::<AnyShape>(Value::Tuple(Tuple::new())).unwrap(),
+            AnyShape::Map(vec![])
+        );
+        // Unnamed only -> seq
+        assert_eq!(
+            from_value::<AnyShape>(Value::Tuple(Tuple::from_unnamed(vec![
+                Value::Int(1),
+                Value::Int(2),
+            ])))
+            .unwrap(),
+            AnyShape::Seq(vec![1, 2])
+        );
+        // Named only -> map
+        assert_eq!(
+            from_value::<AnyShape>(Value::Tuple(Tuple::from_named(vec![(
+                "k".into(),
+                Value::String("v".into()),
+            )])))
+            .unwrap(),
+            AnyShape::Map(vec![("k".into(), "v".into())])
+        );
+        // Mixed -> map with unnamed keyed by position among unnamed
+        assert_eq!(
+            from_value::<AnyShape>(Value::Tuple(Tuple::from_entries(vec![
+                TupleEntry::unnamed(Value::String("a".into())),
+                TupleEntry::named("k", Value::String("v".into())),
+                TupleEntry::unnamed(Value::String("b".into())),
+            ])))
+            .unwrap(),
+            AnyShape::Map(vec![
+                ("0".into(), "a".into()),
+                ("k".into(), "v".into()),
+                ("1".into(), "b".into()),
+            ])
+        );
     }
 
     #[test]

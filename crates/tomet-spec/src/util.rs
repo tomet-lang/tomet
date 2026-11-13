@@ -1,7 +1,7 @@
 //! Shared AST helpers and formatting utilities for specification generators.
 
 use tomet_ast::{
-    Block, Element, Inline, List, ListItem, Name, Paragraph, Placement, RawText, Text, Value,
+    Block, Element, Inline, List, ListItem, Name, Paragraph, Placement, RawText, Text, Tuple, Value,
 };
 use tomet_span::Span;
 use tomet_tree::{ElementExt, element_new};
@@ -31,7 +31,7 @@ pub fn paragraph(content: Vec<Inline>) -> Block {
 /// Builds a block-level `@raw(lang: "text")` code block element.
 pub fn code_block(body: &str) -> Element {
     let mut el = element_new(Name::bare("raw")).with_placement(Placement::Block);
-    el.data.args = Some(Value::Map(vec![(
+    el.data.args = Some(Tuple::from_named([(
         "lang".to_string(),
         Value::String("text".to_string()),
     )]));

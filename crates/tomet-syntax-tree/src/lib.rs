@@ -68,11 +68,11 @@ where
     el.data.transform_prop(key, f)
 }
 
-pub fn element_attrs_view(el: &tomet_ast::Element) -> Option<tomet_ast::Value> {
+pub fn element_attrs_view(el: &tomet_ast::Element) -> Option<tomet_ast::Tuple> {
     el.data.attrs_view()
 }
 
-pub fn element_attrs_mut(el: &mut tomet_ast::Element) -> Option<&mut tomet_ast::Value> {
+pub fn element_attrs_mut(el: &mut tomet_ast::Element) -> Option<&mut tomet_ast::Tuple> {
     el.data.attrs_mut()
 }
 
@@ -109,7 +109,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tomet_ast::{Block, Inline, Name, Text, Value};
+    use tomet_ast::{Block, Inline, Name, Text, Tuple, Value};
     use tomet_span::Span;
 
     fn parse(src: &str) -> tomet_ast::File {
@@ -118,7 +118,7 @@ mod tests {
 
     #[test]
     fn test_value_extension_traits() {
-        let val = Value::Map(vec![("id".into(), Value::Int(123))]);
+        let val = Value::Tuple(Tuple::from_named([("id".into(), Value::Int(123))]));
         assert_eq!(val.get("id").and_then(|v| v.as_i64()), Some(123));
         assert!(!val.is_empty());
     }

@@ -1,7 +1,7 @@
 use tomet_semantics::DeclKind;
 
 use lsp_types::{Hover, HoverContents, MarkupContent, MarkupKind, Position, Range, Uri};
-use tomet_ast::{Declaration, Element, File, InterpExpr, Value};
+use tomet_ast::{Declaration, Element, File, InterpExpr, Tuple, Value};
 use tomet_expr::{DocRef, EvalContext, EvalValue, MemoryResolver, evaluate};
 use tomet_semantics::{
     ElementKind, classify_declaration_lenient, classify_std_lenient, heading_level,
@@ -174,6 +174,7 @@ fn declaration_hover(positions: &TextPositions<'_>, declaration: &Declaration) -
                     .data
                     .args
                     .as_ref()
+                    .and_then(|t| t.nth_unnamed(0))
                     .and_then(|v| v.as_str())
                     .map(str::to_string)
             })
@@ -275,27 +276,43 @@ fn extract_line_cells(line: &str) -> Vec<CellInfo> {
     cells
 }
 
-fn extract_table_aligns_from_args(args: Option<&Value>) -> Vec<String> {
-    let Some(Value::Map(entries)) = args else {
+fn extract_table_aligns_from_args(args: Option<&Tuple>) -> Vec<String> {
+    let Some(args) = args else {
         return Vec::new();
     };
-    for (k, v) in entries {
-        if k == "align" {
-            match v {
-                Value::Seq(seq) => {
-                    return seq
-                        .iter()
-                        .filter_map(|item| match item {
-                            Value::String(s) => Some(s.clone()),
-                            _ => None,
-                        })
-                        .collect();
-                }
-                Value::String(s) => {
-                    return vec![s.clone(); 50];
-                }
-                _ => {}
+    if let Some(v) = args.get("align") {
+        match v {
+            Value::Tuple(tuple) => {
+                return tuple
+                    .values()
+                    .filter_map(|item| match item {
+                        Value::String(s) => Some(s.clone()),
+                        _ => None,
+                    })
+                    .collect();
             }
+            Value::String(s) => {
+                return vec![s.clone(); 50];
+            }
+            Value::Call(_, tuple) => {
+                return tuple
+                    .values()
+                    .filter_map(|item| match item {
+                        Value::String(s) => Some(s.clone()),
+                        _ => None,
+                    })
+                    .collect();
+            }
+            Value::Null
+            | Value::Bool(_)
+            | Value::Int(_)
+            | Value::Float(_)
+            | Value::Number(_)
+            | Value::Interp(_)
+            | Value::Hole(_)
+            | Value::TypeSeat(_)
+            | Value::Element(_)
+            | Value::Blocks(_) => {}
         }
     }
     Vec::new()
@@ -313,7 +330,7 @@ fn table_hover(
 
     // `normalized_element_args`, not raw `el.args`: `align: (...)` is
     // a `Value::Call` until normalized, and `extract_table_aligns_from_args`
-    // only recognizes `Value::Seq`.
+    // only recognizes a tuple of strings.
     let normalized_args = normalized_element_args(el.as_view());
     let aligns = extract_table_aligns_from_args(normalized_args.as_ref());
 
@@ -420,6 +437,15 @@ fn table_hover(
     })
 }
 
+fn find_interp_in_tuple(tuple: &Tuple) -> Option<tomet_ast::InterpExpr> {
+    for v in tuple.values() {
+        if let Some(expr) = find_interp_in_value(v) {
+            return Some(expr);
+        }
+    }
+    None
+}
+
 fn find_interp_in_value(val: &Value) -> Option<tomet_ast::InterpExpr> {
     match val {
         Value::String(s) => {
@@ -439,23 +465,24 @@ fn find_interp_in_value(val: &Value) -> Option<tomet_ast::InterpExpr> {
             }
             None
         }
-        Value::Map(entries) => {
-            for (_, v) in entries {
-                if let Some(expr) = find_interp_in_value(v) {
-                    return Some(expr);
-                }
+        Value::Interp(interp) => Some(interp.expr.clone()),
+        Value::Tuple(tuple) => find_interp_in_tuple(tuple),
+        Value::Call(_, tuple) => find_interp_in_tuple(tuple),
+        Value::Element(el) => {
+            if let Some(args) = &el.data.args {
+                find_interp_in_tuple(args)
+            } else {
+                None
             }
-            None
         }
-        Value::Seq(items) => {
-            for v in items {
-                if let Some(expr) = find_interp_in_value(v) {
-                    return Some(expr);
-                }
-            }
-            None
-        }
-        _ => None,
+        Value::Null
+        | Value::Bool(_)
+        | Value::Int(_)
+        | Value::Float(_)
+        | Value::Number(_)
+        | Value::Hole(_)
+        | Value::TypeSeat(_)
+        | Value::Blocks(_) => None,
     }
 }
 
@@ -465,7 +492,7 @@ fn macro_hover(
     evaluate: Evaluate<'_>,
     el: &Element,
 ) -> Option<Hover> {
-    let expr = find_interp_in_value(el.data.args.as_ref()?)?;
+    let expr = find_interp_in_tuple(el.data.args.as_ref()?)?;
     Some(macro_result_hover(positions, doc, evaluate, &expr, el.span))
 }
 

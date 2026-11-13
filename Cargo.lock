@@ -1794,6 +1794,7 @@ name = "tomet-ast"
 version = "0.5.0"
 dependencies = [
  "serde",
+ "serde_json",
  "tomet-span",
  "unicode-width",
 ]

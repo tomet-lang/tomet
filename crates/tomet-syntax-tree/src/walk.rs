@@ -238,13 +238,8 @@ pub fn children<'a>(node: Node<'a>, f: &mut dyn FnMut(Node<'a>, Place)) {
         Node::Value(value) => match value {
             Value::Element(el) => element(el, f),
             Value::Hole(h) => groups(&h.data, h.content.as_deref(), f),
-            Value::Seq(items) | Value::Call(_, items) => {
-                for v in items {
-                    f(Node::Value(v), Place::Part);
-                }
-            }
-            Value::Map(entries) => {
-                for (_, v) in entries {
+            Value::Tuple(tuple) | Value::Call(_, tuple) => {
+                for v in tuple.values() {
                     f(Node::Value(v), Place::Part);
                 }
             }
@@ -314,7 +309,9 @@ fn groups<'a>(d: &'a Data, content: Option<&'a [Block]>, f: &mut dyn FnMut(Node<
 /// `(args)` and `{value}`.
 fn data<'a>(d: &'a Data, f: &mut dyn FnMut(Node<'a>, Place)) {
     if let Some(args) = &d.args {
-        f(Node::Value(args), Place::Args);
+        for v in args.values() {
+            f(Node::Value(v), Place::Args);
+        }
     }
     if let Some(Group(entries)) = &d.value {
         for entry in entries {
@@ -387,7 +384,7 @@ pub fn walk_node_scoped<'a, B>(
 }
 
 /// Visits every node of `file` in document order, each before what it holds, wherever it sits:
-/// running text, section titles, `::connect`s, and inside a [`Value`] (`Seq`, `Map`, `Call`, a
+/// running text, section titles, `::connect`s, and inside a [`Value`] (a tuple, a call, a
 /// nested element, `[...]` blocks). It is the walk that skips nothing.
 pub fn for_each_node(file: &File, mut f: impl FnMut(Node<'_>)) {
     let _ = walk(file, &mut |node, _| {
@@ -730,7 +727,9 @@ impl<S: Sink> MutWalk<'_, S> {
     #[deny(clippy::wildcard_enum_match_arm)]
     fn data(&mut self, d: &mut Data) {
         if let Some(args) = &mut d.args {
-            self.value(args);
+            for v in args.values_mut() {
+                self.value(v);
+            }
         }
         if let Some(Group(entries)) = &mut d.value {
             for entry in entries {
@@ -749,13 +748,8 @@ impl<S: Sink> MutWalk<'_, S> {
         match value {
             Value::Element(el) => self.element(el),
             Value::Hole(h) => self.groups(&mut h.data, h.content.as_deref_mut()),
-            Value::Seq(items) | Value::Call(_, items) => {
-                for v in items {
-                    self.value(v);
-                }
-            }
-            Value::Map(entries) => {
-                for (_, v) in entries {
+            Value::Tuple(tuple) | Value::Call(_, tuple) => {
+                for v in tuple.values_mut() {
                     self.value(v);
                 }
             }
@@ -1099,10 +1093,10 @@ mod tests {
 
     /// The `[...]` value of `::macro(m: [ ... ])` in `src`.
     fn macro_body(file: &mut File) -> &mut Value {
-        let Some(Value::Map(entries)) = &mut file.header[0].data.args else {
+        let Some(args) = &mut file.header[0].data.args else {
             panic!("expected `(name: template)` entries");
         };
-        &mut entries[0].1
+        args.nth_mut(0).expect("entry").value_mut()
     }
 
     /// Two blocks: an element on a line of its own, then a `$(2)` on a line of its own.
@@ -1146,11 +1140,18 @@ mod tests {
         let Block::Element(card) = &blocks[0] else {
             panic!("expected the card, got {:?}", blocks[0]);
         };
-        let Some(Value::Map(args)) = &card.data.args else {
+        let Some(args) = &card.data.args else {
             panic!("expected named arguments, got {:?}", card.data.args);
         };
-        assert_eq!(args[0].1, Value::String("Welcome".to_string()));
-        assert_eq!(args[1].1, Value::Int(5), "a number stays a number in data");
+        assert_eq!(
+            args.get("title"),
+            Some(&Value::String("Welcome".to_string()))
+        );
+        assert_eq!(
+            args.get("n"),
+            Some(&Value::Int(5)),
+            "a number stays a number in data"
+        );
         let Some([Block::Paragraph(p)]) = card.content.as_deref() else {
             panic!("expected one paragraph, got {:?}", card.content);
         };
@@ -1183,7 +1184,7 @@ mod tests {
     fn a_value_that_has_no_text_has_no_place_in_text() {
         let mut file = tomet_ast_parser::parse_file(BODY).unwrap();
         let body = macro_body(&mut file);
-        fill_interpolations(body, |_| Some(Value::Map(Vec::new())));
+        fill_interpolations(body, |_| Some(Value::Tuple(tomet_ast::Tuple::new())));
         // Data takes a map as it is; running text and a block of its own cannot.
         assert_eq!(interpolations(body), ["name", "2"]);
     }
@@ -1348,11 +1349,18 @@ text <$t_inline> more
         let Block::Element(card) = &blocks[0] else {
             panic!("expected the card, got {:?}", blocks[0]);
         };
-        let Some(Value::Map(args)) = &card.data.args else {
+        let Some(args) = &card.data.args else {
             panic!("expected named arguments, got {:?}", card.data.args);
         };
-        assert_eq!(args[0].1, Value::String("Welcome".to_string()));
-        assert_eq!(args[1].1, Value::Int(5), "a number stays a number in data");
+        assert_eq!(
+            args.get("title"),
+            Some(&Value::String("Welcome".to_string()))
+        );
+        assert_eq!(
+            args.get("n"),
+            Some(&Value::Int(5)),
+            "a number stays a number in data"
+        );
         let Some([Block::Paragraph(p)]) = card.content.as_deref() else {
             panic!("expected one paragraph, got {:?}", card.content);
         };
@@ -1380,7 +1388,7 @@ text <$t_inline> more
         });
         assert_eq!(seats(body), ["string", "int", "name"]);
         // A value with no scalar text has no place in text; data takes it as it is.
-        fill_type_seats(body, |_| Some(Value::Map(Vec::new())));
+        fill_type_seats(body, |_| Some(Value::Tuple(tomet_ast::Tuple::new())));
         assert_eq!(seats(body), ["name"]);
     }
 

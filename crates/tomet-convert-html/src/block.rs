@@ -246,28 +246,30 @@ fn render_list(cx: &RenderCtx, list: &List, out: &mut String) {
         out.push('>');
         if let Some(marker) = &item.data.args {
             out.push_str("<span class=\"tm-list-marker\"");
-            match marker {
-                Value::Map(map) => {
-                    for (k, v) in map {
-                        push_data_attr(out, k, &value_to_plain(v));
-                    }
+            for (k, v) in marker.named() {
+                push_data_attr(out, k, &value_to_plain(v));
+            }
+            if let Some(first_unnamed) = marker.nth_unnamed(0) {
+                match first_unnamed {
+                    Value::Element(_) | Value::Interp(_) => {}
+                    other => out.push_str(&format!(
+                        " data-marker=\"{}\"",
+                        escape_attr(&value_to_plain(other))
+                    )),
                 }
-                Value::Element(_) | Value::Interp(_) => {}
-                other => out.push_str(&format!(
-                    " data-marker=\"{}\"",
-                    escape_attr(&value_to_plain(other))
-                )),
             }
             out.push('>');
-            match marker {
-                Value::Element(el) => {
-                    render_element(cx, el.as_view(), out, true);
-                }
-                Value::Interp(interp) => render_interp(interp, out),
-                other => {
-                    let text = value_to_plain(other);
-                    if !text.is_empty() {
-                        out.push_str(&format!("[{}]", escape_html(&text)));
+            if let Some(first_unnamed) = marker.nth_unnamed(0) {
+                match first_unnamed {
+                    Value::Element(el) => {
+                        render_element(cx, el.as_view(), out, true);
+                    }
+                    Value::Interp(interp) => render_interp(interp, out),
+                    other => {
+                        let text = value_to_plain(other);
+                        if !text.is_empty() {
+                            out.push_str(&format!("[{}]", escape_html(&text)));
+                        }
                     }
                 }
             }

@@ -74,8 +74,7 @@ fn render_comment_element(el: ElementView<'_>, out: &mut String, inline: bool) {
 fn render_task_element(cx: &RenderCtx, el: ElementView<'_>, out: &mut String, inline: bool) {
     let status = normalized_element_args_in(el, cx.bindings)
         .as_ref()
-        .and_then(crate::util::as_map)
-        .and_then(|m| crate::util::map_get(m, "status"))
+        .and_then(|a| a.get("status"))
         .map(value_to_plain)
         .unwrap_or_else(|| " ".to_string());
     let checked = matches!(status.as_str(), "x" | "X" | "done");
@@ -136,9 +135,8 @@ fn conflict_sides(
     el: ElementView<'_>,
 ) -> (Vec<tomet_ast::Block>, Vec<tomet_ast::Block>) {
     let args = normalized_element_args_in(el, cx.bindings);
-    let map = args.as_ref().and_then(crate::util::as_map);
     let side = |key: &str| -> Vec<tomet_ast::Block> {
-        match map.and_then(|m| crate::util::map_get(m, key)) {
+        match args.as_ref().and_then(|a| a.get(key)) {
             Some(tomet_ast::Value::Blocks(blocks)) => blocks.clone(),
             _ => Vec::new(),
         }

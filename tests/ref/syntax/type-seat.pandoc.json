@@ -345,7 +345,7 @@
           [
             [
               "tomet-data",
-              "{\"args\":{\"type_seat\":\"int\"}}"
+              "{\"args\":[{\"type_seat\":\"int\"}]}"
             ]
           ]
         ],

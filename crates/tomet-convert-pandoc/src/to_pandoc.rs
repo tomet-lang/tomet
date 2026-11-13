@@ -29,10 +29,10 @@ pub fn to_pandoc(doc: &File) -> PandocDoc {
         blocks.extend(block_to_pandoc(block));
     }
     let mut out = PandocDoc::new(blocks);
-    if let Some(Value::Map(entries)) = tomet_declaration::document_meta(doc) {
+    if let Some(Value::Tuple(entries)) = tomet_declaration::document_meta(doc) {
         out.meta = entries
-            .iter()
-            .map(|(k, v)| (k.clone(), meta_value(v)))
+            .named()
+            .map(|(k, v)| (k.to_string(), meta_value(v)))
             .collect();
     }
     // The identity of a document is the declaration `::id(...)`; Pandoc's metadata map is where
@@ -67,13 +67,18 @@ fn meta_value(v: &Value) -> MetaValue {
             MetaValue::MetaString(v.scalar_text().map(|t| t.into_owned()).unwrap_or_default())
         }
         Value::String(s) => MetaValue::MetaInlines(text_to_inlines(s)),
-        Value::Seq(items) => MetaValue::MetaList(items.iter().map(meta_value).collect()),
-        Value::Map(entries) => MetaValue::MetaMap(
-            entries
-                .iter()
-                .map(|(k, v)| (k.clone(), meta_value(v)))
-                .collect(),
-        ),
+        Value::Tuple(tuple) => {
+            if tuple.has_no_named() {
+                MetaValue::MetaList(tuple.unnamed().map(meta_value).collect())
+            } else {
+                MetaValue::MetaMap(
+                    tuple
+                        .named()
+                        .map(|(k, v)| (k.to_string(), meta_value(v)))
+                        .collect(),
+                )
+            }
+        }
         // A call (e.g. a `type: list(string)`) has no meaning as
         // document metadata; nothing writes one into `::meta` today.
         Value::Call(..) => MetaValue::MetaString(String::new()),
@@ -284,14 +289,12 @@ fn html_comment(el: ElementView<'_>) -> String {
 /// (`Value::Blocks`), not a scalar, so it cannot go through
 /// `flatten_element_data`/`generic_attr` at all.
 fn conflict_sides(el: ElementView<'_>) -> (Vec<TmBlock>, Vec<TmBlock>) {
-    let Some(Value::Map(entries)) = normalized_element_args(el) else {
+    let Some(args) = normalized_element_args(el) else {
         return (Vec::new(), Vec::new());
     };
     let side = |key: &str| -> Vec<TmBlock> {
-        entries
-            .iter()
-            .find(|(k, _)| k == key)
-            .and_then(|(_, v)| {
+        args.get(key)
+            .and_then(|v| {
                 if let Value::Blocks(blocks) = v {
                     Some(blocks.clone())
                 } else {
@@ -753,10 +756,8 @@ fn table_to_pandoc(el: ElementView<'_>) -> Vec<Block> {
 /// Reads one of `@table`'s own arguments, after positional
 /// normalization so `@table(center)` and `@table(align: center)` agree.
 fn table_arg(el: ElementView<'_>, key: &str) -> Option<Value> {
-    let Value::Map(entries) = normalized_element_args(el)? else {
-        return None;
-    };
-    entries.into_iter().find(|(k, _)| k == key).map(|(_, v)| v)
+    let args = normalized_element_args(el)?;
+    args.get(key).cloned()
 }
 
 fn table_has_header(el: ElementView<'_>) -> bool {

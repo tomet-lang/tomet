@@ -24,8 +24,11 @@ use tomet_type::{Kind, Type};
 ///
 /// Keys the document writes without declaring them are kept as written.
 pub fn typed_meta(config: &PrinterConfig, doc: &File, doc_ref: &DocRef) -> EvalValue {
-    let written = match tomet_declaration::document_meta(doc) {
-        Some(Value::Map(entries)) => entries,
+    let written: Vec<(String, Value)> = match tomet_declaration::document_meta(doc) {
+        Some(Value::Tuple(tuple)) => tuple
+            .named()
+            .map(|(k, v)| (k.to_string(), v.clone()))
+            .collect(),
         _ => Vec::new(),
     };
     let mut entries: Vec<(String, EvalValue)> = written

@@ -20,26 +20,34 @@ export interface Name {
 export type Id = string;
 
 /**
+ * A tuple: entries in order, each with a name or without one. It is the one
+ * container, for `(args)` and for a value alike, and is written by its shape:
+ *
+ * - no entry: `{}`;
+ * - entries, none named: an array;
+ * - entries, all named: an object;
+ * - both: an object, an unnamed entry under its position among the unnamed
+ *   ones (`"0"`, `"1"`).
+ *
+ * `(x)` is a tuple of one entry, `[x]`, never the bare `x`.
+ */
+export type Tuple = Value[] | { [key: string]: Value };
+
+/**
  * A value of `(args)` or a `{...}` pair.
  *
- * A map is an object; the key of a positional entry is `""`. Beyond plain data a
- * value may be what the source wrote there: a call (`{ call, args }`), a
- * `{$ ... }` (`Interpolation`), a `?` hole, a `<$type>` seat (`TypeSeat`), an `@element`, or `[content]`
+ * Beyond plain data and tuples a value may be what the source wrote there: a
+ * call (`{ call, args }`, `args` a `Tuple`), a `{$ ... }` (`Interpolation`), a
+ * `?` hole, a `<$type>` seat (`TypeSeat`), an `@element`, or `[content]`
  * (`Block[]`). A reader tells them apart by their own keys.
  *
  * Only plain data and `Block[]` are read back when a `File` is passed in.
  */
-export type Value =
-  | null
-  | boolean
-  | number
-  | string
-  | Value[]
-  | { [key: string]: Value };
+export type Value = null | boolean | number | string | Tuple;
 
 /** The two groups every node that takes them holds: `(args)` and `{value}`. */
 export interface Data {
-  args: Value | null;
+  args: Tuple | null;
   value: Group | null;
 }
 

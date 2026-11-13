@@ -153,7 +153,7 @@ fn a_bare_name_in_a_value_is_a_string() {
     let doc = ok("@el(a: @name)\n");
     assert_eq!(
         element(&doc.body[0]).data.args,
-        Some(Value::Map(vec![(
+        Some(Tuple::from_named(vec![(
             "a".into(),
             Value::String("@name".into())
         )]))
@@ -455,7 +455,7 @@ fn nameless_connects_keep_working_on_a_valid_owner() {
     assert!(el.data.args.is_some());
     assert_eq!(
         el.data.value,
-        Some(Group::from_map(Value::Map(vec![(
+        Some(Group::from_map(Tuple::from_named(vec![(
             "b".into(),
             Value::Int(2)
         )])))
@@ -464,12 +464,16 @@ fn nameless_connects_keep_working_on_a_valid_owner() {
 
     let doc = ok("@el(a: 1)::(b: 2)\n");
     // The merged-in args come first, then the owner's own.
-    let Some(Value::Map(mut args)) = element(&doc.body[0]).data.args.clone() else {
+    let Some(args) = element(&doc.body[0]).data.args.clone() else {
         panic!("expected merged args")
     };
-    args.sort_by(|a, b| a.0.cmp(&b.0));
+    let mut pairs: Vec<(String, Value)> = args
+        .named()
+        .map(|(k, v)| (k.to_string(), v.clone()))
+        .collect();
+    pairs.sort_by(|a, b| a.0.cmp(&b.0));
     assert_eq!(
-        args,
+        pairs,
         vec![("a".into(), Value::Int(1)), ("b".into(), Value::Int(2))]
     );
 

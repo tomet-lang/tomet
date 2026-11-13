@@ -5,8 +5,7 @@
 
 use std::collections::BTreeMap;
 
-use tomet_ast::{File, Value};
-use tomet_tree::ValueExt;
+use tomet_ast::{File, Tuple, Value};
 
 use crate::declaration::{Declaration, declarations};
 use crate::kind::DeclKind;
@@ -18,7 +17,9 @@ use crate::vars::{VarDecl, read_var_decls};
 /// The second positional slot, the major version, is not part of the name.
 pub fn kind_name(declaration: &Declaration) -> Option<String> {
     let args = declaration.bound_args()?;
-    args.get("kind").and_then(text).or_else(|| text(&args))
+    args.get("kind")
+        .or_else(|| args.nth_unnamed(0))
+        .and_then(text)
 }
 
 /// The identity a `::id(...)` declares: `::id(std.config)` or `::id(id: std.config)`.
@@ -26,61 +27,64 @@ pub fn kind_name(declaration: &Declaration) -> Option<String> {
 /// `None` when it is not written as text, such as `::id($uuid())` before it is evaluated.
 pub fn id_name(declaration: &Declaration) -> Option<String> {
     let args = declaration.bound_args()?;
-    args.get("id").and_then(text).or_else(|| text(&args))
+    args.get("id")
+        .or_else(|| args.nth_unnamed(0))
+        .and_then(text)
 }
 
 /// The kind of document a `::blueprint(X)` or `::blueprint(target: X)` is for.
 pub fn blueprint_target(declaration: &Declaration) -> Option<String> {
     let args = declaration.bound_args()?;
-    text(&args).or_else(|| args.get("target").and_then(text))
+    args.get("target")
+        .or_else(|| args.nth_unnamed(0))
+        .and_then(text)
 }
 
 /// The name a `::dictionary(tomet)` or `::dictionary(name: tomet)` gives its dictionary; a term is mentioned
 /// through it (`@term(tomet#vault-config)`).
 pub fn dictionary_name(declaration: &Declaration) -> Option<String> {
     let args = declaration.bound_args()?;
-    text(&args).or_else(|| args.get("name").and_then(text))
+    args.get("name")
+        .or_else(|| args.nth_unnamed(0))
+        .and_then(text)
 }
 
 /// The names a `::profile(...)` is written with, as written and in order: `::profile(oneline, standalone)` is
 /// `oneline` and `standalone`. A name that is not a profile is returned too (the checker reports it); a
 /// value that is not text comes back as the text it prints as.
 ///
-/// There is no slot to bind the arguments to, so they arrive as the reader left them: a map of unnamed
-/// entries (or the lone value, for one name). An entry written `key: value` is not a bare name; its key
+/// There is no slot to bind the arguments to, so they arrive as the reader left them: a tuple of unnamed
+/// entries (or one entry). An entry written `key: value` is not a bare name; its key
 /// is returned, so that it is reported like any other name that is not a profile.
 pub fn profile_names(declaration: &Declaration) -> Vec<String> {
     match declaration.bound_args() {
         None => Vec::new(),
-        Some(Value::Map(entries)) => entries
-            .iter()
-            .map(|(key, value)| {
-                if key == tomet_semantics_core::POSITIONAL_ENTRY_KEY {
-                    scalar_text_or_debug(value)
-                } else {
-                    key.clone()
-                }
+        Some(tuple) => tuple
+            .entries()
+            .map(|entry| match entry.name() {
+                None => scalar_text_or_debug(entry.value()),
+                Some(key) => key.to_string(),
             })
             .collect(),
-        Some(Value::Seq(items)) => items.iter().map(scalar_text_or_debug).collect(),
-        Some(one) => vec![scalar_text_or_debug(&one)],
     }
 }
 
 /// The version a `::version(...)` declares, as written: `::version(1.10)` is `"1.10"`, not `"1.1"`.
 pub fn version_string(declaration: &Declaration) -> Option<String> {
     let args = declaration.bound_args()?;
-    Some(match args.get("version") {
-        Some(version) => scalar_text_or_debug(version),
-        None => scalar_text_or_debug(&args),
-    })
+    args.get("version")
+        .or_else(|| args.nth_unnamed(0))
+        .map(scalar_text_or_debug)
 }
 
 /// What a `::meta(...)` states: the map of its fields. `::meta()` states none, and is an empty map
 /// rather than nothing. `None` when the declaration is not written as entries
 /// ([`check_declarations`](crate::check_declarations) says so).
 pub fn meta(declaration: &Declaration) -> Option<Value> {
-    declaration.entries().ok().map(Value::Map)
+    declaration
+        .entries()
+        .ok()
+        .map(|entries| Value::Tuple(Tuple::from_named(entries)))
 }
 
 /// The macros a `::macro` defines, in the order written: each entry is a name and its template.
@@ -398,13 +402,16 @@ mod tests {
         let value = document_meta(&parse("::meta(title: Hello)\n")).expect("meta");
         assert_eq!(
             value,
-            Value::Map(vec![("title".into(), Value::String("Hello".into()))])
+            Value::Tuple(Tuple::from_named([(
+                "title".into(),
+                Value::String("Hello".into())
+            )]))
         );
         assert_eq!(document_meta(&parse("#[ Hello ]\n")), None);
         // `::meta()` states no field: an empty map, not nothing
         assert_eq!(
             document_meta(&parse("::meta()\n")),
-            Some(Value::Map(Vec::new()))
+            Some(Value::Tuple(Tuple::new()))
         );
         // a value without a name is not a field
         assert_eq!(document_meta(&parse("::meta(x)\n")), None);

@@ -1,7 +1,7 @@
 //! YAML frontmatter (`---\n...\n---`) extraction and conversion to
 //! `tomet_ast::Value` entries for the synthesized `::meta` block.
 
-use tomet_ast::Value;
+use tomet_ast::{Tuple, Value};
 
 pub(super) fn extract_yaml_frontmatter(src: &str) -> (Option<Vec<(String, Value)>>, &str) {
     let trimmed = src.trim_start();
@@ -84,13 +84,12 @@ fn yaml_to_value(v: serde_yaml::Value) -> Value {
             }
         }
         serde_yaml::Value::Sequence(items) => {
-            Value::Seq(items.into_iter().map(yaml_to_value).collect())
+            Value::Tuple(Tuple::from_unnamed(items.into_iter().map(yaml_to_value)))
         }
-        serde_yaml::Value::Mapping(map) => Value::Map(
+        serde_yaml::Value::Mapping(map) => Value::Tuple(Tuple::from_named(
             map.into_iter()
-                .map(|(k, v)| (yaml_key_to_string(k), yaml_to_value(v)))
-                .collect(),
-        ),
+                .map(|(k, v)| (yaml_key_to_string(k), yaml_to_value(v))),
+        )),
         serde_yaml::Value::Tagged(tagged) => yaml_to_value(tagged.value),
     }
 }
@@ -108,7 +107,7 @@ fn yaml_key_to_string(k: serde_yaml::Value) -> String {
 #[cfg(test)]
 mod tests {
     use crate::import::from_markdown;
-    use tomet_ast::{Name, Value};
+    use tomet_ast::{Name, Tuple, Value};
 
     #[test]
     fn yaml_frontmatter_converts_to_meta() {
@@ -120,7 +119,7 @@ mod tests {
         assert_eq!(declaration.name, Name::bare("meta"));
         assert_eq!(
             declaration.data.args,
-            Some(Value::Map(vec![
+            Some(Tuple::from_named([
                 ("title".to_string(), Value::String("Hello".to_string())),
                 ("author".to_string(), Value::String("Alice".to_string())),
                 ("draft".to_string(), Value::Bool(false)),
@@ -138,14 +137,14 @@ mod tests {
         assert_eq!(declaration.name, Name::bare("meta"));
         assert_eq!(
             declaration.data.args,
-            Some(Value::Map(vec![
+            Some(Tuple::from_named([
                 ("title".to_string(), Value::String("Doc".to_string())),
                 (
                     "tags".to_string(),
-                    Value::Seq(vec![
+                    Value::Tuple(Tuple::from_unnamed(vec![
                         Value::String("rust".to_string()),
                         Value::String("tomet".to_string()),
-                    ])
+                    ]))
                 ),
             ]))
         );
@@ -160,12 +159,12 @@ mod tests {
         let declaration = &doc.header[0];
         assert_eq!(
             declaration.data.args,
-            Some(Value::Map(vec![(
+            Some(Tuple::from_named([(
                 "topics".to_string(),
-                Value::Seq(vec![
+                Value::Tuple(Tuple::from_unnamed(vec![
                     Value::String("@link(ref:@Templater)".to_string()),
                     Value::String("@link(ref:@QuickAdd)".to_string()),
-                ])
+                ]))
             )]))
         );
     }

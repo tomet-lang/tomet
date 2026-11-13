@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use tomet_ast::{Block, Inline, Value};
+use tomet_ast::{Block, Inline, Tuple, Value};
 use tomet_expr::{DocRef, EvalContext, EvalValue, MemoryResolver, NoResolver, Resolver};
 
 use super::*;
@@ -31,10 +31,10 @@ fn vault() -> MemoryResolver {
 fn block_macro(name: &str, body: &str) -> Value {
     let src = format!("::macro({name}: [{body}])\n");
     let file = tomet_ast_parser::parse_file(&src).expect("the macro parses");
-    let Some(Value::Map(entries)) = &file.header[0].data.args else {
+    let Some(tuple) = &file.header[0].data.args else {
         panic!("expected `(name: template)` entries");
     };
-    entries[0].1.clone()
+    tuple.get(name).cloned().expect("macro entry")
 }
 
 /// Resolves `src` as the document `here.tmt` of the small vault above.
@@ -350,7 +350,7 @@ fn a_value_in_an_element_argument_keeps_its_type() {
     };
     assert_eq!(
         el.data.args,
-        Some(Value::Map(vec![
+        Some(Tuple::from_named([
             ("n".into(), Value::Int(3)),
             ("label".into(), Value::String("x".into()))
         ]))
@@ -363,21 +363,21 @@ fn a_value_in_a_value_group_keeps_its_type_and_a_list_stays_a_list() {
         run("::meta(n: $add(1, 1), names: {$ addr(dir:docs)::docs.map(d => d::path) })\n");
     assert!(unresolved.is_empty(), "{unresolved:?}");
     let declaration = &doc.header[0];
-    let Some(Value::Map(entries)) = &declaration.data.args else {
+    let Some(tuple) = &declaration.data.args else {
         panic!("the entries of `::meta(...)`");
     };
     assert_eq!(
-        entries,
-        &vec![
+        tuple,
+        &Tuple::from_named([
             ("n".into(), Value::Int(2)),
             (
                 "names".into(),
-                Value::Seq(vec![
+                Value::Tuple(Tuple::from_unnamed([
                     Value::String("docs/a.tmt".into()),
                     Value::String("docs/b.tmt".into())
-                ])
+                ]))
             ),
-        ]
+        ])
     );
 }
 
@@ -389,10 +389,10 @@ fn a_document_cannot_be_stored_as_data_and_the_expression_stays() {
         panic!("an element block");
     };
     // Still the expression, so the author sees what did not resolve.
-    let Some(Value::Map(entries)) = &el.data.args else {
+    let Some(tuple) = &el.data.args else {
         panic!("args");
     };
-    assert!(matches!(&entries[0].1, Value::Interp(_)));
+    assert!(matches!(tuple.get("doc"), Some(Value::Interp(_))));
 }
 
 #[test]
@@ -429,10 +429,10 @@ fn a_document_reads_var() {
     );
     assert!(unresolved.is_empty(), "{unresolved:?}");
     let declaration = &doc.header[0];
-    let Some(Value::Map(entries)) = &declaration.data.args else {
+    let Some(tuple) = &declaration.data.args else {
         panic!("the entries of `::meta(...)`");
     };
-    assert_eq!(entries[0], ("title".into(), Value::String("Plan".into())));
+    assert_eq!(tuple.get("title"), Some(&Value::String("Plan".into())));
     assert_eq!(text_of(&doc), "Plan for Plan");
 }
 
@@ -502,7 +502,9 @@ fn a_macro_in_an_element_argument_is_expanded_and_stays_text() {
     };
     assert_eq!(
         link.data.args,
-        Some(Value::String("https://x/issues/7".into()))
+        Some(Tuple::from_unnamed([Value::String(
+            "https://x/issues/7".into()
+        )]))
     );
 }
 
@@ -671,7 +673,7 @@ fn a_block_macro_on_its_own_line_is_its_blocks() {
     };
     assert_eq!(
         card.data.args,
-        Some(Value::Map(vec![(
+        Some(Tuple::from_named([(
             "title".to_string(),
             Value::String("Title".to_string())
         )]))

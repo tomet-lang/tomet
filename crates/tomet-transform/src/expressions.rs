@@ -32,7 +32,7 @@
 
 use tomet_ast::{
     Block, Connect, Data, Declaration, Element, Entry, File, Group, Id, Inline, InterpExpr, List,
-    ListItem, Paragraph, Text, Value,
+    ListItem, Paragraph, Text, Tuple, TupleEntry, Value,
 };
 use tomet_expr::{EvalContext, EvalValue, Note, evaluate, evaluate_data};
 use tomet_span::Span;
@@ -324,9 +324,20 @@ impl Pass<'_> {
     /// `(args)` and `{value}`: where an expression keeps its value as data.
     fn data(&mut self, data: Data) -> Data {
         Data {
-            args: data.args.map(|v| self.value(v)),
+            args: data.args.map(|t| self.tuple(t)),
             value: data.value.map(|v| self.element_value(v)),
         }
+    }
+
+    fn tuple(&mut self, tuple: Tuple) -> Tuple {
+        Tuple::from_entries(tuple.into_entries().map(|entry| {
+            let (name, val) = entry.into_parts();
+            let val = self.value(val);
+            match name {
+                Some(name) => TupleEntry::named(name, val),
+                None => TupleEntry::unnamed(val),
+            }
+        }))
     }
 
     #[deny(clippy::wildcard_enum_match_arm)]
@@ -354,16 +365,8 @@ impl Pass<'_> {
                 .data_expression(&interp.expr, interp.span)
                 .unwrap_or(Value::Interp(interp)),
             Value::Element(el) => Value::Element(Box::new(self.element(*el))),
-            Value::Seq(items) => Value::Seq(items.into_iter().map(|v| self.value(v)).collect()),
-            Value::Map(entries) => Value::Map(
-                entries
-                    .into_iter()
-                    .map(|(key, v)| (key, self.value(v)))
-                    .collect(),
-            ),
-            Value::Call(name, args) => {
-                Value::Call(name, args.into_iter().map(|v| self.value(v)).collect())
-            }
+            Value::Tuple(tuple) => Value::Tuple(self.tuple(tuple)),
+            Value::Call(name, args) => Value::Call(name, self.tuple(args)),
             Value::Blocks(blocks) => {
                 Value::Blocks(blocks.into_iter().flat_map(|b| self.block(b)).collect())
             }

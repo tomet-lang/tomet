@@ -1,4 +1,5 @@
 use super::*;
+use tomet_ast::Tuple;
 
 /// Wraps a flat inline sequence as `Element.content` (`Vec<Block>`) -- every fixture below is just one paragraph's worth.
 fn wrap(inlines: Vec<Inline>) -> Option<Vec<Block>> {
@@ -124,7 +125,7 @@ fn link() {
                 assert_eq!(el.name, Name::bare("link"));
                 assert_eq!(
                     el.data.args,
-                    Some(Value::Map(vec![(
+                    Some(Tuple::from_named([(
                         "target".to_string(),
                         Value::String("https://example.com".to_string())
                     )]))
@@ -161,7 +162,7 @@ fn image_becomes_embed_element() {
                 assert_eq!(el.name, Name::bare("embed"));
                 assert_eq!(
                     el.data.args,
-                    Some(Value::Map(vec![(
+                    Some(Tuple::from_named([(
                         "target".to_string(),
                         Value::String("assets/pic.png".to_string())
                     )]))
@@ -194,7 +195,7 @@ fn fenced_code_block() {
             assert_eq!(el.name, Name::bare("raw"));
             assert_eq!(
                 el.data.args,
-                Some(Value::Map(vec![(
+                Some(Tuple::from_named([(
                     "lang".to_string(),
                     Value::String("rust".to_string())
                 )]))
@@ -368,7 +369,7 @@ fn wikilink_converts_to_tomet_element() {
     assert_eq!(el1.name, Name::bare("link"));
     assert_eq!(
         el1.data.args,
-        Some(Value::Map(vec![(
+        Some(Tuple::from_named([(
             "target".to_string(),
             Value::String("ref:name".to_string())
         )]))
@@ -387,7 +388,7 @@ fn wikilink_converts_to_tomet_element() {
     assert_eq!(el2.name, Name::bare("link"));
     assert_eq!(
         el2.data.args,
-        Some(Value::Map(vec![(
+        Some(Tuple::from_named([(
             "target".to_string(),
             Value::String("ref:name".to_string())
         )]))
@@ -555,27 +556,42 @@ fn checkbox_task_list_markers_and_custom_markers_import_as_typed_markers() {
     };
     let items = &list.items;
     assert_eq!(items.len(), 5);
-    assert_eq!(items[0].data.args, Some(Value::String("x".to_string())));
+    assert_eq!(
+        items[0].data.args,
+        Some(Tuple::from_unnamed([Value::String("x".to_string())]))
+    );
     assert_eq!(
         items[0].content,
         wrap(vec![Inline::Text(Text::new("task1", Span::dummy()))]).unwrap()
     );
-    assert_eq!(items[1].data.args, Some(Value::String(" ".to_string())));
+    assert_eq!(
+        items[1].data.args,
+        Some(Tuple::from_unnamed([Value::String(" ".to_string())]))
+    );
     assert_eq!(
         items[1].content,
         wrap(vec![Inline::Text(Text::new("task2", Span::dummy()))]).unwrap()
     );
-    assert_eq!(items[2].data.args, Some(Value::String("c".to_string())));
+    assert_eq!(
+        items[2].data.args,
+        Some(Tuple::from_unnamed([Value::String("c".to_string())]))
+    );
     assert_eq!(
         items[2].content,
         wrap(vec![Inline::Text(Text::new("con item", Span::dummy()))]).unwrap()
     );
-    assert_eq!(items[3].data.args, Some(Value::String("p".to_string())));
+    assert_eq!(
+        items[3].data.args,
+        Some(Tuple::from_unnamed([Value::String("p".to_string())]))
+    );
     assert_eq!(
         items[3].content,
         wrap(vec![Inline::Text(Text::new("pro item", Span::dummy()))]).unwrap()
     );
-    assert_eq!(items[4].data.args, Some(Value::String("x".to_string())));
+    assert_eq!(
+        items[4].data.args,
+        Some(Tuple::from_unnamed([Value::String("x".to_string())]))
+    );
     assert_eq!(
         items[4].content,
         wrap(vec![Inline::Text(Text::new("task3", Span::dummy()))]).unwrap()
@@ -596,7 +612,7 @@ fn embed_wikilinks_and_images_import_as_embed_elements() {
     assert_eq!(embed1.name, Name::bare("embed"));
     assert_eq!(
         embed1.data.args,
-        Some(Value::Map(vec![(
+        Some(Tuple::from_named([(
             "target".to_string(),
             Value::String("name".to_string())
         )]))
@@ -612,7 +628,7 @@ fn embed_wikilinks_and_images_import_as_embed_elements() {
     assert_eq!(embed2.name, Name::bare("embed"));
     assert_eq!(
         embed2.data.args,
-        Some(Value::Map(vec![(
+        Some(Tuple::from_named([(
             "target".to_string(),
             Value::String("_path".to_string())
         )]))
@@ -638,7 +654,7 @@ fn test_wikilink_with_at_prefix_not_enclosed_in_backticks() {
     assert_eq!(el1.name, Name::bare("link"));
     assert_eq!(
         el1.data.args,
-        Some(Value::Map(vec![(
+        Some(Tuple::from_named([(
             "target".to_string(),
             Value::String("ref:@file_name".to_string())
         )]))
@@ -650,7 +666,7 @@ fn test_wikilink_with_at_prefix_not_enclosed_in_backticks() {
     assert_eq!(el2.name, Name::bare("link"));
     assert_eq!(
         el2.data.args,
-        Some(Value::Map(vec![(
+        Some(Tuple::from_named([(
             "target".to_string(),
             Value::String("ref:@Templater".to_string())
         )]))
@@ -696,16 +712,10 @@ fn test_obsidian_callout_blockquote_import() {
         panic!("expected element");
     };
     assert_eq!(el.name, Name::bare("callout"));
-    assert_eq!(
-        el.data.args,
-        Some(Value::Map(vec![
-            ("variant".to_string(), Value::String("info".to_string())),
-            (
-                "title".to_string(),
-                Value::String("2025/04/29 11:09".to_string())
-            ),
-        ]))
-    );
+    let mut expected_args = Tuple::new();
+    expected_args.push_unnamed(Value::String("info".to_string()));
+    expected_args.push_named("title", Value::String("2025/04/29 11:09".to_string()));
+    assert_eq!(el.data.args, Some(expected_args));
 
     let md_plain = "> Plain quote\n";
     let doc_plain = from_markdown(md_plain);

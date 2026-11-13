@@ -284,8 +284,12 @@ impl Vocabulary {
             let Some(entries) = crate::data::declaration_entries(declaration) else {
                 continue;
             };
-            for (name, decl) in entries.as_map().unwrap_or_default() {
-                vocab.elements.insert(name.clone(), decl_from_value(decl));
+            if let Some(tuple) = entries.as_tuple() {
+                for (name, decl) in tuple.named() {
+                    vocab
+                        .elements
+                        .insert(name.to_string(), decl_from_value(decl));
+                }
             }
         }
 
@@ -611,11 +615,11 @@ fn used_namespaces<B>(doc: &File<B>) -> Vec<String> {
         let Some(args) = normalized_declaration_args(declaration) else {
             continue;
         };
-        let namespace = args.as_str().map(str::to_string).or_else(|| {
-            args.get("target")
-                .and_then(|v| v.as_str())
-                .map(str::to_string)
-        });
+        let namespace = args
+            .get("target")
+            .and_then(|v| v.as_str())
+            .or_else(|| args.nth_unnamed(0).and_then(|v| v.as_str()))
+            .map(str::to_string);
         if let Some(namespace) = namespace {
             names.push(namespace);
         }
@@ -641,16 +645,19 @@ fn header<B>(doc: &File<B>) -> Option<(String, bool)> {
         {
             continue;
         }
-        let Some(Value::Map(entries)) = crate::data::declaration_entries(declaration) else {
+        let Some(entries) = crate::data::declaration_entries(declaration) else {
             continue;
         };
-        for (name, fields) in entries {
-            if let Value::Map(_) = fields {
-                let open = fields
+        let Some(tuple) = entries.as_tuple() else {
+            continue;
+        };
+        for (name, fields) in tuple.named() {
+            if let Some(fields_tuple) = fields.as_tuple() {
+                let open = fields_tuple
                     .get("open")
                     .and_then(|v| v.as_bool())
                     .unwrap_or(false);
-                return Some((name, open));
+                return Some((name.to_string(), open));
             }
         }
     }
@@ -687,10 +694,10 @@ fn content_allow_from_value(content: &Value) -> Option<ContentAllow> {
     match content.get("allow")? {
         Value::String(s) if s == "inline" => Some(ContentAllow::Inline),
         Value::String(s) if s == "any" => Some(ContentAllow::Any),
-        // `(a, b)` -- a `Value::Seq`.
-        Value::Seq(items) => {
-            let mut names = Vec::with_capacity(items.len());
-            for item in items {
+        // `(a, b)` -- a tuple with no named entries.
+        Value::Tuple(tuple) if tuple.has_no_named() => {
+            let mut names = Vec::with_capacity(tuple.len());
+            for item in tuple.unnamed() {
                 names.push(name_from_dotted(item.as_str()?));
             }
             Some(ContentAllow::Names(names))
@@ -717,11 +724,13 @@ fn name_from_dotted(s: &str) -> Name {
 /// is not the same as declaring that it takes none -- that distinction
 /// belongs to `@data`'s `open:` and is not built yet.
 fn params_from_value(args: &Value) -> Vec<ParamDecl> {
-    args.as_map()
-        .unwrap_or_default()
-        .iter()
+    let Some(tuple) = args.as_tuple() else {
+        return Vec::new();
+    };
+    tuple
+        .named()
         .map(|(name, spec)| ParamDecl {
-            name: name.clone(),
+            name: name.to_string(),
             ty: spec.get("type").map(parse_type_spec),
             required: spec
                 .get("required")

@@ -28,13 +28,13 @@ a nexus of its own: it puts data into the host it follows.
 
 @memo(a: 1){ b: 2 }::rule(allow: (card))
 
-- 項目 {k: v}
+- 項目 { k: v }
 
 - (k: v) 項目
 
 - 項目::rule(allow: (card))
 
-=[見出し] {k: v}
+=[見出し] { k: v }
 
 =[見出し]::rule(allow: (card))
 

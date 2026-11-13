@@ -2,7 +2,7 @@
 //! or `[content]`, at the offset where the nexus begins; the tree it reads is the CST's, whole.
 
 use crate::{Error, lower_data_file, lower_declaration, lower_file, lower_value};
-use tomet_ast::{Block, Value};
+use tomet_ast::{Block, Tuple, Value};
 use tomet_cst_parser::{parse_cst, parse_cst_value};
 
 fn file(src: &str) -> Result<tomet_ast::File, Error> {
@@ -101,7 +101,10 @@ fn a_nexus_inside_a_value_is_held_to_it_too() {
     // Bare, in a value, it is a string.
     assert_eq!(
         value("k: @name\n").unwrap(),
-        Value::Map(vec![("k".into(), Value::String("@name".into()))])
+        Value::Tuple(Tuple::from_named(vec![(
+            "k".into(),
+            Value::String("@name".into())
+        )]))
     );
     assert!(value("k: @name()\n").is_ok());
     assert!(value("k: @name[ x ]\n").is_ok());
@@ -242,4 +245,138 @@ fn fenced_code_block_line_marker_rules() {
         },
         other => panic!("expected memo, got {other:?}"),
     }
+}
+
+#[test]
+fn an_unnamed_entry_written_twice_is_a_clash_at_its_position() {
+    for (src, message) in [
+        (
+            "@memo(1)::(2)\n",
+            "duplicate entry `0`: first written at 1:7",
+        ),
+        (
+            "@memo(1)::(1)\n",
+            "duplicate entry `0`: first written at 1:7",
+        ),
+        (
+            "@memo(1, 2)::(3)\n",
+            "duplicate entry `0`: first written at 1:7",
+        ),
+        (
+            "@memo(a: (1))::(a: (2))\n",
+            "duplicate entry `a.0`: first written at 1:11",
+        ),
+    ] {
+        let e = refusal(file(src), src);
+        assert_eq!(e.message, message, "{src:?}");
+    }
+}
+
+#[test]
+fn unnamed_entries_merge_when_both_are_tuples_or_only_one_side_has_them() {
+    let doc = file("@memo({x: 1}, k: 0)::({y: 2}, 3)\n").unwrap();
+    let Block::Element(el) = &doc.body[0] else {
+        panic!()
+    };
+    let args = el.data.args.as_ref().unwrap();
+    assert_eq!(args.len(), 3);
+    let Some(Value::Tuple(first)) = args.nth_unnamed(0) else {
+        panic!("{args:?}")
+    };
+    assert_eq!(first.get("x"), Some(&Value::Int(1)));
+    assert_eq!(first.get("y"), Some(&Value::Int(2)));
+    assert_eq!(args.get("k"), Some(&Value::Int(0)));
+    assert_eq!(args.nth_unnamed(1), Some(&Value::Int(3)));
+    // The first writer's entries stay as written; what only the second has comes after.
+    assert_eq!(args.nth(1).and_then(|e| e.name()), Some("k"));
+}
+
+#[test]
+fn merge_named_entries_disjoint_and_recursive() {
+    let doc = file("@memo(a: {x: 1})::(b: 2)::(a: {y: 3})\n").unwrap();
+    let Block::Element(el) = &doc.body[0] else {
+        panic!()
+    };
+    let args = el.data.args.as_ref().unwrap();
+    assert_eq!(args.len(), 2);
+    let a_val = args.get("a").unwrap();
+    match a_val {
+        Value::Tuple(t) => {
+            assert_eq!(t.get("x"), Some(&Value::Int(1)));
+            assert_eq!(t.get("y"), Some(&Value::Int(3)));
+        }
+        other => panic!("expected tuple, got {other:?}"),
+    }
+    assert_eq!(args.get("b"), Some(&Value::Int(2)));
+}
+
+#[test]
+fn a_group_that_holds_an_element_merges_its_pairs_and_keeps_every_entry() {
+    let doc = file("@memo(){ a: 1, @x(1) }::{ b: 2, @y(2) }\n").unwrap();
+    let Block::Element(el) = &doc.body[0] else {
+        panic!()
+    };
+    let group = el.data.value.as_ref().unwrap();
+    let written: Vec<String> = group
+        .0
+        .iter()
+        .map(|entry| match entry {
+            tomet_ast::Entry::Pair(key, _) => key.clone(),
+            tomet_ast::Entry::Element(child) => format!("@{}", child.name.name),
+            tomet_ast::Entry::Hole(_) => "?".to_string(),
+        })
+        .collect();
+    assert_eq!(written, ["a", "@x", "b", "@y"]);
+
+    let src = "@memo(){ a: 1, @x(1) }::{ a: 2 }\n";
+    let e = refusal(file(src), src);
+    assert_eq!(e.message, "duplicate key `a`: first written at 1:10");
+}
+
+#[test]
+fn a_key_written_twice_is_a_clash_that_names_the_first_place() {
+    for (src, message) in [
+        (
+            "@memo(a: 1)::(a: 1)\n",
+            "duplicate key `a`: first written at 1:7",
+        ),
+        (
+            "@memo(a: 1)::(a: 2)\n",
+            "duplicate key `a`: first written at 1:7",
+        ),
+        (
+            "@memo(a: (1, 2))::(a: 1)\n",
+            "duplicate key `a`: first written at 1:7",
+        ),
+        (
+            "@memo(a: list(x))::(a: list(x))\n",
+            "duplicate key `a`: first written at 1:7",
+        ),
+        (
+            "@memo(){ a: 1 }::{ a: 2 }\n",
+            "duplicate key `a`: first written at 1:10",
+        ),
+        (
+            "@memo(){ a: 1 }::meta(a: 2)\n",
+            "duplicate key `a`: first written at 1:10",
+        ),
+        (
+            "@memo(a: {x: 1})\n::(b: 2)\n::(a: {x: 3})\n",
+            "duplicate key `a.x`: first written at 1:11",
+        ),
+        (
+            "@memo(a: 1)::(b: 2)::(b: 3)\n",
+            "duplicate key `b`: first written at 1:15",
+        ),
+    ] {
+        let e = refusal(file(src), src);
+        assert_eq!(e.message, message, "{src:?}");
+    }
+    let src = "@memo(a: 1)\n::(b: 2)\n::(b: 3)\n";
+    let e = refusal(file(src), src).located_in(src);
+    assert_eq!(
+        (e.line, e.column),
+        (3, 4),
+        "the error is at the second writer"
+    );
 }

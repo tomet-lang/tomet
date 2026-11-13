@@ -3,7 +3,7 @@
 //! Provides pure in-memory querying over Tomet AST elements by tag,
 //! attribute/property key, and value content.
 
-use tomet_ast::{Data, Declaration, Element, File, Value};
+use tomet_ast::{Data, Declaration, Element, File, Tuple, Value};
 use tomet_semantics::{classify_declaration_lenient, classify_std_lenient};
 use tomet_span::Span;
 use tomet_tree::{DataExt, for_each_declaration, for_each_element};
@@ -61,11 +61,11 @@ fn matches_parts(tag: &str, data: &Data, query: &StructuralQuery) -> bool {
         let in_args = data
             .args
             .as_ref()
-            .is_some_and(|v| value_contains_str(v, sub));
+            .is_some_and(|t| tuple_contains_str(t, sub));
         let in_val = data
             .value
             .as_ref()
-            .is_some_and(|v| value_contains_str(&v.as_data(), sub));
+            .is_some_and(|v| tuple_contains_str(&v.as_data(), sub));
         if !in_args && !in_val {
             return false;
         }
@@ -106,20 +106,21 @@ pub fn find_structural_matches(doc: &File, query: &StructuralQuery) -> Vec<Struc
     matches
 }
 
+fn tuple_contains_str(tuple: &Tuple, sub: &str) -> bool {
+    tuple
+        .entries()
+        .any(|e| e.name().is_some_and(|k| k.contains(sub)) || value_contains_str(e.value(), sub))
+}
+
 #[deny(clippy::wildcard_enum_match_arm)]
 fn value_contains_str(v: &Value, sub: &str) -> bool {
     match v {
         Value::String(s) => s.contains(sub),
         Value::Number(s) => s.contains(sub),
-        Value::Call(name, args) => {
-            name.contains(sub) || args.iter().any(|item| value_contains_str(item, sub))
-        }
+        Value::Tuple(tuple) => tuple_contains_str(tuple, sub),
+        Value::Call(name, args) => name.contains(sub) || tuple_contains_str(args, sub),
         Value::Interp(it) => it.expr.to_string().contains(sub),
         Value::TypeSeat(seat) => seat.expr.to_string().contains(sub),
-        Value::Map(entries) => entries
-            .iter()
-            .any(|(k, val)| k.contains(sub) || value_contains_str(val, sub)),
-        Value::Seq(items) => items.iter().any(|item| value_contains_str(item, sub)),
         Value::Null
         | Value::Bool(_)
         | Value::Int(_)

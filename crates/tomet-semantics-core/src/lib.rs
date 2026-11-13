@@ -9,6 +9,9 @@ pub mod admits;
 pub mod parse;
 pub mod positional;
 
-pub use admits::{Mismatch, admits, admits_default, datum_value, default_value, is_placeholder};
+pub use admits::{
+    Mismatch, admits, admits_default, datum_value, default_value, describe_tuple, describe_value,
+    is_placeholder,
+};
 pub use parse::parse_type_spec;
-pub use positional::{POSITIONAL_ENTRY_KEY, bind_positional};
+pub use positional::bind_positional;

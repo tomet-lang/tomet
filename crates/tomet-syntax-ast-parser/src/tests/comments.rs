@@ -141,7 +141,7 @@ fn double_slash_inside_a_url_is_not_treated_as_a_comment() {
                 assert_eq!(el.name, Name::bare("link"));
                 assert_eq!(
                     el.data.args,
-                    Some(Value::Map(vec![(
+                    Some(Tuple::from_named(vec![(
                         "target".to_string(),
                         Value::String("https://example.com".to_string())
                     )]))
@@ -223,7 +223,7 @@ fn own_line_comment_works_inside_a_paren_group() {
     assert_eq!(d.name, Name::bare("config"));
     assert_eq!(
         d.data.args,
-        Some(Value::Map(vec![(
+        Some(Tuple::from_named(vec![(
             "format".into(),
             Value::String("json".into())
         )]))
@@ -237,7 +237,7 @@ fn own_line_comment_works_inside_a_lightweight_value_group() {
     let d = &doc.header[0];
     assert_eq!(
         d.data.args,
-        Some(Value::Map(vec![(
+        Some(Tuple::from_named(vec![(
             "key".into(),
             Value::String("value".into())
         )]))
@@ -249,7 +249,10 @@ fn own_line_comment_works_inside_a_sequence() {
     let v = parse_value("(\n  a,\n  // a note\n  b,\n)").unwrap();
     assert_eq!(
         v,
-        Value::Seq(vec![Value::String("a".into()), Value::String("b".into())])
+        Value::Tuple(Tuple::from_unnamed(vec![
+            Value::String("a".into()),
+            Value::String("b".into())
+        ]))
     );
 }
 
@@ -258,7 +261,10 @@ fn trailing_same_line_comment_after_a_scalar_value_is_stripped() {
     let v = parse_value("key: value // trailing note").unwrap();
     assert_eq!(
         v,
-        Value::Map(vec![("key".into(), Value::String("value".into()))])
+        Value::Tuple(Tuple::from_named(vec![(
+            "key".into(),
+            Value::String("value".into())
+        )]))
     );
 }
 
@@ -270,10 +276,10 @@ fn bare_url_values_are_unaffected_by_trailing_comment_support() {
     let v = parse_value("url: https://example.com/path").unwrap();
     assert_eq!(
         v,
-        Value::Map(vec![(
+        Value::Tuple(Tuple::from_named(vec![(
             "url".into(),
             Value::String("https://example.com/path".into())
-        )])
+        )]))
     );
 }
 
@@ -286,10 +292,10 @@ fn a_bare_scalar_starting_with_double_slash_needs_quoting() {
     let quoted = parse_value(r#"path: "//example.com/x""#).unwrap();
     assert_eq!(
         quoted,
-        Value::Map(vec![(
+        Value::Tuple(Tuple::from_named(vec![(
             "path".into(),
             Value::String("//example.com/x".into())
-        )])
+        )]))
     );
     assert!(parse_value("path: //example.com/x").is_err());
 }
@@ -324,12 +330,7 @@ fn comment_marker_inside_a_string_in_a_value_group_is_part_of_the_string() {
     match &doc.body[0] {
         Block::Element(el) => {
             let v = el.data.args.as_ref().unwrap();
-            let Value::Map(entries) = v else {
-                panic!("expected map, got {v:?}")
-            };
-            let (k, val) = &entries[0];
-            assert_eq!(k, "allow");
-            assert_eq!(val, &Value::String("spec/**/*.tmt".into()));
+            assert_eq!(v.get("allow"), Some(&Value::String("spec/**/*.tmt".into())));
         }
         other => panic!("expected element, got {other:?}"),
     }

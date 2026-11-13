@@ -332,13 +332,11 @@ pub fn check_arguments(doc: &File, bindings: &Bindings, errors: &mut Vec<Diagnos
 /// held to the parameters a vocabulary in scope declares for it.
 fn check_arguments_of(
     name: &tomet_ast::Name,
-    args: Option<tomet_ast::Value>,
+    args: Option<tomet_ast::Tuple>,
     span: Span,
     bindings: &Bindings,
     errors: &mut Vec<Diagnostic>,
 ) {
-    use tomet_ast::Value;
-
     let Some(decl) = bindings.declaration(name) else {
         return;
     };
@@ -346,16 +344,22 @@ fn check_arguments_of(
         return;
     }
 
-    let entries: &[(String, Value)] = match args.as_ref() {
-        Some(Value::Map(entries)) => entries,
-        _ => &[],
+    let Some(tuple) = args.as_ref() else {
+        for param in decl.params.iter().filter(|p| p.required) {
+            errors.push(Diagnostic::MissingRequiredArgument {
+                element: name.to_string(),
+                argument: param.name.clone(),
+                span,
+            });
+        }
+        return;
     };
 
-    for (key, _) in entries {
+    for (key, _) in tuple.named() {
         if !key.is_empty() && decl.param(key).is_none() {
             errors.push(Diagnostic::UnknownArgument {
                 element: name.to_string(),
-                argument: key.clone(),
+                argument: key.to_string(),
                 span,
             });
         }
@@ -364,7 +368,7 @@ fn check_arguments_of(
     // whose `type:` names no type is not checked (the vocabulary says so
     // where it is read), and a `{$ ... }` is not known until it is evaluated, nor a `<$...>`
     // until it is filled.
-    for (key, value) in entries {
+    for (key, value) in tuple.named() {
         let Some(ty) = decl.param(key).and_then(|p| p.declared_type()) else {
             continue;
         };
@@ -374,7 +378,7 @@ fn check_arguments_of(
         if let Err(mismatch) = admits(&ty, value) {
             errors.push(Diagnostic::InvalidArgument {
                 element: name.to_string(),
-                argument: key.clone(),
+                argument: key.to_string(),
                 ty: ty.to_string(),
                 reason: mismatch.to_string(),
                 span,
@@ -382,7 +386,7 @@ fn check_arguments_of(
         }
     }
     for param in decl.params.iter().filter(|p| p.required) {
-        if !entries.iter().any(|(k, _)| *k == param.name) {
+        if !tuple.contains_name(&param.name) {
             errors.push(Diagnostic::MissingRequiredArgument {
                 element: name.to_string(),
                 argument: param.name.clone(),
@@ -707,7 +711,6 @@ pub fn check_field_types(
     errors: &mut Vec<Diagnostic>,
 ) {
     use tomet_ast::Value;
-    use tomet_tree::ValueExt;
 
     if field_types.is_empty() {
         return;
@@ -718,12 +721,12 @@ pub fn check_field_types(
         match tomet_semantics::classify_declaration_lenient(declaration) {
             tomet_semantics::ElementKind::Declaration(DeclKind::Meta) if !checked_meta => {
                 checked_meta = true;
-                let Some(Value::Map(entries)) =
+                let Some(Value::Tuple(entries)) =
                     tomet_semantics::data::declaration_entries(declaration)
                 else {
                     continue;
                 };
-                for (field, value) in &entries {
+                for (field, value) in entries.named() {
                     errors.extend(field_value_error(
                         field,
                         value,
@@ -797,8 +800,17 @@ fn describe_value(value: &tomet_ast::Value) -> String {
         Value::Int(n) => n.to_string(),
         Value::Float(n) => n.to_string(),
         Value::Number(text) => text.clone(),
-        Value::Seq(_) => "a list".to_string(),
-        Value::Map(_) => "a map".to_string(),
+        Value::Tuple(tuple) => {
+            if tuple.is_empty() {
+                "an empty tuple".to_string()
+            } else if tuple.has_no_named() {
+                "a list".to_string()
+            } else if tuple.has_no_unnamed() {
+                "a map".to_string()
+            } else {
+                "a list with named entries".to_string()
+            }
+        }
         _ => "something else".to_string(),
     }
 }

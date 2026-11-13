@@ -28,9 +28,11 @@ pub fn declaration_entries(declaration: &tomet_ast::Declaration) -> Option<tomet
     tomet_declaration::Declaration::from_ast(declaration)?
         .entries()
         .ok()
-        .map(tomet_ast::Value::Map)
+        .map(|entries| tomet_ast::Value::Tuple(tomet_ast::Tuple::from_named(entries)))
 }
 
 fn data_of(data: &tomet_ast::Data) -> Option<tomet_ast::Value> {
-    data.value.as_ref().map(|value| value.as_data())
+    data.value
+        .as_ref()
+        .map(|value| tomet_ast::Value::Tuple(value.as_data()))
 }

@@ -1,6 +1,6 @@
 //! Metadata element manipulation in documents.
 
-use tomet_ast::{File, Value};
+use tomet_ast::{File, Tuple, Value};
 use tomet_semantics::{classify_declaration_lenient, classify_std_lenient};
 use tomet_tree::{DataExt, declaration_new, for_each_declaration_mut, for_each_element_mut};
 
@@ -30,7 +30,7 @@ pub fn set_meta_in_doc(doc: &mut File, target_element: &str, key: &str, new_val:
         // A directive inserted at the top of the document is a declaration,
         // which stands alone on its line.
         let mut declaration = declaration_new(target_element);
-        declaration.data.args = Some(Value::Map(vec![(
+        declaration.data.args = Some(Tuple::from_named([(
             key.to_string(),
             Value::String(new_val.to_string()),
         )]));

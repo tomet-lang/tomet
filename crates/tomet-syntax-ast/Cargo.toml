@@ -11,3 +11,6 @@ tomet-span = { workspace = true }
 #--- Crates.io ---
 serde         = { workspace = true }
 unicode-width = { workspace = true }
+
+[dev-dependencies]
+serde_json = { workspace = true }

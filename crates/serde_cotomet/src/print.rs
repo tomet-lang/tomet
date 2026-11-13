@@ -2,7 +2,7 @@
 //! a top-level map is written as bare `key: value` lines (no enclosing braces);
 //! nested maps use `{ ... }`, and a sequence prints as `(a, b)`.
 
-use tomet_ast::Value;
+use tomet_ast::{Tuple, Value};
 use tomet_spelling::{write_key, write_scalar_string};
 
 pub fn print_value(value: &Value) -> String {
@@ -13,16 +13,31 @@ pub fn print_value(value: &Value) -> String {
 
 fn write_value(value: &Value, out: &mut String, top_level: bool) {
     match value {
-        Value::Map(entries) => write_map(entries, out, top_level),
-        Value::Seq(items) => {
-            out.push('(');
-            for (i, item) in items.iter().enumerate() {
-                if i > 0 {
-                    out.push_str(", ");
+        Value::Tuple(tuple) => {
+            if tuple.is_empty() {
+                if !top_level {
+                    out.push_str("()");
                 }
-                write_value(item, out, false);
+            } else if tuple.has_no_named() {
+                out.push('(');
+                for (i, item) in tuple.unnamed().enumerate() {
+                    if i > 0 {
+                        out.push_str(", ");
+                    }
+                    write_value(item, out, false);
+                }
+                out.push(')');
+            } else if tuple.has_no_unnamed() {
+                let entries: Vec<(String, Value)> = tuple
+                    .named()
+                    .map(|(k, v)| (k.to_string(), v.clone()))
+                    .collect();
+                write_map(&entries, out, top_level);
+            } else {
+                out.push('(');
+                write_args(tuple, out);
+                out.push(')');
             }
-            out.push(')');
         }
         Value::String(s) => write_scalar_string(s, out),
         Value::Int(i) => out.push_str(&i.to_string()),
@@ -33,12 +48,7 @@ fn write_value(value: &Value, out: &mut String, top_level: bool) {
         Value::Call(name, args) => {
             out.push_str(name);
             out.push('(');
-            for (i, arg) in args.iter().enumerate() {
-                if i > 0 {
-                    out.push_str(", ");
-                }
-                write_value(arg, out, false);
-            }
+            write_args(args, out);
             out.push(')');
         }
         Value::Interp(interp) => {
@@ -96,20 +106,16 @@ fn write_block_plain_text(block: &tomet_ast::Block, out: &mut String) {
     }
 }
 
-fn write_args(value: &Value, out: &mut String) {
-    let Value::Map(entries) = value else {
-        write_value(value, out, false);
-        return;
-    };
-    for (i, (key, v)) in entries.iter().enumerate() {
+fn write_args(tuple: &Tuple, out: &mut String) {
+    for (i, entry) in tuple.entries().enumerate() {
         if i > 0 {
             out.push_str(", ");
         }
-        if !key.is_empty() {
+        if let Some(key) = entry.name() {
             write_key(key, out);
             out.push_str(": ");
         }
-        write_value(v, out, false);
+        write_value(entry.value(), out, false);
     }
 }
 

@@ -39,7 +39,7 @@ pub use structural::*;
 mod tests {
     use super::*;
     use std::collections::HashMap;
-    use tomet_ast::Value;
+    use tomet_ast::{Tuple, Value};
 
     fn parse_doc(src: &str) -> tomet_ast::File {
         tomet_ast_parser::parse_file(src).expect("valid source")
@@ -51,7 +51,9 @@ mod tests {
             .body
             .into_iter()
             .find_map(|block| match block {
-                tomet_ast::Block::Element(el) => el.data.args,
+                tomet_ast::Block::Element(el) => {
+                    el.data.args.and_then(|t| t.nth_unnamed(0).cloned())
+                }
                 _ => None,
             })
             .expect("an element with args")
@@ -107,7 +109,7 @@ mod tests {
             let val = el
                 .data
                 .get_attr("target")
-                .or(el.data.args.as_ref())
+                .or_else(|| el.data.args.as_ref().and_then(|t| t.nth_unnamed(0)))
                 .cloned();
             results.push((el.name.name.as_str().to_string(), val));
         });
@@ -156,13 +158,16 @@ mod tests {
                 id = declaration.data.args.clone();
             }
             if declaration.name.is_bare_named("meta")
-                && let Some(Value::Map(entries)) =
+                && let Some(Value::Tuple(tuple)) =
                     tomet_semantics::data::declaration_entries(declaration)
             {
-                meta_keys = entries.into_iter().map(|(key, _)| key).collect();
+                meta_keys = tuple.named().map(|(key, _)| key.to_string()).collect();
             }
         });
-        assert_eq!(id, Some(Value::String("doc-1".into())));
+        assert_eq!(
+            id,
+            Some(Tuple::from_unnamed([Value::String("doc-1".into())]))
+        );
         assert_eq!(meta_keys, vec!["title".to_string()]);
 
         // Nothing to promote: no change.

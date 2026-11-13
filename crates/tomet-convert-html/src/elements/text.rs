@@ -4,8 +4,8 @@
 use crate::RenderCtx;
 use crate::block::render_content_blocks;
 use crate::util::{
-    as_map, blocks_to_plain, escape_attr, escape_html, id_attr, map_get, push_named_attrs,
-    split_attrs, value_to_plain,
+    blocks_to_plain, escape_attr, escape_html, id_attr, push_named_attrs, split_attrs,
+    value_to_plain,
 };
 use tomet_ast::{ElementView, Value};
 use tomet_semantics::normalized_element_args;
@@ -48,8 +48,7 @@ pub(crate) fn render_ruby_element(cx: &RenderCtx, el: ElementView<'_>, out: &mut
     let args = normalized_element_args(el);
     let rt = args
         .as_ref()
-        .and_then(as_map)
-        .and_then(|m| map_get(m, "rt"))
+        .and_then(|a| a.get("rt"))
         .and_then(|v| match v {
             Value::String(s) => Some(s.as_str()),
             _ => None,
@@ -72,8 +71,7 @@ pub(crate) fn render_raw_element(el: ElementView<'_>, out: &mut String, inline: 
     let args = normalized_element_args(el);
     let lang = args
         .as_ref()
-        .and_then(as_map)
-        .and_then(|m| map_get(m, "lang"))
+        .and_then(|a| a.get("lang"))
         .map(value_to_plain)
         .unwrap_or_default();
     let code = el.content.map(blocks_to_plain).unwrap_or_default();

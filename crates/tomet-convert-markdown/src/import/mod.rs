@@ -31,7 +31,7 @@
 use pulldown_cmark::{CodeBlockKind, Event, Options, Parser, Tag, TagEnd};
 use tomet_ast::{
     Block, Data, Element, File, Inline, LineBreak, List, ListItem, Name, Paragraph, Placement,
-    RawText, Section, SoftBreak, Text, Value,
+    RawText, Section, SoftBreak, Text, Tuple, Value,
 };
 use tomet_semantics::{ElementKind, classify_std_lenient, comment_element};
 use tomet_span::Span;
@@ -60,7 +60,7 @@ enum Frame {
     Item {
         content: Vec<Inline>,
         sublist: Option<List>,
-        marker: Option<Value>,
+        marker: Option<Tuple>,
     },
     List {
         ordered: bool,
@@ -169,12 +169,12 @@ pub fn from_markdown_with_options(src: &str, options: &ImportOptions) -> File {
         if let Some((pos, text)) = id {
             entries.remove(pos);
             let mut id_declaration = declaration_new("id");
-            id_declaration.data.args = Some(Value::String(text));
+            id_declaration.data.args = Some(Tuple::from_unnamed([Value::String(text)]));
             header.push(id_declaration);
         }
         if !had_id || !entries.is_empty() {
             let mut meta_declaration = declaration_new("meta");
-            meta_declaration.data.args = Some(Value::Map(entries));
+            meta_declaration.data.args = Some(Tuple::from_named(entries));
             header.push(meta_declaration);
         }
     }
@@ -415,14 +415,12 @@ fn end_frame(stack: &mut Vec<Frame>, tag_end: TagEnd, options: &ImportOptions) {
                     t.value = t.value.trim_start().to_string();
                 }
 
-                let args = if let Some(t_str) = title {
-                    Value::Map(vec![
-                        ("variant".to_string(), Value::String(variant)),
-                        ("title".to_string(), Value::String(t_str)),
-                    ])
-                } else {
-                    Value::String(variant)
-                };
+                let mut tuple = Tuple::new();
+                tuple.push_unnamed(Value::String(variant));
+                if let Some(t_str) = title {
+                    tuple.push_named("title", Value::String(t_str));
+                }
+                let args = tuple;
 
                 let el = Element {
                     name: Name::bare("callout"),
@@ -472,7 +470,10 @@ fn end_frame(stack: &mut Vec<Frame>, tag_end: TagEnd, options: &ImportOptions) {
             let args = if lang.is_empty() {
                 None
             } else {
-                Some(Value::Map(vec![("lang".to_string(), Value::String(lang))]))
+                Some(Tuple::from_named([(
+                    "lang".to_string(),
+                    Value::String(lang),
+                )]))
             };
             let el = Element {
                 name: Name::bare("raw"),
@@ -522,7 +523,7 @@ fn end_frame(stack: &mut Vec<Frame>, tag_end: TagEnd, options: &ImportOptions) {
                             && s[close_idx..].starts_with(") ")
                         {
                             let inner = &s[1..close_idx];
-                            marker = Some(Value::String(inner.to_string()));
+                            marker = Some(Tuple::from_unnamed([Value::String(inner.to_string())]));
                             let remainder = s[close_idx + 2..].to_string();
                             t.value = remainder;
                         }
@@ -548,7 +549,9 @@ fn end_frame(stack: &mut Vec<Frame>, tag_end: TagEnd, options: &ImportOptions) {
                                 } else {
                                     inner
                                 };
-                                marker = Some(Value::String(marker_val.to_string()));
+                                marker = Some(Tuple::from_unnamed([Value::String(
+                                    marker_val.to_string(),
+                                )]));
                                 let remainder = s[after_idx..].to_string();
                                 t.value = remainder;
                             }
@@ -594,7 +597,7 @@ fn end_frame(stack: &mut Vec<Frame>, tag_end: TagEnd, options: &ImportOptions) {
                 placement: Placement::Inline,
 
                 data: Data {
-                    args: Some(Value::Map(vec![(
+                    args: Some(Tuple::from_named([(
                         "target".to_string(),
                         Value::String(dest),
                     )])),
@@ -623,7 +626,7 @@ fn end_frame(stack: &mut Vec<Frame>, tag_end: TagEnd, options: &ImportOptions) {
                 placement: Placement::Inline,
 
                 data: Data {
-                    args: Some(Value::Map(vec![(
+                    args: Some(Tuple::from_named([(
                         "target".to_string(),
                         Value::String(dest),
                     )])),

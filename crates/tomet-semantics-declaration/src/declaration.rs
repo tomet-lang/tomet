@@ -1,4 +1,4 @@
-use tomet_ast::{File, Value};
+use tomet_ast::{File, Tuple, Value};
 use tomet_span::Span;
 
 use crate::kind::{DeclKind, Prose};
@@ -23,12 +23,12 @@ pub struct Declaration {
     pub path: Vec<String>,
     /// `(args)` as written: a positional argument is still unnamed
     /// ([`bound_args`](Declaration::bound_args) names it).
-    pub args: Option<Value>,
+    pub args: Option<Tuple>,
     /// `[prose]` as written, a [`Value::Blocks`].
     pub prose: Option<Value>,
-    /// `{data}`, the group read as a map. Only a declaration of shape
+    /// `{data}`, the group read as a tuple. Only a declaration of shape
     /// [`Shape::ArgsAndData`](crate::Shape::ArgsAndData) has one.
-    pub data: Option<Value>,
+    pub data: Option<Tuple>,
 }
 
 /// Why a declaration's head, `(args)` and `[prose]` do not make entries.
@@ -47,16 +47,16 @@ pub enum EntriesError {
 
 impl Declaration {
     /// A declaration built from its parts, `name` being the head as written (`"field.url.wiki"`).
-    pub fn new(name: impl AsRef<str>, args: Option<Value>, data: Option<Value>) -> Declaration {
+    pub fn new(name: impl AsRef<str>, args: Option<Tuple>, data: Option<Tuple>) -> Declaration {
         Declaration::with_prose(name, args, None, data)
     }
 
     /// [`new`](Declaration::new), with the `[prose]` it was written with.
     pub fn with_prose(
         name: impl AsRef<str>,
-        args: Option<Value>,
+        args: Option<Tuple>,
         prose: Option<Value>,
-        data: Option<Value>,
+        data: Option<Tuple>,
     ) -> Declaration {
         let mut segments = name.as_ref().split('.').map(str::to_string);
         Declaration {
@@ -102,11 +102,11 @@ impl Declaration {
             return false;
         }
         match &self.args {
-            Some(Value::Map(entries)) => entries.iter().any(|(key, _)| {
-                key == tomet_semantics_core::POSITIONAL_ENTRY_KEY
-                    || kind.positional_keys().contains(&key.as_str())
+            Some(tuple) => tuple.entries().any(|entry| match entry.name() {
+                None => true,
+                Some(key) => kind.positional_keys().contains(&key),
             }),
-            _ => true,
+            None => true,
         }
     }
 
@@ -121,7 +121,7 @@ impl Declaration {
     /// `(args)` with the positional ones named after the declaration's signature
     /// (`::kind(config, 2)` is `kind: config, version: 2`). For a name that is not a standard
     /// declaration, the arguments as they were written.
-    pub fn bound_args(&self) -> Option<Value> {
+    pub fn bound_args(&self) -> Option<Tuple> {
         let args = self.args.as_ref()?;
         let keys = self.kind().map_or(&[][..], DeclKind::positional_keys);
         Some(tomet_semantics_core::bind_positional(args, keys))
@@ -134,11 +134,11 @@ impl Declaration {
     ///   entries, named by the arguments.
     /// - **Dotted**, a path: `::field.author(type: string)` is one entry, named by the path
     ///   (`author`, or `url.wiki` for `::field.url.wiki`), whose value is what the parentheses hold:
-    ///   named arguments are the fields of a map. This is the grouped entry
+    ///   named arguments are the fields of a tuple. This is the grouped entry
     ///   `author: { type: string }`, with the same value.
     ///
     ///   Positional arguments are the value itself, the entry's own slot (`X.X` is `X`):
-    ///   `::macro.copyright("(C)")` is `copyright: "(C)"`, and several are a sequence, so
+    ///   `::macro.copyright("(C)")` is `copyright: "(C)"`, and several are a tuple, so
     ///   `::workspace.ignore("target", ".git")` is `ignore: ("target", ".git")`. Beside named
     ///   arguments they are the field named like the entry, as `::kind(config, 2)` names its
     ///   first `kind`: `::x.y("a", b: 1)` is `y: (y: "a", b: 1)`.
@@ -154,32 +154,28 @@ impl Declaration {
             }
             return match &self.args {
                 None => Ok(Vec::new()),
-                Some(Value::Map(entries))
-                    if entries
-                        .iter()
-                        .all(|(key, _)| key != tomet_semantics_core::POSITIONAL_ENTRY_KEY) =>
-                {
-                    Ok(entries.clone())
-                }
+                Some(tuple) if tuple.has_no_unnamed() => Ok(tuple
+                    .named()
+                    .map(|(k, v)| (k.to_string(), v.clone()))
+                    .collect()),
                 Some(_) => Err(EntriesError::ValueWithoutName),
             };
         };
 
         let (positional, named): (Vec<Value>, Vec<(String, Value)>) = match &self.args {
             None => (Vec::new(), Vec::new()),
-            Some(Value::Map(entries)) => {
-                let (positional, named): (Vec<_>, Vec<_>) = entries
-                    .iter()
-                    .cloned()
-                    .partition(|(key, _)| key == tomet_semantics_core::POSITIONAL_ENTRY_KEY);
-                (positional.into_iter().map(|(_, v)| v).collect(), named)
-            }
-            Some(one) => (vec![one.clone()], Vec::new()),
+            Some(tuple) => (
+                tuple.unnamed().cloned().collect(),
+                tuple
+                    .named()
+                    .map(|(k, v)| (k.to_string(), v.clone()))
+                    .collect(),
+            ),
         };
         let positional = match positional.len() {
             0 => None,
             1 => positional.into_iter().next(),
-            _ => Some(Value::Seq(positional)),
+            _ => Some(Value::Tuple(Tuple::from_unnamed(positional))),
         };
 
         let prose = self.kind().map_or(Prose::None, DeclKind::prose);
@@ -213,10 +209,10 @@ fn entry_value(
     }
     match (positional, named.is_empty()) {
         (Some(value), true) => value,
-        (None, _) => Value::Map(named),
+        (None, _) => Value::Tuple(Tuple::from_named(named)),
         (Some(value), false) => {
             named.insert(0, (leaf.to_string(), value));
-            Value::Map(named)
+            Value::Tuple(Tuple::from_named(named))
         }
     }
 }
@@ -272,14 +268,17 @@ mod tests {
         assert_eq!(kind.name, "kind");
         assert_eq!(
             kind.bound_args(),
-            Some(Value::Map(vec![
-                ("kind".into(), Value::String("config".into())),
-                ("version".into(), Value::Int(2)),
+            Some(Tuple::from_named([
+                ("kind".to_string(), Value::String("config".into())),
+                ("version".to_string(), Value::Int(2)),
             ]))
         );
         assert_eq!(
             found[1].declaration.bound_args(),
-            Some(Value::Map(vec![("id".into(), Value::String("x".into()))]))
+            Some(Tuple::from_named([(
+                "id".to_string(),
+                Value::String("x".into()),
+            )]))
         );
         assert_eq!(found[1].declaration.data, None);
     }
@@ -348,7 +347,7 @@ mod tests {
             entries_of("::workspace.ignore(\"target\", \".git\")\n"),
             [(
                 "ignore".to_string(),
-                Value::Seq(vec![text("target"), text(".git")])
+                Value::Tuple(Tuple::from_unnamed([text("target"), text(".git")]))
             )]
         );
     }
@@ -359,10 +358,10 @@ mod tests {
             entries_of("::format.table(\"x\", max_col_width: 50)\n"),
             [(
                 "table".to_string(),
-                Value::Map(vec![
-                    ("table".into(), text("x")),
-                    ("max_col_width".into(), Value::Int(50))
-                ])
+                Value::Tuple(Tuple::from_named([
+                    ("table".to_string(), text("x")),
+                    ("max_col_width".to_string(), Value::Int(50)),
+                ]))
             )]
         );
     }
@@ -376,17 +375,19 @@ mod tests {
         ] {
             let entries = entries_of(src);
             assert_eq!(entries[0].0, name);
-            let Value::Map(fields) = &entries[0].1 else {
+            let Value::Tuple(fields) = &entries[0].1 else {
                 panic!("{src}")
             };
             assert!(
-                matches!(fields.last(), Some((key, Value::Blocks(_))) if key == "about"),
+                matches!(fields.entries().last(), Some(e) if e.name() == Some("about") && matches!(e.value(), Value::Blocks(_))),
                 "{src}: {fields:?}"
             );
         }
         // And without `()` entries, it is all there is.
         let entries = entries_of("::element.card[ a card ]\n");
-        assert!(matches!(&entries[0].1, Value::Map(f) if f.len() == 1 && f[0].0 == "about"));
+        assert!(
+            matches!(&entries[0].1, Value::Tuple(f) if f.len() == 1 && f.get("about").is_some())
+        );
     }
 
     #[test]

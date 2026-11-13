@@ -34,7 +34,7 @@ impl VarDecl {
 
     /// Reads one entry of `::var`. The reason is for `tomet check`.
     pub fn from_value(value: &Value) -> Result<VarDecl, String> {
-        let Value::Map(fields) = value else {
+        let Value::Tuple(fields) = value else {
             return Err(
                 "a variable is declared as a map: `{ type: ..., default: ..., about: ... }`"
                     .to_string(),
@@ -45,11 +45,17 @@ impl VarDecl {
             default: None,
             about: None,
         };
-        for (key, field) in fields {
-            match key.as_str() {
-                "type" => decl.ty = parse_type_spec(field).map_err(|e| e.to_string())?,
-                "default" => decl.default = Some(field.clone()),
-                "about" => match plain_text(field) {
+        for entry in fields {
+            let Some(key) = entry.name() else {
+                return Err(
+                    "a variable is declared as a map: `{ type: ..., default: ..., about: ... }`"
+                        .to_string(),
+                );
+            };
+            match key {
+                "type" => decl.ty = parse_type_spec(entry.value()).map_err(|e| e.to_string())?,
+                "default" => decl.default = Some(entry.value().clone()),
+                "about" => match plain_text(entry.value()) {
                     Some(about) => decl.about = Some(about),
                     None => return Err("`about` is text".to_string()),
                 },

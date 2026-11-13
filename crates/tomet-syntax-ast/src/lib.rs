@@ -2,7 +2,7 @@
 //!
 //! Shared AST and `Value` data models for the Tomet toolchain ([`File`], [`Block`],
 //! [`Inline`], [`Element`], [`ElementView`], [`BodyView`], [`Declaration`], [`Interpolation`],
-//! [`Hole`], [`TypeSeat`], [`ListItem`], [`Value`], [`Span`]).
+//! [`Hole`], [`TypeSeat`], [`ListItem`], [`Value`], [`Tuple`], [`TupleEntry`], [`Span`]).
 //!
 //! =[ Design Policy ]
 //!
@@ -32,8 +32,8 @@
 //!   | a [`TypeSeat`], a name tag (`<PATH>`) is text. Merging nodes of different structure into one
 //!   | type with a field to tell them apart is what split `Element` before; a new kind of seat is
 //!   | judged by that rule.
-//!   | A list item is a [`ListItem`] and a nameless `(marker)[content]` entry of a `{...}` group is a
-//!   | [`Bare`]: neither has a name, so neither is an [`Element`], whose name is mandatory.
+//!   | A list item is a [`ListItem`]: it has no name, so it is not an [`Element`], whose name is
+//!   | mandatory.
 //!   | [`ListItem::as_element_view`] gives a zero-copy [`ElementView`] of the element a `-@name(...)`
 //!   | item is.
 //!   | What nodes share is [`Data`] (`(args)` and the `{...}` [`Group`]), and their body groups can
@@ -79,22 +79,19 @@ pub enum Value {
     /// scalar, is [`scalar_text`](Value::scalar_text).
     Number(String),
     String(String),
-    /// `(a, b, c)` -- a sequence. `()` is empty and `(x)` has one element.
-    Seq(Vec<Value>),
-    /// Insertion-ordered key/value pairs (a `.tmt` map has no inherent
-    /// sort order, so preserve whatever order the source used).
-    Map(Vec<(String, Value)>),
-    /// `name(arg, arg, ...)` -- a call the parser did not resolve.
-    /// Positional-only: a call's arguments are never `key: value` pairs, an
-    /// ordered sequence is enough for what this exists to express.
+    /// `(a, b, k: v)` or `{k: v}` -- an ordered run of entries, each with a
+    /// name or without one. `()` is the empty tuple and `(x)` is a tuple with
+    /// one unnamed entry. See [`Tuple`].
+    Tuple(Tuple),
+    /// `name(a, b, ...)` -- a call the parser did not resolve: a head and its
+    /// fields.
     ///
-    /// The parser resolves exactly the literal constructors
-    /// (`string`, `int`, `float`) to the plain value they stand for. Every
-    /// other callee -- `list` (a type: `list(string)`), `enum`, a typo -- is
-    /// kept here as an uninterpreted `String`, the same way the parser never
-    /// judges a `::name(...)` connect's name; only `tomet-semantics` knows
-    /// which of those are real. `list(a, b)` is not a sequence: write
-    /// `(a, b)`.
+    /// The parser resolves the literal constructors (`string`, `int`, `float`)
+    /// to the plain value they stand for. Every other callee -- `list` (a
+    /// type: `list(string)`), `enum`, a typo -- is kept here as an
+    /// uninterpreted `String`, the same way the parser never judges a
+    /// `::name(...)` connect's name; only `tomet-semantics` knows which of
+    /// those are real. `list(a, b)` is not a tuple literal: write `(a, b)`.
     ///
     /// Deliberately not the same mechanism as `$func(args)`'s
     /// `InterpExprKind::Call`: that callee can itself be a path
@@ -102,7 +99,7 @@ pub enum Value {
     /// at parse time. Sharing surface syntax (`name(args)`) is coincidence,
     /// not kinship -- conflating the two would blur which one is
     /// evaluated for a reader of either.
-    Call(String, Vec<Value>),
+    Call(String, Tuple),
     /// `{$ ... }` / `$name(...)` sitting where a value goes -- evaluated later,
     /// so `tomet-semantics` never looks inside it as data. See [`Interpolation`].
     Interp(Interpolation),
@@ -121,8 +118,8 @@ pub enum Value {
     /// element is a first-class element that happens to sit in a value
     /// slot, which is why [`crate::Entry::Element`] already lets one stand
     /// as a bare, keyless entry in a `{...}` group -- this variant is what
-    /// lets the same thing be a named `key: @name(...)` value, and a
-    /// `[...]` sequence item, too, since `Value` is the type all three
+    /// lets the same thing be a named `key: @name(...)` value, or an
+    /// unnamed entry in a tuple, too, since `Value` is the type those
     /// positions share.
     ///
     /// Parsed with `allow_colon_connect: false`, same as
@@ -136,9 +133,341 @@ pub enum Value {
     /// `tmtroot/docs/spec/feature/content-shape.tmt`) sitting as a named
     /// value inside `(args)`/`{data}`, e.g. `@conflict(a: [ ... ], b: [
     /// ... ])`. `[...]` means block content uniformly at any
-    /// value position, as it does at the element level; a sequence is
-    /// `(a, b)`, and `[a, b]` is not an array literal.
+    /// value position, as it does at the element level; a tuple is
+    /// `(a, b)`, and `[a, b]` is not a list literal.
     Blocks(Vec<Block>),
+}
+
+/// One entry in a [`Tuple`]: an optional name and a [`Value`].
+#[derive(Debug, Clone, PartialEq)]
+pub struct TupleEntry {
+    name: Option<String>,
+    value: Value,
+}
+
+impl TupleEntry {
+    pub fn new(name: Option<String>, value: Value) -> Self {
+        Self { name, value }
+    }
+
+    pub fn unnamed(value: Value) -> Self {
+        Self { name: None, value }
+    }
+
+    pub fn named(name: impl Into<String>, value: Value) -> Self {
+        Self {
+            name: Some(name.into()),
+            value,
+        }
+    }
+
+    pub fn name(&self) -> Option<&str> {
+        self.name.as_deref()
+    }
+
+    pub fn set_name(&mut self, name: impl Into<String>) {
+        self.name = Some(name.into());
+    }
+
+    pub fn value(&self) -> &Value {
+        &self.value
+    }
+
+    pub fn value_mut(&mut self) -> &mut Value {
+        &mut self.value
+    }
+
+    pub fn into_value(self) -> Value {
+        self.value
+    }
+
+    pub fn into_parts(self) -> (Option<String>, Value) {
+        (self.name, self.value)
+    }
+}
+
+/// An ordered run of [`TupleEntry`] items, each with a name or without one.
+///
+/// The one data container in the AST: the fields handed to a head (a nexus's `(args)`, the
+/// `(...)` of a [`Value::Call`]) or, with no head written, a value of its own. There is no list
+/// and no map as kinds of value: a tuple whose entries are all unnamed is what a list was, one
+/// whose entries are all named what a map was, and a tuple may mix both. An unnamed entry's key
+/// is its position among the unnamed entries.
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct Tuple {
+    entries: Vec<TupleEntry>,
+}
+
+impl Tuple {
+    pub fn new() -> Self {
+        Self {
+            entries: Vec::new(),
+        }
+    }
+
+    pub fn from_entries(entries: impl IntoIterator<Item = TupleEntry>) -> Self {
+        Self {
+            entries: entries.into_iter().collect(),
+        }
+    }
+
+    pub fn from_unnamed(values: impl IntoIterator<Item = Value>) -> Self {
+        Self {
+            entries: values.into_iter().map(TupleEntry::unnamed).collect(),
+        }
+    }
+
+    pub fn from_named(pairs: impl IntoIterator<Item = (String, Value)>) -> Self {
+        Self {
+            entries: pairs
+                .into_iter()
+                .map(|(k, v)| TupleEntry::named(k, v))
+                .collect(),
+        }
+    }
+
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+
+    /// Whether no entry in this tuple has a name. True for an empty tuple.
+    pub fn has_no_named(&self) -> bool {
+        self.entries.iter().all(|e| e.name.is_none())
+    }
+
+    /// Whether every entry in this tuple has a name. True for an empty tuple.
+    pub fn has_no_unnamed(&self) -> bool {
+        self.entries.iter().all(|e| e.name.is_some())
+    }
+
+    /// The value of the entry named `name`, if any.
+    pub fn get(&self, name: &str) -> Option<&Value> {
+        self.entries
+            .iter()
+            .find_map(|e| (e.name.as_deref() == Some(name)).then_some(&e.value))
+    }
+
+    /// Mutable reference to the value of the entry named `name`, if any.
+    pub fn get_mut(&mut self, name: &str) -> Option<&mut Value> {
+        self.entries
+            .iter_mut()
+            .find_map(|e| (e.name.as_deref() == Some(name)).then_some(&mut e.value))
+    }
+
+    /// Whether an entry with `name` exists in this tuple.
+    pub fn contains_name(&self, name: &str) -> bool {
+        self.entries.iter().any(|e| e.name.as_deref() == Some(name))
+    }
+
+    /// The `n`-th entry as written, regardless of whether it is named.
+    pub fn nth(&self, n: usize) -> Option<&TupleEntry> {
+        self.entries.get(n)
+    }
+
+    /// Mutable reference to the `n`-th entry as written.
+    pub fn nth_mut(&mut self, n: usize) -> Option<&mut TupleEntry> {
+        self.entries.get_mut(n)
+    }
+
+    /// The `n`-th unnamed entry's value.
+    pub fn nth_unnamed(&self, n: usize) -> Option<&Value> {
+        self.unnamed().nth(n)
+    }
+
+    /// Mutable reference to the `n`-th unnamed entry's value.
+    pub fn nth_unnamed_mut(&mut self, n: usize) -> Option<&mut Value> {
+        self.unnamed_mut().nth(n)
+    }
+
+    /// Iteration over all entries in written order.
+    pub fn entries(&self) -> std::slice::Iter<'_, TupleEntry> {
+        self.entries.iter()
+    }
+
+    /// Mutable iteration over all entries in written order.
+    pub fn entries_mut(&mut self) -> std::slice::IterMut<'_, TupleEntry> {
+        self.entries.iter_mut()
+    }
+
+    /// Owning iteration over all entries in written order.
+    pub fn into_entries(self) -> std::vec::IntoIter<TupleEntry> {
+        self.entries.into_iter()
+    }
+
+    /// Iteration over the values of all entries in written order.
+    pub fn values(&self) -> impl Iterator<Item = &Value> {
+        self.entries.iter().map(|e| &e.value)
+    }
+
+    /// Mutable iteration over the values of all entries in written order.
+    pub fn values_mut(&mut self) -> impl Iterator<Item = &mut Value> {
+        self.entries.iter_mut().map(|e| &mut e.value)
+    }
+
+    /// Iteration over the named entries as `(name, value)` pairs in written order.
+    pub fn named(&self) -> impl Iterator<Item = (&str, &Value)> {
+        self.entries
+            .iter()
+            .filter_map(|e| e.name.as_deref().map(|k| (k, &e.value)))
+    }
+
+    /// Mutable iteration over the named entries as `(name, &mut value)` pairs in written order.
+    pub fn named_mut(&mut self) -> impl Iterator<Item = (&str, &mut Value)> {
+        self.entries
+            .iter_mut()
+            .filter_map(|e| e.name.as_deref().map(|k| (k, &mut e.value)))
+    }
+
+    /// Owning iteration over the named entries as `(name, value)` pairs in written order.
+    pub fn into_named(self) -> impl Iterator<Item = (String, Value)> {
+        self.entries
+            .into_iter()
+            .filter_map(|e| e.name.map(|k| (k, e.value)))
+    }
+
+    /// Iteration over the unnamed entries' values in written order.
+    pub fn unnamed(&self) -> impl Iterator<Item = &Value> {
+        self.entries
+            .iter()
+            .filter_map(|e| e.name.is_none().then_some(&e.value))
+    }
+
+    /// Mutable iteration over the unnamed entries' values in written order.
+    fn unnamed_mut(&mut self) -> impl Iterator<Item = &mut Value> {
+        self.entries
+            .iter_mut()
+            .filter_map(|e| e.name.is_none().then_some(&mut e.value))
+    }
+
+    /// Owning iteration over the unnamed entries' values in written order.
+    pub fn into_unnamed(self) -> impl Iterator<Item = Value> {
+        self.entries
+            .into_iter()
+            .filter_map(|e| e.name.is_none().then_some(e.value))
+    }
+
+    pub fn push(&mut self, entry: TupleEntry) {
+        self.entries.push(entry);
+    }
+
+    pub fn push_unnamed(&mut self, value: Value) {
+        self.entries.push(TupleEntry::unnamed(value));
+    }
+
+    pub fn push_named(&mut self, name: impl Into<String>, value: Value) {
+        self.entries.push(TupleEntry::named(name, value));
+    }
+
+    pub fn insert_named(&mut self, index: usize, name: impl Into<String>, value: Value) {
+        self.entries.insert(index, TupleEntry::named(name, value));
+    }
+
+    /// Removes the first entry named `name` and returns its value.
+    pub fn remove(&mut self, name: &str) -> Option<Value> {
+        let idx = self
+            .entries
+            .iter()
+            .position(|e| e.name.as_deref() == Some(name))?;
+        Some(self.entries.remove(idx).value)
+    }
+}
+
+impl IntoIterator for Tuple {
+    type Item = TupleEntry;
+    type IntoIter = std::vec::IntoIter<TupleEntry>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.entries.into_iter()
+    }
+}
+
+impl<'a> IntoIterator for &'a Tuple {
+    type Item = &'a TupleEntry;
+    type IntoIter = std::slice::Iter<'a, TupleEntry>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.entries.iter()
+    }
+}
+
+impl Serialize for Tuple {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        if self.is_empty() {
+            use serde::ser::SerializeMap;
+            let m = serializer.serialize_map(Some(0))?;
+            m.end()
+        } else if self.has_no_named() {
+            use serde::ser::SerializeSeq;
+            let mut s = serializer.serialize_seq(Some(self.len()))?;
+            for entry in &self.entries {
+                s.serialize_element(&entry.value)?;
+            }
+            s.end()
+        } else {
+            use serde::ser::SerializeMap;
+            let mut m = serializer.serialize_map(Some(self.len()))?;
+            let mut unnamed_idx = 0usize;
+            for entry in &self.entries {
+                match &entry.name {
+                    Some(name) => m.serialize_entry(name, &entry.value)?,
+                    None => {
+                        let key = unnamed_idx.to_string();
+                        unnamed_idx += 1;
+                        m.serialize_entry(&key, &entry.value)?;
+                    }
+                }
+            }
+            m.end()
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for Tuple {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        struct TupleVisitor;
+
+        impl<'de> serde::de::Visitor<'de> for TupleVisitor {
+            type Value = Tuple;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+                formatter.write_str("a sequence or map")
+            }
+
+            fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
+            where
+                A: serde::de::SeqAccess<'de>,
+            {
+                let mut tuple = Tuple::new();
+                while let Some(item) = seq.next_element()? {
+                    tuple.push_unnamed(item);
+                }
+                Ok(tuple)
+            }
+
+            fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
+            where
+                A: serde::de::MapAccess<'de>,
+            {
+                let mut tuple = Tuple::new();
+                while let Some((k, v)) = map.next_entry::<String, Value>()? {
+                    tuple.push_named(k, v);
+                }
+                Ok(tuple)
+            }
+        }
+
+        deserializer.deserialize_any(TupleVisitor)
+    }
 }
 
 impl Value {
@@ -155,7 +484,7 @@ impl Value {
     /// The text a bare scalar was written as, for a target that wants text: a
     /// `string` argument given `2024`, `true` or `1.10`.
     ///
-    /// `None` for what is not a scalar (`null`, a list, a map, an element) --
+    /// `None` for what is not a scalar (`null`, a tuple, a call, an element) --
     /// those have no single text. A [`String`](Value::String) is itself,
     /// whether it was quoted or not: the reader does not keep the difference.
     pub fn scalar_text(&self) -> Option<std::borrow::Cow<'_, str>> {
@@ -200,22 +529,7 @@ impl Serialize for Value {
                 _ => serializer.serialize_str(text),
             },
             Value::String(s) => serializer.serialize_str(s),
-            Value::Seq(seq) => {
-                use serde::ser::SerializeSeq;
-                let mut s = serializer.serialize_seq(Some(seq.len()))?;
-                for item in seq {
-                    s.serialize_element(item)?;
-                }
-                s.end()
-            }
-            Value::Map(map) => {
-                use serde::ser::SerializeMap;
-                let mut m = serializer.serialize_map(Some(map.len()))?;
-                for (k, v) in map {
-                    m.serialize_entry(k, v)?;
-                }
-                m.end()
-            }
+            Value::Tuple(tuple) => tuple.serialize(serializer),
             Value::Call(name, args) => {
                 use serde::ser::SerializeMap;
                 let mut m = serializer.serialize_map(Some(2))?;
@@ -296,22 +610,22 @@ impl<'de> Deserialize<'de> for Value {
             where
                 A: serde::de::SeqAccess<'de>,
             {
-                let mut items = Vec::new();
+                let mut tuple = Tuple::new();
                 while let Some(item) = seq.next_element()? {
-                    items.push(item);
+                    tuple.push_unnamed(item);
                 }
-                Ok(Value::Seq(items))
+                Ok(Value::Tuple(tuple))
             }
 
             fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
             where
                 A: serde::de::MapAccess<'de>,
             {
-                let mut entries = Vec::new();
-                while let Some((k, v)) = map.next_entry()? {
-                    entries.push((k, v));
+                let mut tuple = Tuple::new();
+                while let Some((k, v)) = map.next_entry::<String, Value>()? {
+                    tuple.push_named(k, v);
                 }
-                Ok(Value::Map(entries))
+                Ok(Value::Tuple(tuple))
             }
         }
 
@@ -676,7 +990,7 @@ impl std::ops::DerefMut for Text {
 ///
 /// Both halves are ASCII identifiers (`[A-Za-z_][A-Za-z0-9_-]*`). `.` is
 /// the separator, so it is deliberately *not* an identifier character
-/// here -- unlike in map keys, where `url.wiki` is one flat key.
+/// here -- unlike in entry names, where `url.wiki` is one flat name.
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub struct Name {
     pub namespace: Option<String>,
@@ -727,7 +1041,7 @@ impl fmt::Display for Name {
 /// A plain `String`, not [`Value`]: `#(...)` is parsed with a narrower,
 /// scalar-only grammar (a bare identifier-like token or a quoted
 /// string) than the general value grammar `(args)`/`{value}` use, so a
-/// map/seq/call can never end up here -- unlike `Name`, there is no
+/// tuple or call can never end up here -- unlike `Name`, there is no
 /// namespace concept for an id. No ASCII restriction, unlike [`Name`]:
 /// the content is a value, not a structural identifier, so it is as
 /// free as any other string value (e.g. `@line(天音かなた)` elsewhere in
@@ -882,7 +1196,7 @@ impl Connect {
     }
 }
 
-/// The data a node carries: its `(args)` and its `{value}` group, each
+/// The data a node carries: its `(args)` tuple and its `{value}` group, each
 /// optional and at most one of each.
 ///
 /// Every node that takes either holds them as a `Data`, so what reads them
@@ -891,7 +1205,7 @@ impl Connect {
 /// kind (child blocks, an address) and not every node takes them.
 #[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
 pub struct Data {
-    pub args: Option<Value>,
+    pub args: Option<Tuple>,
     pub value: Option<Group>,
 }
 
@@ -906,8 +1220,7 @@ pub struct Data {
 /// `tomet-semantics`' `required_shape` already knew). `#(id)` is not a second
 /// sigil either: it is [`Element::id`], a slot in the element's own groups.
 ///
-/// A node that has no name of its own, a [`Bare`] entry or a plain list item,
-/// is not an element at all.
+/// A node that has no name of its own, a plain list item, is not an element at all.
 ///
 /// `(args)` / `[content]` / `{value}`, each optional and at most one of each,
 /// in any order in the source.
@@ -985,7 +1298,7 @@ pub struct ElementView<'a> {
 
 impl<'a> ElementView<'a> {
     /// Positional or keyword arguments `(args)`.
-    pub fn args(&self) -> Option<&'a Value> {
+    pub fn args(&self) -> Option<&'a Tuple> {
         self.data.args.as_ref()
     }
 
@@ -1027,7 +1340,7 @@ impl<'a> From<&'a Element> for ElementView<'a> {
 /// optional child `[content]`, and optional `#(id)`.
 ///
 /// Shared by nodes that carry body groups ([`ElementView`], [`Declaration`],
-/// [`Bare`], [`Connect`], [`Hole`]).
+/// [`Connect`], [`Hole`]).
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct BodyView<'a> {
     pub data: &'a Data,
@@ -1037,7 +1350,7 @@ pub struct BodyView<'a> {
 
 impl<'a> BodyView<'a> {
     /// Positional or keyword arguments `(args)`.
-    pub fn args(&self) -> Option<&'a Value> {
+    pub fn args(&self) -> Option<&'a Tuple> {
         self.data.args.as_ref()
     }
 
@@ -1050,9 +1363,8 @@ impl<'a> BodyView<'a> {
 /// One entry inside an element's `{value}` group: either a `key: value`
 /// pair or a nested element.
 ///
-/// `Pair`'s shape is exactly [`Value::Map`]'s entry type, which is what
-/// lets the data view be rebuilt from a group without copying any other
-/// structure.
+/// `Pair` is a named entry (`key: value`), which lets the data view be
+/// rebuilt as a [`Tuple`] from a group without copying any other structure.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum Entry {
     Pair(String, Value),
@@ -1065,47 +1377,32 @@ pub enum Entry {
 /// The entries of a `{...}` group, in source order.
 ///
 /// `{...}` is always data: it parses uniformly into [`Entry`] items in
-/// source order, whatever the element is called. "Is this a data map or a
+/// source order, whatever the element is called. "Is this a data group or a
 /// list of children?" is not a parse-time branch -- it is a view
 /// computed downstream in `tomet-semantics`, which is what lets the parser
 /// build the tree without consulting any element vocabulary.
 ///
 /// `Group` holds a source-order sequence of entries (`Group(pub Vec<Entry>)`)
-/// and provides map operations exclusively for [`Entry::Pair`] entries.
+/// and provides named-entry operations exclusively for [`Entry::Pair`] entries.
 /// Non-pair entries ([`Entry::Element`], [`Entry::Hole`]) are
 /// handled directly by callers through exhaustive pattern matching.
 #[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
 pub struct Group(pub Vec<Entry>);
 
 impl Group {
-    /// Builds a group from `key: value` pairs alone.
-    pub fn from_map(value: Value) -> Self {
-        match value {
-            Value::Map(entries) => Group(
-                entries
-                    .into_iter()
-                    .map(|(k, v)| Entry::Pair(k, v))
-                    .collect(),
-            ),
-            // A non-map body has no uniform-entry spelling; callers that
-            // build one are constructing a single positional entry.
-            other => Group(vec![Entry::Pair(String::new(), other)]),
-        }
+    /// Builds a group from the named entries of `tuple`.
+    pub fn from_map(tuple: Tuple) -> Self {
+        Group(tuple.into_named().map(|(k, v)| Entry::Pair(k, v)).collect())
     }
 
     /// The data view: this group's `key: value` pairs, in source order,
-    /// as a [`Value::Map`]. Non-pair entries are skipped.
-    pub fn as_data(&self) -> Value {
+    /// as a [`Tuple`]. Non-pair entries are skipped.
+    pub fn as_data(&self) -> Tuple {
         let Group(entries) = self;
-        Value::Map(
-            entries
-                .iter()
-                .filter_map(|e| match e {
-                    Entry::Pair(k, v) => Some((k.clone(), v.clone())),
-                    Entry::Element(_) | Entry::Hole(_) => None,
-                })
-                .collect(),
-        )
+        Tuple::from_named(entries.iter().filter_map(|e| match e {
+            Entry::Pair(k, v) => Some((k.clone(), v.clone())),
+            Entry::Element(_) | Entry::Hole(_) => None,
+        }))
     }
 
     /// This group's `key: value` pairs, in source order.
@@ -1209,7 +1506,7 @@ pub enum InterpExprKind {
         callee: Box<InterpExpr>,
         args: Vec<InterpExpr>,
     },
-    /// `object.member`: a key of the data an element, a map or a section holds, or the start of a
+    /// `object.member`: a named entry of the data an element, a tuple or a section holds, or the start of a
     /// method call (`object.member(...)` is [`InterpExprKind::Call`] on this). A node's own
     /// attributes are not read with a dot; see [`InterpExprKind::Connect`].
     Member {
@@ -1533,9 +1830,10 @@ mod tests {
     #[test]
     fn test_element_view_and_list_item_as_element_view() {
         let name = Name::bare("item");
+        let args_tuple = Tuple::from_unnamed([Value::Int(42)]);
         let data = Data {
-            args: Some(Value::Int(42)),
-            value: Some(Group::from_map(Value::Map(vec![(
+            args: Some(args_tuple.clone()),
+            value: Some(Group::from_map(Tuple::from_named([(
                 "key".to_string(),
                 Value::String("val".to_string()),
             )]))),
@@ -1580,7 +1878,7 @@ mod tests {
         assert_eq!(el_view, item_view);
         assert_eq!(el_view.name, &name);
         assert_eq!(el_view.placement, Placement::Block);
-        assert_eq!(el_view.args(), Some(&Value::Int(42)));
+        assert_eq!(el_view.args(), Some(&args_tuple));
         assert!(el_view.value().is_some());
         assert_eq!(el_view.id, Some(&id));
         assert_eq!(el_view.connects, &connects);
@@ -1589,7 +1887,7 @@ mod tests {
         let body = el_view.body();
         assert_eq!(body, item.as_body_view());
         assert_eq!(body, element.as_body_view());
-        assert_eq!(body.args(), Some(&Value::Int(42)));
+        assert_eq!(body.args(), Some(&args_tuple));
         assert_eq!(body.content, Some(content_blocks.as_slice()));
         assert_eq!(body.id, Some(&id));
 
@@ -1703,5 +2001,100 @@ mod tests {
         assert_eq!(seat(list).to_string(), "<$list(string, length: 6)>");
         let date = call_expr("date", vec![named("default", name_expr("auto"))]);
         assert_eq!(seat(date).to_string(), "<$date(default: auto)>");
+    }
+
+    #[test]
+    fn test_tuple_and_value_json_serde() {
+        // Empty tuple serializes to `{}`
+        let empty = Tuple::new();
+        assert_eq!(serde_json::to_string(&empty).unwrap(), "{}");
+        assert_eq!(
+            serde_json::to_string(&Value::Tuple(empty.clone())).unwrap(),
+            "{}"
+        );
+
+        // All unnamed entries serialize to array
+        let unnamed = Tuple::from_unnamed([Value::Int(1), Value::Int(2)]);
+        assert_eq!(serde_json::to_string(&unnamed).unwrap(), "[1,2]");
+        assert_eq!(
+            serde_json::to_string(&Value::Tuple(unnamed.clone())).unwrap(),
+            "[1,2]"
+        );
+
+        // All named entries serialize to object
+        let named = Tuple::from_named([
+            ("a".to_string(), Value::Int(1)),
+            ("b".to_string(), Value::Int(2)),
+        ]);
+        assert_eq!(serde_json::to_string(&named).unwrap(), r#"{"a":1,"b":2}"#);
+        assert_eq!(
+            serde_json::to_string(&Value::Tuple(named)).unwrap(),
+            r#"{"a":1,"b":2}"#
+        );
+
+        // Mixed serialize to object with unnamed entries keyed by their index among unnamed
+        let mut mixed = Tuple::new();
+        mixed.push_unnamed(Value::Int(10));
+        mixed.push_named("foo", Value::Int(20));
+        mixed.push_unnamed(Value::Int(30));
+        assert_eq!(
+            serde_json::to_string(&mixed).unwrap(),
+            r#"{"0":10,"foo":20,"1":30}"#
+        );
+        assert_eq!(
+            serde_json::to_string(&Value::Tuple(mixed)).unwrap(),
+            r#"{"0":10,"foo":20,"1":30}"#
+        );
+
+        // Deserialization: [] and {} both deserialize to empty tuple
+        let from_empty_obj: Value = serde_json::from_str("{}").unwrap();
+        match from_empty_obj {
+            Value::Tuple(t) => assert!(t.is_empty()),
+            other => panic!("expected Tuple, got {other:?}"),
+        }
+        let from_empty_arr: Value = serde_json::from_str("[]").unwrap();
+        match from_empty_arr {
+            Value::Tuple(t) => assert!(t.is_empty()),
+            other => panic!("expected Tuple, got {other:?}"),
+        }
+
+        // Deserialization: array yields unnamed entries
+        let from_arr: Value = serde_json::from_str("[1, 2]").unwrap();
+        match from_arr {
+            Value::Tuple(t) => {
+                assert_eq!(t.len(), 2);
+                assert!(t.has_no_named());
+                assert_eq!(t.nth_unnamed(0), Some(&Value::Int(1)));
+                assert_eq!(t.nth_unnamed(1), Some(&Value::Int(2)));
+            }
+            other => panic!("expected Tuple, got {other:?}"),
+        }
+
+        // Deserialization: object yields named entries
+        let from_obj: Value = serde_json::from_str(r#"{"a": 1}"#).unwrap();
+        match from_obj {
+            Value::Tuple(t) => {
+                assert_eq!(t.len(), 1);
+                assert!(t.has_no_unnamed());
+                assert_eq!(t.get("a"), Some(&Value::Int(1)));
+            }
+            other => panic!("expected Tuple, got {other:?}"),
+        }
+
+        // Call serialization with Tuple fields
+        let call = Value::Call(
+            "my_fn".to_string(),
+            Tuple::from_unnamed([Value::Int(1), Value::Int(2)]),
+        );
+        assert_eq!(
+            serde_json::to_string(&call).unwrap(),
+            r#"{"call":"my_fn","args":[1,2]}"#
+        );
+
+        let call_empty = Value::Call("empty_fn".to_string(), Tuple::new());
+        assert_eq!(
+            serde_json::to_string(&call_empty).unwrap(),
+            r#"{"call":"empty_fn","args":{}}"#
+        );
     }
 }

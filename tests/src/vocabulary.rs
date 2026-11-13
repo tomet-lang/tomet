@@ -23,7 +23,7 @@
 //! down -- a branch the parser must not have, and the test fails the
 //! moment one is introduced.
 
-use tomet_ast::{Data, File, Name, Value};
+use tomet_ast::{Data, File, Name, Tuple, Value};
 use tomet_ast_parser::parse_file;
 use tomet_tree::for_each_element_mut;
 
@@ -235,7 +235,7 @@ fn rename_namespace(name: Option<&mut Name>, ident: &str) {
 
 fn rename_arg_key(data: &mut Data, ident: &str) {
     if let Some(args) = &mut data.args {
-        rename_keys(args, ident);
+        rename_tuple_keys(args, ident);
     }
     if let Some(value) = &mut data.value {
         for (key, val) in value.pairs_mut() {
@@ -247,21 +247,29 @@ fn rename_arg_key(data: &mut Data, ident: &str) {
     }
 }
 
+fn rename_tuple_keys(tuple: &mut Tuple, ident: &str) {
+    for entry in tuple.entries_mut() {
+        if entry.name() == Some(ident) {
+            entry.set_name(PLACEHOLDER.to_string());
+        }
+        rename_keys(entry.value_mut(), ident);
+    }
+}
+
 fn rename_keys(value: &mut Value, ident: &str) {
     match value {
-        Value::Map(entries) => {
-            for (key, val) in entries {
-                if key == ident {
-                    *key = PLACEHOLDER.to_string();
-                }
-                rename_keys(val, ident);
-            }
-        }
-        Value::Seq(items) => {
-            for item in items {
-                rename_keys(item, ident);
-            }
-        }
-        _ => {}
+        Value::Tuple(tuple) => rename_tuple_keys(tuple, ident),
+        Value::Call(_, tuple) => rename_tuple_keys(tuple, ident),
+        Value::Null
+        | Value::Bool(_)
+        | Value::Int(_)
+        | Value::Float(_)
+        | Value::Number(_)
+        | Value::String(_)
+        | Value::Interp(_)
+        | Value::Hole(_)
+        | Value::TypeSeat(_)
+        | Value::Element(_)
+        | Value::Blocks(_) => {}
     }
 }

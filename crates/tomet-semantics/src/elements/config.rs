@@ -100,8 +100,8 @@ fn process_export_type(v: &Value, config: &mut DocumentConfig) {
         Value::String(s) => {
             config.export_type.push(ExportType::parse(s));
         }
-        Value::Seq(seq) => {
-            for item in seq {
+        Value::Tuple(tuple) => {
+            for item in tuple.unnamed() {
                 if let Value::String(s) = item {
                     config.export_type.push(ExportType::parse(s));
                 }
@@ -117,8 +117,8 @@ fn process_export_path(v: &Value, config: &mut DocumentConfig) {
         // (e.g. `{ commonmark: "README.md", html: "index.html" }") -- an
         // export destination is always just a filesystem path, never a
         // "kind of reference" needing a `file:`/`path:`-style key wrapper.
-        Value::Map(map) => {
-            for (fk, fv) in map {
+        Value::Tuple(tuple) if !tuple.has_no_named() => {
+            for (fk, fv) in tuple.named() {
                 if let Some(path_str) = clean_path_value(fv) {
                     config.export_paths.insert(ExportType::parse(fk), path_str);
                 }

@@ -9,7 +9,7 @@ fn parses_section_with_attrs() {
             assert_eq!(s.title, vec![Inline::Text("Hello".into())]);
             assert_eq!(
                 s.data.value,
-                Some(Group::from_map(Value::Map(vec![(
+                Some(Group::from_map(Tuple::from_named(vec![(
                     "id".into(),
                     Value::String("header1".into())
                 )])))
@@ -29,7 +29,7 @@ fn parses_link_with_order_free_groups() {
             assert_eq!(el.name, Name::bare("link"));
             assert_eq!(
                 el.data.args,
-                Some(Value::Map(vec![(
+                Some(Tuple::from_named(vec![(
                     "target".into(),
                     Value::String("https://example.com".into())
                 )]))

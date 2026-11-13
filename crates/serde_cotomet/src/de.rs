@@ -70,14 +70,44 @@ impl<'de> de::Deserializer<'de> for ValueDeserializer {
                 _ => visitor.visit_string(text),
             },
             Value::String(s) => visitor.visit_string(s),
-            Value::Seq(items) => visitor.visit_seq(SeqAccess {
-                iter: items.into_iter(),
-                index: 0,
-            }),
-            Value::Map(entries) => visitor.visit_map(MapAccess {
-                iter: entries.into_iter(),
-                value: None,
-            }),
+            Value::Tuple(tuple) => {
+                if tuple.is_empty() {
+                    visitor.visit_map(MapAccess {
+                        iter: Vec::new().into_iter(),
+                        value: None,
+                    })
+                } else if tuple.has_no_named() {
+                    visitor.visit_seq(SeqAccess {
+                        iter: tuple.into_unnamed().collect::<Vec<_>>().into_iter(),
+                        index: 0,
+                    })
+                } else if tuple.has_no_unnamed() {
+                    visitor.visit_map(MapAccess {
+                        iter: tuple.into_named().collect::<Vec<_>>().into_iter(),
+                        value: None,
+                    })
+                } else {
+                    let mut unnamed_idx = 0usize;
+                    let entries: Vec<(String, Value)> = tuple
+                        .into_entries()
+                        .map(|entry| {
+                            let (name, val) = entry.into_parts();
+                            match name {
+                                Some(k) => (k, val),
+                                None => {
+                                    let k = unnamed_idx.to_string();
+                                    unnamed_idx += 1;
+                                    (k, val)
+                                }
+                            }
+                        })
+                        .collect();
+                    visitor.visit_map(MapAccess {
+                        iter: entries.into_iter(),
+                        value: None,
+                    })
+                }
+            }
             Value::Call(name, args) => Err(Error::msg(format!(
                 "call syntax `{name}(...)` has no serde equivalent (got {} arg(s))",
                 args.len()
@@ -105,6 +135,48 @@ impl<'de> de::Deserializer<'de> for ValueDeserializer {
         }
     }
 
+    fn deserialize_seq<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value> {
+        match self.0 {
+            Value::Tuple(tuple) => visitor.visit_seq(SeqAccess {
+                iter: tuple.into_unnamed().collect::<Vec<_>>().into_iter(),
+                index: 0,
+            }),
+            other => ValueDeserializer(other).deserialize_any(visitor),
+        }
+    }
+
+    fn deserialize_tuple<V: Visitor<'de>>(self, _len: usize, visitor: V) -> Result<V::Value> {
+        self.deserialize_seq(visitor)
+    }
+
+    fn deserialize_tuple_struct<V: Visitor<'de>>(
+        self,
+        _name: &'static str,
+        _len: usize,
+        visitor: V,
+    ) -> Result<V::Value> {
+        self.deserialize_seq(visitor)
+    }
+
+    fn deserialize_map<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value> {
+        match self.0 {
+            Value::Tuple(tuple) => visitor.visit_map(MapAccess {
+                iter: tuple.into_named().collect::<Vec<_>>().into_iter(),
+                value: None,
+            }),
+            other => ValueDeserializer(other).deserialize_any(visitor),
+        }
+    }
+
+    fn deserialize_struct<V: Visitor<'de>>(
+        self,
+        _name: &'static str,
+        _fields: &'static [&'static str],
+        visitor: V,
+    ) -> Result<V::Value> {
+        self.deserialize_map(visitor)
+    }
+
     fn deserialize_enum<V: Visitor<'de>>(
         self,
         _name: &'static str,
@@ -113,8 +185,8 @@ impl<'de> de::Deserializer<'de> for ValueDeserializer {
     ) -> Result<V::Value> {
         match self.0 {
             Value::String(s) => visitor.visit_enum(s.into_deserializer()),
-            Value::Map(mut entries) if entries.len() == 1 => {
-                let (variant, value) = entries.remove(0);
+            Value::Tuple(tuple) if tuple.len() == 1 && tuple.has_no_unnamed() => {
+                let (variant, value) = tuple.into_named().next().unwrap();
                 visitor.visit_enum(EnumAccess { variant, value })
             }
             other => Err(Error::msg(format!(
@@ -145,8 +217,8 @@ impl<'de> de::Deserializer<'de> for ValueDeserializer {
     deserialize_float!(deserialize_f32 deserialize_f64);
 
     serde::forward_to_deserialize_any! {
-        bool char bytes byte_buf unit unit_struct newtype_struct seq tuple
-        tuple_struct map struct identifier ignored_any
+        bool char bytes byte_buf unit unit_struct newtype_struct
+        identifier ignored_any
     }
 }
 

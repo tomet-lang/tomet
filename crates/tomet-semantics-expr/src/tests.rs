@@ -1165,7 +1165,7 @@ fn link_target(value: &EvalValue) -> String {
         panic!("expected one inline element, got {:?}", p.content);
     };
     assert_eq!(el.name, tomet_ast::Name::bare("link"));
-    match &el.data.args {
+    match el.data.args.as_ref().and_then(|args| args.nth_unnamed(0)) {
         Some(tomet_ast::Value::String(target)) => target.clone(),
         other => panic!("expected a string target, got {other:?}"),
     }
@@ -1824,10 +1824,10 @@ fn eval_value_number_preserves_written_representation_and_computes_numerically()
 /// The `[ ... ]` value of the first entry of the `::macro` declaration in `src`.
 fn block_macro(src: &str) -> Value {
     let file = tomet_ast_parser::parse_file(src).expect("parses");
-    let Some(Value::Map(entries)) = &file.header[0].data.args else {
+    let Some(args) = &file.header[0].data.args else {
         panic!("expected `(name: template)` entries");
     };
-    entries[0].1.clone()
+    args.nth(0).expect("first entry").value().clone()
 }
 
 fn macros_of(entries: &[(&str, Value)]) -> HashMap<String, Value> {
@@ -1859,7 +1859,7 @@ fn a_block_macro_is_its_blocks_with_the_places_filled_in() {
     };
     assert_eq!(
         card.data.args,
-        Some(Value::Map(vec![(
+        Some(tomet_ast::Tuple::from_named([(
             "title".to_string(),
             Value::String("Welcome".to_string())
         )]))
@@ -1895,7 +1895,10 @@ fn a_number_given_to_a_block_macro_stays_a_number_in_data() {
     };
     assert_eq!(
         el.data.args,
-        Some(Value::Map(vec![("of".to_string(), Value::Int(7))]))
+        Some(tomet_ast::Tuple::from_named([(
+            "of".to_string(),
+            Value::Int(7)
+        )]))
     );
 }
 

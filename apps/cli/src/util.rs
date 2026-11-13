@@ -65,18 +65,13 @@ pub(crate) fn vault_for(file: &Path) -> tomet_load::Vault {
 /// present (see `.agents/tasks/ssg-readiness.md` step 1).
 pub(crate) fn meta_title(doc: &tomet_ast::File) -> Option<String> {
     let meta = tomet_declaration::document_meta(doc)?;
-    let tomet_ast::Value::Map(map) = meta else {
+    let tomet_ast::Value::Tuple(tuple) = meta else {
         return None;
     };
-    map.iter().find_map(|(k, v)| {
-        if k != "title" {
-            return None;
-        }
-        match v {
-            tomet_ast::Value::String(s) => Some(s.clone()),
-            _ => None,
-        }
-    })
+    match tuple.get("title") {
+        Some(tomet_ast::Value::String(s)) => Some(s.clone()),
+        _ => None,
+    }
 }
 
 #[cfg(test)]

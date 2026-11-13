@@ -299,11 +299,11 @@ fn check_version_slot(
 ) {
     const TAKES: usize = 2;
 
-    let Some(Value::Map(entries)) = decl.bound_args() else {
+    let Some(args) = decl.bound_args() else {
         return;
     };
 
-    if entries.iter().any(|(key, _)| key.is_empty()) {
+    if !args.has_no_unnamed() {
         problems.push((
             idx,
             Problem::TooManyArguments {
@@ -313,7 +313,7 @@ fn check_version_slot(
         ));
     }
 
-    if let Some((_, version)) = entries.iter().find(|(key, _)| key == "version")
+    if let Some(version) = args.get("version")
         && !matches!(version, Value::Int(n) if *n >= 1)
     {
         problems.push((
@@ -331,27 +331,19 @@ fn check_version_slot(
 /// `version:` in its `{...}` body.
 fn written_version(decl: &Declaration, kind: DeclKind) -> Option<Value> {
     match kind {
-        DeclKind::Version => decl.bound_args().and_then(|args| match args {
-            Value::Map(entries) => entries
-                .into_iter()
-                .find(|(key, _)| key == "version")
-                .map(|(_, v)| v),
-            other => Some(other),
+        DeclKind::Version => decl.bound_args().and_then(|args| {
+            args.get("version")
+                .cloned()
+                .or_else(|| args.nth_unnamed(0).cloned())
         }),
         DeclKind::Vocabulary => decl.entries().ok()?.into_iter().find_map(|(_, entry)| {
-            let Value::Map(fields) = entry else {
+            let Value::Tuple(fields) = entry else {
                 return None;
             };
-            fields
-                .into_iter()
-                .find(|(key, _)| key == "version")
-                .map(|(_, v)| v)
+            fields.get("version").cloned()
         }),
         DeclKind::Blueprint => match &decl.data {
-            Some(Value::Map(entries)) => entries
-                .iter()
-                .find(|(key, _)| key == "version")
-                .map(|(_, v)| v.clone()),
+            Some(tuple) => tuple.get("version").cloned(),
             _ => None,
         },
         _ => None,
@@ -503,10 +495,10 @@ fn check_fields(
     problems: &mut Vec<(usize, Problem)>,
 ) {
     for (field_name, field_def) in &crate::read::entries(decl) {
-        let Value::Map(props) = field_def else {
+        let Value::Tuple(props) = field_def else {
             continue;
         };
-        for (k, v) in props {
+        for (k, v) in props.named() {
             if k == "type" {
                 if let Err(e) = tomet_semantics_core::parse_type_spec(v) {
                     problems.push((
@@ -527,7 +519,7 @@ fn check_fields(
 mod tests {
     use super::*;
     use crate::declaration::declarations;
-    use tomet_ast::File;
+    use tomet_ast::{File, Tuple};
 
     fn parse(src: &str) -> File {
         tomet_ast_parser::parse_file(src).expect("parses")
@@ -599,7 +591,7 @@ mod tests {
     fn version_slot_valid_and_invalid() {
         let good_kind = Declaration::new(
             "kind",
-            Some(Value::Map(vec![
+            Some(Tuple::from_named([
                 ("kind".into(), Value::String("note".into())),
                 ("version".into(), Value::Int(1)),
             ])),
@@ -610,7 +602,7 @@ mod tests {
 
         let bad_version = Declaration::new(
             "kind",
-            Some(Value::Map(vec![
+            Some(Tuple::from_named([
                 ("kind".into(), Value::String("note".into())),
                 ("version".into(), Value::Float(1.0)),
             ])),
@@ -630,15 +622,12 @@ mod tests {
             "the version in `::kind(...)` must be an integer of 1 or more, found 1.0"
         );
 
-        let too_many_args = Declaration::new(
-            "use",
-            Some(Value::Map(vec![
-                ("target".into(), Value::String("deck".into())),
-                ("version".into(), Value::Int(1)),
-                ("".into(), Value::Int(2)),
-            ])),
-            None,
-        );
+        let mut too_many_tuple = Tuple::from_named([
+            ("target".into(), Value::String("deck".into())),
+            ("version".into(), Value::Int(1)),
+        ]);
+        too_many_tuple.push_unnamed(Value::Int(2));
+        let too_many_args = Declaration::new("use", Some(too_many_tuple), None);
         let problems = check_declarations(&[too_many_args], Host::Tmt);
         assert_eq!(problems.len(), 1);
         assert_eq!(
@@ -658,14 +647,14 @@ mod tests {
     fn declared_versions_held_to_version_type() {
         let good_ver = Declaration::new(
             "version",
-            Some(Value::Map(vec![("version".into(), Value::Float(1.10))])),
+            Some(Tuple::from_named([("version".into(), Value::Float(1.10))])),
             None,
         );
         assert!(check_declarations(&[good_ver], Host::Tmt).is_empty());
 
         let good_prerelease = Declaration::new(
             "version",
-            Some(Value::Map(vec![(
+            Some(Tuple::from_named([(
                 "version".into(),
                 Value::String("1.0-beta".into()),
             )])),
@@ -675,7 +664,7 @@ mod tests {
 
         let bad_ver = Declaration::new(
             "version",
-            Some(Value::Map(vec![(
+            Some(Tuple::from_named([(
                 "version".into(),
                 Value::String("1.0.0_beta".into()),
             )])),
@@ -754,7 +743,7 @@ mod tests {
     fn macros_and_vars_checks() {
         let bad_macro = Declaration::new(
             "macro",
-            Some(Value::Map(vec![("gh".into(), Value::Int(42))])),
+            Some(Tuple::from_named([("gh".into(), Value::Int(42))])),
             None,
         );
         let problems = check_declarations(&[bad_macro], Host::Tmt);
@@ -772,12 +761,12 @@ mod tests {
 
         let bad_var = Declaration::new(
             "var",
-            Some(Value::Map(vec![(
+            Some(Tuple::from_named([(
                 "n".into(),
-                Value::Map(vec![
+                Value::Tuple(Tuple::from_named([
                     ("type".into(), Value::String("int".into())),
                     ("default".into(), Value::String("3".into())),
-                ]),
+                ])),
             )])),
             None,
         );
@@ -826,7 +815,7 @@ mod tests {
     fn scope_checks_for_host() {
         let use_decl = Declaration::new(
             "use",
-            Some(Value::Map(vec![(
+            Some(Tuple::from_named([(
                 "target".into(),
                 Value::String("deck".into()),
             )])),
@@ -844,8 +833,16 @@ mod tests {
 
     #[test]
     fn repeated_singletons_are_reported() {
-        let meta1 = Declaration::new("id", Some(Value::String("a".into())), None);
-        let meta2 = Declaration::new("id", Some(Value::String("b".into())), None);
+        let meta1 = Declaration::new(
+            "id",
+            Some(Tuple::from_unnamed([Value::String("a".into())])),
+            None,
+        );
+        let meta2 = Declaration::new(
+            "id",
+            Some(Tuple::from_unnamed([Value::String("b".into())])),
+            None,
+        );
         let problems = check_declarations(&[meta1, meta2], Host::Ctmt);
         assert_eq!(problems.len(), 1);
         assert_eq!(
@@ -866,7 +863,7 @@ mod tests {
         // Many cardinality is allowed to repeat
         let use1 = Declaration::new(
             "use",
-            Some(Value::Map(vec![(
+            Some(Tuple::from_named([(
                 "target".into(),
                 Value::String("a".into()),
             )])),
@@ -874,7 +871,7 @@ mod tests {
         );
         let use2 = Declaration::new(
             "use",
-            Some(Value::Map(vec![(
+            Some(Tuple::from_named([(
                 "target".into(),
                 Value::String("b".into()),
             )])),

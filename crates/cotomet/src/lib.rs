@@ -60,9 +60,7 @@ fn find_not_data(v: &Value) -> Option<(Span, &'static str)> {
             seat.span,
             "a type seat (`<$type>`) is not read: this reader reads data only",
         )),
-        Value::Seq(items) => items.iter().find_map(find_not_data),
-        Value::Map(entries) => entries.iter().find_map(|(_, v)| find_not_data(v)),
-        Value::Call(_, args) => args.iter().find_map(find_not_data),
+        Value::Tuple(tuple) | Value::Call(_, tuple) => tuple.values().find_map(find_not_data),
         _ => None,
     }
 }
@@ -80,21 +78,19 @@ pub mod syntax {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use tomet_ast::{Tuple, TupleEntry};
 
     fn text(s: &str) -> Value {
         Value::String(s.to_string())
     }
 
     fn map(entries: &[(&str, Value)]) -> Value {
-        Value::Map(
-            entries
-                .iter()
-                .map(|(k, v)| (k.to_string(), v.clone()))
-                .collect(),
-        )
+        Value::Tuple(Tuple::from_named(
+            entries.iter().map(|(k, v)| (k.to_string(), v.clone())),
+        ))
     }
 
-    fn declared(file: &File) -> Vec<(String, Option<Value>, Option<Value>)> {
+    fn declared(file: &File) -> Vec<(String, Option<Tuple>, Option<Tuple>)> {
         file.header
             .iter()
             .map(|d| {
@@ -143,15 +139,14 @@ mod tests {
     fn eval_feature_evaluates_expression() {
         let src = "::macro(vocab: \"vocabularies/$(1)/$(1)@$(2).vocabulary.tmt\")\na: $macro.vocab(\"writ\", \"1.0.0\")\n";
         let file = eval::eval_str(src, &[]).unwrap();
-        let Value::Map(entries) = file.body else {
-            panic!("expected map");
+        let Value::Tuple(tuple) = file.body else {
+            panic!("expected tuple");
         };
         assert_eq!(
-            entries[0],
-            (
-                "a".to_string(),
-                Value::String("vocabularies/writ/writ@1.0.0.vocabulary.tmt".to_string())
-            )
+            tuple.get("a"),
+            Some(&Value::String(
+                "vocabularies/writ/writ@1.0.0.vocabulary.tmt".to_string()
+            ))
         );
     }
 
@@ -166,16 +161,20 @@ mod tests {
             [
                 (
                     "kind".to_string(),
-                    Some(Value::Map(vec![
-                        ("".to_string(), text("catalog")),
-                        ("".to_string(), Value::Int(2)),
-                    ])),
+                    Some(Tuple::from_unnamed([text("catalog"), Value::Int(2)])),
                     None
                 ),
-                ("use".to_string(), Some(text("deck")), None),
+                (
+                    "use".to_string(),
+                    Some(Tuple::from_unnamed([text("deck")])),
+                    None
+                ),
                 (
                     "meta".to_string(),
-                    Some(map(&[("id", text("x")), ("n", Value::Int(1))])),
+                    Some(Tuple::from_named([
+                        ("id".to_string(), text("x")),
+                        ("n".to_string(), Value::Int(1)),
+                    ])),
                     None
                 ),
             ]
@@ -193,20 +192,20 @@ mod tests {
             declared(&f),
             [(
                 "x".to_string(),
-                Some(Value::Map(vec![
-                    ("".to_string(), text("a")),
-                    ("".to_string(), text("b")),
-                ])),
-                Some(map(&[("c", Value::Int(1))]))
+                Some(Tuple::from_unnamed([text("a"), text("b")])),
+                Some(Tuple::from_named([("c".to_string(), Value::Int(1))]))
             )]
         );
         let f = parse_file("::x{ c: 1 }(a)\n").unwrap();
-        assert_eq!(f.header[0].data.args, Some(text("a")));
+        assert_eq!(
+            f.header[0].data.args,
+            Some(Tuple::from_unnamed([text("a")]))
+        );
         // `()` is a declaration's primary group, empty: `::draft` alone does not parse.
         let f = parse_file("::draft()\n").unwrap();
         assert_eq!(
             declared(&f),
-            [("draft".to_string(), Some(Value::Map(vec![])), None)]
+            [("draft".to_string(), Some(Tuple::new()), None)]
         );
         assert!(parse_file("::draft\n").is_err());
     }
@@ -216,9 +215,9 @@ mod tests {
         let f = parse_file("::kind(note, version: 2)\n").unwrap();
         assert_eq!(
             f.header[0].data.args,
-            Some(Value::Map(vec![
-                ("".to_string(), text("note")),
-                ("version".to_string(), Value::Int(2)),
+            Some(Tuple::from_entries([
+                TupleEntry::unnamed(text("note")),
+                TupleEntry::named("version", Value::Int(2)),
             ]))
         );
     }
@@ -226,7 +225,7 @@ mod tests {
     #[test]
     fn a_file_with_only_a_header_has_an_empty_body() {
         let f = parse_file("::kind(catalog)\n").unwrap();
-        assert_eq!(f.body, Value::Map(vec![]));
+        assert_eq!(f.body, Value::Tuple(Tuple::new()));
         assert_eq!(f.header.len(), 1);
     }
 
@@ -283,12 +282,15 @@ mod tests {
     fn a_file_is_a_map_of_keyed_entries() {
         assert_eq!(
             parse_file("a: 1\n// note\n\"b/c\": (x)\n").unwrap().body,
-            map(&[("a", Value::Int(1)), ("b/c", Value::Seq(vec![text("x")]))])
+            map(&[
+                ("a", Value::Int(1)),
+                ("b/c", Value::Tuple(Tuple::from_unnamed([text("x")]))),
+            ])
         );
-        assert_eq!(parse_file("").unwrap().body, Value::Map(vec![]));
+        assert_eq!(parse_file("").unwrap().body, Value::Tuple(Tuple::new()));
         assert_eq!(
             parse_file("// only a comment\n").unwrap().body,
-            Value::Map(vec![])
+            Value::Tuple(Tuple::new())
         );
         assert!(parse_file("a: 1\n").unwrap().header.is_empty());
     }

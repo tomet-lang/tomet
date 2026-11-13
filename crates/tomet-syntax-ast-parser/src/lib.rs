@@ -50,7 +50,7 @@ pub fn parse_data_file(src: &str) -> Result<tomet_ast::File<tomet_ast::Value>> {
     {
         return Ok(tomet_ast::File::new(
             Vec::new(),
-            tomet_ast::Value::Map(Vec::new()),
+            tomet_ast::Value::Tuple(tomet_ast::Tuple::new()),
             tomet_span::Span::new(0, src.len()),
         ));
     }
@@ -78,7 +78,7 @@ pub fn parse_data_file(src: &str) -> Result<tomet_ast::File<tomet_ast::Value>> {
                 .data
                 .args
                 .as_ref()
-                .and_then(tomet_lowering::value::find_interp_in_value)
+                .and_then(tomet_lowering::value::find_interp_in_tuple)
                 .or_else(|| {
                     d.data
                         .value
@@ -110,7 +110,7 @@ pub fn parse_data_file(src: &str) -> Result<tomet_ast::File<tomet_ast::Value>> {
     if body_src.trim().is_empty() {
         return Ok(tomet_ast::File::new(
             header,
-            tomet_ast::Value::Map(Vec::new()),
+            tomet_ast::Value::Tuple(tomet_ast::Tuple::new()),
             tomet_span::Span::new(0, src.len()),
         ));
     }

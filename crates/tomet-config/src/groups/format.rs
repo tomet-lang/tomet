@@ -92,19 +92,19 @@ impl ElementConfig {
 
 fn parse_element_configs(value: &Value) -> Option<BTreeMap<String, ElementConfig>> {
     let mut elements = BTreeMap::new();
-    let Value::Map(map) = value else {
+    let Value::Tuple(tuple) = value else {
         return Some(elements);
     };
 
-    for (name, val) in map {
+    for (name, val) in tuple.named() {
         // "group_order" at root of element is the global default scalar
         if name == "group_order" {
             continue;
         }
-        if let Value::Map(props) = val {
+        if let Value::Tuple(props) = val {
             let mut elem_cfg = ElementConfig::default();
-            for (prop_k, prop_v) in props {
-                match prop_k.as_str() {
+            for (prop_k, prop_v) in props.named() {
+                match prop_k {
                     "group_order" => elem_cfg.group_order = parse_group_order(prop_v),
                     "no_space" => elem_cfg.no_space = parse_colon_spacing(prop_v),
                     "style" => {
@@ -127,9 +127,9 @@ fn parse_element_configs(value: &Value) -> Option<BTreeMap<String, ElementConfig
                     }
                     _ => {}
                 }
-                elem_cfg.custom.insert(prop_k.clone(), prop_v.clone());
+                elem_cfg.custom.insert(prop_k.to_string(), prop_v.clone());
             }
-            elements.insert(name.clone(), elem_cfg);
+            elements.insert(name.to_string(), elem_cfg);
         }
     }
     Some(elements)

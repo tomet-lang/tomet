@@ -183,7 +183,7 @@ fn a_seat_sits_where_a_value_goes() {
     let [Block::Element(card)] = doc.body.as_slice() else {
         panic!("expected one element, got {:?}", doc.body);
     };
-    let Some(Value::TypeSeat(seat)) = &card.data.args else {
+    let Some(Value::TypeSeat(seat)) = card.data.args.as_ref().and_then(|a| a.nth_unnamed(0)) else {
         panic!("expected a seat as the argument, got {:?}", card.data.args);
     };
     assert_eq!(written(seat), "Identifier(date)");
@@ -192,21 +192,21 @@ fn a_seat_sits_where_a_value_goes() {
     let [Block::Element(card)] = doc.body.as_slice() else {
         panic!("expected one element, got {:?}", doc.body);
     };
-    let Some(Value::Map(args)) = &card.data.args else {
+    let Some(args) = &card.data.args else {
         panic!("expected named arguments, got {:?}", card.data.args);
     };
-    assert!(matches!(&args[0].1, Value::TypeSeat(_)));
-    assert!(matches!(&args[1].1, Value::TypeSeat(_)));
+    assert!(matches!(args.get("created"), Some(Value::TypeSeat(_))));
+    assert!(matches!(args.get("n"), Some(Value::TypeSeat(_))));
 
     // In a sequence and in a value group's pair.
     let doc = parse_file("@card((<$int>, <$string>)){ tags: <$list(string)> }\n").unwrap();
     let [Block::Element(card)] = doc.body.as_slice() else {
         panic!("expected one element, got {:?}", doc.body);
     };
-    let Some(Value::Seq(items)) = &card.data.args else {
+    let Some(Value::Tuple(items)) = card.data.args.as_ref().and_then(|a| a.nth_unnamed(0)) else {
         panic!("expected a sequence, got {:?}", card.data.args);
     };
-    assert!(items.iter().all(|v| matches!(v, Value::TypeSeat(_))));
+    assert!(items.unnamed().all(|v| matches!(v, Value::TypeSeat(_))));
     let Some(Group(entries)) = &card.data.value else {
         panic!("expected a value group");
     };
@@ -405,20 +405,21 @@ fn a_seat_is_no_entry_of_a_value_group() {
 #[test]
 fn a_seat_in_a_value_file_is_a_value() {
     let value = parse_value("a: <$date>, b: (<$int>)").unwrap();
-    let Value::Map(entries) = value else {
-        panic!("expected a map");
+    let Value::Tuple(entries) = value else {
+        panic!("expected a tuple");
     };
-    assert!(matches!(&entries[0].1, Value::TypeSeat(_)));
-    assert!(
-        matches!(&entries[1].1, Value::Seq(items) if matches!(items.as_slice(), [Value::TypeSeat(_)]))
-    );
+    assert!(matches!(entries.get("a"), Some(Value::TypeSeat(_))));
+    assert!(matches!(
+        entries.get("b"),
+        Some(Value::Tuple(items)) if items.len() == 1 && matches!(items.nth_unnamed(0), Some(Value::TypeSeat(_)))
+    ));
 
     let file = parse_data_file("::kind(blueprint)\n\ncreated: <$date(default: auto)>\n").unwrap();
-    let Value::Map(entries) = &file.body else {
-        panic!("expected a map");
+    let Value::Tuple(entries) = &file.body else {
+        panic!("expected a tuple");
     };
-    let Value::TypeSeat(seat) = &entries[0].1 else {
-        panic!("expected a seat, got {:?}", entries[0].1);
+    let Some(Value::TypeSeat(seat)) = entries.get("created") else {
+        panic!("expected a seat, got {:?}", entries.get("created"));
     };
     // Its place is in the file, not in the body.
     let src = "::kind(blueprint)\n\ncreated: <$date(default: auto)>\n";

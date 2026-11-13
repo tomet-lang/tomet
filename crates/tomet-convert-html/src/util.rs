@@ -1,6 +1,6 @@
 //! Attribute, value and escaping helpers shared by the renderers.
 
-use tomet_ast::{Block, Data, Id, Inline, Value};
+use tomet_ast::{Block, Data, Id, Inline, Tuple, Value};
 use tomet_semantics::{EXACT_DATA_KEY, flatten_data, is_attribute_key};
 use tomet_tree::ValueExt;
 
@@ -61,14 +61,14 @@ pub(crate) fn blocks_to_plain(blocks: &[Block]) -> String {
     s
 }
 
-pub(crate) fn split_attrs(attrs: Option<&Value>) -> (Option<String>, Vec<(String, String)>) {
+pub(crate) fn split_attrs(attrs: Option<&Tuple>) -> (Option<String>, Vec<(String, String)>) {
     let mut class = None;
     let mut data = Vec::new();
-    if let Some(map) = attrs.and_then(as_map) {
-        for (k, v) in map {
-            match k.as_str() {
+    if let Some(tuple) = attrs {
+        for (k, v) in tuple.named() {
+            match k {
                 "cssclass" => class = Some(value_to_plain(v)),
-                _ => data.push((k.clone(), value_to_plain(v))),
+                _ => data.push((k.to_string(), value_to_plain(v))),
             }
         }
     }
@@ -122,7 +122,7 @@ pub(crate) fn push_data_attr(out: &mut String, key: &str, value: &str) {
 /// is where data goes in HTML -- the same shelf `(args)` already uses,
 /// invisible to the reader.
 ///
-/// They are not dropped in silence: `as_data` returns a `Value::Map` for
+/// They are not dropped in silence: `as_data` returns a `Value::Tuple` for
 /// every group, and `value_to_plain` answers `""` for every map, so a
 /// `tm-value` span built from it would never be written.
 ///
@@ -148,28 +148,20 @@ pub(crate) fn push_value_data_attrs(out: &mut String, held: &Data) {
     push_data_attrs(out, Some(&data), &skip);
 }
 
-pub(crate) fn push_data_attrs(out: &mut String, args: Option<&Value>, skip: &[&str]) {
+pub(crate) fn push_data_attrs(out: &mut String, args: Option<&Tuple>, skip: &[&str]) {
     let Some(args) = args else {
         return;
     };
     let data = flatten_data(Some(args), None);
 
-    match args {
-        Value::Map(_) => {
-            for (k, v) in &data.pairs {
-                if skip.contains(&k.as_str()) {
-                    continue;
-                }
-                push_data_attr(out, k, v);
-            }
+    for (k, v) in &data.pairs {
+        if skip.contains(&k.as_str()) {
+            continue;
         }
-        // A positional group (`@x(1)`) has no key to project onto, so
-        // the shared rule hands it back separately.
-        _ => {
-            if let Some(text) = data.positional.as_ref().filter(|t| !t.is_empty()) {
-                out.push_str(&format!(" data-value=\"{}\"", escape_attr(text)));
-            }
-        }
+        push_data_attr(out, k, v);
+    }
+    if let Some(text) = data.positional.as_ref().filter(|t| !t.is_empty()) {
+        out.push_str(&format!(" data-value=\"{}\"", escape_attr(text)));
     }
 
     if let Some(exact) = data.exact {
@@ -183,17 +175,6 @@ pub(crate) fn push_data_attrs(out: &mut String, args: Option<&Value>, skip: &[&s
 
 pub(crate) fn value_to_plain(v: &Value) -> String {
     v.plain_text()
-}
-
-pub(crate) fn as_map(v: &Value) -> Option<&Vec<(String, Value)>> {
-    match v {
-        Value::Map(m) => Some(m),
-        _ => None,
-    }
-}
-
-pub(crate) fn map_get<'a>(map: &'a [(String, Value)], key: &str) -> Option<&'a Value> {
-    map.iter().find(|(k, _)| k == key).map(|(_, v)| v)
 }
 
 pub(crate) fn escape_html(s: &str) -> String {

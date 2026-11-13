@@ -8,7 +8,7 @@ use super::form::{LoweredSlot, lower_element, lower_slot, slot_of};
 use super::{range_of, unsupported};
 use crate::error::Result;
 use crate::inline::{DELIMITERS, push_soft_break, push_text, trim_edges};
-use tomet_ast::{Block, Data, Element, Inline, Name, Paragraph, Placement, RawText, Value};
+use tomet_ast::{Block, Data, Element, Inline, Name, Paragraph, Placement, RawText, Tuple, Value};
 use tomet_cst::{NodeOrToken, SyntaxElement, SyntaxKind as K, SyntaxNode};
 use tomet_span::Span;
 use tomet_tree::{ElementExt, element_new};
@@ -350,7 +350,7 @@ fn lower_autolink(node: &SyntaxNode) -> Element {
         .with_placement(Placement::Inline)
         .with_span(Span::new(start, end));
     element.data = Data {
-        args: Some(Value::Map(vec![(
+        args: Some(Tuple::from_named(vec![(
             "target".to_string(),
             Value::String(node.text().to_string()),
         )])),

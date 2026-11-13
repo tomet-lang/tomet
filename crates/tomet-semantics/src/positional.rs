@@ -1,4 +1,4 @@
-use tomet_ast::{Data, Declaration, ElementView, Name, Value};
+use tomet_ast::{Data, Declaration, ElementView, Name, Tuple, Value};
 use tomet_tree::ValueExt;
 
 use crate::vocabulary::{Bindings, ElementDecl};
@@ -51,24 +51,16 @@ pub fn builtin_positional_arg_keys(name: &Name) -> &'static [&'static str] {
 /// than a lookup table.
 pub const LIST_MARKER_POSITIONAL_KEY: &str = "marker";
 
-/// Normalizes a list item's `(...)` marker `Value` the same way
-/// [`normalized_element_args`] normalizes an element's `args`: a `Map`
-/// (explicit `key:value`, e.g. `(color: red, priority: high)`) passes
-/// through unchanged; any other `Value` (a bare scalar like `("12:01")`,
-/// or a `Seq`) is wrapped under [`LIST_MARKER_POSITIONAL_KEY`].
-pub fn normalized_list_marker(marker: &Value) -> Value {
-    if let Value::Map(_) = marker {
-        return marker.clone();
-    }
-    Value::Map(vec![(
-        LIST_MARKER_POSITIONAL_KEY.to_string(),
-        marker.clone(),
-    )])
+/// Normalizes a list item's `(...)` marker [`Tuple`] the same way
+/// [`normalized_element_args`] normalizes an element's `args`: names the
+/// positional marker entry after [`LIST_MARKER_POSITIONAL_KEY`].
+pub fn normalized_list_marker(marker: &Tuple) -> Tuple {
+    tomet_semantics_core::bind_positional(marker, &[LIST_MARKER_POSITIONAL_KEY])
 }
 
 /// The per-scheme argument keys (`url`/`file`/`tm`/`id`/`ref`), which
 /// `@link`/`@embed` do not have (they have the one `target` key) -- a bare
-/// `tm:foo/bar` (no `target:` wrapper) still parses as a map entry
+/// `tm:foo/bar` (no `target:` wrapper) still parses as a named entry
 /// `("tm", "foo/bar")`, since the parser's `identifier:` rule has no
 /// notion of "target" being the only real key these two elements have (it
 /// only sees a value position, not an element name). This list exists
@@ -87,34 +79,42 @@ fn is_recoverable_target_scheme(key: &str) -> bool {
 /// key defined, any *other* single key present is unambiguously an
 /// artifact of the parser's `identifier:` rule splitting a bare
 /// `scheme:value` positional argument, not a real intentional field.
-/// Recovers exactly one such entry (skips the whole map untouched if
+/// Recovers exactly one such entry (skips the whole tuple untouched if
 /// there's already a `target` key, or if more than one candidate entry
 /// matches and it'd be ambiguous which one was meant) back into
 /// `target: "scheme:value"`, leaving every other entry -- genuine extra
 /// data alongside the target, e.g. `@link(tm:foo, predicate: depends_on)`
 /// -- untouched.
-fn recover_target_scheme_entry(
-    first_positional_key: Option<&str>,
-    mut entries: Vec<(String, Value)>,
-) -> Value {
-    if first_positional_key != Some("target") || entries.iter().any(|(k, _)| k == "target") {
-        return Value::Map(entries);
+fn recover_target_scheme_entry(first_positional_key: Option<&str>, mut tuple: Tuple) -> Tuple {
+    if first_positional_key != Some("target") || tuple.contains_name("target") {
+        return tuple;
     }
-    let candidates: Vec<usize> = entries
-        .iter()
+    let candidates: Vec<usize> = tuple
+        .entries()
         .enumerate()
-        .filter(|(_, (k, _))| is_recoverable_target_scheme(k))
-        .map(|(idx, _)| idx)
+        .filter_map(|(idx, e)| {
+            let name = e.name()?;
+            if is_recoverable_target_scheme(name) {
+                Some(idx)
+            } else {
+                None
+            }
+        })
         .collect();
     let [idx] = candidates[..] else {
-        return Value::Map(entries);
+        return tuple;
     };
-    let (key, value) = &entries[idx];
-    entries[idx] = (
-        "target".to_string(),
-        Value::String(format!("{key}:{}", value.plain_text())),
-    );
-    Value::Map(entries)
+    let (key, val_text) = {
+        let entry = tuple.nth(idx).unwrap();
+        (
+            entry.name().unwrap().to_string(),
+            entry.value().plain_text(),
+        )
+    };
+    let entry = tuple.nth_mut(idx).unwrap();
+    entry.set_name("target");
+    *entry.value_mut() = Value::String(format!("{key}:{val_text}"));
+    tuple
 }
 
 /// The ordered positional-key list for `name`, owned.
@@ -142,18 +142,12 @@ fn positional_keys(name: Option<&Name>, bindings: &Bindings) -> Vec<String> {
         .unwrap_or_default()
 }
 
-/// Returns the normalized `args` map for an [`Element`]. One unified
+/// Returns the normalized `args` tuple for an [`Element`]. One unified
 /// pipeline for every shape `args` can take:
-/// - `Value::Map`: recover a scheme-collision `target` entry if this
+/// - recover a scheme-collision `target` entry if this
 ///   element's first slot is `"target"` (see
 ///   [`recover_target_scheme_entry`]), then fill any still-unfilled slots
-///   from bare positional entries the parser tagged with
-///   [`tomet_semantics_core::POSITIONAL_ENTRY_KEY`] (`@link(tm:foo, depends_on)`'s `depends_on`,
-///   or a custom element's `(a, b)`).
-/// - `Value::Seq`: an explicit `[...]`-bracketed positional list
-///   (`@task([a, b])`) -- independent of the parser's bare-comma-list
-///   sentinel mechanism, zipped against the slot list positionally.
-/// - anything else (a bare scalar): wrapped under the first slot.
+///   from unnamed entries.
 ///
 /// An element with no positional slots defined at all (empty list) is
 /// returned untouched in every case.
@@ -168,19 +162,19 @@ fn positional_keys(name: Option<&Name>, bindings: &Bindings) -> Vec<String> {
 /// `SettingsSchema` no caller builds would have a second source dead on
 /// arrival; this one exists because the validator passes real bindings
 /// through it.
-pub fn normalized_element_args(el: ElementView<'_>) -> Option<Value> {
+pub fn normalized_element_args(el: ElementView<'_>) -> Option<Tuple> {
     normalized_element_args_in(el, &Bindings::default())
 }
 
 /// [`normalized_element_args`], plus the positional slots a vocabulary in
 /// scope declares with `@param(name){ positional: true }`.
-pub fn normalized_element_args_in(el: ElementView<'_>, bindings: &Bindings) -> Option<Value> {
+pub fn normalized_element_args_in(el: ElementView<'_>, bindings: &Bindings) -> Option<Tuple> {
     normalized_args_in(Some(el.name), el.data, bindings)
 }
 
 /// [`normalized_element_args`] for a declaration: `::kind(config, 2)` is
 /// `kind: config, version: 2`.
-pub fn normalized_declaration_args(declaration: &Declaration) -> Option<Value> {
+pub fn normalized_declaration_args(declaration: &Declaration) -> Option<Tuple> {
     normalized_declaration_args_in(declaration, &Bindings::default())
 }
 
@@ -189,21 +183,20 @@ pub fn normalized_declaration_args(declaration: &Declaration) -> Option<Value> {
 pub fn normalized_declaration_args_in(
     declaration: &Declaration,
     bindings: &Bindings,
-) -> Option<Value> {
+) -> Option<Tuple> {
     normalized_args_in(Some(&declaration.name), &declaration.data, bindings)
 }
 
 /// The one pipeline both read their `args` through: bind the positional
 /// ones to the slots the name has.
-fn normalized_args_in(name: Option<&Name>, data: &Data, bindings: &Bindings) -> Option<Value> {
+fn normalized_args_in(name: Option<&Name>, data: &Data, bindings: &Bindings) -> Option<Tuple> {
     let args = data.args.as_ref()?;
     let keys = positional_keys(name, bindings);
     // `@link(tmt:foo)`: the reader split a `scheme:value` into a key and a value; put it back.
-    let args = match args {
-        Value::Map(entries) if !keys.is_empty() => {
-            recover_target_scheme_entry(keys.first().map(String::as_str), entries.clone())
-        }
-        other => other.clone(),
+    let args = if !keys.is_empty() {
+        recover_target_scheme_entry(keys.first().map(String::as_str), args.clone())
+    } else {
+        args.clone()
     };
     let slots: Vec<&str> = keys.iter().map(String::as_str).collect();
     Some(tomet_semantics_core::bind_positional(&args, &slots))
@@ -212,40 +205,30 @@ fn normalized_args_in(name: Option<&Name>, data: &Data, bindings: &Bindings) -> 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tomet_ast::Name;
-    use tomet_semantics_core::POSITIONAL_ENTRY_KEY;
+    use tomet_ast::{Name, Tuple, Value};
     use tomet_tree::{ValueExt, element_new};
 
     #[test]
     fn normalizes_raw_positional_arg() {
         let mut el = element_new(Name::bare("raw"));
-        el.data.args = Some(Value::String("rust".to_string()));
+        el.data.args = Some(Tuple::from_unnamed([Value::String("rust".to_string())]));
         assert_eq!(
             normalized_element_args(el.as_view()),
-            Some(Value::Map(vec![(
+            Some(Tuple::from_named([(
                 "lang".to_string(),
-                Value::String("rust".to_string())
+                Value::String("rust".to_string()),
             )]))
         );
     }
 
     #[test]
     fn normalizes_conflict_positional_args_by_written_order() {
-        // `@conflict(1, 2)` -- two bare entries, no keys -- parses as a
-        // `Value::Map` with two `POSITIONAL_ENTRY_KEY`-tagged entries
-        // (the single-entry collapse in `parse_map_body_or_scalar` only
-        // applies when there is exactly one). `bind_positional`
-        // assigns them to `a`/`b` in the order they were written, not by
-        // any other ordering -- see `ElementKind::Conflict`'s own doc
-        // comment for why that distinction is deliberate here.
+        // `@conflict(1, 2)` -- two bare entries, no keys
         let mut el = element_new(Name::bare("conflict"));
-        el.data.args = Some(Value::Map(vec![
-            (String::new(), Value::Int(1)),
-            (String::new(), Value::Int(2)),
-        ]));
+        el.data.args = Some(Tuple::from_unnamed([Value::Int(1), Value::Int(2)]));
         assert_eq!(
             normalized_element_args(el.as_view()),
-            Some(Value::Map(vec![
+            Some(Tuple::from_named([
                 ("a".to_string(), Value::Int(1)),
                 ("b".to_string(), Value::Int(2)),
             ]))
@@ -257,13 +240,13 @@ mod tests {
         // `::kind(name, 2)` is two bare entries; `::kind(name)` is one scalar.
         for (sigil, name_key) in [("kind", "kind"), ("use", "target")] {
             let mut el = element_new(Name::bare(sigil));
-            el.data.args = Some(Value::Map(vec![
-                (String::new(), Value::String("deck".to_string())),
-                (String::new(), Value::Int(2)),
+            el.data.args = Some(Tuple::from_unnamed([
+                Value::String("deck".to_string()),
+                Value::Int(2),
             ]));
             assert_eq!(
                 normalized_element_args(el.as_view()),
-                Some(Value::Map(vec![
+                Some(Tuple::from_named([
                     (name_key.to_string(), Value::String("deck".to_string())),
                     ("version".to_string(), Value::Int(2)),
                 ])),
@@ -271,12 +254,12 @@ mod tests {
             );
 
             // the version may be left out
-            el.data.args = Some(Value::String("deck".to_string()));
+            el.data.args = Some(Tuple::from_unnamed([Value::String("deck".to_string())]));
             assert_eq!(
                 normalized_element_args(el.as_view()),
-                Some(Value::Map(vec![(
+                Some(Tuple::from_named([(
                     name_key.to_string(),
-                    Value::String("deck".to_string())
+                    Value::String("deck".to_string()),
                 )])),
                 "@{sigil}(deck)"
             );
@@ -286,12 +269,12 @@ mod tests {
     #[test]
     fn normalizes_embed_positional_arg() {
         let mut el = element_new(Name::bare("embed"));
-        el.data.args = Some(Value::String("foo.png".to_string()));
+        el.data.args = Some(Tuple::from_unnamed([Value::String("foo.png".to_string())]));
         assert_eq!(
             normalized_element_args(el.as_view()),
-            Some(Value::Map(vec![(
+            Some(Tuple::from_named([(
                 "target".to_string(),
-                Value::String("foo.png".to_string())
+                Value::String("foo.png".to_string()),
             )]))
         );
     }
@@ -299,12 +282,14 @@ mod tests {
     #[test]
     fn normalizes_link_positional_arg() {
         let mut el = element_new(Name::bare("link"));
-        el.data.args = Some(Value::String("https://example.com".to_string()));
+        el.data.args = Some(Tuple::from_unnamed([Value::String(
+            "https://example.com".to_string(),
+        )]));
         assert_eq!(
             normalized_element_args(el.as_view()),
-            Some(Value::Map(vec![(
+            Some(Tuple::from_named([(
                 "target".to_string(),
-                Value::String("https://example.com".to_string())
+                Value::String("https://example.com".to_string()),
             )]))
         );
     }
@@ -337,20 +322,20 @@ mod tests {
 
     #[test]
     fn recovers_bare_scheme_prefixed_link_target_from_parser_key_split() {
-        // `@link(tmt:foo/bar)` parses as `Map([("tmt", "foo/bar")])` (the
+        // `@link(tmt:foo/bar)` parses as named entry `[("tmt", "foo/bar")]` (the
         // parser's `identifier:` rule has no notion of `target` being the
         // only real key `@link` has) -- this recovers it back into one
         // `target` string.
         let mut el = element_new(Name::bare("link"));
-        el.data.args = Some(Value::Map(vec![(
+        el.data.args = Some(Tuple::from_named([(
             "tmt".to_string(),
             Value::String("foo/bar".to_string()),
         )]));
         assert_eq!(
             normalized_element_args(el.as_view()),
-            Some(Value::Map(vec![(
+            Some(Tuple::from_named([(
                 "target".to_string(),
-                Value::String("tmt:foo/bar".to_string())
+                Value::String("tmt:foo/bar".to_string()),
             )]))
         );
     }
@@ -361,7 +346,7 @@ mod tests {
         // a parser-split scheme prefix; `predicate` is real extra data and
         // stays untouched.
         let mut el = element_new(Name::bare("link"));
-        el.data.args = Some(Value::Map(vec![
+        el.data.args = Some(Tuple::from_named([
             ("tmt".to_string(), Value::String("foo".to_string())),
             (
                 "predicate".to_string(),
@@ -370,11 +355,11 @@ mod tests {
         ]));
         assert_eq!(
             normalized_element_args(el.as_view()),
-            Some(Value::Map(vec![
+            Some(Tuple::from_named([
                 ("target".to_string(), Value::String("tmt:foo".to_string())),
                 (
                     "predicate".to_string(),
-                    Value::String("depends_on".to_string())
+                    Value::String("depends_on".to_string()),
                 ),
             ]))
         );
@@ -383,13 +368,13 @@ mod tests {
     #[test]
     fn does_not_recover_when_target_key_already_present() {
         let mut el = element_new(Name::bare("link"));
-        el.data.args = Some(Value::Map(vec![
+        el.data.args = Some(Tuple::from_named([
             ("target".to_string(), Value::String("tmt:foo".to_string())),
             ("tmt".to_string(), Value::String("bar".to_string())),
         ]));
         assert_eq!(
             normalized_element_args(el.as_view()),
-            Some(Value::Map(vec![
+            Some(Tuple::from_named([
                 ("target".to_string(), Value::String("tmt:foo".to_string())),
                 ("tmt".to_string(), Value::String("bar".to_string())),
             ]))
@@ -399,13 +384,13 @@ mod tests {
     #[test]
     fn does_not_recover_when_multiple_scheme_candidates_are_ambiguous() {
         let mut el = element_new(Name::bare("link"));
-        el.data.args = Some(Value::Map(vec![
+        el.data.args = Some(Tuple::from_named([
             ("tmt".to_string(), Value::String("foo".to_string())),
             ("id".to_string(), Value::String("bar".to_string())),
         ]));
         assert_eq!(
             normalized_element_args(el.as_view()),
-            Some(Value::Map(vec![
+            Some(Tuple::from_named([
                 ("tmt".to_string(), Value::String("foo".to_string())),
                 ("id".to_string(), Value::String("bar".to_string())),
             ]))
@@ -418,56 +403,32 @@ mod tests {
         // alone -- recovery is scoped to elements whose positional key
         // is `target` (`@link`/`@embed`), not a general mechanism.
         let mut el = element_new(Name::bare("caution"));
-        el.data.args = Some(Value::Map(vec![(
+        el.data.args = Some(Tuple::from_named([(
             "tmt".to_string(),
             Value::String("foo".to_string()),
         )]));
         assert_eq!(
             normalized_element_args(el.as_view()),
-            Some(Value::Map(vec![(
+            Some(Tuple::from_named([(
                 "tmt".to_string(),
-                Value::String("foo".to_string())
+                Value::String("foo".to_string()),
             )]))
         );
     }
 
-    /// A custom element's positional args are left as the parser produced
-    /// them, sentinel keys and all.
-    ///
-    /// Nothing gives a name a slot list through an `::settings`
-    /// `elements: { <name>: { positional: [...] } }` map: that would be a
-    /// second source for a fact the parameter declarations already order.
-    /// Until `@param` is read, `std`'s table is the only source, and it
-    /// has no entry for a custom name.
-    ///
-    /// A consequence worth stating: every builtin has at most one
-    /// positional slot, so `bind_positional`'s multi-slot loop is
-    /// written for `@param` and exercised with one slot today.
     #[test]
     fn a_custom_element_gets_no_positional_inference() {
         let mut el = element_new(Name::namespaced("deck", "job"));
-        el.data.args = Some(Value::Map(vec![
-            (
-                POSITIONAL_ENTRY_KEY.to_string(),
-                Value::String("Clean room".to_string()),
-            ),
-            (
-                POSITIONAL_ENTRY_KEY.to_string(),
-                Value::String("high".to_string()),
-            ),
+        el.data.args = Some(Tuple::from_unnamed([
+            Value::String("Clean room".to_string()),
+            Value::String("high".to_string()),
         ]));
 
         assert_eq!(
             normalized_element_args(el.as_view()),
-            Some(Value::Map(vec![
-                (
-                    POSITIONAL_ENTRY_KEY.to_string(),
-                    Value::String("Clean room".to_string()),
-                ),
-                (
-                    POSITIONAL_ENTRY_KEY.to_string(),
-                    Value::String("high".to_string()),
-                ),
+            Some(Tuple::from_unnamed([
+                Value::String("Clean room".to_string()),
+                Value::String("high".to_string()),
             ]))
         );
     }
@@ -475,32 +436,27 @@ mod tests {
     #[test]
     fn leaves_map_args_unchanged() {
         let mut el = element_new(Name::bare("raw"));
-        let map_val = Value::Map(vec![(
-            "lang".to_string(),
-            Value::String("rust".to_string()),
-        )]);
-        el.data.args = Some(map_val.clone());
-        assert_eq!(normalized_element_args(el.as_view()), Some(map_val));
+        let tuple_val =
+            Tuple::from_named([("lang".to_string(), Value::String("rust".to_string()))]);
+        el.data.args = Some(tuple_val.clone());
+        assert_eq!(normalized_element_args(el.as_view()), Some(tuple_val));
     }
 
     #[test]
     fn normalizes_bare_scalar_list_marker_under_marker_key() {
         assert_eq!(
-            normalized_list_marker(&Value::String("12:01".to_string())),
-            Value::Map(vec![(
-                "marker".to_string(),
-                Value::String("12:01".to_string())
-            )])
+            normalized_list_marker(&Tuple::from_unnamed([Value::String("12:01".to_string())])),
+            Tuple::from_named([("marker".to_string(), Value::String("12:01".to_string()),)])
         );
     }
 
     #[test]
     fn leaves_explicit_key_value_list_marker_unchanged() {
-        let map_val = Value::Map(vec![
+        let tuple_val = Tuple::from_named([
             ("color".to_string(), Value::String("red".to_string())),
             ("priority".to_string(), Value::String("high".to_string())),
         ]);
-        assert_eq!(normalized_list_marker(&map_val), map_val);
+        assert_eq!(normalized_list_marker(&tuple_val), tuple_val);
     }
 
     #[test]
@@ -508,27 +464,28 @@ mod tests {
         // `deck.card` is namespaced, so it has no builtin positional key
         // and nothing to normalize the scalar into.
         let mut el = element_new(Name::namespaced("deck", "card"));
-        el.data.args = Some(Value::String("https://example.com".to_string()));
+        el.data.args = Some(Tuple::from_unnamed([Value::String(
+            "https://example.com".to_string(),
+        )]));
         assert_eq!(
             normalized_element_args(el.as_view()),
-            Some(Value::String("https://example.com".to_string()))
+            Some(Tuple::from_unnamed([Value::String(
+                "https://example.com".to_string(),
+            )]))
         );
     }
 
-    /// The `Seq` arm is the explicit `@name([a, b])` form, and it too is
-    /// left alone for a custom name -- same reason as
-    /// [`a_custom_element_gets_no_positional_inference`].
     #[test]
     fn a_custom_elements_bracketed_positional_list_is_left_alone() {
         let mut el = element_new(Name::namespaced("deck", "job"));
-        el.data.args = Some(Value::Seq(vec![
+        el.data.args = Some(Tuple::from_unnamed([
             Value::String("Clean room".to_string()),
             Value::String("high".to_string()),
         ]));
 
         assert_eq!(
             normalized_element_args(el.as_view()),
-            Some(Value::Seq(vec![
+            Some(Tuple::from_unnamed([
                 Value::String("Clean room".to_string()),
                 Value::String("high".to_string()),
             ]))
@@ -538,10 +495,10 @@ mod tests {
     #[test]
     fn normalizes_task_status_positional_arg() {
         let mut el = element_new(Name::bare("task"));
-        el.data.args = Some(Value::String("x".to_string()));
+        el.data.args = Some(Tuple::from_unnamed([Value::String("x".to_string())]));
         assert_eq!(
             normalized_element_args(el.as_view()),
-            Some(Value::Map(vec![(
+            Some(Tuple::from_named([(
                 "status".to_string(),
                 Value::String("x".to_string()),
             )]))

@@ -4,7 +4,7 @@ use super::render_content_or_fallback;
 use crate::RenderCtx;
 use crate::block::render_content_blocks;
 use crate::util::{blocks_to_plain, escape_attr, escape_html, push_data_attrs};
-use tomet_ast::{ElementView, Value};
+use tomet_ast::ElementView;
 use tomet_semantics::{
     TargetScheme, classify_std_lenient, link_target, normalized_element_args, path_target,
     target_scheme,
@@ -125,8 +125,8 @@ pub(crate) fn render_link_element(
     // (`@link(tm:foo, predicate:x)`'s `tm` entry, folded into `target` by
     // `normalized_element_args`) doesn't also leak out as a stray
     // `data-tm` attribute alongside the real `target`-derived `href`.
-    if matches!(normalized_args, Some(Value::Map(_))) {
-        push_data_attrs(out, normalized_args.as_ref(), &["target"]);
+    if let Some(args) = &normalized_args {
+        push_data_attrs(out, Some(args), &["target"]);
     }
     out.push('>');
     render_content_or_fallback(cx, el, &target, out);

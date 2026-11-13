@@ -1,6 +1,6 @@
 //! Configuration reference generator from [`ConfigGroupSpec`] schemas.
 
-use tomet_ast::{Block, File, ListItem, Section, Value};
+use tomet_ast::{Block, File, ListItem, Section, Tuple, Value};
 use tomet_config::{ConfigEntrySpec, ConfigGroupSpec, PrinterConfig};
 use tomet_tree::declaration_new;
 
@@ -27,7 +27,7 @@ pub fn document(
     intro_paragraphs: &[&str],
 ) -> File {
     let mut id = declaration_new("id");
-    id.data.args = Some(Value::String(doc_id.to_string()));
+    id.data.args = Some(Tuple::from_unnamed([Value::String(doc_id.to_string())]));
 
     let mut blocks = vec![Block::Section(Section::new(1, vec![text(title)], dummy()))];
 

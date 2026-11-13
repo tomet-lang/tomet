@@ -1,6 +1,6 @@
 //! Extension trait and helpers for [`tomet_ast::Value`].
 
-use tomet_ast::Value;
+use tomet_ast::{Tuple, Value};
 
 /// Extension trait providing accessors and inspections on [`Value`].
 pub trait ValueExt {
@@ -22,24 +22,24 @@ pub trait ValueExt {
     /// [`Value::scalar_text`]).
     fn as_f64(&self) -> Option<f64>;
 
-    /// Returns a slice of elements if this value is a `Value::Seq`.
-    fn as_seq(&self) -> Option<&[Value]>;
+    /// Returns the [`Tuple`] if this value is a `Value::Tuple`.
+    fn as_tuple(&self) -> Option<&Tuple>;
 
-    /// Returns a slice of key-value pairs if this value is a `Value::Map`.
-    fn as_map(&self) -> Option<&[(String, Value)]>;
+    /// Returns a mutable reference to the [`Tuple`] if this value is a `Value::Tuple`.
+    fn as_tuple_mut(&mut self) -> Option<&mut Tuple>;
 
-    /// If this value is a `Value::Map`, returns the first value associated with `key`.
+    /// If this value is a `Value::Tuple`, returns the first value associated with `key`.
     fn get(&self, key: &str) -> Option<&Value>;
 
-    /// If this value is a `Value::Map`, returns a mutable reference to the first value associated with `key`.
+    /// If this value is a `Value::Tuple`, returns a mutable reference to the first value associated with `key`.
     fn get_mut(&mut self, key: &str) -> Option<&mut Value>;
 
-    /// Returns `true` if a sequence or map is empty, or if string is empty, or if null.
+    /// Returns `true` if a tuple is empty, or if string is empty, or if null.
     fn is_empty(&self) -> bool;
 
-    /// Returns the flat scalar string projection of this value, joining sequences with `", "`,
-    /// or `None` when this value (or any nested element of a sequence) cannot project to text
-    /// (such as maps, calls, holes, type seats, or blocks).
+    /// Returns the flat scalar string projection of this value, joining unnamed tuple entries with `", "`,
+    /// or `None` when this value (or any nested element) cannot project to text
+    /// (such as named tuples, empty tuples, calls, holes, type seats, or blocks).
     fn scalar_string(&self) -> Option<String>;
 
     /// Returns the plain text representation of this value, or an empty string if it cannot project.
@@ -78,34 +78,30 @@ impl ValueExt for Value {
         self.as_number()
     }
 
-    fn as_seq(&self) -> Option<&[Value]> {
+    fn as_tuple(&self) -> Option<&Tuple> {
         match self {
-            Value::Seq(seq) => Some(seq.as_slice()),
+            Value::Tuple(tuple) => Some(tuple),
             _ => None,
         }
     }
 
-    fn as_map(&self) -> Option<&[(String, Value)]> {
+    fn as_tuple_mut(&mut self) -> Option<&mut Tuple> {
         match self {
-            Value::Map(map) => Some(map.as_slice()),
+            Value::Tuple(tuple) => Some(tuple),
             _ => None,
         }
     }
 
     fn get(&self, key: &str) -> Option<&Value> {
         match self {
-            Value::Map(entries) => entries
-                .iter()
-                .find_map(|(k, v)| if k == key { Some(v) } else { None }),
+            Value::Tuple(tuple) => tuple.get(key),
             _ => None,
         }
     }
 
     fn get_mut(&mut self, key: &str) -> Option<&mut Value> {
         match self {
-            Value::Map(entries) => entries
-                .iter_mut()
-                .find_map(|(k, v)| if k == key { Some(v) } else { None }),
+            Value::Tuple(tuple) => tuple.get_mut(key),
             _ => None,
         }
     }
@@ -114,8 +110,7 @@ impl ValueExt for Value {
         match self {
             Value::Null => true,
             Value::String(s) => s.is_empty(),
-            Value::Seq(seq) => seq.is_empty(),
-            Value::Map(map) => map.is_empty(),
+            Value::Tuple(tuple) => tuple.is_empty(),
             _ => false,
         }
     }
@@ -129,19 +124,19 @@ impl ValueExt for Value {
     }
 }
 
-/// The flat string a value projects to, joining sequences with `", "`, or `None` when it cannot project.
+/// The flat string a value projects to, joining a non-empty unnamed tuple with `", "`, or `None` when it cannot project.
 ///
 /// Bare scalars delegate to [`Value::scalar_text`]; `Value::Null` projects to an empty string.
-/// Sequences project if every element projects. Structured nodes (`Map`, `Call`, `Element`, `Blocks`,
-/// `Interp`, `Hole`, `TypeSeat`) return `None`.
+/// Unnamed tuples project if every element projects. Named or empty tuples, calls, elements, blocks,
+/// interpolations, holes, and type seats return `None`.
 pub fn scalar_string(v: &Value) -> Option<String> {
     if let Some(text) = v.scalar_text() {
         return Some(text.into_owned());
     }
     match v {
         Value::Null => Some(String::new()),
-        Value::Seq(items) => {
-            let parts: Option<Vec<String>> = items.iter().map(scalar_string).collect();
+        Value::Tuple(tuple) if !tuple.is_empty() && tuple.has_no_named() => {
+            let parts: Option<Vec<String>> = tuple.unnamed().map(scalar_string).collect();
             Some(parts?.join(", "))
         }
         _ => None,
@@ -169,19 +164,19 @@ mod tests {
             Some("hello".to_string())
         );
 
-        let seq = Value::Seq(vec![
+        let seq = Value::Tuple(Tuple::from_unnamed([
             Value::String("a".into()),
             Value::Int(1),
             Value::Bool(false),
-        ]);
+        ]));
         assert_eq!(seq.scalar_string(), Some("a, 1, false".to_string()));
         assert_eq!(seq.plain_text(), "a, 1, false");
 
-        let map = Value::Map(vec![("k".into(), Value::Int(1))]);
+        let map = Value::Tuple(Tuple::from_named([("k".into(), Value::Int(1))]));
         assert_eq!(map.scalar_string(), None);
         assert_eq!(map.plain_text(), "");
 
-        let seq_with_map = Value::Seq(vec![Value::String("a".into()), map]);
+        let seq_with_map = Value::Tuple(Tuple::from_unnamed([Value::String("a".into()), map]));
         assert_eq!(seq_with_map.scalar_string(), None);
         assert_eq!(seq_with_map.plain_text(), "");
     }

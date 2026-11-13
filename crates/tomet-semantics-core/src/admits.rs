@@ -1,6 +1,6 @@
 //! Type admission and conformance checking for AST [`Value`]s.
 
-use tomet_ast::Value;
+use tomet_ast::{Tuple, Value};
 use tomet_type::{Datum, DefaultValue, Kind, Type};
 
 /// A value that is not of the type it was held to.
@@ -41,16 +41,16 @@ pub fn admits(ty: &Type, value: &Value) -> Result<(), Mismatch> {
         Kind::Float => matches!(value, Value::Int(_)) || value.as_number().is_some(),
         Kind::Bool => matches!(value, Value::Bool(_)),
         Kind::List => match value {
-            Value::Seq(items) => {
+            Value::Tuple(tuple) if tuple.has_no_named() => {
                 if let Some(item_type) = ty.item() {
-                    for item in items {
+                    for item in tuple.values() {
                         admits(item_type, item)?;
                     }
                 }
-                if ty.length().is_some_and(|length| length != items.len()) {
+                if ty.length().is_some_and(|length| length != tuple.len()) {
                     return Err(Mismatch {
                         ty: ty.clone(),
-                        found: format!("a list of {} items", items.len()),
+                        found: format!("a list of {} items", tuple.len()),
                     });
                 }
                 true
@@ -88,7 +88,7 @@ pub fn datum_value(datum: &Datum) -> Value {
         Datum::Int(n) => Value::Int(*n),
         Datum::Float(n) => Value::Float(*n),
         Datum::Text(text) => Value::String(text.clone()),
-        Datum::Seq(items) => Value::Seq(items.iter().map(datum_value).collect()),
+        Datum::Seq(items) => Value::Tuple(Tuple::from_unnamed(items.iter().map(datum_value))),
     }
 }
 
@@ -112,16 +112,33 @@ pub fn admits_default(ty: &Type) -> Result<(), Mismatch> {
     }
 }
 
+/// A short sentence fragment naming what `tuple` is, for an error sentence:
+///
+/// - no named entry and at least one entry -> `"a list"`
+/// - no unnamed entry and at least one entry -> `"a map"`
+/// - empty -> `"an empty tuple"`
+/// - mixed -> `"a list with named entries"`
+pub fn describe_tuple(tuple: &Tuple) -> &'static str {
+    if tuple.is_empty() {
+        "an empty tuple"
+    } else if tuple.has_no_named() {
+        "a list"
+    } else if tuple.has_no_unnamed() {
+        "a map"
+    } else {
+        "a list with named entries"
+    }
+}
+
 /// A short sentence fragment naming what `value` is, for an error sentence.
-fn describe_value(value: &Value) -> String {
+pub fn describe_value(value: &Value) -> String {
     match value {
         Value::String(text) => format!("`{text}`"),
         Value::Bool(b) => format!("`{b}`"),
         Value::Int(n) => format!("`{n}`"),
         Value::Float(n) => format!("`{n}`"),
         Value::Null => "null".to_string(),
-        Value::Seq(_) => "a list".to_string(),
-        Value::Map(_) => "a map".to_string(),
+        Value::Tuple(tuple) => describe_tuple(tuple).to_string(),
         Value::Number(text) => format!("`{text}`"),
         Value::Call(name, _) => format!("`{name}(...)`"),
         Value::Interp(_) => "`{$ ... }`".to_string(),
@@ -138,6 +155,14 @@ mod tests {
 
     fn text(s: &str) -> Value {
         Value::String(s.to_string())
+    }
+
+    fn seq(items: Vec<Value>) -> Value {
+        Value::Tuple(Tuple::from_unnamed(items))
+    }
+
+    fn map(entries: Vec<(String, Value)>) -> Value {
+        Value::Tuple(Tuple::from_named(entries))
     }
 
     /// The type written as `source`.
@@ -178,14 +203,11 @@ mod tests {
             ),
             (t("nanoid(length: 4, prefix: \"n-\")"), text("anything")),
             (t("string(default: \"x\")"), Value::Int(2024)),
-            (t("list(length: 2)"), Value::Seq(vec![text("a"), text("b")])),
-            (t("list(int, length: 0)"), Value::Seq(vec![])),
-            (t("list"), Value::Seq(vec![])),
-            (t("list"), Value::Seq(vec![text("a")])),
-            (
-                t("list(int)"),
-                Value::Seq(vec![Value::Int(1), Value::Int(2)]),
-            ),
+            (t("list(length: 2)"), seq(vec![text("a"), text("b")])),
+            (t("list(int, length: 0)"), seq(vec![])),
+            (t("list"), seq(vec![])),
+            (t("list"), seq(vec![text("a")])),
+            (t("list(int)"), seq(vec![Value::Int(1), Value::Int(2)])),
         ];
         for (ty, value) in cases {
             assert_eq!(admits(ty, value), Ok(()), "{ty}: {value:?}");
@@ -193,7 +215,7 @@ mod tests {
 
         let bad_cases: &[(Type, Value)] = &[
             (t("string"), Value::Null),
-            (t("string"), Value::Seq(vec![])),
+            (t("string"), seq(vec![])),
             (t("int"), Value::Float(1.0)),
             (t("uint"), Value::Int(-1)),
             (t("float"), Value::Bool(true)),
@@ -212,14 +234,15 @@ mod tests {
                 t("uuid(prefix: \"u:\")"),
                 text("123e4567-e89b-12d3-a456-426614174000"),
             ),
-            (t("list(length: 2)"), Value::Seq(vec![text("a")])),
-            (t("list(string, length: 1)"), Value::Seq(vec![])),
-            (t("nanoid"), Value::Seq(vec![])),
-            (t("nanoid"), Value::Map(vec![])),
+            (t("list(length: 2)"), seq(vec![text("a")])),
+            (t("list(string, length: 1)"), seq(vec![])),
+            (t("nanoid"), seq(vec![])),
+            (t("nanoid"), map(vec![("k".into(), text("v"))])),
             (t("list"), Value::Int(3)),
+            (t("list"), map(vec![("k".into(), text("v"))])),
             (
                 t("list(int)"),
-                Value::Seq(vec![Value::Int(1), Value::String("not an int".into())]),
+                seq(vec![Value::Int(1), Value::String("not an int".into())]),
             ),
         ];
         for (ty, value) in bad_cases {
@@ -239,13 +262,13 @@ mod tests {
         ]);
         assert_eq!(
             datum_value(&datum),
-            Value::Seq(vec![
+            seq(vec![
                 Value::Null,
                 Value::Bool(true),
                 Value::Int(3),
                 Value::Float(1.5),
                 text("a"),
-                Value::Seq(vec![]),
+                seq(vec![]),
             ])
         );
     }
@@ -286,16 +309,16 @@ mod tests {
     #[test]
     fn an_expression_and_a_seat_are_placeholders_and_a_value_is_not() {
         let parsed = tomet_ast_parser::parse_file("::meta(a: $(x), b: <$int>, c: 1)\n").unwrap();
-        let Some(Value::Map(entries)) = &parsed.header[0].data.args else {
-            panic!("a map");
+        let Some(tuple) = &parsed.header[0].data.args else {
+            panic!("a tuple");
         };
-        let placeholders: Vec<bool> = entries.iter().map(|(_, v)| is_placeholder(v)).collect();
+        let placeholders: Vec<bool> = tuple.values().map(is_placeholder).collect();
         assert_eq!(placeholders, [true, true, false]);
     }
 
     #[test]
     fn a_list_of_the_wrong_length_says_how_long_it_is() {
-        let err = admits(&t("list(string, length: 3)"), &Value::Seq(vec![text("a")])).unwrap_err();
+        let err = admits(&t("list(string, length: 3)"), &seq(vec![text("a")])).unwrap_err();
         assert_eq!(
             err.to_string(),
             "a list of 1 items is not a list of 3 items, each a string"

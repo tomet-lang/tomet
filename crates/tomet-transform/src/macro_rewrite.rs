@@ -167,11 +167,14 @@ pub fn transform_link_targets_with_macros(doc: &mut File, macro_set: &MacroSet) 
                     .transform_prop("target", |_| Value::Interp(macro_call));
                 count += 1;
             }
-        } else if let Some(Value::String(url)) = &el.data.args
-            && let Some(macro_call) = macro_set.rewrite_url(url)
+        } else if let Some(tuple) = &mut el.data.args
+            && let Some(Value::String(url)) = tuple.nth_unnamed(0).cloned()
+            && let Some(macro_call) = macro_set.rewrite_url(&url)
         {
-            el.data.args = Some(Value::Interp(macro_call));
-            count += 1;
+            if let Some(v) = tuple.nth_unnamed_mut(0) {
+                *v = Value::Interp(macro_call);
+                count += 1;
+            }
         }
     });
     count

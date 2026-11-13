@@ -1,6 +1,6 @@
 //! Blueprint schema extraction, transformation, and instantiation.
 
-use tomet_ast::{Block, File, Inline, Name, Section, Value};
+use tomet_ast::{Block, File, Inline, Name, Section, Tuple, Value};
 use tomet_expr::{EvalContext, evaluate_type};
 use tomet_id::IdSpec;
 use tomet_semantics::DeclKind;
@@ -34,14 +34,20 @@ pub fn extract_blueprint_info(doc: &File) -> Option<BlueprintInfo> {
             return;
         }
         let target_kind = match &declaration.data.args {
-            Some(Value::String(s)) => s.clone(),
-            Some(Value::Map(entries)) => entries
-                .iter()
-                .find(|(k, _)| k == "target" || k == "kind")
-                .and_then(|(_, v)| v.as_str())
-                .unwrap_or("unknown")
-                .to_string(),
-            _ => "unknown".to_string(),
+            Some(tuple) => {
+                if let Some(s) = tuple
+                    .get("target")
+                    .or_else(|| tuple.get("kind"))
+                    .and_then(|v| v.as_str())
+                {
+                    s.to_string()
+                } else if let Some(s) = tuple.nth_unnamed(0).and_then(|v| v.as_str()) {
+                    s.to_string()
+                } else {
+                    "unknown".to_string()
+                }
+            }
+            None => "unknown".to_string(),
         };
 
         let mut description = None;
@@ -151,7 +157,7 @@ pub fn instantiate_blueprint(
                 .to_string();
 
             declaration.name = Name::bare("kind");
-            declaration.data.args = Some(Value::String(target_kind));
+            declaration.data.args = Some(Tuple::from_unnamed([Value::String(target_kind)]));
             // `{version, description}` describes the blueprint, not the
             // document it produces, so it does not survive promotion.
             declaration.data.value = None;
@@ -274,7 +280,7 @@ pub fn apply_blueprint(
                 let bp_id_val = normalized_declaration_args(bp_id)
                     .as_ref()
                     .and_then(|args| args.get("id"))
-                    .or(bp_id.data.args.as_ref())
+                    .or_else(|| bp_id.data.args.as_ref().and_then(|t| t.nth_unnamed(0)))
                     .cloned();
                 if let Some(Value::TypeSeat(seat)) = &bp_id_val {
                     if let Ok(ty) = evaluate_type(&seat.expr, cx) {
@@ -282,7 +288,9 @@ pub fn apply_blueprint(
                             let doc_val = normalized_declaration_args(doc_id)
                                 .as_ref()
                                 .and_then(|args| args.get("id"))
-                                .or(doc_id.data.args.as_ref())
+                                .or_else(|| {
+                                    doc_id.data.args.as_ref().and_then(|t| t.nth_unnamed(0))
+                                })
                                 .cloned()
                                 .unwrap_or(Value::Null);
                             if !value_satisfies_type(&doc_val, &ty) {
@@ -307,9 +315,9 @@ pub fn apply_blueprint(
 
     let mut meta_patch_entries = Vec::new();
     if let Some(bp_meta) = bp_meta_decl {
-        let bp_entries = tomet_semantics::data::declaration_entries(bp_meta)
+        let bp_entries: Vec<(String, Value)> = tomet_semantics::data::declaration_entries(bp_meta)
             .and_then(|v| match v {
-                Value::Map(entries) => Some(entries),
+                Value::Tuple(tuple) => Some(tuple.into_named().collect()),
                 _ => None,
             })
             .unwrap_or_default();
@@ -376,7 +384,7 @@ pub fn apply_blueprint(
     let mut patch = File::default();
     if let Some(target_kind) = &add_kind {
         let mut kind_decl = declaration_new("kind");
-        kind_decl.data.args = Some(Value::String(target_kind.clone()));
+        kind_decl.data.args = Some(Tuple::from_unnamed([Value::String(target_kind.clone())]));
         patch.header.push(kind_decl);
     }
     if add_id || overwrite_id {
@@ -386,7 +394,7 @@ pub fn apply_blueprint(
     }
     if !meta_patch_entries.is_empty() {
         let mut meta_decl = declaration_new("meta");
-        meta_decl.data.args = Some(Value::Map(meta_patch_entries));
+        meta_decl.data.args = Some(Tuple::from_named(meta_patch_entries));
         patch.header.push(meta_decl);
     }
     patch.body = missing_sections;
@@ -459,12 +467,13 @@ pub fn apply_blueprint(
         .iter()
         .find(|d| classify_declaration_lenient(d) == ElementKind::Declaration(DeclKind::Meta))
     {
-        let filled_entries = tomet_semantics::data::declaration_entries(patch_meta)
-            .and_then(|v| match v {
-                Value::Map(entries) => Some(entries),
-                _ => None,
-            })
-            .unwrap_or_default();
+        let filled_entries: Vec<(String, Value)> =
+            tomet_semantics::data::declaration_entries(patch_meta)
+                .and_then(|v| match v {
+                    Value::Tuple(tuple) => Some(tuple.into_named().collect()),
+                    _ => None,
+                })
+                .unwrap_or_default();
 
         if !filled_entries.is_empty() {
             if let Some(doc_meta) = doc.header.iter_mut().find(|d| {
@@ -475,7 +484,7 @@ pub fn apply_blueprint(
                 }
             } else {
                 let mut new_meta = declaration_new("meta");
-                new_meta.data.args = Some(Value::Map(filled_entries));
+                new_meta.data.args = Some(Tuple::from_named(filled_entries));
                 doc.header.push(new_meta);
             }
             changed = true;
@@ -536,7 +545,12 @@ mod tests {
         let mut kinds = Vec::new();
         for_each_declaration(&doc, |declaration| {
             if classify_declaration_lenient(declaration) == ElementKind::Declaration(DeclKind::Kind)
-                && let Some(s) = declaration.data.args.as_ref().and_then(|v| v.as_str())
+                && let Some(s) = declaration
+                    .data
+                    .args
+                    .as_ref()
+                    .and_then(|t| t.nth_unnamed(0))
+                    .and_then(|v| v.as_str())
             {
                 kinds.push(s.to_string());
             }
@@ -572,16 +586,19 @@ mod tests {
             .iter()
             .find(|d| classify_declaration_lenient(d) == ElementKind::Declaration(DeclKind::Kind))
             .expect("expected a ::kind declaration");
-        assert_eq!(kind.data.args, Some(Value::String("daily-note".into())));
+        assert_eq!(
+            kind.data.args,
+            Some(Tuple::from_unnamed([Value::String("daily-note".into())]))
+        );
 
         let meta = top_level
             .iter()
             .find(|d| classify_declaration_lenient(d) == ElementKind::Declaration(DeclKind::Meta))
             .expect("expected a ::meta declaration");
-        let Some(Value::Map(entries)) = &meta.data.args else {
-            panic!("expected meta map");
+        let Some(tuple) = &meta.data.args else {
+            panic!("expected meta tuple");
         };
-        let get = |key: &str| entries.iter().find(|(k, _)| k == key).unwrap().1.clone();
+        let get = |key: &str| tuple.get(key).unwrap().clone();
         assert_eq!(get("file"), Value::String("plan.tmt".into()));
         assert_eq!(get("title"), Value::String("Sprint 42".into()));
     }
@@ -641,14 +658,20 @@ mod tests {
             .iter()
             .find(|d| classify_declaration_lenient(d) == ElementKind::Declaration(DeclKind::Kind))
             .expect("::kind");
-        assert_eq!(kind.data.args, Some(Value::String("task".into())));
+        assert_eq!(
+            kind.data.args,
+            Some(Tuple::from_unnamed([Value::String("task".into())]))
+        );
 
         let id = doc
             .header
             .iter()
             .find(|d| classify_declaration_lenient(d) == ElementKind::Declaration(DeclKind::Id))
             .expect("::id");
-        assert_eq!(id.data.args, Some(Value::String(UUID.into())));
+        assert_eq!(
+            id.data.args,
+            Some(Tuple::from_unnamed([Value::String(UUID.into())]))
+        );
 
         let meta = doc
             .header
@@ -693,7 +716,9 @@ mod tests {
             .expect("::id");
         assert_eq!(
             id.data.args,
-            Some(Value::String("123e4567-e89b-12d3-a456-426614174000".into()))
+            Some(Tuple::from_unnamed([Value::String(
+                "123e4567-e89b-12d3-a456-426614174000".into()
+            )]))
         );
 
         let meta = doc
@@ -716,7 +741,10 @@ mod tests {
             .iter()
             .find(|d| classify_declaration_lenient(d) == ElementKind::Declaration(DeclKind::Id))
             .expect("::id");
-        assert_eq!(id.data.args, Some(Value::String(UUID.into())));
+        assert_eq!(
+            id.data.args,
+            Some(Tuple::from_unnamed([Value::String(UUID.into())]))
+        );
 
         let meta = doc
             .header
@@ -738,7 +766,10 @@ mod tests {
             .iter()
             .find(|d| classify_declaration_lenient(d) == ElementKind::Declaration(DeclKind::Id))
             .expect("::id");
-        assert_eq!(id.data.args, Some(Value::String("not-a-uuid".into())));
+        assert_eq!(
+            id.data.args,
+            Some(Tuple::from_unnamed([Value::String("not-a-uuid".into())]))
+        );
 
         let meta = doc
             .header

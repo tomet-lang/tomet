@@ -1,5 +1,5 @@
 use serde::ser::{self, Serialize};
-use tomet_ast::Value;
+use tomet_ast::{Tuple, Value};
 
 use crate::error::{Error, Result};
 
@@ -68,9 +68,9 @@ impl ser::Serializer for ValueSerializer {
         Ok(Value::String(v.to_string()))
     }
     fn serialize_bytes(self, v: &[u8]) -> Result<Value> {
-        Ok(Value::Seq(
-            v.iter().map(|b| Value::Int(*b as i64)).collect(),
-        ))
+        Ok(Value::Tuple(Tuple::from_unnamed(
+            v.iter().map(|b| Value::Int(*b as i64)),
+        )))
     }
     fn serialize_none(self) -> Result<Value> {
         Ok(Value::Null)
@@ -106,10 +106,10 @@ impl ser::Serializer for ValueSerializer {
         variant: &'static str,
         value: &T,
     ) -> Result<Value> {
-        Ok(Value::Map(vec![(
+        Ok(Value::Tuple(Tuple::from_named(vec![(
             variant.to_string(),
             value.serialize(ValueSerializer)?,
-        )]))
+        )])))
     }
     fn serialize_seq(self, len: Option<usize>) -> Result<SeqSerializer> {
         Ok(SeqSerializer {
@@ -176,9 +176,9 @@ pub struct SeqSerializer {
 }
 
 fn finish_seq(s: SeqSerializer) -> Result<Value> {
-    let seq = Value::Seq(s.items);
+    let seq = Value::Tuple(Tuple::from_unnamed(s.items));
     match s.variant {
-        Some(variant) => Ok(Value::Map(vec![(variant, seq)])),
+        Some(variant) => Ok(Value::Tuple(Tuple::from_named(vec![(variant, seq)]))),
         None => Ok(seq),
     }
 }
@@ -238,9 +238,9 @@ pub struct MapSerializer {
 }
 
 fn finish_map(s: MapSerializer) -> Result<Value> {
-    let map = Value::Map(s.entries);
+    let map = Value::Tuple(Tuple::from_named(s.entries));
     match s.variant {
-        Some(variant) => Ok(Value::Map(vec![(variant, map)])),
+        Some(variant) => Ok(Value::Tuple(Tuple::from_named(vec![(variant, map)]))),
         None => Ok(map),
     }
 }

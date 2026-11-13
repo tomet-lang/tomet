@@ -32,18 +32,8 @@ pub fn shift_spans(value: &mut Value, delta: usize) {
             seat.span.start += delta;
             seat.span.end += delta;
         }
-        Value::Map(entries) => {
-            for (_, v) in entries {
-                shift_spans(v, delta);
-            }
-        }
-        Value::Seq(items) => {
-            for v in items {
-                shift_spans(v, delta);
-            }
-        }
-        Value::Call(_, args) => {
-            for v in args {
+        Value::Tuple(tuple) | Value::Call(_, tuple) => {
+            for v in tuple.values_mut() {
                 shift_spans(v, delta);
             }
         }
@@ -55,13 +45,14 @@ pub fn shift_spans(value: &mut Value, delta: usize) {
 pub fn find_interp_in_value(v: &Value) -> Option<usize> {
     match v {
         Value::Interp(it) => Some(it.span.start),
-        Value::Map(entries) => entries
-            .iter()
-            .find_map(|(_, val)| find_interp_in_value(val)),
-        Value::Seq(items) => items.iter().find_map(find_interp_in_value),
-        Value::Call(_, args) => args.iter().find_map(find_interp_in_value),
+        Value::Tuple(tuple) | Value::Call(_, tuple) => find_interp_in_tuple(tuple),
         _ => None,
     }
+}
+
+/// Finds the byte offset of the first interpolation in `t`, if any.
+pub fn find_interp_in_tuple(t: &tomet_ast::Tuple) -> Option<usize> {
+    t.values().find_map(find_interp_in_value)
 }
 
 /// Finds the byte offset of the first interpolation in `g`, if any.

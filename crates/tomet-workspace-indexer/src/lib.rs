@@ -26,7 +26,7 @@ use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
 use ignore::WalkBuilder;
-use tomet_ast::Value;
+use tomet_ast::{Tuple, Value};
 use tomet_ast_parser::parse_file;
 use tomet_config::PrinterConfig;
 use tomet_semantics::{classify_declaration_lenient, classify_std_lenient};
@@ -395,16 +395,16 @@ pub fn document_fields(
 
 /// Records `value` at `prefix`, then every path beneath it.
 ///
-/// A `Map` is recorded *and* descended into, so both `meta` and
-/// `meta.title` are present -- the first is what `exists(meta)` asks
-/// about, the second what `eq(meta.title, "...")` does. A `Seq` is
-/// recorded and not descended into: `meta.tags` is the list itself,
-/// because `contains` is how a list is asked about and an index into one
-/// is not something a predicate can write.
+/// A tuple is recorded *and* its named entries descended into, so both
+/// `meta` and `meta.title` are present -- the first is what `exists(meta)`
+/// asks about, the second what `eq(meta.title, "...")` does. Its unnamed
+/// entries are not descended into: `meta.tags` is the tuple itself, because
+/// `contains` is how its items are asked about and a position is not
+/// something a predicate can write.
 fn flatten_into(prefix: &str, value: &Value, out: &mut BTreeMap<String, Value>) {
     out.insert(prefix.to_string(), value.clone());
-    if let Value::Map(entries) = value {
-        for (key, child) in entries {
+    if let Value::Tuple(tuple) = value {
+        for (key, child) in tuple.named() {
             flatten_into(&format!("{prefix}.{key}"), child, out);
         }
     }
@@ -421,11 +421,11 @@ pub fn extract_metadata(src: &str) -> BTreeMap<String, String> {
         });
         tomet_tree::for_each_declaration(&doc, |declaration| {
             if classify_declaration_lenient(declaration).as_str() == "meta"
-                && let Some(Value::Map(entries)) =
+                && let Some(Value::Tuple(tuple)) =
                     tomet_semantics::data::declaration_entries(declaration)
             {
                 // `::meta(k: v)` holds the fields in its parentheses: `meta.k`.
-                for (k, v) in &entries {
+                for (k, v) in tuple.named() {
                     map.insert(format!("meta.{k}"), value_to_string(v));
                 }
             }
@@ -441,10 +441,34 @@ fn collect_meta(data: &tomet_ast::Data, map: &mut BTreeMap<String, String>) {
             map.insert(format!("meta.{k}"), value_to_string(v));
         }
     }
-    if let Some(Value::Map(entries)) = &data.args {
-        for (k, v) in entries {
+    if let Some(args) = &data.args {
+        for (k, v) in args.named() {
             map.insert(format!("meta.(args).{k}"), value_to_string(v));
         }
+    }
+}
+
+fn tuple_to_string(tuple: &Tuple) -> String {
+    if tuple.is_empty() {
+        "()".to_string()
+    } else if tuple.has_no_named() {
+        let s: Vec<_> = tuple.unnamed().map(value_to_string).collect();
+        format!("({})", s.join(", "))
+    } else if tuple.has_no_unnamed() {
+        let s: Vec<_> = tuple
+            .named()
+            .map(|(k, v)| format!("{k}: {}", value_to_string(v)))
+            .collect();
+        format!("{{{}}}", s.join(", "))
+    } else {
+        let s: Vec<_> = tuple
+            .entries()
+            .map(|e| match e.name() {
+                Some(name) => format!("{name}: {}", value_to_string(e.value())),
+                None => value_to_string(e.value()),
+            })
+            .collect();
+        format!("({})", s.join(", "))
     }
 }
 
@@ -455,31 +479,22 @@ fn value_to_string(v: &Value) -> String {
     match v {
         // A hole and a type seat are a blueprint's, and have no value to index.
         Value::Null | Value::Hole(_) | Value::TypeSeat(_) => String::new(),
-        Value::Seq(items) => {
-            let s: Vec<_> = items.iter().map(value_to_string).collect();
-            format!("[{}]", s.join(", "))
+        Value::Bool(_) | Value::Int(_) | Value::Float(_) | Value::Number(_) | Value::String(_) => {
+            v.scalar_text().map(|t| t.into_owned()).unwrap_or_default()
         }
-        Value::Map(entries) => {
-            let s: Vec<_> = entries
-                .iter()
-                .map(|(k, v)| format!("{k}: {}", value_to_string(v)))
-                .collect();
-            format!("{{{}}}", s.join(", "))
-        }
+        Value::Tuple(tuple) => tuple_to_string(tuple),
         Value::Call(name, args) => {
-            let s: Vec<_> = args.iter().map(value_to_string).collect();
-            format!("{name}({})", s.join(", "))
+            format!("{name}{}", tuple_to_string(args))
         }
         Value::Element(el) => {
             let name = el.name.to_string();
             match &el.data.args {
-                Some(args) => format!("@{name}({})", value_to_string(args)),
+                Some(args) => format!("@{name}{}", tuple_to_string(args)),
                 None => format!("@{name}"),
             }
         }
         Value::Interp(interp) => interp.to_string(),
         Value::Blocks(blocks) => format!("<{} block(s)>", blocks.len()),
-        _ => String::new(),
     }
 }
 
@@ -664,18 +679,18 @@ mod metadata_table_tests {
         // `contains` has to be able to look inside the real `Value`.
         assert_eq!(
             fields.get("meta.tags"),
-            Some(&Value::Seq(vec![
+            Some(&Value::Tuple(Tuple::from_unnamed([
                 Value::String("rust".to_string()),
                 Value::String("cli".to_string()),
-            ]))
+            ])))
         );
     }
 
     #[test]
     fn a_nested_map_is_recorded_at_every_depth() {
         let fields = fields_of("::meta(url: { wiki: \"https://example.test\" })\n\n#[ T ]\n");
-        assert!(matches!(fields.get("meta"), Some(Value::Map(_))));
-        assert!(matches!(fields.get("meta.url"), Some(Value::Map(_))));
+        assert!(matches!(fields.get("meta"), Some(Value::Tuple(_))));
+        assert!(matches!(fields.get("meta.url"), Some(Value::Tuple(_))));
         assert_eq!(
             fields.get("meta.url.wiki"),
             Some(&Value::String("https://example.test".to_string()))

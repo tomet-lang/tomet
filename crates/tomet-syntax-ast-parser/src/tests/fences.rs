@@ -89,7 +89,7 @@ fn parses_a_fenced_code_block_with_lang() {
             assert_eq!(el.name, Name::bare("raw"));
             assert_eq!(
                 el.data.args,
-                Some(Value::Map(vec![(
+                Some(Tuple::from_named(vec![(
                     "lang".to_string(),
                     Value::String("rust".to_string())
                 )]))

@@ -305,19 +305,16 @@ fn render_task(cx: &TypstCtx, el: ElementView<'_>, _inline: bool) -> String {
 
 fn task_status(el: ElementView<'_>) -> Option<String> {
     let args = normalized_element_args(el)?;
-    match args {
-        Value::Map(entries) => {
-            entries
-                .into_iter()
-                .find(|(k, _)| k == "status")
-                .and_then(|(_, v)| match v {
-                    Value::String(s) => Some(s),
-                    Value::Bool(b) => Some(if b { "x".to_string() } else { " ".to_string() }),
-                    _ => None,
-                })
+    if let Some(v) = args.get("status") {
+        match v {
+            Value::String(s) => return Some(s.clone()),
+            Value::Bool(b) => return Some(if *b { "x".to_string() } else { " ".to_string() }),
+            _ => return None,
         }
-        Value::String(s) => Some(s),
-        Value::Bool(b) => Some(if b { "x".to_string() } else { " ".to_string() }),
+    }
+    match args.nth_unnamed(0) {
+        Some(Value::String(s)) => Some(s.clone()),
+        Some(Value::Bool(b)) => Some(if *b { "x".to_string() } else { " ".to_string() }),
         _ => None,
     }
 }
@@ -387,9 +384,8 @@ fn render_conflict(cx: &TypstCtx, el: ElementView<'_>) -> String {
 /// (`Value::Blocks`), not a scalar.
 fn conflict_sides(el: ElementView<'_>) -> (Vec<Block>, Vec<Block>) {
     let args = normalized_element_args(el);
-    let map = args.as_ref().and_then(as_map);
     let side = |key: &str| -> Vec<Block> {
-        match map.and_then(|m| map_get(m, key)) {
+        match args.as_ref().and_then(|t| t.get(key)) {
             Some(Value::Blocks(blocks)) => blocks.clone(),
             _ => Vec::new(),
         }
@@ -402,33 +398,20 @@ fn callout_variant_and_title(el: ElementView<'_>) -> (String, Option<String>) {
     let mut title = None;
 
     if let Some(args) = el.data.args.as_ref() {
-        match args {
-            Value::String(s) => variant = Some(s.clone()),
-            Value::Map(entries) => {
-                for (k, v) in entries {
-                    if k == "variant" {
-                        if let Value::String(s) = v {
-                            variant = Some(s.clone());
-                        }
-                    } else if k == "title"
-                        && let Value::String(s) = v
-                    {
-                        title = Some(s.clone());
-                    }
-                }
-                if variant.is_none()
-                    && !entries.is_empty()
-                    && let Value::String(s) = &entries[0].1
-                {
-                    variant = Some(s.clone());
-                }
+        if let Some(v) = args.get("variant") {
+            if let Value::String(s) = v {
+                variant = Some(s.clone());
             }
-            Value::Seq(items) => {
-                if let Some(Value::String(s)) = items.first() {
-                    variant = Some(s.clone());
-                }
+        }
+        if let Some(v) = args.get("title") {
+            if let Value::String(s) = v {
+                title = Some(s.clone());
             }
-            _ => {}
+        }
+        if variant.is_none() {
+            if let Some(Value::String(s)) = args.nth_unnamed(0) {
+                variant = Some(s.clone());
+            }
         }
     }
 
@@ -444,8 +427,7 @@ fn render_raw(el: ElementView<'_>, inline: bool) -> String {
     let args = normalized_element_args(el);
     let lang = args
         .as_ref()
-        .and_then(as_map)
-        .and_then(|m| map_get(m, "lang"))
+        .and_then(|t| t.get("lang"))
         .map(value_to_plain)
         .unwrap_or_default();
     let code = el.content.map(blocks_to_plain).unwrap_or_default();
@@ -497,8 +479,7 @@ fn render_table(cx: &TypstCtx, el: ElementView<'_>) -> String {
     let args = normalized_element_args(el);
     let has_header = args
         .as_ref()
-        .and_then(as_map)
-        .and_then(|m| map_get(m, "header"))
+        .and_then(|t| t.get("header"))
         .map(|v| match v {
             Value::Bool(b) => *b,
             _ => true,
@@ -640,8 +621,7 @@ fn render_ruby(cx: &TypstCtx, el: ElementView<'_>) -> String {
     let args = normalized_element_args(el);
     let rt = args
         .as_ref()
-        .and_then(as_map)
-        .and_then(|m| map_get(m, "rt"))
+        .and_then(|t| t.get("rt"))
         .map(value_to_plain)
         .unwrap_or_default();
     let content = content_to_typst(cx, el);
@@ -750,18 +730,21 @@ fn value_to_plain(v: &Value) -> String {
             .scalar_text()
             .map(|text| text.into_owned())
             .unwrap_or_default(),
-        Value::Seq(items) => items
-            .iter()
-            .map(value_to_plain)
-            .collect::<Vec<_>>()
-            .join(", "),
-        // A map has no single scalar representation; callers that need
-        // per-key access use `as_map`/`map_get` instead.
-        Value::Map(_) => String::new(),
+        Value::Tuple(tuple) => {
+            if tuple.has_no_named() {
+                tuple
+                    .unnamed()
+                    .map(value_to_plain)
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            } else {
+                String::new()
+            }
+        }
         // A call is validation-only (e.g. a `type: list(string)`)
         // and has no rendered form.
         Value::Call(..) => String::new(),
-        // An embedded element has no scalar form either -- same as `Map`.
+        // An embedded element has no scalar form either.
         // Typst has no path from here into `element_to_typst` (this
         // function only ever reads a plain arg like `lang`/`pkg`, never a
         // whole nested element), so this stays unrendered rather than
@@ -769,18 +752,7 @@ fn value_to_plain(v: &Value) -> String {
         Value::Element(_) => String::new(),
         // An interpolation is not known until it is evaluated.
         Value::Interp(_) | Value::Hole(_) | Value::TypeSeat(_) => String::new(),
-        // Block content has no scalar form either -- same as `Map`.
+        // Block content has no scalar form either.
         Value::Blocks(_) => String::new(),
     }
-}
-
-fn as_map(v: &Value) -> Option<&Vec<(String, Value)>> {
-    match v {
-        Value::Map(m) => Some(m),
-        _ => None,
-    }
-}
-
-fn map_get<'a>(map: &'a [(String, Value)], key: &str) -> Option<&'a Value> {
-    map.iter().find(|(k, _)| k == key).map(|(_, v)| v)
 }

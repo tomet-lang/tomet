@@ -120,13 +120,9 @@ fn reference_in(el: &Element) -> Option<Reference> {
             _ => {}
         }
     }
-    if let Some(Value::Map(entries)) = &el.data.args {
-        for (k, v) in entries {
-            if k == "id"
-                && let Value::String(s) = v
-            {
-                return Some(Reference::Id(s.clone()));
-            }
+    if let Some(args) = &el.data.args {
+        if let Some(Value::String(s)) = args.get("id") {
+            return Some(Reference::Id(s.clone()));
         }
     }
     None

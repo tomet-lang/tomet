@@ -3,7 +3,7 @@
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
-use tomet_ast::{Block, File, Value};
+use tomet_ast::{Block, File};
 
 use super::context::{PreparedBlocks, Resolver};
 use super::value::{DirRef, DocRef, EvalValue};
@@ -82,7 +82,7 @@ impl Resolver for MemoryResolver {
         let document = self.document(doc)?;
         Ok(match tomet_declaration::document_meta(&document) {
             Some(meta) => EvalValue::from_ast(&meta, doc),
-            None => EvalValue::from_ast(&Value::Map(Vec::new()), doc),
+            None => EvalValue::Map(Vec::new()),
         })
     }
 

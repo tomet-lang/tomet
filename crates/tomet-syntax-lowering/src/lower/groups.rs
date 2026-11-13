@@ -38,9 +38,11 @@ pub(crate) fn lower_group_list(nodes: impl IntoIterator<Item = SyntaxNode>) -> R
             | K::AUTOLINK => {}
             K::ARGS => {
                 read.data.args = Some(crate::element::lower_paren_value(&child)?);
+                read.args_writers.push(child);
             }
             K::VALUE_DATA | K::MAP_LITERAL => {
                 read.data.value = Some(crate::element::lower_value_group(&child)?);
+                read.value_writers.push(child);
             }
             K::CONTENT => read.content = Some(lower_content(&child)?),
             K::ID_GROUP => {

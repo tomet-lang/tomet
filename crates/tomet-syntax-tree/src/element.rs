@@ -1,7 +1,8 @@
 //! Extension traits, property helpers, and constructors for [`tomet_ast::Element`], [`tomet_ast::Declaration`] and [`tomet_ast::Data`].
 
 use tomet_ast::{
-    Block, Connect, Data, Declaration, Element, Group, Id, List, ListItem, Name, Placement, Value,
+    Block, Connect, Data, Declaration, Element, Group, Id, List, ListItem, Name, Placement, Tuple,
+    Value,
 };
 use tomet_span::Span;
 
@@ -14,7 +15,7 @@ pub trait ElementExt {
     fn with_placement(self, placement: Placement) -> Self;
 
     /// Consumes `self` and sets its `args`.
-    fn with_args(self, args: Value) -> Self;
+    fn with_args(self, args: Tuple) -> Self;
 
     /// Consumes `self` and sets its `content`.
     fn with_content(self, content: Vec<Block>) -> Self;
@@ -42,7 +43,7 @@ impl ElementExt for Element {
         self
     }
 
-    fn with_args(mut self, args: Value) -> Self {
+    fn with_args(mut self, args: Tuple) -> Self {
         self.data.args = Some(args);
         self
     }
@@ -74,21 +75,21 @@ pub trait DataExt {
     /// Merges the `args` and the `key: value` pairs of the
     /// value group into one attrs view -- the value group's keys win on
     /// conflict.
-    fn attrs_view(&self) -> Option<Value>;
+    fn attrs_view(&self) -> Option<Tuple>;
 
     /// Mutable writable attrs slot on `el.args`.
     ///
     /// Unlike [`DataExt::attrs_view`] this does not fall back to the
     /// value group: a group is a list of [`tomet_ast::Entry`] items, not a
-    /// `Value`, so there is no single `&mut Value` to hand out for it. Use
+    /// `Tuple`, so there is no single `&mut Tuple` to hand out for it. Use
     /// [`DataExt::set_prop`] or `Group`'s own pair accessors to
     /// write into a group.
-    fn attrs_mut(&mut self) -> Option<&mut Value>;
+    fn attrs_mut(&mut self) -> Option<&mut Tuple>;
 
-    /// Returns a reference to the property value for `key`, checking `{value}` map first, then `(args)` map.
+    /// Returns a reference to the property value for `key`, checking `{value}` first, then `(args)`.
     fn get_attr<'a>(&'a self, key: &str) -> Option<&'a Value>;
 
-    /// Returns a mutable reference to the property value for `key`, checking `{value}` map first, then `(args)` map.
+    /// Returns a mutable reference to the property value for `key`, checking `{value}` first, then `(args)`.
     fn get_attr_mut<'a>(&'a mut self, key: &str) -> Option<&'a mut Value>;
 
     /// Returns whether the element contains `key` in either `{value}` or `(args)`.
@@ -114,32 +115,26 @@ pub trait DataExt {
 }
 
 impl DataExt for Data {
-    fn attrs_view(&self) -> Option<Value> {
-        let args_map = match &self.args {
-            Some(Value::Map(entries)) => Some(entries.clone()),
-            _ => None,
-        };
-        let value_map = self.value.as_ref().and_then(|v| match v.as_data() {
-            Value::Map(entries) => Some(entries),
-            _ => None,
-        });
-        match (args_map, value_map) {
-            (Some(mut merged), Some(value_entries)) => {
-                for (key, value) in value_entries {
-                    match merged.iter_mut().find(|(k, _)| *k == key) {
-                        Some(existing) => existing.1 = value,
-                        None => merged.push((key, value)),
+    fn attrs_view(&self) -> Option<Tuple> {
+        let value_tuple = self.value.as_ref().map(Group::as_data);
+        match (&self.args, value_tuple) {
+            (Some(args), Some(value_entries)) => {
+                let mut merged = args.clone();
+                for (key, value) in value_entries.into_named() {
+                    match merged.get_mut(&key) {
+                        Some(existing) => *existing = value,
+                        None => merged.push_named(key, value),
                     }
                 }
-                Some(Value::Map(merged))
+                Some(merged)
             }
-            (Some(args), None) => Some(Value::Map(args)),
-            (None, Some(value)) => Some(Value::Map(value)),
-            (None, None) => self.args.clone(),
+            (Some(args), None) => Some(args.clone()),
+            (None, Some(value)) => Some(value),
+            (None, None) => None,
         }
     }
 
-    fn attrs_mut(&mut self) -> Option<&mut Value> {
+    fn attrs_mut(&mut self) -> Option<&mut Tuple> {
         self.args.as_mut()
     }
 
@@ -149,8 +144,8 @@ impl DataExt for Data {
         {
             return Some(found);
         }
-        if let Some(Value::Map(entries)) = &self.args
-            && let Some((_, val)) = entries.iter().find(|(k, _)| k == key)
+        if let Some(args) = &self.args
+            && let Some(val) = args.get(key)
         {
             return Some(val);
         }
@@ -163,8 +158,8 @@ impl DataExt for Data {
         if self.value.as_ref().is_some_and(|v| v.get(key).is_some()) {
             return self.value.as_mut().and_then(|v| v.get_mut(key));
         }
-        if let Some(Value::Map(entries)) = &mut self.args
-            && let Some((_, val)) = entries.iter_mut().find(|(k, _)| k == key)
+        if let Some(args) = &mut self.args
+            && let Some(val) = args.get_mut(key)
         {
             return Some(val);
         }
@@ -182,34 +177,27 @@ impl DataExt for Data {
             *slot = new_val;
             return;
         }
-        if let Some(Value::Map(entries)) = &mut self.args
-            && let Some((_, val)) = entries.iter_mut().find(|(k, _)| k == key)
+        if let Some(args) = &mut self.args
+            && let Some(val) = args.get_mut(key)
         {
             *val = new_val;
             return;
         }
         if let Some(value @ Group(_)) = &mut self.value {
             value.push_pair(key, new_val);
-        } else if let Some(Value::Map(entries)) = &mut self.args {
-            entries.push((key.to_string(), new_val));
-        } else if self.value.is_none() && self.args.is_none() {
-            self.args = Some(Value::Map(vec![(key.to_string(), new_val)]));
-        } else if self.args.is_some() {
-            self.value = Some(Group(vec![tomet_ast::Entry::Pair(
-                key.to_string(),
-                new_val,
-            )]));
+        } else if let Some(args) = &mut self.args {
+            args.push_named(key, new_val);
         } else {
-            self.args = Some(Value::Map(vec![(key.to_string(), new_val)]));
+            self.args = Some(Tuple::from_named([(key.to_string(), new_val)]));
         }
     }
 
     fn rename_prop_key(&mut self, old_key: &str, new_key: &str) -> bool {
         let mut changed = false;
-        if let Some(Value::Map(entries)) = &mut self.args {
-            for (k, _) in entries.iter_mut() {
-                if k == old_key {
-                    *k = new_key.to_string();
+        if let Some(args) = &mut self.args {
+            for entry in args.entries_mut() {
+                if entry.name() == Some(old_key) {
+                    entry.set_name(new_key);
                     changed = true;
                 }
             }
@@ -227,8 +215,8 @@ impl DataExt for Data {
 
     fn replace_prop_value(&mut self, target_key: &str, new_val: Value) -> bool {
         let mut changed = false;
-        if let Some(Value::Map(entries)) = &mut self.args {
-            for (k, val) in entries.iter_mut() {
+        if let Some(args) = &mut self.args {
+            for (k, val) in args.named_mut() {
                 if k == target_key {
                     *val = new_val.clone();
                     changed = true;
@@ -252,10 +240,10 @@ impl DataExt for Data {
         {
             return Some(removed);
         }
-        if let Some(Value::Map(entries)) = &mut self.args
-            && let Some(idx) = entries.iter().position(|(k, _)| k == key)
+        if let Some(args) = &mut self.args
+            && let Some(removed) = args.remove(key)
         {
-            return Some(entries.remove(idx).1);
+            return Some(removed);
         }
         None
     }
@@ -326,8 +314,8 @@ pub fn list(ordered: bool, items: Vec<ListItem>, span: Span) -> List {
 pub fn list_item(
     name: Option<Name>,
     content: Vec<Block>,
-    args: Option<Value>,
-    attrs: Option<Value>,
+    args: Option<Tuple>,
+    attrs: Option<Tuple>,
     id: Option<Id>,
     connects: Vec<Connect>,
     sublist: Option<List>,

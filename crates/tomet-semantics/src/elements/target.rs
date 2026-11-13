@@ -49,15 +49,7 @@ fn target_arg(el: ElementView<'_>) -> Option<String> {
     if let Some(target) = args.get("target").and_then(|v| v.as_str()) {
         return Some(target.to_string());
     }
-    // `@link(https://x)`/`@embed(a.png)`: both `link` and `embed` are
-    // in `builtin_positional_arg_key` (`-> "target"`), so a bare
-    // positional scalar should already have arrived here as a map via
-    // `normalized_element_args` -- this fallback only matters for a
-    // element this function is never called with a `Link`/`Embed`
-    // `kind` for (guarded above), so it's effectively unreachable in
-    // practice but kept for symmetry/safety rather than relying on
-    // that invariant silently.
-    if let Some(s) = args.as_str() {
+    if let Some(s) = args.nth_unnamed(0).and_then(|v| v.as_str()) {
         return Some(s.to_string());
     }
     None
@@ -89,16 +81,13 @@ pub fn target_scheme(target: &str) -> (AddressKind, &str) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tomet_ast::{Element, Name, Value};
+    use tomet_ast::{Element, Name, Tuple, Value};
     use tomet_tree::element_new;
 
     fn map_el(name: Name, entries: Vec<(&str, Value)>) -> Element {
         let mut el = element_new(name);
-        el.data.args = Some(Value::Map(
-            entries
-                .into_iter()
-                .map(|(k, v)| (k.to_string(), v))
-                .collect(),
+        el.data.args = Some(Tuple::from_named(
+            entries.into_iter().map(|(k, v)| (k.to_string(), v)),
         ));
         el
     }
@@ -129,12 +118,12 @@ mod tests {
 
     #[test]
     fn bare_positional_link_has_no_named_key() {
-        // `@link(x.md)`: args is a bare `Value::String`, not a map, but
+        // `@link(x.md)`: args is an unnamed entry, but
         // "link" IS in `builtin_positional_arg_key` (-> "target"), so
-        // `normalized_element_args` turns this into a map before
+        // `normalized_element_args` turns this into named before
         // `link_target` ever sees it.
         let mut el = element_new(Name::bare("link"));
-        el.data.args = Some(s("x.md"));
+        el.data.args = Some(Tuple::from_unnamed([s("x.md")]));
         assert_eq!(crate::classify_std_lenient(el.as_view()), ElementKind::Link);
         assert_eq!(
             link_target_of(el.as_view()),
@@ -159,9 +148,9 @@ mod tests {
     fn embed_bare_positional_maps_to_target_via_normalized_args() {
         // `@embed(a.png)`: "embed" IS in builtin_positional_arg_key
         // (-> "target"), so normalized_element_args already turns this
-        // into a map before link_target ever sees it.
+        // into named before link_target ever sees it.
         let mut el = element_new(Name::bare("embed"));
-        el.data.args = Some(s("a.png"));
+        el.data.args = Some(Tuple::from_unnamed([s("a.png")]));
         assert_eq!(
             link_target_of(el.as_view()),
             Some((ElementKind::Embed, "a.png".to_string()))
@@ -252,12 +241,12 @@ mod tests {
 #[cfg(test)]
 mod path_tests {
     use super::*;
-    use tomet_ast::{Element, Name, Value};
+    use tomet_ast::{Element, Name, Tuple, Value};
     use tomet_tree::element_new;
 
     fn path_el(name: &str, value: &str) -> Element {
         let mut el = element_new(Name::bare(name));
-        el.data.args = Some(Value::String(value.to_string()));
+        el.data.args = Some(Tuple::from_unnamed([Value::String(value.to_string())]));
         el
     }
 

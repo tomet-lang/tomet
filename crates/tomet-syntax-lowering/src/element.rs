@@ -8,12 +8,9 @@ use crate::error::{Error, Result};
 use crate::lower::error_node::lower_error;
 use crate::lower::form::{LoweredSlot, lower_element, lower_slot, slot_of};
 use crate::lower::groups::{lower_content, lower_embedded};
-use tomet_ast::{Block, Connect, Data, Entry, Group, Id, Placement, Value};
+use tomet_ast::{Block, Connect, Data, Entry, Group, Id, Placement, Tuple, TupleEntry, Value};
 use tomet_cst::{SyntaxElement, SyntaxKind as K, SyntaxNode, SyntaxToken};
 use tomet_tree::ElementExt;
-
-/// Sentinel key for a positional (unkeyed) entry inside a map body or args.
-pub const POSITIONAL_ENTRY_KEY: &str = "";
 
 pub(crate) fn duplicate_key_error(pos: usize, key: &str) -> Error {
     err(pos, format!("duplicate key `{key}`"))
@@ -36,14 +33,17 @@ pub(crate) struct Groups {
     pub content: Option<Vec<Block>>,
     pub id: Option<Id>,
     pub connects: Vec<Connect>,
+    /// The nodes that wrote `data.args` and `data.value` so far, in the order they were read:
+    /// what a later nameless connect clashes with, when it writes an entry a second time.
+    pub args_writers: Vec<SyntaxNode>,
+    pub value_writers: Vec<SyntaxNode>,
 }
 
-/// Lowers an `ARGS` node (`(...)`) into a [`Value`].
+/// Lowers an `ARGS` node (`(...)`) into a [`Tuple`].
 ///
-/// An empty `()` is `Value::Map(Vec::new())`.
-/// A single positional value unboxes to that value (e.g. `(42)` -> `Value::Int(42)`).
-/// Otherwise, returns a `Value::Map` of the entries.
-pub(crate) fn lower_paren_value(node: &SyntaxNode) -> Result<Value> {
+/// An empty `()` is `Tuple::new()`.
+/// A single positional value `(x)` is a tuple with one unnamed entry (no unboxing).
+pub(crate) fn lower_paren_value(node: &SyntaxNode) -> Result<Tuple> {
     let closed = node.children_with_tokens().any(|e| e.kind() == K::R_PAREN)
         || (node.children().any(|c| c.kind() == K::ERROR)
             && node.text().to_string().trim_end().ends_with(')'));
@@ -54,7 +54,7 @@ pub(crate) fn lower_paren_value(node: &SyntaxNode) -> Result<Value> {
 
     if entry_children.is_empty() {
         if closed {
-            return Ok(Value::Map(Vec::new()));
+            return Ok(Tuple::new());
         } else {
             return Err(err(
                 usize::from(node.text_range().end()),
@@ -63,16 +63,13 @@ pub(crate) fn lower_paren_value(node: &SyntaxNode) -> Result<Value> {
         }
     }
 
-    let mut entries = lower_map_entries(node, false, true)?;
+    let entries = lower_tuple_entries(node, false, true)?;
 
     if !closed {
         return Err(err(usize::from(node.text_range().end()), "expected ')'"));
     }
 
-    if entries.len() == 1 && entries[0].0 == POSITIONAL_ENTRY_KEY {
-        return Ok(entries.pop().unwrap().1);
-    }
-    Ok(Value::Map(entries))
+    Ok(entries)
 }
 
 /// Lowers an `ID_GROUP` node (`#(id)`) into an [`Id`].
@@ -198,13 +195,13 @@ pub(crate) fn lower_value_group(node: &SyntaxNode) -> Result<Group> {
             K::ERROR => return Err(lower_error(child)),
             K::MAP_ENTRY => {
                 let (key, value, offset) = lower_map_entry(child)?;
-                if key == POSITIONAL_ENTRY_KEY {
+                let Some(key) = key else {
                     return Err(err(
                         offset,
                         "a '{...}' group holds 'key: value' entries or elements; \
                          write a bare value in '(args)' instead",
                     ));
-                }
+                };
                 if entries
                     .iter()
                     .any(|e| matches!(e, Entry::Pair(k, _) if *k == key))
@@ -293,41 +290,41 @@ pub(crate) fn lower_value(root: &SyntaxNode) -> Result<Value> {
         .children()
         .any(|c| matches!(c.kind(), K::MAP_ENTRY | K::SEQ_ITEM | K::ERROR));
     if !has_entries {
-        return Ok(Value::Map(Vec::new()));
+        return Ok(Value::Tuple(Tuple::new()));
     }
 
-    let mut entries = lower_map_entries(root, false, true)?;
-    if entries.len() == 1 && entries[0].0 == POSITIONAL_ENTRY_KEY {
-        return Ok(entries.pop().unwrap().1);
+    let tuple = lower_tuple_entries(root, false, true)?;
+    if tuple.len() == 1 && tuple.has_no_named() {
+        return Ok(tuple.into_entries().next().unwrap().into_value());
     }
-    Ok(Value::Map(entries))
+    Ok(Value::Tuple(tuple))
 }
 
-/// Lowers a root value node from `parse_cst_value` into a map [`Value`], requiring keyed entries only.
+/// Lowers a root value node from `parse_cst_value` into a tuple [`Value`], requiring named entries only.
 pub(crate) fn lower_file_body(root: &SyntaxNode) -> Result<Value> {
     let has_entries = root
         .children()
         .any(|c| matches!(c.kind(), K::MAP_ENTRY | K::SEQ_ITEM | K::ERROR));
     if !has_entries {
-        return Ok(Value::Map(Vec::new()));
+        return Ok(Value::Tuple(Tuple::new()));
     }
 
-    let entries = lower_map_entries(root, true, true)?;
-    Ok(Value::Map(entries))
+    let entries = lower_tuple_entries(root, true, true)?;
+    Ok(Value::Tuple(entries))
 }
 
-/// Lowers child `MAP_ENTRY` and `SEQ_ITEM` nodes into `(key, value)` pairs.
-pub(crate) fn lower_map_entries(
+/// Lowers child `MAP_ENTRY` and `SEQ_ITEM` nodes into a [`Tuple`].
+pub(crate) fn lower_tuple_entries(
     node: &SyntaxNode,
     keyed_only: bool,
     require_separator: bool,
-) -> Result<Vec<(String, Value)>> {
+) -> Result<Tuple> {
     let entry_children: Vec<SyntaxNode> = node
         .children()
         .filter(|c| matches!(c.kind(), K::MAP_ENTRY | K::SEQ_ITEM | K::ERROR))
         .collect();
 
-    let mut entries = Vec::new();
+    let mut entries: Vec<TupleEntry> = Vec::new();
     for (i, child) in entry_children.iter().enumerate() {
         match child.kind() {
             K::ERROR => {
@@ -340,13 +337,23 @@ pub(crate) fn lower_map_entries(
             }
             K::MAP_ENTRY => {
                 let (key, value, offset) = lower_map_entry(child)?;
-                if keyed_only && key == POSITIONAL_ENTRY_KEY {
-                    return Err(err(offset, "expected 'key: value' entry, found bare value"));
+                match key {
+                    None => {
+                        if keyed_only {
+                            return Err(err(
+                                offset,
+                                "expected 'key: value' entry, found bare value",
+                            ));
+                        }
+                        entries.push(TupleEntry::unnamed(value));
+                    }
+                    Some(key) => {
+                        if entries.iter().any(|e| e.name() == Some(key.as_str())) {
+                            return Err(duplicate_key_error(offset, &key));
+                        }
+                        entries.push(TupleEntry::named(key, value));
+                    }
                 }
-                if key != POSITIONAL_ENTRY_KEY && entries.iter().any(|(k, _)| k == &key) {
-                    return Err(duplicate_key_error(offset, &key));
-                }
-                entries.push((key, value));
             }
             K::SEQ_ITEM => {
                 let offset = usize::from(child.text_range().start());
@@ -355,7 +362,7 @@ pub(crate) fn lower_map_entries(
                 if keyed_only {
                     return Err(err(offset, "expected 'key: value' entry, found bare value"));
                 }
-                entries.push((POSITIONAL_ENTRY_KEY.to_string(), val));
+                entries.push(TupleEntry::unnamed(val));
             }
             _ => {}
         }
@@ -384,16 +391,16 @@ pub(crate) fn lower_map_entries(
             }
         }
     }
-    Ok(entries)
+    Ok(Tuple::from_entries(entries))
 }
 
 /// Lowers one `MAP_ENTRY` node into `(key, value, offset)`.
-pub(crate) fn lower_map_entry(node: &SyntaxNode) -> Result<(String, Value, usize)> {
+pub(crate) fn lower_map_entry(node: &SyntaxNode) -> Result<(Option<String>, Value, usize)> {
     let start = usize::from(node.text_range().start());
     let colon = node.children_with_tokens().find(|e| e.kind() == K::COLON);
     let Some(colon) = colon else {
         let val = lower_single_value_from_children(node.children_with_tokens(), false, start)?;
-        return Ok((POSITIONAL_ENTRY_KEY.to_string(), val, start));
+        return Ok((None, val, start));
     };
 
     let colon_start = usize::from(colon.text_range().start());
@@ -433,11 +440,7 @@ pub(crate) fn lower_map_entry(node: &SyntaxNode) -> Result<(String, Value, usize
     if is_scheme_uri {
         let text = node.text().to_string();
         let trimmed = text.trim();
-        return Ok((
-            POSITIONAL_ENTRY_KEY.to_string(),
-            Value::String(trimmed.to_string()),
-            start,
-        ));
+        return Ok((None, Value::String(trimmed.to_string()), start));
     }
 
     if key_tokens.iter().any(|t| t.kind() == K::DOLLAR) {
@@ -445,7 +448,7 @@ pub(crate) fn lower_map_entry(node: &SyntaxNode) -> Result<(String, Value, usize
     }
 
     let key = if key_tokens.is_empty() {
-        String::new()
+        None
     } else if key_tokens[0].kind() == K::STRING_LITERAL {
         let token = &key_tokens[0];
         let offset = usize::from(token.text_range().start());
@@ -453,13 +456,14 @@ pub(crate) fn lower_map_entry(node: &SyntaxNode) -> Result<(String, Value, usize
         if unescaped.is_empty() {
             return Err(err(offset, "a quoted key must not be empty"));
         }
-        unescaped
+        Some(unescaped)
     } else {
         let mut k = String::new();
         for t in &key_tokens {
             k.push_str(t.text());
         }
-        k.trim().to_string()
+        let trimmed = k.trim();
+        (!trimmed.is_empty()).then(|| trimmed.to_string())
     };
 
     let elements_after_colon: Vec<SyntaxElement> = node
@@ -576,12 +580,16 @@ fn lower_single_value_from_children(
                     if !closed {
                         return Err(err(usize::from(n.text_range().end()), "expected '}'"));
                     }
-                    let entries = lower_map_entries(n, false, false)?;
-                    return Ok(Value::Map(entries));
+                    let entries = lower_tuple_entries(n, false, false)?;
+                    return Ok(Value::Tuple(entries));
                 }
-                // A bare `(a, b)` is a sequence: a value has no infix
+                // A bare `(a, b)` is a tuple of unnamed entries: a value has no infix
                 // arithmetic, so no parenthesis here can group anything.
-                K::ARGS => return Ok(Value::Seq(lower_call_args(n, false)?)),
+                K::ARGS => {
+                    return Ok(Value::Tuple(Tuple::from_unnamed(lower_call_args(
+                        n, false,
+                    )?)));
+                }
                 _ => {}
             },
             SyntaxElement::Token(t) if t.kind() == K::STRING_LITERAL => {
@@ -842,7 +850,7 @@ pub fn resolve_call(name: &str, args: Vec<Value>) -> std::result::Result<Value, 
         "string" => construct_string(args),
         "int" => construct_int(args),
         "float" => construct_float(args),
-        _ => Ok(Value::Call(name.to_string(), args)),
+        _ => Ok(Value::Call(name.to_string(), Tuple::from_unnamed(args))),
     }
 }
 

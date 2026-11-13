@@ -4,7 +4,7 @@
 
 use super::{range_of, unsupported};
 use crate::error::Result;
-use tomet_ast::{Block, Inline, Name, Paragraph, Placement, RawText, Value};
+use tomet_ast::{Block, Inline, Name, Paragraph, Placement, RawText, Tuple, Value};
 use tomet_cst::{AstNode, CstCodeBlock, SyntaxNode};
 use tomet_span::Span;
 use tomet_tree::{ElementExt, element_new};
@@ -61,7 +61,10 @@ pub(super) fn lower_code_block(node: &SyntaxNode) -> Result<Block> {
             content_span,
         ))]);
     if !lang.is_empty() {
-        element.data.args = Some(Value::Map(vec![("lang".to_string(), Value::String(lang))]));
+        element.data.args = Some(Tuple::from_named(vec![(
+            "lang".to_string(),
+            Value::String(lang),
+        )]));
     }
     Ok(Block::Element(element))
 }

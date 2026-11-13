@@ -1,6 +1,6 @@
 //! Directive promotion and Value DSL normalization transformations.
 
-use tomet_ast::{Declaration, File, Value};
+use tomet_ast::{Declaration, File, Tuple, Value};
 use tomet_semantics::DeclKind;
 use tomet_semantics::{ElementKind, classify_declaration_lenient};
 use tomet_tree::{DataExt, declaration_new, for_each_declaration_mut};
@@ -36,8 +36,7 @@ where
     let is_empty = match &prop_val {
         Value::Null => true,
         Value::String(s) => s.trim().is_empty(),
-        Value::Seq(items) => items.is_empty(),
-        Value::Map(entries) => entries.is_empty(),
+        Value::Tuple(tuple) => tuple.is_empty(),
         _ => false,
     };
 
@@ -60,7 +59,11 @@ where
     };
 
     let mut new_directive = declaration_new(target_directive_name);
-    new_directive.data.args = Some(prop_val);
+    let args = match prop_val {
+        Value::Tuple(tuple) => tuple,
+        other => Tuple::from_unnamed([other]),
+    };
+    new_directive.data.args = Some(args);
 
     doc.header.insert(insert_pos, new_directive);
     true

@@ -11,7 +11,7 @@
 //! - (Data-only evaluation)
 //!   | Evaluates expressions in value positions of a `.ctmt` file, replacing
 //!   | expressions with their evaluated data values (`Value::String`, `Value::Int`,
-//!   | `Value::Float`, `Value::Bool`, `Value::Seq`, `Value::Map`, `Value::Null`).
+//!   | `Value::Float`, `Value::Bool`, `Value::Tuple`, `Value::Null`).
 //! - (No vault access)
 //!   | Evaluation runs with `NoResolver`. Address expressions (`$tmt(...)`, `$addr(...)`,
 //!   | `$ref(...)`, `$include(...)`) are rejected, and so is a type (`$list(string)`):
@@ -35,7 +35,7 @@ use std::collections::HashMap;
 use std::fmt;
 
 pub type File = tomet_ast::File<Value>;
-use tomet_ast::Value;
+use tomet_ast::{Tuple, Value};
 use tomet_declaration::{DeclKind, Declaration, Host, Problem, check_declarations};
 use tomet_expr::{DocRef, EvalContext, NoResolver};
 use tomet_position::LineIndex;
@@ -177,25 +177,29 @@ fn walk_value(value: Value, lines: &LineIndex, cx: &EvalContext, errors: &mut Ve
                 Value::Interp(interp)
             }
         },
-        Value::Map(entries) => {
-            let mut new_entries = Vec::with_capacity(entries.len());
-            for (k, v) in entries {
-                let new_v = walk_value(v, lines, cx, errors);
-                new_entries.push((k, new_v));
+        Value::Tuple(tuple) => {
+            let mut new_tuple = Tuple::new();
+            for entry in tuple {
+                let (name, val) = entry.into_parts();
+                let new_v = walk_value(val, lines, cx, errors);
+                if let Some(name) = name {
+                    new_tuple.push_named(name, new_v);
+                } else {
+                    new_tuple.push_unnamed(new_v);
+                }
             }
-            Value::Map(new_entries)
-        }
-        Value::Seq(items) => {
-            let mut new_items = Vec::with_capacity(items.len());
-            for item in items {
-                new_items.push(walk_value(item, lines, cx, errors));
-            }
-            Value::Seq(new_items)
+            Value::Tuple(new_tuple)
         }
         Value::Call(name, args) => {
-            let mut new_args = Vec::with_capacity(args.len());
-            for arg in args {
-                new_args.push(walk_value(arg, lines, cx, errors));
+            let mut new_args = Tuple::new();
+            for entry in args {
+                let (name, val) = entry.into_parts();
+                let new_v = walk_value(val, lines, cx, errors);
+                if let Some(name) = name {
+                    new_args.push_named(name, new_v);
+                } else {
+                    new_args.push_unnamed(new_v);
+                }
             }
             Value::Call(name, new_args)
         }
@@ -218,19 +222,18 @@ pos: $macro.vocab("writ", "1.0.0")
 nam: $macro.named(who: "world")
 "#;
         let file = eval_str(src, &[]).unwrap();
-        let Value::Map(entries) = file.body else {
-            panic!("expected map");
+        let Value::Tuple(tuple) = file.body else {
+            panic!("expected tuple");
         };
         assert_eq!(
-            entries[0],
-            (
-                "pos".to_string(),
-                Value::String("vocabularies/writ/writ@1.0.0.vocabulary.tmt".to_string())
-            )
+            tuple.get("pos"),
+            Some(&Value::String(
+                "vocabularies/writ/writ@1.0.0.vocabulary.tmt".to_string()
+            ))
         );
         assert_eq!(
-            entries[1],
-            ("nam".to_string(), Value::String("hello world".to_string()))
+            tuple.get("nam"),
+            Some(&Value::String("hello world".to_string()))
         );
     }
 
@@ -284,31 +287,25 @@ nam: $macro.named(who: "world")
     fn var_default() {
         let src = "::var(rev: { type: string, default: \"main\" })\na: $(var.rev)\n";
         let file = eval_str(src, &[]).unwrap();
-        let Value::Map(entries) = file.body else {
-            panic!("expected map");
+        let Value::Tuple(tuple) = file.body else {
+            panic!("expected tuple");
         };
-        assert_eq!(
-            entries[0],
-            ("a".to_string(), Value::String("main".to_string()))
-        );
+        assert_eq!(tuple.get("a"), Some(&Value::String("main".to_string())));
     }
 
     #[test]
     fn var_that_holds_a_list_giving_a_list() {
         let src = "::var(tags: { type: list, default: (\"a\", \"b\") })\na: $(var.tags)\n";
         let file = eval_str(src, &[]).unwrap();
-        let Value::Map(entries) = file.body else {
-            panic!("expected map");
+        let Value::Tuple(tuple) = file.body else {
+            panic!("expected tuple");
         };
         assert_eq!(
-            entries[0],
-            (
-                "a".to_string(),
-                Value::Seq(vec![
-                    Value::String("a".to_string()),
-                    Value::String("b".to_string())
-                ])
-            )
+            tuple.get("a"),
+            Some(&Value::Tuple(Tuple::from_unnamed([
+                Value::String("a".to_string()),
+                Value::String("b".to_string())
+            ])))
         );
     }
 
@@ -325,15 +322,15 @@ nam: $macro.named(who: "world")
 
         // ...and a value the caller passes for a declared name is used as it is.
         let src = "::var(cfg: { type: string, default: \"none\" })\na: $(var.cfg)\n";
-        let passed = Value::Map(vec![(
+        let passed = Value::Tuple(Tuple::from_named([(
             "host".to_string(),
             Value::String("localhost".to_string()),
-        )]);
+        )]));
         let file = eval_str(src, &[("cfg".to_string(), passed.clone())]).unwrap();
-        let Value::Map(entries) = file.body else {
-            panic!("expected map");
+        let Value::Tuple(tuple) = file.body else {
+            panic!("expected tuple");
         };
-        assert_eq!(entries[0], ("a".to_string(), passed));
+        assert_eq!(tuple.get("a"), Some(&passed));
     }
 
     #[test]
@@ -344,13 +341,10 @@ nam: $macro.named(who: "world")
             &[("rev".to_string(), Value::String("feature".to_string()))],
         )
         .unwrap();
-        let Value::Map(entries) = file.body else {
-            panic!("expected map");
+        let Value::Tuple(tuple) = file.body else {
+            panic!("expected tuple");
         };
-        assert_eq!(
-            entries[0],
-            ("a".to_string(), Value::String("feature".to_string()))
-        );
+        assert_eq!(tuple.get("a"), Some(&Value::String("feature".to_string())));
     }
 
     #[test]
@@ -396,10 +390,10 @@ nam: $macro.named(who: "world")
     fn built_in_add() {
         let src = "a: $add(1, 2)\n";
         let file = eval_str(src, &[]).unwrap();
-        let Value::Map(entries) = file.body else {
-            panic!("expected map");
+        let Value::Tuple(tuple) = file.body else {
+            panic!("expected tuple");
         };
-        assert_eq!(entries[0], ("a".to_string(), Value::Int(3)));
+        assert_eq!(tuple.get("a"), Some(&Value::Int(3)));
     }
 
     #[test]
@@ -420,15 +414,14 @@ nam: $macro.named(who: "world")
     fn expression_nested_in_map_in_list() {
         let src = "items: ({ num: $add(10, 20) })\n";
         let file = eval_str(src, &[]).unwrap();
-        let Value::Map(entries) = file.body else {
-            panic!("expected map");
+        let Value::Tuple(tuple) = file.body else {
+            panic!("expected tuple");
         };
         assert_eq!(
-            entries[0],
-            (
-                "items".to_string(),
-                Value::Seq(vec![Value::Map(vec![("num".to_string(), Value::Int(30))])])
-            )
+            tuple.get("items"),
+            Some(&Value::Tuple(Tuple::from_unnamed([Value::Tuple(
+                Tuple::from_named([("num".to_string(), Value::Int(30))])
+            )])))
         );
     }
 
@@ -436,15 +429,12 @@ nam: $macro.named(who: "world")
     fn quoted_expression_left_as_text() {
         let src = "a: \"$macro.vocab(\\\"writ\\\")\"\n";
         let file = eval_str(src, &[]).unwrap();
-        let Value::Map(entries) = file.body else {
-            panic!("expected map");
+        let Value::Tuple(tuple) = file.body else {
+            panic!("expected tuple");
         };
         assert_eq!(
-            entries[0],
-            (
-                "a".to_string(),
-                Value::String("$macro.vocab(\"writ\")".to_string())
-            )
+            tuple.get("a"),
+            Some(&Value::String("$macro.vocab(\"writ\")".to_string()))
         );
     }
 

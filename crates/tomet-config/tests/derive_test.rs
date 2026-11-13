@@ -1,6 +1,6 @@
 extern crate tomet_config as tomet_spec;
 
-use tomet_ast::Value;
+use tomet_ast::{Tuple, Value};
 use tomet_config::Config;
 use tomet_config::all_config_specs;
 use tomet_config::schema::{ConfigEntrySpec, ConfigSpecProvider};
@@ -69,32 +69,32 @@ fn test_flatten_and_custom_parser() {
         }
     );
 
-    let root = Value::Map(vec![
+    let root = Value::Tuple(Tuple::from_named([
         (
             "section".to_string(),
-            Value::Map(vec![(
+            Value::Tuple(Tuple::from_named([(
                 "space_inside_brackets".to_string(),
                 Value::Bool(true),
-            )]),
+            )])),
         ),
         (
             "link".to_string(),
-            Value::Map(vec![(
+            Value::Tuple(Tuple::from_named([(
                 "group_order".to_string(),
                 Value::String("content".to_string()),
-            )]),
+            )])),
         ),
         (
             "callout".to_string(),
-            Value::Map(vec![(
+            Value::Tuple(Tuple::from_named([(
                 "style".to_string(),
-                Value::Map(vec![(
+                Value::Tuple(Tuple::from_named([(
                     "content".to_string(),
                     Value::String("quote".to_string()),
-                )]),
-            )]),
+                )])),
+            )])),
         ),
-    ]);
+    ]));
 
     let cfg = FormatConfig::from_root(&root);
     assert!(cfg.section_space);
