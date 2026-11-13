@@ -72,7 +72,7 @@ pub enum Node<'a> {
     Block(&'a Block),
     Inline(&'a Inline),
     Value(&'a Value),
-    /// An entry of a `{...}` group: a `key: value` pair, an element, a hole or a bare entry.
+    /// An entry of a `{...}` group: a `key: value` pair, an element or a hole.
     Entry(&'a Entry),
     Connect(&'a Connect),
     Item(&'a ListItem),
@@ -115,7 +115,6 @@ impl<'a> Node<'a> {
             Node::List(l) => Some(l.span),
             Node::Entry(Entry::Element(e)) => Some(e.span),
             Node::Entry(Entry::Hole(h)) => Some(h.span),
-            Node::Entry(Entry::Bare(b)) => Some(b.span),
             Node::Entry(Entry::Pair(..)) => None,
             Node::Value(Value::Element(e)) => Some(e.span),
             Node::Value(Value::Hole(h)) => Some(h.span),
@@ -159,14 +158,13 @@ impl<'a> Node<'a> {
     }
 
     /// The `#(id)` this node carries, if it is a kind that can: an element, a declaration, a
-    /// section, a list, a list item or a bare entry.
+    /// section, a list or a list item.
     pub fn id(self) -> Option<&'a Id> {
         match self {
             Node::Declaration(d) => d.id.as_ref(),
             Node::Block(Block::Section(s)) => s.id.as_ref(),
             Node::Block(Block::List(l)) | Node::List(l) => l.id.as_ref(),
             Node::Item(item) => item.id.as_ref(),
-            Node::Entry(Entry::Bare(b)) => b.id.as_ref(),
             other => other.element().and_then(|el| el.id.as_ref()),
         }
     }
@@ -268,7 +266,6 @@ pub fn children<'a>(node: Node<'a>, f: &mut dyn FnMut(Node<'a>, Place)) {
             Entry::Pair(_, v) => f(Node::Value(v), Place::PairValue),
             Entry::Element(el) => element(el, f),
             Entry::Hole(h) => groups(&h.data, h.content.as_deref(), f),
-            Entry::Bare(b) => groups(&b.data, b.content.as_deref(), f),
         },
         Node::Connect(c) => groups(&c.data, c.content.as_deref(), f),
         Node::Item(item) => {
@@ -741,10 +738,6 @@ impl<S: Sink> MutWalk<'_, S> {
                     Entry::Pair(_, v) => self.value(v),
                     Entry::Element(el) => self.element(el),
                     Entry::Hole(h) => self.groups(&mut h.data, h.content.as_deref_mut()),
-                    Entry::Bare(b) => {
-                        self.sink.id(&mut b.id, b.span);
-                        self.groups(&mut b.data, b.content.as_deref_mut());
-                    }
                 }
             }
         }
@@ -814,7 +807,7 @@ pub fn for_each_declaration_mut(file: &mut File, mut f: impl FnMut(&mut Declarat
 }
 
 /// Hands `f` the `#(id)` of every node of `file` that can carry one (an element, a declaration, a
-/// section, a list, a list item, a bare entry), with the node's span, in document order, each node
+/// section, a list or a list item), with the node's span, in document order, each node
 /// before what it holds. It goes into `::connect`s too, as [`for_each_node`] does; the nodes it
 /// reaches are those for which [`Node::id`] answers.
 pub fn for_each_id_mut(file: &mut File, f: impl FnMut(&mut Option<Id>, Span)) {

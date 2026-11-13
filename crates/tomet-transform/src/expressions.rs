@@ -338,11 +338,6 @@ impl Pass<'_> {
                 .map(|entry| match entry {
                     Entry::Pair(key, value) => Entry::Pair(key, self.value(value)),
                     Entry::Element(el) => Entry::Element(self.element(el)),
-                    Entry::Bare(mut bare) => {
-                        bare.data = self.data(bare.data);
-                        bare.content = self.content(bare.content);
-                        Entry::Bare(bare)
-                    }
                     Entry::Hole(hole) => Entry::Hole(hole),
                 })
                 .collect(),

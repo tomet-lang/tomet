@@ -155,23 +155,6 @@ fn collect_element_value_folding_ranges(
                     collect_element_value_folding_ranges(index, child_val, ranges);
                 }
             }
-            tomet_ast::Entry::Bare(bare) => {
-                let start_line = line0(index, bare.span.start);
-                let end_line = line0(index, bare.span.end);
-                if end_line > start_line {
-                    ranges.push(FoldingRange {
-                        start_line,
-                        start_character: None,
-                        end_line,
-                        end_character: None,
-                        kind: Some(FoldingRangeKind::Region),
-                        collapsed_text: None,
-                    });
-                }
-                if let Some(child_val) = &bare.data.value {
-                    collect_element_value_folding_ranges(index, child_val, ranges);
-                }
-            }
             tomet_ast::Entry::Pair(..) | tomet_ast::Entry::Hole(_) => {}
         }
     }

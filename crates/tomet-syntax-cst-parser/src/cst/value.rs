@@ -183,7 +183,7 @@ impl<'a, 't> CstParser<'a, 't> {
                 // the first `]`, even one inside `` `code` ``.
                 K::L_BRACKET => self.parse_content_group(),
                 K::L_PAREN => self.parse_args_group(),
-                // The `#(id)` of a bare entry, `(1)[text]#(a)`.
+                // An id group: `#(id)`.
                 K::HASH if self.id_follows(self.pos) => self.parse_id_group(),
                 K::QUOTE => self.bump_string_literal(),
                 _ => {

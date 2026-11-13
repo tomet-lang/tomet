@@ -1,5 +1,4 @@
 use super::*;
-use tomet_ast::Entry;
 
 #[test]
 fn parses_section_with_attrs() {
@@ -42,25 +41,12 @@ fn parses_link_with_order_free_groups() {
 }
 
 #[test]
-fn parses_links_container_with_bare_children() {
-    let doc = parse_file("@links() {\n  (1)[ note ]\n  (anotation1)[ note ]\n}\n").unwrap();
-    match &doc.body[0] {
-        Block::Element(el) => {
-            assert_eq!(el.name, Name::bare("links"));
-            match &el.data.value {
-                Some(Group(entries)) => {
-                    let [Entry::Bare(first), Entry::Bare(second)] = entries.as_slice() else {
-                        panic!("expected two bare entries, got {entries:?}");
-                    };
-                    assert_eq!(first.data.args, Some(Value::Int(1)));
-                    assert_eq!(first.content, wrap(vec![Inline::Text("note".into())]));
-                    assert_eq!(second.data.args, Some(Value::String("anotation1".into())));
-                }
-                other => panic!("expected children, got {other:?}"),
-            }
-        }
-        other => panic!("expected element, got {other:?}"),
-    }
+fn a_nameless_entry_in_a_value_group_is_rejected_with_advice() {
+    let err = parse_file("@memo(){\n  (1)[ first ]\n  (2)[ second ]\n}\n").unwrap_err();
+    assert_eq!(
+        err.message,
+        "a '{...}' group takes no nameless entry: write a named element, '@name(...)[...]', as an entry"
+    );
 }
 
 #[test]
@@ -111,18 +97,10 @@ fn a_name_must_be_ascii_to_start_an_element() {
 }
 
 #[test]
-fn a_bare_entry_takes_args_content_and_value_like_a_named_one() {
-    let doc = parse_file("@memo(){ (1)[ ひとつ ]{ id: a } }\n").unwrap();
-    let Block::Element(el) = &doc.body[0] else {
-        panic!()
-    };
-    let Some(Group(entries)) = &el.data.value else {
-        panic!()
-    };
-    let [Entry::Bare(bare)] = entries.as_slice() else {
-        panic!("expected one bare entry, got {entries:?}");
-    };
-    assert_eq!(bare.data.args, Some(Value::Int(1)));
-    assert!(bare.content.is_some());
-    assert!(bare.data.value.is_some());
+fn inline_nameless_entry_in_value_group_is_rejected() {
+    let err = parse_file("@memo(){ (1)[ ひとつ ]{ id: a } }\n").unwrap_err();
+    assert_eq!(
+        err.message,
+        "a '{...}' group takes no nameless entry: write a named element, '@name(...)[...]', as an entry"
+    );
 }

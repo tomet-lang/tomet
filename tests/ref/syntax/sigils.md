@@ -28,12 +28,6 @@ ASCII でない名前は要素にならない。
 
 # 引数も値も取れる
 
-# `{}` は常にデータ
-
-<div data-tm-kind="memo"></div>
-
-<div data-tm-kind="deck.card"></div>
-
 # 未完成の印
 
 文書が自分について言う印。`@draft` はそこに文章が無いこと、`@fixme` は

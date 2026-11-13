@@ -791,28 +791,6 @@ impl Declaration {
     }
 }
 
-/// A nameless entry of a `{...}` group, `(marker)[content]`: the container
-/// already supplies what it is (the `(1)[...]` entries of `@links(){ ... }`),
-/// so it has no name. It takes the groups an element does and no connect.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct Bare {
-    pub data: Data,
-    pub content: Option<Vec<Block>>,
-    pub id: Option<Id>,
-    pub span: Span,
-}
-
-impl Bare {
-    /// A zero-copy borrowed view of this bare entry's body groups.
-    pub fn as_body_view(&self) -> BodyView<'_> {
-        BodyView {
-            data: &self.data,
-            content: self.content.as_deref(),
-            id: self.id.as_ref(),
-        }
-    }
-}
-
 /// A `<?matcher(name, args){options}>[content]` hole: the description of a value that is
 /// not there yet, in a pattern.
 ///
@@ -1080,8 +1058,6 @@ pub enum Entry {
     Pair(String, Value),
     /// A named entry, `@name(...)`.
     Element(Element),
-    /// A nameless entry, `(marker)[content]`. See [`Bare`].
-    Bare(Bare),
     /// A `<?matcher(...)>` hole standing as an entry. See [`Hole`].
     Hole(Hole),
 }
@@ -1096,7 +1072,7 @@ pub enum Entry {
 ///
 /// `Group` holds a source-order sequence of entries (`Group(pub Vec<Entry>)`)
 /// and provides map operations exclusively for [`Entry::Pair`] entries.
-/// Non-pair entries ([`Entry::Element`], [`Entry::Bare`], [`Entry::Hole`]) are
+/// Non-pair entries ([`Entry::Element`], [`Entry::Hole`]) are
 /// handled directly by callers through exhaustive pattern matching.
 #[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
 pub struct Group(pub Vec<Entry>);
@@ -1126,7 +1102,7 @@ impl Group {
                 .iter()
                 .filter_map(|e| match e {
                     Entry::Pair(k, v) => Some((k.clone(), v.clone())),
-                    Entry::Element(_) | Entry::Bare(_) | Entry::Hole(_) => None,
+                    Entry::Element(_) | Entry::Hole(_) => None,
                 })
                 .collect(),
         )
@@ -1137,7 +1113,7 @@ impl Group {
         let Group(entries) = self;
         entries.iter().filter_map(|e| match e {
             Entry::Pair(k, v) => Some((k, v)),
-            Entry::Element(_) | Entry::Bare(_) | Entry::Hole(_) => None,
+            Entry::Element(_) | Entry::Hole(_) => None,
         })
     }
 
@@ -1146,7 +1122,7 @@ impl Group {
         let Group(entries) = self;
         entries.iter_mut().filter_map(|e| match e {
             Entry::Pair(k, v) => Some((k, v)),
-            Entry::Element(_) | Entry::Bare(_) | Entry::Hole(_) => None,
+            Entry::Element(_) | Entry::Hole(_) => None,
         })
     }
 
@@ -1174,7 +1150,7 @@ impl Group {
             .position(|e| matches!(e, Entry::Pair(k, _) if k == key))?;
         match entries.remove(idx) {
             Entry::Pair(_, v) => Some(v),
-            Entry::Element(_) | Entry::Bare(_) | Entry::Hole(_) => {
+            Entry::Element(_) | Entry::Hole(_) => {
                 unreachable!("position matched a Pair")
             }
         }
@@ -1634,7 +1610,7 @@ mod tests {
         assert!(plain_item.as_element_view().is_none());
         assert_eq!(plain_item.as_body_view(), body);
 
-        // BodyView on Declaration, Bare, Hole, Connect
+        // BodyView on Declaration, Hole, Connect
         let decl = Declaration {
             name: name.clone(),
             data: data.clone(),
@@ -1643,14 +1619,6 @@ mod tests {
             span: Span::dummy(),
         };
         assert_eq!(decl.as_body_view(), body);
-
-        let bare = Bare {
-            data: data.clone(),
-            content: Some(content_blocks.clone()),
-            id: Some(id.clone()),
-            span: Span::dummy(),
-        };
-        assert_eq!(bare.as_body_view(), body);
 
         let hole = Hole {
             matcher: Some(name.clone()),

@@ -594,113 +594,6 @@ Block  @memo
 unknown element `memo`: only `std` and this document's own `::kind` may be written bare; namespace it (`ns.memo`), or declare the vocabulary that has it and bind it with `::use`
 ```
 
-### 要素の並び
-
-```tmt
-@memo(){
-  (1)[ ひとつ ]
-  (2)[ ふたつ ]
-}
-```
-
-```
-Block  @memo
-  args    {}
-  group
-    Bare
-      args    1
-      content
-        Paragraph
-          Text "ひとつ"
-    Bare
-      args    2
-      content
-        Paragraph
-          Text "ふたつ"
-```
-
-検証:
-
-```
-unknown element `memo`: only `std` and this document's own `::kind` may be written bare; namespace it (`ns.memo`), or declare the vocabulary that has it and bind it with `::use`
-```
-
-### 対と要素の混在。並び順は保たれる
-
-```tmt
-@deck.card(){ t: x, (a)[ y ], u: z }
-```
-
-```
-Block  @deck.card
-  args    {}
-  group
-    t: "x"
-    Bare
-      args    "a"
-      content
-        Paragraph
-          Text "y"
-    u: "z"
-```
-
-検証:
-
-```
-`deck.card`: the namespace `deck` is not in scope -- declare its vocabulary in `vocabularies` and write `::use(deck)`
-```
-
-### 裸のエントリも名前つき要素と同じ三つのグループを取る。シジルが無いだけで、読む道は同じ
-
-```tmt
-@memo(){ (1)[ ひとつ ]{ id: a } }
-```
-
-```
-Block  @memo
-  args    {}
-  group
-    Bare
-      args    1
-      content
-        Paragraph
-          Text "ひとつ"
-      group
-        id: "a"
-```
-
-検証:
-
-```
-unknown element `memo`: only `std` and this document's own `::kind` may be written bare; namespace it (`ns.memo`), or declare the vocabulary that has it and bind it with `::use`
-```
-
-### グループを次の行に置いてもよい。`@name` と同じ
-
-```tmt
-@memo(){
-  (1)
-  [ ひとつ ]
-}
-```
-
-```
-Block  @memo
-  args    {}
-  group
-    Bare
-      args    1
-      content
-        Paragraph
-          Text "ひとつ"
-```
-
-検証:
-
-```
-unknown element `memo`: only `std` and this document's own `::kind` may be written bare; namespace it (`ns.memo`), or declare the vocabulary that has it and bind it with `::use`
-```
-
 ### 空のグループ
 
 ```tmt
@@ -2880,6 +2773,19 @@ parse error: 2:1: a declaration belongs at the top of the file
 
 ```
 parse error: 1:12: a sequence '(...)' holds values, not 'key: value' entries; write a map as '{...}'
+```
+
+### `{...}` の中に名前を持たない項目は書けない。名前つき要素を書く
+
+```tmt
+@memo(){
+  (1)[ ひとつ ]
+  (2)[ ふたつ ]
+}
+```
+
+```
+parse error: 2:3: a '{...}' group takes no nameless entry: write a named element, '@name(...)[...]', as an entry
 ```
 
 ### データの列を `list(...)` とは書かない。呼び出しとして残り、列として読む側（`ignore:` など）が受け付けない

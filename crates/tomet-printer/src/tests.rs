@@ -1,7 +1,7 @@
 use super::*;
 use crate::value::render_value_inner_with_config;
 use tomet_ast::{
-    Bare, Block, Data, Entry, File, Group, Inline, Name, Paragraph, Section, Text, Value,
+    Block, Data, Entry, File, Group, Inline, Name, Paragraph, Section, Text, Value,
 };
 use tomet_config::{FieldConfig, FormatConfig, MetaConfig};
 use tomet_span::Span;
@@ -414,18 +414,13 @@ fn test_codeblock_formatting() {
 #[test]
 fn test_container_children_indentation() {
     let note = |marker: i64, text: &str| {
-        Entry::Bare(Bare {
-            data: Data {
-                args: Some(Value::Int(marker)),
-                value: None,
-            },
-            content: Some(vec![Block::Paragraph(Paragraph::new(
-                vec![Inline::Text(text.into())],
-                Span::dummy(),
-            ))]),
-            id: None,
-            span: Span::dummy(),
-        })
+        let mut el = element_new(Name::bare("item"));
+        el.data.args = Some(Value::Int(marker));
+        el.content = Some(vec![Block::Paragraph(Paragraph::new(
+            vec![Inline::Text(text.into())],
+            Span::dummy(),
+        ))]);
+        Entry::Element(el)
     };
 
     let mut links = element_new(Name::bare("links"));
@@ -433,7 +428,7 @@ fn test_container_children_indentation() {
 
     let doc = File::new(Vec::new(), vec![Block::Element(links)], Span::dummy());
     let printed = document_to_tm(&doc);
-    assert!(printed.contains("@links(){\n  (1)[note 1]\n  (2)[note 2]\n}"));
+    assert!(printed.contains("@links(){\n  @item(1)[note 1]\n  @item(2)[note 2]\n}"));
 
     // Verify re-parsing
     let re_parsed = tomet_ast_parser::parse_file(&printed).expect("valid doc");

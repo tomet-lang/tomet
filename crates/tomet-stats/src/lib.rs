@@ -162,12 +162,6 @@ pub fn measure(doc: &File) -> Stats {
         }
         None => stats.bare += 1,
     });
-    tomet_tree::for_each_node(doc, |node| {
-        if let tomet_tree::Node::Entry(tomet_ast::Entry::Bare(_)) = node {
-            stats.bare += 1;
-        }
-    });
-
     tomet_tree::for_each_declaration(doc, |declaration| {
         stats.document += 1;
         *stats

@@ -224,10 +224,6 @@ pub const KNOWN_TS_ERRORS: &[(&str, &[&str])] = &[
     // reason it is its own fixture -- `syntax/pipe.tmt` stays clean, and
     // this one holds the case that is honestly still drifting.
     ("syntax/pipe-table.tmt", &[ANY_ERROR]),
-    // A `{...}` group mixing a `key: value` pair with a bare element --
-    // `@deck.card{ title: 混在, (a)[ ... ] }`. Predates this list and has
-    // nothing to do with the sigil work.
-    ("syntax/sigils.tmt", &["title: 混在,"]),
     // Two shapes at once, neither of them new. `children` and `value` are
     // alternatives in `value_group`, so a group holding a pair *and* an
     // element errors (the same limitation `syntax/sigils.tmt` records);

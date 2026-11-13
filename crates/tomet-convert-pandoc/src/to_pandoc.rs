@@ -1,7 +1,7 @@
 //! `tomet_ast::File` -> Pandoc's AST.
 
 use tomet_ast::{
-    Bare, Block as TmBlock, BodyView, ElementView, Entry, File, Group, Id, Inline as TmInline,
+    Block as TmBlock, BodyView, ElementView, Entry, File, Group, Id, Inline as TmInline,
     Interpolation, List, Placement, Value,
 };
 use tomet_semantics::{
@@ -559,8 +559,7 @@ fn element_body_blocks(el: ElementView<'_>) -> Vec<Block> {
     body_blocks(el.body())
 }
 
-/// [`element_body_blocks`] for anything that takes the groups an element
-/// does: a bare entry's body is read the same way.
+/// [`element_body_blocks`] for a body view.
 #[deny(clippy::wildcard_enum_match_arm)]
 fn body_blocks(body: BodyView<'_>) -> Vec<Block> {
     let mut blocks = element_content_to_blocks(body.content.unwrap_or(&[]));
@@ -568,25 +567,11 @@ fn body_blocks(body: BodyView<'_>) -> Vec<Block> {
         for entry in entries {
             match entry {
                 Entry::Element(child) => blocks.extend(element_to_blocks(child.as_view())),
-                Entry::Bare(child) => blocks.push(bare_to_block(child)),
                 Entry::Pair(..) | Entry::Hole(_) => {}
             }
         }
     }
     blocks
-}
-
-/// A bare `(marker)[content]` entry of a `{...}` group. It has no name for
-/// a class to carry, so the attribute says so; see [`ENTRY_KEY`].
-fn bare_to_block(bare: &Bare) -> Block {
-    let value = bare.data.value.as_ref().map(|v| v.as_data());
-    let mut attr = attr_from(
-        bare.id.as_ref(),
-        flatten_data(bare.data.args.as_ref(), value.as_ref()).into_pairs(),
-        &[],
-    );
-    attr.2.push((ENTRY_KEY.to_string(), BARE_ENTRY.to_string()));
-    Block::Div(attr, body_blocks(bare.as_body_view()))
 }
 
 /// Content flattened to plain text, for slots that cannot hold markup --
@@ -797,22 +782,6 @@ fn table_alignment(el: ElementView<'_>) -> Alignment {
 }
 
 // ---- attributes ----------------------------------------------------
-
-/// The attribute key that records a bare `(marker)[content]` entry, which has
-/// no name of its own.
-///
-/// Putting one in the `tomet-<name>` class anyway would make `from_pandoc`
-/// rebuild it as an element *named* `bare`, and `@bare` is not a builtin, so
-/// a round-tripped document would stop validating.
-///
-/// A key rather than another class, because a class collides: a document
-/// whose `::kind` names a vocabulary declaring `bare` writes `@bare`
-/// unqualified, and `tomet-bare` would then mean two things. `tomet-data`
-/// established the reserved-key convention this follows.
-pub(crate) const ENTRY_KEY: &str = "tomet-entry";
-
-/// [`ENTRY_KEY`]'s value for a bare entry.
-pub(crate) const BARE_ENTRY: &str = "bare";
 
 /// The `Attr` for an element Pandoc has no equivalent for: its data, plus the
 /// class carrying its name.

@@ -140,9 +140,6 @@ mod tests {
                                     Entry::Element(item) => {
                                         walk(item.content.as_deref().unwrap_or(&[]), found);
                                     }
-                                    Entry::Bare(bare) => {
-                                        walk(bare.content.as_deref().unwrap_or(&[]), found);
-                                    }
                                     Entry::Pair(..) | Entry::Hole(_) => {}
                                 }
                             }

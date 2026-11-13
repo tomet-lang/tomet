@@ -79,8 +79,7 @@ pub(crate) fn find_part(doc: &File, id: &str) -> Option<Part> {
 }
 
 impl Part {
-    /// The expression language's part for a node of the tree, if it has one. A bare entry carries an
-    /// id but is not something an expression can name.
+    /// The expression language's part for a node of the tree, if it has one.
     pub fn from_tree_node(node: tomet_tree::Node<'_>) -> Option<Part> {
         if let Some(el) = node.element() {
             return Some(Part::Element(Box::new(el.clone())));

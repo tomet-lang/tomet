@@ -7,10 +7,9 @@
 use crate::error::{Error, Result};
 use crate::lower::error_node::lower_error;
 use crate::lower::form::{LoweredSlot, lower_element, lower_slot, slot_of};
-use crate::lower::groups::{lower_content, lower_embedded, lower_group_list};
-use tomet_ast::{Bare, Block, Connect, Data, Entry, Group, Id, Placement, Value};
+use crate::lower::groups::{lower_content, lower_embedded};
+use tomet_ast::{Block, Connect, Data, Entry, Group, Id, Placement, Value};
 use tomet_cst::{SyntaxElement, SyntaxKind as K, SyntaxNode, SyntaxToken};
-use tomet_span::Span;
 use tomet_tree::ElementExt;
 
 /// Sentinel key for a positional (unkeyed) entry inside a map body or args.
@@ -219,97 +218,11 @@ pub(crate) fn lower_value_group(node: &SyntaxNode) -> Result<Group> {
                 let first_non_trivia = child.children_with_tokens().find(|e| !e.kind().is_trivia());
                 match first_non_trivia {
                     Some(SyntaxElement::Node(n)) if n.kind() == K::ARGS => {
-                        let start_pos = usize::from(child.text_range().start());
-                        let mut groups: Vec<SyntaxNode> = child
-                            .children()
-                            .filter(|n| {
-                                matches!(
-                                    n.kind(),
-                                    K::ARGS
-                                        | K::VALUE_DATA
-                                        | K::MAP_LITERAL
-                                        | K::CONTENT
-                                        | K::ID_GROUP
-                                )
-                            })
-                            .collect();
-                        let mut end_pos = groups
-                            .last()
-                            .map(|g| usize::from(g.text_range().end()))
-                            .unwrap_or(start_pos);
-
-                        while i + 1 < children.len() {
-                            let next_child = &children[i + 1];
-                            if next_child.kind() != K::SEQ_ITEM {
-                                break;
-                            }
-                            let mut newlines = 0;
-                            let mut cur = children[i].last_token().and_then(|t| t.next_token());
-                            let next_start = next_child.text_range().start();
-                            while let Some(t) = cur {
-                                if t.text_range().start() >= next_start {
-                                    break;
-                                }
-                                if t.kind() == K::NEWLINE {
-                                    newlines += 1;
-                                }
-                                cur = t.next_token();
-                            }
-                            if newlines > 1 {
-                                break;
-                            }
-
-                            let next_groups: Vec<SyntaxNode> = next_child
-                                .children()
-                                .filter(|n| {
-                                    matches!(
-                                        n.kind(),
-                                        K::ARGS
-                                            | K::VALUE_DATA
-                                            | K::MAP_LITERAL
-                                            | K::CONTENT
-                                            | K::ID_GROUP
-                                    )
-                                })
-                                .collect();
-                            if next_groups.is_empty() {
-                                break;
-                            }
-                            if next_groups.iter().any(|g| g.kind() == K::ARGS) {
-                                break;
-                            }
-                            if next_groups
-                                .iter()
-                                .any(|g| groups.iter().any(|taken| taken.kind() == g.kind()))
-                            {
-                                break;
-                            }
-                            let has_other = next_child.children_with_tokens().any(|e| {
-                                !e.kind().is_trivia()
-                                    && !matches!(
-                                        e.kind(),
-                                        K::VALUE_DATA | K::MAP_LITERAL | K::CONTENT | K::ID_GROUP
-                                    )
-                            });
-                            if has_other {
-                                break;
-                            }
-                            end_pos = next_groups
-                                .last()
-                                .map(|g| usize::from(g.text_range().end()))
-                                .unwrap_or(end_pos);
-                            groups.extend(next_groups);
-                            i += 1;
-                        }
-
-                        let read = lower_group_list(groups)?;
-                        entries.push(Entry::Bare(Bare {
-                            data: read.data,
-                            content: read.content,
-                            id: read.id,
-                            span: Span::new(start_pos, end_pos),
-                        }));
-                        i += 1;
+                        let offset = usize::from(child.text_range().start());
+                        return Err(err(
+                            offset,
+                            "a '{...}' group takes no nameless entry: write a named element, '@name(...)[...]', as an entry",
+                        ));
                     }
                     Some(SyntaxElement::Node(n))
                         if matches!(n.kind(), K::INLINE_FORM | K::BLOCK_FORM) =>

@@ -22,7 +22,7 @@ use crate::util::{
     escape_attr, escape_html, id_attr, push_data_attrs, push_value_data_attrs, value_to_plain,
 };
 use crate::{CustomElementCtx, RenderCtx};
-use tomet_ast::{Bare, BodyView, ElementView, Entry, Group, Interpolation};
+use tomet_ast::{BodyView, ElementView, Entry, Group, Interpolation};
 use tomet_semantics::{
     classify_std_lenient, comment_text, extract_tags, is_directive, normalized_element_args_in,
 };
@@ -224,13 +224,6 @@ fn render_generic_element(
     render_generic(cx, kind, el.body(), out, inline);
 }
 
-/// What a bare `(marker)[content]` entry of a `{...}` group is drawn as: the
-/// generic element of the kind `bare`, since the group it sits in is what says
-/// what it is.
-fn render_bare(cx: &RenderCtx, bare: &Bare, out: &mut String) {
-    render_generic(cx, "bare", bare.as_body_view(), out, false);
-}
-
 /// The generic `tm-element` box of an element, or of anything that takes
 /// the same groups.
 fn render_generic(cx: &RenderCtx, kind: &str, body: BodyView<'_>, out: &mut String, inline: bool) {
@@ -266,7 +259,6 @@ fn render_element_value(cx: &RenderCtx, value: &Group, out: &mut String) {
                     Entry::Element(child) => {
                         render_element(cx, child.as_view(), &mut inner, false);
                     }
-                    Entry::Bare(child) => render_bare(cx, child, &mut inner),
                     Entry::Pair(..) | Entry::Hole(_) => {}
                 }
             }

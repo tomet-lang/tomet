@@ -17,9 +17,7 @@
 //! - **A named element inside a `{...}` group returns as body content.**
 //!   Pandoc cannot say "this `Div` was a group entry rather than part of
 //!   the body", so `@deck.card(){ title: x, @note[y] }` comes back with the
-//!   entry in `[content]`. A bare `(a)[y]` entry does not share the loss:
-//!   it has no name to carry, so [`crate::to_pandoc`] marks it under
-//!   [`ENTRY_KEY`] and it returns to the group.
+//!   entry in `[content]`.
 //!
 //!   Accepted rather than fixed, and the reason is what this bridge is
 //!   for. It exists to reach the formats Pandoc reads and writes --
@@ -35,13 +33,12 @@
 //!   `Attr` is where data goes. Only the elements move.
 
 use tomet_ast::{
-    Bare, Block as TmBlock, Data, Declaration, Element, Entry, File, Group, Id, Inline as TmInline,
+    Block as TmBlock, Declaration, Element, File, Group, Id, Inline as TmInline,
     LineBreak, List, Name, Paragraph, Placement, RawText, Section, SoftBreak, Text, Value,
 };
 use tomet_semantics::{EXACT_DATA_KEY, comment_element};
 use tomet_span::Span;
 
-use crate::to_pandoc::{BARE_ENTRY, ENTRY_KEY};
 use tomet_tree::{ElementExt, declaration_new, element_new, list, list_item};
 
 use crate::ast::{Attr, Block, Inline, MetaValue, PandocDoc, Row, TableParts};
@@ -257,9 +254,7 @@ fn block_element(block: &Block) -> Element {
         Block::Table(parts) => table_element(parts),
         Block::Div(attr, blocks) => {
             let mut el = element_from_attr(attr, || "div".to_string());
-            let (content, entries) = body_from_pandoc(blocks);
-            el.content = Some(content);
-            push_bare_entries(&mut el.data, entries);
+            el.content = Some(pandoc_blocks_to_content(blocks));
             el
         }
         Block::Figure(attr, _, blocks) => {
@@ -601,56 +596,6 @@ fn element_from_attr(attr: &Attr, fallback: impl FnOnce() -> String) -> Element 
     named_element(&class_name(attr).unwrap_or_else(fallback), attr)
 }
 
-/// Whether `attr` marks a `Div` as a bare `(marker)[content]` entry of the
-/// `{...}` group around it.
-///
-/// A bare entry has no name to carry in a class, so [`crate::to_pandoc`]
-/// records it under [`ENTRY_KEY`] instead. Reading it back is what keeps
-/// `@deck.card(){ (a)[ x ] }` from returning as an element named `bare` -- a
-/// name no vocabulary declares, which made the round-tripped document fail
-/// validation.
-fn is_bare_entry(attr: &Attr) -> bool {
-    attr.2
-        .iter()
-        .any(|(k, v)| k == ENTRY_KEY && v == BARE_ENTRY)
-}
-
-/// The body of a `Div` as the content and the bare entries it came from:
-/// each block through [`block_from_pandoc`], except a `Div` marked as a bare
-/// entry, which goes back into the `{...}` group it was written in.
-fn body_from_pandoc(blocks: &[Block]) -> (Vec<TmBlock>, Vec<Bare>) {
-    let mut content = Vec::new();
-    let mut entries = Vec::new();
-    for block in blocks {
-        match block {
-            Block::Div(attr, inner) if is_bare_entry(attr) => {
-                let (inner_content, inner_entries) = body_from_pandoc(inner);
-                let (args, value) = extract_data_from_attr(attr);
-                let mut data = Data { args, value };
-                push_bare_entries(&mut data, inner_entries);
-                entries.push(Bare {
-                    data,
-                    content: (!inner_content.is_empty()).then_some(inner_content),
-                    id: id_from_attr(attr),
-                    span: Span::dummy(),
-                });
-            }
-            other => content.extend(block_from_pandoc(other)),
-        }
-    }
-    (content, entries)
-}
-
-/// Appends `entries` to the `{...}` group of `data`, opening one if there is
-/// none yet.
-fn push_bare_entries(data: &mut Data, entries: Vec<Bare>) {
-    if entries.is_empty() {
-        return;
-    }
-    let Group(group) = data.value.get_or_insert_with(|| Group(Vec::new()));
-    group.extend(entries.into_iter().map(Entry::Bare));
-}
-
 /// The element name a `tomet-` class carries, if there is one.
 fn class_name(attr: &Attr) -> Option<String> {
     attr.1
@@ -676,7 +621,7 @@ fn extract_data_from_attr(attr: &Attr) -> (Option<Value>, Option<Group>) {
 
     let mut entries: Vec<(String, Value)> = Vec::new();
     for (k, v) in &attr.2 {
-        if k == EXACT_DATA_KEY || k == ENTRY_KEY {
+        if k == EXACT_DATA_KEY {
             continue;
         }
         entries.push((k.clone(), Value::String(v.clone())));

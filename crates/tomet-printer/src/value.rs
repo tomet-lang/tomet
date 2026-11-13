@@ -144,7 +144,7 @@ fn render_embedded_hole(hole: &tomet_ast::Hole, config: &PrinterConfig) -> Strin
     s
 }
 
-/// An element (or a bare entry) sitting in a value slot: its `head`, then
+/// An element sitting in a value slot: its `head`, then
 /// `(args)[content]{value}`. Neither `id` nor connects are printed; the
 /// parser never puts one in a value slot.
 fn render_embedded(
@@ -189,12 +189,6 @@ fn render_embedded_value(group: &Group, config: &PrinterConfig) -> String {
                 let nested = Value::Hole(Box::new(nested.clone()));
                 s.push_str(&render_nested(&nested, config));
             }
-            Entry::Bare(bare) => s.push_str(&render_embedded(
-                String::new(),
-                &bare.data,
-                bare.content.as_deref(),
-                config,
-            )),
         }
     }
     s.push('}');

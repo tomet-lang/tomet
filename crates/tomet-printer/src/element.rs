@@ -1,7 +1,7 @@
 //! Rendering elements, values, args, and connects.
 
 use tomet_ast::{
-    Bare, Block, Connect, Data, Declaration, ElementView, Entry, Group, Hole, InterpExpr,
+    Block, Connect, Data, Declaration, ElementView, Entry, Group, Hole, InterpExpr,
     InterpExprKind, Interpolation, Placement, TypeSeat, Value,
 };
 use tomet_config::PrinterConfig;
@@ -153,14 +153,6 @@ pub fn render_element(el: ElementView<'_>, config: &PrinterConfig) -> String {
     out.push_str(&render_groups(name, el.data, el.content, config));
     out.push_str(&render_id(el.id));
     out.push_str(&render_connects(el.connects, config));
-    out
-}
-
-/// Render a [`Bare`] entry into Tomet syntax: `(args)[content]{value}#(id)`,
-/// with no head.
-pub fn render_bare(bare: &Bare, config: &PrinterConfig) -> String {
-    let mut out = render_groups("", &bare.data, bare.content.as_deref(), config);
-    out.push_str(&render_id(bare.id.as_ref()));
     out
 }
 
@@ -320,7 +312,7 @@ pub(crate) fn render_group_entries(entries: &[Entry], config: &PrinterConfig) ->
     }
     let has_element = entries
         .iter()
-        .any(|e| matches!(e, Entry::Element(_) | Entry::Bare(_) | Entry::Hole(_)));
+        .any(|e| matches!(e, Entry::Element(_) | Entry::Hole(_)));
     let rendered: Vec<String> = entries
         .iter()
         .map(|entry| match entry {
@@ -329,13 +321,11 @@ pub(crate) fn render_group_entries(entries: &[Entry], config: &PrinterConfig) ->
             Entry::Pair(k, v) => format!("{}: {}", key_text(k), render_nested(v, config)),
             Entry::Element(child) => render_element(child.as_view(), config),
             Entry::Hole(hole) => render_hole(hole, config),
-            Entry::Bare(bare) => render_bare(bare, config),
         })
         .collect();
 
     // A group of pairs stays on one line; one holding elements gets a
-    // line each, which is how `@links(){ (1)[..] (2)[..] }` has always been
-    // written.
+    // line each.
     if !has_element {
         format!(" {} ", rendered.join(", "))
     } else if rendered.len() == 1 {

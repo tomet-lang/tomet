@@ -24,7 +24,7 @@ use std::fmt::Write as _;
 use std::path::PathBuf;
 
 use tomet_ast::{
-    Bare, Block, Connect, Data, Declaration, ElementView, Entry, File, Group, Hole, Inline,
+    Block, Connect, Data, Declaration, ElementView, Entry, File, Group, Hole, Inline,
     InterpExpr, Interpolation, List, ListItem, Placement, TypeSeat, Value,
 };
 use tomet_ast_parser::parse_file;
@@ -182,27 +182,6 @@ const CASES: &[Case] = &[
          単独では要素にならない（`@memo{ ... }` は下の「主グループの無いネクサス」）。\
          中身は `key: value` の並び",
         "@memo(){ a: 1, b: two }\n",
-    ),
-    case(
-        None,
-        "要素の並び",
-        "@memo(){\n  (1)[ ひとつ ]\n  (2)[ ふたつ ]\n}\n",
-    ),
-    case(
-        None,
-        "対と要素の混在。並び順は保たれる",
-        "@deck.card(){ t: x, (a)[ y ], u: z }\n",
-    ),
-    case(
-        None,
-        "裸のエントリも名前つき要素と同じ三つのグループを取る。\
-         シジルが無いだけで、読む道は同じ",
-        "@memo(){ (1)[ ひとつ ]{ id: a } }\n",
-    ),
-    case(
-        None,
-        "グループを次の行に置いてもよい。`@name` と同じ",
-        "@memo(){\n  (1)\n  [ ひとつ ]\n}\n",
     ),
     case(None, "空のグループ", "@memo(){}\n"),
     case(
@@ -810,6 +789,11 @@ const REJECTED: &[Case] = &[
     ),
     case(
         None,
+        "`{...}` の中に名前を持たない項目は書けない。名前つき要素を書く",
+        "@memo(){\n  (1)[ ひとつ ]\n  (2)[ ふたつ ]\n}\n",
+    ),
+    case(
+        None,
         "データの列を `list(...)` とは書かない。呼び出しとして残り、\
          列として読む側（`ignore:` など）が受け付けない",
         "::workspace(ignore: list(\"a\"))\n",
@@ -1038,7 +1022,6 @@ fn dump_block(out: &mut String, block: &Block, depth: usize) {
                             }
                             Entry::Element(child) => dump_element(out, child.as_view(), depth + 2),
                             Entry::Hole(child) => dump_hole(out, child, depth + 2),
-                            Entry::Bare(child) => dump_bare(out, child, depth + 2),
                         }
                     }
                 }
@@ -1184,17 +1167,6 @@ fn dump_item(out: &mut String, item: &ListItem, depth: usize) {
     }
 }
 
-/// A nameless `{...}` entry's head line is `Bare`, as it always was.
-fn dump_bare(out: &mut String, bare: &Bare, depth: usize) {
-    indent(out, depth);
-    out.push_str("Bare\n");
-    dump_groups(out, &bare.data, bare.content.as_deref(), depth);
-    if let Some(id) = &bare.id {
-        indent(out, depth + 1);
-        let _ = writeln!(out, "id      {:?}", id.0);
-    }
-}
-
 /// A connect's head line reads like an inline element's, as it always did.
 fn dump_connect(out: &mut String, connect: &Connect, depth: usize) {
     indent(out, depth);
@@ -1231,7 +1203,6 @@ fn dump_groups(out: &mut String, data: &Data, content: Option<&[Block]>, depth: 
                     }
                     Entry::Element(child) => dump_element(out, child.as_view(), depth + 2),
                     Entry::Hole(child) => dump_hole(out, child, depth + 2),
-                    Entry::Bare(child) => dump_bare(out, child, depth + 2),
                 }
             }
         }

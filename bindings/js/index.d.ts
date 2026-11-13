@@ -49,8 +49,6 @@ export type Group = Entry[];
 export type Entry =
   | { Pair: [string, Value] }
   | { Element: Element }
-  /** A nameless `(marker)[content]` entry, as in `@links(){ (1)[...] }`. */
-  | { Bare: Bare }
   | { Hole: Hole };
 
 /** Whether an element stands on its own or inside running text. */
@@ -78,13 +76,6 @@ export interface Connect {
 /** A `::name(args)[content]{value}#(id)` declaration about the document itself. */
 export interface Declaration {
   name: Name;
-  data: Data;
-  content: Block[] | null;
-  id: Id | null;
-  span: Span;
-}
-
-export interface Bare {
   data: Data;
   content: Block[] | null;
   id: Id | null;
