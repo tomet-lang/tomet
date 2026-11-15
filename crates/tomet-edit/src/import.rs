@@ -314,7 +314,7 @@ fn import_content_children(doc: &mut EditDoc, content_node: &SyntaxNode) -> Vec<
     children
 }
 
-/// Imports an `ARGS`, `VALUE_DATA`, or `MAP_LITERAL` CST node into an [`AttrSlot`].
+/// Imports an `ARGS` or `VALUE_DATA` CST node into an [`AttrSlot`].
 pub fn import_attr_slot(group_node: &SyntaxNode) -> AttrSlot {
     let raw = group_node.text().to_string();
     let elems: Vec<SyntaxElement> = group_node.children_with_tokens().collect();
@@ -521,7 +521,7 @@ fn import_edit_value(elems: &[SyntaxElement]) -> EditValue {
         && let NodeOrToken::Node(node) = &elems[0]
     {
         match node.kind() {
-            K::MAP_LITERAL => {
+            K::ARGS if node.children().any(|c| c.kind() == K::MAP_ENTRY) => {
                 return EditValue {
                     raw,
                     edited: false,

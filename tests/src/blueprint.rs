@@ -35,8 +35,8 @@ fn test_blueprint_end_to_end_lifecycle() {
   description: "Daily Standup & Plan"
 }
 ::var(
-  author: { type: string, default: "Anonymous" }
-  title: { type: string, default: "Daily" }
+  author: (type: string, default: "Anonymous")
+  title: (type: string, default: "Daily")
 )
 ::id(<$uuid(default: auto)>)
 ::meta(

@@ -272,7 +272,7 @@ fn block_form_needs_a_bare_line() {
 
 #[test]
 fn groups_are_structured() {
-    let root = parse_cst("@x(a: 1, (p, q), name(r), \"k\": { n: [1, 2] })\n");
+    let root = parse_cst("@x(a: 1, (p, q), name(r), \"k\": (n: [1, 2]))\n");
     let args = find(&root, K::ARGS).unwrap();
     assert_eq!(
         child_kinds(&args),
@@ -285,11 +285,16 @@ fn groups_are_structured() {
     let call = args.children().nth(2).unwrap();
     assert_eq!(call.text().to_string(), "name(r)");
     assert_eq!(count(&call, K::ARGS), 1);
-    assert_eq!(count(&root, K::MAP_LITERAL), 1);
     // `[1, 2]` as a value is blocks: a content, not a list.
     assert_eq!(count(&root, K::CONTENT), 1);
     // `(p, q)` and its `p` and `q`, `name(r)` and its `r`.
     assert_eq!(count(&root, K::SEQ_ITEM), 5);
+}
+
+#[test]
+fn value_starting_brace_is_error() {
+    let root = parse_cst("@x(\"k\": { n: 1 })\n");
+    assert_eq!(count(&root, K::ERROR), 1);
 }
 
 #[test]

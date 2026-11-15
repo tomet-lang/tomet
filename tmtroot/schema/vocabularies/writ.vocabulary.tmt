@@ -2,7 +2,7 @@
 ::vocabulary.writ(version: "1.0.0")
 
 ::element(
-  rule: {
+  rule: (
     display: block
     singleton: false
     about: | 一つの規則。パラメータは自分の group の中に持つ。
@@ -27,13 +27,13 @@
            | guard はポインタであって、プログラムではない。エントリにシェル行を
            | 埋め込む案は却下された。それは散文をまとった Makefile であり、
            | `.writ.tmt` を読むだけで任意のコマンドが走りうることになる。
-    args: {
-      id: {
+    args: (
+      id: (
         type: string
         positional: true
         about: | 規則の識別子。見出しではなくここが名前である。見出しは散文で、
                | 書き換えられる。
-      }
-    }
-  }
+      )
+    )
+  )
 )

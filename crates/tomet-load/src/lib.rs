@@ -401,7 +401,7 @@ mod tests {
         fs::create_dir_all(root.join("notes")).expect("temp dirs");
         fs::write(
             root.join(tomet_load_config::VAULT_CONFIG_FILE),
-            "::kind(config)\n::field(tags: { type: list }, created: { type: datetime })\n",
+            "::kind(config)\n::field(tags: (type: list), created: (type: datetime))\n",
         )
         .expect("config");
         for (file, tags, created) in [
@@ -565,7 +565,7 @@ mod tests {
                 ("bp.blueprint.tmt", "::kind(blueprint)\n::blueprint(note)\n"),
                 (
                     "deck.vocabulary.tmt",
-                    "::kind(vocabulary)\n::vocabulary.deck(version: \"1.0.0\")\n\n::element(card: {})\n",
+                    "::kind(vocabulary)\n::vocabulary.deck(version: \"1.0.0\")\n\n::element(card: ())\n",
                 ),
                 (
                     "tomet.dictionary.tmt",
@@ -658,7 +658,7 @@ mod tests {
             ],
         );
         let vault_file = root.join(tomet_load_config::VAULT_CONFIG_FILE);
-        fs::write(&vault_file, "::workspace(folder: { entry: index.tmt })\n").unwrap();
+        fs::write(&vault_file, "::workspace(folder: (entry: index.tmt))\n").unwrap();
         let vault = Vault::discover(&root);
         let reported = |rel: &str| {
             let path = root.join(rel);
@@ -681,7 +681,7 @@ mod tests {
     fn an_entry_name_that_is_not_a_file_name_is_reported_in_the_vault_config() {
         let root = include_vault("tomet_test_load_entry_invalid", &[]);
         let path = root.join(tomet_load_config::VAULT_CONFIG_FILE);
-        fs::write(&path, "::workspace(folder: { entry: \"a/self.tmt\" })\n").unwrap();
+        fs::write(&path, "::workspace(folder: (entry: \"a/self.tmt\"))\n").unwrap();
         let vault = Vault::discover(&root);
         let doc = tomet_ast_parser::parse_file(&fs::read_to_string(&path).unwrap()).unwrap();
         let findings = vault.findings(&path, &doc);
@@ -696,7 +696,7 @@ mod tests {
         );
         assert!(findings.has_errors());
 
-        fs::write(&path, "::workspace(folder: { entry: index.tmt })\n").unwrap();
+        fs::write(&path, "::workspace(folder: (entry: index.tmt))\n").unwrap();
         let doc = tomet_ast_parser::parse_file(&fs::read_to_string(&path).unwrap()).unwrap();
         assert!(
             Vault::discover(&root)
@@ -795,7 +795,7 @@ mod tests {
         );
         fs::write(
             root.join(tomet_load_config::VAULT_CONFIG_FILE),
-            "::workspace(folder: { entry: index.tmt })\n",
+            "::workspace(folder: (entry: index.tmt))\n",
         )
         .unwrap();
 

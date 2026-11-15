@@ -22,8 +22,8 @@
 //! `{$ expr }` and `$(ref)` are each one `INTERP_EXPR`, the whole form, in an `INLINE_FORM`; `$name(args)`
 //! is a `SIGIL` and its `ARGS`. Inside `ARGS`/`VALUE_DATA` an entry is a
 //! `MAP_ENTRY` (`key: value`) or a `SEQ_ITEM`, and nested groups are
-//! `MAP_LITERAL`, `CONTENT` (a value written `[ ... ]` is blocks, as in the AST
-//! parser; there is no list literal) or `ARGS` -- a bare `(a, b)` is a sequence,
+//! `CONTENT` (a value written `[ ... ]` is blocks, as in the AST
+//! parser; there is no list literal) or `ARGS` -- a bare `(a, b)` or `(k: v)` is a tuple,
 //! and `name(a, b)` a call.
 //! `CONTENT` recurses into the same block grammar `ROOT`/`SECTION` use
 //! (`SECTION`, `LIST`, `BLOCK_FORM`, `CODE_BLOCK`, `THEMATIC_BREAK`,

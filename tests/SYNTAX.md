@@ -716,7 +716,7 @@ unknown element `memo`: only `std` and this document's own `::kind` may be writt
 ### 型の `list(string)` は列ではなく呼び出しのまま残る
 
 ```tmt
-::field(tags: { type: list(string) })
+::field(tags: (type: list(string)))
 ```
 
 ```
@@ -724,10 +724,10 @@ Declaration ::field
   args    {tags: {type: list("string")}}
 ```
 
-### 入れ子のマップ
+### 入れ子のタプル
 
 ```tmt
-@memo(m: { x: 1 })
+@memo(m: (x: 1))
 ```
 
 ```
@@ -739,6 +739,16 @@ Block  @memo
 
 ```
 unknown element `memo`: only `std` and this document's own `::kind` may be written bare; namespace it (`ns.memo`), or declare the vocabulary that has it and bind it with `::use`
+```
+
+### 値位置の `{...}` はエラー。`(k: v)` を書く
+
+```tmt
+@memo(m: { x: 1 })
+```
+
+```
+parse error: 1:10: `{` cannot start a value: write `(k: v)`
 ```
 
 ### 値位置の `|` は括弧のない `[ ... ]`。散文の `,` や `}` では閉じず、`|` で始まらない次の行が次のキーになる
@@ -2321,16 +2331,16 @@ unknown element `x`: only `std` and this document's own `::kind` may be written 
 ```tmt
 ::meta(title: "x")
 ::macro(gh: "https://x/$(1)")
-::var(a: { type: string })
-::format(table: { max_col_width: 50 })
-::field(created: { type: datetime })
+::var(a: (type: string))
+::format(table: (max_col_width: 50))
+::field(created: (type: datetime))
 ::workspace(ignore: ("a"))
 ::export(type: commonmark)
 ::blueprint(b: "b.tmt")
 ::vocabulary(v: "v.tmt")
 ::dictionary(d: "d.tmt")
 ::migration(m: 1)
-::element(card: { display: block })
+::element(card: (display: block))
 ```
 
 ```

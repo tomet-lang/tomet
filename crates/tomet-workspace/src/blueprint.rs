@@ -573,7 +573,7 @@ mod tests {
         fs::create_dir_all(dir.join(".tomet/blueprints")).unwrap();
         fs::write(
             dir.join(".tomet/blueprints/daily-note.blueprint.tmt"),
-            "::kind(blueprint)\n::blueprint(daily-note)\n::var(\n  title: { type: string }\n)\n::meta(\n  title: $(var.title)\n)\n\n=[ Tasks for $(var.title) ]#(tasks)\n",
+            "::kind(blueprint)\n::blueprint(daily-note)\n::var(\n  title: (type: string)\n)\n::meta(\n  title: $(var.title)\n)\n\n=[ Tasks for $(var.title) ]#(tasks)\n",
         )
         .unwrap();
         dir
@@ -680,7 +680,7 @@ mod tests {
     fn self_is_the_new_document_and_var_is_what_was_passed() {
         let file = blueprint_file(
             "self",
-            "::blueprint(note)\n::var(\n  author: { type: string }\n)\n::meta(\n  file: $(self::filename)\n  by: $(var.author)\n)\n",
+            "::blueprint(note)\n::var(\n  author: (type: string)\n)\n::meta(\n  file: $(self::filename)\n  by: $(var.author)\n)\n",
         );
         let mut vars = HashMap::new();
         vars.insert("author".to_string(), Value::String("Ann".into()));
@@ -703,7 +703,7 @@ mod tests {
     fn a_variable_takes_its_default_and_a_passed_value_wins() {
         let file = blueprint_file(
             "title",
-            "::blueprint(note)\n::var(\n  title: { default: \"Untitled\" }\n)\n\n=[ $(var.title) ]\n",
+            "::blueprint(note)\n::var(\n  title: (default: \"Untitled\")\n)\n\n=[ $(var.title) ]\n",
         );
         let config = PrinterConfig::default();
         let made = |vars: &HashMap<String, Value>| {
@@ -773,7 +773,7 @@ mod tests {
 
     #[test]
     fn a_required_variable_that_is_not_passed_stops_the_creation() {
-        let src = "::blueprint(note)\n::var(\n  title: { type: string }\n)\n\n=[ $(var.title) ]\n";
+        let src = "::blueprint(note)\n::var(\n  title: (type: string)\n)\n\n=[ $(var.title) ]\n";
         let err = made_with("required", src, &[]).unwrap_err().to_string();
         assert!(
             err.contains("title") && err.contains("--var title"),
@@ -788,7 +788,7 @@ mod tests {
 
     #[test]
     fn a_name_nothing_declares_is_refused() {
-        let src = "::blueprint(note)\n::var(\n  title: { default: \"x\" }\n)\n";
+        let src = "::blueprint(note)\n::var(\n  title: (default: \"x\")\n)\n";
         let err = made_with("undeclared", src, &[("titel", "Hi")])
             .unwrap_err()
             .to_string();
@@ -800,8 +800,7 @@ mod tests {
 
     #[test]
     fn a_passed_value_is_converted_to_the_declared_type() {
-        let src =
-            "::blueprint(note)\n::var(\n  n: { type: int }\n)\n::meta(count: $add(var.n, 1))\n";
+        let src = "::blueprint(note)\n::var(\n  n: (type: int)\n)\n::meta(count: $add(var.n, 1))\n";
         assert!(
             made_with("typed", src, &[("n", "41")])
                 .unwrap()
@@ -815,8 +814,7 @@ mod tests {
 
     #[test]
     fn the_blueprints_vars_do_not_go_into_the_new_document() {
-        let src =
-            "::blueprint(note)\n::var(\n  title: { default: \"x\" }\n)\n\n=[ $(var.title) ]\n";
+        let src = "::blueprint(note)\n::var(\n  title: (default: \"x\")\n)\n\n=[ $(var.title) ]\n";
         let content = made_with("dropped", src, &[]).unwrap();
         assert!(!content.contains("::var"), "{content}");
         assert!(content.contains("::kind(note)"), "{content}");
@@ -925,7 +923,7 @@ mod tests {
     fn a_default_written_out_is_the_value_of_its_seat() {
         let content = instantiated(
             "seats-given",
-            "::blueprint(note)\n::var(\n  tags: { type: list(string), default: (\"a\", \"b\") }\n)\n::meta(\n  count: <$int(default: 3)>\n  title: <$string(default: \"Untitled\")>\n  tags: <$list(string, length: 2, default: var.tags)>\n)\n",
+            "::blueprint(note)\n::var(\n  tags: (type: list(string), default: (\"a\", \"b\"))\n)\n::meta(\n  count: <$int(default: 3)>\n  title: <$string(default: \"Untitled\")>\n  tags: <$list(string, length: 2, default: var.tags)>\n)\n",
             &fixed(&[]),
         )
         .unwrap();
@@ -1030,7 +1028,7 @@ mod tests {
         assert!(seat.downcast_ref::<SeatsNotFilled>().is_some());
         let var = instantiated(
             "seats-kind-var",
-            "::blueprint(note)\n::var(\n  title: { type: string }\n)\n::meta(a: $(var.title))\n",
+            "::blueprint(note)\n::var(\n  title: (type: string)\n)\n::meta(a: $(var.title))\n",
             &fixed(&[]),
         )
         .unwrap_err();

@@ -121,7 +121,7 @@ mod tests {
         for src in [
             "a: <$date>\n",
             "a: (1, <$uuid()>)\n",
-            "m: { k: <$list(string)> }\n",
+            "m: (k: <$list(string)>)\n",
         ] {
             let err = parse_file(src).unwrap_err();
             assert!(
@@ -153,7 +153,7 @@ mod tests {
     #[test]
     fn a_file_may_open_with_declarations() {
         let f = parse_file(
-            "// header\n::kind(catalog, 2)\n::use(deck)\n::meta(id: x, n: 1)\n\n\"a/b\": 1\nm: { k: v }\n",
+            "// header\n::kind(catalog, 2)\n::use(deck)\n::meta(id: x, n: 1)\n\n\"a/b\": 1\nm: (k: v)\n",
         )
         .unwrap();
         assert_eq!(

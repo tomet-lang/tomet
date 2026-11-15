@@ -1,6 +1,7 @@
 //! Renders a `Value` back into cotomet data text:
-//! a top-level map is written as bare `key: value` lines (no enclosing braces);
-//! nested maps use `{ ... }`, and a sequence prints as `(a, b)`.
+//! a top-level tuple whose entries all have names is written as bare `key: value`
+//! lines (no enclosing parentheses); any other tuple is `( ... )`, with `key: value`
+//! for a named entry and the value alone for an unnamed one.
 
 use tomet_ast::{Tuple, Value};
 use tomet_spelling::{write_key, write_scalar_string};
@@ -18,21 +19,8 @@ fn write_value(value: &Value, out: &mut String, top_level: bool) {
                 if !top_level {
                     out.push_str("()");
                 }
-            } else if tuple.has_no_named() {
-                out.push('(');
-                for (i, item) in tuple.unnamed().enumerate() {
-                    if i > 0 {
-                        out.push_str(", ");
-                    }
-                    write_value(item, out, false);
-                }
-                out.push(')');
-            } else if tuple.has_no_unnamed() {
-                let entries: Vec<(String, Value)> = tuple
-                    .named()
-                    .map(|(k, v)| (k.to_string(), v.clone()))
-                    .collect();
-                write_map(&entries, out, top_level);
+            } else if top_level && tuple.has_no_unnamed() {
+                write_top_level_lines(tuple, out);
             } else {
                 out.push('(');
                 write_args(tuple, out);
@@ -119,27 +107,16 @@ fn write_args(tuple: &Tuple, out: &mut String) {
     }
 }
 
-fn write_map(entries: &[(String, Value)], out: &mut String, top_level: bool) {
-    if top_level {
-        for (i, (key, value)) in entries.iter().enumerate() {
-            if i > 0 {
-                out.push('\n');
-            }
-            write_key(key, out);
-            out.push_str(": ");
-            write_value(value, out, false);
+/// The top level of a document whose entries all have names is written as bare
+/// `key: value` lines, with no enclosing `( )`.
+fn write_top_level_lines(tuple: &Tuple, out: &mut String) {
+    for (i, (key, value)) in tuple.named().enumerate() {
+        if i > 0 {
+            out.push('\n');
         }
-    } else {
-        out.push('{');
-        for (i, (key, value)) in entries.iter().enumerate() {
-            if i > 0 {
-                out.push_str(", ");
-            }
-            write_key(key, out);
-            out.push_str(": ");
-            write_value(value, out, false);
-        }
-        out.push('}');
+        write_key(key, out);
+        out.push_str(": ");
+        write_value(value, out, false);
     }
 }
 

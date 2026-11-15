@@ -881,10 +881,10 @@ mod tests {
 
     #[test]
     fn fields_type_declaration_validation() {
-        let valid = problems_of("::field(tags: { type: list(string) })\n");
+        let valid = problems_of("::field(tags: (type: list(string)))\n");
         assert!(valid.is_empty(), "{valid:?}");
 
-        let invalid = problems_of("::field(owner: { type: person })\n");
+        let invalid = problems_of("::field(owner: (type: person))\n");
         assert_eq!(invalid.len(), 1);
         assert!(matches!(
             &invalid[0],
@@ -992,7 +992,7 @@ mod tests {
         // The same invalid definition is found either way.
         for src in [
             "::field.owner(type: person)\n",
-            "::field(owner: { type: person })\n",
+            "::field(owner: (type: person))\n",
         ] {
             let found = problems_of(src);
             assert!(
@@ -1039,7 +1039,7 @@ mod tests {
         assert!(problems_of("::element.card[ a card ]\n").is_empty());
         // Nowhere to attach it.
         for src in [
-            "::field(author: { type: string })[ x ]\n",
+            "::field(author: (type: string))[ x ]\n",
             "::kind(note)[ x ]\n",
             "::format.table()[ x ]\n",
             "::macro.m(\"x\")[ y ]\n",
@@ -1055,13 +1055,13 @@ mod tests {
 
     #[test]
     fn a_plural_declaration_says_what_to_write_instead() {
-        let found = problems_of("::fields(a: { type: string })\n");
+        let found = problems_of("::fields(a: (type: string))\n");
         assert!(
             found.is_empty(),
             "a retired name is not a standard one: {found:?}"
         );
 
-        let doc = parse("::fields(a: { type: string })\n::macros(m: \"x\")\n");
+        let doc = parse("::fields(a: (type: string))\n::macros(m: \"x\")\n");
         let decls: Vec<_> = doc
             .header
             .iter()

@@ -328,7 +328,7 @@ impl EditValue {
 pub enum EditValueKind {
     /// Scalar literal, identifier, or call expression.
     Scalar(String),
-    /// Nested map literal `{ ... }`.
+    /// Nested tuple/map literal `( ... )`.
     Map(AttrSlot),
     /// Inline form in value position (e.g. `@doc.icon(star)` or `@conflict(a: 1, b: 2)`).
     Form {

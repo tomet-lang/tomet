@@ -196,7 +196,7 @@ fn validate_connect(node: &SyntaxNode) -> bool {
                     }
                     group_count += 1;
                 }
-                K::VALUE_DATA | K::MAP_LITERAL => {
+                K::VALUE_DATA => {
                     if !validate_value_group(&child) {
                         return false;
                     }
@@ -217,7 +217,7 @@ fn validate_connect(node: &SyntaxNode) -> bool {
                         return false;
                     }
                 }
-                K::VALUE_DATA | K::MAP_LITERAL => {
+                K::VALUE_DATA => {
                     if !validate_value_group(&child) {
                         return false;
                     }
@@ -263,7 +263,7 @@ pub(super) fn is_valid_tail_group_list(groups: &[SyntaxNode]) -> bool {
                 }
                 seen_args = true;
             }
-            K::VALUE_DATA | K::MAP_LITERAL => {
+            K::VALUE_DATA => {
                 if seen_value || !validate_value_group(child) {
                     return false;
                 }
@@ -287,10 +287,7 @@ pub(super) fn is_valid_tail_group_list(groups: &[SyntaxNode]) -> bool {
 }
 
 pub(super) fn tail_claims_something(groups: &[SyntaxNode]) -> bool {
-    groups.iter().any(|g| {
-        matches!(
-            g.kind(),
-            K::ARGS | K::VALUE_DATA | K::MAP_LITERAL | K::ID_GROUP | K::CONNECT
-        )
-    })
+    groups
+        .iter()
+        .any(|g| matches!(g.kind(), K::ARGS | K::VALUE_DATA | K::ID_GROUP | K::CONNECT))
 }

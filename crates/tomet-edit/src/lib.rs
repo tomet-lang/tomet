@@ -858,7 +858,7 @@ Second paragraph.
 
     #[test]
     fn nested_edit_value_and_inline_items_import_and_roundtrip() {
-        let src = "::meta(nested: { a: (1, 2), icon: @doc.icon(star) })\n\n=[ *Styled* Heading ]\n\nHello *italic*, **bold**, `code`, and @badge(ok)[green].\n";
+        let src = "::meta(nested: (a: (1, 2), icon: @doc.icon(star)))\n\n=[ *Styled* Heading ]\n\nHello *italic*, **bold**, `code`, and @badge(ok)[green].\n";
         let doc = import_source(src);
         assert_eq!(export_doc(&doc), src);
 

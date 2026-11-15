@@ -4,17 +4,17 @@
 @rule(tomet-position-dependencies){
   why: | tomet-position is a base-layer crate resolving byte offsets to lines and columns.
        | It holds zero dependencies on other workspace members.
-  guard: { twrit: dependencies }
+  guard: ( twrit: dependencies )
   crate: @crate(tomet-position)
   dependencies: ()
 }
 
 @rule(tomet-position-purity){
   why: | tomet-position is completely pure: no external crates and no I/O or system effects.
-  guard: { twrit: pure }
+  guard: ( twrit: pure )
   crate: @crate(tomet-position)
-  pure: {
+  pure: (
     forbid: ("std::fs", "std::net", "std::process", "std::env")
     allow-external: ()
-  }
+  )
 }

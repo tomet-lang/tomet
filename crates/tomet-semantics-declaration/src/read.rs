@@ -427,7 +427,7 @@ mod tests {
 
     #[test]
     fn a_variable_declared_twice_is_the_later_declaration() {
-        let doc = parse("::var(a: { default: 1 })\n::var(a: { default: 2 }, b: {})\n");
+        let doc = parse("::var(a: (default: 1))\n::var(a: (default: 2), b: ())\n");
         let vars = document_vars(&doc);
         assert_eq!(vars.len(), 2);
         assert_eq!(vars[0].0, "a");

@@ -1,80 +1,80 @@
 ::kind(config)
 ::format(
-  meta: {
+  meta: (
     always_newline: true
-  }
-  section: {
+  )
+  section: (
     space_inside_brackets: true
-  }
-  element: {
-    table: {
+  )
+  element: (
+    table: (
       adjust_width: auto
       max_col_width: 20
-    }
-    link: {
+    )
+    link: (
       no_space: true
-    }
-    callout: {
-      style: {
+    )
+    callout: (
+      style: (
         content: block
-      }
-    }
-  }
-  blockquote: {
+      )
+    )
+  )
+  blockquote: (
     always_newline: true
-  }
-  list: {
-    multiline: {
-      style: {
+  )
+  list: (
+    multiline: (
+      style: (
         content: box
-      }
-    }
-  }
+      )
+    )
+  )
 )
 ::field(
-  aliases: {
+  aliases: (
     type: list
     always_newline: true
-  }
-  created: {
+  )
+  created: (
     type: datetime
     format: rfc3339
     offset: "+09:00"
-  }
-  modified: {
+  )
+  modified: (
     type: datetime
     format: rfc3339
     offset: "+09:00"
-  }
-  topics: {
+  )
+  topics: (
     type: list
     list_type: "@link"
     always_newline: false
-  }
-  url.wiki: {
+  )
+  url.wiki: (
     type: list
     always_newline: true
-  }
-  url.source: {
+  )
+  url.source: (
     type: list
     always_newline: true
-  }
-  url.main: {
+  )
+  url.main: (
     type: list
     always_newline: true
-  }
+  )
 )
 ::workspace(
   ignore: ("00-09 System/01 Apps/obsidian")
 )
 ::migration(
-  created: {
+  created: (
     type: datetime
     format: iso8601
-  }
-  updated: {
+  )
+  updated: (
     type: datetime
     format: iso8601
     merge: modified
-  }
+  )
 )

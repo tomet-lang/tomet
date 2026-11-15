@@ -124,11 +124,11 @@ mod tests {
     }
 
     const SETTINGS: &str = "::field(
-  tags: { type: list }
-  created: { type: datetime, format: rfc3339 }
-  title: { type: string }
-  rev: { type: version }
-  note: { always_newline: true }
+  tags: (type: list)
+  created: (type: datetime, format: rfc3339)
+  title: (type: string)
+  rev: (type: version)
+  note: (always_newline: true)
 )
 ";
 

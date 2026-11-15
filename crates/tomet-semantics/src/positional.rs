@@ -450,11 +450,11 @@ mod tests {
         use crate::Vocabulary;
         let vocab_src = r#"::vocabulary.deck()
 ::element(
-  card: {
-    args: {
-      target: { positional: true }
-    }
-  }
+  card: (
+    args: (
+      target: (positional: true)
+    )
+  )
 )
 "#;
         let vocab_doc = tomet_ast_parser::parse_file(vocab_src).expect("valid vocabulary");

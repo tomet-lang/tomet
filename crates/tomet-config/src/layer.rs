@@ -202,10 +202,10 @@ mod tests {
     #[test]
     fn the_inner_layer_wins_key_by_key() {
         let outer = layer(
-            "::format(element: { table: { max_col_width: 50 }, link: { no_space: true } }, meta: { always_newline: true })\n::macro(a: \"outer-a\", b: \"outer-b\")\n",
+            "::format(element: (table: (max_col_width: 50), link: (no_space: true)), meta: (always_newline: true))\n::macro(a: \"outer-a\", b: \"outer-b\")\n",
         );
         let inner =
-            layer("::format(element: { table: { max_col_width: 80 } })\n::macro(b: \"inner-b\")\n");
+            layer("::format(element: (table: (max_col_width: 80)))\n::macro(b: \"inner-b\")\n");
         let cfg = Config::from_layers([&outer, &inner]);
         // Replaced where the inner layer says something ...
         assert_eq!(cfg.format.table_max_col_width, Some(80));
@@ -231,10 +231,10 @@ mod tests {
     #[test]
     fn a_name_table_is_merged_by_name_and_the_later_entry_wins() {
         let outer = layer(
-            "::blueprint(a: @file(a.tmt), b: @file(b.tmt))\n::field(created: { type: datetime })\n",
+            "::blueprint(a: @file(a.tmt), b: @file(b.tmt))\n::field(created: (type: datetime))\n",
         );
         let inner = layer(
-            "::blueprint(b: @file(b2.tmt), c: @file(c.tmt))\n::field(created: { format: rfc3339 })\n",
+            "::blueprint(b: @file(b2.tmt), c: @file(c.tmt))\n::field(created: (format: rfc3339))\n",
         );
         let cfg = Config::from_layers([&outer, &inner]);
         assert_eq!(
@@ -272,9 +272,8 @@ mod tests {
 
     #[test]
     fn the_workspace_is_dropped_from_a_layer_that_may_not_declare_it() {
-        let mut l = layer(
-            "::workspace(ignore: (\"a\"))\n::format(element: { link: { no_space: true } })\n",
-        );
+        let mut l =
+            layer("::workspace(ignore: (\"a\"))\n::format(element: (link: (no_space: true)))\n");
         assert_eq!(l.strip_vault_only(), vec![DeclKind::Workspace]);
         assert!(l.strip_vault_only().is_empty());
         let cfg = Config::from_layers([&l]);

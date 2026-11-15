@@ -17,13 +17,13 @@
 =[見出しの座 `<$string>`]
 
 =[値の位置]
-@memo({type_seat: int})[]
+@memo((type_seat: int))[]
 
-@memo(key: {type_seat: string})[]
+@memo(key: (type_seat: string))[]
 
-@memo(id: {type_seat: "uuid(default: auto)"}, tags: ({type_seat: string}, {type_seat: int}))[]
+@memo(id: (type_seat: "uuid(default: auto)"), tags: ((type_seat: string), (type_seat: int)))[]
 
-@memo()[]{ name: {type_seat: string}, size: {type_seat: "int(default: 0)"} }
+@memo()[]{ name: (type_seat: string), size: (type_seat: "int(default: 0)") }
 
 =[引数]
 `<$string(length: 80)>`

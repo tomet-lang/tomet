@@ -163,29 +163,44 @@ impl<'a, 't> CstParser<'a, 't> {
         if self.current_kind() == Some(K::PIPE) {
             self.parse_pipe_content();
         }
+        let mut is_first = true;
         while let Some(k) = self.current_kind() {
             if k == close || matches!(k, K::COMMA | K::NEWLINE) {
                 break;
             }
             match k {
-                // `{$ expr }` is an expression; any other `{` opens a map.
+                // `{$ expr }` is an expression; `{` that starts a value is an error.
                 K::L_BRACE if self.gate_at(self.pos) => {
                     self.try_parse_inline_form();
+                    is_first = false;
                 }
-                K::L_BRACE => {
-                    self.builder.start_node(K::MAP_LITERAL.into());
+                K::L_BRACE if is_first => {
+                    self.builder.start_node(K::ERROR.into());
                     self.bump();
                     self.parse_entries(K::R_BRACE);
                     self.builder.finish_node();
+                    is_first = false;
                 }
                 // `[ ... ]` as a value is blocks, the same `[content]` a
                 // form takes, and not a list: read as a list it would close at
                 // the first `]`, even one inside `` `code` ``.
-                K::L_BRACKET => self.parse_content_group(),
-                K::L_PAREN => self.parse_args_group(),
+                K::L_BRACKET => {
+                    self.parse_content_group();
+                    is_first = false;
+                }
+                K::L_PAREN => {
+                    self.parse_args_group();
+                    is_first = false;
+                }
                 // An id group: `#(id)`.
-                K::HASH if self.id_follows(self.pos) => self.parse_id_group(),
-                K::QUOTE => self.bump_string_literal(),
+                K::HASH if self.id_follows(self.pos) => {
+                    self.parse_id_group();
+                    is_first = false;
+                }
+                K::QUOTE => {
+                    self.bump_string_literal();
+                    is_first = false;
+                }
                 _ => {
                     if !self.try_parse_inline_form() {
                         if self.name_at(self.pos) {
@@ -194,6 +209,7 @@ impl<'a, 't> CstParser<'a, 't> {
                             self.bump();
                         }
                     }
+                    is_first = false;
                 }
             }
         }

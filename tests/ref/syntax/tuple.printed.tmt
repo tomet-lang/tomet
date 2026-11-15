@@ -1,11 +1,11 @@
 ::kind(fixture)
 
-::meta(tags: (a, b, sep: ","), size: {w: 10, h: 20}, x: ((a, version: 3), b, c), icon: glyph(triangle, pkg: lucide), use: vocab(a, version: 3), ordered: (1: a, b), status: {404: x, 500: y}, numbered: (a, b))
+::meta(tags: (a, b, sep: ","), size: (w: 10, h: 20), x: ((a, version: 3), b, c), icon: glyph(triangle, pkg: lucide), use: vocab(a, version: 3), ordered: (1: a, b), status: (404: x, 500: y), numbered: (a, b))
 
 =[Tuple]
 A tuple at a value position takes named and unnamed entries together.
 
-@item(tags: (a, b, sep: ","), size: {w: 10, h: 20})
+@item(tags: (a, b, sep: ","), size: (w: 10, h: 20))
 
 @item(x: ((a, version: 3), b, c))
 
@@ -15,4 +15,4 @@ A call takes named and unnamed entries together.
 
 Entries may be keyed by decimal text.
 
-@item(ordered: (1: a, b), status: {404: x, 500: y}, numbered: (a, b))
+@item(ordered: (1: a, b), status: (404: x, 500: y), numbered: (a, b))

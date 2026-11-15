@@ -866,7 +866,7 @@ mod tests {
     fn the_exact_copy_restores_both_groups() {
         // Without `tomet-data` the two groups cannot be told apart on the
         // way back; with it, they come back exactly as written.
-        let doc = parse_file("@deck.card(url: \"x\"){ id: c1, m: { k: v } }\n").unwrap();
+        let doc = parse_file("@deck.card(url: \"x\"){ id: c1, m: (k: v) }\n").unwrap();
         let back = from_pandoc(&to_pandoc(&doc));
         let TmBlock::Element(el) = &back.body[0] else {
             panic!("expected an element, got {:?}", back.body[0]);

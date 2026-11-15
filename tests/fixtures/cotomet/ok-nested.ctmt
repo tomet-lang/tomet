@@ -1,9 +1,9 @@
-map: { a: 1, b: { c: 2, d: (x, y) } }
-multi: {
+map: ( a: 1, b: ( c: 2, d: (x, y) ) )
+multi: (
   x: 1
   y: 2
-}
-empty-map: {}
+)
+empty-map: ()
 empty-list: ()
 names: (a, b, c)
 numbers: (1, 2.5, -3)

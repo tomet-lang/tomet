@@ -95,8 +95,8 @@ mod tests {
 
     const SETTINGS: &str = "::kind(config)
 ::field(
-  tags: { type: list }
-  created: { type: datetime }
+  tags: (type: list)
+  created: (type: datetime)
 )
 ";
 

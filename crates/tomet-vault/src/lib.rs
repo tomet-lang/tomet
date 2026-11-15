@@ -586,7 +586,7 @@ mod tests {
     use super::*;
 
     const BLUEPRINT: &str = "::kind(blueprint)\n::blueprint(note)\n::meta(\n  date: \"2026\"\n)\n\n=[ Items ]#(items)::rule(allow: (task))\n";
-    const UUID_SETTINGS: &str = "::kind(config)\n::field(id: { type: uuid })\n";
+    const UUID_SETTINGS: &str = "::kind(config)\n::field(id: (type: uuid))\n";
 
     fn texts(items: &[&str]) -> Vec<String> {
         items.iter().map(|s| s.to_string()).collect()
@@ -864,7 +864,7 @@ mod tests {
 
     #[test]
     fn a_document_reads_its_own_meta_typed_by_the_settings() {
-        let config = tomet_config::load_config_from_str("::field(tags: { type: list })\n").unwrap();
+        let config = tomet_config::load_config_from_str("::field(tags: (type: list))\n").unwrap();
         let vault = Vault::from_sources(config, "/v", &[]);
         // No `tags` written: still a list, so `.contains` answers instead of failing.
         let (doc, prepared) = prepared(
@@ -912,7 +912,7 @@ mod tests {
 
     fn vault_with_a_macro() -> Vault {
         let config = tomet_config::load_config_from_str(
-            "::macro(gh: \"https://gh/$(1)\")\n::field(n: { type: uuid })\n",
+            "::macro(gh: \"https://gh/$(1)\")\n::field(n: (type: uuid))\n",
         )
         .unwrap();
         Vault::from_sources(config, "/v", &[("acme.tmt", ACME)])

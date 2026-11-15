@@ -142,7 +142,7 @@ mod tests {
         let tmpl_file = tmpl_dir.join("task.blueprint.tmt");
         fs::write(
             &tmpl_file,
-            "::kind(blueprint)\n::blueprint(task)\n::id(<$uuid(default: auto)>)\n::var(\n  title: { default: \"Untitled\" }\n)\n::meta(\n  title: $(var.title)\n)\n\n=[ Description ]#(description)\n",
+            "::kind(blueprint)\n::blueprint(task)\n::id(<$uuid(default: auto)>)\n::var(\n  title: (default: \"Untitled\")\n)\n::meta(\n  title: $(var.title)\n)\n\n=[ Description ]#(description)\n",
         )
         .unwrap();
 

@@ -15,9 +15,9 @@ does not relax the rule to fit the change it wanted to make.
 ==[ parser-purity ]
 
 @rule(parser-purity){
-  guard: { twrit: pure }
+  guard: ( twrit: pure )
 
-  pure: {
+  pure: (
     crates: [ "crates/tomet-syntax-cst-parser" ]
     forbid: [ "std::fs", "std::net", "std::process", "std::env" ]
     allow-external: [
@@ -26,7 +26,7 @@ does not relax the rule to fit the change it wanted to make.
       "proc-macro2", "quote", "syn", "unicode-ident", "unicode-width",
       "ahash", "cfg-if", "once_cell", "zerocopy", "zerocopy-derive"
     ]
-  }
+  )
 }
 
 The CST parser is pure, deterministic and side-effect-free. It performs no

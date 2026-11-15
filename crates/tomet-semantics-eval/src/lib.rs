@@ -267,7 +267,7 @@ nam: $macro.named(who: "world")
 
     #[test]
     fn var_default() {
-        let src = "::var(rev: { type: string, default: \"main\" })\na: $(var.rev)\n";
+        let src = "::var(rev: (type: string, default: \"main\"))\na: $(var.rev)\n";
         let file = eval_str(src, &[]).unwrap();
         let Value::Tuple(tuple) = file.body else {
             panic!("expected tuple");
@@ -277,7 +277,7 @@ nam: $macro.named(who: "world")
 
     #[test]
     fn var_that_holds_a_list_giving_a_list() {
-        let src = "::var(tags: { type: list, default: (\"a\", \"b\") })\na: $(var.tags)\n";
+        let src = "::var(tags: (type: list, default: (\"a\", \"b\")))\na: $(var.tags)\n";
         let file = eval_str(src, &[]).unwrap();
         let Value::Tuple(tuple) = file.body else {
             panic!("expected tuple");
@@ -294,7 +294,7 @@ nam: $macro.named(who: "world")
     #[test]
     fn a_map_comes_from_the_caller_not_from_a_declared_default() {
         // `::var` has no `map` type: a declared default that is a map is refused...
-        let src = "::var(cfg: { default: { host: \"localhost\" } })\na: $(var.cfg)\n";
+        let src = "::var(cfg: (default: (host: \"localhost\")))\na: $(var.cfg)\n";
         let errs = eval_str(src, &[]).unwrap_err();
         assert!(
             errs[0].message.starts_with("`cfg` in `::var`"),
@@ -303,7 +303,7 @@ nam: $macro.named(who: "world")
         );
 
         // ...and a value the caller passes for a declared name is used as it is.
-        let src = "::var(cfg: { type: string, default: \"none\" })\na: $(var.cfg)\n";
+        let src = "::var(cfg: (type: string, default: \"none\"))\na: $(var.cfg)\n";
         let passed = Value::Tuple(Tuple::from_named([(
             "host".to_string(),
             Value::String("localhost".to_string()),
@@ -317,7 +317,7 @@ nam: $macro.named(who: "world")
 
     #[test]
     fn var_given_by_caller() {
-        let src = "::var(rev: { type: string, default: \"main\" })\na: $(var.rev)\n";
+        let src = "::var(rev: (type: string, default: \"main\"))\na: $(var.rev)\n";
         let file = eval_str(
             src,
             &[("rev".to_string(), Value::String("feature".to_string()))],
@@ -340,7 +340,7 @@ nam: $macro.named(who: "world")
         assert!(errs[0].message.contains("no member `undeclared`"));
 
         // Passing undeclared var from caller
-        let src2 = "::var(ok: { default: 1 })\na: 1\n";
+        let src2 = "::var(ok: (default: 1))\na: 1\n";
         let errs2 = eval_str(
             src2,
             &[("unknown".to_string(), Value::String("x".to_string()))],
@@ -356,7 +356,7 @@ nam: $macro.named(who: "world")
 
     #[test]
     fn unset_var_with_no_default_error() {
-        let src = "::var(required: { type: string })\na: $(var.required)\n";
+        let src = "::var(required: (type: string))\na: $(var.required)\n";
         let errs = eval_str(src, &[]).unwrap_err();
         assert_eq!(errs.len(), 1);
         assert_eq!(errs[0].line, 2);
@@ -394,7 +394,7 @@ nam: $macro.named(who: "world")
 
     #[test]
     fn expression_nested_in_map_in_list() {
-        let src = "items: ({ num: $add(10, 20) })\n";
+        let src = "items: ((num: $add(10, 20)))\n";
         let file = eval_str(src, &[]).unwrap();
         let Value::Tuple(tuple) = file.body else {
             panic!("expected tuple");

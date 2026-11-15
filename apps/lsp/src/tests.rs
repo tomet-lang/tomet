@@ -711,7 +711,7 @@ fn a_ctmt_uri_is_data_and_nothing_else_is() {
 #[test]
 fn a_cotomet_file_has_diagnostics_from_the_cotomet_parser_only() {
     assert_eq!(
-        data_diagnostics_for("// header\n\"a/b\": 1\nm: { x: (1) }\n"),
+        data_diagnostics_for("// header\n\"a/b\": 1\nm: (x: (1))\n"),
         Vec::new()
     );
     // a tomet reading of this text would find `=[ ... ]` a heading and `@x` an element

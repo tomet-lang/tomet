@@ -590,23 +590,23 @@ fn values_are_left_as_written_unless_alignment_is_asked_for() {
 #[test]
 fn the_values_of_a_multi_line_group_are_aligned_after_the_colon() {
     let src = "::format(
-  meta: { always_newline: true }
-  heading: { space_inside_brackets: true }
-  table: { adjust_width: auto, max_col_width: 50 }
-  link: { no_space: true, group_order: \"[]()\" }
-  quote: { always_newline: true }
-  callout: { style: { content: block } }
-  list: { multiline: { style: { content: box } } }
+  meta: (always_newline: true)
+  heading: (space_inside_brackets: true)
+  table: (adjust_width: auto, max_col_width: 50)
+  link: (no_space: true, group_order: \"[]()\")
+  quote: (always_newline: true)
+  callout: (style: (content: block))
+  list: (multiline: (style: (content: box)))
 )
 ";
     let want = "::format(
-  meta:    { always_newline: true }
-  heading: { space_inside_brackets: true }
-  table:   { adjust_width: auto, max_col_width: 50 }
-  link:    { no_space: true, group_order: \"[]()\" }
-  quote:   { always_newline: true }
-  callout: { style: { content: block } }
-  list:    { multiline: { style: { content: box } } }
+  meta:    (always_newline: true)
+  heading: (space_inside_brackets: true)
+  table:   (adjust_width: auto, max_col_width: 50)
+  link:    (no_space: true, group_order: \"[]()\")
+  quote:   (always_newline: true)
+  callout: (style: (content: block))
+  list:    (multiline: (style: (content: box)))
 )
 ";
     assert_eq!(aligned(src), want);

@@ -14,7 +14,7 @@ pub struct Service {
     /// Invariant for service configuration:
     ///
     /// @rule(service-config){
-    ///   guard: { twrit: door }
+    ///   guard: (twrit: door)
     /// }
     ///
     /// Refer to @file(docs/spec/service.tmt) for details.

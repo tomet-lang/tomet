@@ -3,7 +3,7 @@ use super::*;
 #[test]
 fn a_nested_map_survives_as_an_exact_copy() {
     // It does not render as `data-m=""` -- key kept, contents gone.
-    let doc = parse_file("@deck.x(a: 1, m: { k: v })[ 本文 ]\n").unwrap();
+    let doc = parse_file("@deck.x(a: 1, m: (k: v))[ 本文 ]\n").unwrap();
     let html = render_body(&doc);
     assert!(html.contains(r#"data-a="1""#), "got {html}");
     assert!(

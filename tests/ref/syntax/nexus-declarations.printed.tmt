@@ -4,11 +4,11 @@
 
 ::macro(gh: "https://github.com/tomet/tomet/issues/$(1)")
 
-::var(title: {type: string, default: Daily})
+::var(title: (type: string, default: Daily))
 
-::format(table: {max_col_width: 50})
+::format(table: (max_col_width: 50))
 
-::field(created: {type: datetime, format: rfc3339})
+::field(created: (type: datetime, format: rfc3339))
 
 ::workspace(ignore: (tests/fixtures))
 
@@ -20,9 +20,9 @@
 
 ::dictionary(tomet: tomet.dict.tmt)
 
-::migration(meta: {created: {type: datetime, format: iso8601}})
+::migration(meta: (created: (type: datetime, format: iso8601)))
 
-::element(card: {display: block})
+::element(card: (display: block))
 
 ::blueprint(daily){ version: "1.0" }
 

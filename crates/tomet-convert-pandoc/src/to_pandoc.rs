@@ -1062,7 +1062,7 @@ mod tests {
 
     #[test]
     fn a_nested_value_is_carried_by_the_exact_copy() {
-        let blocks = convert("@deck.card(){ a: 1, m: { k: v } }\n");
+        let blocks = convert("@deck.card(){ a: 1, m: (k: v) }\n");
         let Block::Div(attr, _) = &blocks[0] else {
             panic!("expected a Div, got {:?}", blocks[0]);
         };

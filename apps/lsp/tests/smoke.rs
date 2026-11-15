@@ -16,7 +16,7 @@ struct Server {
     // `io_threads.join()` never returns and the process never exits even
     // after it's handled the `exit` notification.
     stdin: Option<ChildStdin>,
-    stdout: BufReader<std::process::ChildStdout>,
+    receiver: std::sync::mpsc::Receiver<Value>,
     next_id: i64,
 }
 
@@ -29,11 +29,43 @@ impl Server {
             .spawn()
             .expect("failed to spawn tomet-lsp");
         let stdin = child.stdin.take().unwrap();
-        let stdout = BufReader::new(child.stdout.take().unwrap());
+        let mut stdout = BufReader::new(child.stdout.take().unwrap());
+        let (tx, rx) = std::sync::mpsc::channel();
+        std::thread::spawn(move || {
+            loop {
+                let mut content_length = None;
+                loop {
+                    let mut line = String::new();
+                    if stdout.read_line(&mut line).unwrap_or(0) == 0 {
+                        return;
+                    }
+                    let line = line.trim_end();
+                    if line.is_empty() {
+                        break;
+                    }
+                    if let Some(v) = line.strip_prefix("Content-Length:") {
+                        content_length = v.trim().parse::<usize>().ok();
+                    }
+                }
+                let Some(len) = content_length else {
+                    return;
+                };
+                let mut buf = vec![0u8; len];
+                if stdout.read_exact(&mut buf).is_err() {
+                    return;
+                }
+                let Ok(msg) = serde_json::from_slice(&buf) else {
+                    continue;
+                };
+                if tx.send(msg).is_err() {
+                    return;
+                }
+            }
+        });
         Server {
             child,
             stdin: Some(stdin),
-            stdout,
+            receiver: rx,
             next_id: 1,
         }
     }
@@ -59,22 +91,9 @@ impl Server {
     }
 
     fn read_message(&mut self) -> Value {
-        let mut content_length = None;
-        loop {
-            let mut line = String::new();
-            self.stdout.read_line(&mut line).unwrap();
-            let line = line.trim_end();
-            if line.is_empty() {
-                break;
-            }
-            if let Some(v) = line.strip_prefix("Content-Length:") {
-                content_length = Some(v.trim().parse::<usize>().unwrap());
-            }
-        }
-        let len = content_length.expect("no Content-Length header");
-        let mut buf = vec![0u8; len];
-        self.stdout.read_exact(&mut buf).unwrap();
-        serde_json::from_slice(&buf).unwrap()
+        self.receiver
+            .recv_timeout(MESSAGE_TIMEOUT)
+            .expect("timed out waiting for message from tomet-lsp")
     }
 
     fn shutdown(mut self) {
@@ -86,6 +105,19 @@ impl Server {
         assert!(status.success(), "server exited with {status:?}");
     }
 }
+
+impl Drop for Server {
+    fn drop(&mut self) {
+        drop(self.stdin.take());
+        let _ = self.child.kill();
+        let _ = self.child.wait();
+    }
+}
+
+/// How long a test waits for the server's next message. It only turns a server
+/// that will never answer into a failing test instead of a hung one; a message
+/// that comes arrives at once, so the bound is generous.
+const MESSAGE_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(30);
 
 fn diagnostics_array(msg: &Value) -> &Vec<Value> {
     assert_eq!(
@@ -388,7 +420,7 @@ fn uuid_vault(name: &str) -> std::path::PathBuf {
     std::fs::create_dir_all(&root).unwrap();
     std::fs::write(
         root.join(tomet_load_config::VAULT_CONFIG_FILE),
-        "::kind(config)\n::field(id: { type: uuid })\n",
+        "::kind(config)\n::field(id: (type: uuid))\n",
     )
     .unwrap();
     root

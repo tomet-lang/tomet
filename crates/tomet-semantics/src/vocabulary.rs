@@ -766,15 +766,15 @@ mod tests {
 ::vocabulary.writ(version: "1.0.0")
 
 ::element(
-  layers: {
+  layers: (
     display: block
     singleton: true
     about: | Layers.
-  }
-  pure: {
+  )
+  pure: (
     display: block
     about: | Purity.
-  }
+  )
 )
 "#;
 
@@ -801,22 +801,22 @@ mod tests {
 ::vocabulary.deck(version: "1.0.0")
 
 ::element(
-  card: {
+  card: (
     display: block
-    args: {
-      id: {
+    args: (
+      id: (
         type: uint
         positional: true
         required: true
         about: | 通し番号。
-      }
-      tags: {
+      )
+      tags: (
         type: list(string)
         about: | タグ。
-      }
-    }
+      )
+    )
     about: | カード一枚。
-  }
+  )
 )
 "#,
         );
@@ -851,11 +851,11 @@ mod tests {
 ::vocabulary.deck(version: "1.0.0")
 
 ::element(
-  card: {
+  card: (
     display: block
-    content: { allow: (link, em, ns.widget) }
+    content: (allow: (link, em, ns.widget))
     about: | カード一枚。
-  }
+  )
 )
 "#,
         );
@@ -877,14 +877,14 @@ mod tests {
 ::vocabulary.deck(version: "1.0.0")
 
 ::element(
-  label: {
-    content: { allow: inline }
+  label: (
+    content: (allow: inline)
     about: | 短い説明。
-  }
-  box: {
-    content: { allow: any }
+  )
+  box: (
+    content: (allow: any)
     about: | 何でも。
-  }
+  )
 )
 "#,
         );
@@ -902,10 +902,10 @@ mod tests {
 ::vocabulary.deck(version: "1.0.0")
 
 ::element(
-  plain: {
+  plain: (
     display: block
     about: | 何も宣言しない。
-  }
+  )
 )
 "#,
         );
@@ -925,13 +925,13 @@ mod tests {
     /// made, where any `::kind` at all counted as a blueprint.
     #[test]
     fn a_document_without_the_header_is_not_a_vocabulary() {
-        let doc = tomet_ast_parser::parse_file("::kind(note)\n\n::element(x: {})\n").unwrap();
+        let doc = tomet_ast_parser::parse_file("::kind(note)\n\n::element(x: ())\n").unwrap();
         assert!(Vocabulary::from_file(&doc).is_none());
     }
 
     #[test]
     fn shadowing_a_builtin_is_reported_at_the_declaration() {
-        let v = vocab("::vocabulary.deck()\n\n::element(link: {}, ref: {}, item: {})\n");
+        let v = vocab("::vocabulary.deck()\n\n::element(link: (), ref: (), item: ())\n");
         assert_eq!(v.shadowed_builtins(), ["item", "link"]);
         assert!(vocab(WRIT).shadowed_builtins().is_empty());
     }
@@ -954,7 +954,7 @@ mod tests {
     #[test]
     fn loaded_vocabularies_rejects_reserved_element_name() {
         let doc = tomet_ast_parser::parse_file(
-            "::kind(vocabulary)\n::vocabulary.deck()\n\n::element(item: {})\n",
+            "::kind(vocabulary)\n::vocabulary.deck()\n\n::element(item: ())\n",
         )
         .unwrap();
         let mut loaded = LoadedVocabularies::default();
@@ -970,16 +970,16 @@ mod tests {
     const DECK: &str = "::vocabulary.deck()
 
 ::element(
-  entry: {
-    args: {
-      id: { type: uint, positional: true }
-      tags: { type: list(string) }
-      unsupported: { type: set(string) }
-      owner: { type: person }
-      stars: { type: uint, default: \"many\" }
-      note: {}
-    }
-  }
+  entry: (
+    args: (
+      id: (type: uint, positional: true)
+      tags: (type: list(string))
+      unsupported: (type: set(string))
+      owner: (type: person)
+      stars: (type: uint, default: \"many\")
+      note: ()
+    )
+  )
 )
 ";
 
@@ -1055,7 +1055,7 @@ mod tests {
     /// omitted".
     #[test]
     fn std_wins_and_used_namespaces_are_never_bare() {
-        let deck = vocab("::vocabulary.deck()\n\n::element(ref: {})\n");
+        let deck = vocab("::vocabulary.deck()\n\n::element(ref: ())\n");
         let b = Bindings {
             kind: Some(vocab(WRIT)),
             used: [("deck".to_string(), deck)].into_iter().collect(),
@@ -1110,7 +1110,7 @@ mod tests {
     /// would be repeating it.
     #[test]
     fn use_brings_a_namespace_into_scope_by_name() {
-        let deck = vocab("::vocabulary.deck()\n\n::element(ref: {})\n");
+        let deck = vocab("::vocabulary.deck()\n\n::element(ref: ())\n");
         let doc = tomet_ast_parser::parse_file("::kind(writ)\n::use(deck)\n\n@deck.ref(id:1)\n")
             .expect("document parses");
 
@@ -1129,7 +1129,7 @@ mod tests {
     /// the same with or without it.
     #[test]
     fn a_version_after_the_name_does_not_change_what_binds() {
-        let deck = vocab("::vocabulary.deck()\n\n::element(ref: {})\n");
+        let deck = vocab("::vocabulary.deck()\n\n::element(ref: ())\n");
         for src in [
             "::kind(writ, 1)\n::use(deck, 3)\n\n@deck.ref(id:1)\n",
             "::kind(writ)\n::use(deck)\n\n@deck.ref(id:1)\n",
@@ -1145,7 +1145,7 @@ mod tests {
     /// scope. Only the document's own kind binds without being written.
     #[test]
     fn an_available_vocabulary_is_not_in_scope_unless_the_document_asks() {
-        let deck = vocab("::vocabulary.deck()\n\n::element(ref: {})\n");
+        let deck = vocab("::vocabulary.deck()\n\n::element(ref: ())\n");
         let doc =
             tomet_ast_parser::parse_file("::kind(writ)\n\n@layers()\n").expect("document parses");
 

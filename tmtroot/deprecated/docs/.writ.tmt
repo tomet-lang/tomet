@@ -16,9 +16,9 @@ proposes an edit here and stops.
 ==[ document-placement ]
 
 @rule(document-placement){
-  guard: { twrit: placement }
+  guard: ( twrit: placement )
 
-  placement: {
+  placement: (
     within: "."
     allow: [
       "spec/**/*.tmt",
@@ -30,7 +30,7 @@ proposes an edit here and stops.
       "roadmap.tmt",
       ".writ.tmt"
     ]
-  }
+  )
 }
 
 A new document goes where it belongs by what it *is*, not by what it is
@@ -121,7 +121,7 @@ placement pattern declared in `@rule(document-placement)`.
 ==[ docs-language ]
 
 @rule(docs-language){
-  guard: { runs: "just writ-check" }
+  guard: ( runs: "just writ-check" )
 }
 
 `spec/`, `guide/`, `examples/` and `why/` are written in **Japanese**.
@@ -155,7 +155,7 @@ find . -name '.writ.tmt' -not -path './target/*' \
 ==[ generated-md-not-edited ]
 
 @rule(generated-md-not-edited){
-  guard: { runs: "just docs-check" }
+  guard: ( runs: "just docs-check" )
 }
 
 `.md` under `spec/` and `guide/` is exported from the sibling `.tmt` via

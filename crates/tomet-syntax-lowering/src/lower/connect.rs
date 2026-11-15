@@ -101,7 +101,7 @@ pub(super) fn merge_connect(node: &SyntaxNode, read: &mut Groups) -> Result<()> 
                 });
                 read.args_writers.push(child);
             }
-            K::VALUE_DATA | K::MAP_LITERAL => {
+            K::VALUE_DATA => {
                 let value = crate::element::lower_value_group(&child)?;
                 merge_value_group(read, value, &child)?;
             }

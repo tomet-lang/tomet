@@ -63,19 +63,11 @@ fn render_tuple(tuple: &Tuple, config: &PrinterConfig) -> String {
     if tuple.is_empty() {
         return "()".to_string();
     }
-    if tuple.has_no_unnamed() {
-        let parts: Vec<_> = tuple
-            .named()
-            .map(|(k, val)| format!("{}: {}", key_text(k), render_nested(val, config)))
-            .collect();
-        format!("{{{}}}", parts.join(", "))
-    } else {
-        let mut parts = Vec::new();
-        for entry in tuple.entries() {
-            parts.push(render_entry(entry, config));
-        }
-        format!("({})", parts.join(", "))
+    let mut parts = Vec::new();
+    for entry in tuple.entries() {
+        parts.push(render_entry(entry, config));
     }
+    format!("({})", parts.join(", "))
 }
 
 /// A hole sitting in a value slot: `<?matcher(args){value}>[content]`. The head is
@@ -307,33 +299,30 @@ mod tests {
     }
 
     #[test]
-    fn a_nested_map_keeps_its_braces() {
-        // Without them `m: { k: v }` printed as `m: k: v`, which reparses
-        // as the string "k: v" -- nesting destroyed by any
-        // print-then-parse cycle.
+    fn a_nested_map_keeps_its_parens() {
         assert_eq!(
             render_value(&map(&[
                 ("id", Value::String("c1".into())),
                 ("m", map(&[("k", Value::String("v".into()))])),
             ])),
-            "{id: c1, m: {k: v}}"
+            "(id: c1, m: (k: v))"
         );
     }
 
     #[test]
-    fn a_map_inside_a_sequence_keeps_its_braces() {
+    fn a_map_inside_a_sequence_keeps_its_parens() {
         assert_eq!(
             render_value_inner(&Value::Tuple(Tuple::from_unnamed(vec![
                 map(&[("k", Value::Int(1))]),
                 Value::Int(2),
             ]))),
-            "({k: 1}, 2)"
+            "((k: 1), 2)"
         );
     }
 
     #[test]
     fn a_top_level_map_is_still_wrapped_once() {
-        assert_eq!(render_value(&map(&[("a", Value::Int(1))])), "{a: 1}");
+        assert_eq!(render_value(&map(&[("a", Value::Int(1))])), "(a: 1)");
     }
 
     #[test]

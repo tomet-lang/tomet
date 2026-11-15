@@ -5,10 +5,10 @@
        | vocabulary. It performs no I/O and holds zero external dependencies, and it depends
        | on no other workspace crate. Which crates may depend on it is the root
        | `.writ.tmt`'s.
-  guard: { twrit: pure }
-  pure: {
+  guard: ( twrit: pure )
+  pure: (
     crates: [ "crates/tomet-base-type" ]
     forbid: [ "std::fs", "std::net", "std::process", "std::env" ]
     allow-external: []
-  }
+  )
 }

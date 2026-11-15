@@ -182,7 +182,7 @@ pub(crate) fn lower_hash_id(node: &SyntaxNode) -> Result<Id> {
     Ok(Id(trimmed.to_string()))
 }
 
-/// Lowers a `{...}` value group (`VALUE_DATA` or `MAP_LITERAL`) into a [`Group`].
+/// Lowers a `{...}` value group (`VALUE_DATA`) into a [`Group`].
 pub(crate) fn lower_value_group(node: &SyntaxNode) -> Result<Group> {
     let closed = node.children_with_tokens().any(|e| e.kind() == K::R_BRACE);
 
@@ -553,13 +553,7 @@ fn lower_single_value_from_children(
             SyntaxElement::Token(t) => t.kind() == K::STRING_LITERAL,
             SyntaxElement::Node(n) => matches!(
                 n.kind(),
-                K::CONTENT
-                    | K::SLOT
-                    | K::INLINE_FORM
-                    | K::BLOCK_FORM
-                    | K::INTERP_EXPR
-                    | K::MAP_LITERAL
-                    | K::ARGS
+                K::CONTENT | K::SLOT | K::INLINE_FORM | K::BLOCK_FORM | K::INTERP_EXPR | K::ARGS
             ),
         };
         if is_standalone {
@@ -598,14 +592,6 @@ fn lower_single_value_from_children(
                     };
                 }
                 K::INTERP_EXPR => return Ok(Value::Interp(crate::interp::lower_interpolation(n)?)),
-                K::MAP_LITERAL => {
-                    let closed = n.children_with_tokens().any(|e| e.kind() == K::R_BRACE);
-                    if !closed {
-                        return Err(err(usize::from(n.text_range().end()), "expected '}'"));
-                    }
-                    let entries = lower_tuple_entries(n, false, false, false)?;
-                    return Ok(Value::Tuple(entries));
-                }
                 // A bare `(a, b)` or `(a, k: v)` is a tuple: a value has no infix
                 // arithmetic, so no parenthesis here can group anything.
                 K::ARGS => {

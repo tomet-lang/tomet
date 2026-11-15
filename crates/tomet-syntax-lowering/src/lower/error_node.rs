@@ -23,6 +23,10 @@ pub(crate) fn lower_error(node: &SyntaxNode) -> Error {
         return second_group(node);
     }
 
+    if first == Some(K::L_BRACE) {
+        return err(start, "`{` cannot start a value: write `(k: v)`");
+    }
+
     if first == Some(K::COMMENT) {
         return err(start, "unterminated block comment '/*', expected '*/'");
     }

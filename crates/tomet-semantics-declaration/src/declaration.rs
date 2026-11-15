@@ -326,7 +326,7 @@ mod tests {
         // `X.X` is `X`: the first positional argument is the entry itself.
         assert_eq!(entries_of("::macro.copyright(\"(C)\")\n"), grouped);
 
-        let grouped = entries_of("::field(author: { type: string, required: true })\n");
+        let grouped = entries_of("::field(author: (type: string, required: true))\n");
         assert_eq!(
             entries_of("::field.author(type: string, required: true)\n"),
             grouped

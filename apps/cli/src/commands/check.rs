@@ -404,7 +404,7 @@ mod tests {
         .unwrap();
         fs::write(
             dir.join(".tomet/vocabularies/deck.vocabulary.tmt"),
-            "::kind(vocabulary)\n::vocabulary.deck()\n\n::element(card: {})\n",
+            "::kind(vocabulary)\n::vocabulary.deck()\n\n::element(card: ())\n",
         )
         .unwrap();
         dir
@@ -443,7 +443,7 @@ mod tests {
         fs::write(root.join("good.tmt"), "::kind(deck)\n\n@card()\n").unwrap();
         fs::write(
             root.join("ok.ctmt"),
-            "// header\n\"tmtroot/a.tmt\": \"../a.tmt\"\nm: { x: 1 }\n",
+            "// header\n\"tmtroot/a.tmt\": \"../a.tmt\"\nm: (x: 1)\n",
         )
         .unwrap();
         fs::write(root.join("empty.ctmt"), "").unwrap();
@@ -496,7 +496,7 @@ mod tests {
         let root = vault("uuid");
         fs::write(
             root.join(tomet_load_config::VAULT_CONFIG_FILE),
-            "::kind(config)\n::field(id: { type: uuid })\n",
+            "::kind(config)\n::field(id: (type: uuid))\n",
         )
         .unwrap();
         fs::write(
@@ -663,14 +663,14 @@ mod tests {
         }
 
         // 1. Valid standard declarations pass
-        let good_src = "::kind(catalog, 1)\n::version(1.0.0)\n::meta(\n  author: \"me\"\n)\n::macro(\n  name: \"val\"\n)\n::var(\n  n: { type: int, default: 1 }\n)\nkey: 42\n";
+        let good_src = "::kind(catalog, 1)\n::version(1.0.0)\n::meta(\n  author: \"me\"\n)\n::macro(\n  name: \"val\"\n)\n::var(\n  n: (type: int, default: 1)\n)\nkey: 42\n";
         let good_file = root.join("good.ctmt");
         fs::write(&good_file, good_src).unwrap();
         assert_eq!(ctmt_messages(&good_file, good_src), Vec::<String>::new());
         check(&good_file, false, true, false).expect("valid ctmt passes");
 
         // 2. A file that opens with non-standard ::upstreams(){ ... } checks clean
-        let upstreams_src = "::upstreams(){\n  vocabularies: { git: \"https://github.com/tomet-lang/vocabularies.git\", rev: main, root: vocabularies }\n  commonfiles: { git: \"https://github.com/tomet-lang/commonfiles.git\", rev: main, root: base }\n}\n\"tmtroot/schema/vocabularies/rust@1.0.0.vocabulary.tmt\": { source: { upstream: vocabularies, path: \"...\" } }\n";
+        let upstreams_src = "::upstreams(){\n  vocabularies: (git: \"https://github.com/tomet-lang/vocabularies.git\", rev: main, root: vocabularies)\n  commonfiles: (git: \"https://github.com/tomet-lang/commonfiles.git\", rev: main, root: base)\n}\n\"tmtroot/schema/vocabularies/rust@1.0.0.vocabulary.tmt\": (source: (upstream: vocabularies, path: \"...\"))\n";
         let upstreams_file = root.join("upstreams.ctmt");
         fs::write(&upstreams_file, upstreams_src).unwrap();
         assert_eq!(
@@ -680,7 +680,7 @@ mod tests {
         check(&upstreams_file, false, true, false).expect("::upstreams checks clean");
 
         // 3. The same file with ::kind(catalog, 1.0) added reports version problem only
-        let bad_kind_src = "::kind(catalog, 1.0)\n::upstreams(){\n  vocabularies: { git: \"https://github.com/tomet-lang/vocabularies.git\", rev: main, root: vocabularies }\n}\nkey: 1\n";
+        let bad_kind_src = "::kind(catalog, 1.0)\n::upstreams(){\n  vocabularies: (git: \"https://github.com/tomet-lang/vocabularies.git\", rev: main, root: vocabularies)\n}\nkey: 1\n";
         let bad_kind_file = root.join("upstreams_bad_kind.ctmt");
         fs::write(&bad_kind_file, bad_kind_src).unwrap();
         let msgs = ctmt_messages(&bad_kind_file, bad_kind_src);

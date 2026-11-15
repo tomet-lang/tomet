@@ -232,7 +232,7 @@ mod tests {
         let _ = fs::create_dir_all(&vault);
         fs::write(
             vault.join(tomet_load_config::VAULT_CONFIG_FILE),
-            "::kind(config)\n::format(table: { adjust_width: auto })\n",
+            "::kind(config)\n::format(table: (adjust_width: auto))\n",
         )
         .unwrap();
 

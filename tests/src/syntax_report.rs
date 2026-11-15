@@ -211,9 +211,14 @@ const CASES: &[Case] = &[
     case(
         None,
         "型の `list(string)` は列ではなく呼び出しのまま残る",
-        "::field(tags: { type: list(string) })\n",
+        "::field(tags: (type: list(string)))\n",
     ),
-    case(None, "入れ子のマップ", "@memo(m: { x: 1 })\n"),
+    case(None, "入れ子のタプル", "@memo(m: (x: 1))\n"),
+    case(
+        None,
+        "値位置の `{...}` はエラー。`(k: v)` を書く",
+        "@memo(m: { x: 1 })\n",
+    ),
     case(
         None,
         "値位置の `|` は括弧のない `[ ... ]`。散文の `,` や `}` では閉じず、\
@@ -625,11 +630,11 @@ const CASES: &[Case] = &[
          `meta` `macros` `format` `fields` `workspace` `export` `blueprints` \
          `vocabularies` `dictionaries` `migration` `vars` `elements`。\
          `::meta{ ... }` はもう書けない（下の「主グループの無いネクサス」）",
-        "::meta(title: \"x\")\n::macro(gh: \"https://x/$(1)\")\n::var(a: { type: string })\n\
-         ::format(table: { max_col_width: 50 })\n::field(created: { type: datetime })\n\
+        "::meta(title: \"x\")\n::macro(gh: \"https://x/$(1)\")\n::var(a: (type: string))\n\
+         ::format(table: (max_col_width: 50))\n::field(created: (type: datetime))\n\
          ::workspace(ignore: (\"a\"))\n::export(type: commonmark)\n::blueprint(b: \"b.tmt\")\n\
          ::vocabulary(v: \"v.tmt\")\n::dictionary(d: \"d.tmt\")\n::migration(m: 1)\n\
-         ::element(card: { display: block })\n",
+         ::element(card: (display: block))\n",
     ),
     case(
         None,

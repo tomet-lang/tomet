@@ -131,18 +131,18 @@ mod tests {
     #[test]
     fn test_fields_declaration_parsing() {
         let src = r#"::field(
-  aliases: {
+  aliases: (
     type: list
     always_newline: true
-  }
-  created: {
+  )
+  created: (
     type: datetime
     format: rfc3339
-  }
-  modified: {
+  )
+  modified: (
     type: datetime
     format: rfc3339
-  }
+  )
 )
 "#;
         let cfg = load_config_from_str(src).unwrap();
@@ -159,7 +159,7 @@ mod tests {
 
     #[test]
     fn callout_style_is_read_from_element_callout() {
-        let live = r#"::format(element: { callout: { style: { content: block } } })
+        let live = r#"::format(element: (callout: (style: (content: block))))
 "#;
         assert_eq!(
             load_config_from_str(live)
@@ -169,7 +169,7 @@ mod tests {
             Some(ContentLayout::Block)
         );
 
-        let retired = r#"::format(callout: { style: { content: block } })
+        let retired = r#"::format(callout: (style: (content: block)))
 "#;
         assert_eq!(
             load_config_from_str(retired)
@@ -195,14 +195,14 @@ mod tests {
 
     #[test]
     fn test_code_fence_lines_config() {
-        let src = r#"::format(code: { fence: { lines: "marked" } })"#;
+        let src = r#"::format(code: (fence: (lines: "marked")))"#;
         let cfg = load_config_from_str(src).expect("parse code.fence.lines");
         assert_eq!(
             cfg.format.code_fence_lines,
             Some(tomet_style::FenceLines::Marked)
         );
 
-        let src_bare = r#"::format(code: { fence: { lines: "bare" } })"#;
+        let src_bare = r#"::format(code: (fence: (lines: "bare")))"#;
         let cfg_bare = load_config_from_str(src_bare).expect("parse bare");
         assert_eq!(
             cfg_bare.format.code_fence_lines,
@@ -213,9 +213,9 @@ mod tests {
     #[test]
     fn test_section_and_link_spacing_config() {
         let src = r#"::format(
-  section: { title: "bare", space_inside_brackets: true, blank_before: true, blank_after: false }
-  declaration: { blank_between: false, blank_after: true }
-  element: { link: { no_space: true } }
+  section: (title: "bare", space_inside_brackets: true, blank_before: true, blank_after: false)
+  declaration: (blank_between: false, blank_after: true)
+  element: (link: (no_space: true))
 )
 "#;
         let cfg = load_config_from_str(src).expect("failed to parse format");
@@ -246,16 +246,16 @@ mod tests {
         };
         assert_eq!(load("::format()\n").paragraph_separator, None);
         assert_eq!(
-            load("::format(paragraph: { separator: blank })\n").paragraph_separator,
+            load("::format(paragraph: (separator: blank))\n").paragraph_separator,
             Some(ParagraphSeparator::Blank)
         );
         assert_eq!(
-            load("::format(paragraph: { separator: semicolon })\n").paragraph_separator,
+            load("::format(paragraph: (separator: semicolon))\n").paragraph_separator,
             Some(ParagraphSeparator::Semicolon)
         );
         // A value that is no separator leaves it unset instead of guessing one.
         assert_eq!(
-            load("::format(paragraph: { separator: newline })\n").paragraph_separator,
+            load("::format(paragraph: (separator: newline))\n").paragraph_separator,
             None
         );
     }
@@ -269,7 +269,7 @@ mod tests {
         };
         assert_eq!(load("::format()\n").max_key_width(), 20);
         assert_eq!(
-            load("::format(map: { max_key_width: 8 })\n").max_key_width(),
+            load("::format(map: (max_key_width: 8))\n").max_key_width(),
             8
         );
     }
@@ -277,28 +277,28 @@ mod tests {
     #[test]
     fn test_group_order_config() {
         let src1 = r#"::format(
-  element: { group_order: "content_first" }
+  element: (group_order: "content_first")
 )
 "#;
         let cfg1 = load_config_from_str(src1).expect("failed to parse format");
         assert_eq!(cfg1.format.group_order, Some(GroupOrder::ContentFirst));
 
         let src2 = r#"::format(
-  element: { group_order: "[]()" }
+  element: (group_order: "[]()")
 )
 "#;
         let cfg2 = load_config_from_str(src2).expect("failed to parse format");
         assert_eq!(cfg2.format.group_order, Some(GroupOrder::ContentFirst));
 
         let src3 = r#"::format(
-  element: { group_order: "args_first" }
+  element: (group_order: "args_first")
 )
 "#;
         let cfg3 = load_config_from_str(src3).expect("failed to parse format");
         assert_eq!(cfg3.format.group_order, Some(GroupOrder::ArgsFirst));
 
         let src4 = r#"::format(
-  element: { link: { group_order: "content_first" } }
+  element: (link: (group_order: "content_first"))
 )
 "#;
         let cfg4 = load_config_from_str(src4).expect("failed to parse format");
@@ -311,10 +311,10 @@ mod tests {
         assert_eq!(cfg4.element_group_order("other"), None);
 
         let src5 = r#"::format(
-  element: {
+  element: (
     group_order: "args_first"
-    link: { group_order: "[]()" }
-  }
+    link: (group_order: "[]()")
+  )
 )
 "#;
         let cfg5 = load_config_from_str(src5).expect("failed to parse format");
@@ -354,12 +354,12 @@ mod tests {
         assert_eq!(cfg.format.table_align.as_deref(), Some("center"));
 
         let src_mixed = r#"::format(
-  element.callout: {
+  element.callout: (
     style.content: "block"
-  }
-  list.multiline: {
+  )
+  list.multiline: (
     style.content: "expanded"
-  }
+  )
 )
 "#;
         let cfg_mixed = load_config_from_str(src_mixed).expect("failed to parse mixed format");
@@ -391,8 +391,8 @@ mod tests {
   meta.always_newline: true
 )
 ::field(
-  url.wiki: { type: list, always_newline: true }
-  title: { length: 70 }
+  url.wiki: (type: list, always_newline: true)
+  title: (length: 70)
 )
 ::workspace(
   ignore: ("target", "build")
@@ -430,11 +430,11 @@ mod tests {
         .expect("dotted heads");
         let grouped = load_config_from_str(
             r#"::macro(copyright: "(C) 2026")
-::format(meta: { always_newline: true }, element: { link: { no_space: true, group_order: "[]()" } })
+::format(meta: (always_newline: true), element: (link: (no_space: true, group_order: "[]()")))
 ::field(
-  aliases: { type: list, always_newline: true }
-  url.wiki: { type: list, always_newline: true }
-  title: { length: 70 }
+  aliases: (type: list, always_newline: true)
+  url.wiki: (type: list, always_newline: true)
+  title: (length: 70)
 )
 ::workspace(ignore: ("target", "build"), unswept: ("tests/fixtures"))
 ::blueprint(note: @file(note.blueprint.tmt))
@@ -463,16 +463,16 @@ mod tests {
     #[test]
     fn test_arbitrary_element_configuration() {
         let src = r#"::format(
-  element.note: {
+  element.note: (
     group_order: "[]()"
     no_space: true
     style.content: "expanded"
     badge: "important"
-  }
-  element.custom: {
+  )
+  element.custom: (
     color: "blue"
     count: 5
-  }
+  )
 )
 "#;
         let cfg = load_config_from_str(src).expect("parses custom elements");

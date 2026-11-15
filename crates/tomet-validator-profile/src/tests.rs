@@ -22,7 +22,7 @@ fn a_document_that_needs_nothing_from_outside_has_no_findings() {
     let source = "\
 ::profile(standalone)
 ::macro(gh: \"https://x/$(1)\")
-::var(topic: { type: string, default: \"a\" })
+::var(topic: (type: string, default: \"a\"))
 
 See $macro.gh(1) on $(var.topic), a $(self::kind) and $add(1, 2).
 ";

@@ -180,9 +180,9 @@ mod tests {
         let map: BTreeMap<String, i32> = from_value(empty).expect("empty tuple into map");
         assert!(map.is_empty());
         assert!(from_str::<Vec<i32>>("()").unwrap().is_empty());
-        assert!(from_str::<Vec<i32>>("{}").unwrap().is_empty());
+        assert!(from_str::<Vec<i32>>("{}").is_err());
         assert!(from_str::<BTreeMap<String, i32>>("()").unwrap().is_empty());
-        assert!(from_str::<BTreeMap<String, i32>>("{}").unwrap().is_empty());
+        assert!(from_str::<BTreeMap<String, i32>>("{}").is_err());
     }
 
     #[test]
@@ -381,7 +381,7 @@ mod tests {
 
     #[test]
     fn a_data_error_names_the_key_path_to_the_value() {
-        let err = failure::<Settings>("bookmarks: ({label: a, path: (1)})");
+        let err = failure::<Settings>("bookmarks: ((label: a, path: (1)))");
         assert!(err.starts_with("bookmarks[0].path: "), "{err}");
         assert!(err.contains("invalid type"), "{err}");
 
@@ -391,7 +391,7 @@ mod tests {
 
     #[test]
     fn a_missing_field_is_reported_at_the_map_that_lacks_it() {
-        let err = failure::<Settings>("bookmarks: ({label: a, path: p}, {label: b})");
+        let err = failure::<Settings>("bookmarks: ((label: a, path: p), (label: b))");
         assert!(err.starts_with("bookmarks[1]: "), "{err}");
         assert!(err.contains("missing field `path`"), "{err}");
 
@@ -411,15 +411,15 @@ mod tests {
     fn a_key_holding_a_dot_is_quoted_so_it_is_not_taken_for_two_steps() {
         use std::collections::BTreeMap;
         // `a.tmt` is a bare key, but in a path the dot separates steps
-        let err = failure::<BTreeMap<String, Bookmark>>("a.tmt: { label: x }");
+        let err = failure::<BTreeMap<String, Bookmark>>("a.tmt: (label: x)");
         assert!(err.starts_with("\"a.tmt\": "), "{err}");
         assert!(err.contains("missing field `path`"), "{err}");
 
-        let err = failure::<BTreeMap<String, Bookmark>>("a.tmt: { label: x, path: (1) }");
+        let err = failure::<BTreeMap<String, Bookmark>>("a.tmt: (label: x, path: (1))");
         assert!(err.starts_with("\"a.tmt\".path: "), "{err}");
 
         // a key without a dot stays bare
-        let err = failure::<BTreeMap<String, Bookmark>>("a-b: { label: x, path: (1) }");
+        let err = failure::<BTreeMap<String, Bookmark>>("a-b: (label: x, path: (1))");
         assert!(err.starts_with("a-b.path: "), "{err}");
     }
 
@@ -435,14 +435,14 @@ mod tests {
         struct Wrapper {
             effect: Effect,
         }
-        let err = failure::<Wrapper>("effect: { Blur: big }");
+        let err = failure::<Wrapper>("effect: (Blur: big)");
         assert!(err.starts_with("effect.Blur: "), "{err}");
     }
 
     #[test]
     fn the_path_is_data_not_just_text() {
         let Error::Data { path, .. } =
-            from_str::<Settings>("bookmarks: ({label: a, path: (1)})").unwrap_err()
+            from_str::<Settings>("bookmarks: ((label: a, path: (1)))").unwrap_err()
         else {
             panic!("expected a data error");
         };

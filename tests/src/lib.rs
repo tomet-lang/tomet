@@ -293,6 +293,10 @@ pub const KNOWN_TS_ERRORS: &[(&str, &[&str])] = &[
     // A tuple taking named and unnamed entries together at value positions and in calls.
     // Tree-sitter's grammar does not know these forms yet; the grammar follows in the last step of the task.
     ("syntax/tuple.tmt", &[ANY_ERROR]),
+    // Value-position `(k: v)` tuple. Tree-sitter's grammar does not know this form yet; the grammar follows in the last step of the task.
+    ("default.config.tmt", &[ANY_ERROR]),
+    ("syntax/nexus-declarations.tmt", &[ANY_ERROR]),
+    ("test.config.tmt", &[ANY_ERROR]),
     // ---- the nexus rule, refused on purpose --------------------------
     //
     // `syntax/nexus-invalid-*.tmt` are forms `tomet-parser` refuses: a nexus

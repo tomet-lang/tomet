@@ -5,4 +5,4 @@
 ::config(format: json){ strict: true }
 
 "tmtroot/a.tmt": "../a.tmt"
-m: { git: x, rev: y }
+m: ( git: x, rev: y )

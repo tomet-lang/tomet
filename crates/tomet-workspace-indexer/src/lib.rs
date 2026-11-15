@@ -450,26 +450,16 @@ fn collect_meta(data: &tomet_ast::Data, map: &mut BTreeMap<String, String>) {
 
 fn tuple_to_string(tuple: &Tuple) -> String {
     if tuple.is_empty() {
-        "()".to_string()
-    } else if tuple.has_no_named() {
-        let s: Vec<_> = tuple.unnamed().map(value_to_string).collect();
-        format!("({})", s.join(", "))
-    } else if tuple.has_no_unnamed() {
-        let s: Vec<_> = tuple
-            .named()
-            .map(|(k, v)| format!("{k}: {}", value_to_string(v)))
-            .collect();
-        format!("{{{}}}", s.join(", "))
-    } else {
-        let s: Vec<_> = tuple
-            .entries()
-            .map(|e| match e.name() {
-                None => value_to_string(e.value()),
-                Some(name) => format!("{name}: {}", value_to_string(e.value())),
-            })
-            .collect();
-        format!("({})", s.join(", "))
+        return "()".to_string();
     }
+    let s: Vec<_> = tuple
+        .entries()
+        .map(|e| match e.name() {
+            None => value_to_string(e.value()),
+            Some(name) => format!("{name}: {}", value_to_string(e.value())),
+        })
+        .collect();
+    format!("({})", s.join(", "))
 }
 
 fn value_to_string(v: &Value) -> String {
@@ -688,7 +678,7 @@ mod metadata_table_tests {
 
     #[test]
     fn a_nested_map_is_recorded_at_every_depth() {
-        let fields = fields_of("::meta(url: { wiki: \"https://example.test\" })\n\n#[ T ]\n");
+        let fields = fields_of("::meta(url: (wiki: \"https://example.test\"))\n\n#[ T ]\n");
         assert!(matches!(fields.get("meta"), Some(Value::Tuple(_))));
         assert!(matches!(fields.get("meta.url"), Some(Value::Tuple(_))));
         assert_eq!(

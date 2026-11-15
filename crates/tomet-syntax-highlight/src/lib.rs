@@ -286,7 +286,7 @@ fn slot_tag(slot: &SyntaxNode) -> Tag {
 fn is_group_bracket(kind: K) -> bool {
     matches!(
         kind,
-        K::ARGS | K::VALUE_DATA | K::CONTENT | K::MAP_LITERAL | K::ID_GROUP | K::INTERP_EXPR
+        K::ARGS | K::VALUE_DATA | K::CONTENT | K::ID_GROUP | K::INTERP_EXPR
     )
 }
 
@@ -298,7 +298,6 @@ fn is_group_punctuation(kind: K) -> bool {
         K::ARGS
             | K::VALUE_DATA
             | K::CONTENT
-            | K::MAP_LITERAL
             | K::ID_GROUP
             | K::CONNECT
             | K::MAP_ENTRY
@@ -307,7 +306,7 @@ fn is_group_punctuation(kind: K) -> bool {
 }
 
 /// The nesting depth of enclosing groups (`ARGS`, `CONTENT`, `VALUE_DATA`,
-/// `MAP_LITERAL`, `ID_GROUP`, `INTERP_EXPR`). Top-level tokens have depth `0`.
+/// `ID_GROUP`, `INTERP_EXPR`). Top-level tokens have depth `0`.
 fn group_depth(token: &SyntaxToken) -> u8 {
     let count = token
         .parent_ancestors()
@@ -361,13 +360,9 @@ fn is_key(token: &SyntaxToken) -> bool {
 fn in_value(token: &SyntaxToken) -> bool {
     for node in token.parent_ancestors() {
         match node.kind() {
-            K::ARGS
-            | K::VALUE_DATA
-            | K::ID_GROUP
-            | K::MAP_LITERAL
-            | K::MAP_ENTRY
-            | K::SEQ_ITEM
-            | K::INTERP_EXPR => return true,
+            K::ARGS | K::VALUE_DATA | K::ID_GROUP | K::MAP_ENTRY | K::SEQ_ITEM | K::INTERP_EXPR => {
+                return true;
+            }
             K::PARAGRAPH
             | K::LIST_ITEM
             | K::SECTION_HEADING
@@ -640,8 +635,8 @@ mod tests {
             ]
         );
 
-        // (2) Nested map literals in values: ( ... { ... { ... } } )
-        let src2 = "@foo(a: { b: { c: 1 } })\n";
+        // (2) Nested tuple literals in values: ( ... ( ... ( ... ) ) )
+        let src2 = "@foo(a: (b: (c: 1)))\n";
         let spans2 = highlight(src2);
         let tagged_depths2: Vec<(&str, &'static str, u8)> = spans2
             .iter()
@@ -654,15 +649,15 @@ mod tests {
                 ("(", "bracket", 1),
                 ("a", "propertyName", 1),
                 (":", "punctuation", 1),
-                ("{", "bracket", 2),
+                ("(", "bracket", 2),
                 ("b", "propertyName", 2),
                 (":", "punctuation", 2),
-                ("{", "bracket", 3),
+                ("(", "bracket", 3),
                 ("c", "propertyName", 3),
                 (":", "punctuation", 3),
                 ("1", "number", 3),
-                ("}", "bracket", 3),
-                ("}", "bracket", 2),
+                (")", "bracket", 3),
+                (")", "bracket", 2),
                 (")", "bracket", 1),
             ]
         );

@@ -74,7 +74,7 @@ pub(super) fn require_primary_group(node: &SyntaxNode, head: &str, at: usize) ->
     let mut lone: Vec<&str> = Vec::new();
     for child in node.children() {
         let group = match child.kind() {
-            K::VALUE_DATA | K::MAP_LITERAL => "`{...}`",
+            K::VALUE_DATA => "`{...}`",
             K::ID_GROUP => "`#(id)`",
             K::CONNECT => "`::connect`",
             _ => continue,

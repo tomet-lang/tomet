@@ -268,7 +268,7 @@ fn an_unnamed_entry_written_twice_is_a_clash_at_its_position() {
 
 #[test]
 fn unnamed_entries_merge_when_both_are_tuples_or_only_one_side_has_them() {
-    let doc = file("@memo({x: 1}, k: 0)::({y: 2}, 3)\n").unwrap();
+    let doc = file("@memo((x: 1), k: 0)::((y: 2), 3)\n").unwrap();
     let Block::Element(el) = &doc.body[0] else {
         panic!()
     };
@@ -287,7 +287,7 @@ fn unnamed_entries_merge_when_both_are_tuples_or_only_one_side_has_them() {
 
 #[test]
 fn merge_named_entries_disjoint_and_recursive() {
-    let doc = file("@memo(a: {x: 1})::(b: 2)::(a: {y: 3})\n").unwrap();
+    let doc = file("@memo(a: (x: 1))::(b: 2)::(a: (y: 3))\n").unwrap();
     let Block::Element(el) = &doc.body[0] else {
         panic!()
     };
@@ -355,7 +355,7 @@ fn a_key_written_twice_is_a_clash_that_names_the_first_place() {
             "duplicate key `a`: first written at 1:10",
         ),
         (
-            "@memo(a: {x: 1})\n::(b: 2)\n::(a: {x: 3})\n",
+            "@memo(a: (x: 1))\n::(b: 2)\n::(a: (x: 3))\n",
             "duplicate key `a.x`: first written at 1:11",
         ),
         (
@@ -417,4 +417,19 @@ fn tuple_duplicate_keys_and_literal_constructors() {
     assert_eq!(args.len(), 2);
     assert_eq!(args.get("404"), Some(&Value::String("x".into())));
     assert_eq!(args.get("500"), Some(&Value::String("y".into())));
+}
+
+#[test]
+fn value_starting_brace_is_error_and_middle_brace_is_scalar() {
+    let err = file("@memo(a: {x: 1})\n").unwrap_err();
+    assert_eq!(err.message, "`{` cannot start a value: write `(k: v)`");
+    assert_eq!(err.offset, 9); // offset of `{`
+
+    // In the middle of a value, `{` is part of scalar text
+    let doc = file("@memo(a: x {y})\n").unwrap();
+    let Block::Element(el) = &doc.body[0] else {
+        panic!()
+    };
+    let args = el.data.args.as_ref().unwrap();
+    assert_eq!(args.get("a"), Some(&Value::String("x {y}".into())));
 }

@@ -352,7 +352,7 @@ mod tests {
     #[test]
     fn the_names_a_document_defines_are_read_from_the_document() {
         let doc = tomet_ast_parser::parse_file(
-            "::macro(gh: \"https://x/$(1)\")\n::var(topic: { type: string })\n",
+            "::macro(gh: \"https://x/$(1)\")\n::var(topic: (type: string))\n",
         )
         .unwrap();
         let own = OwnNames::of_document(&doc);

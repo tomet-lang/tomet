@@ -36,7 +36,7 @@ impl VarDecl {
     pub fn from_value(value: &Value) -> Result<VarDecl, String> {
         let Value::Tuple(fields) = value else {
             return Err(
-                "a variable is declared as a map: `{ type: ..., default: ..., about: ... }`"
+                "a variable is declared as a map: `(type: ..., default: ..., about: ...)`"
                     .to_string(),
             );
         };
@@ -48,7 +48,7 @@ impl VarDecl {
         for entry in fields.entries() {
             let Some(key) = entry.name() else {
                 return Err(
-                    "a variable is declared as a map: `{ type: ..., default: ..., about: ... }`"
+                    "a variable is declared as a map: `(type: ..., default: ..., about: ...)`"
                         .to_string(),
                 );
             };
@@ -129,7 +129,7 @@ mod tests {
     #[test]
     fn a_declaration_has_a_type_a_default_and_an_about() {
         let found = decls(
-            "::var(\n  title: {\n    type: string\n    about: | 題。\n  }\n  n: { type: int, default: 3 }\n)\n",
+            "::var(\n  title: (\n    type: string\n    about: | 題。\n  )\n  n: (type: int, default: 3)\n)\n",
         );
         let title = found[0].1.as_ref().unwrap();
         assert_eq!(title.ty, Type::bare(Kind::String));
@@ -143,13 +143,13 @@ mod tests {
 
     #[test]
     fn the_type_is_a_string_when_it_is_left_out() {
-        let found = decls("::var(\n  who: { default: \"me\" }\n)\n");
+        let found = decls("::var(\n  who: (default: \"me\")\n)\n");
         assert_eq!(found[0].1.as_ref().unwrap().ty, Type::bare(Kind::String));
     }
 
     #[test]
     fn a_type_that_is_not_one_is_refused_with_the_types_there_are() {
-        let found = decls("::var(\n  title: { type: person }\n)\n");
+        let found = decls("::var(\n  title: (type: person)\n)\n");
         let reason = found[0].1.as_ref().unwrap_err();
         assert!(
             reason.contains("`person` is not a type")
@@ -167,7 +167,7 @@ mod tests {
 
     #[test]
     fn an_unknown_key_is_refused_with_the_keys_there_are() {
-        let found = decls("::var(\n  title: { kind: string }\n)\n");
+        let found = decls("::var(\n  title: (kind: string)\n)\n");
         let reason = found[0].1.as_ref().unwrap_err();
         assert!(
             reason.contains("`kind`") && reason.contains("`default`"),

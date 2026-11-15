@@ -136,7 +136,7 @@ fn a_bare_paren_group_is_a_sequence() {
         ])
     );
     assert_eq!(
-        parse_value("({k: 1}, 2, \"q\")").unwrap(),
+        parse_value("((k: 1), 2, \"q\")").unwrap(),
         seq(vec![
             Value::Tuple(Tuple::from_named(vec![("k".into(), Value::Int(1))])),
             Value::Int(2),
@@ -340,10 +340,10 @@ fn a_pipe_value_continues_on_aligned_pipe_lines() {
 }
 
 /// The shape a vocabulary writes: a pipe value among the keys of nested
-/// maps, closed by `}` on the line after it.
+/// maps, closed by `)` on the line after it.
 #[test]
 fn a_pipe_value_inside_nested_maps() {
-    let src = "args: {\n  id: {\n    type: string\n    about: | The id.\n  }\n}";
+    let src = "args: (\n  id: (\n    type: string\n    about: | The id.\n  )\n)";
     let Value::Tuple(entries) = parse_value(src).unwrap() else {
         panic!("expected a tuple");
     };

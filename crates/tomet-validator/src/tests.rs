@@ -61,7 +61,7 @@ fn a_repeated_standard_declaration_says_where_the_first_is() {
 #[test]
 fn a_vocabularys_singleton_is_enforced_too() {
     let vocab = tomet_ast_parser::parse_file(
-        "::kind(vocabulary)\n::vocabulary.deck()\n\n::element(spread: { singleton: true })\n",
+        "::kind(vocabulary)\n::vocabulary.deck()\n\n::element(spread: (singleton: true))\n",
     )
     .expect("vocabulary parses");
     let bindings = Bindings {
@@ -148,7 +148,7 @@ fn a_typoed_connect_name_is_reported() {
 #[test]
 fn allow_list_resolves_a_namespaced_custom_element_via_bindings() {
     let vocab = tomet_ast_parser::parse_file(
-        "::kind(vocabulary)\n::vocabulary.ns()\n\n::element(mycard: {})\n",
+        "::kind(vocabulary)\n::vocabulary.ns()\n\n::element(mycard: ())\n",
     )
     .expect("vocabulary parses");
     let bindings = Bindings {
@@ -356,7 +356,7 @@ fn a_body_element_written_with_double_colon_is_reported_with_the_sigil_to_use() 
 #[test]
 fn a_user_declared_preamble_element_is_a_declaration() {
     let vocab = tomet_semantics::Vocabulary::from_file(&parse(
-        "::kind(vocabulary)\n::vocabulary.deck()\n\n::element(character: { region: preamble, singleton: true })\n",
+        "::kind(vocabulary)\n::vocabulary.deck()\n\n::element(character: (region: preamble, singleton: true))\n",
     ))
     .expect("a vocabulary");
     let bindings = Bindings::for_document(&parse("::kind(deck)\n"), [vocab]);
@@ -377,22 +377,22 @@ fn deck_with_params() -> Bindings {
 ::vocabulary.deck()
 
 ::element(
-  card: {
-    args: {
-      id: {
+  card: (
+    args: (
+      id: (
         positional: true
         required: true
         about: | 通し番号。
-      }
-      tags: {
+      )
+      tags: (
         about: | タグ。
-      }
-    }
+      )
+    )
     about: | カード。
-  }
-  plain: {
+  )
+  plain: (
     about: | 宣言なし。
-  }
+  )
 )
 "#,
     ))
@@ -430,21 +430,21 @@ fn deck_with_content_allow() -> Bindings {
 ::vocabulary.deck()
 
 ::element(
-  list: {
+  list: (
     display: block
     // `entry` resolves bare here (the document's own `::kind(deck)`), which
     // `Bindings::classify` normalizes to `deck.entry` even though it's
     // written bare -- same pre-existing quirk `check_one_rule`'s own doc
     // comment notes for `::rule(allow:...)`, so the allow-list has to name
     // it the same way.
-    content: { allow: (deck.entry) }
+    content: (allow: (deck.entry))
     about: | カードの一覧。
-  }
-  entry: {
+  )
+  entry: (
     display: block
-    content: { allow: inline }
+    content: (allow: inline)
     about: | 一覧の一項目。
-  }
+  )
 )
 "#,
     ))
@@ -685,7 +685,7 @@ fn a_macro_that_is_not_a_string_is_reported() {
 
 #[test]
 fn a_variable_is_a_declaration_with_a_type_it_can_have_and_a_default_that_fits() {
-    let good = "::var(\n  title: {\n    type: string\n    about: | 題。\n  }\n  n: { type: int, default: 3 }\n  at: { type: datetime, default: \"2026-10-25T09:00:00+09:00\" }\n  tags: { type: list, default: (a, b) }\n)\n";
+    let good = "::var(\n  title: (\n    type: string\n    about: | 題。\n  )\n  n: (type: int, default: 3)\n  at: (type: datetime, default: \"2026-10-25T09:00:00+09:00\")\n  tags: (type: list, default: (a, b))\n)\n";
     assert!(
         definition_problems(good).is_empty(),
         "{:?}",
@@ -694,17 +694,14 @@ fn a_variable_is_a_declaration_with_a_type_it_can_have_and_a_default_that_fits()
 
     for (src, needle) in [
         ("::var(\n  title: \"x\"\n)\n", "declared as a map"),
+        ("::var(\n  title: (kind: string)\n)\n", "unknown key `kind`"),
+        ("::var(\n  title: (type: person)\n)\n", "is not a type"),
         (
-            "::var(\n  title: { kind: string }\n)\n",
-            "unknown key `kind`",
-        ),
-        ("::var(\n  title: { type: person }\n)\n", "is not a type"),
-        (
-            "::var(\n  n: { type: int, default: \"3\" }\n)\n",
+            "::var(\n  n: (type: int, default: \"3\")\n)\n",
             "`default` is not a value of `type: int`",
         ),
         (
-            "::var(\n  at: { type: datetime, default: \"tomorrow\" }\n)\n",
+            "::var(\n  at: (type: datetime, default: \"tomorrow\")\n)\n",
             "`default` is not a value of `type: datetime`",
         ),
     ] {
@@ -718,8 +715,8 @@ fn a_variable_is_a_declaration_with_a_type_it_can_have_and_a_default_that_fits()
 #[test]
 fn the_config_declarations_are_clean() {
     let doc = parse(
-        "::kind(config)\n::format(callout: { style: { content: block } })\n\
-         ::field(created: { type: datetime })\n\
+        "::kind(config)\n::format(callout: (style: (content: block)))\n\
+         ::field(created: (type: datetime))\n\
          ::blueprint(a: @file(a.blueprint.tmt))\n\
          ::vocabulary(deck: @file(deck.vocabulary.tmt))\n\
          ::workspace(ignore: (\"x\"))\n\
@@ -733,9 +730,7 @@ fn the_config_declarations_are_clean() {
 #[test]
 fn the_dissolved_config_and_settings_are_unknown_declarations() {
     for name in ["config", "settings"] {
-        let doc = parse(&format!(
-            "::{name}(format: {{ link: {{ no_space: true }} }})\n"
-        ));
+        let doc = parse(&format!("::{name}(format: (link: (no_space: true)))\n"));
         let errors = validate_document(&doc);
         assert!(
             errors.iter().any(|e| matches!(
@@ -754,7 +749,7 @@ fn the_dissolved_config_and_settings_are_unknown_declarations() {
 /// saying so is what keeps these tests about duplicate ids.
 fn with_deck() -> Bindings {
     let vocab = tomet_ast_parser::parse_file(
-        "::kind(vocabulary)\n::vocabulary.deck()\n\n::element(task: {}, ref: {})\n",
+        "::kind(vocabulary)\n::vocabulary.deck()\n\n::element(task: (), ref: ())\n",
     )
     .expect("vocabulary parses");
     Bindings {
@@ -869,7 +864,7 @@ fn test_validate_cst_exact_range() {
 fn validate_cst_counts_only_the_id_group_not_any_attribute_named_id() {
     // A literal `id:` key -- nested in a map, or `@link`'s own -- is
     // ordinary data, never this slot, so none of these count.
-    let src = "@a(){id: x}\n@b(){meta: {id: x}}\n@link[t](id: x)\n";
+    let src = "@a(){id: x}\n@b(){meta: (id: x)}\n@link[t](id: x)\n";
     let cst = tomet_cst_parser::parse_cst(src);
     assert!(validate_cst(&cst).is_empty());
 
@@ -1265,17 +1260,17 @@ const TYPED_DECK: &str = r#"::kind(vocabulary)
 ::vocabulary.deck()
 
 ::element(
-  entry: {
-    args: {
-      id: { type: uint, positional: true }
-      label: { type: string }
-      rev: { type: version }
-      done: { type: bool }
-      owner: { type: person }
-      tags: { type: list(string) }
-      unsupported: { type: set(string) }
-    }
-  }
+  entry: (
+    args: (
+      id: (type: uint, positional: true)
+      label: (type: string)
+      rev: (type: version)
+      done: (type: bool)
+      owner: (type: person)
+      tags: (type: list(string))
+      unsupported: (type: set(string))
+    )
+  )
 )
 "#;
 
@@ -1482,10 +1477,10 @@ fn the_same_document_without_the_promise_is_not_reported() {
 #[test]
 fn a_retired_plural_declaration_is_reported_once_with_its_replacement() {
     for (src, written, instead) in [
-        ("::fields(a: { type: string })\n", "fields", "field"),
+        ("::fields(a: (type: string))\n", "fields", "field"),
         ("::macros(m: \"x\")\n", "macros", "macro"),
-        ("::vars(v: { default: 1 })\n", "vars", "var"),
-        ("::elements(card: {})\n", "elements", "element"),
+        ("::vars(v: (default: 1))\n", "vars", "var"),
+        ("::elements(card: ())\n", "elements", "element"),
         (
             "::vocabularies(deck: @file(d.tmt))\n",
             "vocabularies",
@@ -1513,7 +1508,7 @@ fn a_retired_plural_declaration_is_reported_once_with_its_replacement() {
 fn a_dotted_declaration_is_checked_like_the_grouped_one() {
     for src in [
         "::field.owner(type: person)\n",
-        "::field(owner: { type: person })\n",
+        "::field(owner: (type: person))\n",
     ] {
         let errors = validate_document(&parse(src));
         assert_eq!(errors.len(), 1, "{src}: {errors:?}");

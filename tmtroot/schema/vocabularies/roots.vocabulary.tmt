@@ -2,18 +2,18 @@
 ::vocabulary.roots(version: "1.0.0")
 
 ::element(
-  root: {
+  root: (
     display: block
     singleton: false
     about: | 索引の一つの根。指す先の名前かパスを一つ受け取る。
-    args: {
-      target: {
+    args: (
+      target: (
         type: string
         positional: true
         about: | 指す先。文書のパス(`elements.roots.tmt`)か、名前(`std.meta`)。
-      }
-    }
-  }
+      )
+    )
+  )
 )
 
 @dir(tmtroot/index/) の索引のための語彙。`::kind(roots)` の文書は、`root` で
