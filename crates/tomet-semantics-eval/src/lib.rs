@@ -35,7 +35,7 @@ use std::collections::HashMap;
 use std::fmt;
 
 pub type File = tomet_ast::File<Value>;
-use tomet_ast::{Tuple, Value};
+use tomet_ast::Value;
 use tomet_declaration::{DeclKind, Declaration, Host, Problem, check_declarations};
 use tomet_expr::{DocRef, EvalContext, NoResolver};
 use tomet_position::LineIndex;
@@ -178,31 +178,12 @@ fn walk_value(value: Value, lines: &LineIndex, cx: &EvalContext, errors: &mut Ve
             }
         },
         Value::Tuple(tuple) => {
-            let mut new_tuple = Tuple::new();
-            for entry in tuple {
-                let (name, val) = entry.into_parts();
-                let new_v = walk_value(val, lines, cx, errors);
-                if let Some(name) = name {
-                    new_tuple.push_named(name, new_v);
-                } else {
-                    new_tuple.push_unnamed(new_v);
-                }
-            }
-            Value::Tuple(new_tuple)
+            Value::Tuple(tuple.map_values(|value| walk_value(value, lines, cx, errors)))
         }
-        Value::Call(name, args) => {
-            let mut new_args = Tuple::new();
-            for entry in args {
-                let (name, val) = entry.into_parts();
-                let new_v = walk_value(val, lines, cx, errors);
-                if let Some(name) = name {
-                    new_args.push_named(name, new_v);
-                } else {
-                    new_args.push_unnamed(new_v);
-                }
-            }
-            Value::Call(name, new_args)
-        }
+        Value::Call(name, args) => Value::Call(
+            name,
+            args.map_values(|value| walk_value(value, lines, cx, errors)),
+        ),
         other => other,
     }
 }
@@ -210,6 +191,7 @@ fn walk_value(value: Value, lines: &LineIndex, cx: &EvalContext, errors: &mut Ve
 #[cfg(test)]
 mod tests {
     use super::*;
+    use tomet_ast::Tuple;
 
     #[test]
     fn macro_with_positional_and_named_arguments() {

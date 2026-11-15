@@ -2765,15 +2765,24 @@ parse error: 1:6: a nameless connect is written `::{...}` or `::(...)`, not `:{.
 parse error: 2:1: a declaration belongs at the top of the file
 ```
 
-### 列は値だけを持ち、`key: value` の項目は持てない。マップは `{...}`
+### 値の位置の `( )` は、値と `key: value` の項目をまとめて持てる。名前のない項目は位置がキー
 
 ```tmt
 @memo(xs: (a: 1))
 ```
 
 ```
-parse error: 1:12: a sequence '(...)' holds values, not 'key: value' entries; write a map as '{...}'
+Block  @memo
+  args    {xs: {a: 1}}
 ```
+
+検証:
+
+```
+unknown element `memo`: only `std` and this document's own `::kind` may be written bare; namespace it (`ns.memo`), or declare the vocabulary that has it and bind it with `::use`
+```
+
+> **パースは通る。** 上が実際の結果。
 
 ### `{...}` の中に名前を持たない項目は書けない。名前つき要素を書く
 

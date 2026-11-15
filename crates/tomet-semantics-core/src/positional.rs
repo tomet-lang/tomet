@@ -1,45 +1,44 @@
 //! Giving positional arguments their names.
 //!
-//! The reader leaves a positional argument unnamed (`name: None` in a [`Tuple`]);
-//! what the first, the second... are called is a signature, and the signature belongs to whoever
-//! owns the element: a declaration's to `tomet-declaration`, a body element's to `tomet-semantics`.
-//! The binding itself is the same for all of them.
+//! The reader leaves a positional argument unnamed: its key is its position. What the first, the
+//! second... are called is a signature, and the signature belongs to whoever owns the element: a
+//! declaration's to `tomet-declaration`, a body element's to `tomet-semantics`. The binding itself
+//! is the same for all of them.
 
-use tomet_ast::Tuple;
+use tomet_ast::{Tuple, TupleEntry};
 
-/// Names the positional arguments of `(args)` after `keys`, in order.
+/// Names the unnamed entries of `(args)` after `keys`, in order.
 ///
-/// The reader keeps a positional argument as it was written: an unnamed entry in a [`Tuple`]. A
-/// signature says what the first, the second... are called; this puts the names on.
-///
-/// Over one tuple, each remaining unnamed entry takes the next slot in `keys` that is not already
-/// present as a name, left to right on both sides. A slot with no unnamed entry left, and an
-/// unnamed entry past the last slot, are both left as they are -- nothing is dropped, and an
-/// unassigned entry stays unnamed.
+/// Each unnamed entry takes, left to right, the next name of `keys` that no entry of `args` has
+/// yet. An unnamed entry past the last name stays unnamed, and so keeps a position: the first one
+/// left is position 0. A name with no unnamed entry left for it is not added. Nothing is dropped.
 ///
 /// With no `keys` -- an element that has no positional slots -- `args` comes back unchanged.
 ///
 /// This is the mechanism only; the signatures are the callers'.
 pub fn bind_positional(args: &Tuple, keys: &[&str]) -> Tuple {
-    if keys.is_empty() {
-        return args.clone();
-    }
-    let mut tuple = args.clone();
-    for key in keys {
-        if tuple.get(key).is_some() {
-            continue;
+    let mut free = keys.iter().filter(|key| !args.contains_key(key));
+    let bound = args.entries().map(|entry| {
+        let name = match entry.name() {
+            Some(_) => None,
+            None => free.next(),
+        };
+        match name {
+            Some(name) => TupleEntry::named(*name, entry.value().clone()),
+            None => entry.clone(),
         }
-        if let Some(entry) = tuple.entries_mut().find(|e| e.name().is_none()) {
-            entry.set_name(*key);
-        }
-    }
-    tuple
+    });
+    // A name is given only if no entry has it, and each at most once; the entries left unnamed
+    // only move to lower positions, which no name of `args` could be.
+    Tuple::try_from_entries(bound).unwrap_or_else(|duplicate| {
+        panic!("the signature {keys:?} names two positional arguments alike: {duplicate}")
+    })
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tomet_ast::{TupleEntry, Value};
+    use tomet_ast::Value;
 
     fn text(s: &str) -> Value {
         Value::String(s.to_string())

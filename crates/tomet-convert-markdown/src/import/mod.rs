@@ -31,7 +31,7 @@
 use pulldown_cmark::{CodeBlockKind, Event, Options, Parser, Tag, TagEnd};
 use tomet_ast::{
     Block, Data, Element, File, Inline, LineBreak, List, ListItem, Name, Paragraph, Placement,
-    RawText, Section, SoftBreak, Text, Tuple, Value,
+    RawText, Section, SoftBreak, Text, Tuple, TupleEntry, Value,
 };
 use tomet_semantics::{ElementKind, classify_std_lenient, comment_element};
 use tomet_span::Span;
@@ -415,12 +415,11 @@ fn end_frame(stack: &mut Vec<Frame>, tag_end: TagEnd, options: &ImportOptions) {
                     t.value = t.value.trim_start().to_string();
                 }
 
-                let mut tuple = Tuple::new();
-                tuple.push_unnamed(Value::String(variant));
+                let mut entries = vec![TupleEntry::unnamed(Value::String(variant))];
                 if let Some(t_str) = title {
-                    tuple.push_named("title", Value::String(t_str));
+                    entries.push(TupleEntry::named("title", Value::String(t_str)));
                 }
-                let args = tuple;
+                let args = Tuple::from_entries(entries);
 
                 let el = Element {
                     name: Name::bare("callout"),

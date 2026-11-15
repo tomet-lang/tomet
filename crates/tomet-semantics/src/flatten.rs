@@ -124,11 +124,8 @@ pub fn flatten_data(args: Option<&Tuple>, value: Option<&Tuple>) -> FlatData {
     }
 }
 
-/// Converts a Tomet tuple to JSON according to the specification table:
-/// - empty: `{}`
-/// - at least one entry, none named: array
-/// - at least one entry, none unnamed: object
-/// - mixed: object, where an unnamed entry's key is its position among unnamed (`"0"`, `"1"`)
+/// A tuple as JSON, by its keys: no entry is `{}`; keys that are `0`, `1`, ... in the order
+/// written (every entry unnamed) are an array; anything else is an object keyed by the keys.
 pub fn tuple_to_json(tuple: &Tuple) -> serde_json::Value {
     if tuple.is_empty() {
         serde_json::Value::Object(serde_json::Map::new())
@@ -136,17 +133,8 @@ pub fn tuple_to_json(tuple: &Tuple) -> serde_json::Value {
         serde_json::Value::Array(tuple.unnamed().map(value_to_json).collect())
     } else {
         let mut obj = serde_json::Map::new();
-        let mut unnamed_idx = 0usize;
-        for entry in tuple.entries() {
-            let key = match entry.name() {
-                Some(name) => name.to_string(),
-                None => {
-                    let k = unnamed_idx.to_string();
-                    unnamed_idx += 1;
-                    k
-                }
-            };
-            obj.insert(key, value_to_json(entry.value()));
+        for (key, value) in tuple.keyed() {
+            obj.insert(key.into_owned(), value_to_json(value));
         }
         serde_json::Value::Object(obj)
     }

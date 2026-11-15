@@ -32,7 +32,7 @@
 
 use tomet_ast::{
     Block, Connect, Data, Declaration, Element, Entry, File, Group, Id, Inline, InterpExpr, List,
-    ListItem, Paragraph, Text, Tuple, TupleEntry, Value,
+    ListItem, Paragraph, Text, Tuple, Value,
 };
 use tomet_expr::{EvalContext, EvalValue, Note, evaluate, evaluate_data};
 use tomet_span::Span;
@@ -330,14 +330,7 @@ impl Pass<'_> {
     }
 
     fn tuple(&mut self, tuple: Tuple) -> Tuple {
-        Tuple::from_entries(tuple.into_entries().map(|entry| {
-            let (name, val) = entry.into_parts();
-            let val = self.value(val);
-            match name {
-                Some(name) => TupleEntry::named(name, val),
-                None => TupleEntry::unnamed(val),
-            }
-        }))
+        tuple.map_values(|value| self.value(value))
     }
 
     #[deny(clippy::wildcard_enum_match_arm)]

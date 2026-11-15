@@ -86,34 +86,22 @@ fn is_recoverable_target_scheme(key: &str) -> bool {
 /// data alongside the target, e.g. `@link(tm:foo, predicate: depends_on)`
 /// -- untouched.
 fn recover_target_scheme_entry(first_positional_key: Option<&str>, mut tuple: Tuple) -> Tuple {
-    if first_positional_key != Some("target") || tuple.contains_name("target") {
+    if first_positional_key != Some("target") || tuple.contains_key("target") {
         return tuple;
     }
-    let candidates: Vec<usize> = tuple
-        .entries()
-        .enumerate()
-        .filter_map(|(idx, e)| {
-            let name = e.name()?;
-            if is_recoverable_target_scheme(name) {
-                Some(idx)
-            } else {
-                None
-            }
-        })
+    let candidates: Vec<&str> = tuple
+        .named()
+        .filter_map(|(name, _)| is_recoverable_target_scheme(name).then_some(name))
         .collect();
-    let [idx] = candidates[..] else {
+    let [scheme] = candidates[..] else {
         return tuple;
     };
-    let (key, val_text) = {
-        let entry = tuple.nth(idx).unwrap();
-        (
-            entry.name().unwrap().to_string(),
-            entry.value().plain_text(),
-        )
-    };
-    let entry = tuple.nth_mut(idx).unwrap();
-    entry.set_name("target");
-    *entry.value_mut() = Value::String(format!("{key}:{val_text}"));
+    let scheme = scheme.to_string();
+    // No entry has the key `target` (checked above), so the renaming repeats none.
+    if let Some(value) = tuple.get_mut(&scheme) {
+        *value = Value::String(format!("{scheme}:{}", value.plain_text()));
+    }
+    let _ = tuple.rename(&scheme, "target");
     tuple
 }
 

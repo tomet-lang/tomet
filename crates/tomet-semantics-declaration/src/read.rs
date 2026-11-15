@@ -63,7 +63,7 @@ pub fn profile_names(declaration: &Declaration) -> Vec<String> {
             .entries()
             .map(|entry| match entry.name() {
                 None => scalar_text_or_debug(entry.value()),
-                Some(key) => key.to_string(),
+                Some(name) => name.to_string(),
             })
             .collect(),
     }

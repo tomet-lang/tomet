@@ -184,15 +184,25 @@ fn a_list_call_is_not_a_sequence() {
 }
 
 #[test]
-fn a_sequence_holds_values_not_entries() {
-    for src in ["k: (a: 1)", "k: (a, b: 2)", "(x: 1)"] {
-        let err = parse_value(src).unwrap_err();
-        assert!(
-            err.message.contains("holds values"),
-            "{src:?}: {}",
-            err.message
-        );
-    }
+fn a_paren_tuple_at_value_position_takes_named_and_unnamed_entries() {
+    let v = parse_value("k: (a: 1)").unwrap();
+    let Value::Tuple(t) = v else { panic!() };
+    let Some(Value::Tuple(inner)) = t.get("k") else {
+        panic!()
+    };
+    assert_eq!(inner.get("a"), Some(&Value::Int(1)));
+
+    let v = parse_value("k: (a, b: 2)").unwrap();
+    let Value::Tuple(t) = v else { panic!() };
+    let Some(Value::Tuple(inner)) = t.get("k") else {
+        panic!()
+    };
+    assert_eq!(inner.nth_unnamed(0), Some(&Value::String("a".into())));
+    assert_eq!(inner.get("b"), Some(&Value::Int(2)));
+
+    let v = parse_value("(x: 1)").unwrap();
+    let Value::Tuple(inner) = v else { panic!() };
+    assert_eq!(inner.get("x"), Some(&Value::Int(1)));
 }
 
 #[test]

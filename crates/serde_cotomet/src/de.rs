@@ -81,26 +81,10 @@ impl<'de> de::Deserializer<'de> for ValueDeserializer {
                         iter: tuple.into_unnamed().collect::<Vec<_>>().into_iter(),
                         index: 0,
                     })
-                } else if tuple.has_no_unnamed() {
-                    visitor.visit_map(MapAccess {
-                        iter: tuple.into_named().collect::<Vec<_>>().into_iter(),
-                        value: None,
-                    })
                 } else {
-                    let mut unnamed_idx = 0usize;
                     let entries: Vec<(String, Value)> = tuple
-                        .into_entries()
-                        .map(|entry| {
-                            let (name, val) = entry.into_parts();
-                            match name {
-                                Some(k) => (k, val),
-                                None => {
-                                    let k = unnamed_idx.to_string();
-                                    unnamed_idx += 1;
-                                    (k, val)
-                                }
-                            }
-                        })
+                        .keyed()
+                        .map(|(key, value)| (key.into_owned(), value.clone()))
                         .collect();
                     visitor.visit_map(MapAccess {
                         iter: entries.into_iter(),

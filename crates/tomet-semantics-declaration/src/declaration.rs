@@ -104,7 +104,7 @@ impl Declaration {
         match &self.args {
             Some(tuple) => tuple.entries().any(|entry| match entry.name() {
                 None => true,
-                Some(key) => kind.positional_keys().contains(&key),
+                Some(name) => kind.positional_keys().contains(&name),
             }),
             None => true,
         }

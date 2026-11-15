@@ -270,6 +270,18 @@ mod tests {
     }
 
     #[test]
+    fn mixed_tuple_from_source_deserializes() {
+        use std::collections::BTreeMap;
+        let map: BTreeMap<String, String> =
+            from_str(r#"(a, sep: ",")"#).expect("reads mixed tuple from source into map");
+        assert_eq!(map, BTreeMap::from([("sep".into(), ",".into())]));
+
+        let seq: Vec<String> =
+            from_str(r#"(a, sep: ",")"#).expect("reads mixed tuple from source into seq");
+        assert_eq!(seq, vec!["a"]);
+    }
+
+    #[test]
     fn a_map_keyed_by_paths_round_trips_through_serde() {
         use std::collections::BTreeMap;
 

@@ -236,18 +236,9 @@ impl EvalValue {
                 if tuple.has_no_named() {
                     EvalValue::Seq(tuple.unnamed().map(|v| Self::from_ast(v, doc)).collect())
                 } else {
-                    let mut unnamed_idx = 0usize;
                     let mut entries = Vec::with_capacity(tuple.len());
-                    for entry in tuple.entries() {
-                        let key = match entry.name() {
-                            Some(k) => k.to_string(),
-                            None => {
-                                let k = unnamed_idx.to_string();
-                                unnamed_idx += 1;
-                                k
-                            }
-                        };
-                        entries.push((key, Self::from_ast(entry.value(), doc)));
+                    for (key, value) in tuple.keyed() {
+                        entries.push((key.into_owned(), Self::from_ast(value, doc)));
                     }
                     EvalValue::Map(entries)
                 }
@@ -289,7 +280,7 @@ impl EvalValue {
             EvalValue::Map(entries) => {
                 let mut tuple = Tuple::new();
                 for (k, v) in entries {
-                    tuple.push_named(k.clone(), v.to_ast()?);
+                    tuple.try_push_named(k.clone(), v.to_ast()?).ok()?;
                 }
                 Value::Tuple(tuple)
             }
@@ -406,9 +397,9 @@ mod tests {
         );
 
         let mut mixed = Tuple::new();
-        mixed.push_unnamed(Value::Int(10));
-        mixed.push_named("k", Value::Int(20));
-        mixed.push_unnamed(Value::Int(30));
+        mixed.try_push_unnamed(Value::Int(10)).unwrap();
+        mixed.try_push_named("k", Value::Int(20)).unwrap();
+        mixed.try_push_unnamed(Value::Int(30)).unwrap();
         let eval = EvalValue::from_ast(&Value::Tuple(mixed), &doc());
         assert_eq!(
             eval,
@@ -418,6 +409,21 @@ mod tests {
                 ("1".into(), EvalValue::Int(30)),
             ])
         );
+    }
+
+    #[test]
+    fn mixed_tuple_read_from_source_through_eval_bridge() {
+        let ast = tomet_ast_parser::parse_value(r#"(a, sep: ",")"#).unwrap();
+        let eval = EvalValue::from_ast(&ast, &doc());
+        assert_eq!(
+            eval,
+            EvalValue::Map(vec![
+                ("0".into(), EvalValue::String("a".into())),
+                ("sep".into(), EvalValue::String(",".into())),
+            ])
+        );
+        let back = eval.to_ast().expect("converts back to AST value");
+        assert_eq!(back, ast);
     }
 
     #[test]

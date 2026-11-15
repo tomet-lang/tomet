@@ -1,5 +1,5 @@
 use super::*;
-use tomet_ast::Tuple;
+use tomet_ast::{Tuple, TupleEntry};
 
 /// Wraps a flat inline sequence as `Element.content` (`Vec<Block>`) -- every fixture below is just one paragraph's worth.
 fn wrap(inlines: Vec<Inline>) -> Option<Vec<Block>> {
@@ -712,9 +712,10 @@ fn test_obsidian_callout_blockquote_import() {
         panic!("expected element");
     };
     assert_eq!(el.name, Name::bare("callout"));
-    let mut expected_args = Tuple::new();
-    expected_args.push_unnamed(Value::String("info".to_string()));
-    expected_args.push_named("title", Value::String("2025/04/29 11:09".to_string()));
+    let expected_args = Tuple::from_entries([
+        TupleEntry::unnamed(Value::String("info".to_string())),
+        TupleEntry::named("title", Value::String("2025/04/29 11:09".to_string())),
+    ]);
     assert_eq!(el.data.args, Some(expected_args));
 
     let md_plain = "> Plain quote\n";

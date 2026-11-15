@@ -248,11 +248,11 @@ fn rename_arg_key(data: &mut Data, ident: &str) {
 }
 
 fn rename_tuple_keys(tuple: &mut Tuple, ident: &str) {
-    for entry in tuple.entries_mut() {
-        if entry.name() == Some(ident) {
-            entry.set_name(PLACEHOLDER.to_string());
-        }
-        rename_keys(entry.value_mut(), ident);
+    tuple
+        .rename(ident, PLACEHOLDER)
+        .expect("the placeholder is not a key of the vocabulary");
+    for value in tuple.values_mut() {
+        rename_keys(value, ident);
     }
 }
 

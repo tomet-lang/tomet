@@ -250,21 +250,15 @@ fn fenced_code_block_line_marker_rules() {
 #[test]
 fn an_unnamed_entry_written_twice_is_a_clash_at_its_position() {
     for (src, message) in [
-        (
-            "@memo(1)::(2)\n",
-            "duplicate entry `0`: first written at 1:7",
-        ),
-        (
-            "@memo(1)::(1)\n",
-            "duplicate entry `0`: first written at 1:7",
-        ),
+        ("@memo(1)::(2)\n", "duplicate key `0`: first written at 1:7"),
+        ("@memo(1)::(1)\n", "duplicate key `0`: first written at 1:7"),
         (
             "@memo(1, 2)::(3)\n",
-            "duplicate entry `0`: first written at 1:7",
+            "duplicate key `0`: first written at 1:7",
         ),
         (
             "@memo(a: (1))::(a: (2))\n",
-            "duplicate entry `a.0`: first written at 1:11",
+            "duplicate key `a.0`: first written at 1:11",
         ),
     ] {
         let e = refusal(file(src), src);
@@ -379,4 +373,48 @@ fn a_key_written_twice_is_a_clash_that_names_the_first_place() {
         (3, 4),
         "the error is at the second writer"
     );
+}
+
+#[test]
+fn tuple_duplicate_keys_and_literal_constructors() {
+    for (src, message) in [
+        ("@memo(\"0\": a, b)\n", "duplicate key `0`"),
+        ("@memo(b, \"0\": a)\n", "duplicate key `0`"),
+        (
+            "@memo(\"0\": 1)::(2)\n",
+            "duplicate key `0`: first written at 1:7",
+        ),
+        (
+            "@memo(k: string(name: 1))\n",
+            "string() takes no named fields",
+        ),
+        ("@memo(k: int(name: 1))\n", "int() takes no named fields"),
+        (
+            "@memo(k: float(name: 1))\n",
+            "float() takes no named fields",
+        ),
+    ] {
+        let e = refusal(file(src), src);
+        assert_eq!(e.message, message, "{src:?}");
+    }
+
+    // ("1": a, b) is not an error
+    let doc = file("@memo(\"1\": a, b)\n").unwrap();
+    let Block::Element(el) = &doc.body[0] else {
+        panic!()
+    };
+    let args = el.data.args.as_ref().unwrap();
+    assert_eq!(args.len(), 2);
+    assert_eq!(args.nth(0).unwrap().name(), Some("1"));
+    assert_eq!(args.nth(1).unwrap().name(), None);
+
+    // ("404": x, "500": y) is a tuple with two keys and nothing more
+    let doc = file("@memo(\"404\": x, \"500\": y)\n").unwrap();
+    let Block::Element(el) = &doc.body[0] else {
+        panic!()
+    };
+    let args = el.data.args.as_ref().unwrap();
+    assert_eq!(args.len(), 2);
+    assert_eq!(args.get("404"), Some(&Value::String("x".into())));
+    assert_eq!(args.get("500"), Some(&Value::String("y".into())));
 }

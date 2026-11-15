@@ -45,7 +45,7 @@ impl VarDecl {
             default: None,
             about: None,
         };
-        for entry in fields {
+        for entry in fields.entries() {
             let Some(key) = entry.name() else {
                 return Err(
                     "a variable is declared as a map: `{ type: ..., default: ..., about: ... }`"

@@ -322,7 +322,7 @@ fn add_entries(document: &mut File, name: &str, entries: Vec<(String, Value)>) {
         Some(declaration) => match &mut declaration.data.args {
             Some(held) => {
                 for (k, v) in entries {
-                    held.push_named(k, v);
+                    held.set(&k, v);
                 }
             }
             other => *other = Some(Tuple::from_named(entries)),

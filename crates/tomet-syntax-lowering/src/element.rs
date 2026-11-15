@@ -63,7 +63,7 @@ pub(crate) fn lower_paren_value(node: &SyntaxNode) -> Result<Tuple> {
         }
     }
 
-    let entries = lower_tuple_entries(node, false, true)?;
+    let entries = lower_tuple_entries(node, false, true, false)?;
 
     if !closed {
         return Err(err(usize::from(node.text_range().end()), "expected ')'"));
@@ -194,7 +194,7 @@ pub(crate) fn lower_value_group(node: &SyntaxNode) -> Result<Group> {
         match child.kind() {
             K::ERROR => return Err(lower_error(child)),
             K::MAP_ENTRY => {
-                let (key, value, offset) = lower_map_entry(child)?;
+                let (key, value, offset) = lower_map_entry(child, false)?;
                 let Some(key) = key else {
                     return Err(err(
                         offset,
@@ -293,7 +293,7 @@ pub(crate) fn lower_value(root: &SyntaxNode) -> Result<Value> {
         return Ok(Value::Tuple(Tuple::new()));
     }
 
-    let tuple = lower_tuple_entries(root, false, true)?;
+    let tuple = lower_tuple_entries(root, false, true, false)?;
     if tuple.len() == 1 && tuple.has_no_named() {
         return Ok(tuple.into_entries().next().unwrap().into_value());
     }
@@ -309,7 +309,7 @@ pub(crate) fn lower_file_body(root: &SyntaxNode) -> Result<Value> {
         return Ok(Value::Tuple(Tuple::new()));
     }
 
-    let entries = lower_tuple_entries(root, true, true)?;
+    let entries = lower_tuple_entries(root, true, true, false)?;
     Ok(Value::Tuple(entries))
 }
 
@@ -318,13 +318,25 @@ pub(crate) fn lower_tuple_entries(
     node: &SyntaxNode,
     keyed_only: bool,
     require_separator: bool,
+    raw_scalars: bool,
 ) -> Result<Tuple> {
     let entry_children: Vec<SyntaxNode> = node
         .children()
         .filter(|c| matches!(c.kind(), K::MAP_ENTRY | K::SEQ_ITEM | K::ERROR))
         .collect();
 
-    let mut entries: Vec<TupleEntry> = Vec::new();
+    // Every entry with the key it is written with and where it stands. An entry written without
+    // a key has the key of its position among the entries written without one; that is decided
+    // here, on the text, because a tuple does not know how its entries were spelled.
+    let mut written: Vec<(String, Value, usize)> = Vec::new();
+    let mut unnamed_count = 0usize;
+    let mut write = |key: String, value: Value, offset: usize| -> Result<()> {
+        if written.iter().any(|(held, _, _)| *held == key) {
+            return Err(duplicate_key_error(offset, &key));
+        }
+        written.push((key, value, offset));
+        Ok(())
+    };
     for (i, child) in entry_children.iter().enumerate() {
         match child.kind() {
             K::ERROR => {
@@ -336,7 +348,7 @@ pub(crate) fn lower_tuple_entries(
                 return Err(lower_error(child));
             }
             K::MAP_ENTRY => {
-                let (key, value, offset) = lower_map_entry(child)?;
+                let (key, value, offset) = lower_map_entry(child, raw_scalars)?;
                 match key {
                     None => {
                         if keyed_only {
@@ -345,24 +357,24 @@ pub(crate) fn lower_tuple_entries(
                                 "expected 'key: value' entry, found bare value",
                             ));
                         }
-                        entries.push(TupleEntry::unnamed(value));
+                        unnamed_count += 1;
+                        write((unnamed_count - 1).to_string(), value, offset)?;
                     }
-                    Some(key) => {
-                        if entries.iter().any(|e| e.name() == Some(key.as_str())) {
-                            return Err(duplicate_key_error(offset, &key));
-                        }
-                        entries.push(TupleEntry::named(key, value));
-                    }
+                    Some(key) => write(key, value, offset)?,
                 }
             }
             K::SEQ_ITEM => {
                 let offset = usize::from(child.text_range().start());
-                let val =
-                    lower_single_value_from_children(child.children_with_tokens(), false, offset)?;
+                let val = lower_single_value_from_children(
+                    child.children_with_tokens(),
+                    raw_scalars,
+                    offset,
+                )?;
                 if keyed_only {
                     return Err(err(offset, "expected 'key: value' entry, found bare value"));
                 }
-                entries.push(TupleEntry::unnamed(val));
+                unnamed_count += 1;
+                write((unnamed_count - 1).to_string(), val, offset)?;
             }
             _ => {}
         }
@@ -391,15 +403,25 @@ pub(crate) fn lower_tuple_entries(
             }
         }
     }
-    Ok(Tuple::from_entries(entries))
+    let offsets: Vec<usize> = written.iter().map(|(_, _, offset)| *offset).collect();
+    Tuple::try_from_entries(
+        written
+            .into_iter()
+            .map(|(key, value, _)| TupleEntry::named(key, value)),
+    )
+    .map_err(|duplicate| duplicate_key_error(offsets[duplicate.index], &duplicate.key))
 }
 
 /// Lowers one `MAP_ENTRY` node into `(key, value, offset)`.
-pub(crate) fn lower_map_entry(node: &SyntaxNode) -> Result<(Option<String>, Value, usize)> {
+pub(crate) fn lower_map_entry(
+    node: &SyntaxNode,
+    raw_scalars: bool,
+) -> Result<(Option<String>, Value, usize)> {
     let start = usize::from(node.text_range().start());
     let colon = node.children_with_tokens().find(|e| e.kind() == K::COLON);
     let Some(colon) = colon else {
-        let val = lower_single_value_from_children(node.children_with_tokens(), false, start)?;
+        let val =
+            lower_single_value_from_children(node.children_with_tokens(), raw_scalars, start)?;
         return Ok((None, val, start));
     };
 
@@ -473,7 +495,8 @@ pub(crate) fn lower_map_entry(node: &SyntaxNode) -> Result<(Option<String>, Valu
         .collect();
 
     let fallback_offset = usize::from(colon.text_range().end());
-    let value = lower_single_value_from_children(elements_after_colon, false, fallback_offset)?;
+    let value =
+        lower_single_value_from_children(elements_after_colon, raw_scalars, fallback_offset)?;
     Ok((key, value, start))
 }
 
@@ -580,15 +603,13 @@ fn lower_single_value_from_children(
                     if !closed {
                         return Err(err(usize::from(n.text_range().end()), "expected '}'"));
                     }
-                    let entries = lower_tuple_entries(n, false, false)?;
+                    let entries = lower_tuple_entries(n, false, false, false)?;
                     return Ok(Value::Tuple(entries));
                 }
-                // A bare `(a, b)` is a tuple of unnamed entries: a value has no infix
+                // A bare `(a, b)` or `(a, k: v)` is a tuple: a value has no infix
                 // arithmetic, so no parenthesis here can group anything.
                 K::ARGS => {
-                    return Ok(Value::Tuple(Tuple::from_unnamed(lower_call_args(
-                        n, false,
-                    )?)));
+                    return Ok(Value::Tuple(lower_paren_value(n)?));
                 }
                 _ => {}
             },
@@ -650,7 +671,7 @@ fn lower_single_value_from_children(
 }
 
 /// Lowers call arguments inside an `ARGS` node `(...)`.
-fn lower_call_args(args_node: &SyntaxNode, raw_args: bool) -> Result<Vec<Value>> {
+fn lower_call_args(args_node: &SyntaxNode, raw_args: bool) -> Result<Tuple> {
     let closed = args_node
         .children_with_tokens()
         .any(|e| e.kind() == K::R_PAREN);
@@ -661,44 +682,7 @@ fn lower_call_args(args_node: &SyntaxNode, raw_args: bool) -> Result<Vec<Value>>
         ));
     }
 
-    let items: Vec<SyntaxNode> = args_node
-        .children()
-        .filter(|c| matches!(c.kind(), K::SEQ_ITEM | K::MAP_ENTRY | K::ERROR))
-        .collect();
-
-    for i in 0..items.len().saturating_sub(1) {
-        let end = items[i].text_range().end();
-        let next_start = items[i + 1].text_range().start();
-        let has_comma = args_node.children_with_tokens().any(|e| {
-            e.kind() == K::COMMA
-                && e.text_range().start() >= end
-                && e.text_range().end() <= next_start
-        });
-        if !has_comma {
-            return Err(err(
-                usize::from(next_start),
-                "expected ',' or ')' in call arguments",
-            ));
-        }
-    }
-
-    let mut args = Vec::new();
-    for item in items {
-        if item.kind() == K::ERROR {
-            return Err(lower_error(&item));
-        }
-        if item.kind() == K::MAP_ENTRY {
-            return Err(err(
-                usize::from(item.text_range().start()),
-                "a sequence '(...)' holds values, not 'key: value' entries; \
-                 write a map as '{...}'",
-            ));
-        }
-        let offset = usize::from(item.text_range().start());
-        let val = lower_single_value_from_children(item.children_with_tokens(), raw_args, offset)?;
-        args.push(val);
-    }
-    Ok(args)
+    lower_tuple_entries(args_node, false, true, raw_args)
 }
 
 /// Unescapes a `"..."` string literal.
@@ -845,44 +829,46 @@ pub fn scalar_from_text(s: &str) -> std::result::Result<Value, String> {
     }
 }
 
-pub fn resolve_call(name: &str, args: Vec<Value>) -> std::result::Result<Value, String> {
+pub fn resolve_call(name: &str, args: Tuple) -> std::result::Result<Value, String> {
     match name {
-        "string" => construct_string(args),
-        "int" => construct_int(args),
-        "float" => construct_float(args),
-        _ => Ok(Value::Call(name.to_string(), Tuple::from_unnamed(args))),
+        "string" => construct_string(&args),
+        "int" => construct_int(&args),
+        "float" => construct_float(&args),
+        _ => Ok(Value::Call(name.to_string(), args)),
     }
 }
 
-fn at_most_one(name: &str, args: Vec<Value>) -> std::result::Result<Option<Value>, String> {
-    let mut args = args.into_iter();
-    let arg = args.next();
-    if args.next().is_some() {
+fn at_most_one<'a>(name: &str, args: &'a Tuple) -> std::result::Result<Option<&'a Value>, String> {
+    if !args.has_no_named() {
+        return Err(format!("{name}() takes no named fields"));
+    }
+    if args.len() > 1 {
         return Err(format!("{name}() takes at most one argument"));
     }
-    Ok(arg)
+    Ok(args.nth_unnamed(0))
 }
 
-fn construct_string(args: Vec<Value>) -> std::result::Result<Value, String> {
+fn construct_string(args: &Tuple) -> std::result::Result<Value, String> {
     Ok(Value::String(match at_most_one("string", args)? {
         None => String::new(),
-        Some(Value::String(s)) => s,
+        Some(Value::String(s)) => s.clone(),
         Some(Value::Int(i)) => i.to_string(),
         Some(Value::Bool(b)) => b.to_string(),
         Some(Value::Null) => "null".to_string(),
-        Some(Value::Number(text)) => text,
-        Some(Value::Float(f)) if f.is_finite() => Value::float_text(f),
+        Some(Value::Number(text)) => text.clone(),
+        Some(Value::Float(f)) if f.is_finite() => Value::float_text(*f),
         Some(Value::Float(f)) if f.is_nan() => "nan".to_string(),
-        Some(Value::Float(f)) => (if f > 0.0 { "inf" } else { "-inf" }).to_string(),
+        Some(Value::Float(f)) => (if *f > 0.0 { "inf" } else { "-inf" }).to_string(),
         Some(other) => return Err(format!("string() takes a scalar, got {other:?}")),
     }))
 }
 
-fn construct_int(args: Vec<Value>) -> std::result::Result<Value, String> {
+fn construct_int(args: &Tuple) -> std::result::Result<Value, String> {
     match at_most_one("int", args)? {
         None => Ok(Value::Int(0)),
-        Some(Value::Int(i)) => Ok(Value::Int(i)),
+        Some(Value::Int(i)) => Ok(Value::Int(*i)),
         Some(Value::Float(f)) => {
+            let f = *f;
             if f.is_finite() && f >= i64::MIN as f64 && f < i64::MAX as f64 {
                 Ok(Value::Int(f.trunc() as i64))
             } else {
@@ -906,11 +892,11 @@ fn construct_int(args: Vec<Value>) -> std::result::Result<Value, String> {
     }
 }
 
-fn construct_float(args: Vec<Value>) -> std::result::Result<Value, String> {
+fn construct_float(args: &Tuple) -> std::result::Result<Value, String> {
     match at_most_one("float", args)? {
         None => Ok(Value::Float(0.0)),
-        Some(Value::Int(i)) => Ok(Value::Float(i as f64)),
-        Some(Value::Float(f)) => Ok(Value::Float(f)),
+        Some(Value::Int(i)) => Ok(Value::Float(*i as f64)),
+        Some(Value::Float(f)) => Ok(Value::Float(*f)),
         Some(Value::Number(text)) => match text.parse::<f64>() {
             Ok(f) if f.is_finite() => Ok(Value::Float(f)),
             _ => Err(format!("float `{text}` is out of range")),

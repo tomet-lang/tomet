@@ -223,13 +223,13 @@ fn update_element_target(el: &mut Element, new_target: String) {
     if let Some(tuple) = &mut el.data.args {
         if let Some(v) = tuple.get_mut("target") {
             *v = Value::String(new_target);
-        } else if tuple.contains_name("ref") {
+        } else if tuple.contains_key("ref") {
             tuple.remove("ref");
-            tuple.push_named("target", Value::String(new_target));
+            tuple.set("target", Value::String(new_target));
         } else if let Some(v) = tuple.nth_unnamed_mut(0) {
             *v = Value::String(new_target);
         } else {
-            tuple.push_named("target", Value::String(new_target));
+            tuple.set("target", Value::String(new_target));
         }
     } else {
         el.data.args = Some(Tuple::from_unnamed([Value::String(new_target)]));

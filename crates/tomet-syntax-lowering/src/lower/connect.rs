@@ -8,8 +8,6 @@
 //! entry's key is its position among the unnamed entries, so `(a)` and `(b)` clash at position 0
 //! exactly as `(k: a)` and `(k: b)` clash at `k`.
 
-use std::fmt;
-
 use super::form::require_primary_group;
 use super::groups::lower_groups;
 use super::{name_of, range_of, unsupported};
@@ -211,23 +209,6 @@ pub(super) fn desugar_connect(node: &SyntaxNode, read: &mut Groups) -> Result<bo
     Ok(true)
 }
 
-/// One step of the way to an entry: its name, or its position among the unnamed entries of
-/// its tuple.
-#[derive(Clone, PartialEq)]
-enum Key {
-    Name(String),
-    Position(usize),
-}
-
-impl fmt::Display for Key {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Key::Name(name) => f.write_str(name),
-            Key::Position(n) => write!(f, "{n}"),
-        }
-    }
-}
-
 /// `second` merged into `first`, both found at `path` from the groups being merged.
 ///
 /// The entries of `first` stay where they were written, then come the entries only `second`
@@ -236,49 +217,32 @@ impl fmt::Display for Key {
 fn merge_tuples(
     first: &Tuple,
     second: &Tuple,
-    path: &mut Vec<Key>,
+    path: &mut Vec<String>,
     writers: &Writers,
 ) -> Result<Tuple> {
     let mut merged = Vec::with_capacity(first.len() + second.len());
-    let mut position = 0;
-    for entry in first.entries() {
-        let (key, other) = match entry.name() {
-            Some(name) => (Key::Name(name.to_string()), second.get(name)),
-            None => {
-                position += 1;
-                (
-                    Key::Position(position - 1),
-                    second.nth_unnamed(position - 1),
-                )
+    for (key, value) in first.keyed() {
+        let value = match second.get(&key) {
+            None => value.clone(),
+            Some(other) => {
+                path.push(key.to_string());
+                let (Value::Tuple(ours), Value::Tuple(theirs)) = (value, other) else {
+                    return Err(writers.clash(path));
+                };
+                let value = Value::Tuple(merge_tuples(ours, theirs, path, writers)?);
+                path.pop();
+                value
             }
         };
-        let Some(other) = other else {
-            merged.push(entry.clone());
-            continue;
-        };
-        path.push(key);
-        let (Value::Tuple(ours), Value::Tuple(theirs)) = (entry.value(), other) else {
-            return Err(writers.clash(path));
-        };
-        let value = Value::Tuple(merge_tuples(ours, theirs, path, writers)?);
-        path.pop();
-        merged.push(TupleEntry::new(entry.name().map(str::to_string), value));
+        merged.push(TupleEntry::named(key, value));
     }
-    let unnamed_in_first = position;
-    let mut position = 0;
-    for entry in second.entries() {
-        let only_in_second = match entry.name() {
-            Some(name) => !first.contains_name(name),
-            None => {
-                position += 1;
-                position > unnamed_in_first
-            }
-        };
-        if only_in_second {
-            merged.push(entry.clone());
+    for (key, value) in second.keyed() {
+        if !first.contains_key(&key) {
+            merged.push(TupleEntry::named(key, value.clone()));
         }
     }
-    Ok(Tuple::from_entries(merged))
+    // The keys of `first`, then keys it does not have: none is repeated.
+    Ok(Tuple::try_from_entries(merged).expect("merged keys are distinct"))
 }
 
 /// Who wrote the two tuples being merged: the nodes that wrote the first one, in the order
@@ -292,13 +256,8 @@ struct Writers<'a> {
 impl Writers<'_> {
     /// The error for the entry at `path` being written twice: at the second writer, naming
     /// the place of the first.
-    fn clash(&self, path: &[Key]) -> crate::error::Error {
-        let written: Vec<String> = path.iter().map(Key::to_string).collect();
-        let what = match path.last() {
-            Some(Key::Position(_)) => "entry",
-            _ => "key",
-        };
-        let mut message = format!("duplicate {what} `{}`", written.join("."));
+    fn clash(&self, path: &[String]) -> crate::error::Error {
+        let mut message = format!("duplicate key `{}`", path.join("."));
         if let Some(first) = self.earlier.iter().find_map(|node| entry_at(node, path)) {
             let (offset, _) = range_of(&first);
             if let Some(root) = first.ancestors().last() {
@@ -317,29 +276,30 @@ fn is_entry(node: &SyntaxNode) -> bool {
 }
 
 /// The node of the entry at `path` in what `writer` wrote, if it wrote one there.
-fn entry_at(writer: &SyntaxNode, path: &[Key]) -> Option<SyntaxNode> {
+fn entry_at(writer: &SyntaxNode, path: &[String]) -> Option<SyntaxNode> {
     let mut within = writer.clone();
     let mut found = None;
     for key in path {
         let holder = std::iter::once(within.clone())
             .chain(within.descendants())
             .find(|node| node.children().any(|child| is_entry(&child)))?;
-        let mut position = 0;
+        let mut unnamed_count = 0usize;
         let entry = holder.children().filter(is_entry).find(|entry| {
-            let name = match entry.kind() {
-                K::MAP_ENTRY => crate::element::lower_map_entry(entry)
+            let entry_key = match entry.kind() {
+                K::MAP_ENTRY => crate::element::lower_map_entry(entry, false)
                     .ok()
                     .and_then(|(name, _, _)| name),
                 _ => None,
             };
-            match (name, key) {
-                (Some(name), Key::Name(wanted)) => name == *wanted,
-                (None, Key::Position(wanted)) => {
-                    position += 1;
-                    position - 1 == *wanted
+            let entry_key = match entry_key {
+                Some(name) => name,
+                None => {
+                    let k = unnamed_count.to_string();
+                    unnamed_count += 1;
+                    k
                 }
-                _ => false,
-            }
+            };
+            entry_key == *key
         })?;
         within = entry.clone();
         found = Some(entry);

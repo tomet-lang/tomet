@@ -36,8 +36,8 @@ pub fn collect_paths(value: &Value, out: &mut Vec<String>) {
 
 /// Retrieves or creates an empty `Value::Tuple` (named) entry at `key` in `target`.
 fn get_or_insert_map<'a>(target: &'a mut Tuple, key: &str) -> &'a mut Tuple {
-    if !target.contains_name(key) {
-        target.push_named(key, Value::Tuple(Tuple::new()));
+    if !target.contains_key(key) {
+        target.set(key, Value::Tuple(Tuple::new()));
     }
     let val = target.get_mut(key).unwrap();
     if !matches!(val, Value::Tuple(_)) {
@@ -55,11 +55,7 @@ fn insert_or_merge_prop(tuple: &mut Tuple, key: &str, value: &Value) {
         match (existing, value) {
             (Value::Tuple(ex_props), Value::Tuple(new_props)) if !new_props.has_no_named() => {
                 for (pk, pv) in new_props.named() {
-                    if let Some(p) = ex_props.get_mut(pk) {
-                        *p = pv.clone();
-                    } else {
-                        ex_props.push_named(pk, pv.clone());
-                    }
+                    ex_props.set(pk, pv.clone());
                 }
             }
             (ex, val) => {
@@ -67,7 +63,7 @@ fn insert_or_merge_prop(tuple: &mut Tuple, key: &str, value: &Value) {
             }
         }
     } else {
-        tuple.push_named(key, value.clone());
+        tuple.set(key, value.clone());
     }
 }
 
@@ -98,14 +94,10 @@ pub fn merge_entry(target: &mut Tuple, key: &str, value: &Value) {
                     merge_entry(existing_map, sub_k, sub_v);
                 }
             }
-        } else if let Some(existing) = target.get_mut(key) {
-            *existing = value.clone();
         } else {
-            target.push_named(key, value.clone());
+            target.set(key, value.clone());
         }
-    } else if let Some(existing) = target.get_mut(key) {
-        *existing = value.clone();
     } else {
-        target.push_named(key, value.clone());
+        target.set(key, value.clone());
     }
 }

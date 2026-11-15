@@ -72,14 +72,7 @@ fn render_tuple(tuple: &Tuple, config: &PrinterConfig) -> String {
     } else {
         let mut parts = Vec::new();
         for entry in tuple.entries() {
-            match entry.name() {
-                None => parts.push(render_nested(entry.value(), config)),
-                Some(k) => parts.push(format!(
-                    "{}: {}",
-                    key_text(k),
-                    render_nested(entry.value(), config)
-                )),
-            }
+            parts.push(render_entry(entry, config));
         }
         format!("({})", parts.join(", "))
     }
@@ -171,16 +164,18 @@ pub(crate) fn render_args(tuple: &Tuple, config: &PrinterConfig) -> String {
     }
     let mut parts = Vec::new();
     for entry in tuple.entries() {
-        match entry.name() {
-            None => parts.push(render_nested(entry.value(), config)),
-            Some(k) => parts.push(format!(
-                "{}: {}",
-                key_text(k),
-                render_nested(entry.value(), config)
-            )),
-        }
+        parts.push(render_entry(entry, config));
     }
     parts.join(", ")
+}
+
+/// One entry of a tuple as it is written: `value`, or `name: value`.
+fn render_entry(entry: &tomet_ast::TupleEntry, config: &PrinterConfig) -> String {
+    let value = render_nested(entry.value(), config);
+    match entry.name() {
+        None => value,
+        Some(name) => format!("{}: {value}", key_text(name)),
+    }
 }
 
 fn render_meta_field_value(

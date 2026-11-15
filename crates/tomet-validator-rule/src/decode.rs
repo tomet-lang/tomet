@@ -94,6 +94,12 @@ mod tests {
     }
 
     #[test]
+    fn named_field_in_enum_is_an_error() {
+        let connect = parse_connect("@x[a]::rule(allow: enum(card, pkg: lucide))\n");
+        assert_eq!(decode_rule_args(&connect), None);
+    }
+
+    #[test]
     fn missing_allow_is_none() {
         let connect = parse_connect("@x[a]::rule(direct: true)\n");
         assert_eq!(decode_rule_args(&connect), None);

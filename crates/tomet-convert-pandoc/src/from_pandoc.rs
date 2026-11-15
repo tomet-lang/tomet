@@ -34,7 +34,7 @@
 
 use tomet_ast::{
     Block as TmBlock, Declaration, Element, File, Group, Id, Inline as TmInline, LineBreak, List,
-    Name, Paragraph, Placement, RawText, Section, SoftBreak, Text, Tuple, Value,
+    Name, Paragraph, Placement, RawText, Section, SoftBreak, Text, Tuple, TupleEntry, Value,
 };
 use tomet_semantics::{EXACT_DATA_KEY, comment_element};
 use tomet_span::Span;
@@ -667,7 +667,9 @@ fn merge_arg(el: &mut Element, key: &str, value: Value) {
     match el.data.args.as_mut() {
         Some(tuple) => {
             tuple.remove(key);
-            tuple.insert_named(0, key, value);
+            let rest = std::mem::take(tuple).into_entries();
+            *tuple =
+                Tuple::from_entries(std::iter::once(TupleEntry::named(key, value)).chain(rest));
         }
         None => el.data.args = Some(Tuple::from_named([(key.to_string(), value)])),
     }

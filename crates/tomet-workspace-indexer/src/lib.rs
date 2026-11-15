@@ -464,8 +464,8 @@ fn tuple_to_string(tuple: &Tuple) -> String {
         let s: Vec<_> = tuple
             .entries()
             .map(|e| match e.name() {
-                Some(name) => format!("{name}: {}", value_to_string(e.value())),
                 None => value_to_string(e.value()),
+                Some(name) => format!("{name}: {}", value_to_string(e.value())),
             })
             .collect();
         format!("({})", s.join(", "))

@@ -120,11 +120,8 @@ impl DataExt for Data {
         match (&self.args, value_tuple) {
             (Some(args), Some(value_entries)) => {
                 let mut merged = args.clone();
-                for (key, value) in value_entries.into_named() {
-                    match merged.get_mut(&key) {
-                        Some(existing) => *existing = value,
-                        None => merged.push_named(key, value),
-                    }
+                for (key, value) in value_entries.keyed() {
+                    merged.set(&key, value.clone());
                 }
                 Some(merged)
             }
@@ -186,7 +183,7 @@ impl DataExt for Data {
         if let Some(value @ Group(_)) = &mut self.value {
             value.push_pair(key, new_val);
         } else if let Some(args) = &mut self.args {
-            args.push_named(key, new_val);
+            args.set(key, new_val);
         } else {
             self.args = Some(Tuple::from_named([(key.to_string(), new_val)]));
         }
@@ -194,13 +191,9 @@ impl DataExt for Data {
 
     fn rename_prop_key(&mut self, old_key: &str, new_key: &str) -> bool {
         let mut changed = false;
+        // A key is held once: where `new_key` is already taken, the entry keeps its key.
         if let Some(args) = &mut self.args {
-            for entry in args.entries_mut() {
-                if entry.name() == Some(old_key) {
-                    entry.set_name(new_key);
-                    changed = true;
-                }
-            }
+            changed |= args.rename(old_key, new_key).unwrap_or(false);
         }
         if let Some(value) = &mut self.value {
             for (k, _) in value.pairs_mut() {

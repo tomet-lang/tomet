@@ -1,0 +1,426 @@
+{
+  "pandoc-api-version": [
+    1,
+    23,
+    1
+  ],
+  "meta": {
+    "icon": {
+      "t": "MetaString",
+      "c": ""
+    },
+    "numbered": {
+      "t": "MetaList",
+      "c": [
+        {
+          "t": "MetaInlines",
+          "c": [
+            {
+              "t": "Str",
+              "c": "a"
+            }
+          ]
+        },
+        {
+          "t": "MetaInlines",
+          "c": [
+            {
+              "t": "Str",
+              "c": "b"
+            }
+          ]
+        }
+      ]
+    },
+    "ordered": {
+      "t": "MetaMap",
+      "c": {
+        "1": {
+          "t": "MetaInlines",
+          "c": [
+            {
+              "t": "Str",
+              "c": "a"
+            }
+          ]
+        }
+      }
+    },
+    "size": {
+      "t": "MetaMap",
+      "c": {
+        "h": {
+          "t": "MetaString",
+          "c": "20"
+        },
+        "w": {
+          "t": "MetaString",
+          "c": "10"
+        }
+      }
+    },
+    "status": {
+      "t": "MetaMap",
+      "c": {
+        "404": {
+          "t": "MetaInlines",
+          "c": [
+            {
+              "t": "Str",
+              "c": "x"
+            }
+          ]
+        },
+        "500": {
+          "t": "MetaInlines",
+          "c": [
+            {
+              "t": "Str",
+              "c": "y"
+            }
+          ]
+        }
+      }
+    },
+    "tags": {
+      "t": "MetaMap",
+      "c": {
+        "sep": {
+          "t": "MetaInlines",
+          "c": [
+            {
+              "t": "Str",
+              "c": ","
+            }
+          ]
+        }
+      }
+    },
+    "use": {
+      "t": "MetaString",
+      "c": ""
+    },
+    "x": {
+      "t": "MetaList",
+      "c": [
+        {
+          "t": "MetaMap",
+          "c": {
+            "version": {
+              "t": "MetaString",
+              "c": "3"
+            }
+          }
+        },
+        {
+          "t": "MetaInlines",
+          "c": [
+            {
+              "t": "Str",
+              "c": "b"
+            }
+          ]
+        },
+        {
+          "t": "MetaInlines",
+          "c": [
+            {
+              "t": "Str",
+              "c": "c"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "blocks": [
+    {
+      "t": "Header",
+      "c": [
+        1,
+        [
+          "",
+          [],
+          []
+        ],
+        [
+          {
+            "t": "Str",
+            "c": "Tuple"
+          }
+        ]
+      ]
+    },
+    {
+      "t": "Para",
+      "c": [
+        {
+          "t": "Str",
+          "c": "A"
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Str",
+          "c": "tuple"
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Str",
+          "c": "at"
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Str",
+          "c": "a"
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Str",
+          "c": "value"
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Str",
+          "c": "position"
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Str",
+          "c": "takes"
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Str",
+          "c": "named"
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Str",
+          "c": "and"
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Str",
+          "c": "unnamed"
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Str",
+          "c": "entries"
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Str",
+          "c": "together."
+        }
+      ]
+    },
+    {
+      "t": "Div",
+      "c": [
+        [
+          "",
+          [
+            "tomet-item"
+          ],
+          [
+            [
+              "tomet-data",
+              "{\"args\":{\"tags\":{\"0\":\"a\",\"1\":\"b\",\"sep\":\",\"},\"size\":{\"w\":10,\"h\":20}}}"
+            ]
+          ]
+        ],
+        []
+      ]
+    },
+    {
+      "t": "Div",
+      "c": [
+        [
+          "",
+          [
+            "tomet-item"
+          ],
+          [
+            [
+              "tomet-data",
+              "{\"args\":{\"x\":[{\"0\":\"a\",\"version\":3},\"b\",\"c\"]}}"
+            ]
+          ]
+        ],
+        []
+      ]
+    },
+    {
+      "t": "Para",
+      "c": [
+        {
+          "t": "Str",
+          "c": "A"
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Str",
+          "c": "call"
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Str",
+          "c": "takes"
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Str",
+          "c": "named"
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Str",
+          "c": "and"
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Str",
+          "c": "unnamed"
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Str",
+          "c": "entries"
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Str",
+          "c": "together."
+        }
+      ]
+    },
+    {
+      "t": "Div",
+      "c": [
+        [
+          "",
+          [
+            "tomet-item"
+          ],
+          [
+            [
+              "tomet-data",
+              "{\"args\":{\"icon\":{\"call\":\"glyph\",\"args\":{\"0\":\"triangle\",\"pkg\":\"lucide\"}},\"use\":{\"call\":\"vocab\",\"args\":{\"0\":\"a\",\"version\":3}}}}"
+            ]
+          ]
+        ],
+        []
+      ]
+    },
+    {
+      "t": "Para",
+      "c": [
+        {
+          "t": "Str",
+          "c": "Entries"
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Str",
+          "c": "may"
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Str",
+          "c": "be"
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Str",
+          "c": "keyed"
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Str",
+          "c": "by"
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Str",
+          "c": "decimal"
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Str",
+          "c": "text."
+        }
+      ]
+    },
+    {
+      "t": "Div",
+      "c": [
+        [
+          "",
+          [
+            "tomet-item"
+          ],
+          [
+            [
+              "numbered",
+              "a, b"
+            ],
+            [
+              "tomet-data",
+              "{\"args\":{\"ordered\":{\"1\":\"a\",\"0\":\"b\"},\"status\":{\"404\":\"x\",\"500\":\"y\"},\"numbered\":[\"a\",\"b\"]}}"
+            ]
+          ]
+        ],
+        []
+      ]
+    }
+  ]
+}

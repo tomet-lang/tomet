@@ -111,8 +111,8 @@ fn write_args(tuple: &Tuple, out: &mut String) {
         if i > 0 {
             out.push_str(", ");
         }
-        if let Some(key) = entry.name() {
-            write_key(key, out);
+        if let Some(name) = entry.name() {
+            write_key(name, out);
             out.push_str(": ");
         }
         write_value(entry.value(), out, false);

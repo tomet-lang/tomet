@@ -626,7 +626,7 @@ mod tests {
             ("target".into(), Value::String("deck".into())),
             ("version".into(), Value::Int(1)),
         ]);
-        too_many_tuple.push_unnamed(Value::Int(2));
+        too_many_tuple.try_push_unnamed(Value::Int(2)).unwrap();
         let too_many_args = Declaration::new("use", Some(too_many_tuple), None);
         let problems = check_declarations(&[too_many_args], Host::Tmt);
         assert_eq!(problems.len(), 1);

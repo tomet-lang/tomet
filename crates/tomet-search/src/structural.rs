@@ -107,9 +107,9 @@ pub fn find_structural_matches(doc: &File, query: &StructuralQuery) -> Vec<Struc
 }
 
 fn tuple_contains_str(tuple: &Tuple, sub: &str) -> bool {
-    tuple
-        .entries()
-        .any(|e| e.name().is_some_and(|k| k.contains(sub)) || value_contains_str(e.value(), sub))
+    tuple.entries().any(|e| {
+        e.name().is_some_and(|name| name.contains(sub)) || value_contains_str(e.value(), sub)
+    })
 }
 
 #[deny(clippy::wildcard_enum_match_arm)]

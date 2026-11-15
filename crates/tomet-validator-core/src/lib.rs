@@ -386,7 +386,7 @@ fn check_arguments_of(
         }
     }
     for param in decl.params.iter().filter(|p| p.required) {
-        if !tuple.contains_name(&param.name) {
+        if !tuple.contains_key(&param.name) {
             errors.push(Diagnostic::MissingRequiredArgument {
                 element: name.to_string(),
                 argument: param.name.clone(),

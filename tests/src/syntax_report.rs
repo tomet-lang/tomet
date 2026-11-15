@@ -784,7 +784,7 @@ const REJECTED: &[Case] = &[
     ),
     case(
         None,
-        "列は値だけを持ち、`key: value` の項目は持てない。マップは `{...}`",
+        "値の位置の `( )` は、値と `key: value` の項目をまとめて持てる。名前のない項目は位置がキー",
         "@memo(xs: (a: 1))\n",
     ),
     case(
@@ -1226,8 +1226,8 @@ fn tuple_inner_str(tuple: &Tuple) -> String {
     let inner: Vec<String> = tuple
         .entries()
         .map(|entry| match entry.name() {
-            Some(k) => format!("{k}: {}", value_str(entry.value())),
             None => value_str(entry.value()),
+            Some(name) => format!("{name}: {}", value_str(entry.value())),
         })
         .collect();
     inner.join(", ")

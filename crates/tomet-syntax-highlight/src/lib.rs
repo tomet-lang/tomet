@@ -792,6 +792,13 @@ mod tests {
     }
 
     #[test]
+    fn a_key_in_a_paren_tuple_value() {
+        let src = "@elem(tags: (a, sep: \",\"))\n";
+        assert!(has(src, "tags", "propertyName"));
+        assert!(has(src, "sep", "propertyName"));
+    }
+
+    #[test]
     fn ranges_are_ordered_whole_and_apart() {
         for src in [
             "=[ T ]\n@a(k: \"v\")[ *x* `c` https://a.b ]\n- i\n---\n| a | b |\n@q\n| x\n| y\n",

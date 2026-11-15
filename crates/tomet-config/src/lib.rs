@@ -107,9 +107,9 @@ impl Config {
         let paths = |paths: Vec<String>| {
             Value::Tuple(Tuple::from_unnamed(paths.into_iter().map(Value::String)))
         };
-        root.push_named("blueprints", paths(layer.blueprint_paths()));
-        root.push_named("vocabularies", paths(layer.vocabulary_paths()));
-        root.push_named("dictionaries", paths(layer.dictionary_paths()));
+        root.set("blueprints", paths(layer.blueprint_paths()));
+        root.set("vocabularies", paths(layer.vocabulary_paths()));
+        root.set("dictionaries", paths(layer.dictionary_paths()));
         let root = Value::Tuple(root);
 
         Self {

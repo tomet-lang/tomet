@@ -147,16 +147,8 @@ fn data(doc: &DocRef, args: &Option<Tuple>, value: &Option<Group>) -> EvalValue 
     let merged = match (args, value_tuple) {
         (Some(args_tuple), Some(val_tuple)) => {
             let mut merged = args_tuple.clone();
-            for entry in val_tuple {
-                if let Some(name) = entry.name() {
-                    if let Some(existing) = merged.get_mut(name) {
-                        *existing = entry.into_value();
-                    } else {
-                        merged.push(entry);
-                    }
-                } else {
-                    merged.push(entry);
-                }
+            for (key, value) in val_tuple.keyed() {
+                merged.set(&key, value.clone());
             }
             Value::Tuple(merged)
         }
