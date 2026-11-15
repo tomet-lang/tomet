@@ -4,7 +4,7 @@ use tomet_ast::{Block, File, Inline, Name, Section, Tuple, Value};
 use tomet_expr::{EvalContext, evaluate_type};
 use tomet_id::IdSpec;
 use tomet_semantics::DeclKind;
-use tomet_semantics::{ElementKind, classify_declaration_lenient, normalized_declaration_args};
+use tomet_semantics::{ElementKind, classify_declaration_lenient, declaration_args_view};
 use tomet_semantics_core::admits;
 use tomet_tree::{
     DataExt, ValueExt, declaration_new, for_each_declaration, for_each_declaration_mut,
@@ -117,7 +117,7 @@ pub fn instantiate_blueprint(
         if classify_declaration_lenient(declaration) != ElementKind::Declaration(DeclKind::Kind) {
             return true;
         }
-        let is_blueprint_kind = normalized_declaration_args(declaration)
+        let is_blueprint_kind = declaration_args_view(declaration)
             .as_ref()
             .and_then(|args| args.get("kind"))
             .and_then(|v| v.as_str())
@@ -146,10 +146,10 @@ pub fn instantiate_blueprint(
             == ElementKind::Declaration(DeclKind::Blueprint)
         {
             // The target is `::blueprint`'s positional argument, which
-            // `tomet-semantics::positional` normalizes to `target`.
+            // `tomet-semantics::positional` views under `target`.
             // That is the one spelling: a spelled-out `target:` and a
             // `kind:` would be three spellings for one thing.
-            let target_kind = normalized_declaration_args(declaration)
+            let target_kind = declaration_args_view(declaration)
                 .as_ref()
                 .and_then(|args| args.get("target"))
                 .and_then(|v| v.as_str())
@@ -277,20 +277,16 @@ pub fn apply_blueprint(
                 add_id = true;
             }
             Some(doc_id) => {
-                let bp_id_val = normalized_declaration_args(bp_id)
+                let bp_id_val = declaration_args_view(bp_id)
                     .as_ref()
                     .and_then(|args| args.get("id"))
-                    .or_else(|| bp_id.data.args.as_ref().and_then(|t| t.nth_unnamed(0)))
                     .cloned();
                 if let Some(Value::TypeSeat(seat)) = &bp_id_val {
                     if let Ok(ty) = evaluate_type(&seat.expr, cx) {
                         if ty.overwrite() {
-                            let doc_val = normalized_declaration_args(doc_id)
+                            let doc_val = declaration_args_view(doc_id)
                                 .as_ref()
                                 .and_then(|args| args.get("id"))
-                                .or_else(|| {
-                                    doc_id.data.args.as_ref().and_then(|t| t.nth_unnamed(0))
-                                })
                                 .cloned()
                                 .unwrap_or(Value::Null);
                             if !value_satisfies_type(&doc_val, &ty) {
@@ -507,6 +503,7 @@ mod tests {
     use super::*;
     use crate::FixedSource;
     use std::collections::HashMap;
+    use tomet_ast::{Tuple, TupleEntry};
     use tomet_expr::{DocRef, EvalValue, NoResolver};
 
     fn instantiate(src: &str, vars: EvalValue) -> (File, Instantiated) {
@@ -571,10 +568,13 @@ mod tests {
     #[test]
     fn instantiates_blueprint_to_kind_and_resolves_expressions() {
         let src = "::blueprint(daily-note)\n::meta(\n  file: $(self::filename)\n  title: $(var.title)\n)\n\n=[ Plan for $(var.title) ]#(plan)\n";
-        let vars = EvalValue::Map(vec![(
-            "title".to_string(),
-            EvalValue::String("Sprint 42".into()),
-        )]);
+        let vars = EvalValue::Tuple(
+            Tuple::try_from_entries([TupleEntry::named(
+                "title".to_string(),
+                EvalValue::String("Sprint 42".into()),
+            )])
+            .unwrap(),
+        );
         let (doc, report) = instantiate(src, vars);
         assert!(report.changed);
         assert!(report.unresolved.is_empty(), "{:?}", report.unresolved);
@@ -607,7 +607,7 @@ mod tests {
     fn an_expression_with_no_value_is_left_and_reported() {
         let (doc, report) = instantiate(
             "::blueprint(note)\n::meta(title: $(var.title))\n",
-            EvalValue::Map(vec![]),
+            EvalValue::Tuple(Tuple::new()),
         );
         assert_eq!(report.unresolved.len(), 1);
         assert!(

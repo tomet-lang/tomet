@@ -19,9 +19,9 @@ use tomet_ast::{
     Block, ElementView, File, Inline, Interpolation, List, Placement, Section, Tuple, Value,
 };
 use tomet_semantics::{
-    FootnoteRegistry, TargetScheme, classify_std_lenient, comment_text, extract_tags,
-    heading_level, is_attribute_key, is_directive, link_target, normalized_element_args,
-    path_target, target_scheme,
+    FootnoteRegistry, TargetScheme, classify_std_lenient, comment_text, element_args_view,
+    extract_tags, heading_level, is_attribute_key, is_directive, link_target, path_target,
+    target_scheme,
 };
 
 struct MarkdownCtx<'a> {
@@ -301,7 +301,7 @@ fn render_interp(interp: &Interpolation) -> String {
 /// `@ruby[漢字](rt:"かんじ")` -- no CommonMark ruby syntax exists, so this
 /// falls back to raw inline `<ruby>`/`<rt>` HTML, same as `mark` above.
 fn render_ruby(cx: &MarkdownCtx, el: ElementView<'_>) -> String {
-    let args = normalized_element_args(el);
+    let args = element_args_view(el);
     let rt = args
         .as_ref()
         .and_then(|a| a.get("rt"))
@@ -601,8 +601,8 @@ fn render_task(cx: &MarkdownCtx, el: ElementView<'_>, _inline: bool) -> String {
 }
 
 fn task_status(el: ElementView<'_>) -> Option<String> {
-    let args = normalized_element_args(el)?;
-    if let Some(v) = args.get("status").or_else(|| args.nth_unnamed(0)) {
+    let args = element_args_view(el)?;
+    if let Some(v) = args.get("status") {
         match v {
             Value::String(s) => Some(s.clone()),
             Value::Bool(b) => Some(if *b { "x".to_string() } else { " ".to_string() }),
@@ -670,7 +670,7 @@ fn render_conflict(cx: &MarkdownCtx, el: ElementView<'_>, inline: bool) -> Strin
 /// not a scalar, so it cannot go through `push_data_attrs`/the generic
 /// flatten path at all.
 fn conflict_sides(el: ElementView<'_>) -> (Vec<Block>, Vec<Block>) {
-    let args = normalized_element_args(el);
+    let args = element_args_view(el);
     let side = |key: &str| -> Vec<Block> {
         match args.as_ref().and_then(|a| a.get(key)) {
             Some(Value::Blocks(blocks)) => blocks.clone(),

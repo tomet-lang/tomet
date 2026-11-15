@@ -238,7 +238,7 @@ mod tests {
     use std::cell::Cell;
     use std::collections::HashMap;
 
-    use tomet_ast::{Block, Inline, Tuple};
+    use tomet_ast::{Block, Inline, Tuple, TupleEntry};
     use tomet_expr::{DocRef, EvalValue, NoResolver};
 
     use super::*;
@@ -426,13 +426,16 @@ mod tests {
     #[test]
     fn a_list_default_is_a_list_where_a_value_goes() {
         // A list is not written in an expression; one a variable holds is a plain value.
-        let vars = EvalValue::Map(vec![(
-            "tags".to_string(),
-            EvalValue::Seq(vec![
-                EvalValue::String("a".into()),
-                EvalValue::String("b".into()),
-            ]),
-        )]);
+        let vars = EvalValue::Tuple(
+            Tuple::try_from_entries([TupleEntry::named(
+                "tags".to_string(),
+                EvalValue::Tuple(Tuple::from_unnamed([
+                    EvalValue::String("a".into()),
+                    EvalValue::String("b".into()),
+                ])),
+            )])
+            .unwrap(),
+        );
         let (doc, _) = made(
             "::blueprint(note)\n::meta(tags: <$list(string, length: 2, default: var.tags)>)\n",
             vars,
@@ -553,10 +556,13 @@ mod tests {
 
     #[test]
     fn a_list_has_no_place_in_running_text() {
-        let vars = EvalValue::Map(vec![(
-            "tags".to_string(),
-            EvalValue::Seq(vec![EvalValue::String("a".into())]),
-        )]);
+        let vars = EvalValue::Tuple(
+            Tuple::try_from_entries([TupleEntry::named(
+                "tags".to_string(),
+                EvalValue::Tuple(Tuple::from_unnamed([EvalValue::String("a".into())])),
+            )])
+            .unwrap(),
+        );
         for src in [
             "::blueprint(note)\n\nTags: <$list(string, default: var.tags)>\n",
             "::blueprint(note)\n\n<$list(string, default: var.tags)>\n",
@@ -637,7 +643,7 @@ mod tests {
     fn a_seat_does_not_touch_the_expressions_around_it() {
         let (doc, report) = made(
             "::blueprint(note)\n::meta(by: $(var.author), day: <$date(default: auto)>)\n",
-            EvalValue::Map(vec![]),
+            EvalValue::Tuple(Tuple::new()),
             &fixed(&[]),
         )
         .unwrap();

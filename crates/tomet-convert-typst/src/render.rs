@@ -5,9 +5,9 @@ use std::collections::HashSet;
 
 use tomet_ast::{Block, ElementView, File, Inline, Interpolation, List, Placement, Section, Value};
 use tomet_semantics::{
-    FootnoteRegistry, TargetScheme, classify_std_lenient, comment_text, extract_tags,
-    heading_level, is_directive, link_target, normalized_element_args, parse_table_rows,
-    path_target, target_scheme,
+    FootnoteRegistry, TargetScheme, classify_std_lenient, comment_text, element_args_view,
+    extract_tags, heading_level, is_directive, link_target, parse_table_rows, path_target,
+    target_scheme,
 };
 
 pub(crate) struct TypstCtx<'a> {
@@ -304,15 +304,8 @@ fn render_task(cx: &TypstCtx, el: ElementView<'_>, _inline: bool) -> String {
 }
 
 fn task_status(el: ElementView<'_>) -> Option<String> {
-    let args = normalized_element_args(el)?;
-    if let Some(v) = args.get("status") {
-        match v {
-            Value::String(s) => return Some(s.clone()),
-            Value::Bool(b) => return Some(if *b { "x".to_string() } else { " ".to_string() }),
-            _ => return None,
-        }
-    }
-    match args.nth_unnamed(0) {
+    let args = element_args_view(el)?;
+    match args.get("status") {
         Some(Value::String(s)) => Some(s.clone()),
         Some(Value::Bool(b)) => Some(if *b { "x".to_string() } else { " ".to_string() }),
         _ => None,
@@ -383,7 +376,7 @@ fn render_conflict(cx: &TypstCtx, el: ElementView<'_>) -> String {
 /// Reads `a`/`b` out of `el`'s `(args)` -- block content
 /// (`Value::Blocks`), not a scalar.
 fn conflict_sides(el: ElementView<'_>) -> (Vec<Block>, Vec<Block>) {
-    let args = normalized_element_args(el);
+    let args = element_args_view(el);
     let side = |key: &str| -> Vec<Block> {
         match args.as_ref().and_then(|t| t.get(key)) {
             Some(Value::Blocks(blocks)) => blocks.clone(),
@@ -420,11 +413,11 @@ fn callout_variant_and_title(el: ElementView<'_>) -> (String, Option<String>) {
 
 /// `<raw>(lang:xxx)[code]` -- Typst uses the same triple-backtick
 /// raw-block fence syntax as CommonMark for blocks, and single backticks
-/// or `#raw(...)` for inlines. Reads `lang` via `normalized_element_args`
+/// or `#raw(...)` for inlines. Reads `lang` via `element_args_view`
 /// (not raw `el.args`) so a positional lang arg (`<raw>("rust")[...]`)
 /// resolves the same as a named `lang:rust` one.
 fn render_raw(el: ElementView<'_>, inline: bool) -> String {
-    let args = normalized_element_args(el);
+    let args = element_args_view(el);
     let lang = args
         .as_ref()
         .and_then(|t| t.get("lang"))
@@ -476,7 +469,7 @@ fn render_table(cx: &TypstCtx, el: ElementView<'_>) -> String {
         return String::new();
     }
 
-    let args = normalized_element_args(el);
+    let args = element_args_view(el);
     let has_header = args
         .as_ref()
         .and_then(|t| t.get("header"))
@@ -618,7 +611,7 @@ fn render_generic(cx: &TypstCtx, el: ElementView<'_>, kind: &str, inline: bool) 
 /// it's the reading, meaningful content rather than decoration. Renders as
 /// `base(reading)`, the least-lossy plain-text approximation.
 fn render_ruby(cx: &TypstCtx, el: ElementView<'_>) -> String {
-    let args = normalized_element_args(el);
+    let args = element_args_view(el);
     let rt = args
         .as_ref()
         .and_then(|t| t.get("rt"))

@@ -6,7 +6,7 @@ use tomet_ast::ElementView;
 use tomet_tree::ValueExt;
 
 use crate::kind::ElementKind;
-use crate::positional::normalized_element_args;
+use crate::positional::element_args_view;
 
 /// The clamped `1..=6` heading level of a heading-shaped element, if it
 /// has one. `None` for any non-heading element, or for a heading whose
@@ -17,7 +17,7 @@ pub fn heading_level(el: ElementView<'_>) -> Option<u8> {
     if crate::classify_std_lenient(el) != ElementKind::Heading {
         return None;
     }
-    normalized_element_args(el)?
+    element_args_view(el)?
         .get("level")
         .and_then(|v| v.as_i64())
         .map(|n| n.clamp(1, 6) as u8)
@@ -66,7 +66,7 @@ mod tests {
     #[test]
     fn bare_int_arg_normalizes_into_level() {
         // `#[x]` sugar produces a tuple with one unnamed `Value::Int(level)` in `args` --
-        // `normalized_element_args` binds it under the single "level" positional slot before this reads it.
+        // `element_args_view` aliases it under the single "level" positional slot before this reads it.
         let mut el = element_new(Name::bare("heading"));
         el.data.args = Some(Tuple::from_unnamed([Value::Int(1)]));
         assert_eq!(heading_level(el.as_view()), Some(1));

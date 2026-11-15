@@ -31,8 +31,8 @@ use std::sync::Arc;
 use crate::block::render_block;
 use crate::elements::{HeadingState, render_footnotes};
 use crate::util::{escape_attr, escape_html};
-use tomet_ast::{Block, File, Tuple};
-use tomet_semantics::{Bindings, FootnoteRegistry, builtin_doc_vocabularies};
+use tomet_ast::{Block, File};
+use tomet_semantics::{Bindings, FootnoteRegistry, TupleView, builtin_doc_vocabularies};
 
 const DEFAULT_STYLE: &str = "\
 body { font-family: sans-serif; line-height: 1.6; max-width: 48rem; margin: 2rem auto; padding: 0 1rem; }
@@ -121,7 +121,7 @@ pub struct CustomElementCtx<'a> {
     /// Whether this element sits inline in running text (`span`) or as a
     /// block (`div`) -- the same distinction `render_generic_element` uses.
     pub inline: bool,
-    normalize_args: Box<dyn Fn() -> Option<Tuple> + 'a>,
+    args_view: Box<dyn Fn() -> Option<TupleView<'a, 'static>> + 'a>,
 }
 
 impl<'a> CustomElementCtx<'a> {
@@ -129,24 +129,21 @@ impl<'a> CustomElementCtx<'a> {
         kind: &'a str,
         content: Option<&'a [Block]>,
         inline: bool,
-        normalize_args: impl Fn() -> Option<Tuple> + 'a,
+        args_view: impl Fn() -> Option<TupleView<'a, 'static>> + 'a,
     ) -> Self {
         Self {
             kind,
             content,
             inline,
-            normalize_args: Box::new(normalize_args),
+            args_view: Box::new(args_view),
         }
     }
 
-    /// `args`, normalized against the same vocabularies this crate binds
+    /// `args`, viewed against the same vocabularies this crate binds
     /// for rendering (`builtin_doc_vocabularies`), so a positional first
-    /// argument -- `doc.icon`'s `name` -- is already keyed by name rather
-    /// than left under the parser's positional sentinel. Clones the args
-    /// tuple on every call; see the type-level doc for why that cost is
-    /// opt-in rather than paid up front for every element.
-    pub fn normalized_args(&self) -> Option<Tuple> {
-        (self.normalize_args)()
+    /// argument -- `doc.icon`'s `name` -- is reached by its alias name.
+    pub fn args_view(&self) -> Option<TupleView<'a, 'static>> {
+        (self.args_view)()
     }
 }
 

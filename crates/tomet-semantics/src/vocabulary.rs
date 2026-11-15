@@ -35,7 +35,7 @@ use tomet_semantics_core::{admits, parse_type_spec};
 use tomet_declaration::DeclKind;
 
 use crate::kind::{ElementKind, Shape, UnknownName, builtin_kinds, classify_declaration_lenient};
-use crate::positional::normalized_declaration_args;
+use crate::positional::declaration_args_view;
 
 /// Where an element is allowed to sit in a document.
 ///
@@ -612,7 +612,7 @@ fn used_namespaces<B>(doc: &File<B>) -> Vec<String> {
         if classify_declaration_lenient(declaration) != ElementKind::Declaration(DeclKind::Use) {
             continue;
         }
-        let Some(args) = normalized_declaration_args(declaration) else {
+        let Some(args) = declaration_args_view(declaration) else {
             continue;
         };
         let namespace = args

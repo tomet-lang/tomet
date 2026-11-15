@@ -4,7 +4,7 @@ use crate::RenderCtx;
 use crate::block::render_inlines;
 use crate::util::{id_attr, push_named_attrs, split_attrs};
 use tomet_ast::{ElementView, Value};
-use tomet_semantics::normalized_element_args;
+use tomet_semantics::element_args_view;
 
 pub(crate) fn render_table_element(cx: &RenderCtx, el: ElementView<'_>, out: &mut String) {
     let inlines = match el.content {
@@ -20,7 +20,7 @@ pub(crate) fn render_table_element(cx: &RenderCtx, el: ElementView<'_>, out: &mu
         return;
     }
 
-    let args = normalized_element_args(el);
+    let args = element_args_view(el);
     let has_header = args
         .as_ref()
         .and_then(|a| a.get("header"))

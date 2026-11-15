@@ -16,37 +16,29 @@ use crate::vars::{VarDecl, read_var_decls};
 ///
 /// The second positional slot, the major version, is not part of the name.
 pub fn kind_name(declaration: &Declaration) -> Option<String> {
-    let args = declaration.bound_args()?;
-    args.get("kind")
-        .or_else(|| args.nth_unnamed(0))
-        .and_then(text)
+    let args = declaration.args_view()?;
+    args.get("kind").and_then(text)
 }
 
 /// The identity a `::id(...)` declares: `::id(std.config)` or `::id(id: std.config)`.
 ///
 /// `None` when it is not written as text, such as `::id($uuid())` before it is evaluated.
 pub fn id_name(declaration: &Declaration) -> Option<String> {
-    let args = declaration.bound_args()?;
-    args.get("id")
-        .or_else(|| args.nth_unnamed(0))
-        .and_then(text)
+    let args = declaration.args_view()?;
+    args.get("id").and_then(text)
 }
 
 /// The kind of document a `::blueprint(X)` or `::blueprint(target: X)` is for.
 pub fn blueprint_target(declaration: &Declaration) -> Option<String> {
-    let args = declaration.bound_args()?;
-    args.get("target")
-        .or_else(|| args.nth_unnamed(0))
-        .and_then(text)
+    let args = declaration.args_view()?;
+    args.get("target").and_then(text)
 }
 
 /// The name a `::dictionary(tomet)` or `::dictionary(name: tomet)` gives its dictionary; a term is mentioned
 /// through it (`@term(tomet#vault-config)`).
 pub fn dictionary_name(declaration: &Declaration) -> Option<String> {
-    let args = declaration.bound_args()?;
-    args.get("name")
-        .or_else(|| args.nth_unnamed(0))
-        .and_then(text)
+    let args = declaration.args_view()?;
+    args.get("name").and_then(text)
 }
 
 /// The names a `::profile(...)` is written with, as written and in order: `::profile(oneline, standalone)` is
@@ -57,24 +49,25 @@ pub fn dictionary_name(declaration: &Declaration) -> Option<String> {
 /// entries (or one entry). An entry written `key: value` is not a bare name; its key
 /// is returned, so that it is reported like any other name that is not a profile.
 pub fn profile_names(declaration: &Declaration) -> Vec<String> {
-    match declaration.bound_args() {
+    match declaration.args_view() {
         None => Vec::new(),
-        Some(tuple) => tuple
+        Some(view) => view
             .entries()
-            .map(|entry| match entry.name() {
-                None => scalar_text_or_debug(entry.value()),
-                Some(name) => name.to_string(),
-            })
+            .enumerate()
+            .map(
+                |(i, entry)| match entry.name().or_else(|| view.entry_alias(i)) {
+                    None => scalar_text_or_debug(entry.value()),
+                    Some(name) => name.to_string(),
+                },
+            )
             .collect(),
     }
 }
 
 /// The version a `::version(...)` declares, as written: `::version(1.10)` is `"1.10"`, not `"1.1"`.
 pub fn version_string(declaration: &Declaration) -> Option<String> {
-    let args = declaration.bound_args()?;
-    args.get("version")
-        .or_else(|| args.nth_unnamed(0))
-        .map(scalar_text_or_debug)
+    let args = declaration.args_view()?;
+    args.get("version").map(scalar_text_or_debug)
 }
 
 /// What a `::meta(...)` states: the map of its fields. `::meta()` states none, and is an empty map

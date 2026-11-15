@@ -11,7 +11,7 @@ use tomet_ast::ElementView;
 use tomet_tree::ValueExt;
 
 use crate::kind::ElementKind;
-use crate::positional::normalized_element_args;
+use crate::positional::element_args_view;
 
 /// The raw target string of a link-shaped element, if it has one. `kind`
 /// should be `classify_std_lenient(el)`'s result -- only `Link`/`Embed` ever return
@@ -45,14 +45,10 @@ pub fn path_target(el: ElementView<'_>, kind: &ElementKind) -> Option<String> {
 }
 
 fn target_arg(el: ElementView<'_>) -> Option<String> {
-    let args = normalized_element_args(el)?;
-    if let Some(target) = args.get("target").and_then(|v| v.as_str()) {
-        return Some(target.to_string());
-    }
-    if let Some(s) = args.nth_unnamed(0).and_then(|v| v.as_str()) {
-        return Some(s.to_string());
-    }
-    None
+    let args = element_args_view(el)?;
+    args.get("target")
+        .and_then(|v| v.as_str())
+        .map(str::to_string)
 }
 
 /// Classifies `el` and extracts its link target in one step, for callers
@@ -120,7 +116,7 @@ mod tests {
     fn bare_positional_link_has_no_named_key() {
         // `@link(x.md)`: args is an unnamed entry, but
         // "link" IS in `builtin_positional_arg_key` (-> "target"), so
-        // `normalized_element_args` turns this into named before
+        // `element_args_view` aliases this to "target" before
         // `link_target` ever sees it.
         let mut el = element_new(Name::bare("link"));
         el.data.args = Some(Tuple::from_unnamed([s("x.md")]));
@@ -145,10 +141,10 @@ mod tests {
     }
 
     #[test]
-    fn embed_bare_positional_maps_to_target_via_normalized_args() {
+    fn embed_bare_positional_maps_to_target_via_element_args_view() {
         // `@embed(a.png)`: "embed" IS in builtin_positional_arg_key
-        // (-> "target"), so normalized_element_args already turns this
-        // into named before link_target ever sees it.
+        // (-> "target"), so element_args_view already aliases this
+        // to "target" before link_target ever sees it.
         let mut el = element_new(Name::bare("embed"));
         el.data.args = Some(Tuple::from_unnamed([s("a.png")]));
         assert_eq!(

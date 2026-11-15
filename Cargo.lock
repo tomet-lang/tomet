@@ -1971,6 +1971,7 @@ dependencies = [
  "tomet-ast",
  "tomet-ast-parser",
  "tomet-declaration",
+ "tomet-semantics",
  "tomet-span",
  "tomet-tree",
  "tomet-type",

@@ -24,7 +24,7 @@ use crate::util::{
 use crate::{CustomElementCtx, RenderCtx};
 use tomet_ast::{BodyView, ElementView, Entry, Group, Interpolation};
 use tomet_semantics::{
-    classify_std_lenient, comment_text, extract_tags, is_directive, normalized_element_args_in,
+    classify_std_lenient, comment_text, element_args_view_in, extract_tags, is_directive,
 };
 
 pub(crate) fn render_element(cx: &RenderCtx, el: ElementView<'_>, out: &mut String, inline: bool) {
@@ -72,7 +72,7 @@ fn render_comment_element(el: ElementView<'_>, out: &mut String, inline: bool) {
 }
 
 fn render_task_element(cx: &RenderCtx, el: ElementView<'_>, out: &mut String, inline: bool) {
-    let status = normalized_element_args_in(el, cx.bindings)
+    let status = element_args_view_in(el, cx.bindings)
         .as_ref()
         .and_then(|a| a.get("status"))
         .map(value_to_plain)
@@ -134,7 +134,7 @@ fn conflict_sides(
     cx: &RenderCtx,
     el: ElementView<'_>,
 ) -> (Vec<tomet_ast::Block>, Vec<tomet_ast::Block>) {
-    let args = normalized_element_args_in(el, cx.bindings);
+    let args = element_args_view_in(el, cx.bindings);
     let side = |key: &str| -> Vec<tomet_ast::Block> {
         match args.as_ref().and_then(|a| a.get(key)) {
             Some(tomet_ast::Value::Blocks(blocks)) => blocks.clone(),
@@ -187,8 +187,8 @@ fn render_custom_or_generic_element(
 ) {
     if let Some(renderer) = &cx.options.custom_element {
         let bindings = cx.bindings;
-        let ctx = CustomElementCtx::new(kind, el.content, inline, || {
-            normalized_element_args_in(el, bindings)
+        let ctx = CustomElementCtx::new(kind, el.content, inline, move || {
+            element_args_view_in(el, bindings)
         });
         if let Some(html) = (renderer.0)(ctx) {
             out.push_str(&html);

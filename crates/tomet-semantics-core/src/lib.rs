@@ -14,4 +14,4 @@ pub use admits::{
     is_placeholder,
 };
 pub use parse::parse_type_spec;
-pub use positional::bind_positional;
+pub use positional::{Slots, TupleView};

@@ -456,7 +456,7 @@ fn item_expression(item: &ListItem) -> Option<(&InterpExpr, Span)> {
 /// What to do instead, for a value that has no place in output.
 fn misfit(value: &EvalValue) -> String {
     let hint = match value {
-        EvalValue::Seq(_) => " -- join it into text with `.join(\", \")`",
+        EvalValue::Tuple(_) => " -- join it into text with `.join(\", \")`",
         EvalValue::Document(_) | EvalValue::Part { .. } => {
             " -- use `include(...)` for its content, or `.link()` for a link"
         }
@@ -498,7 +498,7 @@ fn to_blocks(value: EvalValue, span: Span) -> Result<Vec<Block>, String> {
 
 fn to_items(value: EvalValue, span: Span) -> Result<Vec<ListItem>, String> {
     let values = match value {
-        EvalValue::Seq(values) => values,
+        EvalValue::Tuple(tuple) => tuple.unnamed().cloned().collect(),
         single => vec![single],
     };
     values

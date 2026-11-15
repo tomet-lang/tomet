@@ -311,7 +311,7 @@ pub fn check_arguments(doc: &File, bindings: &Bindings, errors: &mut Vec<Diagnos
     for_each_element_and_item(doc, |el| {
         check_arguments_of(
             el.name,
-            tomet_semantics::normalized_element_args_in(el, bindings),
+            tomet_semantics::element_args_view_in(el, bindings),
             el.span,
             bindings,
             errors,
@@ -320,7 +320,7 @@ pub fn check_arguments(doc: &File, bindings: &Bindings, errors: &mut Vec<Diagnos
     for declaration in &doc.header {
         check_arguments_of(
             &declaration.name,
-            tomet_semantics::normalized_declaration_args_in(declaration, bindings),
+            tomet_semantics::declaration_args_view_in(declaration, bindings),
             declaration.span,
             bindings,
             errors,
@@ -328,11 +328,11 @@ pub fn check_arguments(doc: &File, bindings: &Bindings, errors: &mut Vec<Diagnos
     }
 }
 
-/// The arguments written for `name` (already bound to the slots it has),
+/// The arguments written for `name` (viewed through the slots it has),
 /// held to the parameters a vocabulary in scope declares for it.
 fn check_arguments_of(
     name: &tomet_ast::Name,
-    args: Option<tomet_ast::Tuple>,
+    args: Option<tomet_semantics::TupleView<'_, '_>>,
     span: Span,
     bindings: &Bindings,
     errors: &mut Vec<Diagnostic>,
@@ -344,7 +344,7 @@ fn check_arguments_of(
         return;
     }
 
-    let Some(tuple) = args.as_ref() else {
+    let Some(view) = args.as_ref() else {
         for param in decl.params.iter().filter(|p| p.required) {
             errors.push(Diagnostic::MissingRequiredArgument {
                 element: name.to_string(),
@@ -355,7 +355,7 @@ fn check_arguments_of(
         return;
     };
 
-    for (key, _) in tuple.named() {
+    for (key, _) in view.tuple().named() {
         if !key.is_empty() && decl.param(key).is_none() {
             errors.push(Diagnostic::UnknownArgument {
                 element: name.to_string(),
@@ -368,25 +368,22 @@ fn check_arguments_of(
     // whose `type:` names no type is not checked (the vocabulary says so
     // where it is read), and a `{$ ... }` is not known until it is evaluated, nor a `<$...>`
     // until it is filled.
-    for (key, value) in tuple.named() {
-        let Some(ty) = decl.param(key).and_then(|p| p.declared_type()) else {
-            continue;
-        };
-        if is_placeholder(value) {
-            continue;
-        }
-        if let Err(mismatch) = admits(&ty, value) {
-            errors.push(Diagnostic::InvalidArgument {
-                element: name.to_string(),
-                argument: key.to_string(),
-                ty: ty.to_string(),
-                reason: mismatch.to_string(),
-                span,
-            });
-        }
-    }
-    for param in decl.params.iter().filter(|p| p.required) {
-        if !tuple.contains_key(&param.name) {
+    for param in &decl.params {
+        if let Some(value) = view.get(&param.name) {
+            if let Some(ty) = param.declared_type() {
+                if !is_placeholder(value) {
+                    if let Err(mismatch) = admits(&ty, value) {
+                        errors.push(Diagnostic::InvalidArgument {
+                            element: name.to_string(),
+                            argument: param.name.clone(),
+                            ty: ty.to_string(),
+                            reason: mismatch.to_string(),
+                            span,
+                        });
+                    }
+                }
+            }
+        } else if param.required {
             errors.push(Diagnostic::MissingRequiredArgument {
                 element: name.to_string(),
                 argument: param.name.clone(),
@@ -739,7 +736,7 @@ pub fn check_field_types(
             // it is written: `meta: { id: { type: uuid } }` holds `::id(...)` to a UUID.
             tomet_semantics::ElementKind::Declaration(DeclKind::Id) if !checked_id => {
                 checked_id = true;
-                let Some(value) = tomet_semantics::normalized_declaration_args(declaration)
+                let Some(value) = tomet_semantics::declaration_args_view(declaration)
                     .and_then(|args| args.get("id").cloned())
                 else {
                     return;

@@ -16,7 +16,7 @@ use tomet_ast::Name;
 /// This module is the second, separate thing: which bare words are legal
 /// right after a `:`. The parser reads `:name(...)` uniformly, without
 /// judging the name (mirroring how it never judges an `@name`); this is
-/// where the judging happens, the same split `normalized_element_args`
+/// where the judging happens, the same split `element_args_view`
 /// already draws between "where" (parser) and "what it means"
 /// (semantics).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

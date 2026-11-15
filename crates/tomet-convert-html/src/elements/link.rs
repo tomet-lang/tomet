@@ -6,13 +6,12 @@ use crate::block::render_content_blocks;
 use crate::util::{blocks_to_plain, escape_attr, escape_html, push_data_attrs};
 use tomet_ast::ElementView;
 use tomet_semantics::{
-    TargetScheme, classify_std_lenient, link_target, normalized_element_args, path_target,
-    target_scheme,
+    TargetScheme, classify_std_lenient, element_args_view, link_target, path_target, target_scheme,
 };
 
 /// Strips `target`'s scheme prefix the same way `render_link_element`
 /// does -- e.g. `<embed>(ref:name)` (recovered from the parser's
-/// `identifier:` key split, see `normalized_element_args`) must render
+/// `identifier:` key split, see `element_args_view`) must render
 /// `src="name"`, not the literal `"ref:name"`. Both `@link` and `<embed>`
 /// share one `target` key with the scheme embedded in the string, so
 /// `<embed>` needs the same treatment `@link` gets, not just a raw
@@ -95,7 +94,7 @@ pub(crate) fn render_link_element(
     out: &mut String,
     inline: bool,
 ) {
-    let normalized_args = normalized_element_args(el);
+    let args_view = element_args_view(el);
     let raw_target = link_target(el, &classify_std_lenient(el)).unwrap_or_default();
     let (scheme, target) = target_scheme(&raw_target);
     let target = target.to_string();
@@ -121,12 +120,12 @@ pub(crate) fn render_link_element(
     // ...) are already fully captured by `target` above --
     // `push_data_attrs`'s non-map fallback would otherwise duplicate that
     // same value as a redundant `data-value` attribute. Uses the
-    // *normalized* args (not raw `el.args`) so a recovered scheme key
+    // args view (not raw `el.args`) so a recovered scheme key
     // (`@link(tm:foo, predicate:x)`'s `tm` entry, folded into `target` by
-    // `normalized_element_args`) doesn't also leak out as a stray
+    // `element_args_view`) doesn't also leak out as a stray
     // `data-tm` attribute alongside the real `target`-derived `href`.
-    if let Some(args) = &normalized_args {
-        push_data_attrs(out, Some(args), &["target"]);
+    if let Some(args) = &args_view {
+        push_data_attrs(out, Some(args.tuple()), &["target"]);
     }
     out.push('>');
     render_content_or_fallback(cx, el, &target, out);

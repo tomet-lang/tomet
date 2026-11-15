@@ -4,7 +4,7 @@
 
 use std::sync::Arc;
 
-use tomet_ast::{Block, File, Value};
+use tomet_ast::{Block, File, Tuple, TupleEntry, Value};
 use tomet_config::{FieldConfig, PrinterConfig};
 use tomet_expr::{DirRef, DocRef, EvalValue, PreparedBlocks, Resolver, typed_value};
 use tomet_type::{Kind, Type};
@@ -31,22 +31,22 @@ pub fn typed_meta(config: &PrinterConfig, doc: &File, doc_ref: &DocRef) -> EvalV
             .collect(),
         _ => Vec::new(),
     };
-    let mut entries: Vec<(String, EvalValue)> = written
+    let mut entries: Vec<TupleEntry<EvalValue>> = written
         .iter()
         .map(|(key, value)| {
             let value = match config.meta.fields.get(key) {
                 Some(field) => typed(field, Some((value, doc_ref))),
                 None => EvalValue::from_ast(value, doc_ref),
             };
-            (key.clone(), value)
+            TupleEntry::named(key.clone(), value)
         })
         .collect();
     for (key, field) in &config.meta.fields {
-        if !entries.iter().any(|(k, _)| k == key) {
-            entries.push((key.clone(), typed(field, None)));
+        if !entries.iter().any(|e| e.name() == Some(key.as_str())) {
+            entries.push(TupleEntry::named(key.clone(), typed(field, None)));
         }
     }
-    EvalValue::Map(entries)
+    EvalValue::Tuple(Tuple::try_from_entries(entries).expect("meta keys are unique"))
 }
 
 fn typed(field: &FieldConfig, value: Option<(&Value, &DocRef)>) -> EvalValue {
@@ -55,7 +55,7 @@ fn typed(field: &FieldConfig, value: Option<(&Value, &DocRef)>) -> EvalValue {
         .as_deref()
         .and_then(|s| s.parse::<Type>().ok());
     match (ty, value) {
-        (Some(ty), None) if ty.kind() == Kind::List => EvalValue::Seq(Vec::new()),
+        (Some(ty), None) if ty.kind() == Kind::List => EvalValue::Tuple(Tuple::new()),
         (Some(ty), Some((value, doc))) => typed_value(&ty, value, doc),
         (None, Some((value, doc))) => EvalValue::from_ast(value, doc),
         (_, None) => EvalValue::Null,
@@ -139,7 +139,7 @@ mod tests {
 
     fn field<'a>(meta: &'a EvalValue, key: &str) -> Option<&'a EvalValue> {
         match meta {
-            EvalValue::Map(entries) => entries.iter().find(|(k, _)| k == key).map(|(_, v)| v),
+            EvalValue::Tuple(tuple) => tuple.get(key),
             _ => None,
         }
     }
@@ -147,7 +147,7 @@ mod tests {
     #[test]
     fn a_list_field_the_document_lacks_is_an_empty_list() {
         let meta = meta_of("::meta(title: A)\n");
-        assert_eq!(field(&meta, "tags"), Some(&EvalValue::Seq(vec![])));
+        assert_eq!(field(&meta, "tags"), Some(&EvalValue::Tuple(Tuple::new())));
     }
 
     #[test]
@@ -155,15 +155,17 @@ mod tests {
         let meta = meta_of("::meta(tags: rust)\n");
         assert_eq!(
             field(&meta, "tags"),
-            Some(&EvalValue::Seq(vec![EvalValue::String("rust".into())]))
+            Some(&EvalValue::Tuple(Tuple::from_unnamed(vec![
+                EvalValue::String("rust".into())
+            ])))
         );
         let meta = meta_of("::meta(tags: (a, b))\n");
         assert_eq!(
             field(&meta, "tags"),
-            Some(&EvalValue::Seq(vec![
+            Some(&EvalValue::Tuple(Tuple::from_unnamed(vec![
                 EvalValue::String("a".into()),
                 EvalValue::String("b".into())
-            ]))
+            ])))
         );
     }
 
@@ -231,7 +233,7 @@ mod tests {
     #[test]
     fn a_document_without_meta_still_has_the_declared_fields() {
         let meta = meta_of("Just text.\n");
-        assert_eq!(field(&meta, "tags"), Some(&EvalValue::Seq(vec![])));
+        assert_eq!(field(&meta, "tags"), Some(&EvalValue::Tuple(Tuple::new())));
         assert_eq!(field(&meta, "title"), Some(&EvalValue::Null));
     }
 

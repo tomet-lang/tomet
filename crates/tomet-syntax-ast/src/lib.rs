@@ -138,23 +138,23 @@ pub enum Value {
     Blocks(Vec<Block>),
 }
 
-/// One entry of a [`Tuple`]: a [`Value`], with a name or without one.
+/// One entry of a [`Tuple`]: a value, with a name or without one.
 ///
 /// An entry with no name is an entry whose key was not written; its key is its position among
 /// the unnamed entries of its tuple. An entry does not know that position: ask the tuple
 /// ([`Tuple::keyed`], [`Tuple::get`]).
 #[derive(Debug, Clone, PartialEq)]
-pub struct TupleEntry {
+pub struct TupleEntry<V = Value> {
     name: Option<String>,
-    value: Value,
+    value: V,
 }
 
-impl TupleEntry {
-    pub fn unnamed(value: Value) -> Self {
+impl<V> TupleEntry<V> {
+    pub fn unnamed(value: V) -> Self {
         Self { name: None, value }
     }
 
-    pub fn named(name: impl Into<String>, value: Value) -> Self {
+    pub fn named(name: impl Into<String>, value: V) -> Self {
         Self {
             name: Some(name.into()),
             value,
@@ -166,20 +166,27 @@ impl TupleEntry {
         self.name.as_deref()
     }
 
-    pub fn value(&self) -> &Value {
+    pub fn value(&self) -> &V {
         &self.value
     }
 
-    pub fn value_mut(&mut self) -> &mut Value {
+    pub fn value_mut(&mut self) -> &mut V {
         &mut self.value
     }
 
-    pub fn into_value(self) -> Value {
+    pub fn into_value(self) -> V {
         self.value
     }
 
-    pub fn into_parts(self) -> (Option<String>, Value) {
+    pub fn into_parts(self) -> (Option<String>, V) {
         (self.name, self.value)
+    }
+
+    pub fn map_value<U>(self, f: impl FnOnce(V) -> U) -> TupleEntry<U> {
+        TupleEntry {
+            name: self.name,
+            value: f(self.value),
+        }
     }
 }
 
@@ -221,9 +228,17 @@ impl std::error::Error for DuplicateKey {}
 ///   ones after it by itself.
 /// - no key is held twice. Every way to build or change a tuple that could repeat one is
 ///   fallible and returns [`DuplicateKey`]; nothing else can add an entry.
-#[derive(Debug, Clone, PartialEq, Default)]
-pub struct Tuple {
-    entries: Vec<TupleEntry>,
+#[derive(Debug, Clone, PartialEq)]
+pub struct Tuple<V = Value> {
+    entries: Vec<TupleEntry<V>>,
+}
+
+impl<V> Default for Tuple<V> {
+    fn default() -> Self {
+        Self {
+            entries: Vec::new(),
+        }
+    }
 }
 
 /// The decimal a position is written as, if `name` is one: no sign, no leading zero.
@@ -236,7 +251,7 @@ fn as_position(name: &str) -> Option<usize> {
     }
 }
 
-impl Tuple {
+impl<V> Tuple<V> {
     pub fn new() -> Self {
         Self::default()
     }
@@ -246,7 +261,7 @@ impl Tuple {
     /// This is the one place the rules of a tuple's keys are applied; every other constructor
     /// and every change goes through it.
     pub fn try_from_entries(
-        entries: impl IntoIterator<Item = TupleEntry>,
+        entries: impl IntoIterator<Item = TupleEntry<V>>,
     ) -> Result<Self, DuplicateKey> {
         let mut tuple = Self::new();
         for (index, entry) in entries.into_iter().enumerate() {
@@ -258,7 +273,7 @@ impl Tuple {
     }
 
     /// Adds `entry` at the end, unless its key is already held.
-    pub fn try_push(&mut self, entry: TupleEntry) -> Result<(), DuplicateKey> {
+    pub fn try_push(&mut self, entry: TupleEntry<V>) -> Result<(), DuplicateKey> {
         let next = self.unnamed_len();
         let duplicate = |key: String| DuplicateKey {
             key,
@@ -291,13 +306,13 @@ impl Tuple {
     /// # Panics
     ///
     /// If a key is given twice. Use [`Tuple::try_from_entries`] for entries that are data.
-    pub fn from_entries(entries: impl IntoIterator<Item = TupleEntry>) -> Self {
+    pub fn from_entries(entries: impl IntoIterator<Item = TupleEntry<V>>) -> Self {
         Self::try_from_entries(entries)
             .unwrap_or_else(|duplicate| panic!("Tuple::from_entries: {duplicate}"))
     }
 
     /// A tuple of unnamed entries. It cannot repeat a key.
-    pub fn from_unnamed(values: impl IntoIterator<Item = Value>) -> Self {
+    pub fn from_unnamed(values: impl IntoIterator<Item = V>) -> Self {
         Self {
             entries: values.into_iter().map(TupleEntry::unnamed).collect(),
         }
@@ -308,7 +323,7 @@ impl Tuple {
     /// # Panics
     ///
     /// If a key is given twice. Use [`Tuple::try_from_entries`] for names that are data.
-    pub fn from_named(pairs: impl IntoIterator<Item = (String, Value)>) -> Self {
+    pub fn from_named(pairs: impl IntoIterator<Item = (String, V)>) -> Self {
         Self::from_entries(
             pairs
                 .into_iter()
@@ -339,7 +354,7 @@ impl Tuple {
     }
 
     /// The index, among the entries as written, of the entry whose key is `key`.
-    fn index_of(&self, key: &str) -> Option<usize> {
+    pub fn index_of(&self, key: &str) -> Option<usize> {
         let position = as_position(key);
         let mut seen = 0;
         self.entries.iter().position(|entry| match &entry.name {
@@ -352,12 +367,12 @@ impl Tuple {
     }
 
     /// The value of the entry whose key is `key`: a name, or a position in decimal.
-    pub fn get(&self, key: &str) -> Option<&Value> {
+    pub fn get(&self, key: &str) -> Option<&V> {
         self.index_of(key).map(|index| &self.entries[index].value)
     }
 
     /// Mutable counterpart of [`Tuple::get`].
-    pub fn get_mut(&mut self, key: &str) -> Option<&mut Value> {
+    pub fn get_mut(&mut self, key: &str) -> Option<&mut V> {
         self.index_of(key)
             .map(|index| &mut self.entries[index].value)
     }
@@ -368,22 +383,22 @@ impl Tuple {
     }
 
     /// The `n`-th entry as written.
-    pub fn nth(&self, n: usize) -> Option<&TupleEntry> {
+    pub fn nth(&self, n: usize) -> Option<&TupleEntry<V>> {
         self.entries.get(n)
     }
 
     /// Mutable counterpart of [`Tuple::nth`]: the entry's value can change, its name cannot.
-    pub fn nth_mut(&mut self, n: usize) -> Option<&mut TupleEntry> {
+    pub fn nth_mut(&mut self, n: usize) -> Option<&mut TupleEntry<V>> {
         self.entries.get_mut(n)
     }
 
     /// The `n`-th unnamed entry's value: the entry whose key is `n`.
-    pub fn nth_unnamed(&self, n: usize) -> Option<&Value> {
+    pub fn nth_unnamed(&self, n: usize) -> Option<&V> {
         self.unnamed().nth(n)
     }
 
     /// Mutable counterpart of [`Tuple::nth_unnamed`].
-    pub fn nth_unnamed_mut(&mut self, n: usize) -> Option<&mut Value> {
+    pub fn nth_unnamed_mut(&mut self, n: usize) -> Option<&mut V> {
         self.entries
             .iter_mut()
             .filter(|e| e.name.is_none())
@@ -392,18 +407,18 @@ impl Tuple {
     }
 
     /// All entries in written order.
-    pub fn entries(&self) -> std::slice::Iter<'_, TupleEntry> {
+    pub fn entries(&self) -> std::slice::Iter<'_, TupleEntry<V>> {
         self.entries.iter()
     }
 
     /// Owning iteration over all entries in written order.
-    pub fn into_entries(self) -> std::vec::IntoIter<TupleEntry> {
+    pub fn into_entries(self) -> std::vec::IntoIter<TupleEntry<V>> {
         self.entries.into_iter()
     }
 
     /// Every entry with its key, in written order: the name of a named entry, the position of an
     /// unnamed one.
-    pub fn keyed(&self) -> impl Iterator<Item = (std::borrow::Cow<'_, str>, &Value)> {
+    pub fn keyed(&self) -> impl Iterator<Item = (std::borrow::Cow<'_, str>, &V)> {
         let mut position = 0;
         self.entries.iter().map(move |entry| {
             let key = match &entry.name {
@@ -418,18 +433,18 @@ impl Tuple {
     }
 
     /// The values of all entries in written order.
-    pub fn values(&self) -> impl Iterator<Item = &Value> {
+    pub fn values(&self) -> impl Iterator<Item = &V> {
         self.entries.iter().map(|e| &e.value)
     }
 
     /// Mutable counterpart of [`Tuple::values`]. A value can change in place; a name cannot.
-    pub fn values_mut(&mut self) -> impl Iterator<Item = &mut Value> {
+    pub fn values_mut(&mut self) -> impl Iterator<Item = &mut V> {
         self.entries.iter_mut().map(|e| &mut e.value)
     }
 
     /// This tuple with every value passed through `f`. The keys are untouched.
-    pub fn map_values(self, mut f: impl FnMut(Value) -> Value) -> Self {
-        Self {
+    pub fn map_values<U>(self, mut f: impl FnMut(V) -> U) -> Tuple<U> {
+        Tuple {
             entries: self
                 .entries
                 .into_iter()
@@ -441,43 +456,55 @@ impl Tuple {
         }
     }
 
+    /// This tuple with every value passed through fallible `f`. The keys are untouched.
+    pub fn try_map_values<U, E>(self, mut f: impl FnMut(V) -> Result<U, E>) -> Result<Tuple<U>, E> {
+        let mut entries = Vec::with_capacity(self.entries.len());
+        for e in self.entries {
+            entries.push(TupleEntry {
+                name: e.name,
+                value: f(e.value)?,
+            });
+        }
+        Ok(Tuple { entries })
+    }
+
     /// The named entries as `(name, value)`, in written order.
-    pub fn named(&self) -> impl Iterator<Item = (&str, &Value)> {
+    pub fn named(&self) -> impl Iterator<Item = (&str, &V)> {
         self.entries
             .iter()
             .filter_map(|e| Some((e.name.as_deref()?, &e.value)))
     }
 
     /// Mutable counterpart of [`Tuple::named`].
-    pub fn named_mut(&mut self) -> impl Iterator<Item = (&str, &mut Value)> {
+    pub fn named_mut(&mut self) -> impl Iterator<Item = (&str, &mut V)> {
         self.entries
             .iter_mut()
             .filter_map(|e| Some((e.name.as_deref()?, &mut e.value)))
     }
 
     /// Owning counterpart of [`Tuple::named`].
-    pub fn into_named(self) -> impl Iterator<Item = (String, Value)> {
+    pub fn into_named(self) -> impl Iterator<Item = (String, V)> {
         self.entries
             .into_iter()
             .filter_map(|e| Some((e.name?, e.value)))
     }
 
     /// The unnamed entries' values, in written order: the `n`-th has the key `n`.
-    pub fn unnamed(&self) -> impl Iterator<Item = &Value> {
+    pub fn unnamed(&self) -> impl Iterator<Item = &V> {
         self.entries
             .iter()
             .filter_map(|e| e.name.is_none().then_some(&e.value))
     }
 
     /// Owning counterpart of [`Tuple::unnamed`].
-    pub fn into_unnamed(self) -> impl Iterator<Item = Value> {
+    pub fn into_unnamed(self) -> impl Iterator<Item = V> {
         self.entries
             .into_iter()
             .filter_map(|e| e.name.is_none().then_some(e.value))
     }
 
     /// Adds an unnamed entry at the end, unless an entry is named with its position.
-    pub fn try_push_unnamed(&mut self, value: Value) -> Result<(), DuplicateKey> {
+    pub fn try_push_unnamed(&mut self, value: V) -> Result<(), DuplicateKey> {
         self.try_push(TupleEntry::unnamed(value))
     }
 
@@ -485,14 +512,14 @@ impl Tuple {
     pub fn try_push_named(
         &mut self,
         name: impl Into<String>,
-        value: Value,
+        value: V,
     ) -> Result<(), DuplicateKey> {
         self.try_push(TupleEntry::named(name, value))
     }
 
     /// Gives the key `key` the value `value`: in place if an entry has that key, as a new entry
     /// at the end if none has. It cannot repeat a key.
-    pub fn set(&mut self, key: &str, value: Value) {
+    pub fn set(&mut self, key: &str, value: V) {
         match self.index_of(key) {
             Some(index) => self.entries[index].value = value,
             None => self
@@ -504,7 +531,10 @@ impl Tuple {
     /// Names the entry whose key is `key` with `name`, where it stands. `Ok(false)` if no entry
     /// has the key `key`; an error, and no change, if another entry already has the key `name`.
     /// Naming an unnamed entry moves the unnamed ones after it down by one.
-    pub fn rename(&mut self, key: &str, name: impl Into<String>) -> Result<bool, DuplicateKey> {
+    pub fn rename(&mut self, key: &str, name: impl Into<String>) -> Result<bool, DuplicateKey>
+    where
+        V: Clone,
+    {
         let Some(index) = self.index_of(key) else {
             return Ok(false);
         };
@@ -516,24 +546,24 @@ impl Tuple {
 
     /// Removes the entry whose key is `key` and returns its value. The unnamed entries after a
     /// removed unnamed one move down by one, as their keys are their positions.
-    pub fn remove(&mut self, key: &str) -> Option<Value> {
+    pub fn remove(&mut self, key: &str) -> Option<V> {
         let index = self.index_of(key)?;
         Some(self.entries.remove(index).value)
     }
 }
 
-impl IntoIterator for Tuple {
-    type Item = TupleEntry;
-    type IntoIter = std::vec::IntoIter<TupleEntry>;
+impl<V> IntoIterator for Tuple<V> {
+    type Item = TupleEntry<V>;
+    type IntoIter = std::vec::IntoIter<TupleEntry<V>>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.entries.into_iter()
     }
 }
 
-impl<'a> IntoIterator for &'a Tuple {
-    type Item = &'a TupleEntry;
-    type IntoIter = std::slice::Iter<'a, TupleEntry>;
+impl<'a, V> IntoIterator for &'a Tuple<V> {
+    type Item = &'a TupleEntry<V>;
+    type IntoIter = std::slice::Iter<'a, TupleEntry<V>>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.entries.iter()
@@ -2329,5 +2359,21 @@ mod tests {
             ("1".into(), Value::String("b".into())),
         ]);
         assert_eq!(unnamed_tuple, named_tuple);
+    }
+
+    #[test]
+    fn generic_tuple_preserves_rules_for_custom_type() {
+        let unnamed: Tuple<i32> = Tuple::from_unnamed([10, 20]);
+        let canonical_named: Tuple<i32> =
+            Tuple::try_from_entries([TupleEntry::named("0", 10), TupleEntry::named("1", 20)])
+                .unwrap();
+        assert_eq!(unnamed, canonical_named);
+        assert!(canonical_named.has_no_named());
+        assert_eq!(unnamed.get("0"), Some(&10));
+        assert_eq!(unnamed.get("1"), Some(&20));
+
+        let mapped = unnamed.map_values(|n| n * 2);
+        assert_eq!(mapped.get("0"), Some(&20));
+        assert_eq!(mapped.get("1"), Some(&40));
     }
 }

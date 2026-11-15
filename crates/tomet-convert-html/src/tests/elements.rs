@@ -59,7 +59,7 @@ fn custom_element_hook_renders_doc_icon() {
             if ctx.kind != "doc.icon" {
                 return None;
             }
-            let args = ctx.normalized_args();
+            let args = ctx.args_view();
             let get = |key: &str| {
                 args.as_ref()
                     .and_then(|a| a.get(key))

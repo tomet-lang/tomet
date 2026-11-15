@@ -406,7 +406,7 @@ impl LoadedDictionaries {
 
 /// The word a `@term` definition defines: its one argument, as it is written.
 fn term_name(el: &Element) -> Option<String> {
-    crate::normalized_element_args(el.as_view())?
+    crate::element_args_view(el.as_view())?
         .get("target")?
         .as_str()
         .filter(|name| !name.is_empty())

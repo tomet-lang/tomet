@@ -6,6 +6,8 @@
 
 use std::cmp::Ordering;
 
+use tomet_ast::{Tuple, TupleEntry};
+
 use super::args::Args;
 use super::context::EvalContext;
 use super::error::EvalError;
@@ -20,12 +22,12 @@ pub(crate) fn call_method(
     cx: &EvalContext,
 ) -> Result<EvalValue, EvalError> {
     match (&receiver, member) {
-        (EvalValue::Seq(items), "filter") => {
+        (EvalValue::Tuple(tuple), "filter") => {
             let f = function_arg(member, args)?;
             let mut kept = Vec::new();
-            for item in items {
+            for item in tuple.unnamed() {
                 match super::apply(&f, vec![item.clone()], cx)? {
-                    EvalValue::Bool(true) => kept.push(item.clone()),
+                    EvalValue::Bool(true) => kept.push(TupleEntry::unnamed(item.clone())),
                     EvalValue::Bool(false) => {}
                     other => {
                         return Err(EvalError::mismatch(
@@ -36,18 +38,28 @@ pub(crate) fn call_method(
                     }
                 }
             }
-            Ok(EvalValue::Seq(kept))
+            Tuple::try_from_entries(kept)
+                .map(EvalValue::Tuple)
+                .map_err(|e| EvalError::message(e.to_string()))
         }
-        (EvalValue::Seq(items), "map") => {
+        (EvalValue::Tuple(tuple), "map") => {
             let f = function_arg(member, args)?;
-            items
-                .iter()
-                .map(|item| super::apply(&f, vec![item.clone()], cx))
-                .collect::<Result<_, _>>()
-                .map(EvalValue::Seq)
+            let mut mapped = Vec::new();
+            for item in tuple.unnamed() {
+                mapped.push(TupleEntry::unnamed(super::apply(
+                    &f,
+                    vec![item.clone()],
+                    cx,
+                )?));
+            }
+            Tuple::try_from_entries(mapped)
+                .map(EvalValue::Tuple)
+                .map_err(|e| EvalError::message(e.to_string()))
         }
-        (EvalValue::Seq(items), "sort") => sort(items, args, cx),
-        (EvalValue::Seq(items), "join") => {
+        (EvalValue::Tuple(tuple), "sort") => {
+            sort(&tuple.unnamed().cloned().collect::<Vec<_>>(), args, cx)
+        }
+        (EvalValue::Tuple(tuple), "join") => {
             let [separator] = take::<1>(member, args)?;
             let EvalValue::String(separator) = separator else {
                 return Err(EvalError::mismatch(
@@ -56,25 +68,97 @@ pub(crate) fn call_method(
                     separator.type_name(),
                 ));
             };
-            let parts = items
-                .iter()
+            let parts = tuple
+                .unnamed()
                 .map(scalar_text)
                 .collect::<Result<Vec<_>, _>>()?;
             Ok(EvalValue::String(parts.join(&separator)))
         }
-        (EvalValue::Seq(items), "contains") => {
+        (EvalValue::Tuple(tuple), "contains") => {
             let [needle] = take::<1>(member, args)?;
             Ok(EvalValue::Bool(
-                items.iter().any(|i| values_equal(i, &needle)),
+                tuple.unnamed().any(|i| values_equal(i, &needle)),
             ))
         }
-        (EvalValue::Seq(items), "len") => {
-            take::<0>(member, args)?;
-            Ok(EvalValue::Int(items.len() as i64))
+        (EvalValue::Tuple(tuple), "has") => {
+            let [key] = take::<1>(member, args)?;
+            let key_str = match &key {
+                EvalValue::String(s) => s.clone(),
+                EvalValue::Int(i) => i.to_string(),
+                _ => {
+                    return Err(EvalError::mismatch(
+                        "`.has` on a tuple",
+                        "a string or int key",
+                        key.type_name(),
+                    ));
+                }
+            };
+            Ok(EvalValue::Bool(tuple.index_of(&key_str).is_some()))
         }
-        (EvalValue::Seq(items), "item") => {
+        (EvalValue::Tuple(tuple), "len") => {
+            take::<0>(member, args)?;
+            let count = tuple.unnamed().count();
+            Ok(EvalValue::Int(count as i64))
+        }
+        (EvalValue::Tuple(tuple), "item") => {
             let [index] = take::<1>(member, args)?;
-            index_into(items, &index)
+            let i = match &index {
+                EvalValue::Int(i) => *i,
+                EvalValue::Number(text) => text.parse::<i64>().map_err(|_| {
+                    EvalError::mismatch("`item`", "an integer index", index.type_name())
+                })?,
+                _ => {
+                    return Err(EvalError::mismatch(
+                        "`item`",
+                        "an integer index",
+                        index.type_name(),
+                    ));
+                }
+            };
+            usize::try_from(i)
+                .ok()
+                .and_then(|idx| tuple.entries().nth(idx))
+                .map(|e| e.value().clone())
+                .ok_or_else(|| EvalError::message(format!("`item({i})` is out of range")))
+        }
+        (EvalValue::Tuple(tuple), "get") => {
+            let [key, default] = take::<2>(member, args)?;
+            let key_str = match &key {
+                EvalValue::String(s) => s.clone(),
+                EvalValue::Int(i) => i.to_string(),
+                _ => {
+                    return Err(EvalError::mismatch(
+                        "`.get`",
+                        "a string or int key",
+                        key.type_name(),
+                    ));
+                }
+            };
+            Ok(tuple.get(&key_str).cloned().unwrap_or(default))
+        }
+        (EvalValue::Tuple(tuple), "positional") => {
+            take::<0>(member, args)?;
+            let entries = tuple
+                .unnamed()
+                .cloned()
+                .map(TupleEntry::unnamed)
+                .collect::<Vec<_>>();
+            Tuple::try_from_entries(entries)
+                .map(EvalValue::Tuple)
+                .map_err(|e| EvalError::message(e.to_string()))
+        }
+        (EvalValue::Tuple(tuple), "named") => {
+            take::<0>(member, args)?;
+            let entries = tuple
+                .entries()
+                .filter_map(|e| {
+                    e.name()
+                        .map(|n| TupleEntry::named(n.to_string(), e.value().clone()))
+                })
+                .collect::<Vec<_>>();
+            Tuple::try_from_entries(entries)
+                .map(EvalValue::Tuple)
+                .map_err(|e| EvalError::message(e.to_string()))
         }
         (EvalValue::DateTime(value), "format") => {
             let [format] = take::<1>(member, args)?;
@@ -104,32 +188,6 @@ pub(crate) fn call_method(
                 ))
             })?;
             Ok(EvalValue::DateTime(value.to_offset(offset)))
-        }
-        (EvalValue::Map(entries), "get") => {
-            let [key, default] = take::<2>(member, args)?;
-            let EvalValue::String(key) = key else {
-                return Err(EvalError::mismatch(
-                    "`.get`",
-                    "a string key",
-                    key.type_name(),
-                ));
-            };
-            Ok(entries
-                .iter()
-                .find(|(k, _)| *k == key)
-                .map(|(_, v)| v.clone())
-                .unwrap_or(default))
-        }
-        (EvalValue::Map(entries), "contains") => {
-            let [key] = take::<1>(member, args)?;
-            let EvalValue::String(key) = key else {
-                return Err(EvalError::mismatch(
-                    "`.contains` on a map",
-                    "a string key",
-                    key.type_name(),
-                ));
-            };
-            Ok(EvalValue::Bool(entries.iter().any(|(k, _)| *k == key)))
         }
         (EvalValue::String(text), "contains") => {
             let [needle] = take::<1>(member, args)?;
@@ -281,5 +339,5 @@ fn sort(items: &[EvalValue], args: Args, cx: &EvalContext) -> Result<EvalValue, 
     });
     let mut sorted: Vec<EvalValue> = keyed.into_iter().map(|(_, item)| item).collect();
     sorted.extend(absent);
-    Ok(EvalValue::Seq(sorted))
+    Ok(EvalValue::Tuple(Tuple::from_unnamed(sorted)))
 }

@@ -10,7 +10,7 @@
 //! holds it to that ([`Type::holds_text`]). What a type is, and what form its
 //! text takes, is `tomet-type`'s to say.
 
-use tomet_ast::Value;
+use tomet_ast::{Tuple, TupleEntry, Value};
 use tomet_declaration::VarDecl;
 use tomet_type::{Kind, Type, Version};
 
@@ -21,7 +21,7 @@ use crate::value::{DocRef, EvalValue};
 /// that have no value to put in it.
 #[derive(Debug, Clone, PartialEq)]
 pub struct VarScope {
-    /// A [`EvalValue::Map`] from name to value, in the order declared.
+    /// A [`EvalValue::Tuple`] of declared variables.
     pub values: EvalValue,
     /// Declared, no `default`, and none passed.
     pub unset: Vec<String>,
@@ -31,7 +31,7 @@ impl VarScope {
     /// No variables at all.
     pub fn empty() -> VarScope {
         VarScope {
-            values: EvalValue::Map(Vec::new()),
+            values: EvalValue::Tuple(Tuple::new()),
             unset: Vec::new(),
         }
     }
@@ -114,12 +114,14 @@ pub fn var_scope(
             (None, None) => None,
         };
         match value {
-            Some(value) => values.push((name.clone(), value)),
+            Some(value) => values.push(TupleEntry::named(name.clone(), value)),
             None => unset.push(name.clone()),
         }
     }
     Ok(VarScope {
-        values: EvalValue::Map(values),
+        values: EvalValue::Tuple(
+            Tuple::try_from_entries(values).expect("variable names are unique"),
+        ),
         unset,
     })
 }
@@ -223,16 +225,24 @@ pub fn shaped(ty: &Type, value: EvalValue) -> EvalValue {
             Ok(n) if n >= 0 => EvalValue::Int(n),
             _ => EvalValue::Number(text),
         },
-        (Kind::List, EvalValue::Seq(items)) => match ty.item() {
+        (Kind::List, EvalValue::Tuple(tuple)) => match ty.item() {
             Some(item) => {
-                EvalValue::Seq(items.into_iter().map(|value| shaped(item, value)).collect())
+                let mapped = tuple
+                    .unnamed()
+                    .cloned()
+                    .map(|value| TupleEntry::unnamed(shaped(item, value)))
+                    .collect::<Vec<_>>();
+                EvalValue::Tuple(Tuple::try_from_entries(mapped).unwrap())
             }
-            None => EvalValue::Seq(items),
+            None => EvalValue::Tuple(tuple),
         },
-        (Kind::List, single) => EvalValue::Seq(vec![match ty.item() {
-            Some(item) => shaped(item, single),
-            None => single,
-        }]),
+        (Kind::List, single) => {
+            let item_val = match ty.item() {
+                Some(item) => shaped(item, single),
+                None => single,
+            };
+            EvalValue::Tuple(Tuple::from_unnamed(vec![item_val]))
+        }
         (_, value) => value,
     }
 }
@@ -270,12 +280,18 @@ mod tests {
         let scope = var_scope(&decls, &doc(), &[]).unwrap();
         assert_eq!(
             scope.values,
-            EvalValue::Map(vec![("who".into(), EvalValue::String("me".into()))])
+            EvalValue::Tuple(Tuple::from_named([(
+                "who".into(),
+                EvalValue::String("me".into())
+            )]))
         );
         let scope = var_scope(&decls, &doc(), &passed("who", "you")).unwrap();
         assert_eq!(
             scope.values,
-            EvalValue::Map(vec![("who".into(), EvalValue::String("you".into()))])
+            EvalValue::Tuple(Tuple::from_named([(
+                "who".into(),
+                EvalValue::String("you".into())
+            )]))
         );
     }
 
@@ -284,7 +300,7 @@ mod tests {
         let decls = vec![("title".to_string(), decl(None, None))];
         let scope = var_scope(&decls, &doc(), &[]).unwrap();
         assert_eq!(scope.unset, ["title"]);
-        assert_eq!(scope.values, EvalValue::Map(Vec::new()));
+        assert_eq!(scope.values, EvalValue::Tuple(Tuple::new()));
     }
 
     #[test]
@@ -311,7 +327,7 @@ mod tests {
         let scope = var_scope(&decls, &doc(), &passed("n", "3")).unwrap();
         assert_eq!(
             scope.values,
-            EvalValue::Map(vec![("n".into(), EvalValue::Int(3))])
+            EvalValue::Tuple(Tuple::from_named([("n".into(), EvalValue::Int(3))]))
         );
         for (name, text) in [("n", "three"), ("on", "yes"), ("at", "tomorrow")] {
             let err = var_scope(&decls, &doc(), &passed(name, text)).unwrap_err();
@@ -333,7 +349,10 @@ mod tests {
         let scope = var_scope(&decls, &doc(), &[]).unwrap();
         assert_eq!(
             scope.values,
-            EvalValue::Map(vec![("n".into(), EvalValue::String("many".into()))])
+            EvalValue::Tuple(Tuple::from_named([(
+                "n".into(),
+                EvalValue::String("many".into())
+            )]))
         );
     }
 
@@ -352,22 +371,28 @@ mod tests {
         let scope = var_scope(&decls, &doc(), &[]).unwrap();
         assert_eq!(
             scope.values,
-            EvalValue::Map(vec![
+            EvalValue::Tuple(Tuple::from_named([
                 ("rev".into(), EvalValue::String("1.10".into())),
                 ("label".into(), EvalValue::String("2024".into())),
-            ])
+            ]))
         );
         // passed as text, a version is held to its form
         let decls = vec![("rev".to_string(), decl(Some(bare(Kind::Version)), None))];
         let ok = var_scope(&decls, &doc(), &passed("rev", "1.10.0")).unwrap();
         assert_eq!(
             ok.values,
-            EvalValue::Map(vec![("rev".into(), EvalValue::String("1.10.0".into()))])
+            EvalValue::Tuple(Tuple::from_named([(
+                "rev".into(),
+                EvalValue::String("1.10.0".into())
+            )]))
         );
         let ok_beta = var_scope(&decls, &doc(), &passed("rev", "1.0-beta")).unwrap();
         assert_eq!(
             ok_beta.values,
-            EvalValue::Map(vec![("rev".into(), EvalValue::String("1.0-beta".into()))])
+            EvalValue::Tuple(Tuple::from_named([(
+                "rev".into(),
+                EvalValue::String("1.0-beta".into())
+            )]))
         );
         assert!(var_scope(&decls, &doc(), &passed("rev", "1.0.0_beta")).is_err());
     }
@@ -386,12 +411,12 @@ mod tests {
             "`--var day=2026-13-01`: `day` is declared `type: date`, but `2026-13-01` is not a date such as `2026-10-25`"
         );
         let scope = var_scope(&decls, &doc(), &passed("day", "2026-10-25")).unwrap();
-        let EvalValue::Map(entries) = scope.values else {
-            panic!("a map");
+        let EvalValue::Tuple(entries) = scope.values else {
+            panic!("a tuple");
         };
         assert_eq!(
-            entries[0].1,
-            EvalValue::DateTime(parse_datetime("2026-10-25").unwrap())
+            entries.get("day"),
+            Some(&EvalValue::DateTime(parse_datetime("2026-10-25").unwrap()))
         );
         // What is not a date stays as written, for `tomet check` to report.
         assert_eq!(

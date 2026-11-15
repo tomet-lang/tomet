@@ -58,7 +58,7 @@
 
 use std::collections::HashMap;
 
-use tomet_ast::Value;
+use tomet_ast::{BinaryOp, InterpExpr, InterpExprKind, Literal, Tuple, TupleEntry, Value};
 use tomet_declaration::{Arity, Placeholder, is_ident_placeholder, placeholder_of};
 use tomet_tree::fill_interpolations;
 
@@ -92,8 +92,6 @@ pub use types::{evaluate_type, type_names};
 pub use value::{Closure, DirRef, DocRef, Env, EvalValue, Namespace, Part, scalar_text};
 pub use vars::{VarError, VarScope, shaped, typed_value, var_scope};
 
-use tomet_ast::{BinaryOp, InterpExpr, InterpExprKind, Literal};
-
 use args::Args;
 use ops::{arithmetic, compare, values_equal};
 
@@ -110,9 +108,8 @@ pub fn evaluate(expr: &InterpExpr, cx: &EvalContext) -> Result<EvalValue, EvalEr
 fn refers_to_vault(value: &EvalValue) -> bool {
     match value {
         EvalValue::Document(_) | EvalValue::Directory(_) | EvalValue::Part { .. } => true,
-        EvalValue::Seq(items) => items.iter().any(refers_to_vault),
-        EvalValue::Map(entries) => entries.iter().any(|(_, v)| refers_to_vault(v)),
-        EvalValue::Call(_, args) => args.iter().any(refers_to_vault),
+        EvalValue::Tuple(tuple) => tuple.values().any(refers_to_vault),
+        EvalValue::Call(_, args) => args.values().any(refers_to_vault),
         _ => false,
     }
 }
@@ -160,11 +157,20 @@ fn eval(expr: &InterpExpr, cx: &EvalContext, env: &Env) -> Result<EvalValue, Eva
         }),
         InterpExprKind::Group(inner) => eval(inner, cx, env),
         InterpExprKind::Seq(items) => {
-            let mut values = Vec::with_capacity(items.len());
+            let mut entries = Vec::with_capacity(items.len());
             for item in items {
-                values.push(eval(item, cx, env)?);
+                match &item.kind {
+                    InterpExprKind::NamedArg { name, value } => {
+                        entries.push(TupleEntry::named(name.clone(), eval(value, cx, env)?));
+                    }
+                    _ => {
+                        entries.push(TupleEntry::unnamed(eval(item, cx, env)?));
+                    }
+                }
             }
-            Ok(EvalValue::Seq(values))
+            Tuple::try_from_entries(entries)
+                .map(EvalValue::Tuple)
+                .map_err(|e| EvalError::message(format!("duplicate key `{}` in tuple", e.key)))
         }
         InterpExprKind::Identifier(name) => name_value(name, cx, env),
         InterpExprKind::Lambda { params, body } => {
@@ -250,14 +256,29 @@ fn member_value(value: EvalValue, member: &str) -> Result<EvalValue, EvalError> 
         EvalValue::Part { doc, part } => parts::part_member(doc, part, member),
         EvalValue::Directory(dir) => parts::directory_member(dir, member),
         EvalValue::DateTime(value) => datetime::member(value, member),
-        EvalValue::Map(entries) => entries
-            .iter()
-            .find(|(k, _)| k == member)
-            .map(|(_, v)| v.clone())
-            .ok_or_else(|| EvalError::UnknownMember {
-                on: "map",
-                member: member.to_string(),
-            }),
+        EvalValue::Tuple(tuple) => {
+            tuple
+                .get(member)
+                .cloned()
+                .ok_or_else(|| EvalError::UnknownMember {
+                    on: "tuple",
+                    member: member.to_string(),
+                })
+        }
+        EvalValue::String(_)
+        | EvalValue::Int(_)
+        | EvalValue::Float(_)
+        | EvalValue::Number(_)
+        | EvalValue::Bool(_) => {
+            if member == "0" {
+                Ok(value)
+            } else {
+                Err(EvalError::UnknownMember {
+                    on: value.type_name(),
+                    member: member.to_string(),
+                })
+            }
+        }
         EvalValue::Namespace(Namespace::Macro) => Err(EvalError::message(format!(
             "the macro `{member}` has to be called: `macro.{member}(...)`"
         ))),

@@ -125,6 +125,31 @@ fn parses_dotted_member_interpolation() {
 }
 
 #[test]
+fn parses_dotted_positional_members_as_separate_steps() {
+    let doc = parse_file("$(use.0.0)\n").unwrap();
+    assert_eq!(
+        describe(interp_expr(&doc.body[0])),
+        "Member(Member(Identifier(use), 0), 0)"
+    );
+
+    let doc2 = parse_file("$(x.1.0)\n").unwrap();
+    assert_eq!(
+        describe(interp_expr(&doc2.body[0])),
+        "Member(Member(Identifier(x), 1), 0)"
+    );
+
+    // Float literals in value position are still parsed as floats
+    let doc3 = parse_file("{$ 1.5 }\n").unwrap();
+    assert_eq!(describe(interp_expr(&doc3.body[0])), "Float(1.5)");
+
+    let doc4 = parse_file("{$ x == 0.0 }\n").unwrap();
+    assert_eq!(
+        describe(interp_expr(&doc4.body[0])),
+        "(Identifier(x) == Float(0))"
+    );
+}
+
+#[test]
 fn parses_call_interpolation_with_nested_call() {
     let doc = parse_file("$sum(a, mul(b, c))\n").unwrap();
     assert_eq!(

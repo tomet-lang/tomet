@@ -33,19 +33,19 @@ pub(crate) fn values_equal(a: &EvalValue, b: &EvalValue) -> bool {
         (V::Null, V::Null) => true,
         (V::Bool(x), V::Bool(y)) => x == y,
         (V::String(x), V::String(y)) => x == y,
-        (V::Seq(x), V::Seq(y)) => {
-            x.len() == y.len() && x.iter().zip(y).all(|(l, r)| values_equal(l, r))
-        }
-        (V::Map(x), V::Map(y)) => {
+        (V::Tuple(x), V::Tuple(y)) => {
             x.len() == y.len()
-                && x.iter().all(|(key, l)| {
-                    y.iter()
-                        .find(|(k, _)| k == key)
-                        .is_some_and(|(_, r)| values_equal(l, r))
-                })
+                && x.entries()
+                    .zip(y.entries())
+                    .all(|(l, r)| l.name() == r.name() && values_equal(l.value(), r.value()))
         }
         (V::Call(n1, a1), V::Call(n2, a2)) => {
-            n1 == n2 && a1.len() == a2.len() && a1.iter().zip(a2).all(|(l, r)| values_equal(l, r))
+            n1 == n2
+                && a1.len() == a2.len()
+                && a1
+                    .entries()
+                    .zip(a2.entries())
+                    .all(|(l, r)| l.name() == r.name() && values_equal(l.value(), r.value()))
         }
         (V::DateTime(x), V::DateTime(y)) => x == y,
         (V::Version(x), V::Version(y)) => x == y,

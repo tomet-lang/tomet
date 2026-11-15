@@ -1,4 +1,5 @@
 use tomet_ast::{Data, Declaration, ElementView, Name, Tuple, Value};
+use tomet_semantics_core::{Slots, TupleView};
 use tomet_tree::ValueExt;
 
 use crate::vocabulary::{Bindings, ElementDecl};
@@ -51,11 +52,9 @@ pub fn builtin_positional_arg_keys(name: &Name) -> &'static [&'static str] {
 /// than a lookup table.
 pub const LIST_MARKER_POSITIONAL_KEY: &str = "marker";
 
-/// Normalizes a list item's `(...)` marker [`Tuple`] the same way
-/// [`normalized_element_args`] normalizes an element's `args`: names the
-/// positional marker entry after [`LIST_MARKER_POSITIONAL_KEY`].
-pub fn normalized_list_marker(marker: &Tuple) -> Tuple {
-    tomet_semantics_core::bind_positional(marker, &[LIST_MARKER_POSITIONAL_KEY])
+/// Views a list item's `(...)` marker [`Tuple`] through [`LIST_MARKER_POSITIONAL_KEY`].
+pub fn list_marker_view(marker: &Tuple) -> TupleView<'_, 'static> {
+    TupleView::new(marker, &[LIST_MARKER_POSITIONAL_KEY])
 }
 
 /// The per-scheme argument keys (`url`/`file`/`tm`/`id`/`ref`), which
@@ -85,109 +84,89 @@ fn is_recoverable_target_scheme(key: &str) -> bool {
 /// `target: "scheme:value"`, leaving every other entry -- genuine extra
 /// data alongside the target, e.g. `@link(tm:foo, predicate: depends_on)`
 /// -- untouched.
-fn recover_target_scheme_entry(first_positional_key: Option<&str>, mut tuple: Tuple) -> Tuple {
+fn recover_target_scheme_entry(first_positional_key: Option<&str>, tuple: &Tuple) -> Option<Tuple> {
     if first_positional_key != Some("target") || tuple.contains_key("target") {
-        return tuple;
+        return None;
     }
     let candidates: Vec<&str> = tuple
         .named()
         .filter_map(|(name, _)| is_recoverable_target_scheme(name).then_some(name))
         .collect();
     let [scheme] = candidates[..] else {
-        return tuple;
+        return None;
     };
     let scheme = scheme.to_string();
-    // No entry has the key `target` (checked above), so the renaming repeats none.
+    let mut tuple = tuple.clone();
     if let Some(value) = tuple.get_mut(&scheme) {
         *value = Value::String(format!("{scheme}:{}", value.plain_text()));
     }
     let _ = tuple.rename(&scheme, "target");
-    tuple
+    Some(tuple)
 }
 
-/// The ordered positional-key list for `name`, owned.
-///
-/// Two sources, and `std` is asked first: its table is hard-coded and a
-/// vocabulary may not shadow a builtin name, so the order cannot matter --
-/// it is written this way round so the code says which one wins.
-///
-/// A vocabulary's half is the `@param`s marked `positional: true`, in
-/// declaration order. There is no separate `positional: [ ... ]` list
-/// because that would state an order the declarations already carry; an
-/// `::settings` key spelled exactly that way was deleted for being the
-/// duplicate `explicit-form-first` names outright.
-fn positional_keys(name: Option<&Name>, bindings: &Bindings) -> Vec<String> {
+/// The ordered positional-key slots for `name`.
+fn positional_slots(name: Option<&Name>, bindings: &Bindings) -> Slots<'static> {
     let Some(name) = name else {
-        return Vec::new();
+        return Slots::Borrowed(&[]);
     };
     let builtin = builtin_positional_arg_keys(name);
     if !builtin.is_empty() {
-        return builtin.iter().map(|s| s.to_string()).collect();
+        return Slots::Borrowed(builtin);
     }
-    bindings
+    let keys = bindings
         .declaration(name)
         .map(ElementDecl::positional_keys)
-        .unwrap_or_default()
+        .unwrap_or_default();
+    Slots::Owned(keys)
 }
 
-/// Returns the normalized `args` tuple for an [`Element`]. One unified
-/// pipeline for every shape `args` can take:
-/// - recover a scheme-collision `target` entry if this
-///   element's first slot is `"target"` (see
-///   [`recover_target_scheme_entry`]), then fill any still-unfilled slots
-///   from unnamed entries.
-///
-/// An element with no positional slots defined at all (empty list) is
-/// returned untouched in every case.
-///
-/// Knows only `std`. A caller holding the document's [`Bindings`] should
-/// use [`normalized_element_args_in`], which also reads what a vocabulary
-/// declares -- the same split as `validate_document` and
-/// `validate_document_with`, and for the same reason: most callers here
-/// (HTML, Typst, `::meta` reading) have no vault to resolve against.
-///
-/// This is deliberately *not* a `_with_schema` twin: one taking a
-/// `SettingsSchema` no caller builds would have a second source dead on
-/// arrival; this one exists because the validator passes real bindings
-/// through it.
-pub fn normalized_element_args(el: ElementView<'_>) -> Option<Tuple> {
-    normalized_element_args_in(el, &Bindings::default())
+/// Returns the arguments view for an [`Element`]. Knows only `std`.
+pub fn element_args_view(el: ElementView<'_>) -> Option<TupleView<'_, 'static>> {
+    element_args_view_in(el, &Bindings::default())
 }
 
-/// [`normalized_element_args`], plus the positional slots a vocabulary in
+/// [`element_args_view`], plus the positional slots a vocabulary in
 /// scope declares with `@param(name){ positional: true }`.
-pub fn normalized_element_args_in(el: ElementView<'_>, bindings: &Bindings) -> Option<Tuple> {
-    normalized_args_in(Some(el.name), el.data, bindings)
-}
-
-/// [`normalized_element_args`] for a declaration: `::kind(config, 2)` is
-/// `kind: config, version: 2`.
-pub fn normalized_declaration_args(declaration: &Declaration) -> Option<Tuple> {
-    normalized_declaration_args_in(declaration, &Bindings::default())
-}
-
-/// [`normalized_declaration_args`], plus the positional slots a vocabulary in
-/// scope declares.
-pub fn normalized_declaration_args_in(
-    declaration: &Declaration,
+pub fn element_args_view_in<'a>(
+    el: ElementView<'a>,
     bindings: &Bindings,
-) -> Option<Tuple> {
-    normalized_args_in(Some(&declaration.name), &declaration.data, bindings)
+) -> Option<TupleView<'a, 'static>> {
+    args_view_in(Some(el.name), el.data, bindings)
 }
 
-/// The one pipeline both read their `args` through: bind the positional
-/// ones to the slots the name has.
-fn normalized_args_in(name: Option<&Name>, data: &Data, bindings: &Bindings) -> Option<Tuple> {
+/// Arguments view for a declaration: `::kind(config, 2)` views `kind` and `version`.
+pub fn declaration_args_view(declaration: &Declaration) -> Option<TupleView<'_, 'static>> {
+    declaration_args_view_in(declaration, &Bindings::default())
+}
+
+/// [`declaration_args_view`], plus the positional slots a vocabulary in scope declares.
+pub fn declaration_args_view_in<'a>(
+    declaration: &'a Declaration,
+    bindings: &Bindings,
+) -> Option<TupleView<'a, 'static>> {
+    args_view_in(Some(&declaration.name), &declaration.data, bindings)
+}
+
+/// Views `args` through the signature slots that `name` has.
+fn args_view_in<'a>(
+    name: Option<&Name>,
+    data: &'a Data,
+    bindings: &Bindings,
+) -> Option<TupleView<'a, 'static>> {
     let args = data.args.as_ref()?;
-    let keys = positional_keys(name, bindings);
-    // `@link(tmt:foo)`: the reader split a `scheme:value` into a key and a value; put it back.
-    let args = if !keys.is_empty() {
-        recover_target_scheme_entry(keys.first().map(String::as_str), args.clone())
+    let slots = positional_slots(name, bindings);
+    let first_key = slots.get(0);
+    let recovered = if !slots.is_empty() {
+        recover_target_scheme_entry(first_key, args)
     } else {
-        args.clone()
+        None
     };
-    let slots: Vec<&str> = keys.iter().map(String::as_str).collect();
-    Some(tomet_semantics_core::bind_positional(&args, &slots))
+    Some(match (recovered, slots) {
+        (Some(owned), Slots::Borrowed(b)) => TupleView::from_owned(owned, b),
+        (Some(owned), Slots::Owned(o)) => TupleView::from_owned_with_owned_slots(owned, o),
+        (None, Slots::Borrowed(b)) => TupleView::new(args, b),
+        (None, Slots::Owned(o)) => TupleView::with_owned_slots(args, o),
+    })
 }
 
 #[cfg(test)]
@@ -200,13 +179,11 @@ mod tests {
     fn normalizes_raw_positional_arg() {
         let mut el = element_new(Name::bare("raw"));
         el.data.args = Some(Tuple::from_unnamed([Value::String("rust".to_string())]));
-        assert_eq!(
-            normalized_element_args(el.as_view()),
-            Some(Tuple::from_named([(
-                "lang".to_string(),
-                Value::String("rust".to_string()),
-            )]))
-        );
+        let view = element_args_view(el.as_view()).unwrap();
+        assert_eq!(view.get("lang"), Some(&Value::String("rust".to_string())));
+        assert_eq!(view.get("0"), Some(&Value::String("rust".to_string())));
+        assert_eq!(view.entry_alias(0), Some("lang"));
+        assert_eq!(view.tuple(), el.data.args.as_ref().unwrap());
     }
 
     #[test]
@@ -214,13 +191,12 @@ mod tests {
         // `@conflict(1, 2)` -- two bare entries, no keys
         let mut el = element_new(Name::bare("conflict"));
         el.data.args = Some(Tuple::from_unnamed([Value::Int(1), Value::Int(2)]));
-        assert_eq!(
-            normalized_element_args(el.as_view()),
-            Some(Tuple::from_named([
-                ("a".to_string(), Value::Int(1)),
-                ("b".to_string(), Value::Int(2)),
-            ]))
-        );
+        let view = element_args_view(el.as_view()).unwrap();
+        assert_eq!(view.get("a"), Some(&Value::Int(1)));
+        assert_eq!(view.get("0"), Some(&Value::Int(1)));
+        assert_eq!(view.get("b"), Some(&Value::Int(2)));
+        assert_eq!(view.get("1"), Some(&Value::Int(2)));
+        assert_eq!(view.tuple(), el.data.args.as_ref().unwrap());
     }
 
     #[test]
@@ -232,25 +208,25 @@ mod tests {
                 Value::String("deck".to_string()),
                 Value::Int(2),
             ]));
+            let view = element_args_view(el.as_view()).unwrap();
             assert_eq!(
-                normalized_element_args(el.as_view()),
-                Some(Tuple::from_named([
-                    (name_key.to_string(), Value::String("deck".to_string())),
-                    ("version".to_string(), Value::Int(2)),
-                ])),
+                view.get(name_key),
+                Some(&Value::String("deck".to_string())),
                 "@{sigil}(deck, 2)"
             );
+            assert_eq!(view.get("version"), Some(&Value::Int(2)));
+            assert_eq!(view.tuple(), el.data.args.as_ref().unwrap());
 
             // the version may be left out
             el.data.args = Some(Tuple::from_unnamed([Value::String("deck".to_string())]));
+            let view = element_args_view(el.as_view()).unwrap();
             assert_eq!(
-                normalized_element_args(el.as_view()),
-                Some(Tuple::from_named([(
-                    name_key.to_string(),
-                    Value::String("deck".to_string()),
-                )])),
+                view.get(name_key),
+                Some(&Value::String("deck".to_string())),
                 "@{sigil}(deck)"
             );
+            assert_eq!(view.get("version"), None);
+            assert_eq!(view.tuple(), el.data.args.as_ref().unwrap());
         }
     }
 
@@ -258,13 +234,12 @@ mod tests {
     fn normalizes_embed_positional_arg() {
         let mut el = element_new(Name::bare("embed"));
         el.data.args = Some(Tuple::from_unnamed([Value::String("foo.png".to_string())]));
+        let view = element_args_view(el.as_view()).unwrap();
         assert_eq!(
-            normalized_element_args(el.as_view()),
-            Some(Tuple::from_named([(
-                "target".to_string(),
-                Value::String("foo.png".to_string()),
-            )]))
+            view.get("target"),
+            Some(&Value::String("foo.png".to_string()))
         );
+        assert_eq!(view.tuple(), el.data.args.as_ref().unwrap());
     }
 
     #[test]
@@ -273,13 +248,16 @@ mod tests {
         el.data.args = Some(Tuple::from_unnamed([Value::String(
             "https://example.com".to_string(),
         )]));
+        let view = element_args_view(el.as_view()).unwrap();
         assert_eq!(
-            normalized_element_args(el.as_view()),
-            Some(Tuple::from_named([(
-                "target".to_string(),
-                Value::String("https://example.com".to_string()),
-            )]))
+            view.get("target"),
+            Some(&Value::String("https://example.com".to_string()))
         );
+        assert_eq!(
+            view.get("0"),
+            Some(&Value::String("https://example.com".to_string()))
+        );
+        assert_eq!(view.tuple(), el.data.args.as_ref().unwrap());
     }
 
     #[test]
@@ -292,17 +270,14 @@ mod tests {
         ] {
             let doc = tomet_ast_parser::parse_file(&format!("a @term({written}) b\n"))
                 .expect("a mention parses");
-            let mut found = None;
+            let mut target = None;
             tomet_tree::for_each_element(&doc, |el| {
                 if el.name.name == "term" {
-                    found = normalized_element_args(el.as_view());
+                    target = element_args_view(el.as_view())
+                        .and_then(|args| args.get("target").cloned())
+                        .and_then(|v| v.as_str().map(str::to_string));
                 }
             });
-            let target = found
-                .as_ref()
-                .and_then(|args| args.get("target"))
-                .and_then(|v| v.as_str())
-                .map(str::to_string);
             let expected = written.trim_matches('"').to_string();
             assert_eq!(target, Some(expected), "{written}");
         }
@@ -319,12 +294,10 @@ mod tests {
             "tmt".to_string(),
             Value::String("foo/bar".to_string()),
         )]));
+        let view = element_args_view(el.as_view()).unwrap();
         assert_eq!(
-            normalized_element_args(el.as_view()),
-            Some(Tuple::from_named([(
-                "target".to_string(),
-                Value::String("tmt:foo/bar".to_string()),
-            )]))
+            view.get("target"),
+            Some(&Value::String("tmt:foo/bar".to_string()))
         );
     }
 
@@ -341,15 +314,14 @@ mod tests {
                 Value::String("depends_on".to_string()),
             ),
         ]));
+        let view = element_args_view(el.as_view()).unwrap();
         assert_eq!(
-            normalized_element_args(el.as_view()),
-            Some(Tuple::from_named([
-                ("target".to_string(), Value::String("tmt:foo".to_string())),
-                (
-                    "predicate".to_string(),
-                    Value::String("depends_on".to_string()),
-                ),
-            ]))
+            view.get("target"),
+            Some(&Value::String("tmt:foo".to_string()))
+        );
+        assert_eq!(
+            view.get("predicate"),
+            Some(&Value::String("depends_on".to_string()))
         );
     }
 
@@ -360,13 +332,12 @@ mod tests {
             ("target".to_string(), Value::String("tmt:foo".to_string())),
             ("tmt".to_string(), Value::String("bar".to_string())),
         ]));
+        let view = element_args_view(el.as_view()).unwrap();
         assert_eq!(
-            normalized_element_args(el.as_view()),
-            Some(Tuple::from_named([
-                ("target".to_string(), Value::String("tmt:foo".to_string())),
-                ("tmt".to_string(), Value::String("bar".to_string())),
-            ]))
+            view.get("target"),
+            Some(&Value::String("tmt:foo".to_string()))
         );
+        assert_eq!(view.get("tmt"), Some(&Value::String("bar".to_string())));
     }
 
     #[test]
@@ -376,32 +347,22 @@ mod tests {
             ("tmt".to_string(), Value::String("foo".to_string())),
             ("id".to_string(), Value::String("bar".to_string())),
         ]));
-        assert_eq!(
-            normalized_element_args(el.as_view()),
-            Some(Tuple::from_named([
-                ("tmt".to_string(), Value::String("foo".to_string())),
-                ("id".to_string(), Value::String("bar".to_string())),
-            ]))
-        );
+        let view = element_args_view(el.as_view()).unwrap();
+        assert_eq!(view.get("target"), None);
+        assert_eq!(view.get("tmt"), Some(&Value::String("foo".to_string())));
+        assert_eq!(view.get("id"), Some(&Value::String("bar".to_string())));
     }
 
     #[test]
     fn does_not_recover_for_non_link_embed_elements() {
-        // An arbitrary custom element's own `tmt`-named field is left
-        // alone -- recovery is scoped to elements whose positional key
-        // is `target` (`@link`/`@embed`), not a general mechanism.
         let mut el = element_new(Name::bare("caution"));
         el.data.args = Some(Tuple::from_named([(
             "tmt".to_string(),
             Value::String("foo".to_string()),
         )]));
-        assert_eq!(
-            normalized_element_args(el.as_view()),
-            Some(Tuple::from_named([(
-                "tmt".to_string(),
-                Value::String("foo".to_string()),
-            )]))
-        );
+        let view = element_args_view(el.as_view()).unwrap();
+        assert_eq!(view.get("target"), None);
+        assert_eq!(view.get("tmt"), Some(&Value::String("foo".to_string())));
     }
 
     #[test]
@@ -411,14 +372,14 @@ mod tests {
             Value::String("Clean room".to_string()),
             Value::String("high".to_string()),
         ]));
-
+        let view = element_args_view(el.as_view()).unwrap();
         assert_eq!(
-            normalized_element_args(el.as_view()),
-            Some(Tuple::from_unnamed([
-                Value::String("Clean room".to_string()),
-                Value::String("high".to_string()),
-            ]))
+            view.get("0"),
+            Some(&Value::String("Clean room".to_string()))
         );
+        assert_eq!(view.get("1"), Some(&Value::String("high".to_string())));
+        assert_eq!(view.entry_alias(0), None);
+        assert_eq!(view.entry_alias(1), None);
     }
 
     #[test]
@@ -427,15 +388,21 @@ mod tests {
         let tuple_val =
             Tuple::from_named([("lang".to_string(), Value::String("rust".to_string()))]);
         el.data.args = Some(tuple_val.clone());
-        assert_eq!(normalized_element_args(el.as_view()), Some(tuple_val));
+        let view = element_args_view(el.as_view()).unwrap();
+        assert_eq!(view.get("lang"), Some(&Value::String("rust".to_string())));
+        assert_eq!(view.tuple(), &tuple_val);
     }
 
     #[test]
     fn normalizes_bare_scalar_list_marker_under_marker_key() {
+        let marker = Tuple::from_unnamed([Value::String("12:01".to_string())]);
+        let view = list_marker_view(&marker);
         assert_eq!(
-            normalized_list_marker(&Tuple::from_unnamed([Value::String("12:01".to_string())])),
-            Tuple::from_named([("marker".to_string(), Value::String("12:01".to_string()),)])
+            view.get("marker"),
+            Some(&Value::String("12:01".to_string()))
         );
+        assert_eq!(view.get("0"), Some(&Value::String("12:01".to_string())));
+        assert_eq!(view.tuple(), &marker);
     }
 
     #[test]
@@ -444,52 +411,108 @@ mod tests {
             ("color".to_string(), Value::String("red".to_string())),
             ("priority".to_string(), Value::String("high".to_string())),
         ]);
-        assert_eq!(normalized_list_marker(&tuple_val), tuple_val);
+        let view = list_marker_view(&tuple_val);
+        assert_eq!(view.get("color"), Some(&Value::String("red".to_string())));
+        assert_eq!(
+            view.get("priority"),
+            Some(&Value::String("high".to_string()))
+        );
+        assert_eq!(view.tuple(), &tuple_val);
     }
 
     #[test]
     fn an_element_with_no_positional_key_leaves_a_bare_scalar_alone() {
-        // `deck.card` is namespaced, so it has no builtin positional key
-        // and nothing to normalize the scalar into.
         let mut el = element_new(Name::namespaced("deck", "card"));
         el.data.args = Some(Tuple::from_unnamed([Value::String(
             "https://example.com".to_string(),
         )]));
+        let view = element_args_view(el.as_view()).unwrap();
         assert_eq!(
-            normalized_element_args(el.as_view()),
-            Some(Tuple::from_unnamed([Value::String(
-                "https://example.com".to_string(),
-            )]))
+            view.get("0"),
+            Some(&Value::String("https://example.com".to_string()))
         );
-    }
-
-    #[test]
-    fn a_custom_elements_bracketed_positional_list_is_left_alone() {
-        let mut el = element_new(Name::namespaced("deck", "job"));
-        el.data.args = Some(Tuple::from_unnamed([
-            Value::String("Clean room".to_string()),
-            Value::String("high".to_string()),
-        ]));
-
-        assert_eq!(
-            normalized_element_args(el.as_view()),
-            Some(Tuple::from_unnamed([
-                Value::String("Clean room".to_string()),
-                Value::String("high".to_string()),
-            ]))
-        );
+        assert_eq!(view.entry_alias(0), None);
+        assert_eq!(view.tuple(), el.data.args.as_ref().unwrap());
     }
 
     #[test]
     fn normalizes_task_status_positional_arg() {
         let mut el = element_new(Name::bare("task"));
         el.data.args = Some(Tuple::from_unnamed([Value::String("x".to_string())]));
+        let view = element_args_view(el.as_view()).unwrap();
+        assert_eq!(view.get("status"), Some(&Value::String("x".to_string())));
+        assert_eq!(view.get("0"), Some(&Value::String("x".to_string())));
+        assert_eq!(view.tuple(), el.data.args.as_ref().unwrap());
+    }
+
+    #[test]
+    fn signature_alias_and_position_with_and_without_vocabulary_and_invariance() {
+        use crate::Vocabulary;
+        let vocab_src = r#"::vocabulary.deck()
+::element(
+  card: {
+    args: {
+      target: { positional: true }
+    }
+  }
+)
+"#;
+        let vocab_doc = tomet_ast_parser::parse_file(vocab_src).expect("valid vocabulary");
+        let vocab = Vocabulary::from_file(&vocab_doc).expect("parsed vocabulary");
+        let mut bindings = Bindings::default();
+        bindings.used.insert("deck".to_string(), vocab);
+
+        let mut el = element_new(Name::namespaced("deck", "card"));
+        el.data.args = Some(Tuple::from_unnamed([Value::String(
+            "https://example.com".to_string(),
+        )]));
+
+        // 1. Without vocabulary: position 0 is accessible, alias "target" is None
+        let view_without = element_args_view_in(el.as_view(), &Bindings::default()).unwrap();
         assert_eq!(
-            normalized_element_args(el.as_view()),
-            Some(Tuple::from_named([(
-                "status".to_string(),
-                Value::String("x".to_string()),
-            )]))
+            view_without.get("0"),
+            Some(&Value::String("https://example.com".to_string()))
         );
+        assert_eq!(view_without.get("target"), None);
+        assert_eq!(view_without.entry_alias(0), None);
+
+        // 2. With vocabulary: position 0 and alias "target" give the EXACT SAME value
+        let view_with = element_args_view_in(el.as_view(), &bindings).unwrap();
+        assert_eq!(
+            view_with.get("0"),
+            Some(&Value::String("https://example.com".to_string()))
+        );
+        assert_eq!(
+            view_with.get("target"),
+            Some(&Value::String("https://example.com".to_string()))
+        );
+        assert_eq!(view_with.get("0"), view_with.get("target"));
+        assert_eq!(view_with.entry_alias(0), Some("target"));
+
+        // 3. Invariance: an alias NEVER shows up in the tuple's printed text, JSON or equality
+        assert_eq!(view_with.tuple(), el.data.args.as_ref().unwrap());
+        let json = serde_json::to_string(view_with.tuple()).unwrap();
+        assert_eq!(json, r#"["https://example.com"]"#);
+        assert!(!json.contains("target"));
+
+        // 4. The slot an entry already has by NAME is skipped
+        let mut el_named = element_new(Name::namespaced("deck", "card"));
+        el_named.data.args = Some(
+            Tuple::try_from_entries([
+                tomet_ast::TupleEntry::named("target", Value::String("named_url".to_string())),
+                tomet_ast::TupleEntry::unnamed(Value::String("positional_url".to_string())),
+            ])
+            .unwrap(),
+        );
+        let view_skipped = element_args_view_in(el_named.as_view(), &bindings).unwrap();
+        assert_eq!(
+            view_skipped.get("target"),
+            Some(&Value::String("named_url".to_string()))
+        );
+        assert_eq!(
+            view_skipped.get("0"),
+            Some(&Value::String("positional_url".to_string()))
+        );
+        assert_eq!(view_skipped.entry_alias(0), None);
     }
 }

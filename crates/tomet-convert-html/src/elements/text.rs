@@ -8,7 +8,7 @@ use crate::util::{
     value_to_plain,
 };
 use tomet_ast::{ElementView, Value};
-use tomet_semantics::normalized_element_args;
+use tomet_semantics::element_args_view;
 
 /// A bare `---` break is a plain `<hr>`; a titled one (`---[ Title ]---`,
 /// the break's `content`) wraps two `<hr>`s
@@ -45,7 +45,7 @@ pub(crate) fn render_wrapped_inline(
 /// `rt` is meaningful content (the reading), not decoration, so it has to
 /// reach the output as text a reader/screen-reader sees.
 pub(crate) fn render_ruby_element(cx: &RenderCtx, el: ElementView<'_>, out: &mut String) {
-    let args = normalized_element_args(el);
+    let args = element_args_view(el);
     let rt = args
         .as_ref()
         .and_then(|a| a.get("rt"))
@@ -68,7 +68,7 @@ pub(crate) fn render_ruby_element(cx: &RenderCtx, el: ElementView<'_>, out: &mut
 /// it renders `<pre><code>...</code></pre>`. Inside running text (`inline == true`),
 /// it renders `<code class="...">...</code>`.
 pub(crate) fn render_raw_element(el: ElementView<'_>, out: &mut String, inline: bool) {
-    let args = normalized_element_args(el);
+    let args = element_args_view(el);
     let lang = args
         .as_ref()
         .and_then(|a| a.get("lang"))

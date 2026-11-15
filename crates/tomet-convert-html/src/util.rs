@@ -160,8 +160,10 @@ pub(crate) fn push_data_attrs(out: &mut String, args: Option<&Tuple>, skip: &[&s
         }
         push_data_attr(out, k, v);
     }
-    if let Some(text) = data.positional.as_ref().filter(|t| !t.is_empty()) {
-        out.push_str(&format!(" data-value=\"{}\"", escape_attr(text)));
+    if !skip.contains(&"target") {
+        if let Some(text) = data.positional.as_ref().filter(|t| !t.is_empty()) {
+            out.push_str(&format!(" data-value=\"{}\"", escape_attr(text)));
+        }
     }
 
     if let Some(exact) = data.exact {

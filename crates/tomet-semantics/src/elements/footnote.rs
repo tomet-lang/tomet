@@ -1,7 +1,7 @@
 //! Footnote collection, sequential numbering, and cross-reference resolution.
 
 use crate::kind::{ElementKind, classify_std_lenient};
-use crate::positional::normalized_element_args;
+use crate::positional::element_args_view;
 use std::collections::HashMap;
 use tomet_ast::{Element, ElementView, File, Placement};
 use tomet_span::Span;
@@ -165,11 +165,8 @@ impl FootnoteRegistry {
 }
 
 fn get_element_id(el: ElementView<'_>) -> Option<String> {
-    let args = normalized_element_args(el)?;
-    if let Some(id) = args.get("id") {
-        return value_to_id(id);
-    }
-    args.nth_unnamed(0).and_then(value_to_id)
+    let args = element_args_view(el)?;
+    args.get("id").and_then(value_to_id)
 }
 
 fn value_to_id(val: &tomet_ast::Value) -> Option<String> {

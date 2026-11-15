@@ -88,17 +88,10 @@ pub fn extract_blueprint_schema(blueprint: &File) -> Option<BlueprintSchema> {
                 }
             }
             ElementKind::Declaration(DeclKind::Id) => {
-                let norm_args = tomet_semantics::normalized_declaration_args(declaration);
+                let norm_args = tomet_semantics::declaration_args_view(declaration);
                 let seat = norm_args
                     .as_ref()
                     .and_then(|args| args.get("id"))
-                    .or_else(|| {
-                        declaration
-                            .data
-                            .args
-                            .as_ref()
-                            .and_then(|args| args.nth_unnamed(0))
-                    })
                     .and_then(find_type_seat);
                 let expected_type = seat.and_then(evaluate_type_seat);
                 required_meta_keys.push(RequiredMetaKey {
@@ -187,18 +180,8 @@ pub fn validate_against_schema(
     for declaration in &doc.header {
         match classify_declaration_lenient(declaration) {
             ElementKind::Declaration(DeclKind::Id) => {
-                let norm_args = tomet_semantics::normalized_declaration_args(declaration);
-                let val = norm_args
-                    .as_ref()
-                    .and_then(|args| args.get("id"))
-                    .or_else(|| {
-                        declaration
-                            .data
-                            .args
-                            .as_ref()
-                            .and_then(|args| args.nth_unnamed(0))
-                    })
-                    .cloned();
+                let norm_args = tomet_semantics::declaration_args_view(declaration);
+                let val = norm_args.as_ref().and_then(|args| args.get("id")).cloned();
                 doc_fields.insert("id".to_string(), (val, declaration.span));
             }
             ElementKind::Declaration(DeclKind::Meta) => {

@@ -5,9 +5,8 @@ use tomet_ast::{
     Interpolation, List, Placement, Value,
 };
 use tomet_semantics::{
-    ElementKind, TableRow, classify_std_lenient, comment_text, flatten_data, flatten_element_data,
-    heading_level, is_directive, link_target, normalized_element_args, parse_table_rows,
-    path_target,
+    ElementKind, TableRow, classify_std_lenient, comment_text, element_args_view, flatten_data,
+    flatten_element_data, heading_level, is_directive, link_target, parse_table_rows, path_target,
 };
 
 use crate::ast::{
@@ -289,7 +288,7 @@ fn html_comment(el: ElementView<'_>) -> String {
 /// (`Value::Blocks`), not a scalar, so it cannot go through
 /// `flatten_element_data`/`generic_attr` at all.
 fn conflict_sides(el: ElementView<'_>) -> (Vec<TmBlock>, Vec<TmBlock>) {
-    let Some(args) = normalized_element_args(el) else {
+    let Some(args) = element_args_view(el) else {
         return (Vec::new(), Vec::new());
     };
     let side = |key: &str| -> Vec<TmBlock> {
@@ -756,7 +755,7 @@ fn table_to_pandoc(el: ElementView<'_>) -> Vec<Block> {
 /// Reads one of `@table`'s own arguments, after positional
 /// normalization so `@table(center)` and `@table(align: center)` agree.
 fn table_arg(el: ElementView<'_>, key: &str) -> Option<Value> {
-    let args = normalized_element_args(el)?;
+    let args = element_args_view(el)?;
     args.get(key).cloned()
 }
 

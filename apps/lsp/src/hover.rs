@@ -4,8 +4,8 @@ use lsp_types::{Hover, HoverContents, MarkupContent, MarkupKind, Position, Range
 use tomet_ast::{Declaration, Element, File, InterpExpr, Tuple, Value};
 use tomet_expr::{DocRef, EvalContext, EvalValue, MemoryResolver, evaluate};
 use tomet_semantics::{
-    ElementKind, classify_declaration_lenient, classify_std_lenient, heading_level,
-    normalized_declaration_args, normalized_element_args,
+    ElementKind, TupleView, classify_declaration_lenient, classify_std_lenient,
+    declaration_args_view, element_args_view, heading_level,
 };
 use tomet_span::Span;
 use tomet_tree::{
@@ -89,8 +89,11 @@ pub fn hover_in(text: &str, pos: Position, evaluate: Evaluate<'_>) -> Option<Hov
                 } else {
                     let mut desc = format!("**Element**: `{}`\n", format!("@{}", el.name));
                     desc.push_str(&format!("- **Classification**: `{}`\n", kind.as_str()));
-                    if let Some(norm_args) = normalized_element_args(view) {
-                        desc.push_str(&format!("- **Normalized Args**: `{norm_args:?}`\n"));
+                    if let Some(norm_args) = element_args_view(view) {
+                        desc.push_str(&format!(
+                            "- **Normalized Args**: `{:?}`\n",
+                            norm_args.tuple()
+                        ));
                     }
                     Some(Hover {
                         contents: HoverContents::Markup(MarkupContent {
@@ -163,7 +166,7 @@ pub fn hover_in(text: &str, pos: Position, evaluate: Evaluate<'_>) -> Option<Hov
 fn declaration_hover(positions: &TextPositions<'_>, declaration: &Declaration) -> Hover {
     let span = declaration.span;
     let kind = classify_declaration_lenient(declaration);
-    let args = normalized_declaration_args(declaration);
+    let args = declaration_args_view(declaration);
     let text_of = |keys: &[&str]| {
         args.as_ref()
             .and_then(|v| keys.iter().find_map(|key| v.get(key)))
@@ -213,7 +216,10 @@ fn declaration_hover(positions: &TextPositions<'_>, declaration: &Declaration) -
         let mut desc = format!("**Declaration**: `::{}`\n", declaration.name);
         desc.push_str(&format!("- **Classification**: `{}`\n", kind.as_str()));
         if let Some(norm_args) = &args {
-            desc.push_str(&format!("- **Normalized Args**: `{norm_args:?}`\n"));
+            desc.push_str(&format!(
+                "- **Normalized Args**: `{:?}`\n",
+                norm_args.tuple()
+            ));
         }
         desc
     };
@@ -276,7 +282,7 @@ fn extract_line_cells(line: &str) -> Vec<CellInfo> {
     cells
 }
 
-fn extract_table_aligns_from_args(args: Option<&Tuple>) -> Vec<String> {
+fn extract_table_aligns_from_args(args: Option<&TupleView<'_, '_>>) -> Vec<String> {
     let Some(args) = args else {
         return Vec::new();
     };
@@ -328,10 +334,10 @@ fn table_hover(
     let start_line = positions.line(el.span.start) as usize;
     let end_line = (positions.line(el.span.end) as usize).min(lines.len().saturating_sub(1));
 
-    // `normalized_element_args`, not raw `el.args`: `align: (...)` is
-    // a `Value::Call` until normalized, and `extract_table_aligns_from_args`
+    // `element_args_view`, not raw `el.args`: `align: (...)` is
+    // a `Value::Call` until viewed, and `extract_table_aligns_from_args`
     // only recognizes a tuple of strings.
-    let normalized_args = normalized_element_args(el.as_view());
+    let normalized_args = element_args_view(el.as_view());
     let aligns = extract_table_aligns_from_args(normalized_args.as_ref());
 
     let mut table_rows: Vec<(usize, Vec<CellInfo>)> = Vec::new();
@@ -570,16 +576,15 @@ fn render_value(value: &EvalValue) -> String {
         EvalValue::Float(f) => f.to_string(),
         EvalValue::Number(s) => s.clone(),
         EvalValue::String(s) => s.clone(),
-        EvalValue::Seq(items) => {
-            let items: Vec<String> = items.iter().map(render_value).collect();
-            format!("[{}]", items.join(", "))
-        }
-        EvalValue::Map(entries) => {
-            let entries: Vec<String> = entries
-                .iter()
-                .map(|(k, v)| format!("{k}: {}", render_value(v)))
+        EvalValue::Tuple(tuple) => {
+            let entries: Vec<String> = tuple
+                .entries()
+                .map(|e| match e.name() {
+                    Some(name) => format!("{name}: {}", render_value(e.value())),
+                    None => render_value(e.value()),
+                })
                 .collect();
-            format!("{{{}}}", entries.join(", "))
+            format!("({})", entries.join(", "))
         }
         EvalValue::DateTime(dt) => tomet_expr::format_datetime(dt, "YYYY-MM-DD HH:mm:ss"),
         EvalValue::Version(v) => v.to_string(),
@@ -594,8 +599,14 @@ fn render_value(value: &EvalValue) -> String {
         EvalValue::Namespace(_) => "namespace".to_string(),
         EvalValue::Type(ty) => ty.to_string(),
         EvalValue::Call(name, args) => {
-            let args: Vec<String> = args.iter().map(render_value).collect();
-            format!("{name}({})", args.join(", "))
+            let entries: Vec<String> = args
+                .entries()
+                .map(|e| match e.name() {
+                    Some(name) => format!("{name}: {}", render_value(e.value())),
+                    None => render_value(e.value()),
+                })
+                .collect();
+            format!("{name}({})", entries.join(", "))
         }
     }
 }

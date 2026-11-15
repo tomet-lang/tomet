@@ -171,12 +171,10 @@ pub enum EvalValue {
     /// integer too large for an `i64`.
     Number(String),
     String(String),
-    Seq(Vec<EvalValue>),
-    /// Insertion-ordered, like a named [`Tuple`](tomet_ast::Tuple).
-    Map(Vec<(String, EvalValue)>),
+    /// A tuple of values: the one data container of the evaluator, matching [`Tuple`](tomet_ast::Tuple).
+    Tuple(Tuple<EvalValue>),
     /// A call literal, kept as written (`list(string)`, `enum(a, b)`).
-    /// A sequence `(a, b)` is an [`EvalValue::Seq`], not a call.
-    Call(String, Vec<EvalValue>),
+    Call(String, Tuple<EvalValue>),
     /// A structured part of a document: an element, a section, a list, a connect,
     /// a declaration, or a list item, with the document it came from.
     Part {
@@ -207,8 +205,7 @@ impl EvalValue {
             EvalValue::Float(_) => "float",
             EvalValue::Number(_) => "number",
             EvalValue::String(_) => "string",
-            EvalValue::Seq(_) => "list",
-            EvalValue::Map(_) => "map",
+            EvalValue::Tuple(_) => "tuple",
             EvalValue::Call(..) => "call",
             EvalValue::Part { .. } => "element",
             EvalValue::Document(_) => "document",
@@ -233,20 +230,12 @@ impl EvalValue {
             Value::Number(text) => EvalValue::Number(text.clone()),
             Value::String(s) => EvalValue::String(s.clone()),
             Value::Tuple(tuple) => {
-                if tuple.has_no_named() {
-                    EvalValue::Seq(tuple.unnamed().map(|v| Self::from_ast(v, doc)).collect())
-                } else {
-                    let mut entries = Vec::with_capacity(tuple.len());
-                    for (key, value) in tuple.keyed() {
-                        entries.push((key.into_owned(), Self::from_ast(value, doc)));
-                    }
-                    EvalValue::Map(entries)
-                }
+                EvalValue::Tuple(tuple.clone().map_values(|v| Self::from_ast(&v, doc)))
             }
-            Value::Call(name, args) => {
-                let args = args.unnamed().map(|v| Self::from_ast(v, doc)).collect();
-                EvalValue::Call(name.clone(), args)
-            }
+            Value::Call(name, args) => EvalValue::Call(
+                name.clone(),
+                args.clone().map_values(|v| Self::from_ast(&v, doc)),
+            ),
             Value::Element(el) => EvalValue::Part {
                 doc: doc.clone(),
                 part: Box::new(Part::Element(el.clone())),
@@ -273,21 +262,18 @@ impl EvalValue {
             EvalValue::Float(f) => Value::Float(*f),
             EvalValue::Number(text) => Value::Number(text.clone()),
             EvalValue::String(s) => Value::String(s.clone()),
-            EvalValue::Seq(items) => {
-                let values: Vec<Value> = items.iter().map(Self::to_ast).collect::<Option<_>>()?;
-                Value::Tuple(Tuple::from_unnamed(values))
-            }
-            EvalValue::Map(entries) => {
-                let mut tuple = Tuple::new();
-                for (k, v) in entries {
-                    tuple.try_push_named(k.clone(), v.to_ast()?).ok()?;
-                }
-                Value::Tuple(tuple)
-            }
-            EvalValue::Call(name, args) => {
-                let values: Vec<Value> = args.iter().map(Self::to_ast).collect::<Option<_>>()?;
-                Value::Call(name.clone(), Tuple::from_unnamed(values))
-            }
+            EvalValue::Tuple(tuple) => Value::Tuple(
+                tuple
+                    .clone()
+                    .try_map_values(|v| Self::to_ast(&v).ok_or(()))
+                    .ok()?,
+            ),
+            EvalValue::Call(name, args) => Value::Call(
+                name.clone(),
+                args.clone()
+                    .try_map_values(|v| Self::to_ast(&v).ok_or(()))
+                    .ok()?,
+            ),
             EvalValue::Part { part, .. } => match &**part {
                 Part::Element(el) => Value::Element(el.clone()),
                 Part::Section(_)
@@ -372,11 +358,11 @@ mod tests {
     }
 
     #[test]
-    fn a_list_is_a_seq_and_a_call_is_kept() {
+    fn a_tuple_and_a_call_are_kept() {
         let list = Value::Tuple(Tuple::from_unnamed([Value::Int(1), Value::Int(2)]));
         assert_eq!(
             EvalValue::from_ast(&list, &doc()),
-            EvalValue::Seq(vec![EvalValue::Int(1), EvalValue::Int(2)])
+            EvalValue::Tuple(Tuple::from_unnamed([EvalValue::Int(1), EvalValue::Int(2)]))
         );
         let other = Value::Call(
             "enum".into(),
@@ -393,35 +379,22 @@ mod tests {
         let empty = Value::Tuple(Tuple::new());
         assert_eq!(
             EvalValue::from_ast(&empty, &doc()),
-            EvalValue::Seq(Vec::new())
+            EvalValue::Tuple(Tuple::new())
         );
 
         let mut mixed = Tuple::new();
         mixed.try_push_unnamed(Value::Int(10)).unwrap();
         mixed.try_push_named("k", Value::Int(20)).unwrap();
         mixed.try_push_unnamed(Value::Int(30)).unwrap();
-        let eval = EvalValue::from_ast(&Value::Tuple(mixed), &doc());
-        assert_eq!(
-            eval,
-            EvalValue::Map(vec![
-                ("0".into(), EvalValue::Int(10)),
-                ("k".into(), EvalValue::Int(20)),
-                ("1".into(), EvalValue::Int(30)),
-            ])
-        );
+        let eval = EvalValue::from_ast(&Value::Tuple(mixed.clone()), &doc());
+        let back = eval.to_ast().expect("converts back to AST value");
+        assert_eq!(back, Value::Tuple(mixed));
     }
 
     #[test]
     fn mixed_tuple_read_from_source_through_eval_bridge() {
         let ast = tomet_ast_parser::parse_value(r#"(a, sep: ",")"#).unwrap();
         let eval = EvalValue::from_ast(&ast, &doc());
-        assert_eq!(
-            eval,
-            EvalValue::Map(vec![
-                ("0".into(), EvalValue::String("a".into())),
-                ("sep".into(), EvalValue::String(",".into())),
-            ])
-        );
         let back = eval.to_ast().expect("converts back to AST value");
         assert_eq!(back, ast);
     }
@@ -434,7 +407,11 @@ mod tests {
         assert_eq!(EvalValue::Type(Type::bare(Kind::String)).to_ast(), None);
         // One of them anywhere inside makes the whole thing not data.
         assert_eq!(
-            EvalValue::Seq(vec![EvalValue::Int(1), EvalValue::Document(doc())]).to_ast(),
+            EvalValue::Tuple(Tuple::from_unnamed([
+                EvalValue::Int(1),
+                EvalValue::Document(doc())
+            ]))
+            .to_ast(),
             None
         );
     }
@@ -474,8 +451,7 @@ mod tests {
                 .as_deref(),
             Some("1.2.3")
         );
-        assert_eq!(EvalValue::Seq(vec![]).scalar_text(), None);
-        assert_eq!(EvalValue::Map(vec![]).scalar_text(), None);
+        assert_eq!(EvalValue::Tuple(Tuple::new()).scalar_text(), None);
         assert_eq!(EvalValue::Document(doc()).scalar_text(), None);
         assert_eq!(
             EvalValue::Type(Type::bare(Kind::String)).scalar_text(),

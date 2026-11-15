@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use tomet_ast::{Block, Inline, Tuple, Value};
+use tomet_ast::{Block, Inline, Tuple, TupleEntry, Value};
 use tomet_expr::{DocRef, EvalContext, EvalValue, MemoryResolver, NoResolver, Resolver};
 
 use super::*;
@@ -233,7 +233,9 @@ fn a_document_in_the_text_says_to_use_include_or_link() {
 #[test]
 fn a_datetime_in_the_text_says_to_format_it() {
     let when = tomet_expr::parse_datetime("2026-11-11T09:30:00+09:00").expect("a datetime");
-    let vars = EvalValue::Map(vec![("when".into(), EvalValue::DateTime(when))]);
+    let vars = EvalValue::Tuple(
+        Tuple::try_from_entries([TupleEntry::named("when", EvalValue::DateTime(when))]).unwrap(),
+    );
     let (_, unresolved) = run_with("When: $(var.when)\n", &vars);
     assert!(
         reasons(&unresolved)[0].contains(".format"),
@@ -422,7 +424,10 @@ fn a_reference_is_answered_from_the_document_the_resolver_holds() {
 
 #[test]
 fn a_document_reads_var() {
-    let vars = EvalValue::Map(vec![("title".into(), EvalValue::String("Plan".into()))]);
+    let vars = EvalValue::Tuple(
+        Tuple::try_from_entries([TupleEntry::named("title", EvalValue::String("Plan".into()))])
+            .unwrap(),
+    );
     let (doc, unresolved) = run_with(
         "::meta(title: $(var.title))\n\nPlan for $(var.title)\n",
         &vars,
@@ -442,7 +447,7 @@ fn a_document_reads_var() {
 fn only_a_variable_that_has_no_value_yet_awaits_input() {
     let resolver = vault();
     let macros = HashMap::new();
-    let vars = EvalValue::Map(vec![]);
+    let vars = EvalValue::Tuple(Tuple::new());
     let cx = EvalContext {
         resolver: &resolver,
         self_doc: DocRef("here.tmt".to_string()),

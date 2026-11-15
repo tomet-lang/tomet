@@ -42,12 +42,11 @@ fn directory_docs(
     cx.resolver
         .dir_docs(dir)
         .map(|docs| {
-            EvalValue::Seq(
+            EvalValue::Tuple(Tuple::from_unnamed(
                 docs.into_iter()
                     .filter(|doc| keep(doc))
-                    .map(EvalValue::Document)
-                    .collect(),
-            )
+                    .map(EvalValue::Document),
+            ))
         })
         .map_err(|why| {
             // the vault root is the empty path: nothing to quote
@@ -196,16 +195,95 @@ fn children(doc: &DocRef, part: &Part) -> Vec<EvalValue> {
     }
 }
 
-/// What a part holds as data, whatever the part is: `u1.id` is a key of this.
-fn part_data(doc: &DocRef, part: &Part) -> EvalValue {
+/// What a part holds as data, whatever the part is: `u1.id` or `u1.0` reads a field of this.
+fn part_field(doc: &DocRef, part: &Part, member: &str) -> Option<EvalValue> {
     match part {
-        Part::Element(el) => data(doc, &el.data.args, &el.data.value),
-        Part::Section(sec) => data(doc, &sec.data.args, &sec.data.value),
-        Part::Connect(conn) => data(doc, &conn.data.args, &conn.data.value),
-        Part::Declaration(d) => data(doc, &d.data.args, &d.data.value),
-        Part::Item(item) => data(doc, &item.data.args, &item.data.value),
-        // A list has neither arguments nor a value group.
-        Part::List(_) => data(doc, &None, &None),
+        Part::Element(el) => {
+            if let Some(val) = el
+                .data
+                .value
+                .as_ref()
+                .and_then(|v| v.as_data().get(member).cloned())
+            {
+                return Some(EvalValue::from_ast(&val, doc));
+            }
+            if let Some(view) = tomet_semantics::element_args_view(el.as_view())
+                && let Some(val) = view.get(member)
+            {
+                return Some(EvalValue::from_ast(val, doc));
+            }
+            el.data
+                .args
+                .as_ref()
+                .and_then(|args| args.get(member))
+                .map(|v| EvalValue::from_ast(v, doc))
+        }
+        Part::Declaration(d) => {
+            if let Some(val) = d
+                .data
+                .value
+                .as_ref()
+                .and_then(|v| v.as_data().get(member).cloned())
+            {
+                return Some(EvalValue::from_ast(&val, doc));
+            }
+            if let Some(view) = tomet_semantics::declaration_args_view(d)
+                && let Some(val) = view.get(member)
+            {
+                return Some(EvalValue::from_ast(val, doc));
+            }
+            d.data
+                .args
+                .as_ref()
+                .and_then(|args| args.get(member))
+                .map(|v| EvalValue::from_ast(v, doc))
+        }
+        Part::Section(sec) => {
+            if let Some(val) = sec
+                .data
+                .value
+                .as_ref()
+                .and_then(|v| v.as_data().get(member).cloned())
+            {
+                return Some(EvalValue::from_ast(&val, doc));
+            }
+            sec.data
+                .args
+                .as_ref()
+                .and_then(|args| args.get(member))
+                .map(|v| EvalValue::from_ast(v, doc))
+        }
+        Part::Connect(conn) => {
+            if let Some(val) = conn
+                .data
+                .value
+                .as_ref()
+                .and_then(|v| v.as_data().get(member).cloned())
+            {
+                return Some(EvalValue::from_ast(&val, doc));
+            }
+            conn.data
+                .args
+                .as_ref()
+                .and_then(|args| args.get(member))
+                .map(|v| EvalValue::from_ast(v, doc))
+        }
+        Part::Item(item) => {
+            if let Some(val) = item
+                .data
+                .value
+                .as_ref()
+                .and_then(|v| v.as_data().get(member).cloned())
+            {
+                return Some(EvalValue::from_ast(&val, doc));
+            }
+            item.data
+                .args
+                .as_ref()
+                .and_then(|args| args.get(member))
+                .map(|v| EvalValue::from_ast(v, doc))
+        }
+        Part::List(_) => None,
     }
 }
 
@@ -215,9 +293,7 @@ fn part_data(doc: &DocRef, part: &Part) -> EvalValue {
 /// (`part::id`). A key the part does not have is an error, which for the retired spellings that read
 /// the node's own properties gives the way to what was probably meant.
 pub(crate) fn part_member(doc: &DocRef, part: &Part, member: &str) -> Result<EvalValue, EvalError> {
-    if let EvalValue::Map(entries) = part_data(doc, part)
-        && let Some((_, value)) = entries.into_iter().find(|(key, _)| key == member)
-    {
+    if let Some(value) = part_field(doc, part, member) {
         return Ok(value);
     }
     match member {
@@ -272,15 +348,12 @@ pub(crate) fn part_connect(
         "content" => Ok(EvalValue::Fragment(child_blocks(part))),
         "doc" => Ok(EvalValue::Document(doc.clone())),
         "meta" => Ok(part_meta(doc, part)),
-        "connects" => Ok(EvalValue::Seq(
-            connects_of(part)
-                .iter()
-                .map(|conn| EvalValue::Part {
-                    doc: doc.clone(),
-                    part: Box::new(Part::Connect(Box::new(conn.clone()))),
-                })
-                .collect(),
-        )),
+        "connects" => Ok(EvalValue::Tuple(Tuple::from_unnamed(
+            connects_of(part).iter().map(|conn| EvalValue::Part {
+                doc: doc.clone(),
+                part: Box::new(Part::Connect(Box::new(conn.clone()))),
+            }),
+        ))),
         _ => connects_of(part)
             .iter()
             .find(|conn| conn.name.is_bare_named(member))
@@ -304,7 +377,7 @@ fn part_meta(doc: &DocRef, part: &Part) -> EvalValue {
     };
     match group {
         Some(group) => EvalValue::from_ast(&Value::Tuple(group.as_data()), doc),
-        None => EvalValue::Map(Vec::new()),
+        None => EvalValue::Tuple(Tuple::new()),
     }
 }
 

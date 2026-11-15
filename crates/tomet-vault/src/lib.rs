@@ -331,7 +331,7 @@ impl Vault {
             {
                 return;
             }
-            let Some(target) = tomet_semantics::normalized_element_args(view).and_then(|args| {
+            let Some(target) = tomet_semantics::element_args_view(view).and_then(|args| {
                 args.get("target")
                     .and_then(|v| v.as_str())
                     .map(String::from)
@@ -430,7 +430,7 @@ impl Vault {
             {
                 return;
             }
-            let Some(target) = tomet_semantics::normalized_element_args(view).and_then(|args| {
+            let Some(target) = tomet_semantics::element_args_view(view).and_then(|args| {
                 args.get("target")
                     .and_then(|v| v.as_str())
                     .map(String::from)

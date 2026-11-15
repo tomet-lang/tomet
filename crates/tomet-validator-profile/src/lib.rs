@@ -138,7 +138,7 @@ fn term_findings(doc: &File, findings: &mut Vec<Finding>) {
             return;
         }
         // A `@term` with no argument is a definition, not a mention.
-        let Some(target) = tomet_semantics::normalized_element_args(el).and_then(|args| {
+        let Some(target) = tomet_semantics::element_args_view(el).and_then(|args| {
             args.get("target")
                 .and_then(|value| value.as_str())
                 .map(String::from)

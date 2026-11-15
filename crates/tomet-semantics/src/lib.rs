@@ -83,12 +83,12 @@ pub use kind::{
     required_shape, shape_mismatch,
 };
 pub use positional::{
-    LIST_MARKER_POSITIONAL_KEY, builtin_positional_arg_keys, normalized_declaration_args,
-    normalized_declaration_args_in, normalized_element_args, normalized_element_args_in,
-    normalized_list_marker,
+    LIST_MARKER_POSITIONAL_KEY, builtin_positional_arg_keys, declaration_args_view,
+    declaration_args_view_in, element_args_view, element_args_view_in, list_marker_view,
 };
 pub use rebase::rebase_relative_links;
 pub use tomet_declaration::DeclKind;
+pub use tomet_semantics_core::TupleView;
 pub use tomet_semantics_core::admits::{Mismatch, admits};
 pub use tomet_tree::{ElementExt, ValueExt};
 pub use vocabulary::{

@@ -223,7 +223,7 @@ fn parse_call_form(cur: &mut Cursor, start_pos: usize) -> Result<InterpExpr> {
                 look.bump();
                 skip_expr_ws(&mut look);
                 *cur = look;
-                let member = eat_interp_ident(cur)?.to_string();
+                let member = eat_interp_member(cur)?.to_string();
                 expr = InterpExpr {
                     kind: InterpExprKind::Member {
                         object: Box::new(expr),
@@ -520,7 +520,7 @@ fn parse_interp_postfix(cur: &mut Cursor) -> Result<InterpExpr> {
                 look.bump();
                 skip_expr_ws(&mut look);
                 *cur = look;
-                let member = eat_interp_ident(cur)?.to_string();
+                let member = eat_interp_member(cur)?.to_string();
                 expr = InterpExpr {
                     kind: InterpExprKind::Member {
                         object: Box::new(expr),
@@ -780,6 +780,17 @@ fn parse_interp_number(cur: &mut Cursor, start: usize) -> Result<InterpExpr> {
         kind: InterpExprKind::Literal(literal),
         span: cur.span_from(start),
     })
+}
+
+fn eat_interp_member<'a>(cur: &mut Cursor<'a>) -> Result<&'a str> {
+    let start = cur.pos();
+    if cur.peek().is_some_and(|c| c.is_ascii_digit()) {
+        Ok(cur.eat_while(|c| c.is_ascii_digit()))
+    } else if cur.peek().is_some_and(is_interp_ident_start) {
+        Ok(cur.eat_while(is_interp_ident_char))
+    } else {
+        Err(err(start, "expected an identifier or a position"))
+    }
 }
 
 fn eat_interp_ident<'a>(cur: &mut Cursor<'a>) -> Result<&'a str> {

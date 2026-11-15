@@ -1,4 +1,5 @@
 use tomet_ast::{File, Tuple, Value};
+use tomet_semantics_core::TupleView;
 use tomet_span::Span;
 
 use crate::kind::{DeclKind, Prose};
@@ -22,7 +23,7 @@ pub struct Declaration {
     /// The segments after it, `["url", "wiki"]` for `::field.url.wiki`. Empty for `::field`.
     pub path: Vec<String>,
     /// `(args)` as written: a positional argument is still unnamed
-    /// ([`bound_args`](Declaration::bound_args) names it).
+    /// ([`args_view`](Declaration::args_view) views it with its aliases).
     pub args: Option<Tuple>,
     /// `[prose]` as written, a [`Value::Blocks`].
     pub prose: Option<Value>,
@@ -118,13 +119,12 @@ impl Declaration {
             .join(".")
     }
 
-    /// `(args)` with the positional ones named after the declaration's signature
-    /// (`::kind(config, 2)` is `kind: config, version: 2`). For a name that is not a standard
-    /// declaration, the arguments as they were written.
-    pub fn bound_args(&self) -> Option<Tuple> {
+    /// A view over `(args)` and the declaration's signature: slot names alias the unnamed entries,
+    /// without rewriting the tuple.
+    pub fn args_view(&self) -> Option<TupleView<'_, '_>> {
         let args = self.args.as_ref()?;
         let keys = self.kind().map_or(&[][..], DeclKind::positional_keys);
-        Some(tomet_semantics_core::bind_positional(args, keys))
+        Some(TupleView::new(args, keys))
     }
 
     /// What this declaration says, as `(name, value)` entries of its declaration: the one answer
@@ -266,20 +266,21 @@ mod tests {
         );
         let kind = &found[0].declaration;
         assert_eq!(kind.name, "kind");
+        let view0 = kind.args_view().unwrap();
+        assert_eq!(view0.get("kind"), Some(&Value::String("config".into())));
+        assert_eq!(view0.get("0"), Some(&Value::String("config".into())));
+        assert_eq!(view0.get("version"), Some(&Value::Int(2)));
+        assert_eq!(view0.get("1"), Some(&Value::Int(2)));
         assert_eq!(
-            kind.bound_args(),
-            Some(Tuple::from_named([
-                ("kind".to_string(), Value::String("config".into())),
-                ("version".to_string(), Value::Int(2)),
+            kind.args.as_ref(),
+            Some(&Tuple::from_unnamed([
+                Value::String("config".into()),
+                Value::Int(2),
             ]))
         );
-        assert_eq!(
-            found[1].declaration.bound_args(),
-            Some(Tuple::from_named([(
-                "id".to_string(),
-                Value::String("x".into()),
-            )]))
-        );
+        let view1 = found[1].declaration.args_view().unwrap();
+        assert_eq!(view1.get("id"), Some(&Value::String("x".into())));
+        assert_eq!(view1.get("0"), None);
         assert_eq!(found[1].declaration.data, None);
     }
 

@@ -91,6 +91,7 @@ mod tests {
     use super::*;
     use std::fs;
     use std::path::PathBuf;
+    use tomet_ast::Tuple;
 
     const SETTINGS: &str = "::kind(config)
 ::field(
@@ -154,30 +155,25 @@ mod tests {
         let vault = Vault::discover(&root);
         let resolver = vault.resolver();
 
-        let EvalValue::Map(rust) = resolver.meta(&DocRef("notes/rust.tmt".into())).unwrap() else {
-            panic!("meta is a map");
+        let EvalValue::Tuple(rust) = resolver.meta(&DocRef("notes/rust.tmt".into())).unwrap()
+        else {
+            panic!("meta is a tuple");
         };
-        let get = |entries: &[(String, EvalValue)], key: &str| {
-            entries
-                .iter()
-                .find(|(k, _)| k == key)
-                .map(|(_, v)| v.clone())
-        };
-        assert!(matches!(
-            get(&rust, "created"),
-            Some(EvalValue::DateTime(_))
-        ));
+        assert!(matches!(rust.get("created"), Some(EvalValue::DateTime(_))));
         assert_eq!(
-            get(&rust, "tags"),
-            Some(EvalValue::Seq(vec![EvalValue::String("rust".into())]))
+            rust.get("tags"),
+            Some(&EvalValue::Tuple(Tuple::from_unnamed(vec![
+                EvalValue::String("rust".into())
+            ])))
         );
 
         // A document that has neither field still has both, typed.
-        let EvalValue::Map(go) = resolver.meta(&DocRef("notes/deep/go.tmt".into())).unwrap() else {
-            panic!("meta is a map");
+        let EvalValue::Tuple(go) = resolver.meta(&DocRef("notes/deep/go.tmt".into())).unwrap()
+        else {
+            panic!("meta is a tuple");
         };
-        assert_eq!(get(&go, "tags"), Some(EvalValue::Seq(vec![])));
-        assert_eq!(get(&go, "created"), Some(EvalValue::Null));
+        assert_eq!(go.get("tags"), Some(&EvalValue::Tuple(Tuple::new())));
+        assert_eq!(go.get("created"), Some(&EvalValue::Null));
         let _ = fs::remove_dir_all(&root);
     }
 
@@ -224,7 +220,9 @@ mod tests {
         .unwrap();
         assert_eq!(
             evaluate(&interp.expr, &cx).unwrap(),
-            EvalValue::Seq(vec![EvalValue::String("notes/rust.tmt".into())])
+            EvalValue::Tuple(Tuple::from_unnamed(vec![EvalValue::String(
+                "notes/rust.tmt".into()
+            )]))
         );
         let _ = fs::remove_dir_all(&root);
     }

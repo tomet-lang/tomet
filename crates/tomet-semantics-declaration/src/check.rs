@@ -299,11 +299,11 @@ fn check_version_slot(
 ) {
     const TAKES: usize = 2;
 
-    let Some(args) = decl.bound_args() else {
+    let Some(view) = decl.args_view() else {
         return;
     };
 
-    if !args.has_no_unnamed() {
+    if view.has_unaliased_unnamed() {
         problems.push((
             idx,
             Problem::TooManyArguments {
@@ -313,7 +313,7 @@ fn check_version_slot(
         ));
     }
 
-    if let Some(version) = args.get("version")
+    if let Some(version) = view.get("version")
         && !matches!(version, Value::Int(n) if *n >= 1)
     {
         problems.push((
@@ -331,11 +331,9 @@ fn check_version_slot(
 /// `version:` in its `{...}` body.
 fn written_version(decl: &Declaration, kind: DeclKind) -> Option<Value> {
     match kind {
-        DeclKind::Version => decl.bound_args().and_then(|args| {
-            args.get("version")
-                .cloned()
-                .or_else(|| args.nth_unnamed(0).cloned())
-        }),
+        DeclKind::Version => decl
+            .args_view()
+            .and_then(|view| view.get("version").cloned()),
         DeclKind::Vocabulary => decl.entries().ok()?.into_iter().find_map(|(_, entry)| {
             let Value::Tuple(fields) = entry else {
                 return None;
