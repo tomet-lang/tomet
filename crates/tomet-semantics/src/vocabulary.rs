@@ -89,14 +89,14 @@ pub struct ElementDecl {
     pub singleton: bool,
     /// `(args)`, in declaration order.
     pub params: Vec<ParamDecl>,
-    /// `content: { allow: }`, or `None` when the element declared no
+    /// `content: ( allow: )`, or `None` when the element declared no
     /// `content:` at all -- distinct from `Some(ContentAllow::Any)`
-    /// (`content: { allow: any }`, written out), the same "absent says
+    /// (`content: ( allow: any )`, written out), the same "absent says
     /// nothing, not none" reasoning `@data`'s `open:` already has.
     pub content_allow: Option<ContentAllow>,
 }
 
-/// `content: { allow: }`'s value -- what a vocabulary's own element may hold
+/// `content: ( allow: )`'s value -- what a vocabulary's own element may hold
 /// in `[content]`/`|content` (`Vec<Block>`, see `tmtroot/docs/spec/
 /// feature/content-shape.tmt`).
 #[derive(Debug, Clone, PartialEq)]
@@ -634,7 +634,7 @@ fn builtin(name: &str) -> Option<ElementKind> {
 }
 
 /// The namespace a vocabulary's own header names, and whether it is open: `::vocabulary.ns(version: "1.0.0")`
-/// names `ns`, and `::vocabulary(ns: { open: true })` is the same header grouped.
+/// names `ns`, and `::vocabulary(ns: ( open: true ))` is the same header grouped.
 ///
 /// The entry holds the header's fields. `::vocabulary.ns(@file(...))` is a registration of
 /// the file in a vault's config, which is not a vocabulary's header: its value is a path, not fields.
@@ -689,7 +689,7 @@ fn decl_from_value(decl: &Value) -> ElementDecl {
     }
 }
 
-/// The `content: { allow: }` an element declares, if any.
+/// The `content: ( allow: )` an element declares, if any.
 fn content_allow_from_value(content: &Value) -> Option<ContentAllow> {
     match content.get("allow")? {
         Value::String(s) if s == "inline" => Some(ContentAllow::Inline),

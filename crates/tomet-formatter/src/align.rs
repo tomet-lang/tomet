@@ -15,8 +15,8 @@ use crate::reorder::find_matching;
 ///
 /// ```text
 /// ::format(
-///   meta:    { always_newline: true }
-///   heading: { space_inside_brackets: true }
+///   meta:    ( always_newline: true )
+///   heading: ( space_inside_brackets: true )
 /// )
 /// ```
 ///

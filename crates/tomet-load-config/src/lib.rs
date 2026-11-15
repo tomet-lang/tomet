@@ -20,7 +20,7 @@
 //!   document: its leading `::` declarations apply to its folder and below. The entry file is an
 //!   ordinary document that is also a layer; its name is the vault's to choose
 //!   ([`WorkspaceConfig::folder_entry`](tomet_config::WorkspaceConfig::folder_entry),
-//!   `::workspace(folder: { entry: ... })`) and is not a constant of this crate.
+//!   `::workspace(folder: ( entry: ... ))`) and is not a constant of this crate.
 //! - (document) the document's own declarations (`::format`, `::field`, `::macro`, ...), applied
 //!   by [`config_for`].
 //!

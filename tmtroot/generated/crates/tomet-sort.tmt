@@ -1,6 +1,6 @@
 ::kind(api)
 
-::meta{crate: tomet-sort, dependencies: list(), dependents: list()}
+::meta(crate: tomet-sort, dependencies: list(), dependents: list())
 
 =[tomet-sort]
 

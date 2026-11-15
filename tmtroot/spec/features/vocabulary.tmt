@@ -6,18 +6,18 @@ vocabulary は、ある kind の文書が使える要素の名前と、その要
 ::vocabulary.deck(version: "1.0.0")
 
 ::element(
-  card: {
+  card: (
     display: block
     about: | カード一枚。
-    args: {
-      id: {
+    args: (
+      id: (
         type: uint
         positional: true
         required: true
         about: | 通し番号。
-      }
-    }
-  }
+      )
+    )
+  )
 )
 ```
 
@@ -26,8 +26,8 @@ vocabulary は、ある kind の文書が使える要素の名前と、その要
 
 #[ 名前はキー ]
 
-`::element` の中身は、要素の名前をキーにしたマップ。`args` の中身は、引数の名前を
-キーにしたマップ。どの段も「キー: フィールドのマップ」という同じ形で、要素と引数で
+`::element` の中身は、要素の名前をキーにしたタプル。`args` の中身は、引数の名前を
+キーにしたタプル。どの段も「キー: フィールドのタプル」という同じ形で、要素と引数で
 別の記法を覚える必要がない。名前を `@element(card)` のように括弧の引数へ入れる綴りは
 無い。
 
@@ -40,8 +40,8 @@ vocabulary は、ある kind の文書が使える要素の名前と、その要
 |[ `display`   ][ 両方  ][ `block` か `inline`。置かれた形がこれと違えば報告される ]
 |[ `region`    ][ body  ][ `preamble` なら文書の頭にだけ置ける ]
 |[ `singleton` ][ false ][ 一つの文書に一つまで ]
-|[ `args`      ][ なし  ][ 引数のマップ。無いのは「何も言わない」で、「取らない」ではない ]
-|[ `content`   ][ なし  ][ `{ allow: }`。`[content]` に何を許すか ]
+|[ `args`      ][ なし  ][ 引数のタプル。無いのは「何も言わない」で、「取らない」ではない ]
+|[ `content`   ][ なし  ][ `( allow: )`。`[content]` に何を許すか ]
 |[ `about`     ][ なし  ][ 要素の散文。検査は読まない ]
 
 `content` の `allow:` は、`(a, b)`（この名前だけ）、`inline`（段落一つだけ）、

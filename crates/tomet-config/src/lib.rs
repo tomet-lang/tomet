@@ -66,7 +66,7 @@ impl Config {
     }
 
     /// The config a stack of layers comes to, outermost first: the inner layer
-    /// wins, key by key (a map merges; a list or a scalar is replaced), and a
+    /// wins, key by key (a tuple with named entries merges; any other tuple or a scalar is replaced), and a
     /// macro, a variable or a registered name is replaced by name. Built once
     /// from the merged value trees, see [`ConfigLayer`].
     pub fn from_layers<'a>(layers: impl IntoIterator<Item = &'a ConfigLayer>) -> Self {

@@ -79,7 +79,7 @@ pub enum Value {
     /// scalar, is [`scalar_text`](Value::scalar_text).
     Number(String),
     String(String),
-    /// `(a, b, k: v)` or `{k: v}` -- an ordered run of entries, each with a
+    /// `(a, b, k: v)` -- an ordered run of entries, each with a
     /// name or without one. `()` is the empty tuple and `(x)` is a tuple with
     /// one unnamed entry. See [`Tuple`].
     Tuple(Tuple),

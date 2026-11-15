@@ -13,7 +13,7 @@
 //! - (Singular names, a path in the head)
 //!   | Every name is singular, and what a declaration holds is written either in the head as a
 //!   | dot-path, `::field.author(type: string)[ the author ]`, or grouped under the name,
-//!   | `::field(author: { type: string })`. [`Declaration::entries`] is the one place the two meet,
+//!   | `::field(author: ( type: string ))`. [`Declaration::entries`] is the one place the two meet,
 //!   | so every reader sees the same entries. A first positional argument is the entry itself
 //!   | (`X.X` is `X`), and a trailing `[...]` is its `about` or, for a macro, its value. The plural
 //!   | spellings (`::fields`) are retired and reported as such ([`Problem::Retired`]).

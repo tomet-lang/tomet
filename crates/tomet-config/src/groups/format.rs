@@ -161,7 +161,7 @@ pub struct FormatConfig {
     pub paragraph_separator: Option<ParagraphSeparator>,
 
     /// Align the values of consecutive `key: value` lines of a `(...)` group written over several
-    /// lines, the colon staying on the key (`meta:    {...}` over `section: {...}`). A blank line,
+    /// lines, the colon staying on the key (`meta:    (...)` over `section: (...)`). A blank line,
     /// a comment, or an entry whose value runs over several lines ends a run. Off, each line keeps
     /// the spacing it has.
     #[config(key = "map.align_values", default = false)]

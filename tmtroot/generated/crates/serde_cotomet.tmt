@@ -1,6 +1,6 @@
 ::kind(api)
 
-::meta{crate: serde_cotomet, dependencies: list(tomet-ast, tomet-ast-parser), dependents: list(cotomet)}
+::meta(crate: serde_cotomet, dependencies: list(tomet-ast, tomet-ast-parser), dependents: list(cotomet))
 
 =[serde_cotomet]
 

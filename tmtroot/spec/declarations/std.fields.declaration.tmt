@@ -16,8 +16,8 @@
 
 ```tm
 ::field(
-  aliases: { type: list, always_newline: true }
-  url.wiki: { type: list, always_newline: true }
+  aliases: ( type: list, always_newline: true )
+  url.wiki: ( type: list, always_newline: true )
 )
 ```
 

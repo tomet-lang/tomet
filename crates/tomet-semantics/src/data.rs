@@ -17,9 +17,9 @@ pub fn declaration_data(declaration: &tomet_ast::Declaration) -> Option<tomet_as
     data_of(&declaration.data)
 }
 
-/// The `name: value` entries a declaration is written with, as a map: `::meta(title: T)` is
-/// `{ title: T }`, `::meta()` is the empty map, and the dotted head `::field.author(type: string)` is
-/// `{ author: { type: string } }`, the same as `::field(author: { type: string })`. `None` when the
+/// The `name: value` entries a declaration is written with, as a tuple: `::meta(title: T)` is
+/// `( title: T )`, `::meta()` is the empty tuple, and the dotted head `::field.author(type: string)` is
+/// `( author: ( type: string ) )`, the same as `::field(author: ( type: string ))`. `None` when the
 /// declaration is not written as entries, such as the lone value of `::meta(x)`.
 ///
 /// What the head, the parentheses and a trailing `[...]` come to is

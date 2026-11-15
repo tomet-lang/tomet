@@ -5,10 +5,10 @@
 
 ```tm
 ::format(
-  meta: { always_newline: true }
-  heading: { space_inside_brackets: true }
-  table: { adjust_width: auto, max_col_width: 50 }
-  link: { no_space: true, group_order: "[]()" }
+  meta: ( always_newline: true )
+  heading: ( space_inside_brackets: true )
+  table: ( adjust_width: auto, max_col_width: 50 )
+  link: ( no_space: true, group_order: "[]()" )
 )
 ```
 
@@ -20,4 +20,4 @@
 
 =[ 書く場所 ]
 
-`.tmt` の文書の先頭に一つ。@term(tomet#vault-config)、フォルダの @term(tomet#folder-config)、文書自身のどれにも書ける。層は外側から重なり、キーごとに、内側が外側を上書きする。マップは中まで合わさり、リストと単一の値は置き換わる（@file(tmtroot/spec/features/config.tmt)）。
+`.tmt` の文書の先頭に一つ。@term(tomet#vault-config)、フォルダの @term(tomet#folder-config)、文書自身のどれにも書ける。層は外側から重なり、キーごとに、内側が外側を上書きする。名前のある項目を持つタプルは中まで合わさり、そうでないタプルと単一の値は置き換わる（@file(tmtroot/spec/features/config.tmt)）。

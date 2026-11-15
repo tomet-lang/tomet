@@ -1,6 +1,6 @@
 ::kind(api)
 
-::meta{crate: tomet-semantics-core, dependencies: list(tomet-ast, tomet-type), dependents: list(tomet-config, tomet-declaration, tomet-semantics, tomet-validator-core)}
+::meta(crate: tomet-semantics-core, dependencies: list(tomet-ast, tomet-type), dependents: list(tomet-config, tomet-declaration, tomet-semantics, tomet-validator-core))
 
 =[tomet-semantics-core]
 

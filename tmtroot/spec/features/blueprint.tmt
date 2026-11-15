@@ -15,10 +15,10 @@
 ::kind(blueprint)
 ::blueprint(daily-note)
 ::var(
-  title: {
+  title: (
     type: string
     about: | 日記の題。
-  }
+  )
 )
 ::meta(
   id: ${generate.uuid()}

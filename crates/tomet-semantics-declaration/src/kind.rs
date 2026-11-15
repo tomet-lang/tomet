@@ -10,7 +10,7 @@
 /// Every name is singular. A declaration is a node of the document's tree: `::field` is the
 /// `field` node, and the fields it holds are its children, written either in the head as a
 /// dot-path (`::field.author(type: string)`) or grouped under the parent
-/// (`::field(author: { type: string })`); both are the same tree. The plural spellings
+/// (`::field(author: ( type: string ))`); both are the same tree. The plural spellings
 /// (`::fields`, `::macros`, ...) are retired; see [`DeclKind::retired`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum DeclKind {

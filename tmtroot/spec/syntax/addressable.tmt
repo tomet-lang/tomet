@@ -56,14 +56,14 @@ tmt:docs/spec/syntax.tmt#intro
 |[ `.key`        ][ 要素の引数と値の key `key` の値（ユーザーが書いたデータ） ]
 |[ `::id`        ][ 要素自身の ID 文字列 ]
 |[ `::name`      ][ 要素の種類名（`card` など） ]
-|[ `::meta`      ][ 要素の `{...}` のマップ（`::meta.key` でその key） ]
+|[ `::meta`      ][ 要素の `{...}` のタプル（`::meta.key` でその key） ]
 |[ `::connects`  ][ 接続要素（`::connect`）のリスト ]
 |[ `.item(n)`    ][ 配列の値、または子ブロックの n 番目(0 始まり) ]
 |[ `#item(0)`    ][ ドキュメントルートの n 番目のブロック ]
 
 ===[ プロパティと値の中 ]
 
-配列やリストの値の中は、`.key` の後ろに `item(n)` をつないで指す。添字は 0 始まり。
+タプルの値の中は、`.key` の後ろに `item(n)` をつないで指す。添字は 0 始まり。
 
 ```
 @card(tags: (a, b, c)) #(intro)
@@ -102,11 +102,11 @@ ${#intro.tags.item(2)}        関数呼び出し記法（等価）
 - ユーザーが定義するユニークプロパティも、`#(x)` と同じ仕組みでアドレスに使える。どのプロパティが一意かは `.settings`（`default.config.tmt`）で宣言する。
 
 ```
-::config{
-  meta: {
-    isbn: { type: string, unique: true }
-  }
-}
+::config(
+  meta: (
+    isbn: ( type: string, unique: true )
+  )
+)
 ```
 
 `default.config.tmt` の `meta:` の欄に、`unique: true` を書く。

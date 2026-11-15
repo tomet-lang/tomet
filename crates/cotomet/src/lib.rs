@@ -24,7 +24,7 @@ pub use tomet_ast_parser::{Error, Result, parse_value};
 #[cfg(feature = "eval")]
 pub use cotomet_eval as eval;
 
-/// Parse a standalone cotomet file (`.ctmt`): declarations, then a map of
+/// Parse a standalone cotomet file (`.ctmt`): declarations, then
 /// `key: value` entries.
 ///
 /// Unquoted `$` expressions and type seats (`<$type>`) are rejected (this reader reads data only).

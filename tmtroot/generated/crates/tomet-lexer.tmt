@@ -1,6 +1,6 @@
 ::kind(api)
 
-::meta{crate: tomet-lexer, dependencies: list(tomet-cst, tomet-span), dependents: list(tomet-ast-parser, tomet-cst-parser, tomet-lowering)}
+::meta(crate: tomet-lexer, dependencies: list(tomet-cst, tomet-span), dependents: list(tomet-ast-parser, tomet-cst-parser, tomet-lowering))
 
 =[tomet-lexer]
 

@@ -1,6 +1,6 @@
 ::kind(api)
 
-::meta{crate: tomet-span, dependencies: list(), dependents: list(cotomet, cotomet-eval, tomet-address, tomet-ast, tomet-ast-parser, tomet-convert-standalone, tomet-cst-parser, tomet-declaration, tomet-expr, tomet-extract, tomet-html, tomet-lexer, tomet-links, tomet-lowering, tomet-lsp, tomet-markdown, tomet-pandoc, tomet-printer, tomet-search, tomet-semantics, tomet-spec, tomet-transform, tomet-tree, tomet-validator, tomet-validator-blueprint, tomet-validator-core, tomet-validator-profile, tomet-validator-rule, tomet-vault)}
+::meta(crate: tomet-span, dependencies: list(), dependents: list(cotomet, cotomet-eval, tomet-address, tomet-ast, tomet-ast-parser, tomet-convert-standalone, tomet-cst-parser, tomet-declaration, tomet-expr, tomet-extract, tomet-html, tomet-lexer, tomet-links, tomet-lowering, tomet-lsp, tomet-markdown, tomet-pandoc, tomet-printer, tomet-search, tomet-semantics, tomet-spec, tomet-transform, tomet-tree, tomet-validator, tomet-validator-blueprint, tomet-validator-core, tomet-validator-profile, tomet-validator-rule, tomet-vault))
 
 =[tomet-span]
 

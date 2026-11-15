@@ -80,7 +80,7 @@ impl ConfigLayer {
     /// Lays `inner` over `self`: the inner layer wins where both say something.
     ///
     /// Entries are kept in order and merged key by key when the [`Config`](crate::Config)
-    /// is read (a map merges, a list or a scalar is replaced); a name table, the macros and the
+    /// is read (a tuple with named entries merges; any other tuple or a scalar is replaced); a name table, the macros and the
     /// variables are replaced by name.
     pub(crate) fn push_inner(&mut self, inner: &ConfigLayer) {
         self.format.extend(inner.format.iter().cloned());

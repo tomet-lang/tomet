@@ -25,7 +25,7 @@ enum CheckFileResult {
 /// Checks one file, or every `.tmt` and `.ctmt` under a directory.
 ///
 /// A `.ctmt` is a standalone cotomet file, not a document: it is parsed as
-/// cotomet and must be a map of `key: value` entries, with its header
+/// cotomet and must be `key: value` entries, with its header
 /// declarations validated against [`tomet_declaration::Host::Ctmt`].
 ///
 /// Checking is not parsing: a document that parses is not thereby OK --
@@ -435,7 +435,7 @@ mod tests {
     }
 
     /// A `.ctmt` is checked next to the `.tmt` files: parsed as cotomet, and a
-    /// file is a map of `key: value` entries. One bad file does not hide
+    /// file is `key: value` entries. One bad file does not hide
     /// the others, and a directory run reaches it.
     #[test]
     fn a_cotomet_file_is_checked_beside_the_documents() {

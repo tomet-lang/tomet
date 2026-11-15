@@ -309,8 +309,8 @@ pub(crate) fn render_group_entries(entries: &[Entry], config: &PrinterConfig) ->
     let rendered: Vec<String> = entries
         .iter()
         .map(|entry| match entry {
-            // `render_nested`, not `render_value_inner_with_config`: a nested map needs its own
-            // braces here or `m: { k: v }` prints as `m: k: v` and reparses as a string.
+            // `render_nested`, not `render_value_inner_with_config`: a nested tuple needs its own
+            // parentheses here or `m: ( k: v )` prints as `m: k: v` and reparses as a string.
             Entry::Pair(k, v) => format!("{}: {}", key_text(k), render_nested(v, config)),
             Entry::Element(child) => render_element(child.as_view(), config),
             Entry::Hole(hole) => render_hole(hole, config),

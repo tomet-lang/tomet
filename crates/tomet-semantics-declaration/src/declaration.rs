@@ -130,12 +130,12 @@ impl Declaration {
     /// What this declaration says, as `(name, value)` entries of its declaration: the one answer
     /// whichever way it was written.
     ///
-    /// - **Grouped**, no path: `::field(author: { type: string }, created: { type: datetime })` is two
+    /// - **Grouped**, no path: `::field(author: ( type: string ), created: ( type: datetime ))` is two
     ///   entries, named by the arguments.
     /// - **Dotted**, a path: `::field.author(type: string)` is one entry, named by the path
     ///   (`author`, or `url.wiki` for `::field.url.wiki`), whose value is what the parentheses hold:
     ///   named arguments are the fields of a tuple. This is the grouped entry
-    ///   `author: { type: string }`, with the same value.
+    ///   `author: ( type: string )`, with the same value.
     ///
     ///   Positional arguments are the value itself, the entry's own slot (`X.X` is `X`):
     ///   `::macro.copyright("(C)")` is `copyright: "(C)"`, and several are a tuple, so

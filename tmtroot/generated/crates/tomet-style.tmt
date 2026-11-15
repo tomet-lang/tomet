@@ -1,6 +1,6 @@
 ::kind(api)
 
-::meta{crate: tomet-style, dependencies: list(tomet-ast, tomet-config, tomet-field-utils, tomet-semantics, tomet-tree, tomet-type), dependents: list(tomet-edit, tomet-printer, tomet-transform)}
+::meta(crate: tomet-style, dependencies: list(tomet-ast, tomet-config, tomet-field-utils, tomet-semantics, tomet-tree, tomet-type), dependents: list(tomet-edit, tomet-printer, tomet-transform))
 
 =[tomet-style]
 

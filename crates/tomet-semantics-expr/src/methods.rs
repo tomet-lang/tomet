@@ -1,7 +1,7 @@
 //! Methods: what a value of a given type can be asked to do.
 //!
 //! A method works on its receiver and the arguments it is given, and never
-//! converts either: `.join` joins scalars, `.contains` asks a list, a map or a
+//! converts either: `.join` joins scalars, `.contains` asks a tuple or a
 //! string the question that suits it, and a type with no such method says so.
 
 use std::cmp::Ordering;

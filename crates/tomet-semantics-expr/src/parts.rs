@@ -137,10 +137,10 @@ fn block_value(doc: &DocRef, block: &Block) -> EvalValue {
 
 // ---- members of a part -------------------------------------------------------
 
-/// The data a node holds -- its `(args)` and `{value}` -- seen as one map: the value's keys win
+/// The data a node holds -- its `(args)` and `{value}` -- seen as one tuple: the value's keys win
 /// on a conflict, since `{value}` is where a node's real data usually
 /// lives (`::meta(...)`) while `(args)` tends toward attributes. When neither is
-/// a map, whichever scalar group there is.
+/// a tuple, whichever scalar group there is.
 fn data(doc: &DocRef, args: &Option<Tuple>, value: &Option<Group>) -> EvalValue {
     let value_tuple = value.as_ref().map(|v| v.as_data());
     let merged = match (args, value_tuple) {
@@ -321,8 +321,8 @@ fn retired_prop() -> EvalError {
 
 /// `part::member`: from a node to what hangs off it. The node's own `id`, `name`, `content` and
 /// `connects`; the `doc` it is in; its `meta`, which is its `{...}` (`@user(id: "u1"){ tag: vip }` is
-/// `@user(id: "u1")::meta(tag: vip)`, and the map is empty when there is none); or the connect of
-/// that name stacked after it (`u1::rule`), as the map of its data.
+/// `@user(id: "u1")::meta(tag: vip)`, and the tuple is empty when there is none); or the connect of
+/// that name stacked after it (`u1::rule`), as the tuple of its data.
 pub(crate) fn part_connect(
     doc: &DocRef,
     part: &Part,
@@ -365,7 +365,7 @@ pub(crate) fn part_connect(
     }
 }
 
-/// The `{...}` a part carries, as a map: empty when it has none.
+/// The `{...}` a part carries, as a tuple: empty when it has none.
 fn part_meta(doc: &DocRef, part: &Part) -> EvalValue {
     let group = match part {
         Part::Element(el) => &el.data.value,

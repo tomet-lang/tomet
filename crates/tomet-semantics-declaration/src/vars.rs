@@ -1,8 +1,8 @@
-//! `::var(name: { type, default, about })` -- the variables a document or
+//! `::var(name: ( type, default, about ))` -- the variables a document or
 //! a vault declares. See `tmtroot/spec/elements/std.var.element.tmt`.
 //!
-//! Every entry is a declaration, a map of fields; there is no spelling that
-//! writes a value directly, so a map-valued default is never mistaken for a
+//! Every entry is a declaration, a tuple of fields; there is no spelling that
+//! writes a value directly, so a tuple-valued default is never mistaken for a
 //! declaration (it goes in `default:`).
 
 use tomet_ast::{Block, Inline, Value};
@@ -101,7 +101,7 @@ fn plain_text(value: &Value) -> Option<String> {
 }
 
 /// The entries of one `::var` declaration, each read, or the reason it cannot be: the entries of
-/// its `(...)`, `::var(a: { type: int })`, as for `::macro`.
+/// its `(...)`, `::var(a: ( type: int ))`, as for `::macro`.
 pub fn read_var_decls(declaration: &Declaration) -> Vec<(String, Result<VarDecl, String>)> {
     crate::read::entries(declaration)
         .into_iter()
