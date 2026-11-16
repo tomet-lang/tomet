@@ -260,7 +260,8 @@ fn rename_keys(value: &mut Value, ident: &str) {
     match value {
         Value::Tuple(tuple) => rename_tuple_keys(tuple, ident),
         Value::Call(_, tuple) => rename_tuple_keys(tuple, ident),
-        Value::Null
+        Value::None
+        | Value::Auto
         | Value::Bool(_)
         | Value::Int(_)
         | Value::Float(_)

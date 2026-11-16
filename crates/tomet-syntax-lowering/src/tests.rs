@@ -378,7 +378,10 @@ fn a_key_written_twice_is_a_clash_that_names_the_first_place() {
 #[test]
 fn tuple_duplicate_keys_and_literal_constructors() {
     for (src, message) in [
-        ("@memo(\"0\": a, b)\n", "duplicate key `0`"),
+        (
+            "@memo(\"0\": a, b)\n",
+            "a value without a name must come before the named ones",
+        ),
         ("@memo(b, \"0\": a)\n", "duplicate key `0`"),
         (
             "@memo(\"0\": 1)::(2)\n",
@@ -398,15 +401,15 @@ fn tuple_duplicate_keys_and_literal_constructors() {
         assert_eq!(e.message, message, "{src:?}");
     }
 
-    // ("1": a, b) is not an error
-    let doc = file("@memo(\"1\": a, b)\n").unwrap();
+    // (b, "2": a) is valid: unnamed before named
+    let doc = file("@memo(b, \"2\": a)\n").unwrap();
     let Block::Element(el) = &doc.body[0] else {
         panic!()
     };
     let args = el.data.args.as_ref().unwrap();
     assert_eq!(args.len(), 2);
-    assert_eq!(args.nth(0).unwrap().name(), Some("1"));
-    assert_eq!(args.nth(1).unwrap().name(), None);
+    assert_eq!(args.nth(0).unwrap().name(), None);
+    assert_eq!(args.nth(1).unwrap().name(), Some("2"));
 
     // ("404": x, "500": y) is a tuple with two keys and nothing more
     let doc = file("@memo(\"404\": x, \"500\": y)\n").unwrap();
@@ -432,4 +435,81 @@ fn value_starting_brace_is_error_and_middle_brace_is_scalar() {
     };
     let args = el.data.args.as_ref().unwrap();
     assert_eq!(args.get("a"), Some(&Value::String("x {y}".into())));
+}
+
+#[test]
+fn dotted_declaration_heads_are_refused_with_advice() {
+    for (src, want) in [
+        ("::field.author(type: string)\n", "a declaration head has no dot: write `::field(author: (...))`"),
+        ("::macro.copyright(\"copy\")\n", "a declaration head has no dot: write `::macro(copyright: (...))`"),
+        ("::blueprint.x(a: 1)\n", "a declaration head has no dot: write `::blueprint(x: (...))`"),
+        ("::vocabulary.x(version: \"1.0.0\")\n", "a declaration head has no dot: write `::vocabulary(x: (...))`"),
+        ("::field.url.wiki(type: list)\n", "a declaration head has no dot: write `::field(url.wiki: (...))`"),
+    ] {
+        let err = file(src).unwrap_err();
+        assert_eq!(err.message, want, "{src}");
+    }
+}
+
+#[test]
+fn positions_only_on_the_left_for_all_four_paren_kinds() {
+    const WANT_ERR: &str = "a value without a name must come before the named ones";
+
+    // 1. Value tuple
+    for valid in ["(a, b, k: v)", "(1: a, 2: b)", "(\"1\": a, \"2\": b)", "(a, b)"] {
+        assert!(value(valid).is_ok(), "{valid}");
+    }
+    for invalid in ["(a, k: v, b)", "(\"1\": a, b)", "(\"0\": a, b)", "(1: a, b)"] {
+        let err = value(invalid).unwrap_err();
+        assert_eq!(err.message, WANT_ERR, "{invalid}");
+    }
+
+    // 2. Call args
+    for valid in [
+        "@c(x: glyph(triangle, pkg: lucide))\n",
+        "@c(x: glyph(1: a, 2: b))\n",
+    ] {
+        assert!(file(valid).is_ok(), "{valid}");
+    }
+    for invalid in [
+        "@c(x: glyph(pkg: lucide, triangle))\n",
+        "@c(x: glyph(\"1\": a, b))\n",
+    ] {
+        let err = file(invalid).unwrap_err();
+        assert_eq!(err.message, WANT_ERR, "{invalid}");
+    }
+
+    // 3. Element args
+    for valid in [
+        "@card(a, k: v)\n",
+        "@card(1: a, 2: b)\n",
+        "@card(a, b)\n",
+    ] {
+        assert!(file(valid).is_ok(), "{valid}");
+    }
+    for invalid in [
+        "@card(k: v, a)\n",
+        "@card(\"1\": a, b)\n",
+        "@card(1: a, b)\n",
+    ] {
+        let err = file(invalid).unwrap_err();
+        assert_eq!(err.message, WANT_ERR, "{invalid}");
+    }
+
+    // 4. Declaration args
+    for valid in [
+        "::use(a, k: v)\n",
+        "::decl(1: a, 2: b)\n",
+        "::use(a, b)\n",
+    ] {
+        assert!(file(valid).is_ok(), "{valid}");
+    }
+    for invalid in [
+        "::use(k: v, a)\n",
+        "::decl(\"1\": a, b)\n",
+        "::decl(1: a, b)\n",
+    ] {
+        let err = file(invalid).unwrap_err();
+        assert_eq!(err.message, WANT_ERR, "{invalid}");
+    }
 }

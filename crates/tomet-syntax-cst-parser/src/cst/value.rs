@@ -50,7 +50,7 @@ impl<'a, 't> CstParser<'a, 't> {
                     None
                 }
             }
-            K::TRUE_KW | K::FALSE_KW | K::NULL_KW => {
+            K::TRUE_KW | K::FALSE_KW | K::NONE_KW | K::AUTO_KW => {
                 let n = self.name_tokens_at(from);
                 if n > 1 {
                     let colon_tok = self.skip_ws_from(from + n);

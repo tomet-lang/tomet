@@ -173,7 +173,7 @@ mod tests {
             panic!("meta is a tuple");
         };
         assert_eq!(go.get("tags"), Some(&EvalValue::Tuple(Tuple::new())));
-        assert_eq!(go.get("created"), Some(&EvalValue::Null));
+        assert_eq!(go.get("created"), Some(&EvalValue::None));
         let _ = fs::remove_dir_all(&root);
     }
 
@@ -203,7 +203,7 @@ mod tests {
         let vault = Vault::discover(&root);
         let resolver = vault.resolver();
         let macros = HashMap::new();
-        let var = EvalValue::Null;
+        let var = EvalValue::None;
         let cx = EvalContext {
             resolver: &resolver,
             self_doc: DocRef("index.tmt".into()),

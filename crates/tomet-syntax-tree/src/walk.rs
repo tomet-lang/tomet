@@ -248,7 +248,8 @@ pub fn children<'a>(node: Node<'a>, f: &mut dyn FnMut(Node<'a>, Place)) {
                     f(Node::Block(b), Place::Content);
                 }
             }
-            Value::Null
+            Value::None
+            | Value::Auto
             | Value::Interp(_)
             | Value::TypeSeat(_)
             | Value::Bool(_)
@@ -758,7 +759,8 @@ impl<S: Sink> MutWalk<'_, S> {
                     self.block(b);
                 }
             }
-            Value::Null
+            Value::None
+            | Value::Auto
             | Value::Interp(_)
             | Value::TypeSeat(_)
             | Value::Bool(_)

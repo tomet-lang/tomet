@@ -468,7 +468,7 @@ fn value_to_string(v: &Value) -> String {
     }
     match v {
         // A hole and a type seat are a blueprint's, and have no value to index.
-        Value::Null | Value::Hole(_) | Value::TypeSeat(_) => String::new(),
+        Value::None | Value::Auto | Value::Hole(_) | Value::TypeSeat(_) => String::new(),
         Value::Bool(_) | Value::Int(_) | Value::Float(_) | Value::Number(_) | Value::String(_) => {
             v.scalar_text().map(|t| t.into_owned()).unwrap_or_default()
         }

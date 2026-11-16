@@ -10,13 +10,11 @@
 //!   | rather than in it; only the header of `::blueprint` adds a `{data}`
 //!   | body to it. (A dictionary's terms are blocks of the document body, not data of its header.) This crate is that and only that: a datetime, a type or an
 //!   | expression is another concept and lives elsewhere.
-//! - (Singular names, a path in the head)
-//!   | Every name is singular, and what a declaration holds is written either in the head as a
-//!   | dot-path, `::field.author(type: string)[ the author ]`, or grouped under the name,
-//!   | `::field(author: ( type: string ))`. [`Declaration::entries`] is the one place the two meet,
-//!   | so every reader sees the same entries. A first positional argument is the entry itself
-//!   | (`X.X` is `X`), and a trailing `[...]` is its `about` or, for a macro, its value. The plural
-//!   | spellings (`::fields`) are retired and reported as such ([`Problem::Retired`]).
+//! - (Singular names, grouped under the name)
+//!   | Every name is singular, and what a declaration holds is written grouped under the name,
+//!   | `::field(author: ( type: string ))`. [`Declaration::entries`] is the one place that extracts
+//!   | entries, so every reader sees the same entries. The plural spellings (`::fields`) are
+//!   | retired and reported as such ([`Problem::Retired`]).
 //! - (Shape here, meaning injected)
 //!   | [`DeclKind`] is the closed list of the standard declarations. Each has a [`Spec`]: its
 //!   | positional slots, whether it may be written once or many times, where it may be written
@@ -61,7 +59,7 @@ pub use profile::Profile;
 pub use read::{
     blueprint_target, dictionary_name, document_blueprint, document_dictionary, document_entries,
     document_id, document_kind, document_macros, document_meta, document_profiles, document_vars,
-    document_version, id_name, is_blueprint, kind_name, macros, meta, profile_names,
-    version_string,
+    document_version, document_vocabulary, id_name, is_blueprint, kind_name, macros, meta,
+    profile_names, version_string, vocabulary_namespace,
 };
 pub use vars::{VAR_KEYS, VarDecl, read_var_decls};

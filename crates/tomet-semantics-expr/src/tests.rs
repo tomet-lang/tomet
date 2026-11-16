@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use tomet_type::{AutoFill, DefaultValue, Kind, Type, TypeError};
+use tomet_type::{AutoFill, Datum, Kind, Type, TypeError};
 
 use super::*;
 
@@ -48,7 +48,7 @@ fn run_with(
 
 /// Evaluates with nothing in `var`.
 fn out(src: &str) -> Result<EvalValue, EvalError> {
-    run_with(src, &EvalValue::Null, &HashMap::new())
+    run_with(src, &EvalValue::None, &HashMap::new())
 }
 
 /// Evaluates with `var` set.
@@ -63,7 +63,9 @@ fn literals_evaluate_to_themselves() {
     assert_eq!(out("-3").unwrap(), int(-3));
     assert_eq!(out("\"hi\"").unwrap(), text("hi"));
     assert_eq!(out("true").unwrap(), EvalValue::Bool(true));
-    assert_eq!(out("null").unwrap(), EvalValue::Null);
+    assert_eq!(out("none").unwrap(), EvalValue::None);
+    assert_eq!(out("auto").unwrap(), EvalValue::Auto);
+    assert!(tomet_ast_parser::parse_interpolation_str("{$ null }").is_err());
     assert_eq!(out("(1)").unwrap(), int(1));
     assert_eq!(out("()").unwrap(), seq(vec![]));
     assert_eq!(out("(\"a\",)").unwrap(), seq(vec![text("a")]));
@@ -166,8 +168,8 @@ fn equality_compares_numbers_as_numbers_and_never_errors_across_types() {
     assert_eq!(out("1 != 2").unwrap(), EvalValue::Bool(true));
     assert_eq!(out("\"a\" == \"a\"").unwrap(), EvalValue::Bool(true));
     assert_eq!(out("1 == \"1\"").unwrap(), EvalValue::Bool(false));
-    assert_eq!(out("null == true").unwrap(), EvalValue::Bool(false));
-    assert_eq!(out("null == null").unwrap(), EvalValue::Bool(true));
+    assert_eq!(out("none == true").unwrap(), EvalValue::Bool(false));
+    assert_eq!(out("none == none").unwrap(), EvalValue::Bool(true));
 }
 
 #[test]
@@ -187,9 +189,9 @@ fn ordering_takes_two_numbers_or_two_strings_and_nothing_else() {
         })
     );
     assert_eq!(
-        out("null < 1"),
+        out("none < 1"),
         Err(EvalError::NotComparable {
-            left: "null",
+            left: "none",
             right: "int"
         })
     );
@@ -213,8 +215,8 @@ fn and_or_take_only_booleans() {
         Err(EvalError::TypeMismatch { got: "int", .. })
     ));
     assert!(matches!(
-        out("null || true"),
-        Err(EvalError::TypeMismatch { got: "null", .. })
+        out("none || true"),
+        Err(EvalError::TypeMismatch { got: "none", .. })
     ));
     assert!(matches!(
         out("true && \"x\""),
@@ -229,7 +231,7 @@ fn not_and_exists() {
         out("not(0)"),
         Err(EvalError::TypeMismatch { got: "int", .. })
     ));
-    assert_eq!(out("exists(null)").unwrap(), EvalValue::Bool(false));
+    assert_eq!(out("exists(none)").unwrap(), EvalValue::Bool(false));
     assert_eq!(out("exists(0)").unwrap(), EvalValue::Bool(true));
     assert_eq!(out("exists(\"\")").unwrap(), EvalValue::Bool(true));
 }
@@ -384,9 +386,9 @@ fn an_item_with_no_key_goes_last_whichever_way_the_rest_are_ordered() {
         "xs",
         seq(vec![
             map(vec![("k", int(2)), ("n", text("a"))]),
-            map(vec![("k", EvalValue::Null), ("n", text("none1"))]),
+            map(vec![("k", EvalValue::None), ("n", text("none1"))]),
             map(vec![("k", int(1)), ("n", text("b"))]),
-            map(vec![("k", EvalValue::Null), ("n", text("none2"))]),
+            map(vec![("k", EvalValue::None), ("n", text("none2"))]),
         ]),
     )]);
     assert_eq!(
@@ -398,7 +400,7 @@ fn an_item_with_no_key_goes_last_whichever_way_the_rest_are_ordered() {
         seq(vec![text("a"), text("b"), text("none1"), text("none2")])
     );
     // Only keys that exist have to agree: a number and a string still clash.
-    let clash = map(vec![("xs", seq(vec![int(1), EvalValue::Null, text("a")]))]);
+    let clash = map(vec![("xs", seq(vec![int(1), EvalValue::None, text("a")]))]);
     assert!(with_var("var.xs.sort(x => x)", clash).is_err());
 }
 
@@ -429,7 +431,7 @@ fn join_takes_scalars_only() {
         with_var("var.xs.join(\",\")", nested),
         Err(EvalError::TypeMismatch { got: "tuple", .. })
     ));
-    let nulls = map(vec![("xs", seq(vec![EvalValue::Null]))]);
+    let nulls = map(vec![("xs", seq(vec![EvalValue::None]))]);
     assert!(with_var("var.xs.join(\",\")", nulls).is_err());
 }
 
@@ -468,7 +470,7 @@ fn maps_and_strings_have_their_own_contains_and_get() {
 
 #[test]
 fn scalar_zero_member_and_tuple_operations() {
-    // b.0 == b for each scalar, and not for a tuple, a call, Null
+    // b.0 == b for each scalar, and not for a tuple, a call, None
     let vars = map(vec![
         ("s", text("hello")),
         ("i", int(42)),
@@ -513,11 +515,11 @@ fn scalar_zero_member_and_tuple_operations() {
         })
     );
 
-    // Null, Call, and Tuple without "0" do NOT have .0
+    // None, Call, and Tuple without "0" do NOT have .0
     assert_eq!(
-        out("null.0"),
+        out("none.0"),
         Err(EvalError::UnknownMember {
-            on: "null",
+            on: "none",
             member: "0".into()
         })
     );
@@ -859,11 +861,11 @@ fn addresses_by_position_and_signature_alias() {
 }
 
 #[test]
-fn a_method_on_the_wrong_type_or_on_null_is_an_error() {
+fn a_method_on_the_wrong_type_or_on_none_is_an_error() {
     assert_eq!(
-        out("null.contains(1)"),
+        out("none.contains(1)"),
         Err(EvalError::UnknownMember {
-            on: "null",
+            on: "none",
             member: "contains".to_string()
         })
     );
@@ -913,7 +915,7 @@ fn a_macro_fills_positional_and_named_placeholders() {
         Value::String("https://x/issues/$(1)".to_string()),
     );
     macros.insert("who".to_string(), Value::String("hi $(name)".to_string()));
-    let run = |src: &str| run_with(src, &EvalValue::Null, &macros);
+    let run = |src: &str| run_with(src, &EvalValue::None, &macros);
     assert_eq!(run("macro.gh(12)").unwrap(), text("https://x/issues/12"));
     assert_eq!(run("macro.who(name: \"ann\")").unwrap(), text("hi ann"));
     assert_eq!(
@@ -929,7 +931,7 @@ fn macro_bare_word_argument_is_unknown_name() {
         "gh".to_string(),
         Value::String("https://x/issues/$(1)".to_string()),
     );
-    let run = |src: &str| run_with(src, &EvalValue::Null, &macros);
+    let run = |src: &str| run_with(src, &EvalValue::None, &macros);
     assert_eq!(
         run("macro.gh(tomet)"),
         Err(EvalError::UnknownName("tomet".to_string()))
@@ -943,7 +945,7 @@ fn macro_non_placeholder_in_template_treated_as_plain_text() {
         "env".to_string(),
         Value::String("$(HOME)/bin:$(PATH:-/bin):$()".to_string()),
     );
-    let run = |src: &str| run_with(src, &EvalValue::Null, &macros);
+    let run = |src: &str| run_with(src, &EvalValue::None, &macros);
     assert_eq!(
         run("macro.env(HOME: \"/root\")").unwrap(),
         text("/root/bin:$(PATH:-/bin):$()")
@@ -954,7 +956,7 @@ fn macro_non_placeholder_in_template_treated_as_plain_text() {
 fn a_macro_cannot_be_named_without_being_called_and_has_no_bare_form() {
     let mut macros = HashMap::new();
     macros.insert("gh".to_string(), Value::String("x".to_string()));
-    let run = |src: &str| run_with(src, &EvalValue::Null, &macros);
+    let run = |src: &str| run_with(src, &EvalValue::None, &macros);
     assert!(run("macro.gh").is_err());
     // The bare name is not a macro and not a function.
     assert_eq!(
@@ -1016,7 +1018,7 @@ fn in_vault(src: &str) -> Result<EvalValue, EvalError> {
 /// Evaluates as written in `here.tmt` of `resolver`.
 fn in_resolver(resolver: &MemoryResolver, src: &str) -> Result<EvalValue, EvalError> {
     let macros = HashMap::new();
-    let vars = EvalValue::Null;
+    let vars = EvalValue::None;
     let cx = EvalContext {
         resolver,
         self_doc: DocRef("here.tmt".to_string()),
@@ -1164,7 +1166,7 @@ fn the_members_a_document_and_a_directory_had_with_a_dot_are_retired_to_the_doub
             "{error}"
         );
     }
-    assert_eq!(in_vault("self::id").unwrap(), EvalValue::Null);
+    assert_eq!(in_vault("self::id").unwrap(), EvalValue::None);
     assert_eq!(
         in_vault("tmt(\"docs/a.tmt\")::doc::path").unwrap(),
         text("docs/a.tmt")
@@ -1230,7 +1232,7 @@ fn document_members() {
     assert_eq!(in_vault("self::kind").unwrap(), text("note"));
     assert_eq!(
         in_vault("tmt(\"docs/a.tmt\")::kind").unwrap(),
-        EvalValue::Null
+        EvalValue::None
     );
     assert_eq!(
         in_vault("self.nope"),
@@ -1244,7 +1246,7 @@ fn document_members() {
 #[test]
 fn the_meta_a_resolver_gives_is_what_is_read() {
     // The in-memory resolver applies no settings, so a field the document
-    // lacks is absent; the vault's resolver makes it `Null` or `[]`.
+    // lacks is absent; the vault's resolver makes it `None` or `[]`.
     assert!(matches!(
         in_vault("tmt(\"docs/sub/b.tmt\")::meta.tags"),
         Err(EvalError::UnknownMember { on: "tuple", .. })
@@ -1694,7 +1696,7 @@ fn include_in(
 ) -> Result<EvalValue, EvalError> {
     let resolver = guide_vault();
     let macros = HashMap::new();
-    let vars = EvalValue::Null;
+    let vars = EvalValue::None;
     let cx = EvalContext {
         resolver: &resolver,
         self_doc: DocRef(host.to_string()),
@@ -1940,7 +1942,7 @@ fn list_vault() -> MemoryResolver {
 fn in_list_vault(src: &str) -> Result<EvalValue, EvalError> {
     let resolver = list_vault();
     let macros = HashMap::new();
-    let vars = EvalValue::Null;
+    let vars = EvalValue::None;
     let cx = EvalContext {
         resolver: &resolver,
         self_doc: DocRef("here.tmt".to_string()),
@@ -1971,7 +1973,7 @@ fn item_on_a_list_counts_its_items() {
     assert_eq!(in_list_vault("#shopping.item(0)::id").unwrap(), text("i1"));
     assert_eq!(
         in_list_vault("#shopping.item(1)::id").unwrap(),
-        EvalValue::Null
+        EvalValue::None
     );
     assert!(in_list_vault("#shopping.item(3)").is_err());
 }
@@ -2050,7 +2052,7 @@ fn evaluate_data_returns_ast_value_or_fails_when_not_storable() {
         resolver: &NoResolver,
         self_doc: DocRef("here.tmt".to_string()),
         macros: &empty_map,
-        var: &EvalValue::Null,
+        var: &EvalValue::None,
         var_unset: &[],
         includes: &[],
         heading_level: 0,
@@ -2077,7 +2079,7 @@ fn evaluate_data_returns_ast_value_or_fails_when_not_storable() {
 fn a_list_of_documents_is_a_list_that_cannot_be_stored_as_data() {
     let resolver = vault();
     let macros = HashMap::new();
-    let vars = EvalValue::Null;
+    let vars = EvalValue::None;
     let cx = EvalContext {
         resolver: &resolver,
         self_doc: DocRef("here.tmt".to_string()),
@@ -2242,7 +2244,7 @@ fn a_block_macro_is_its_blocks_with_the_places_filled_in() {
             block_macro("::macro(notice: [ Notice: $(msg) ])\n"),
         ),
     ]);
-    let run = |src: &str| run_with(src, &EvalValue::Null, &macros);
+    let run = |src: &str| run_with(src, &EvalValue::None, &macros);
 
     let EvalValue::Fragment(blocks) = run("macro.card(\"Welcome\", \"Hello\")").unwrap() else {
         panic!("a block macro is a fragment");
@@ -2279,7 +2281,7 @@ fn a_block_macro_is_its_blocks_with_the_places_filled_in() {
 #[test]
 fn a_number_given_to_a_block_macro_stays_a_number_in_data() {
     let macros = macros_of(&[("n", block_macro("::macro(n: [\n@meter(of: $(1))\n])\n"))]);
-    let run = |src: &str| run_with(src, &EvalValue::Null, &macros);
+    let run = |src: &str| run_with(src, &EvalValue::None, &macros);
     let EvalValue::Fragment(blocks) = run("macro.n(7)").unwrap() else {
         panic!("a block macro is a fragment");
     };
@@ -2308,7 +2310,7 @@ fn a_block_macro_checks_its_arguments_as_a_text_macro_does() {
         ),
         ("none", block_macro("::macro(none: [ plain ])\n")),
     ]);
-    let run = |src: &str| run_with(src, &EvalValue::Null, &macros);
+    let run = |src: &str| run_with(src, &EvalValue::None, &macros);
     assert_eq!(
         run("macro.card(\"only one\")"),
         Err(EvalError::WrongArgCount {
@@ -2337,7 +2339,7 @@ fn a_block_macro_checks_its_arguments_as_a_text_macro_does() {
 #[test]
 fn a_template_that_is_neither_a_string_nor_blocks_cannot_be_called() {
     let macros = macros_of(&[("three", Value::Int(3))]);
-    let run = |src: &str| run_with(src, &EvalValue::Null, &macros);
+    let run = |src: &str| run_with(src, &EvalValue::None, &macros);
     let Err(error) = run("macro.three()") else {
         panic!("a number is not a template");
     };
@@ -2361,7 +2363,7 @@ fn seat(src: &str) -> Result<Type, EvalError> {
         resolver: &NoResolver,
         self_doc: DocRef("here.tmt".to_string()),
         macros: &HashMap::new(),
-        var: &EvalValue::Null,
+        var: &EvalValue::None,
         var_unset: &[],
         includes: &[],
         heading_level: 0,
@@ -2474,32 +2476,37 @@ fn a_function_wins_over_a_type_of_the_same_name() {
 }
 
 #[test]
-fn auto_is_read_as_the_default_of_a_type_and_nowhere_else() {
-    // Not a name, not a value.
-    assert_eq!(out("auto"), Err(EvalError::UnknownName("auto".to_string())));
-    assert_eq!(
+fn auto_is_read_as_the_default_of_a_type_and_a_keyword_value() {
+    assert_eq!(out("auto").unwrap(), EvalValue::Auto);
+    assert!(matches!(
         out("add(1, auto)"),
-        Err(EvalError::UnknownName("auto".to_string()))
-    );
+        Err(EvalError::TypeMismatch { got: "auto", .. })
+    ));
     // Not as another argument of a type, nor by position.
     assert_eq!(
         out("nanoid(length: auto)"),
-        Err(EvalError::UnknownName("auto".to_string()))
+        Err(EvalError::BadType(TypeError::AutoElsewhere {
+            ty: Kind::Nanoid,
+            argument: "length".to_string(),
+        }))
     );
     assert_eq!(
         out("list(auto)"),
-        Err(EvalError::UnknownName("auto".to_string()))
+        Err(EvalError::BadType(TypeError::AutoElsewhere {
+            ty: Kind::List,
+            argument: "item".to_string(),
+        }))
     );
     // Not as the default of anything but a type.
     assert_eq!(
         out("add(default: auto)"),
-        Err(EvalError::UnknownName("auto".to_string()))
+        Err(EvalError::Message("`add` takes no named argument, got `default`".into()))
     );
-    // As the default of a type it is the type's `auto`, not evaluated.
+    // As the default of a type it is the type's `auto`.
     let EvalValue::Type(made) = out("uuid(default: auto)").unwrap() else {
         panic!("a type");
     };
-    assert_eq!(made.default(), Some(&DefaultValue::Auto));
+    assert_eq!(made.default(), Some(&Datum::Auto));
     assert_eq!(made.auto(), Some(AutoFill::Id));
 }
 
@@ -2509,7 +2516,7 @@ fn auto_is_admitted_for_the_kinds_that_make_a_value_up_and_refused_for_the_rest(
     // type (`a_type_seat_admits_auto_only_for_the_kinds_that_make_a_value_up`).
     assert_eq!(
         out("version(default: auto)"),
-        Err(EvalError::UnknownName("auto".to_string()))
+        Err(EvalError::Message("`version` takes no named argument, got `default`".into()))
     );
     for kind in Kind::ALL
         .into_iter()
@@ -2671,7 +2678,7 @@ fn a_type_is_not_data_and_not_text() {
         resolver: &NoResolver,
         self_doc: DocRef("here.tmt".to_string()),
         macros: &HashMap::new(),
-        var: &EvalValue::Null,
+        var: &EvalValue::None,
         var_unset: &[],
         includes: &[],
         heading_level: 0,
@@ -2757,11 +2764,14 @@ fn a_type_seat_admits_auto_only_for_the_kinds_that_make_a_value_up() {
     // And `auto` is nothing outside `default`.
     assert_eq!(
         seat("nanoid(length: auto)"),
-        Err(EvalError::UnknownName("auto".to_string()))
+        Err(bad(TypeError::AutoElsewhere {
+            ty: Kind::Nanoid,
+            argument: "length".to_string(),
+        }))
     );
     assert_eq!(
         seat("auto"),
-        Err(bad(TypeError::Unknown("auto".to_string())))
+        Err(EvalError::Message("a type seat holds a type, and `auto` is a auto".into()))
     );
 }
 

@@ -309,7 +309,7 @@ fn an_item_has_no_default_of_its_own() {
     .unwrap();
     assert_eq!(
         ty.default(),
-        Some(&DefaultValue::Given(Datum::Seq(vec![Datum::Int(1)])))
+        Some(&Datum::Seq(vec![Datum::Int(1)]))
     );
 }
 
@@ -318,10 +318,10 @@ fn an_item_has_no_default_of_its_own() {
 #[test]
 fn every_kind_takes_a_given_default() {
     for kind in Kind::ALL {
-        let ty = Type::build(kind.name(), &[], &[("default", Arg::Datum(Datum::Null))]).unwrap();
+        let ty = Type::build(kind.name(), &[], &[("default", Arg::Datum(Datum::None))]).unwrap();
         assert_eq!(
             ty.default(),
-            Some(&DefaultValue::Given(Datum::Null)),
+            Some(&Datum::None),
             "{kind}"
         );
         assert_eq!(ty.auto(), None, "{kind}");
@@ -331,11 +331,11 @@ fn every_kind_takes_a_given_default() {
 #[test]
 fn auto_is_for_the_kinds_that_make_a_value_up_and_no_other() {
     for kind in Kind::ALL {
-        let built = Type::build(kind.name(), &[], &[("default", Arg::Auto)]);
+        let built = Type::build(kind.name(), &[], &[("default", Arg::Datum(Datum::Auto))]);
         match kind.auto() {
             Some(fill) => {
                 let ty = built.unwrap_or_else(|e| panic!("{kind}: {e}"));
-                assert_eq!(ty.default(), Some(&DefaultValue::Auto));
+                assert_eq!(ty.default(), Some(&Datum::Auto));
                 assert_eq!(ty.auto(), Some(fill));
             }
             None => assert_eq!(built, Err(TypeError::AutoNotAllowed { ty: kind }), "{kind}"),
@@ -346,7 +346,7 @@ fn auto_is_for_the_kinds_that_make_a_value_up_and_no_other() {
 #[test]
 fn what_auto_makes_up_is_an_id_or_the_moment() {
     let auto = |name: &str| {
-        Type::build(name, &[], &[("default", Arg::Auto)])
+        Type::build(name, &[], &[("default", Arg::Datum(Datum::Auto))])
             .unwrap()
             .auto()
     };
@@ -367,24 +367,24 @@ fn auto_is_the_value_of_default_and_of_nothing_else() {
         })
     };
     assert_eq!(
-        Type::build("nanoid", &[], &[("length", Arg::Auto)]),
+        Type::build("nanoid", &[], &[("length", Arg::Datum(Datum::Auto))]),
         elsewhere(Kind::Nanoid, "length")
     );
     assert_eq!(
-        Type::build("uuid", &[], &[("prefix", Arg::Auto)]),
+        Type::build("uuid", &[], &[("prefix", Arg::Datum(Datum::Auto))]),
         elsewhere(Kind::Uuid, "prefix")
     );
     assert_eq!(
-        Type::build("list", &[Arg::Auto], &[]),
+        Type::build("list", &[Arg::Datum(Datum::Auto)], &[]),
         elsewhere(Kind::List, "item")
     );
     assert_eq!(
-        Type::build("nanoid", &[], &[("overwrite", Arg::Auto)]),
+        Type::build("nanoid", &[], &[("overwrite", Arg::Datum(Datum::Auto))]),
         elsewhere(Kind::Nanoid, "overwrite")
     );
     // Not even where a kind has no `default: auto` to give it meaning.
     assert_eq!(
-        Type::build("string", &[], &[("default", Arg::Auto)]),
+        Type::build("string", &[], &[("default", Arg::Datum(Datum::Auto))]),
         Err(TypeError::AutoNotAllowed { ty: Kind::String })
     );
 }
@@ -393,7 +393,7 @@ fn auto_is_the_value_of_default_and_of_nothing_else() {
 fn the_messages_name_the_type_and_the_argument() {
     let message = |err: TypeError| err.to_string();
     assert_eq!(
-        message(Type::build("string", &[], &[("default", Arg::Auto)]).unwrap_err()),
+        message(Type::build("string", &[], &[("default", Arg::Datum(Datum::Auto))]).unwrap_err()),
         "`string` has no `default: auto`; only `datetime`, `date`, `uuid` and `nanoid` make a value up"
     );
     assert_eq!(
@@ -424,7 +424,7 @@ fn the_messages_name_the_type_and_the_argument() {
         "`list` takes 1 argument written by position (its item type), and 2 are written"
     );
     assert_eq!(
-        message(Type::build("nanoid", &[], &[("prefix", Arg::Auto)]).unwrap_err()),
+        message(Type::build("nanoid", &[], &[("prefix", Arg::Datum(Datum::Auto))]).unwrap_err()),
         "`nanoid`: `auto` is the value of `default` and of nothing else, not of `prefix`"
     );
     assert_eq!(
@@ -463,7 +463,7 @@ fn the_text_form_is_the_canonical_spelling() {
         ("float(default: 1.5)", "float(default: 1.5)"),
         ("float(default: 100000.0)", "float(default: 1e5)"),
         ("bool(default: true)", "bool(default: true)"),
-        ("string(default: null)", "string(default: null)"),
+        ("string(default: none)", "string(default: none)"),
         ("nanoid(overwrite: true)", "nanoid(overwrite: true)"),
         ("nanoid", "nanoid(overwrite: false)"),
         (
@@ -557,7 +557,11 @@ fn a_text_that_is_not_well_formed_says_where() {
     );
     assert_eq!(
         at("string(default: (a))").1,
-        "text in quotes, a number, `true`, `false`, `null` or a list"
+        "text in quotes, a number, `true`, `false`, `none` or a list"
+    );
+    assert_eq!(
+        refused("string(default: null)").to_string(),
+        "`string(default: null)` is not a type: expected a bare `null` is an error: write `none` at byte 16"
     );
     assert_eq!(
         refused("list(string").to_string(),
@@ -609,8 +613,8 @@ fn strings_with_what_needs_escaping_read_back() {
 fn sample() -> Vec<Type> {
     let defaults: Vec<Option<Arg>> = vec![
         None,
-        Some(Arg::Auto),
-        Some(Arg::Datum(Datum::Null)),
+        Some(Arg::Datum(Datum::Auto)),
+        Some(Arg::Datum(Datum::None)),
         Some(Arg::Datum(Datum::Bool(false))),
         Some(Arg::Datum(Datum::Int(-7))),
         Some(Arg::Datum(Datum::Float(0.1))),
@@ -621,7 +625,7 @@ fn sample() -> Vec<Type> {
         Some(Arg::Datum(Datum::Seq(vec![
             Datum::Int(1),
             Datum::Text("a".to_string()),
-            Datum::Seq(vec![Datum::Null]),
+            Datum::Seq(vec![Datum::None]),
         ]))),
     ];
     let mut out = Vec::new();

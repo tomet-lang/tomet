@@ -4,7 +4,7 @@
 //! ```text
 //! type    = name [ "(" [ argument { "," argument } ] ")" ]
 //! argument = [ name ":" ] value
-//! value   = type | "auto" | "null" | "true" | "false" | number | string | list
+//! value   = type | "auto" | "none" | "true" | "false" | number | string | list
 //! list    = "(" [ value { "," value } ] ")"
 //! ```
 //!
@@ -152,7 +152,7 @@ impl<'a> Reader<'a> {
         Ok(None)
     }
 
-    /// An argument's value: a type, `auto`, or a plain value.
+    /// An argument's value: a type or a plain value.
     fn value(&mut self) -> Result<Arg, TypeError> {
         self.skip_space();
         if matches!(self.peek(), Some('"' | '(')) {
@@ -160,16 +160,13 @@ impl<'a> Reader<'a> {
         }
         let start = self.at;
         let word = self.word("a value")?;
-        if word == "auto" {
-            return Ok(Arg::Auto);
-        }
         if let Some(datum) = self.literal(word, start)? {
             return Ok(Arg::Datum(datum));
         }
         Ok(Arg::Type(self.type_named(word)?))
     }
 
-    /// A plain value: text, a number, `true`, `false`, `null` or a list of them.
+    /// A plain value: text, a number, `true`, `false`, `none` or a list of them.
     fn datum(&mut self) -> Result<Datum, TypeError> {
         self.skip_space();
         match self.peek() {
@@ -205,7 +202,7 @@ impl<'a> Reader<'a> {
                     None => {
                         self.at = start;
                         Err(self.malformed(
-                            "text in quotes, a number, `true`, `false`, `null` or a list",
+                            "text in quotes, a number, `true`, `false`, `none` or a list",
                         ))
                     }
                 }
@@ -213,12 +210,17 @@ impl<'a> Reader<'a> {
         }
     }
 
-    /// The plain value `word` is -- `null`, `true`, `false` or a number -- or
+    /// The plain value `word` is -- `none`, `true`, `false` or a number -- or
     /// `None` when it is none of them (so a name). `start` is where it began,
     /// for the error of a number that is not one.
     fn literal(&mut self, word: &str, start: usize) -> Result<Option<Datum>, TypeError> {
         match word {
-            "null" => return Ok(Some(Datum::Null)),
+            "null" => {
+                self.at = start;
+                return Err(self.malformed("a bare `null` is an error: write `none`"));
+            }
+            "none" => return Ok(Some(Datum::None)),
+            "auto" => return Ok(Some(Datum::Auto)),
             "true" => return Ok(Some(Datum::Bool(true))),
             "false" => return Ok(Some(Datum::Bool(false))),
             _ => {}

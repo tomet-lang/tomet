@@ -41,10 +41,8 @@ pub(crate) fn is_constructor(name: &str) -> bool {
 
 /// Builds the type `name(args)`.
 ///
-/// Arguments by position are evaluated, so `list(string)` is given the type
-/// `string`. `auto` is not a name: it is read here, and only as the value of
-/// the argument `default`, which is why this takes the arguments as written
-/// and not as evaluated.
+/// Arguments are evaluated: `list(string)` is given the type `string`, and `default: auto`
+/// is given the value `auto`.
 pub(crate) fn construct(
     name: &str,
     args: &[InterpExpr],
@@ -56,31 +54,21 @@ pub(crate) fn construct(
     for arg in args {
         match &arg.kind {
             InterpExprKind::NamedArg { name: key, value } => {
-                let arg = if key == "default" && is_auto(value) {
-                    Arg::Auto
-                } else {
-                    let mut arg = argument(name, super::eval(value, cx, env)?)?;
-                    if name == "list"
-                        && key == "default"
-                        && matches!(&value.kind, InterpExprKind::Group(_))
-                    {
-                        if let Arg::Datum(d) = arg {
-                            arg = Arg::Datum(Datum::Seq(vec![d]));
-                        }
+                let mut arg = argument(name, super::eval(value, cx, env)?)?;
+                if name == "list"
+                    && key == "default"
+                    && matches!(&value.kind, InterpExprKind::Group(_))
+                {
+                    if let Arg::Datum(d) = arg {
+                        arg = Arg::Datum(Datum::Seq(vec![d]));
                     }
-                    arg
-                };
+                }
                 named.push((key.as_str(), arg));
             }
             _ => positional.push(argument(name, super::eval(arg, cx, env)?)?),
         }
     }
     Type::build(name, &positional, &named).map_err(EvalError::BadType)
-}
-
-/// Whether `value` is the bare word `auto`.
-fn is_auto(value: &InterpExpr) -> bool {
-    matches!(&value.kind, InterpExprKind::Identifier(word) if word == "auto")
 }
 
 /// An evaluated value as an argument of the type `ty`: a type, or plain data.
@@ -96,7 +84,7 @@ fn argument(ty: &str, value: EvalValue) -> Result<Arg, EvalError> {
         .ok_or_else(|| {
             EvalError::mismatch(
                 format!("an argument of the type `{ty}`"),
-                "a type or plain data: a number, text, `true`, `false`, `null` or a list of them",
+                "a type or plain data: a number, text, `true`, `false`, `none`, `auto` or a list of them",
                 value.type_name(),
             )
         })
@@ -106,7 +94,8 @@ fn argument(ty: &str, value: EvalValue) -> Result<Arg, EvalError> {
 /// (a map, an element, content).
 fn datum(value: &Value) -> Option<Datum> {
     Some(match value {
-        Value::Null => Datum::Null,
+        Value::None => Datum::None,
+        Value::Auto => Datum::Auto,
         Value::Bool(b) => Datum::Bool(*b),
         Value::Int(n) => Datum::Int(*n),
         Value::Float(n) => Datum::Float(*n),

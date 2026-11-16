@@ -20,7 +20,7 @@
 // external scanner. The same goes for a quoted string, which is a key when a
 // `:` follows it.
 //
-// The words of a scalar are not typed here (`null`, `true`, a number): the
+// The words of a scalar are not typed here (`none`, `auto`, `true`, a number): the
 // highlight query does that from the node's text.
 
 // A character a word may hold. `:` is left out so a key ends before its

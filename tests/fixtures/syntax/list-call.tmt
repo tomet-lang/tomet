@@ -5,7 +5,7 @@
 ::meta(
   icon: @doc.icon("triangle")
   icons: (@doc.icon("a"), @doc.icon("b", pkg:"lucide"))
-  mixed: @doc.icon(pkg:"lucide", "triangle")
+  mixed: @doc.icon("triangle", pkg:"lucide")
 )
 
 =[ 値の中の要素と列 ]

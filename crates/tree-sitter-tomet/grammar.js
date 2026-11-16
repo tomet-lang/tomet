@@ -543,7 +543,7 @@ module.exports = grammar({
     // (`x => body`, `(a, b) => body`), `doc#id`, and `addr(...)`. See
     // `tmtroot/spec/expressions/`. Precedence is only here to keep the tree
     // unambiguous; the real parser (`tomet-parser/src/interp.rs`) is the
-    // authority. `true` / `false` / `null` read as plain identifiers.
+    // authority. `true` / `false` / `none` / `auto` read as plain identifiers.
     _interp_expr: ($) =>
       choice($.interp_binary, $.interp_lambda, $._interp_operand),
     _interp_operand: ($) =>
@@ -772,7 +772,7 @@ module.exports = grammar({
         3,
         seq(
           token(prec(2, "::")),
-          field("name", $._element_name),
+          field("name", $._declaration_name),
           $._nexus_groups,
         ),
       ),
@@ -1012,6 +1012,13 @@ module.exports = grammar({
     // `_entry_value`/`scalar`'s comment). Aliased back to `identifier`
     // (referencing the rule, not a bare string) so it still shows up as
     // a normal, visible `identifier` node in the tree.
+    // A declaration name is an ASCII identifier with no `.` (a declaration head has no dot).
+    _declaration_name: ($) =>
+      alias(
+        token(prec(1, /[A-Za-z_][A-Za-z0-9_-]*/)),
+        $.identifier,
+      ),
+
     // An element name is an ASCII identifier, optionally `.`-separated
     // into `namespace.name`. The old permissive charset existed to let
     // `<id:taskA>` smuggle a target through the name; that is

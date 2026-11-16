@@ -81,7 +81,7 @@ pub struct Prepared {
 /// Validates `source` the way a host with no disk can: what `tomet check` says
 /// of it, given the vault's pieces as text.
 ///
-/// - `vocabularies`: `::vocabulary.ns()` documents. One that does not parse, has
+/// - `vocabularies`: `::vocabulary(ns)` documents. One that does not parse, has
 ///   no header, or claims a reserved or already-taken namespace is skipped: it
 ///   binds no namespace.
 /// - `config`: the settings, as a config document (what `default.config.tmt`
@@ -666,7 +666,7 @@ mod tests {
         );
     }
 
-    const ACME: &str = "::kind(vocabulary)\n::vocabulary.acme(version: \"1.0.0\")\n";
+    const ACME: &str = "::kind(vocabulary)\n::vocabulary(acme, version: \"1.0.0\")\n";
 
     #[test]
     fn a_vocabulary_handed_in_as_text_binds_like_one_read_from_disk() {
@@ -684,7 +684,7 @@ mod tests {
             ".",
             &[(
                 "doc.tmt",
-                "::kind(vocabulary)\n::vocabulary.doc(version: \"1.0.0\")\n",
+                "::kind(vocabulary)\n::vocabulary(doc, version: \"1.0.0\")\n",
             )],
         );
         assert!(

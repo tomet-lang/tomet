@@ -288,7 +288,7 @@ pub fn apply_blueprint(
                                 .as_ref()
                                 .and_then(|args| args.get("id"))
                                 .cloned()
-                                .unwrap_or(Value::Null);
+                                .unwrap_or(Value::None);
                             if !value_satisfies_type(&doc_val, &ty) {
                                 overwrite_id = true;
                             }
@@ -536,7 +536,7 @@ mod tests {
     fn instantiating_leaves_one_kind() {
         let (doc, _) = instantiate(
             "::kind(blueprint)\n::blueprint(daily-note){\n  version: \"1.0\"\n}\n\n=[ Plan ]\n",
-            EvalValue::Null,
+            EvalValue::None,
         );
 
         let mut kinds = Vec::new();
@@ -632,7 +632,7 @@ mod tests {
             resolver: &NoResolver,
             self_doc: DocRef("test.tmt".into()),
             macros: &macros,
-            var: &EvalValue::Null,
+            var: &EvalValue::None,
             var_unset: &[],
             includes: &[],
             heading_level: 0,
@@ -794,7 +794,7 @@ mod tests {
             resolver: &NoResolver,
             self_doc: DocRef("test.tmt".into()),
             macros: &macros,
-            var: &EvalValue::Null,
+            var: &EvalValue::None,
             var_unset: &[],
             includes: &[],
             heading_level: 0,

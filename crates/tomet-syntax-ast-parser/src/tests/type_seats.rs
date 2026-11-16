@@ -41,7 +41,7 @@ fn a_seat_holds_the_type_as_the_expression_it_is_written() {
         ("<$date>", "Identifier(date)"),
         (
             "<$date(default: auto)>",
-            "Call(Identifier(date), [NamedArg(default, Identifier(auto))])",
+            "Call(Identifier(date), [NamedArg(default, Auto)])",
         ),
         (
             "<$list(string, length: 6)>",
@@ -49,7 +49,7 @@ fn a_seat_holds_the_type_as_the_expression_it_is_written() {
         ),
         (
             r#"<$nanoid(length: 8, prefix: "note-", default: auto)>"#,
-            r#"Call(Identifier(nanoid), [NamedArg(length, Int(8)), NamedArg(prefix, String("note-")), NamedArg(default, Identifier(auto))])"#,
+            r#"Call(Identifier(nanoid), [NamedArg(length, Int(8)), NamedArg(prefix, String("note-")), NamedArg(default, Auto)])"#,
         ),
         // A type inside a type.
         (
@@ -148,7 +148,7 @@ fn a_seat_sits_in_running_text() {
     assert_eq!(written(first), "Identifier(uuid)");
     assert_eq!(
         written(second),
-        "Call(Identifier(date), [NamedArg(default, Identifier(auto))])"
+        "Call(Identifier(date), [NamedArg(default, Auto)])"
     );
     // Starting the line, with more text after it, it starts a paragraph.
     let items = inlines("<$uuid> is the id");
@@ -378,7 +378,7 @@ fn a_hole_and_a_name_tag_stay_what_they_were() {
 
 #[test]
 fn a_seat_that_is_not_a_type_is_refused_and_says_what_it_holds() {
-    for src in ["<$true>", "<$null>", "<$false(a)>"] {
+    for src in ["<$true>", "<$none>", "<$false(a)>"] {
         let message = error_of(src);
         assert!(
             message.contains("a type seat holds a type"),

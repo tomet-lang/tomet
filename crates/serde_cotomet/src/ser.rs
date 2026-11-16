@@ -73,16 +73,16 @@ impl ser::Serializer for ValueSerializer {
         )))
     }
     fn serialize_none(self) -> Result<Value> {
-        Ok(Value::Null)
+        Ok(Value::None)
     }
     fn serialize_some<T: Serialize + ?Sized>(self, value: &T) -> Result<Value> {
         value.serialize(self)
     }
     fn serialize_unit(self) -> Result<Value> {
-        Ok(Value::Null)
+        Ok(Value::None)
     }
     fn serialize_unit_struct(self, _name: &'static str) -> Result<Value> {
-        Ok(Value::Null)
+        Ok(Value::None)
     }
     fn serialize_unit_variant(
         self,

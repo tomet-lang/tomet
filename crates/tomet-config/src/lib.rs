@@ -412,22 +412,16 @@ mod tests {
     }
 
     #[test]
-    fn a_dotted_head_declares_what_the_grouped_form_declares() {
-        let dotted = load_config_from_str(
-            r#"::macro.copyright("(C) 2026")
-::format.meta(always_newline: true)
-::format.element.link(no_space: true, group_order: "[]()")
-::field.aliases(type: list, always_newline: true)
-::field.url.wiki(type: list, always_newline: true)
-::field.title(length: 70)[ the title ]
-::workspace.ignore("target", "build")
-::workspace.unswept("tests/fixtures")
-::blueprint.note(@file(note.blueprint.tmt))
-::vocabulary.deck(@file(deck.vocabulary.tmt))
-::dictionary.tomet(@file(tomet.dict.tmt))
-"#,
-        )
-        .expect("dotted heads");
+    fn a_dotted_head_is_an_error() {
+        assert!(load_config_from_str("::macro.copyright(\"(C) 2026\")\n").is_err());
+        assert!(load_config_from_str("::format.meta(always_newline: true)\n").is_err());
+        assert!(load_config_from_str("::field.author(type: string)\n").is_err());
+        assert!(load_config_from_str("::blueprint.x(a: 1)\n").is_err());
+        assert!(load_config_from_str("::vocabulary.x(version: \"1.0.0\")\n").is_err());
+    }
+
+    #[test]
+    fn grouped_declarations_load() {
         let grouped = load_config_from_str(
             r#"::macro(copyright: "(C) 2026")
 ::format(meta: (always_newline: true), element: (link: (no_space: true, group_order: "[]()")))
@@ -443,21 +437,16 @@ mod tests {
 "#,
         )
         .expect("grouped");
-        assert_eq!(dotted.macros, grouped.macros);
+        assert_eq!(grouped.macros.len(), 1);
         assert_eq!(
-            dotted.format.link_target_colon,
-            grouped.format.link_target_colon
-        );
-        assert_eq!(
-            dotted.meta.field_layout,
+            grouped.meta.field_layout,
             Some(tomet_style::GroupLayout::OnePerLine)
         );
-        assert_eq!(dotted.meta.fields.len(), grouped.meta.fields.len());
-        assert!(dotted.meta.fields.get("url.wiki").unwrap().always_newline);
-        assert_eq!(dotted.meta.fields.get("title").unwrap().length, Some(70));
-        assert_eq!(dotted.workspace.ignore, vec!["target", "build"]);
-        assert_eq!(dotted.workspace.unswept, vec!["tests/fixtures"]);
-        assert_eq!(dotted.registry, grouped.registry);
+        assert_eq!(grouped.meta.fields.len(), 3);
+        assert!(grouped.meta.fields.get("url.wiki").unwrap().always_newline);
+        assert_eq!(grouped.meta.fields.get("title").unwrap().length, Some(70));
+        assert_eq!(grouped.workspace.ignore, vec!["target", "build"]);
+        assert_eq!(grouped.workspace.unswept, vec!["tests/fixtures"]);
     }
 
     #[test]
@@ -505,9 +494,8 @@ mod tests {
     }
 
     #[test]
-    fn one_positional_argument_of_a_path_is_a_list_of_one_where_a_list_is_read() {
-        // `X.X` is `X`: the one argument is the entry, and a list setting reads it as a list of one.
-        let cfg = load_config_from_str("::workspace.ignore(\"target\")\n").expect("parses");
+    fn workspace_ignore_reads_as_a_list() {
+        let cfg = load_config_from_str("::workspace(ignore: (\"target\",))\n").expect("parses");
         assert_eq!(cfg.workspace.ignore, vec!["target"]);
     }
 }

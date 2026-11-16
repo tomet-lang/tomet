@@ -330,7 +330,30 @@ pub(crate) fn lower_tuple_entries(
     // here, on the text, because a tuple does not know how its entries were spelled.
     let mut written: Vec<(String, Value, usize)> = Vec::new();
     let mut unnamed_count = 0usize;
-    let mut write = |key: String, value: Value, offset: usize| -> Result<()> {
+    let mut seen_named = false;
+    // The one place that admits an entry. `key` is `None` for an entry written without a name:
+    // such an entry is refused where only named ones are allowed, and everywhere it must stand
+    // to the left of the named ones.
+    let mut write = |key: Option<String>, value: Value, offset: usize| -> Result<()> {
+        let key = match key {
+            Some(key) => {
+                seen_named = true;
+                key
+            }
+            None => {
+                if keyed_only {
+                    return Err(err(offset, "expected 'key: value' entry, found bare value"));
+                }
+                if seen_named {
+                    return Err(err(
+                        offset,
+                        "a value without a name must come before the named ones",
+                    ));
+                }
+                unnamed_count += 1;
+                (unnamed_count - 1).to_string()
+            }
+        };
         if written.iter().any(|(held, _, _)| *held == key) {
             return Err(duplicate_key_error(offset, &key));
         }
@@ -349,19 +372,7 @@ pub(crate) fn lower_tuple_entries(
             }
             K::MAP_ENTRY => {
                 let (key, value, offset) = lower_map_entry(child, raw_scalars)?;
-                match key {
-                    None => {
-                        if keyed_only {
-                            return Err(err(
-                                offset,
-                                "expected 'key: value' entry, found bare value",
-                            ));
-                        }
-                        unnamed_count += 1;
-                        write((unnamed_count - 1).to_string(), value, offset)?;
-                    }
-                    Some(key) => write(key, value, offset)?,
-                }
+                write(key, value, offset)?;
             }
             K::SEQ_ITEM => {
                 let offset = usize::from(child.text_range().start());
@@ -370,11 +381,7 @@ pub(crate) fn lower_tuple_entries(
                     raw_scalars,
                     offset,
                 )?;
-                if keyed_only {
-                    return Err(err(offset, "expected 'key: value' entry, found bare value"));
-                }
-                unnamed_count += 1;
-                write((unnamed_count - 1).to_string(), val, offset)?;
+                write(None, val, offset)?;
             }
             _ => {}
         }
@@ -797,7 +804,9 @@ fn classify_number(s: &str) -> Option<NumberShape> {
 
 pub fn scalar_from_text(s: &str) -> std::result::Result<Value, String> {
     match s {
-        "null" => return Ok(Value::Null),
+        "null" => return Err("a bare `null` is an error: write `none`".to_string()),
+        "none" => return Ok(Value::None),
+        "auto" => return Ok(Value::Auto),
         "true" => return Ok(Value::Bool(true)),
         "false" => return Ok(Value::Bool(false)),
         _ => {}
@@ -840,7 +849,8 @@ fn construct_string(args: &Tuple) -> std::result::Result<Value, String> {
         Some(Value::String(s)) => s.clone(),
         Some(Value::Int(i)) => i.to_string(),
         Some(Value::Bool(b)) => b.to_string(),
-        Some(Value::Null) => "null".to_string(),
+        Some(Value::None) => "none".to_string(),
+        Some(Value::Auto) => "auto".to_string(),
         Some(Value::Number(text)) => text.clone(),
         Some(Value::Float(f)) if f.is_finite() => Value::float_text(*f),
         Some(Value::Float(f)) if f.is_nan() => "nan".to_string(),

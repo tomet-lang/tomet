@@ -162,7 +162,8 @@ impl std::fmt::Debug for Env {
 /// What an expression evaluates to.
 #[derive(Debug, Clone, PartialEq)]
 pub enum EvalValue {
-    Null,
+    None,
+    Auto,
     Bool(bool),
     Int(i64),
     Float(f64),
@@ -199,7 +200,8 @@ impl EvalValue {
     /// The name used in error messages.
     pub fn type_name(&self) -> &'static str {
         match self {
-            EvalValue::Null => "null",
+            EvalValue::None => "none",
+            EvalValue::Auto => "auto",
             EvalValue::Bool(_) => "bool",
             EvalValue::Int(_) => "int",
             EvalValue::Float(_) => "float",
@@ -223,7 +225,8 @@ impl EvalValue {
     /// from, for the elements it may contain.
     pub fn from_ast(value: &Value, doc: &DocRef) -> EvalValue {
         match value {
-            Value::Null => EvalValue::Null,
+            Value::None => EvalValue::None,
+            Value::Auto => EvalValue::Auto,
             Value::Bool(b) => EvalValue::Bool(*b),
             Value::Int(i) => EvalValue::Int(*i),
             Value::Float(f) => EvalValue::Float(*f),
@@ -256,7 +259,8 @@ impl EvalValue {
     /// namespaces and types, and a section or a list (which are not elements).
     pub fn to_ast(&self) -> Option<Value> {
         Some(match self {
-            EvalValue::Null => Value::Null,
+            EvalValue::None => Value::None,
+            EvalValue::Auto => Value::Auto,
             EvalValue::Bool(b) => Value::Bool(*b),
             EvalValue::Int(i) => Value::Int(*i),
             EvalValue::Float(f) => Value::Float(*f),
@@ -298,14 +302,15 @@ impl EvalValue {
     /// The text of a bare scalar, if that is what the value is.
     ///
     /// Following `tmtroot/spec/expressions/overview.expr.tmt`, scalars are
-    /// `Null`, booleans, numbers, strings, and versions. A `Null` evaluates to
+    /// `None`, booleans, numbers, strings, and versions. A `None` evaluates to
     /// empty text (`""`).
     ///
     /// Returns `None` for non-scalar values (such as sequences, maps, parts,
     /// documents, directories, fragments, functions, namespaces, or types).
     pub fn scalar_text(&self) -> Option<String> {
         Some(match self {
-            EvalValue::Null => String::new(),
+            EvalValue::None => String::new(),
+            EvalValue::Auto => "auto".to_string(),
             EvalValue::Bool(b) => b.to_string(),
             EvalValue::Int(i) => i.to_string(),
             EvalValue::Float(f) => f.to_string(),
@@ -351,7 +356,7 @@ mod tests {
                 Value::Tuple(Tuple::from_unnamed([Value::String("a".into())])),
             ),
             ("ok".into(), Value::Bool(true)),
-            ("nothing".into(), Value::Null),
+            ("nothing".into(), Value::None),
         ]));
         let eval = EvalValue::from_ast(&ast, &doc());
         assert_eq!(eval.to_ast(), Some(ast));
@@ -430,7 +435,8 @@ mod tests {
 
     #[test]
     fn test_eval_value_scalar_text() {
-        assert_eq!(EvalValue::Null.scalar_text().as_deref(), Some(""));
+        assert_eq!(EvalValue::None.scalar_text().as_deref(), Some(""));
+        assert_eq!(EvalValue::Auto.scalar_text().as_deref(), Some("auto"));
         assert_eq!(EvalValue::Bool(true).scalar_text().as_deref(), Some("true"));
         assert_eq!(EvalValue::Int(42).scalar_text().as_deref(), Some("42"));
         assert_eq!(

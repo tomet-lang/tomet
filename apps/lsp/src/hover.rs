@@ -309,7 +309,8 @@ fn extract_table_aligns_from_args(args: Option<&TupleView<'_, '_>>) -> Vec<Strin
                     })
                     .collect();
             }
-            Value::Null
+            Value::None
+            | Value::Auto
             | Value::Bool(_)
             | Value::Int(_)
             | Value::Float(_)
@@ -481,7 +482,8 @@ fn find_interp_in_value(val: &Value) -> Option<tomet_ast::InterpExpr> {
                 None
             }
         }
-        Value::Null
+        Value::None
+        | Value::Auto
         | Value::Bool(_)
         | Value::Int(_)
         | Value::Float(_)
@@ -570,7 +572,8 @@ fn evaluate_for_hover(
 
 fn render_value(value: &EvalValue) -> String {
     match value {
-        EvalValue::Null => "null".to_string(),
+        EvalValue::None => "none".to_string(),
+        EvalValue::Auto => "auto".to_string(),
         EvalValue::Bool(b) => b.to_string(),
         EvalValue::Int(i) => i.to_string(),
         EvalValue::Float(f) => f.to_string(),

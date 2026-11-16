@@ -694,7 +694,8 @@ fn push_data_attrs(out: &mut String, args: &Tuple) {
 #[deny(clippy::wildcard_enum_match_arm)]
 fn value_to_plain(v: &Value) -> String {
     match v {
-        Value::Null => String::new(),
+        Value::None => String::new(),
+        Value::Auto => "auto".to_string(),
         Value::Bool(b) => b.to_string(),
         Value::Int(i) => i.to_string(),
         Value::Float(f) => Value::float_text(*f),

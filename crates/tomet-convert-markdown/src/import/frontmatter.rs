@@ -52,7 +52,7 @@ pub(super) fn extract_yaml_frontmatter(src: &str) -> (Option<Vec<(String, Value)
 
 fn yaml_to_value(v: serde_yaml::Value) -> Value {
     match v {
-        serde_yaml::Value::Null => Value::Null,
+        serde_yaml::Value::Null => Value::None,
         serde_yaml::Value::Bool(b) => Value::Bool(b),
         serde_yaml::Value::Number(n) => {
             if let Some(i) = n.as_i64() {

@@ -153,7 +153,7 @@ fn data(doc: &DocRef, args: &Option<Tuple>, value: &Option<Group>) -> EvalValue 
         }
         (Some(args_tuple), None) => Value::Tuple(args_tuple.clone()),
         (None, Some(val_tuple)) => Value::Tuple(val_tuple),
-        (None, None) => Value::Null,
+        (None, None) => Value::None,
     };
     EvalValue::from_ast(&merged, doc)
 }
@@ -332,7 +332,7 @@ pub(crate) fn part_connect(
         "id" => Ok(part
             .id()
             .map(|id| EvalValue::String(id.to_string()))
-            .unwrap_or(EvalValue::Null)),
+            .unwrap_or(EvalValue::None)),
         "name" => Ok(EvalValue::String(match part {
             Part::Element(el) => el.name.to_string(),
             Part::Connect(conn) => conn.name.to_string(),
@@ -463,10 +463,10 @@ pub(crate) fn document_connect(
             .map_err(|why| EvalError::Unresolved(format!("metadata of `{}`: {why}", doc.0))),
         "kind" => Ok(tomet_declaration::document_kind(&*load(doc, cx)?)
             .map(EvalValue::String)
-            .unwrap_or(EvalValue::Null)),
+            .unwrap_or(EvalValue::None)),
         "id" => Ok(tomet_declaration::document_id(&*load(doc, cx)?)
             .map(EvalValue::String)
-            .unwrap_or(EvalValue::Null)),
+            .unwrap_or(EvalValue::None)),
         "doc" => Ok(EvalValue::Document(doc.clone())),
         _ => Err(EvalError::UnknownMember {
             on: "document",

@@ -34,7 +34,7 @@ where
     };
 
     let is_empty = match &prop_val {
-        Value::Null => true,
+        Value::None => true,
         Value::String(s) => s.trim().is_empty(),
         Value::Tuple(tuple) => tuple.is_empty(),
         _ => false,

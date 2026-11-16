@@ -299,33 +299,22 @@ fn the_twelve_declarations_read_their_parenthesised_arguments() {
 }
 
 #[test]
-fn a_declaration_head_is_a_path_that_is_kept_whole() {
+fn a_declaration_head_with_a_dot_is_refused() {
     let src = read_fixture(Path::new("syntax/declaration-paths.tmt"));
-    let doc = parse_file(&src).expect("the declaration-paths fixture parses");
-    let heads: Vec<String> = doc.header.iter().map(|d| d.name.to_string()).collect();
-    for want in [
-        "macro.copyright",
-        "field.url.wiki",
-        "field.author",
-        "element.card",
-    ] {
-        assert!(heads.iter().any(|head| head == want), "{want} in {heads:?}");
-    }
+    let err = parse_file(&src).expect_err("declaration-paths.tmt must be refused");
+    assert!(
+        err.to_string()
+            .contains("a declaration head has no dot: write `::macro(copyright: (...))`"),
+        "expected advice for declaration-paths.tmt, got: {err}"
+    );
+
     let src = read_fixture(Path::new("syntax/declaration-paths-positional.tmt"));
-    let doc = parse_file(&src).expect("the positional fixture parses");
-    let heads: Vec<String> = doc.header.iter().map(|d| d.name.to_string()).collect();
-    for want in ["workspace.ignore", "blueprint.daily", "dictionary.tomet"] {
-        assert!(heads.iter().any(|head| head == want), "{want} in {heads:?}");
-    }
-    let src = read_fixture(Path::new("syntax/declaration-paths.tmt"));
-    let doc = parse_file(&src).expect("the declaration-paths fixture parses");
-    // The prose after the head is kept with the declaration.
-    let author = doc
-        .header
-        .iter()
-        .find(|d| d.name.to_string() == "field.author")
-        .expect("::field.author");
-    assert!(author.content.is_some());
+    let err = parse_file(&src).expect_err("declaration-paths-positional.tmt must be refused");
+    assert!(
+        err.to_string()
+            .contains("a declaration head has no dot: write `::workspace(ignore: (...))`"),
+        "expected advice for declaration-paths-positional.tmt, got: {err}"
+    );
 }
 
 #[test]

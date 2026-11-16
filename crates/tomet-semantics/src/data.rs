@@ -18,9 +18,8 @@ pub fn declaration_data(declaration: &tomet_ast::Declaration) -> Option<tomet_as
 }
 
 /// The `name: value` entries a declaration is written with, as a tuple: `::meta(title: T)` is
-/// `( title: T )`, `::meta()` is the empty tuple, and the dotted head `::field.author(type: string)` is
-/// `( author: ( type: string ) )`, the same as `::field(author: ( type: string ))`. `None` when the
-/// declaration is not written as entries, such as the lone value of `::meta(x)`.
+/// `( title: T )`, `::meta()` is the empty tuple, and `::field(author: ( type: string ))` is
+/// `( author: ( type: string ) )`. `None` when the declaration is not written as entries.
 ///
 /// What the head, the parentheses and a trailing `[...]` come to is
 /// [`tomet_declaration::Declaration::entries`]'s to say; this only asks it.

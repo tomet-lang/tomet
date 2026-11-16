@@ -3,7 +3,7 @@
 use std::fmt;
 use std::str::FromStr;
 
-use crate::{AutoFill, DefaultValue, Kind, TypeError, Version, datetime, is_uuid, text};
+use crate::{AutoFill, Datum, Kind, TypeError, Version, datetime, is_uuid, text};
 
 /// A type a value can be declared as: a [`Kind`] with the arguments that kind
 /// takes, and a `default`.
@@ -22,7 +22,7 @@ use crate::{AutoFill, DefaultValue, Kind, TypeError, Version, datetime, is_uuid,
 #[derive(Debug, Clone, PartialEq)]
 pub struct Type {
     pub(crate) form: Form,
-    pub(crate) default: Option<DefaultValue>,
+    pub(crate) default: Option<Datum>,
     pub(crate) overwrite: bool,
 }
 
@@ -135,7 +135,7 @@ impl Type {
     }
 
     /// What a value of this type is when none is written.
-    pub fn default(&self) -> Option<&DefaultValue> {
+    pub fn default(&self) -> Option<&Datum> {
         self.default.as_ref()
     }
 
@@ -146,7 +146,7 @@ impl Type {
     /// built. [`Kind::auto`] is the same question asked of the kind alone.
     pub fn auto(&self) -> Option<AutoFill> {
         match self.default {
-            Some(DefaultValue::Auto) => self.kind().auto(),
+            Some(Datum::Auto) => self.kind().auto(),
             _ => None,
         }
     }

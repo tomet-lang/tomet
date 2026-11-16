@@ -59,7 +59,8 @@ impl<'de> de::Deserializer<'de> for ValueDeserializer {
 
     fn deserialize_any<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value> {
         match self.0 {
-            Value::Null => visitor.visit_unit(),
+            Value::None => visitor.visit_unit(),
+            Value::Auto => Err(Error::msg("`auto` has no serde equivalent")),
             Value::Bool(b) => visitor.visit_bool(b),
             Value::Int(i) => visitor.visit_i64(i),
             Value::Float(f) => visitor.visit_f64(f),
@@ -114,7 +115,7 @@ impl<'de> de::Deserializer<'de> for ValueDeserializer {
 
     fn deserialize_option<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value> {
         match self.0 {
-            Value::Null => visitor.visit_none(),
+            Value::None => visitor.visit_none(),
             other => visitor.visit_some(ValueDeserializer(other)),
         }
     }

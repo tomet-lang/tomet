@@ -49,7 +49,7 @@ mod version;
 #[cfg(test)]
 mod tests;
 
-pub use arg::{Arg, Datum, DefaultValue};
+pub use arg::{Arg, Datum};
 pub use error::TypeError;
 pub use kind::{AutoFill, Kind};
 pub use ty::Type;

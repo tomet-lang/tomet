@@ -711,9 +711,11 @@ fn parse_interp_primary(cur: &mut Cursor, start_pos: usize) -> Result<InterpExpr
             // are values, not keywords: nothing else in an expression is
             // reserved by its spelling.
             let kind = match name.as_str() {
+                "null" => return Err(err(start_pos, "a bare `null` is an error: write `none`")),
                 "true" => InterpExprKind::Literal(Literal::Bool(true)),
                 "false" => InterpExprKind::Literal(Literal::Bool(false)),
-                "null" => InterpExprKind::Literal(Literal::Null),
+                "none" => InterpExprKind::Literal(Literal::None),
+                "auto" => InterpExprKind::Literal(Literal::Auto),
                 _ => InterpExprKind::Identifier(name),
             };
             Ok(InterpExpr {

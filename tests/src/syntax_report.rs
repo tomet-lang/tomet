@@ -234,7 +234,7 @@ const CASES: &[Case] = &[
     case(
         None,
         "スカラーは型が推論される",
-        "@memo(i: 1, f: 1.5, b: true, n: null)\n",
+        "@memo(i: 1, f: 1.5, b: true, n: none)\n",
     ),
     case(
         None,
@@ -388,10 +388,10 @@ const CASES: &[Case] = &[
     case(None, "`$name(...)` 形式", "$uuid()\n"),
     case(
         Some("式の部品"),
-        "`true` `false` `null` は値",
+        "`true` `false` `none` は値",
         "{$ true }\n",
     ),
-    case(None, "`null`", "{$ null }\n"),
+    case(None, "`none`", "{$ none }\n"),
     case(
         None,
         "比較は連鎖しない。`==` `!=` `<` `<=` `>` `>=`",
@@ -1255,7 +1255,8 @@ fn tuple_str(tuple: &Tuple) -> String {
 
 fn value_str(v: &Value) -> String {
     match v {
-        Value::Null => "null".to_string(),
+        Value::None => "none".to_string(),
+        Value::Auto => "auto".to_string(),
         Value::Bool(b) => b.to_string(),
         Value::Int(i) => i.to_string(),
         Value::Float(f) => f.to_string(),
@@ -1305,7 +1306,8 @@ fn interp_str(expr: &InterpExpr) -> String {
         K::Literal(Literal::Float(f)) => f.to_string(),
         K::Literal(Literal::String(s)) => format!("{s:?}"),
         K::Literal(Literal::Bool(b)) => b.to_string(),
-        K::Literal(Literal::Null) => "null".to_string(),
+        K::Literal(Literal::None) => "none".to_string(),
+        K::Literal(Literal::Auto) => "auto".to_string(),
         K::Call { callee, args } => {
             let inner: Vec<String> = args.iter().map(interp_str).collect();
             format!("{}({})", interp_str(callee), inner.join(", "))

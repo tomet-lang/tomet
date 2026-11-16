@@ -19,13 +19,13 @@ use tomet_type::{Kind, Type};
 ///
 /// A bare key is one of:
 ///
-/// - `true`, `false` or `null`;
+/// - `true`, `false`, `none` or `auto`;
 /// - a number made of digits, or digits, a `.` and digits (`2024`, `1.0`);
 /// - a [name](is_name).
 ///
 /// A key with any other character, a non-ASCII letter included, is quoted.
 pub fn is_bare_key(key: &str) -> bool {
-    matches!(key, "true" | "false" | "null") || is_number_key(key) || is_name(key)
+    matches!(key, "true" | "false" | "none" | "auto") || is_number_key(key) || is_name(key)
 }
 
 fn is_number_key(key: &str) -> bool {
@@ -39,9 +39,9 @@ fn is_number_key(key: &str) -> bool {
 /// Whether `name` is read as one name: an ASCII letter or `_`, then ASCII letters, digits, `_`, `-`
 /// and `.`, where each `.` has a name part right after it, and no run of digits that opens a token
 /// (after a `_`, `-` or `.`) is followed by `.` and a digit, which reads as a float. A lone `true`,
-/// `false` or `null` is a value and not a name.
+/// `false`, `none` or `auto` is a value and not a name.
 pub fn is_name(name: &str) -> bool {
-    if matches!(name, "true" | "false" | "null") {
+    if matches!(name, "true" | "false" | "none" | "auto") {
         return false;
     }
     let bytes = name.as_bytes();
@@ -140,7 +140,7 @@ pub fn write_scalar_string(s: &str, out: &mut String) {
         Some('&' | '*' | '!' | '%' | '@' | '`' | '|' | '>' | '?' | '-' | '~')
     );
 
-    let is_keyword_or_number = matches!(s, "null" | "true" | "false") || is_number(s);
+    let is_keyword_or_number = matches!(s, "none" | "auto" | "null" | "true" | "false") || is_number(s);
 
     let needs_quotes = s.is_empty()
         || is_keyword_or_number
@@ -259,7 +259,7 @@ mod tests {
 
     #[test]
     fn a_keyword_or_a_number_is_a_bare_key() {
-        for bare in ["true", "false", "null", "2024", "1.0", "01"] {
+        for bare in ["true", "false", "none", "auto", "2024", "1.0", "01"] {
             assert!(is_bare_key(bare), "{bare}");
         }
         for quoted in ["1.", ".5", "1.2.3", "-1", "1e3"] {
@@ -281,7 +281,7 @@ mod tests {
     fn a_scalar_string_is_quoted_when_bare_it_would_be_something_else() {
         assert_eq!(scalar_text("plain"), "plain");
         assert_eq!(scalar_text("2026-06-17T05:52:44Z"), "2026-06-17T05:52:44Z");
-        for quoted in ["true", "false", "null", "123", "45.67", "", " a", "a b"] {
+        for quoted in ["true", "false", "none", "auto", "null", "123", "45.67", "", " a", "a b"] {
             assert_eq!(scalar_text(quoted), format!("\"{quoted}\""));
         }
         // Text shaped like an interpolation is a string like any other: quoted, never read as the

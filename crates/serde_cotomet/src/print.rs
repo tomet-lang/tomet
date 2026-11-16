@@ -32,7 +32,8 @@ fn write_value(value: &Value, out: &mut String, top_level: bool) {
         Value::Float(f) => write_float(*f, out),
         Value::Number(text) => out.push_str(text),
         Value::Bool(b) => out.push_str(if *b { "true" } else { "false" }),
-        Value::Null => out.push_str("null"),
+        Value::None => out.push_str("none"),
+        Value::Auto => out.push_str("auto"),
         Value::Call(name, args) => {
             out.push_str(name);
             out.push('(');

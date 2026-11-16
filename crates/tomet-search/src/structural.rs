@@ -121,7 +121,8 @@ fn value_contains_str(v: &Value, sub: &str) -> bool {
         Value::Call(name, args) => name.contains(sub) || tuple_contains_str(args, sub),
         Value::Interp(it) => it.expr.to_string().contains(sub),
         Value::TypeSeat(seat) => seat.expr.to_string().contains(sub),
-        Value::Null
+        Value::None
+        | Value::Auto
         | Value::Bool(_)
         | Value::Int(_)
         | Value::Float(_)

@@ -2,7 +2,7 @@
 //! whether it is one.
 
 use crate::ty::Form;
-use crate::{Arg, Datum, DefaultValue, Kind, Type, TypeError};
+use crate::{Arg, Datum, Kind, Type, TypeError};
 
 impl Type {
     /// Builds a type from a name and the arguments written for it: the ones
@@ -19,11 +19,10 @@ impl Type {
     ///   `nanoid` and not negative for a `list`;
     /// - `prefix` (`uuid`, `nanoid`) is text, and an empty prefix is none;
     /// - `default` (every kind) is a plain value, or `auto` for a kind that
-    ///   makes a value up ([`Kind::auto`]). It is not held to the type here
-    ///   (see [`DefaultValue::Given`]);
+    ///   makes a value up ([`Kind::auto`]). It is not held to the type here;
     /// - `overwrite` (every kind) is a boolean (`true` or `false`), defaulting to `false`;
     /// - a name that is not one of these, or is written twice, is an error;
-    /// - [`Arg::Auto`] is the value of `default` and of no other argument.
+    /// - `auto` is the value of `default` and of no other argument.
     pub fn build(name: &str, positional: &[Arg], named: &[(&str, Arg)]) -> Result<Type, TypeError> {
         let kind = Kind::from_name(name).ok_or_else(|| TypeError::Unknown(name.to_string()))?;
 
@@ -54,14 +53,14 @@ impl Type {
 
         // `auto` has one place; anything else is refused before the
         // parameters are read, so that it is not taken for a wrong value.
-        if let Some(Arg::Auto) = positional.first() {
+        if let Some(Arg::Datum(Datum::Auto)) = positional.first() {
             return Err(TypeError::AutoElsewhere {
                 ty: kind,
                 argument: "item".to_string(),
             });
         }
         for (key, arg) in named {
-            if *key != "default" && matches!(arg, Arg::Auto) {
+            if *key != "default" && matches!(arg, Arg::Datum(Datum::Auto)) {
                 return Err(TypeError::AutoElsewhere {
                     ty: kind,
                     argument: key.to_string(),
@@ -171,11 +170,11 @@ fn prefix_of(kind: Kind, arg: &Arg) -> Result<Option<String>, TypeError> {
 }
 
 /// A `default`: `auto` when the kind makes a value up, or a plain value.
-fn default_of(kind: Kind, arg: &Arg) -> Result<DefaultValue, TypeError> {
+fn default_of(kind: Kind, arg: &Arg) -> Result<Datum, TypeError> {
     match arg {
-        Arg::Auto if kind.auto().is_some() => Ok(DefaultValue::Auto),
-        Arg::Auto => Err(TypeError::AutoNotAllowed { ty: kind }),
-        Arg::Datum(datum) if datum.is_finite() => Ok(DefaultValue::Given(datum.clone())),
+        Arg::Datum(Datum::Auto) if kind.auto().is_some() => Ok(Datum::Auto),
+        Arg::Datum(Datum::Auto) => Err(TypeError::AutoNotAllowed { ty: kind }),
+        Arg::Datum(datum) if datum.is_finite() => Ok(datum.clone()),
         Arg::Datum(_) => Err(wrong(
             kind,
             "default",

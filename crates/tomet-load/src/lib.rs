@@ -565,7 +565,7 @@ mod tests {
                 ("bp.blueprint.tmt", "::kind(blueprint)\n::blueprint(note)\n"),
                 (
                     "deck.vocabulary.tmt",
-                    "::kind(vocabulary)\n::vocabulary.deck(version: \"1.0.0\")\n\n::element(card: ())\n",
+                    "::kind(vocabulary)\n::vocabulary(deck, version: \"1.0.0\")\n\n::element(card: ())\n",
                 ),
                 (
                     "tomet.dictionary.tmt",

@@ -153,7 +153,8 @@ fn eval(expr: &InterpExpr, cx: &EvalContext, env: &Env) -> Result<EvalValue, Eva
             Literal::Float(f) => EvalValue::Float(*f),
             Literal::String(s) => EvalValue::String(s.clone()),
             Literal::Bool(b) => EvalValue::Bool(*b),
-            Literal::Null => EvalValue::Null,
+            Literal::None => EvalValue::None,
+            Literal::Auto => EvalValue::Auto,
         }),
         InterpExprKind::Group(inner) => eval(inner, cx, env),
         InterpExprKind::Seq(items) => {
@@ -476,7 +477,7 @@ pub const FUNCTIONS: &[(&str, &str)] = &[
     ("div", "Floating-point division function `div(a, b)`"),
     ("mod", "Integer modulo function `mod(a, b)`"),
     ("not", "Negation `not(bool)`"),
-    ("exists", "Whether a value is not null `exists(value)`"),
+    ("exists", "Whether a value is not none `exists(value)`"),
     ("emoji", "An emoji by name `emoji(\"sparkles\")`"),
     ("unicode", "A character by code point `unicode(0x2713)`"),
     (
@@ -564,7 +565,7 @@ fn builtin(name: &str, args: Args, cx: &EvalContext) -> Result<EvalValue, EvalEr
             None => unreachable!("`exactly` returned one value"),
         },
         "exists" => match args.exactly(name, 1)?.pop() {
-            Some(value) => Ok(EvalValue::Bool(value != EvalValue::Null)),
+            Some(value) => Ok(EvalValue::Bool(value != EvalValue::None)),
             None => unreachable!("`exactly` returned one value"),
         },
         "version" => match args.exactly(name, 1)?.pop() {

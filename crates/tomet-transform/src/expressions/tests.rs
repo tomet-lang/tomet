@@ -74,7 +74,7 @@ fn run_in(src: &str, resolver: &dyn Resolver, vars: &EvalValue) -> (File, Vec<Un
 }
 
 fn run(src: &str) -> (File, Vec<Unresolved>) {
-    run_with(src, &EvalValue::Null)
+    run_with(src, &EvalValue::None)
 }
 
 /// Every text node in the document, in order, joined with `|` between blocks.
@@ -155,8 +155,8 @@ fn a_scalar_on_its_own_line_becomes_a_paragraph() {
 }
 
 #[test]
-fn null_is_empty_text() {
-    let (doc, _) = run("a{$ null }b\n");
+fn none_is_empty_text() {
+    let (doc, _) = run("a{$ none }b\n");
     assert_eq!(text_of(&doc), "ab");
 }
 
@@ -290,7 +290,7 @@ fn macro_table_cases() {
         resolver: &resolver,
         self_doc: DocRef("here.tmt".to_string()),
         macros: &macros,
-        var: &EvalValue::Null,
+        var: &EvalValue::None,
         var_unset: &[],
         includes: &[],
         heading_level: 0,
@@ -474,7 +474,7 @@ fn only_a_variable_that_has_no_value_yet_awaits_input() {
 fn with_no_vault_a_reference_to_another_document_fails_and_stays() {
     let mut doc = tomet_ast_parser::parse_file("see {$ tmt(\"x.tmt\")#a::id }\n").unwrap();
     let macros = HashMap::new();
-    let vars = EvalValue::Null;
+    let vars = EvalValue::None;
     let cx = EvalContext {
         resolver: &NoResolver,
         self_doc: DocRef("here.tmt".into()),
@@ -615,7 +615,7 @@ fn only_the_selected_expressions_are_resolved() {
         resolver: &resolver,
         self_doc: DocRef("here.tmt".to_string()),
         macros: &macros,
-        var: &EvalValue::Null,
+        var: &EvalValue::None,
         var_unset: &[],
         includes: &[],
         heading_level: 0,
@@ -652,7 +652,7 @@ fn written_number_in_metadata_interpolates_as_written() {
         resolver: &resolver,
         self_doc: DocRef("doc.tmt".to_string()),
         macros: &HashMap::new(),
-        var: &EvalValue::Null,
+        var: &EvalValue::None,
         var_unset: &[],
         includes: &[],
         heading_level: 0,

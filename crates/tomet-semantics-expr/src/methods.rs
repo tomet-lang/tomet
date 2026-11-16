@@ -207,9 +207,9 @@ pub(crate) fn call_method(
     }
 }
 
-/// The text of a scalar, for `.join` and macro expansion. Only scalars (other than `null`) have one.
+/// The text of a scalar, for `.join` and macro expansion. Only scalars (other than `none`) have one.
 pub(crate) fn scalar_text(value: &EvalValue) -> Result<String, EvalError> {
-    if matches!(value, EvalValue::Null) {
+    if matches!(value, EvalValue::None) {
         return Err(EvalError::mismatch(
             "turning a value into text",
             "a string, number or bool",
@@ -308,15 +308,15 @@ fn sort(items: &[EvalValue], args: Args, cx: &EvalContext) -> Result<EvalValue, 
         }
     };
 
-    // An item whose key is `Null` -- a field the document does not have --
+    // An item whose key is `None` -- a field the document does not have --
     // goes after all the others, whichever way the rest are ordered, and
-    // keeps its place among the other `Null`s. Only keys that exist have to
+    // keeps its place among the other `None`s. Only keys that exist have to
     // agree on a kind.
     let mut keyed = Vec::with_capacity(items.len());
     let mut absent = Vec::new();
     for item in items {
         match super::apply(&f, vec![item.clone()], cx)? {
-            EvalValue::Null => absent.push(item.clone()),
+            EvalValue::None => absent.push(item.clone()),
             key => keyed.push((key, item.clone())),
         }
     }

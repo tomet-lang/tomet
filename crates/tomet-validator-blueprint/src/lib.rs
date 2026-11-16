@@ -54,7 +54,7 @@ fn evaluate_type_seat(seat: &tomet_ast::TypeSeat) -> Option<Type> {
         resolver: &tomet_expr::NoResolver,
         self_doc: tomet_expr::DocRef(String::new()),
         macros: &HashMap::new(),
-        var: &tomet_expr::EvalValue::Null,
+        var: &tomet_expr::EvalValue::None,
         var_unset: &[],
         includes: &[],
         heading_level: 0,
@@ -209,7 +209,7 @@ pub fn validate_against_schema(
             }
             Some((val_opt, field_span)) => {
                 if let Some(ty) = &req.expected_type {
-                    let val = val_opt.as_ref().unwrap_or(&Value::Null);
+                    let val = val_opt.as_ref().unwrap_or(&Value::None);
                     if !tomet_semantics_core::is_placeholder(val) {
                         let conforms = if let Some(spec) = tomet_id::IdSpec::new(ty) {
                             val.scalar_text().is_some_and(|text| spec.accepts(&text))
@@ -365,7 +365,8 @@ fn describe_value(value: &Value) -> String {
                 "a list with named entries".to_string()
             }
         }
-        Value::Null => "null".to_string(),
+        Value::None => "none".to_string(),
+        Value::Auto => "auto".to_string(),
         _ => "something else".to_string(),
     }
 }

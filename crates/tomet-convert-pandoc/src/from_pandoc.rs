@@ -686,13 +686,13 @@ fn parse_name(name: &str) -> Name {
 
 fn json_to_value(v: &serde_json::Value) -> Value {
     match v {
-        serde_json::Value::Null => Value::Null,
+        serde_json::Value::Null => Value::None,
         serde_json::Value::Bool(b) => Value::Bool(*b),
         serde_json::Value::Number(n) => n
             .as_i64()
             .map(Value::Int)
             .or_else(|| n.as_f64().map(Value::Float))
-            .unwrap_or(Value::Null),
+            .unwrap_or(Value::None),
         serde_json::Value::String(s) => Value::String(s.clone()),
         serde_json::Value::Array(items) => {
             Value::Tuple(Tuple::from_unnamed(items.iter().map(json_to_value)))
@@ -977,7 +977,7 @@ mod tests {
 
     #[test]
     fn the_json_bridge_is_symmetric() {
-        assert_json_round_trip(&Value::Null);
+        assert_json_round_trip(&Value::None);
         assert_json_round_trip(&Value::Bool(true));
         assert_json_round_trip(&Value::Int(-7));
         assert_json_round_trip(&Value::String("x".into()));

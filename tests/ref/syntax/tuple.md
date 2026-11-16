@@ -12,5 +12,5 @@ A call takes named and unnamed entries together.
 
 Entries may be keyed by decimal text.
 
-<div data-tm-kind="item" data-ordered="" data-status="" data-numbered="a, b"></div>
+<div data-tm-kind="item" data-ordered="b, a" data-status="" data-numbered="a, b"></div>
 

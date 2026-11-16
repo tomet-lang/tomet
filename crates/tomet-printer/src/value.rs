@@ -35,7 +35,8 @@ pub(crate) fn render_nested(v: &Value, config: &PrinterConfig) -> String {
 #[deny(clippy::wildcard_enum_match_arm)]
 pub(crate) fn render_value_inner_with_config(v: &Value, config: &PrinterConfig) -> String {
     match v {
-        Value::Null => String::new(),
+        Value::None => String::new(),
+        Value::Auto => "auto".to_string(),
         Value::Bool(b) => b.to_string(),
         Value::Int(i) => i.to_string(),
         Value::Float(f) => Value::float_text(*f),
@@ -175,7 +176,7 @@ fn render_meta_field_value(
     field_cfg: Option<&FieldConfig>,
     config: &PrinterConfig,
 ) -> String {
-    if let Value::Null = v {
+    if let Value::None = v {
         return String::new();
     }
     if let Some(cfg) = field_cfg {
@@ -346,7 +347,8 @@ mod tests {
             render_value_inner(&Value::String("has space".to_string())),
             "\"has space\""
         );
-        assert_eq!(render_value_inner(&Value::Null), "");
+        assert_eq!(render_value_inner(&Value::None), "");
+        assert_eq!(render_value_inner(&Value::Auto), "auto");
     }
 
     #[test]

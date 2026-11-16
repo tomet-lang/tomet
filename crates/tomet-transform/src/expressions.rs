@@ -363,7 +363,8 @@ impl Pass<'_> {
             Value::Blocks(blocks) => {
                 Value::Blocks(blocks.into_iter().flat_map(|b| self.block(b)).collect())
             }
-            other @ (Value::Null
+            other @ (Value::None
+            | Value::Auto
             | Value::Bool(_)
             | Value::Int(_)
             | Value::Float(_)

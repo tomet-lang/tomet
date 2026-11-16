@@ -36,7 +36,7 @@ pub fn parse_type_spec(spec: &Value) -> Result<Type, TypeError> {
 fn arg(value: &Value) -> Result<Arg, TypeError> {
     let datum = match value {
         Value::String(_) | Value::Call(..) => return parse_type_spec(value).map(Arg::Type),
-        Value::Null => Datum::Null,
+        Value::None => Datum::None,
         Value::Bool(b) => Datum::Bool(*b),
         Value::Int(n) => Datum::Int(*n),
         Value::Float(n) => Datum::Float(*n),
@@ -144,6 +144,6 @@ mod tests {
         );
 
         assert_eq!(parse_type_spec(&Value::Int(42)), Err(TypeError::NotAType));
-        assert_eq!(parse_type_spec(&Value::Null), Err(TypeError::NotAType));
+        assert_eq!(parse_type_spec(&Value::None), Err(TypeError::NotAType));
     }
 }

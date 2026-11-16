@@ -55,7 +55,8 @@ pub enum SyntaxKind {
     RAW_STRING_LITERAL,
     TRUE_KW,
     FALSE_KW,
-    NULL_KW,
+    NONE_KW,
+    AUTO_KW,
 
     // --- Identifiers / Text Chunks ---
     IDENT,
@@ -184,7 +185,8 @@ impl SyntaxKind {
                 | SyntaxKind::RAW_STRING_LITERAL
                 | SyntaxKind::TRUE_KW
                 | SyntaxKind::FALSE_KW
-                | SyntaxKind::NULL_KW
+                | SyntaxKind::NONE_KW
+                | SyntaxKind::AUTO_KW
         )
     }
 }

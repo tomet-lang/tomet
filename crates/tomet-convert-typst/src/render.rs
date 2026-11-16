@@ -717,7 +717,8 @@ fn escape_typst_string(s: &str) -> String {
 
 fn value_to_plain(v: &Value) -> String {
     match v {
-        Value::Null => String::new(),
+        Value::None => String::new(),
+        Value::Auto => "auto".to_string(),
         // The text a scalar was written as: `1.0` stays `1.0`, `1.10` stays `1.10`.
         Value::Bool(_) | Value::Int(_) | Value::Float(_) | Value::Number(_) | Value::String(_) => v
             .scalar_text()

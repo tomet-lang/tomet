@@ -49,7 +49,7 @@ fn problem_with(seat: &TypeSeat) -> Option<String> {
         resolver: &NoResolver,
         self_doc: DocRef(String::new()),
         macros: &HashMap::new(),
-        var: &EvalValue::Null,
+        var: &EvalValue::None,
         var_unset: &[],
         includes: &[],
         heading_level: 0,

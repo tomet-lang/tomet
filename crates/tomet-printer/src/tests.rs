@@ -224,8 +224,8 @@ fn test_rfc3339_with_offset_formatting() {
 }
 
 #[test]
-fn test_null_value_rendering() {
-    let rendered = render_value_inner_with_config(&Value::Null, &PrinterConfig::default());
+fn test_none_value_rendering() {
+    let rendered = render_value_inner_with_config(&Value::None, &PrinterConfig::default());
     assert_eq!(rendered, "");
     let md = "---\ntitle:\n---\n\n# Document\n";
     let doc = tomet_markdown::from_markdown(md);

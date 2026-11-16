@@ -812,12 +812,12 @@ unknown element `memo`: only `std` and this document's own `::kind` may be writt
 ### スカラーは型が推論される
 
 ```tmt
-@memo(i: 1, f: 1.5, b: true, n: null)
+@memo(i: 1, f: 1.5, b: true, n: none)
 ```
 
 ```
 Block  @memo
-  args    {i: 1, f: 1.5, b: true, n: null}
+  args    {i: 1, f: 1.5, b: true, n: none}
 ```
 
 検証:
@@ -1424,7 +1424,7 @@ Interp $
 
 ## 式の部品
 
-### `true` `false` `null` は値
+### `true` `false` `none` は値
 
 ```tmt
 {$ true }
@@ -1435,15 +1435,15 @@ Interp $
   interp  true
 ```
 
-### `null`
+### `none`
 
 ```tmt
-{$ null }
+{$ none }
 ```
 
 ```
 Interp $
-  interp  null
+  interp  none
 ```
 
 ### 比較は連鎖しない。`==` `!=` `<` `<=` `>` `>=`
@@ -2402,7 +2402,6 @@ Block  @term
 
 ```
 `::vocabulary` takes no `{...}`; write its entries in the parentheses, `::vocabulary(name: value)`
-`::vocabulary(...)` holds `name: value` entries; found a value without a name. Name it in the head, `::vocabulary.name(value)`
 ```
 
 ### 中身が空の宣言も `()` を書く

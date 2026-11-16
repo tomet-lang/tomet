@@ -25,7 +25,7 @@ pub trait Resolver {
     /// The document's `::meta`, typed by the settings' `type:` declarations:
     /// a `list` field is a list (empty when the document lacks it), a
     /// `datetime` field is a datetime, and the other declared fields are
-    /// `Null` when the document lacks them. A key that is not declared and
+    /// `None` when the document lacks them. A key that is not declared and
     /// not present is absent from the map.
     fn meta(&self, doc: &DocRef) -> Result<EvalValue, String>;
     /// Prepares `blocks`, which were read from `doc`, as `doc` itself would

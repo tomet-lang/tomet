@@ -18,7 +18,7 @@ use tomet_type::{Kind, Type};
 ///  | the same `parse_datetime`);
 /// -| a field whose type is text (`string`, `version`, `uuid`, `nanoid`) is the
 ///  | text it was written as, so `rev: 1.10` is `"1.10"` and not `1.1`;
-/// -| every other declared field is `Null` when the document lacks it;
+/// -| every other declared field is `None` when the document lacks it;
 /// -| a key that is neither declared nor written is absent from the map, so
 ///  | reading it is an error and a typo cannot turn into an answer of "no".
 ///
@@ -58,7 +58,7 @@ fn typed(field: &FieldConfig, value: Option<(&Value, &DocRef)>) -> EvalValue {
         (Some(ty), None) if ty.kind() == Kind::List => EvalValue::Tuple(Tuple::new()),
         (Some(ty), Some((value, doc))) => typed_value(&ty, value, doc),
         (None, Some((value, doc))) => EvalValue::from_ast(value, doc),
-        (_, None) => EvalValue::Null,
+        (_, None) => EvalValue::None,
     }
 }
 
@@ -188,11 +188,11 @@ mod tests {
     }
 
     #[test]
-    fn a_declared_field_the_document_lacks_is_null() {
+    fn a_declared_field_the_document_lacks_is_none() {
         let meta = meta_of("::meta(tags: a)\n");
-        assert_eq!(field(&meta, "title"), Some(&EvalValue::Null));
-        assert_eq!(field(&meta, "created"), Some(&EvalValue::Null));
-        assert_eq!(field(&meta, "note"), Some(&EvalValue::Null));
+        assert_eq!(field(&meta, "title"), Some(&EvalValue::None));
+        assert_eq!(field(&meta, "created"), Some(&EvalValue::None));
+        assert_eq!(field(&meta, "note"), Some(&EvalValue::None));
     }
 
     #[test]
@@ -234,7 +234,7 @@ mod tests {
     fn a_document_without_meta_still_has_the_declared_fields() {
         let meta = meta_of("Just text.\n");
         assert_eq!(field(&meta, "tags"), Some(&EvalValue::Tuple(Tuple::new())));
-        assert_eq!(field(&meta, "title"), Some(&EvalValue::Null));
+        assert_eq!(field(&meta, "title"), Some(&EvalValue::None));
     }
 
     #[test]

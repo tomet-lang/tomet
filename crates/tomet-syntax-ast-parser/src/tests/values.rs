@@ -82,10 +82,10 @@ fn an_embedded_element_with_content_is_accepted() {
 /// A quoted positional value parses as the string it quotes wherever it
 /// stands in the group: as its sole value, first among several entries,
 /// or after a `key:` entry, without the quote marks baked into the
-/// string and without failing on the following `,`.
-/// `@doc.icon("star", pkg:"lucide")` is exactly this shape.
+/// Positional values must appear before named entries in a tuple.
+/// `@doc.icon("star", pkg:"lucide")` is valid; `@doc.icon(pkg:"lucide", "star")` is rejected.
 #[test]
-fn quoted_positional_value_parses_the_same_regardless_of_position() {
+fn positional_values_must_come_before_named_entries() {
     assert_eq!(
         parse_value(r#""star", pkg:"lucide""#).unwrap(),
         Value::Tuple(Tuple::from_entries(vec![
@@ -93,13 +93,10 @@ fn quoted_positional_value_parses_the_same_regardless_of_position() {
             TupleEntry::named("pkg", Value::String("lucide".into())),
         ]))
     );
-    assert_eq!(
-        parse_value(r#"pkg:"lucide", "star""#).unwrap(),
-        Value::Tuple(Tuple::from_entries(vec![
-            TupleEntry::named("pkg", Value::String("lucide".into())),
-            TupleEntry::unnamed(Value::String("star".into())),
-        ]))
-    );
+    let err = parse_value(r#"pkg:"lucide", "star""#).unwrap_err();
+    assert!(err
+        .to_string()
+        .contains("a value without a name must come before the named ones"));
 }
 
 #[test]
@@ -107,8 +104,11 @@ fn parses_scalars() {
     assert_eq!(parse_value("42").unwrap(), Value::Int(42));
     assert_eq!(parse_value("-3.5").unwrap(), Value::Float(-3.5));
     assert_eq!(parse_value("true").unwrap(), Value::Bool(true));
-    assert_eq!(parse_value("null").unwrap(), Value::Null);
+    assert_eq!(parse_value("none").unwrap(), Value::None);
+    assert_eq!(parse_value("auto").unwrap(), Value::Auto);
     assert_eq!(parse_value("hello").unwrap(), Value::String("hello".into()));
+    let err = parse_value("null").expect_err("null is an error");
+    assert!(err.to_string().contains("write `none`"));
 }
 
 #[test]
@@ -268,6 +268,33 @@ fn a_quoted_key_is_a_map_key() {
         Value::Tuple(Tuple::from_named(vec![
             ("tmtroot/a.tmt".into(), Value::String("../x".into())),
             ("plain".into(), Value::Int(1)),
+        ]))
+    );
+}
+
+#[test]
+fn bare_integer_and_quoted_numeric_keys_are_the_same_key() {
+    assert_eq!(
+        parse_value("(5: x)").unwrap(),
+        Value::Tuple(Tuple::from_named([("5".into(), Value::String("x".into()))]))
+    );
+    assert_eq!(
+        parse_value("(\"5\": x)").unwrap(),
+        Value::Tuple(Tuple::from_named([("5".into(), Value::String("x".into()))]))
+    );
+    assert_eq!(
+        parse_value("(404: x)").unwrap(),
+        Value::Tuple(Tuple::from_named([("404".into(), Value::String("x".into()))]))
+    );
+
+    // true, false, none, auto as keys work as text keys
+    assert_eq!(
+        parse_value("(true: 1, false: 2, none: 3, auto: 4)").unwrap(),
+        Value::Tuple(Tuple::from_named([
+            ("true".into(), Value::Int(1)),
+            ("false".into(), Value::Int(2)),
+            ("none".into(), Value::Int(3)),
+            ("auto".into(), Value::Int(4)),
         ]))
     );
 }

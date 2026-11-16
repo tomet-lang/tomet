@@ -61,7 +61,7 @@ fn a_repeated_standard_declaration_says_where_the_first_is() {
 #[test]
 fn a_vocabularys_singleton_is_enforced_too() {
     let vocab = tomet_ast_parser::parse_file(
-        "::kind(vocabulary)\n::vocabulary.deck()\n\n::element(spread: (singleton: true))\n",
+        "::kind(vocabulary)\n::vocabulary(deck)\n\n::element(spread: (singleton: true))\n",
     )
     .expect("vocabulary parses");
     let bindings = Bindings {
@@ -148,7 +148,7 @@ fn a_typoed_connect_name_is_reported() {
 #[test]
 fn allow_list_resolves_a_namespaced_custom_element_via_bindings() {
     let vocab = tomet_ast_parser::parse_file(
-        "::kind(vocabulary)\n::vocabulary.ns()\n\n::element(mycard: ())\n",
+        "::kind(vocabulary)\n::vocabulary(ns)\n\n::element(mycard: ())\n",
     )
     .expect("vocabulary parses");
     let bindings = Bindings {
@@ -256,7 +256,7 @@ fn an_element_named_item_is_rejected_as_unknown() {
 #[test]
 fn an_element_named_item_is_rejected_even_in_open_vocabulary() {
     let vocab =
-        tomet_ast_parser::parse_file("::kind(vocabulary)\n::vocabulary.sketch(open: true)\n")
+        tomet_ast_parser::parse_file("::kind(vocabulary)\n::vocabulary(sketch, open: true)\n")
             .expect("vocabulary parses");
     let bindings = Bindings {
         kind: Some(tomet_semantics::Vocabulary::from_file(&vocab).expect("valid vocabulary")),
@@ -356,7 +356,7 @@ fn a_body_element_written_with_double_colon_is_reported_with_the_sigil_to_use() 
 #[test]
 fn a_user_declared_preamble_element_is_a_declaration() {
     let vocab = tomet_semantics::Vocabulary::from_file(&parse(
-        "::kind(vocabulary)\n::vocabulary.deck()\n\n::element(character: (region: preamble, singleton: true))\n",
+        "::kind(vocabulary)\n::vocabulary(deck)\n\n::element(character: (region: preamble, singleton: true))\n",
     ))
     .expect("a vocabulary");
     let bindings = Bindings::for_document(&parse("::kind(deck)\n"), [vocab]);
@@ -374,7 +374,7 @@ fn a_user_declared_preamble_element_is_a_declaration() {
 fn deck_with_params() -> Bindings {
     let vocab = tomet_semantics::Vocabulary::from_file(&parse(
         r#"::kind(vocabulary)
-::vocabulary.deck()
+::vocabulary(deck)
 
 ::element(
   card: (
@@ -427,7 +427,7 @@ fn an_undeclared_argument_is_reported() {
 fn deck_with_content_allow() -> Bindings {
     let vocab = tomet_semantics::Vocabulary::from_file(&parse(
         r#"::kind(vocabulary)
-::vocabulary.deck()
+::vocabulary(deck)
 
 ::element(
   list: (
@@ -749,7 +749,7 @@ fn the_dissolved_config_and_settings_are_unknown_declarations() {
 /// saying so is what keeps these tests about duplicate ids.
 fn with_deck() -> Bindings {
     let vocab = tomet_ast_parser::parse_file(
-        "::kind(vocabulary)\n::vocabulary.deck()\n\n::element(task: (), ref: ())\n",
+        "::kind(vocabulary)\n::vocabulary(deck)\n\n::element(task: (), ref: ())\n",
     )
     .expect("vocabulary parses");
     Bindings {
@@ -1199,10 +1199,10 @@ fn version_problems(src: &str) -> Vec<String> {
 #[test]
 fn a_declared_version_is_held_to_the_version_type() {
     for ok in [
-        "::vocabulary.deck(version: \"1.0.0\")\n",
-        "::vocabulary.deck(version: \"1.0-beta\")\n",
-        "::vocabulary.deck(version: 1.10)\n",
-        "::vocabulary.deck(version: 2)\n",
+        "::vocabulary(deck, version: \"1.0.0\")\n",
+        "::vocabulary(deck, version: \"1.0-beta\")\n",
+        "::vocabulary(deck, version: 1.10)\n",
+        "::vocabulary(deck, version: 2)\n",
         "::blueprint(note){ version: \"1.0\", description: \"x\" }\n",
         "::version(1.0)\n",
         "::version(1.10)\n",
@@ -1216,11 +1216,11 @@ fn a_declared_version_is_held_to_the_version_type() {
     }
     for (bad, needle) in [
         (
-            "::vocabulary.deck(version: \"abc\")\n",
+            "::vocabulary(deck, version: \"abc\")\n",
             "`abc` is not a version",
         ),
         (
-            "::vocabulary.deck(version: \"1.0.0_beta\")\n",
+            "::vocabulary(deck, version: \"1.0.0_beta\")\n",
             "`1.0.0_beta`",
         ),
         (
@@ -1257,7 +1257,7 @@ fn a_version_field_in_meta_reads_a_bare_number_as_text() {
 }
 
 const TYPED_DECK: &str = r#"::kind(vocabulary)
-::vocabulary.deck()
+::vocabulary(deck)
 
 ::element(
   entry: (
@@ -1503,11 +1503,10 @@ fn a_retired_plural_declaration_is_reported_once_with_its_replacement() {
     }
 }
 
-/// A dotted head and the grouped form are held to the same checks.
+/// Grouped declarations are held to their checks.
 #[test]
-fn a_dotted_declaration_is_checked_like_the_grouped_one() {
+fn declarations_are_checked() {
     for src in [
-        "::field.owner(type: person)\n",
         "::field(owner: (type: person))\n",
     ] {
         let errors = validate_document(&parse(src));
@@ -1518,10 +1517,10 @@ fn a_dotted_declaration_is_checked_like_the_grouped_one() {
         );
     }
     for src in [
-        "::macro.gh(\"https://x/$(1)\")\n",
-        "::var.n(type: int, default: 3)[ how many ]\n",
-        "::workspace.ignore(\"target\", \".git\")\n",
-        "::format.element.table(max_col_width: 50)\n::format.meta(always_newline: true)\n",
+        "::macro(gh: \"https://x/$(1)\")\n",
+        "::var(n: (type: int, default: 3))\n",
+        "::workspace(ignore: (\"target\", \".git\"))\n",
+        "::format(element: (table: (max_col_width: 50)), meta: (always_newline: true))\n",
     ] {
         let errors = validate_document(&parse(src));
         assert!(errors.is_empty(), "{src}: {errors:?}");

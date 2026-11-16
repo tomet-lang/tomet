@@ -114,6 +114,7 @@ fn parse_element_configs(value: &Value) -> Option<BTreeMap<String, ElementConfig
                     }
                     "adjust_width" => {
                         elem_cfg.table_adjust_width = match prop_v {
+                            Value::Auto => Some("auto".to_string()),
                             Value::Bool(b) => Some(b.to_string()),
                             Value::String(s) => Some(s.clone()),
                             _ => None,

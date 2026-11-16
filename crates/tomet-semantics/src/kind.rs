@@ -220,7 +220,7 @@ impl ElementKind {
 /// any collision between the two: a vocabulary may not declare a name that
 /// appears here, so the shorthand is never ambiguous.
 ///
-/// **Why `std` lives in Rust rather than in a `::vocabulary.std()` document,
+/// **Why `std` lives in Rust rather than in a `::vocabulary(std)` document,
 /// and what has to change.** These entries carry behavior, not just shape:
 /// `@link`'s target kind is derived from the target string's own scheme
 /// prefix (`crate::target::target_scheme`), `::meta` selects an embedded
@@ -230,7 +230,7 @@ impl ElementKind {
 /// under a key that means "call into the binary".
 ///
 /// That is a limit of the vocabulary format, not a property of `std`, and
-/// the author's decision is that it has to go: `::vocabulary.std()` must
+/// the author's decision is that it has to go: `::vocabulary(std)` must
 /// eventually be writable. Until then, treat this list as the one
 /// hard-coded namespace and not as a permanent exemption. The useful test
 /// while designing the format is to try to express `@link` in it -- what
@@ -446,11 +446,7 @@ pub fn classify_std_lenient(el: ElementView<'_>) -> ElementKind {
 pub fn classify_declaration(
     declaration: &tomet_ast::Declaration,
 ) -> Result<ElementKind, UnknownName> {
-    // `::field.author` is a `field`: the first segment of the head is the declaration, the rest is
-    // a path into what it declares.
-    let head = declaration.name.to_string();
-    let root = head.split('.').next().unwrap_or_default();
-    classify_std_name(&Name::bare(root))
+    classify_std_name(&declaration.name)
 }
 
 /// [`classify_declaration`], falling back to `Custom` for an unknown name:

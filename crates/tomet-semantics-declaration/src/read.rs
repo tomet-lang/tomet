@@ -41,6 +41,12 @@ pub fn dictionary_name(declaration: &Declaration) -> Option<String> {
     args.get("name").and_then(text)
 }
 
+/// The namespace a `::vocabulary(ns)` gives its vocabulary.
+pub fn vocabulary_namespace(declaration: &Declaration) -> Option<String> {
+    let args = declaration.args_view()?;
+    args.get("namespace").and_then(text)
+}
+
 /// The names a `::profile(...)` is written with, as written and in order: `::profile(oneline, standalone)` is
 /// `oneline` and `standalone`. A name that is not a profile is returned too (the checker reports it); a
 /// value that is not text comes back as the text it prints as.
@@ -85,8 +91,8 @@ pub fn meta(declaration: &Declaration) -> Option<Value> {
 /// A template is a [`Value`]: a string is a text macro, and `[ ... ]` is a block macro (see
 /// [`crate::Arity`]). An entry of any other kind is returned too, because refusing it is
 /// `tomet check`'s business and not a reader's; whoever calls the macro finds out it cannot.
-/// `::macro.gh("...")` defines one and `::macro(gh: "...", n: "...")` defines several, with the same
-/// result (see [`Declaration::entries`]).
+/// `::macro(gh: "...")` defines one and `::macro(gh: "...", n: "...")` defines several (see
+/// [`Declaration::entries`]).
 pub fn macros(declaration: &Declaration) -> Vec<(String, Value)> {
     entries(declaration)
 }
@@ -138,19 +144,29 @@ pub fn document_blueprint<B>(doc: &File<B>) -> Option<String> {
 
 /// Whether this document is a blueprint: it says so itself with `::kind(blueprint)`, or it is the
 /// header of one, `::blueprint(X)`. A document that only registers a blueprint file
-/// (`::blueprint.x(@file(...))`) is not.
+/// (`::blueprint(x: @file(...))`) is not.
 pub fn is_blueprint<B>(doc: &File<B>) -> bool {
     document_kind(doc).as_deref() == Some("blueprint") || document_blueprint(doc).is_some()
 }
 
 /// The name of the dictionary a document is, from its `::dictionary(name)` header; `None` for a
-/// document that is not one. A registration (`::dictionary.tomet(@file(...))`) does not make the
+/// document that is not one. A registration (`::dictionary(tomet: @file(...))`) does not make the
 /// document that writes it a dictionary.
 pub fn document_dictionary<B>(doc: &File<B>) -> Option<String> {
     let header = declarations(doc)
         .into_iter()
         .find(|found| found.kind == DeclKind::Dictionary && found.declaration.is_own_header())?;
     dictionary_name(&header.declaration)
+}
+
+/// The namespace of the vocabulary a document is, from its `::vocabulary(ns)` header; `None` for a
+/// document that is not one. A registration (`::vocabulary(ns: @file(...))`) does not make the
+/// document that writes it a vocabulary.
+pub fn document_vocabulary<B>(doc: &File<B>) -> Option<String> {
+    let header = declarations(doc)
+        .into_iter()
+        .find(|found| found.kind == DeclKind::Vocabulary && found.declaration.is_own_header())?;
+    vocabulary_namespace(&header.declaration)
 }
 
 /// The language version this document declares, as written.
@@ -165,9 +181,8 @@ pub fn document_meta<B>(doc: &File<B>) -> Option<Value> {
 }
 
 /// The `(name, value)` entries of every declaration of `kind` in the document, in the order first
-/// written (`::format.table(...)`, `::field.created(...)`, `::blueprint.writ(...)`, or the same
-/// grouped under `::format(...)`). An entry written twice is the later one. Empty when the document
-/// does not write it.
+/// written (`::field(created: ...)`, `::blueprint(writ: ...)`). An entry written twice is the later one.
+/// Empty when the document does not write it.
 pub fn document_entries<B>(doc: &File<B>, kind: DeclKind) -> Vec<(String, Value)> {
     let mut merged = Vec::new();
     for found in declarations(doc).iter().filter(|found| found.kind == kind) {
@@ -298,7 +313,7 @@ mod tests {
         assert_eq!(document_dictionary(&parse("::kind(note)\n")), None);
         // A registration is not the document being a dictionary.
         assert_eq!(
-            document_dictionary(&parse("::dictionary.tomet(@file(tomet.dict.tmt))\n")),
+            document_dictionary(&parse("::dictionary(tomet: @file(tomet.dict.tmt))\n")),
             None
         );
     }
@@ -365,7 +380,7 @@ mod tests {
         for src in [
             "::kind(note)\n",
             "::meta(title: x)\n\n=[ A ]\n",
-            "::blueprint.daily-note(@file(daily-note.blueprint.tmt))\n",
+            "::blueprint(daily-note: @file(daily-note.blueprint.tmt))\n",
         ] {
             assert!(!is_blueprint(&parse(src)), "{src:?}");
         }

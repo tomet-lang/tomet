@@ -20,7 +20,13 @@ fn is_name_start(c: char) -> bool {
 fn is_name_part(kind: SyntaxKind, text: &str, ascii: bool) -> bool {
     match kind {
         K::IDENT => !ascii || text.is_ascii(),
-        K::INT_NUMBER | K::UNDERSCORE | K::MINUS | K::TRUE_KW | K::FALSE_KW | K::NULL_KW => true,
+        K::INT_NUMBER
+        | K::UNDERSCORE
+        | K::MINUS
+        | K::TRUE_KW
+        | K::FALSE_KW
+        | K::NONE_KW
+        | K::AUTO_KW => true,
         _ => false,
     }
 }
@@ -28,7 +34,7 @@ fn is_name_part(kind: SyntaxKind, text: &str, ascii: bool) -> bool {
 impl<'a, 't> CstParser<'a, 't> {
     /// How many tokens, from `from`, form a name; 0 if none starts there.
     ///
-    /// A keyword (`true`, `false`, `null`) starts a name only when it is the head of a longer
+    /// A keyword (`true`, `false`, `none`, `auto`) starts a name only when it is the head of a longer
     /// one (`true-ish`): alone it is a value.
     pub(super) fn name_tokens_at(&self, from: usize) -> usize {
         let Some(first_kind) = self.raw_kind_at(from) else {
@@ -40,7 +46,7 @@ impl<'a, 't> CstParser<'a, 't> {
                 first_text.is_ascii() && first_text.chars().next().is_some_and(is_name_start)
             }
             K::UNDERSCORE => true,
-            K::TRUE_KW | K::FALSE_KW | K::NULL_KW => {
+            K::TRUE_KW | K::FALSE_KW | K::NONE_KW | K::AUTO_KW => {
                 let next = from + 1;
                 self.start_of(next) == self.start_of(from) + first_text.len()
                     && matches!(
@@ -72,7 +78,7 @@ impl<'a, 't> CstParser<'a, 't> {
         };
         let first_text = self.text_at(i);
         let valid_start = match first_kind {
-            K::IDENT | K::TRUE_KW | K::FALSE_KW | K::NULL_KW => {
+            K::IDENT | K::TRUE_KW | K::FALSE_KW | K::NONE_KW | K::AUTO_KW => {
                 (!ascii || first_text.is_ascii()) && first_text.chars().next().is_some_and(first)
             }
             K::UNDERSCORE => first('_'),

@@ -92,6 +92,8 @@ pub fn read_fixture(rel: &Path) -> String {
 /// group), kept apart because the parser stops at the first error. A nexus test
 /// holds each to the place and reason it is refused for.
 pub const KNOWN_UNPARSEABLE: &[&str] = &[
+    "syntax/declaration-paths-positional.tmt",
+    "syntax/declaration-paths.tmt",
     "syntax/nexus-invalid-bare-block.tmt",
     "syntax/nexus-invalid-bare-hr.tmt",
     "syntax/nexus-invalid-combine-data.tmt",

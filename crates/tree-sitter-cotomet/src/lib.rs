@@ -16,7 +16,7 @@
 //!  | scalar there holds a `:` only when text runs straight on after it
 //!  | (`12:30`). Entries need no separator in the grammar, where the parser
 //!  | wants a newline or a `,` (it reads the rest of the line as one scalar).
-//! -| **A bare scalar is not typed here.** `null`, `true`, `false` and a
+//! -| **A bare scalar is not typed here.** `none`, `auto`, `true`, `false` and a
 //!  | number are the highlight query's business, decided from the node's
 //!  | text, so the tree has one `scalar` node for all of them.
 //! -| **A top-level bare value is accepted.** A `.ctmt` file is `key: value`
@@ -88,7 +88,7 @@ mod tests {
         for src in [
             "",
             "// only a comment\n",
-            "a: 1\nb: two words\nc: true, d: null\n",
+            "a: 1\nb: two words\nc: true, d: none\n",
             "\"tmtroot/a.tmt\": \"../a.tmt\"\n",
             "m: ( x: 1, y: ( z: 2 ) )\n",
             "m: (\n  x: 1\n  y: 2\n)\n",
@@ -199,9 +199,9 @@ mod tests {
 
     #[test]
     fn highlights_type_a_scalar_from_its_text() {
-        let captured = highlights("a: null\nb: true\nc: -12.5e3\nd: 007\ne: two words\nf: \"s\"\n");
+        let captured = highlights("a: none\nb: true\nc: -12.5e3\nd: 007\ne: two words\nf: \"s\"\n");
         for (name, text) in [
-            ("constant.builtin", "null"),
+            ("constant.builtin", "none"),
             ("constant.builtin", "true"),
             ("number", "-12.5e3"),
             // not a JSON number, so a string
@@ -217,7 +217,7 @@ mod tests {
             );
         }
         // a scalar is exactly one of the three
-        for text in ["null", "true", "-12.5e3", "007", "two words"] {
+        for text in ["none", "true", "-12.5e3", "007", "two words"] {
             let n = captured
                 .iter()
                 .filter(|(name, t)| {

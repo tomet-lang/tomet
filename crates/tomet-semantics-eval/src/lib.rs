@@ -11,7 +11,7 @@
 //! - (Data-only evaluation)
 //!   | Evaluates expressions in value positions of a `.ctmt` file, replacing
 //!   | expressions with their evaluated data values (`Value::String`, `Value::Int`,
-//!   | `Value::Float`, `Value::Bool`, `Value::Tuple`, `Value::Null`).
+//!   | `Value::Float`, `Value::Bool`, `Value::Tuple`, `Value::None`, `Value::Auto`).
 //! - (No vault access)
 //!   | Evaluation runs with `NoResolver`. Address expressions (`$tmt(...)`, `$addr(...)`,
 //!   | `$ref(...)`, `$include(...)`) are rejected, and so is a type (`$list(string)`):

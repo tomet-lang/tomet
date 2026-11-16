@@ -205,7 +205,7 @@ pub enum Diagnostic {
     /// reader comes to believe it is obeyed. `span` is the declaration.
     VaultOnlyDeclaration { name: String, span: Span },
     /// A `::blueprint` / `::vocabulary` entry whose key is not the name the file it registers
-    /// gives itself (`::blueprint(x)`, `::vocabulary.x()`). The key is the name it is registered under;
+    /// gives itself (`::blueprint(x)`, `::vocabulary(x)`). The key is the name it is registered under;
     /// the file must agree. `declared` is `None` when the file names nothing. `span` is the declaration.
     RegistryNameMismatch {
         declaration: &'static str,

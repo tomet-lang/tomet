@@ -448,7 +448,7 @@ mod tests {
     #[test]
     fn signature_alias_and_position_with_and_without_vocabulary_and_invariance() {
         use crate::Vocabulary;
-        let vocab_src = r#"::vocabulary.deck()
+        let vocab_src = r#"::vocabulary(deck)
 ::element(
   card: (
     args: (

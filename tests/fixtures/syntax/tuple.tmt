@@ -5,7 +5,7 @@
   x: ((a, version: 3), b, c)
   icon: glyph(triangle, pkg: lucide)
   use: vocab(a, version: 3)
-  ordered: ("1": a, b)
+  ordered: (b, "1": a)
   status: ("404": x, "500": y)
   numbered: ("0": a, "1": b)
 )
@@ -24,4 +24,4 @@ A call takes named and unnamed entries together.
 
 Entries may be keyed by decimal text.
 
-@item(ordered: ("1": a, b), status: ("404": x, "500": y), numbered: ("0": a, "1": b))
+@item(ordered: (b, "1": a), status: ("404": x, "500": y), numbered: ("0": a, "1": b))

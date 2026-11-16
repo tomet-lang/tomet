@@ -1,8 +1,8 @@
 ; Syntax highlighting for cotomet (`.ctmt`), using the standard capture names
 ; shared across tree-sitter-based editors (Zed, Neovim, Helix, ...).
 ;
-; A bare scalar is typed from its text, as the parser types it: `null`,
-; `true`, `false` and a JSON number are not strings. The three patterns for
+; A bare scalar is typed from its text, as the parser types it: `none`,
+; `auto`, `true`, `false` and a JSON number are not strings. The three patterns for
 ; `(scalar)` exclude one another, so it does not matter which an editor
 ; applies first.
 
@@ -41,10 +41,10 @@
   (#not-match? @function "^(string|int|float)$"))
 
 ((scalar) @constant.builtin
-  (#match? @constant.builtin "^(null|true|false)$"))
+  (#match? @constant.builtin "^(none|auto|true|false)$"))
 
 ((scalar) @number
   (#match? @number "^-?(0|[1-9][0-9]*)(\\.[0-9]+)?([eE][+-]?[0-9]+)?$"))
 
 ((scalar) @string
-  (#not-match? @string "^(null|true|false|-?(0|[1-9][0-9]*)(\\.[0-9]+)?([eE][+-]?[0-9]+)?)$"))
+  (#not-match? @string "^(none|auto|true|false|-?(0|[1-9][0-9]*)(\\.[0-9]+)?([eE][+-]?[0-9]+)?)$"))

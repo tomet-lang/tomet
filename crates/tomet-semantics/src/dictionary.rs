@@ -533,7 +533,7 @@ mod tests {
     fn a_registration_is_not_a_dictionary_header() {
         let loaded = loaded(&[(
             "vault.config.tmt",
-            "::dictionary.tomet(@file(tomet.dict.tmt))\n",
+            "::dictionary(tomet: @file(tomet.dict.tmt))\n",
         )]);
         assert!(loaded.is_empty());
         assert!(

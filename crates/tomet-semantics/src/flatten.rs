@@ -146,7 +146,8 @@ pub fn tuple_to_json(tuple: &Tuple) -> serde_json::Value {
 /// inverse, checked against it in `assert_json_round_trip`.
 pub fn value_to_json(v: &Value) -> serde_json::Value {
     match v {
-        Value::Null => serde_json::Value::Null,
+        Value::None => serde_json::Value::Null,
+        Value::Auto => panic!("`auto` has no JSON representation"),
         Value::Bool(b) => serde_json::Value::Bool(*b),
         Value::Int(i) => serde_json::Value::from(*i),
         Value::Float(f) => serde_json::Number::from_f64(*f)

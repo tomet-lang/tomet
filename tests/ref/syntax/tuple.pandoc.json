@@ -1,5 +1,9 @@
 {
-  "pandoc-api-version": [1, 23, 1],
+  "pandoc-api-version": [
+    1,
+    23,
+    1
+  ],
   "meta": {
     "icon": {
       "t": "MetaString",
@@ -29,9 +33,18 @@
       ]
     },
     "ordered": {
-      "t": "MetaMap",
-      "c": {
-        "1": {
+      "t": "MetaList",
+      "c": [
+        {
+          "t": "MetaInlines",
+          "c": [
+            {
+              "t": "Str",
+              "c": "b"
+            }
+          ]
+        },
+        {
           "t": "MetaInlines",
           "c": [
             {
@@ -40,7 +53,7 @@
             }
           ]
         }
-      }
+      ]
     },
     "size": {
       "t": "MetaMap",
@@ -134,7 +147,11 @@
       "t": "Header",
       "c": [
         1,
-        ["", [], []],
+        [
+          "",
+          [],
+          []
+        ],
         [
           {
             "t": "Str",
@@ -234,7 +251,9 @@
       "c": [
         [
           "",
-          ["tomet-item"],
+          [
+            "tomet-item"
+          ],
           [
             [
               "tomet-data",
@@ -250,7 +269,9 @@
       "c": [
         [
           "",
-          ["tomet-item"],
+          [
+            "tomet-item"
+          ],
           [
             [
               "tomet-data",
@@ -324,7 +345,9 @@
       "c": [
         [
           "",
-          ["tomet-item"],
+          [
+            "tomet-item"
+          ],
           [
             [
               "tomet-data",
@@ -391,12 +414,21 @@
       "c": [
         [
           "",
-          ["tomet-item"],
           [
-            ["numbered", "a, b"],
+            "tomet-item"
+          ],
+          [
+            [
+              "ordered",
+              "b, a"
+            ],
+            [
+              "numbered",
+              "a, b"
+            ],
             [
               "tomet-data",
-              "{\"args\":{\"ordered\":{\"1\":\"a\",\"0\":\"b\"},\"status\":{\"404\":\"x\",\"500\":\"y\"},\"numbered\":[\"a\",\"b\"]}}"
+              "{\"args\":{\"ordered\":[\"b\",\"a\"],\"status\":{\"404\":\"x\",\"500\":\"y\"},\"numbered\":[\"a\",\"b\"]}}"
             ]
           ]
         ],

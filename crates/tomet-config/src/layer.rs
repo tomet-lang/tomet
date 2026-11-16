@@ -138,8 +138,7 @@ impl ConfigLayer {
 }
 
 /// The `(name, path)` pairs a document registers in its `::blueprint`, `::vocabulary` or
-/// `::dictionary` (`kind`), in the order written: `::blueprint.writ(@file(path))`, or the same
-/// grouped, `::blueprint(writ: @file(path))`. An entry that is not a reference to a file is left out.
+/// `::dictionary` (`kind`), in the order written: `::blueprint(writ: @file(path))`. An entry that is not a reference to a file is left out.
 pub fn registry_entries<B>(doc: &File<B>, kind: DeclKind) -> Vec<(String, String)> {
     document_entries(doc, kind)
         .into_iter()

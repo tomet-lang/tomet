@@ -59,7 +59,8 @@ pub fn to_pandoc(doc: &File) -> PandocDoc {
 #[deny(clippy::wildcard_enum_match_arm)]
 fn meta_value(v: &Value) -> MetaValue {
     match v {
-        Value::Null => MetaValue::MetaString(String::new()),
+        Value::None => MetaValue::MetaString(String::new()),
+        Value::Auto => MetaValue::MetaString("auto".to_string()),
         Value::Bool(b) => MetaValue::MetaBool(*b),
         // The text it was written as: `1.10` is not `1.1` to a reader.
         Value::Int(_) | Value::Float(_) | Value::Number(_) => {

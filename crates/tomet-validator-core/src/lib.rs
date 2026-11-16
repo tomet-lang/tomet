@@ -770,7 +770,7 @@ fn field_value_error(
         .ok()
         .filter(|ty| ty.has_text_form())?;
     let well_formed = match value {
-        Value::Null => true,
+        Value::None => true,
         // `{$ ... }` keeps its place in the tree until it is evaluated, and `<$...>` until it is
         // filled, and what either comes to is not known here.
         _ if is_placeholder(value) => true,

@@ -26,7 +26,8 @@ pub(super) fn describe(expr: &InterpExpr) -> String {
         InterpExprKind::Literal(Literal::Float(f)) => format!("Float({f})"),
         InterpExprKind::Literal(Literal::String(s)) => format!("String({s:?})"),
         InterpExprKind::Literal(Literal::Bool(b)) => format!("Bool({b})"),
-        InterpExprKind::Literal(Literal::Null) => "Null".to_string(),
+        InterpExprKind::Literal(Literal::None) => "None".to_string(),
+        InterpExprKind::Literal(Literal::Auto) => "Auto".to_string(),
         InterpExprKind::Binary { op, lhs, rhs } => {
             format!("({} {} {})", describe(lhs), op.symbol(), describe(rhs))
         }
@@ -330,10 +331,13 @@ fn printed(src: &str) -> String {
 }
 
 #[test]
-fn true_false_and_null_are_literals() {
+fn true_false_none_and_auto_are_literals() {
     assert_eq!(described("true"), "Bool(true)");
     assert_eq!(described("false"), "Bool(false)");
-    assert_eq!(described("null"), "Null");
+    assert_eq!(described("none"), "None");
+    assert_eq!(described("auto"), "Auto");
+    let err = parse_file("{$ null }\n").unwrap_err();
+    assert!(err.to_string().contains("write `none`"));
 }
 
 #[test]
@@ -638,8 +642,9 @@ fn display_gives_back_the_canonical_spelling() {
         ("d=>d.x", "d => d.x"),
         ("(a,b)=>a<b", "(a, b) => a < b"),
         ("true", "true"),
-        ("null", "null"),
-        ("xs.filter(d => d.n != null)", "xs.filter(d => d.n != null)"),
+        ("none", "none"),
+        ("auto", "auto"),
+        ("xs.filter(d => d.n != none)", "xs.filter(d => d.n != none)"),
     ];
     for (src, expected) in cases {
         assert_eq!(printed(src), expected, "source: {src}");

@@ -57,7 +57,7 @@ pub enum Tag {
     String,
     /// A number in a value.
     Number,
-    /// `true`, `false` or `null` in a value.
+    /// `true`, `false`, `none` or `auto` in a value.
     Atom,
     /// `// to the end of the line`.
     LineComment,
@@ -267,7 +267,7 @@ fn own_tag(token: &SyntaxToken, fences: &HashSet<usize>) -> Option<Tag> {
         _ if is_key(token) => Some(Tag::PropertyName),
         K::STRING_LITERAL | K::RAW_STRING_LITERAL if in_value(token) => Some(Tag::String),
         K::INT_NUMBER | K::FLOAT_NUMBER if in_value(token) => Some(Tag::Number),
-        K::TRUE_KW | K::FALSE_KW | K::NULL_KW if in_value(token) => Some(Tag::Atom),
+        K::TRUE_KW | K::FALSE_KW | K::NONE_KW | K::AUTO_KW if in_value(token) => Some(Tag::Atom),
         _ => None,
     }
 }
@@ -540,7 +540,7 @@ mod tests {
 
     #[test]
     fn entries_have_keys_and_values() {
-        let src = "@x(name: \"v\", n: 3, f: 1.5, ok: true, no: null)\n";
+        let src = "@x(name: \"v\", n: 3, f: 1.5, ok: true, no: none)\n";
         for key in ["name", "n", "f", "ok", "no"] {
             assert!(has(src, key, "propertyName"), "{key}");
         }
@@ -548,7 +548,7 @@ mod tests {
         assert!(has(src, "3", "number"));
         assert!(has(src, "1.5", "number"));
         assert!(has(src, "true", "atom"));
-        assert!(has(src, "null", "atom"));
+        assert!(has(src, "none", "atom"));
     }
 
     #[test]

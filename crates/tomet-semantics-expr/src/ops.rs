@@ -30,7 +30,8 @@ pub(crate) fn values_equal(a: &EvalValue, b: &EvalValue) -> bool {
     match (a, b) {
         _ if as_i64(a).is_some() && as_i64(b).is_some() => as_i64(a) == as_i64(b),
         _ if number(a).is_some() && number(b).is_some() => number(a) == number(b),
-        (V::Null, V::Null) => true,
+        (V::None, V::None) => true,
+        (V::Auto, V::Auto) => true,
         (V::Bool(x), V::Bool(y)) => x == y,
         (V::String(x), V::String(y)) => x == y,
         (V::Tuple(x), V::Tuple(y)) => {

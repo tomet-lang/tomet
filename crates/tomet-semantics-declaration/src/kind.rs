@@ -8,9 +8,8 @@
 /// a user's own preamble element is a vocabulary's, and is not here.
 ///
 /// Every name is singular. A declaration is a node of the document's tree: `::field` is the
-/// `field` node, and the fields it holds are its children, written either in the head as a
-/// dot-path (`::field.author(type: string)`) or grouped under the parent
-/// (`::field(author: ( type: string ))`); both are the same tree. The plural spellings
+/// `field` node, and the fields it holds are its children, written grouped under the parent
+/// (`::field(author: ( type: string ))`). The plural spellings
 /// (`::fields`, `::macros`, ...) are retired; see [`DeclKind::retired`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum DeclKind {
@@ -25,45 +24,43 @@ pub enum DeclKind {
     Profile,
     /// `::meta(title: T, ...)`: information about the document: its free attributes, as `name: value` entries.
     Meta,
-    /// `::format.table(max_col_width: 50)`: how documents are formatted: the rules `tomet format` and
-    /// the printers follow. One declaration per element it styles, or all grouped under `::format(...)`.
+    /// `::format(table: (max_col_width: 50))`: how documents are formatted: the rules `tomet format` and
+    /// the printers follow.
     Format,
-    /// `::field.author(type: string)[ about ]`: a `::meta` field this vault or folder declares: its
-    /// type and shape. The `[...]` is the field's `about`.
+    /// `::field(author: (type: string, about: "about"))`: a `::meta` field this vault or folder declares: its
+    /// type and shape.
     Field,
-    /// `::workspace.ignore("target")`: which paths are part of the vault. Only the vault config may write it.
+    /// `::workspace(ignore: ("target"))`: which paths are part of the vault. Only the vault config may write it.
     Workspace,
     /// `::export(type, path)`: where and in which formats this document is exported.
     Export,
-    /// Two things, told apart by whether the head has a path. `::blueprint(kind)` is the header of a
-    /// blueprint document: what `tomet new` makes a document of that kind from. `::blueprint.name(@file(path))`
+    /// Two things, told apart by its form: `::blueprint(kind)` is the header of a
+    /// blueprint document: what `tomet new` makes a document of that kind from. `::blueprint(name: @file(path))`
     /// registers the blueprint file `path` under `name` in a vault or folder config.
     ///
     /// The registered name must be the name the file gives itself (`::blueprint(name)`); `tomet check`
     /// reports one that is not. The value is `@file`, not a new element: it is a link `tomet` already
     /// tracks and can rewrite when the file moves.
     Blueprint,
-    /// Two things, by the value: `::vocabulary.ns(version: "1.0.0")` is the header of a vocabulary
-    /// document (named arguments), and `::vocabulary.ns(@file(path))` registers the file under the
+    /// Two things, told apart by its form: `::vocabulary(ns, version: "1.0.0")` is the header of a vocabulary
+    /// document, and `::vocabulary(ns: @file(path))` registers the file under the
     /// namespace `ns` in a vault or folder config. The registered name must be the namespace the file
     /// gives itself.
     Vocabulary,
-    /// Two things, told apart by whether the head has a path. `::dictionary(name){ "term": ... }` is the
-    /// header of a dictionary document (the name its terms are mentioned by, `@term(name#id)`, and its
-    /// terms); `::dictionary.name(@file(path))` registers the file in a vault or folder config, with
-    /// the path relative to the vault root.
+    /// Two things, told apart by its form: `::dictionary(name)` is the header of a dictionary document
+    /// (the name its terms are mentioned by, `@term(name#id)`); `::dictionary(name: @file(path))` registers
+    /// the file in a vault or folder config, with the path relative to the vault root.
     Dictionary,
     /// `::migration(...)`: the settings of the migration tool. `tomet` reads nothing from it; it is
     /// registered so that the vault config may carry it until the tool declares its own vocabulary.
     Migration,
-    /// `::macro.name("template")`: a macro this document or vault defines. A text macro is a string;
-    /// a block macro is the `[...]` after the head, `::macro.card[ @card[ $(1) ] ]`.
+    /// `::macro(name: "template")`: a macro this document or vault defines.
     Macro,
-    /// `::var.name(type: string, default: x)[ about ]`: a variable this document or vault declares.
+    /// `::var(name: (type: string, default: x, about: "about"))`: a variable this document or vault declares.
     Var,
     /// `::use(ns, 3)`: brings a vocabulary into scope.
     Use,
-    /// `::element.name(display: block)[ about ]`: an element a vocabulary declares.
+    /// `::element(name: (display: block, about: "about"))`: an element a vocabulary declares.
     Element,
 }
 
@@ -72,7 +69,7 @@ pub enum DeclKind {
 pub enum Cardinality {
     /// At most once: a second `::kind` or `::meta` is a mistake.
     Once,
-    /// As often as needed: `::use` brings in one vocabulary each, and `::field.author`, `::field.created`
+    /// As often as needed: `::use` brings in one vocabulary each, and `::element` declares elements.
     /// are one declaration per field. A path in the head is what makes several declarations one tree.
     Many,
 }
@@ -112,17 +109,15 @@ impl Scope {
 /// to it, so which declarations may carry one is fixed here and not left to each reader.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Shape {
-    /// `::kind(config, 2)`: `(args)` bound to the declaration's positional slots, no `{...}`, and no
-    /// path after the name -- unless the declaration has a header of its own
-    /// ([`Spec::own_header`]), where a path is a registration: `::dictionary(tomet)` is the
-    /// header of a dictionary, `::dictionary.tomet(@file(...))` registers one.
+    /// `::kind(config, 2)`: `(args)` bound to the declaration's positional slots, no `{...}`,
+    /// unless the declaration has a header of its own ([`Spec::own_header`]), where named entries
+    /// register files: `::dictionary(tomet)` is the header of a dictionary,
+    /// `::dictionary(tomet: @file(...))` registers one.
     Args,
-    /// `::meta(title: T)` or `::field.author(type: string)`: a tree of entries, written as named
-    /// arguments of the declaration or as a dot-path in its head. No `{...}`. See
-    /// [`Declaration::entries`](crate::Declaration::entries) for how the two spellings meet.
+    /// `::meta(title: T)` or `::field(author: (type: string))`: a tree of entries, written as named
+    /// arguments of the declaration. No `{...}`.
     Entries,
-    /// `::blueprint(note){ ... }`: `(args)` for the slots, and a `{...}` body read as data. The same
-    /// name with a path in the head is an [`Entries`](Shape::Entries) registration and takes no body.
+    /// `::blueprint(note){ ... }`: `(args)` for the slots, and a `{...}` body read as data.
     ArgsAndData,
 }
 
@@ -136,9 +131,9 @@ pub struct Spec {
     /// `version`. Once, here, for every host that reads a declaration.
     pub positional: &'static [&'static str],
     pub cardinality: Cardinality,
-    /// Whether the form without a path names the document itself and so may be written once, even
+    /// Whether the form with positional slots names the document itself and so may be written once, even
     /// though the declaration as a whole is [`Cardinality::Many`]: `::blueprint(daily)` is the
-    /// header of a blueprint, `::blueprint.daily(@file(...))` one of many registrations.
+    /// header of a blueprint, `::blueprint(daily: @file(...))` one of many registrations.
     pub own_header: bool,
     pub scope: Scope,
     /// What it is written with: whether `(...)` holds entries and whether it takes a `{...}`.
@@ -148,13 +143,12 @@ pub struct Spec {
     pub vault_only: bool,
 }
 
-/// What a trailing `[...]` on a declaration with a path becomes.
+/// What a trailing `[...]` on a declaration would become.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Prose {
-    /// It is the declaration's `about:` entry: `::field.author(type: string)[ the author ]` is
-    /// `::field.author(type: string, about: [ the author ])`.
+    /// It would be the declaration's `about:` entry.
     About,
-    /// It is the whole value: `::macro.card[ @card[ $(1) ] ]` is `::macro.card([ @card[ $(1) ] ])`.
+    /// It would be the whole value.
     Value,
     /// The declaration takes none.
     None,
@@ -277,13 +271,17 @@ const SPECS: [Spec; 17] = [
             Shape::ArgsAndData,
         )
     },
-    spec(
-        DeclKind::Vocabulary,
-        "vocabulary",
-        Cardinality::Many,
-        Scope::Tmt,
-        Shape::Entries,
-    ),
+    Spec {
+        positional: &["namespace"],
+        own_header: true,
+        ..spec(
+            DeclKind::Vocabulary,
+            "vocabulary",
+            Cardinality::Many,
+            Scope::Tmt,
+            Shape::Args,
+        )
+    },
     Spec {
         // The name the dictionary is mentioned by: `@term(tomet#id)` names it `tomet`.
         positional: &["name"],
@@ -488,6 +486,7 @@ mod tests {
         assert_eq!(DeclKind::Version.positional_keys(), ["version"]);
         assert_eq!(DeclKind::Use.positional_keys(), ["target", "version"]);
         assert_eq!(DeclKind::Blueprint.positional_keys(), ["target"]);
+        assert_eq!(DeclKind::Vocabulary.positional_keys(), ["namespace"]);
         assert_eq!(DeclKind::Dictionary.positional_keys(), ["name"]);
         assert!(DeclKind::Meta.positional_keys().is_empty());
         // Its arguments are names, not slots.
@@ -536,12 +535,19 @@ mod tests {
                 DeclKind::Migration
             ]
         );
-        // Two of the many have a header of their own, which is written once.
+        // Three of the many have a header of their own, which is written once.
         let own_header: Vec<DeclKind> = DeclKind::ALL
             .into_iter()
             .filter(|k| k.spec().own_header)
             .collect();
-        assert_eq!(own_header, [DeclKind::Blueprint, DeclKind::Dictionary]);
+        assert_eq!(
+            own_header,
+            [
+                DeclKind::Blueprint,
+                DeclKind::Vocabulary,
+                DeclKind::Dictionary
+            ]
+        );
     }
 
     #[test]

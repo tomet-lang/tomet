@@ -10,7 +10,7 @@
 //!   | `tomet-ast` is the foundational AST crate referenced across the workspace,
 //!   | depending only on `tomet-span`, `serde`, and `unicode-width`.
 //!   | It contains only struct/enum definitions and pure inherent methods for construction
-//!   | (`new`, `with_*`) and structural inspection (`as_str()`, `get()`, `is_null()`).
+//!   | (`new`, `with_*`) and structural inspection (`as_str()`, `get()`, `is_none()`).
 //! - (A Node's Role Is Its Type)
 //!   | A `{$ ... }`, `$(...)` or `$name(...)` is an [`Interpolation`] (an expression and a span), not an [`Element`]:
 //!   | it has no name, no groups and no connects, so it is a variant of [`Block`],
@@ -58,7 +58,8 @@ use tomet_span::Span;
 /// equivalent (no headings, prose, or links).
 #[derive(Debug, Clone, PartialEq)]
 pub enum Value {
-    Null,
+    None,
+    Auto,
     Bool(bool),
     Int(i64),
     Float(f64),
@@ -654,12 +655,13 @@ impl Value {
     /// The text a bare scalar was written as, for a target that wants text: a
     /// `string` argument given `2024`, `true` or `1.10`.
     ///
-    /// `None` for what is not a scalar (`null`, a tuple, a call, an element) --
+    /// `None` for what is not a scalar (`none`, a tuple, a call, an element) --
     /// those have no single text. A [`String`](Value::String) is itself,
     /// whether it was quoted or not: the reader does not keep the difference.
     pub fn scalar_text(&self) -> Option<std::borrow::Cow<'_, str>> {
         use std::borrow::Cow;
         Some(match self {
+            Value::Auto => Cow::Borrowed("auto"),
             Value::String(s) | Value::Number(s) => Cow::Borrowed(s.as_str()),
             Value::Int(i) => Cow::Owned(i.to_string()),
             Value::Float(f) => Cow::Owned(Value::float_text(*f)),
@@ -687,7 +689,8 @@ impl Serialize for Value {
         S: serde::Serializer,
     {
         match self {
-            Value::Null => serializer.serialize_none(),
+            Value::None => serializer.serialize_none(),
+            Value::Auto => Err(serde::ser::Error::custom("`auto` has no JSON representation")),
             Value::Bool(b) => serializer.serialize_bool(*b),
             Value::Int(i) => serializer.serialize_i64(*i),
             Value::Float(f) => serializer.serialize_f64(*f),
@@ -769,11 +772,11 @@ impl<'de> Deserialize<'de> for Value {
             }
 
             fn visit_none<E>(self) -> Result<Self::Value, E> {
-                Ok(Value::Null)
+                Ok(Value::None)
             }
 
             fn visit_unit<E>(self) -> Result<Self::Value, E> {
-                Ok(Value::Null)
+                Ok(Value::None)
             }
 
             // An array and an object are a tuple, read as `Tuple` reads them.
@@ -1879,7 +1882,8 @@ impl fmt::Display for InterpExpr {
                 f.write_str(")")
             }
             InterpExprKind::Literal(Literal::Bool(b)) => write!(f, "{b}"),
-            InterpExprKind::Literal(Literal::Null) => f.write_str("null"),
+            InterpExprKind::Literal(Literal::None) => f.write_str("none"),
+            InterpExprKind::Literal(Literal::Auto) => f.write_str("auto"),
             InterpExprKind::Member { object, member } => write!(f, "{object}.{member}"),
             InterpExprKind::Connect { object, member } => write!(f, "{object}::{member}"),
             InterpExprKind::NamedArg { name, value } => write!(f, "{name}: {value}"),
@@ -1966,7 +1970,8 @@ pub enum Literal {
     Float(f64),
     String(String),
     Bool(bool),
-    Null,
+    None,
+    Auto,
 }
 
 /// A Tomet file: its `::name(...)` declarations in the preamble header, followed by its body.

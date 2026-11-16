@@ -340,7 +340,8 @@ pub fn tokenize(src: &str) -> Vec<(SyntaxKind, &str)> {
                 let kind = match text {
                     "true" => SyntaxKind::TRUE_KW,
                     "false" => SyntaxKind::FALSE_KW,
-                    "null" => SyntaxKind::NULL_KW,
+                    "none" => SyntaxKind::NONE_KW,
+                    "auto" => SyntaxKind::AUTO_KW,
                     _ => SyntaxKind::IDENT,
                 };
                 tokens.push((kind, text));

@@ -1,7 +1,7 @@
 //! Type admission and conformance checking for AST [`Value`]s.
 
 use tomet_ast::{Tuple, Value};
-use tomet_type::{Datum, DefaultValue, Kind, Type};
+use tomet_type::{Datum, Kind, Type};
 
 /// A value that is not of the type it was held to.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -83,7 +83,8 @@ pub fn is_placeholder(value: &Value) -> bool {
 /// `(a, b)` a list.
 pub fn datum_value(datum: &Datum) -> Value {
     match datum {
-        Datum::Null => Value::Null,
+        Datum::None => Value::None,
+        Datum::Auto => Value::Auto,
         Datum::Bool(b) => Value::Bool(*b),
         Datum::Int(n) => Value::Int(*n),
         Datum::Float(n) => Value::Float(*n),
@@ -97,8 +98,8 @@ pub fn datum_value(datum: &Datum) -> Value {
 /// made up when it is needed and is no value to read here.
 pub fn default_value(ty: &Type) -> Option<Value> {
     match ty.default()? {
-        DefaultValue::Given(datum) => Some(datum_value(datum)),
-        DefaultValue::Auto => None,
+        Datum::Auto => None,
+        datum => Some(datum_value(datum)),
     }
 }
 
@@ -137,7 +138,8 @@ pub fn describe_value(value: &Value) -> String {
         Value::Bool(b) => format!("`{b}`"),
         Value::Int(n) => format!("`{n}`"),
         Value::Float(n) => format!("`{n}`"),
-        Value::Null => "null".to_string(),
+        Value::None => "none".to_string(),
+        Value::Auto => "auto".to_string(),
         Value::Tuple(tuple) => describe_tuple(tuple).to_string(),
         Value::Number(text) => format!("`{text}`"),
         Value::Call(name, _) => format!("`{name}(...)`"),
@@ -214,7 +216,7 @@ mod tests {
         }
 
         let bad_cases: &[(Type, Value)] = &[
-            (t("string"), Value::Null),
+            (t("string"), Value::None),
             (t("string"), seq(vec![])),
             (t("int"), Value::Float(1.0)),
             (t("uint"), Value::Int(-1)),
@@ -224,7 +226,7 @@ mod tests {
             (t("datetime"), text("not a date")),
             (t("version"), text("1.0.0_beta")),
             (t("version"), Value::Bool(true)),
-            (t("version"), Value::Null),
+            (t("version"), Value::None),
             (t("version"), Value::Float(1e21)),
             (t("date"), Value::Int(2026)),
             (t("date"), text("2026-02-29")),
@@ -253,7 +255,7 @@ mod tests {
     #[test]
     fn a_datum_is_the_value_a_document_holds() {
         let datum = Datum::Seq(vec![
-            Datum::Null,
+            Datum::None,
             Datum::Bool(true),
             Datum::Int(3),
             Datum::Float(1.5),
@@ -263,7 +265,7 @@ mod tests {
         assert_eq!(
             datum_value(&datum),
             seq(vec![
-                Value::Null,
+                Value::None,
                 Value::Bool(true),
                 Value::Int(3),
                 Value::Float(1.5),

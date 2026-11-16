@@ -2579,7 +2579,7 @@
             "name": "name",
             "content": {
               "type": "SYMBOL",
-              "name": "_element_name"
+              "name": "_declaration_name"
             }
           },
           {
@@ -3099,6 +3099,22 @@
       "type": "PATTERN",
       "value": "[A-Za-z_][A-Za-z0-9_.-]*"
     },
+    "_declaration_name": {
+      "type": "ALIAS",
+      "content": {
+        "type": "TOKEN",
+        "content": {
+          "type": "PREC",
+          "value": 1,
+          "content": {
+            "type": "PATTERN",
+            "value": "[A-Za-z_][A-Za-z0-9_-]*"
+          }
+        }
+      },
+      "named": true,
+      "value": "identifier"
+    },
     "_element_name": {
       "type": "ALIAS",
       "content": {
@@ -3499,13 +3515,30 @@
     }
   ],
   "conflicts": [
-    ["section"],
-    ["_tuple_items"],
-    ["_entry_sep", "_tuple_items"],
-    ["map"],
-    ["children"],
-    ["_interp_operand", "interp_lambda"],
-    ["thematic_break", "titled_thematic_break"]
+    [
+      "section"
+    ],
+    [
+      "_tuple_items"
+    ],
+    [
+      "_entry_sep",
+      "_tuple_items"
+    ],
+    [
+      "map"
+    ],
+    [
+      "children"
+    ],
+    [
+      "_interp_operand",
+      "interp_lambda"
+    ],
+    [
+      "thematic_break",
+      "titled_thematic_break"
+    ]
   ],
   "precedences": [],
   "externals": [

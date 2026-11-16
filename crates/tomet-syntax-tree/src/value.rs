@@ -4,8 +4,8 @@ use tomet_ast::{Tuple, Value};
 
 /// Extension trait providing accessors and inspections on [`Value`].
 pub trait ValueExt {
-    /// Returns `true` if this value is `Value::Null`.
-    fn is_null(&self) -> bool;
+    /// Returns `true` if this value is `Value::None`.
+    fn is_none(&self) -> bool;
 
     /// Returns the string slice if this value is a `Value::String`.
     fn as_str(&self) -> Option<&str>;
@@ -47,8 +47,8 @@ pub trait ValueExt {
 }
 
 impl ValueExt for Value {
-    fn is_null(&self) -> bool {
-        matches!(self, Value::Null)
+    fn is_none(&self) -> bool {
+        matches!(self, Value::None)
     }
 
     fn as_str(&self) -> Option<&str> {
@@ -108,7 +108,7 @@ impl ValueExt for Value {
 
     fn is_empty(&self) -> bool {
         match self {
-            Value::Null => true,
+            Value::None => true,
             Value::String(s) => s.is_empty(),
             Value::Tuple(tuple) => tuple.is_empty(),
             _ => false,
@@ -126,7 +126,7 @@ impl ValueExt for Value {
 
 /// The flat string a value projects to, joining a non-empty unnamed tuple with `", "`, or `None` when it cannot project.
 ///
-/// Bare scalars delegate to [`Value::scalar_text`]; `Value::Null` projects to an empty string.
+/// Bare scalars delegate to [`Value::scalar_text`]; `Value::None` projects to an empty string.
 /// Unnamed tuples project if every element projects. Named or empty tuples, calls, elements, blocks,
 /// interpolations, holes, and type seats return `None`.
 pub fn scalar_string(v: &Value) -> Option<String> {
@@ -134,7 +134,7 @@ pub fn scalar_string(v: &Value) -> Option<String> {
         return Some(text.into_owned());
     }
     match v {
-        Value::Null => Some(String::new()),
+        Value::None => Some(String::new()),
         Value::Tuple(tuple) if !tuple.is_empty() && tuple.has_no_named() => {
             let parts: Option<Vec<String>> = tuple.unnamed().map(scalar_string).collect();
             Some(parts?.join(", "))
@@ -149,8 +149,10 @@ mod tests {
 
     #[test]
     fn test_scalar_string_and_plain_text() {
-        assert_eq!(Value::Null.scalar_string(), Some("".to_string()));
-        assert_eq!(Value::Null.plain_text(), "");
+        assert_eq!(Value::None.scalar_string(), Some("".to_string()));
+        assert_eq!(Value::None.plain_text(), "");
+        assert_eq!(Value::Auto.scalar_string(), Some("auto".to_string()));
+        assert_eq!(Value::Auto.plain_text(), "auto");
 
         assert_eq!(Value::Bool(true).scalar_string(), Some("true".to_string()));
         assert_eq!(Value::Int(42).scalar_string(), Some("42".to_string()));
