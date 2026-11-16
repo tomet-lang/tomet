@@ -2,18 +2,20 @@
 
 # Tomet
 
-Tome to me!
+[English](README.md) | [日本語](docs/readmes/README.ja.md) | [简体中文](docs/readmes/README.zh-CN.md)
 
-Tomet (`.tmt` / `.tmt`) is a human-readable, strongly-typed markup language and Rust toolchain designed as a modern alternative.
+Tome to me.
+
+Tomet is a human-readable, structured markup language and Rust toolchain.
 
 ## Example
 
-```tm
-::id(doc-asdfadsf)
+```tmt
+::id(readme)
 
 =[ heading ]
 
-- list #(item)
+- list #(id)
   -. orderd
 
 @table
@@ -24,6 +26,8 @@ Tomet (`.tmt` / `.tmt`) is a human-readable, strongly-typed markup language and 
 ```
 
 ## Repository Layout
+
+<div data-tm-kind="todo"></div>
 
 ```
 tomet/
@@ -77,5 +81,4 @@ Nix is the packaging story. `nix/pkgs/tomet.nix` and `nix/pkgs/vscode-extension.
 - What a crate is and why it exists: that crate's `//!` module doc and `tmtroot/generated/crates/`.
 - What a crate depends on: its `Cargo.toml`.
 - What the CLI does: `tomet --help`.
-- Multilingual docs: Japanese documentation lives under `tmtroot/locales/ja/` (exported to `README.ja.md`).
 

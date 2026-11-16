@@ -1,0 +1,77 @@
+::export(
+  type: commonmark,
+  path: "docs/readmes/README.zh-CN.md"
+)
+::id(doc-XPCA2A8F)
+::meta(
+  lang:      "zh-Hans"
+  lang_name: "简体中文"
+)
+
+$macro.generated_by(self::path)
+
+@callout(warning)
+| Tomet 目前正在开发中，语法和规范每天都在发生很大变化。
+| 试用时请先做好备份，不要用于正式运行。
+
+@callout(note)
+| 本页是尚未经过人工确认的翻译草稿。内容以英文版 README 为准。
+
+=[ Tomet ]
+
+{$ vault::docs
+    .filter(d => d::filename == "readme.tmt" && exists(d::meta.lang))
+    .sort(d => d::meta.lang)
+    .map(d => d.link(d::meta.lang_name))
+    .join(" | ") }
+
+Tome to me!!
+
+==[ Tomet 是什么？ ]
+
+-. 符合人体工学，易于阅读。
+-. 对解析器同样友好。
+-. 扩展性有保障。
+-. 重视 key:value。
+-. 出于研究目的而开发。
+
+==[ 为什么使用 Tomet？ ]
+
+-. 无歧义的语法
+-. 专注于链接与变量
+-. 统一的记法
+-. 为文字标注读音（ruby）很容易
+-. 保留字面量
+
+@callout(note)
+| 适合希望像 MDX 或 Astro 组件那样，在文档中嵌入带类型的数据或组件的工程师
+| 适合希望像 Obsidian 的 Dataview 或 Bases 那样，将元数据与笔记深度联动的知识库构建者
+
+==[ 示例 ]
+
+```tmt
+`` ::id(readme)
+``
+`` =[ heading ]
+``
+`` - list #(id)
+``   -. orderd
+``
+`` @table
+`` |[ col1 ][ col2 ][ col3 ]
+``
+`` @callout(info)
+`` | content
+```
+
+==[ 已知的弱点 ]
+
+-. 视觉噪音与输入负担。符号过多（因此重视 LSP 功能）
+-. 与 Markdown 并不完全兼容
+
+==[ 支持的编辑器 ]
+
+- Helix
+- Neovim
+- VSCode
+- Zed

@@ -4,16 +4,24 @@
   path: "README.md"
 )
 ::meta(
-  lang: "en"
+  lang:      "en"
+  lang_name: "English"
 )
 
 $macro.generated_by(self::path)
 
 =[ Tomet ]
 
+{$ vault::docs
+    .filter(d => d::filename == "readme.tmt" && exists(d::meta.lang))
+    .sort(d => d::meta.lang)
+    .map(d => d.link(d::meta.lang_name))
+    .join(" | ")
+}
+
 Tome to me.
 
-Tomet (`.tmt` / `.tmt`) is a human-readable, structured markup language and Rust toolchain.
+Tomet is a human-readable, structured markup language and Rust toolchain.
 
 ==[ Example ]
 
@@ -86,4 +94,3 @@ Nix is the packaging story. `nix/pkgs/tomet.nix` and `nix/pkgs/vscode-extension.
 - What a crate is and why it exists: that crate's `//!` module doc and @dir(tmtroot/generated/crates/).
 - What a crate depends on: its @file(Cargo.toml).
 - What the CLI does: `tomet --help`.
-- Multilingual docs: Japanese documentation lives under @dir(tmtroot/locales/ja/) (exported to @file(README.ja.md)).

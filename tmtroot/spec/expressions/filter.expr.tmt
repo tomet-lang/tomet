@@ -30,7 +30,19 @@
 
 =[ リンクにする ]
 
-文書は、出力位置にそのまま置けない（@file(tmtroot/spec/expressions/overview.expr.tmt)）。リンクにするときは `d.link()` を使う。結果の Seq は断片の並びで、リスト項目位置に置くと、各要素が1項目に展開される。
+文書は、出力位置にそのまま置けない（@file(tmtroot/spec/expressions/overview.expr.tmt)）。リンクにするときは `d.link()`（またはラベルを指定する `d.link(label)`）を使う。ラベルに `none` を渡すと型エラーになる（ラベル省略ではなくエラー）。結果の Seq は断片の並びで、リスト項目位置に置くと各要素が1項目に展開され、`.join(区切り)` を呼ぶと1段落に連結された断片になる。
+
+多言語の README へのリンク列（言語バー）をインライン位置に置く例:
+
+```tm
+`` {$ vault::docs
+``     .filter(d => d::filename == "readme.tmt")
+``     .sort(d => d::meta.lang)
+``     .map(d => d.link(d::meta.lang_name))
+``     .join(" | ") }
+```
+
+`d::meta.lang` や `d::meta.lang_name` を読むには、`vault.config.tmt` などで `lang` と `lang_name` が `::field` として宣言されていなければならない（宣言されていないメタフィールドを読むとエラーになる）。
 
 文書の中身を並べたいときは `d => include(d)`。
 

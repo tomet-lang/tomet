@@ -6,6 +6,8 @@
 
 # Tomet
 
+[English](../../README.md) | [日本語](README.ja.md) | [简体中文](README.zh-CN.md)
+
 ![license](https://img.shields.io/github/license/tomet-lang/tomet?style=flat-square&color=brightgreen)
 ![release](https://img.shields.io/github/downloads/tomet-lang/tomet/total?style=flat-square&color=orange)
 ![npm](https://img.shields.io/npm/v/@tomet/wasm?style=flat-square&color=blue)

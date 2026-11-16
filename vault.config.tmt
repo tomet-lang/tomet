@@ -1,7 +1,7 @@
 ::kind(config)
 ::id(config-vault)
-::macro(copyright("(C) 2026 Tomet Projects"))
-::macro(generated_by[@comment[ Generated from $(1). Edit that, then `tomet export .`. ]])
+::macro(copyright: ("(C) 2026 Tomet Projects"))
+::macro(generated_by: [@comment[ Generated from $(1). Edit that, then `tomet export .`. ]])
 ::format(
   meta: (always_newline: true)
   section: (
@@ -28,6 +28,8 @@
   url.wiki:   (type: list, always_newline: true)
   url.source: (type: list, always_newline: true)
   url.main:   (type: list, always_newline: true)
+  lang:       (type: string)
+  lang_name:  (type: string)
 )
 ::vocabulary(
   writ:       @file(tmtroot/schema/vocabularies/writ.vocabulary.tmt)
@@ -41,10 +43,10 @@
   tomet:      @file(tmtroot/dict/tomet.dict.tmt)
 )
 ::blueprint(
-  writ: @file(tmtroot/schema/blueprints/writ.blueprint.tmt)
+  writ:    @file(tmtroot/schema/blueprints/writ.blueprint.tmt)
   element: @file(tmtroot/schema/blueprints/element.blueprint.tmt)
-  crate: @file(tmtroot/schema/blueprints/crate.blueprint.tmt)
-  demo: @file(tmtroot/schema/blueprints/demo.blueprint.tmt)
+  crate:   @file(tmtroot/schema/blueprints/crate.blueprint.tmt)
+  demo:    @file(tmtroot/schema/blueprints/demo.blueprint.tmt)
 )
 ::workspace(
   ignore: ("00-09 System/01 Apps/obsidian")
