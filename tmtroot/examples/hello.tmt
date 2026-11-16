@@ -1,0 +1,13 @@
+=[ Hello, Tomet ]
+
+Tomet is a *structured* markup language.
+
+- a list item
+  -. an ordered child
+
+@callout(note)
+| A callout.
+
+@table
+|[ name  ][ kind     ]
+|[ tomet ][ language ]

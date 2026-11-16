@@ -36,7 +36,7 @@ Tome to me!!
 ## 示例
 
 ```tmt
-::id(readme)
+::id(example-overview)
 
 =[ heading ]
 

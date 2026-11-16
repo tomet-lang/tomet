@@ -17,6 +17,7 @@
 - 第1引数は、文書か要素（参照）。
 - 戻り値は**断片**。断片だけが、ブロック位置やインライン位置にそのまま置ける（@file(tmtroot/spec/expressions/overview.expr.tmt)）。
 - 参照を出力位置に直接置いても、取り込まれない。型不一致になる。内容を出すときは、必ず `include` を通す。
+- 文書の構造として中身を展開するのが `include` で、書かれたままのテキストをコードブロックとして見せるには `{$ raw(doc::source, lang: "tmt") }` を使う。
 
 名前は他言語に合わせた。文書を組む言語（AsciiDoc、Org-mode、Typst、mdBook、Quarto、LaTeX）は `include` を使う。`@embed` は中身が不透明な外部のメディア用で、別の仕事。
 

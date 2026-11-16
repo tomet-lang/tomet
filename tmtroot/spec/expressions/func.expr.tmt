@@ -15,7 +15,7 @@
 - 述語: `exists`、`not`
 - 文字: `emoji`、`unicode`
 - アドレス: `tmt`、`ref`、`addr`（@file(tmtroot/spec/expressions/address.expr.tmt)）
-- 断片: `include`、`link`（@file(tmtroot/spec/expressions/include.expr.tmt)）
+- 断片: `include`、`link`、`raw`（@file(tmtroot/spec/expressions/include.expr.tmt)）
 
 受け手に対する操作（`contains`、日時の整形など）は関数ではなくメソッド（@file(tmtroot/spec/expressions/types.expr.tmt)）。関数は、二つの対等な値の関係と、受け手を持たない操作だけ。
 
@@ -24,6 +24,7 @@
 - `exists(x)` は、`x` が Null でなければ真。`x != null` と同じ意味で、読みやすさのために残している。
 - `emoji` は名前から絵文字を返す。知らない名前はエラー。`unicode` はコードポイントから文字を返す。
 - `link(対象, ラベル)` は対象へのリンクの断片を作る。ラベルは省略可能。ラベルに `none` を渡すと「ラベルなし」ではなく型エラーになる。
+- `raw(テキスト, lang: "...")` はコードブロックの断片を作る。テキストスカラーを受け取り、名前付き引数 `lang` は省略可能。
 - 比較できるのは、数同士、文字列同士、日時同士。それ以外の組み合わせはエラー。
 
 =[ 作成時だけの関数 ]

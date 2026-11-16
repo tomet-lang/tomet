@@ -12,7 +12,7 @@ It combines clear syntax for typed data and cross-document links with multi-form
 ## Example
 
 ```tmt
-::id(readme)
+::id(example-overview)
 
 =[ heading ]
 

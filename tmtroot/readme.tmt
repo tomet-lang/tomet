@@ -27,20 +27,7 @@ It combines clear syntax for typed data and cross-document links with multi-form
 
 ==[ Example ]
 
-```tmt
-`` ::id(readme)
-``
-`` =[ heading ]
-``
-`` - list #(id)
-``   -. orderd
-``
-`` @table
-`` |[ col1 ][ col2 ][ col3 ]
-``
-`` @callout(info)
-`` | content
-```
+$raw(tmt("tmtroot/examples/overview.tmt")::source, lang: "tmt")
 
 ==[ Try it ]
 
@@ -56,21 +43,7 @@ Install `sisho` and `tomet` together using the @link[Quick install](tmt:tmtroot/
 
 Create a document `hello.tmt`:
 
-```tmt
-`` =[ Hello, Tomet ]
-``
-`` Tomet is a *structured* markup language.
-``
-`` - a list item
-``   -. an ordered child
-``
-`` @callout(note)
-`` | A callout.
-``
-`` @table
-`` |[ name  ][ kind     ]
-`` |[ tomet ][ language ]
-```
+$raw(tmt("tmtroot/examples/hello.tmt")::source, lang: "tmt")
 
 ===[ 3. Check it ]
 

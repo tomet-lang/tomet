@@ -23,21 +23,7 @@ For other installation methods, see @link[Install Tomet and Sisho](tmt:tmtroot/d
 
 Create a file named `hello.tmt` containing headings, a list with an ordered sub-item, a callout, and a table:
 
-```tmt
-`` =[ Hello, Tomet ]
-``
-`` Tomet is a *structured* markup language.
-``
-`` - a list item
-``   -. an ordered child
-``
-`` @callout(note)
-`` | A callout.
-``
-`` @table
-`` |[ name  ][ kind     ]
-`` |[ tomet ][ language ]
-```
+$raw(tmt("tmtroot/examples/hello.tmt")::source, lang: "tmt")
 
 You now have a complete Tomet document in a single file.
 
@@ -115,20 +101,6 @@ Add an `::export` declaration to the top of `hello.tmt` to define the target for
 ``   type: (commonmark, html)
 ``   path: ( commonmark: "hello.md", html: "hello.html" )
 `` )
-``
-`` =[ Hello, Tomet ]
-``
-`` Tomet is a *structured* markup language.
-``
-`` - a list item
-``   -. an ordered child
-``
-`` @callout(note)
-`` | A callout.
-``
-`` @table
-`` |[ name  ][ kind     ]
-`` |[ tomet ][ language ]
 ```
 
 Run `tomet export hello.tmt` to generate the output files:

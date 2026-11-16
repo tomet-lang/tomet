@@ -1,0 +1,12 @@
+::id(example-overview)
+
+=[ heading ]
+
+- list #(id)
+  -. orderd
+
+@table
+|[ col1 ][ col2 ][ col3 ]
+
+@callout(info)
+| content

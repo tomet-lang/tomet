@@ -112,20 +112,6 @@ Add an `::export` declaration to the top of `hello.tmt` to define the target for
   type: (commonmark, html)
   path: ( commonmark: "hello.md", html: "hello.html" )
 )
-
-=[ Hello, Tomet ]
-
-Tomet is a *structured* markup language.
-
-- a list item
-  -. an ordered child
-
-@callout(note)
-| A callout.
-
-@table
-|[ name  ][ kind     ]
-|[ tomet ][ language ]
 ```
 
 Run `tomet export hello.tmt` to generate the output files:

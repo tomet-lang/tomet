@@ -49,20 +49,7 @@ Tome to me!!
 
 ==[ 示例 ]
 
-```tmt
-`` ::id(readme)
-``
-`` =[ heading ]
-``
-`` - list #(id)
-``   -. orderd
-``
-`` @table
-`` |[ col1 ][ col2 ][ col3 ]
-``
-`` @callout(info)
-`` | content
-```
+$raw(tmt("tmtroot/examples/overview.tmt")::source, lang: "tmt")
 
 请参阅 @link[快速入门指南（英文）](tmt:tmtroot/docs/quick_start.tmt) 开始使用。
 
