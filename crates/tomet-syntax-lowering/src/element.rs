@@ -549,8 +549,10 @@ fn lower_single_value_from_children(
                 let name = name_token.text();
                 let args_node = args_elem.as_node().unwrap();
                 let raw_args = name == "string";
-                let args = lower_call_args(args_node, raw_args)?;
+                let mut args = lower_call_args(args_node, raw_args)?;
                 let start = usize::from(name_token.text_range().start());
+                let end = usize::from(args_elem.text_range().end());
+                args.set_span(tomet_span::Span::new(start, end));
                 let call_val = resolve_call(name, args).map_err(|m| err(start, m))?;
                 if non_trivia_indices.len() > 2 {
                     let next_elem = &elements[non_trivia_indices[2]];

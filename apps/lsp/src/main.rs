@@ -222,9 +222,7 @@ fn main_loop(connection: Connection) -> anyhow::Result<()> {
                         serde_json::from_value(note.params)?;
                     let uri = params.text_document.uri;
                     documents.insert(uri.clone(), params.text_document.text.clone());
-                    if !tomet_lsp::is_data_uri(&uri)
-                        && let Some(path) = tomet_lsp::uri_to_file_path(&uri)
-                    {
+                    if let Some(path) = tomet_lsp::uri_to_file_path(&uri) {
                         workspace.set_buffer(path, params.text_document.text.clone());
                         debounce.touch(Instant::now());
                     }
@@ -241,9 +239,7 @@ fn main_loop(connection: Connection) -> anyhow::Result<()> {
                     let uri = params.text_document.uri;
                     if let Some(change) = params.content_changes.into_iter().next_back() {
                         documents.insert(uri.clone(), change.text.clone());
-                        if !tomet_lsp::is_data_uri(&uri)
-                            && let Some(path) = tomet_lsp::uri_to_file_path(&uri)
-                        {
+                        if let Some(path) = tomet_lsp::uri_to_file_path(&uri) {
                             workspace.set_buffer(path, change.text.clone());
                             debounce.touch(Instant::now());
                         }
@@ -259,9 +255,7 @@ fn main_loop(connection: Connection) -> anyhow::Result<()> {
                     let uri = params.text_document.uri;
                     documents.remove(&uri);
                     from_vault.remove(&uri);
-                    if !tomet_lsp::is_data_uri(&uri)
-                        && let Some(path) = tomet_lsp::uri_to_file_path(&uri)
-                    {
+                    if let Some(path) = tomet_lsp::uri_to_file_path(&uri) {
                         workspace.close(&path);
                         // Once closed, what was open is read from the disk.
                         debounce.touch(Instant::now());
@@ -295,11 +289,11 @@ fn publish(
     text: &str,
     from_vault: Option<&Vec<lsp_types::Diagnostic>>,
 ) -> anyhow::Result<()> {
-    // A `.ctmt` is read by the cotomet parser, and the vault has no say.
-    if tomet_lsp::is_data_uri(&uri) {
-        return publish_diagnostics(connection, uri, tomet_lsp::data_diagnostics_for(text));
-    }
-    let mut diagnostics = tomet_lsp::diagnostics_for(text);
+    let mut diagnostics = if tomet_lsp::is_data_uri(&uri) {
+        tomet_lsp::data_diagnostics_for(text)
+    } else {
+        tomet_lsp::diagnostics_for(text)
+    };
     diagnostics.extend(from_vault.into_iter().flatten().cloned());
     publish_diagnostics(connection, uri, diagnostics)
 }
@@ -315,9 +309,6 @@ fn refresh(
     from_vault: &mut HashMap<Uri, Vec<lsp_types::Diagnostic>>,
 ) -> anyhow::Result<()> {
     for (uri, text) in documents {
-        if tomet_lsp::is_data_uri(uri) {
-            continue;
-        }
         let Some(path) = tomet_lsp::uri_to_file_path(uri) else {
             continue;
         };

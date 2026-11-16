@@ -62,6 +62,8 @@ pub enum DeclKind {
     Use,
     /// `::element(name: (display: block, about: "about"))`: an element a vocabulary declares.
     Element,
+    /// `::constructor(name: (about: "about", args: (...)))`: a constructor a vocabulary declares.
+    Constructor,
 }
 
 /// How many times a declaration may be written in one document.
@@ -79,10 +81,11 @@ pub enum Cardinality {
 pub enum Scope {
     /// In a `.tmt` document and in a `.ctmt` file.
     Both,
-    /// In a `.tmt` document only: it presumes elements, vocabularies or a vault.
+    /// In a `.tmt` document only: it is about document prose or elements, or belongs to a
+    /// config, blueprint, vocabulary or dictionary document.
     ///
-    /// This is data, not structure. `config` and `settings` may open to `.ctmt` later; that is a
-    /// change of this value and of nothing else.
+    /// This is data, not structure. Opening a declaration to `.ctmt` is a change of this value
+    /// and of nothing else.
     Tmt,
 }
 
@@ -174,7 +177,7 @@ const fn spec(
 }
 
 /// Every standard declaration, in the order they are listed to people.
-const SPECS: [Spec; 17] = [
+const SPECS: [Spec; 18] = [
     Spec {
         // The second slot is the version of that kind's definition, a `version`, and may be
         // left out. The validator checks the value; nothing reads it yet.
@@ -327,13 +330,20 @@ const SPECS: [Spec; 17] = [
             DeclKind::Use,
             "use",
             Cardinality::Many,
-            Scope::Tmt,
+            Scope::Both,
             Shape::Args,
         )
     },
     spec(
         DeclKind::Element,
         "element",
+        Cardinality::Many,
+        Scope::Tmt,
+        Shape::Entries,
+    ),
+    spec(
+        DeclKind::Constructor,
+        "constructor",
         Cardinality::Many,
         Scope::Tmt,
         Shape::Entries,
@@ -353,7 +363,7 @@ const RETIRED: [(&str, DeclKind); 7] = [
 
 impl DeclKind {
     /// Every standard declaration.
-    pub const ALL: [DeclKind; 17] = [
+    pub const ALL: [DeclKind; 18] = [
         DeclKind::Kind,
         DeclKind::Id,
         DeclKind::Version,
@@ -371,6 +381,7 @@ impl DeclKind {
         DeclKind::Var,
         DeclKind::Use,
         DeclKind::Element,
+        DeclKind::Constructor,
     ];
 
     /// What is fixed about this declaration.
@@ -423,7 +434,9 @@ impl DeclKind {
     /// What a trailing `[...]` on this declaration, written with a path, becomes.
     pub fn prose(self) -> Prose {
         match self {
-            DeclKind::Field | DeclKind::Var | DeclKind::Element => Prose::About,
+            DeclKind::Field | DeclKind::Var | DeclKind::Element | DeclKind::Constructor => {
+                Prose::About
+            }
             DeclKind::Macro => Prose::Value,
             _ => Prose::None,
         }
@@ -554,6 +567,7 @@ mod tests {
         assert_eq!(DeclKind::Field.prose(), Prose::About);
         assert_eq!(DeclKind::Var.prose(), Prose::About);
         assert_eq!(DeclKind::Element.prose(), Prose::About);
+        assert_eq!(DeclKind::Constructor.prose(), Prose::About);
         assert_eq!(DeclKind::Macro.prose(), Prose::Value);
         assert_eq!(DeclKind::Meta.prose(), Prose::None);
     }
@@ -572,7 +586,8 @@ mod tests {
                 DeclKind::Version,
                 DeclKind::Meta,
                 DeclKind::Macro,
-                DeclKind::Var
+                DeclKind::Var,
+                DeclKind::Use,
             ]
         );
         assert!(DeclKind::ALL.iter().all(|k| k.allowed_in(Host::Tmt)));

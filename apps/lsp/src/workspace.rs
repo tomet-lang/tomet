@@ -41,7 +41,10 @@ impl Workspace {
     /// `path` is open with `text`, or its text changed. Anything in the vault
     /// that reads that file from here on reads this text.
     pub fn set_buffer(&mut self, path: PathBuf, text: String) {
-        self.vault_for(&path).set_buffer(&path, &text);
+        let vault = self.vault_for(&path);
+        if !is_ctmt_path(&path) {
+            vault.set_buffer(&path, &text);
+        }
         self.buffers.insert(path, text);
     }
 
@@ -82,6 +85,21 @@ impl Workspace {
             return Vec::new();
         };
         let vault = self.vault_for(path);
+        if is_ctmt_path(path) {
+            let Ok(parsed) = cotomet::parse_file_with_expressions(&text) else {
+                return Vec::new();
+            };
+            let bindings = vault.bindings(&parsed);
+            let mut diagnostics = Vec::new();
+            tomet_validator::check_ctmt_calls(&parsed, &bindings, &mut diagnostics);
+            return to_diagnostics(
+                &text,
+                &Findings {
+                    diagnostics,
+                    unresolved: Vec::new(),
+                },
+            );
+        }
         let Ok((doc, _)) = vault.parse(&text) else {
             return Vec::new();
         };
@@ -168,6 +186,13 @@ impl Workspace {
     pub fn take_notices(&mut self) -> Vec<String> {
         std::mem::take(&mut self.notices)
     }
+}
+
+/// Whether `path` has a `.ctmt` extension.
+fn is_ctmt_path(path: &Path) -> bool {
+    path.extension()
+        .and_then(|e| e.to_str())
+        .is_some_and(|e| e.eq_ignore_ascii_case("ctmt"))
 }
 
 /// The directory of the config that governs `path`; with none, the file's own.

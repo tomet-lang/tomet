@@ -165,12 +165,14 @@ impl std::error::Error for DuplicateKey {}
 #[derive(Debug, Clone, PartialEq)]
 pub struct Tuple<V = Value> {
     entries: Vec<TupleEntry<V>>,
+    span: tomet_span::Span,
 }
 
 impl<V> Default for Tuple<V> {
     fn default() -> Self {
         Self {
             entries: Vec::new(),
+            span: tomet_span::Span::dummy(),
         }
     }
 }
@@ -249,7 +251,24 @@ impl<V> Tuple<V> {
     pub fn from_unnamed(values: impl IntoIterator<Item = V>) -> Self {
         Self {
             entries: values.into_iter().map(TupleEntry::unnamed).collect(),
+            span: tomet_span::Span::dummy(),
         }
+    }
+
+    /// The source span of this tuple (or of the [`Value::Call`] that holds it).
+    pub fn span(&self) -> tomet_span::Span {
+        self.span
+    }
+
+    /// Sets the source span of this tuple.
+    pub fn set_span(&mut self, span: tomet_span::Span) {
+        self.span = span;
+    }
+
+    /// Returns this tuple with its source span set to `span`.
+    pub fn with_span(mut self, span: tomet_span::Span) -> Self {
+        self.span = span;
+        self
     }
 
     /// A tuple of named entries, for names known to differ (a literal, the keys of a map).
@@ -387,6 +406,7 @@ impl<V> Tuple<V> {
                     value: f(e.value),
                 })
                 .collect(),
+            span: self.span,
         }
     }
 
@@ -399,7 +419,10 @@ impl<V> Tuple<V> {
                 value: f(e.value)?,
             });
         }
-        Ok(Tuple { entries })
+        Ok(Tuple {
+            entries,
+            span: self.span,
+        })
     }
 
     /// The named entries as `(name, value)`, in written order.

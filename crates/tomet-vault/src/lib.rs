@@ -63,7 +63,7 @@ pub use tomet_transform::{Unresolved, UnresolvedKind};
 pub use tomet_validator::Diagnostic;
 
 /// Whether `doc` promises `::profile(standalone)`, which is a promise to be read without a vault.
-fn reads_alone(doc: &File) -> bool {
+fn reads_alone<B>(doc: &File<B>) -> bool {
     tomet_declaration::document_profiles(doc).contains(&tomet_declaration::Profile::Standalone)
 }
 
@@ -223,7 +223,7 @@ impl Vault {
     /// Only what changes the meaning is taken away. A constraint the vault puts on a document
     /// (a blueprint, the `type:` a metadata field must have) leaves what it means as it is, so it
     /// is still checked.
-    fn seen_by(&self, doc: &File) -> &Vault {
+    fn seen_by<B>(&self, doc: &File<B>) -> &Vault {
         if reads_alone(doc) {
             self.alone.get_or_init(|| {
                 Box::new(Vault::new(
@@ -355,7 +355,7 @@ impl Vault {
     /// This is what makes an element name mean something. Matching on a
     /// bare `Element::name` instead is the shortcut that drops the
     /// namespaced spelling of the same element.
-    pub fn bindings(&self, doc: &File) -> Bindings {
+    pub fn bindings<B>(&self, doc: &File<B>) -> Bindings {
         self.seen_by(doc).loaded.bindings_for(doc)
     }
 

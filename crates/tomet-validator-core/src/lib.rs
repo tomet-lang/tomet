@@ -16,7 +16,7 @@ use tomet_ast::{Block, ElementView, File, Inline};
 use tomet_cst::{SyntaxNode, TextRange};
 use tomet_semantics::DeclKind;
 use tomet_semantics::{Bindings, Shape};
-use tomet_semantics_core::{admits, is_placeholder};
+use tomet_semantics_core::is_placeholder;
 use tomet_span::Span;
 use tomet_tree::{Node, Place, Visit};
 
@@ -326,6 +326,9 @@ pub fn check_arguments(doc: &File, bindings: &Bindings, errors: &mut Vec<Diagnos
             errors,
         );
     }
+    tomet_tree::for_each_call(doc, |head, args, span| {
+        check_call(head, args, span, bindings, errors);
+    });
 }
 
 /// The arguments written for `name` (viewed through the slots it has),
@@ -343,52 +346,119 @@ fn check_arguments_of(
     if decl.params.is_empty() {
         return;
     }
+    check_params_of(&name.to_string(), &decl.params, args.as_ref(), span, errors);
+}
 
-    let Some(view) = args.as_ref() else {
-        for param in decl.params.iter().filter(|p| p.required) {
-            errors.push(Diagnostic::MissingRequiredArgument {
-                element: name.to_string(),
-                argument: param.name.clone(),
-                span,
-            });
-        }
+/// Checks a written call (`Value::Call`) against its vocabulary constructor definition when its
+/// head is namespaced (`namespace.name`). Bare heads (`list`, `string`, `int`, `enum`, ...) are
+/// not constructor calls and are left untouched.
+pub fn check_call(
+    head: &str,
+    args: &tomet_ast::Tuple,
+    span: Span,
+    bindings: &Bindings,
+    errors: &mut Vec<Diagnostic>,
+) {
+    let Some((namespace, constructor)) = head.split_once('.') else {
         return;
     };
+    let Some(vocab) = bindings.vocabulary_in_scope(namespace) else {
+        errors.push(Diagnostic::UnknownConstructor {
+            name: head.to_string(),
+            unbound_namespace: Some(namespace.to_string()),
+            known: Vec::new(),
+            span,
+        });
+        return;
+    };
+    let Some(decl) = vocab.constructors.get(constructor) else {
+        let known = vocab.constructors.keys().cloned().collect();
+        errors.push(Diagnostic::UnknownConstructor {
+            name: head.to_string(),
+            unbound_namespace: None,
+            known,
+            span,
+        });
+        return;
+    };
+    let view = tomet_semantics::constructor_args_view(args, decl);
+    check_params_of(head, &decl.params, Some(&view), span, errors);
+}
 
-    for (key, _) in view.tuple().named() {
-        if !key.is_empty() && decl.param(key).is_none() {
-            errors.push(Diagnostic::UnknownArgument {
-                element: name.to_string(),
-                argument: key.to_string(),
-                span,
-            });
-        }
+/// Checks every namespaced constructor call in a `.ctmt` file (`header` declarations and `body`
+/// value) against the vocabularies in `bindings`.
+pub fn check_ctmt_calls(
+    file: &File<tomet_ast::Value>,
+    bindings: &Bindings,
+    errors: &mut Vec<Diagnostic>,
+) {
+    for decl in &file.header {
+        tomet_tree::for_each_call_in_declaration(decl, |head, args, span| {
+            check_call(head, args, span, bindings, errors);
+        });
     }
-    // An argument is held to the `type:` its parameter declares. A parameter
-    // whose `type:` names no type is not checked (the vocabulary says so
-    // where it is read), and a `{$ ... }` is not known until it is evaluated, nor a `<$...>`
-    // until it is filled.
-    for param in &decl.params {
-        if let Some(value) = view.get(&param.name) {
-            if let Some(ty) = param.declared_type() {
-                if !is_placeholder(value) {
-                    if let Err(mismatch) = admits(&ty, value) {
-                        errors.push(Diagnostic::InvalidArgument {
-                            element: name.to_string(),
-                            argument: param.name.clone(),
-                            ty: ty.to_string(),
-                            reason: mismatch.to_string(),
-                            span,
-                        });
-                    }
-                }
+    tomet_tree::for_each_call_in_value(&file.body, |head, args, span| {
+        check_call(head, args, span, bindings, errors);
+    });
+}
+
+fn check_params_of(
+    element: &str,
+    params: &[tomet_semantics::ParamDecl],
+    view: Option<&tomet_semantics::TupleView<'_, '_>>,
+    span: Span,
+    errors: &mut Vec<Diagnostic>,
+) {
+    use tomet_semantics::CallError;
+
+    for problem in tomet_semantics::check_call_params(element, params, view) {
+        match problem {
+            CallError::DuplicateArgument { call, argument } => {
+                errors.push(Diagnostic::DuplicateArgument {
+                    element: call,
+                    argument,
+                    span,
+                });
             }
-        } else if param.required {
-            errors.push(Diagnostic::MissingRequiredArgument {
-                element: name.to_string(),
-                argument: param.name.clone(),
-                span,
-            });
+            CallError::TooManyPositionalArguments { call, slots, given } => {
+                errors.push(Diagnostic::TooManyPositionalArguments {
+                    element: call,
+                    slots,
+                    given,
+                    span,
+                });
+            }
+            CallError::UnknownArgument { call, argument } => {
+                errors.push(Diagnostic::UnknownArgument {
+                    element: call,
+                    argument,
+                    span,
+                });
+            }
+            CallError::MissingRequiredArgument { call, argument } => {
+                errors.push(Diagnostic::MissingRequiredArgument {
+                    element: call,
+                    argument,
+                    span,
+                });
+            }
+            CallError::InvalidArgument {
+                call,
+                argument,
+                ty,
+                reason,
+            } => {
+                errors.push(Diagnostic::InvalidArgument {
+                    element: call,
+                    argument,
+                    ty,
+                    reason,
+                    span,
+                });
+            }
+            CallError::NotACall
+            | CallError::WrongNamespace { .. }
+            | CallError::UnknownConstructor { .. } => {}
         }
     }
 }
@@ -631,12 +701,23 @@ fn for_each_direct_content_item<'a>(content: &'a [Block], mut f: impl FnMut(Elem
     }
 }
 
-/// Checks how a vocabulary document declares its parameters: a `type:` that names
-/// no type, a `default:` that is not of its `type:`. The same findings are reported
-/// where a vault reads the vocabulary ([`tomet_semantics::LoadedVocabularies`]);
+/// Checks how a vocabulary document declares its parameters and constructors: a `type:` that names
+/// no type, a `default:` that is not of its `type:`, and invalid `::constructor` fields. The same
+/// findings are reported where a vault reads the vocabulary ([`tomet_semantics::LoadedVocabularies`]);
 /// this is for checking the vocabulary file itself.
 pub fn check_vocabulary_params(doc: &File, errors: &mut Vec<Diagnostic>) {
-    use tomet_semantics::{ElementKind, Vocabulary, classify_declaration_lenient};
+    use tomet_semantics::{
+        ElementKind, Vocabulary, classify_declaration_lenient, constructor_problems_in,
+    };
+
+    for (span, problem) in constructor_problems_in(doc) {
+        errors.push(Diagnostic::InvalidDefinition {
+            declaration: "constructor",
+            name: problem.name,
+            reason: problem.reason,
+            span,
+        });
+    }
 
     let Some(vocab) = Vocabulary::from_file(doc) else {
         return;

@@ -1,9 +1,9 @@
-//! A standalone cotomet file (`.ctmt`) as the language server serves it.
+//! A standalone cotomet file (`.ctmt`) as the language server serves it from its text alone.
 //!
-//! It is data, not a document: the cotomet parser says what is wrong with it,
-//! the whitespace formatter formats it, and the features that read a document
-//! (hover, symbols, completion, folding, definition) have nothing to say. It
-//! never reaches the vault, which holds documents.
+//! It is data, not a document: the cotomet parser says what is wrong with its syntax, header
+//! declarations and expressions, the whitespace formatter formats it, and the features that read a
+//! prose document (hover, symbols, completion, folding, definition) have nothing to say.
+//! Constructor calls in a `.ctmt` are checked against the vault's vocabularies in [`crate::Workspace`].
 
 use lsp_types::{Diagnostic, DiagnosticSeverity, Uri};
 use tomet_load::is_error;
@@ -127,13 +127,16 @@ mod tests {
 
     #[test]
     fn declaration_error_produces_diagnostic() {
-        let text = "::use(deck)\nkey: 1\n";
+        let ok_use = "::use(deck, version: \"1.0.0\")\nkey: 1\n";
+        assert!(data_diagnostics_for(ok_use).is_empty());
+
+        let text = "::export(type: commonmark)\nkey: 1\n";
         let diags = data_diagnostics_for(text);
         assert_eq!(diags.len(), 1);
         assert!(
             diags[0]
                 .message
-                .contains("`::use` is not permitted in this host")
+                .contains("`::export` is not permitted in this host")
         );
         assert_eq!(diags[0].severity, Some(DiagnosticSeverity::ERROR));
     }

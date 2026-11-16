@@ -85,8 +85,9 @@ pub use kind::{
     required_shape, shape_mismatch,
 };
 pub use positional::{
-    LIST_MARKER_POSITIONAL_KEY, builtin_positional_arg_keys, declaration_args_view,
-    declaration_args_view_in, element_args_view, element_args_view_in, list_marker_view,
+    LIST_MARKER_POSITIONAL_KEY, builtin_positional_arg_keys, constructor_args_view,
+    declaration_args_view, declaration_args_view_in, element_args_view, element_args_view_in,
+    list_marker_view,
 };
 pub use rebase::rebase_relative_links;
 pub use tomet_declaration::DeclKind;
@@ -94,6 +95,8 @@ pub use tomet_declaration::DeclKind;
 pub use tomet_semantics_core::TupleView;
 pub use tomet_tree::{ElementExt, ValueExt};
 pub use vocabulary::{
-    Bindings, ContentAllow, ElementDecl, LoadedVocabularies, ParamDecl, RESERVED_ELEMENT_NAMES,
-    RESERVED_NAMESPACES, Region, Vocabulary, builtin_doc_vocabularies, is_reserved_element_name,
+    Bindings, CONSTRUCTOR_KEYS, CallError, Constructed, ConstructorDecl, ConstructorProblem,
+    ContentAllow, ElementDecl, LoadedVocabularies, PARAM_KEYS, ParamDecl, RESERVED_ELEMENT_NAMES,
+    RESERVED_NAMESPACES, Region, Vocabulary, builtin_doc_vocabularies, check_call_params,
+    constructor_problems_in, is_reserved_element_name, read_call,
 };

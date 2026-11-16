@@ -273,3 +273,42 @@ pub fn for_each_type_seat_in_value(value: &Value, mut f: impl FnMut(&TypeSeat)) 
         Visit::<()>::Descend
     });
 }
+
+/// Visits every [`Value::Call`] in `file`, in document order, wherever it sits.
+pub fn for_each_call(file: &File, mut f: impl FnMut(&str, &tomet_ast::Tuple, tomet_span::Span)) {
+    for_each_node(file, |node| {
+        if let Some((head, args, span)) = node.call() {
+            f(head, args, span);
+        }
+    });
+}
+
+/// Visits every [`Value::Call`] under `value`, in document order, wherever it sits.
+pub fn for_each_call_in_value(
+    value: &Value,
+    mut f: impl FnMut(&str, &tomet_ast::Tuple, tomet_span::Span),
+) {
+    let _ = walk_node(Node::Value(value), Place::Part, &mut |node, _| {
+        if let Some((head, args, span)) = node.call() {
+            f(head, args, span);
+        }
+        Visit::<()>::Descend
+    });
+}
+
+/// Visits every [`Value::Call`] under `declaration`, in document order, wherever it sits.
+pub fn for_each_call_in_declaration(
+    declaration: &Declaration,
+    mut f: impl FnMut(&str, &tomet_ast::Tuple, tomet_span::Span),
+) {
+    let _ = walk_node(
+        Node::Declaration(declaration),
+        Place::Header,
+        &mut |node, _| {
+            if let Some((head, args, span)) = node.call() {
+                f(head, args, span);
+            }
+            Visit::<()>::Descend
+        },
+    );
+}

@@ -97,7 +97,7 @@ pub(crate) fn check(path: &Path, data: bool, quiet: bool, json: bool) -> anyhow:
             };
 
             if tomet_indexer::is_ctmt_file(file) {
-                return check_ctmt(file, &src, json);
+                return check_ctmt(file, &src, &vault, json);
             }
 
             let doc = match tomet_ast_parser::parse_file(&src) {
@@ -288,7 +288,12 @@ fn format_diagnostics(
 /// evaluator also reports errors within header declarations (such as a malformed
 /// `::var` or `::macro` entry), those duplicates are dropped in favor of the
 /// declaration check's diagnostic so each problem is reported once.
-fn check_ctmt(file: &Path, src: &str, json: bool) -> CheckFileResult {
+fn check_ctmt(
+    file: &Path,
+    src: &str,
+    vault: &tomet_load::Vault,
+    json: bool,
+) -> CheckFileResult {
     let parsed = match cotomet::parse_file_with_expressions(src) {
         Ok(parsed) => parsed,
         Err(err) => return parse_failure(file, src, &err.into(), json),
@@ -306,6 +311,8 @@ fn check_ctmt(file: &Path, src: &str, json: bool) -> CheckFileResult {
         .collect();
     let mut diagnostics = Vec::new();
     tomet_validator::check_ctmt_declarations(&declared, &mut diagnostics);
+    let bindings = vault.bindings(&parsed);
+    tomet_validator::check_ctmt_calls(&parsed, &bindings, &mut diagnostics);
 
     let eval_res = cotomet_eval::eval_file(parsed, src, &[]);
     let eval_errors: Vec<_> = match eval_res {
@@ -650,7 +657,8 @@ mod tests {
         let root = vault("ctmt_declarations");
 
         fn ctmt_messages(file: &Path, src: &str) -> Vec<String> {
-            match check_ctmt(file, src, false) {
+            let vault = tomet_load::Vault::discover(file);
+            match check_ctmt(file, src, &vault, false) {
                 CheckFileResult::Checked { stderr_lines, .. } => stderr_lines
                     .into_iter()
                     .map(|l| {
@@ -693,13 +701,20 @@ mod tests {
         let err = check(&bad_kind_file, false, true, false).expect_err("bad ::kind version fails");
         assert!(err.to_string().contains("1 of 1 file(s) failed"));
 
-        // 4. NotForThisHost (::use in .ctmt) fails
-        let not_for_host_src = "::use(deck)\nkey: 1\n";
+        // 4. ::use in .ctmt is allowed (Scope::Both), while ::export is NotForThisHost
+        let use_src = "::use(deck, version: \"1.0.0\")\nkey: 1\n";
+        let use_file = root.join("use_ok.ctmt");
+        fs::write(&use_file, use_src).unwrap();
+        assert_eq!(ctmt_messages(&use_file, use_src), Vec::<String>::new());
+        check(&use_file, false, true, false).expect("::use in .ctmt passes");
+
+        let not_for_host_src = "::export(type: commonmark)\nkey: 1\n";
         let not_for_host_file = root.join("not_for_host.ctmt");
         fs::write(&not_for_host_file, not_for_host_src).unwrap();
         let msgs = ctmt_messages(&not_for_host_file, not_for_host_src);
-        assert_eq!(msgs, vec!["`::use` is not permitted in this host"]);
-        let err = check(&not_for_host_file, false, true, false).expect_err("::use in .ctmt fails");
+        assert_eq!(msgs, vec!["`::export` is not permitted in this host"]);
+        let err =
+            check(&not_for_host_file, false, true, false).expect_err("::export in .ctmt fails");
         assert!(err.to_string().contains("1 of 1 file(s) failed"));
 
         // 5. Duplicate singleton (two ::meta) fails
@@ -714,6 +729,37 @@ mod tests {
         let err = check(&dup_file, false, true, false).expect_err("duplicate ::meta fails");
         assert!(err.to_string().contains("1 of 1 file(s) failed"));
 
+        // 6. Constructor calls in .ctmt with and without ::use, and outside any vault
+        fs::write(
+            root.join(".tomet/vocabularies/deck.vocabulary.tmt"),
+            "::kind(vocabulary)\n::vocabulary(deck, version: \"1.0.0\")\n::constructor(\n  card: (\n    args: (\n      id: (type: uint, positional: true, required: true)\n    )\n  )\n)\n",
+        )
+        .unwrap();
+        let with_use_src = "::use(deck, version: \"1.0.0\")\nfirst: deck.card(1)\n";
+        let with_use_file = root.join("with_use.ctmt");
+        fs::write(&with_use_file, with_use_src).unwrap();
+        assert_eq!(ctmt_messages(&with_use_file, with_use_src), Vec::<String>::new());
+        check(&with_use_file, false, true, false).expect("valid constructor call in .ctmt passes");
+
+        let without_use_src = "first: deck.card(1)\n";
+        let without_use_file = root.join("without_use.ctmt");
+        fs::write(&without_use_file, without_use_src).unwrap();
+        assert_eq!(
+            ctmt_messages(&without_use_file, without_use_src),
+            vec!["`deck.card`: the namespace `deck` is not in scope -- declare its vocabulary in `vocabularies` and write `::use(deck)`"]
+        );
+
+        let no_vault_dir =
+            std::env::temp_dir().join(format!("tomet_test_ctmt_no_vault_{}", nanoid::nanoid!()));
+        fs::create_dir_all(&no_vault_dir).unwrap();
+        let lone_ctmt = no_vault_dir.join("lone.ctmt");
+        fs::write(&lone_ctmt, with_use_src).unwrap();
+        assert_eq!(
+            ctmt_messages(&lone_ctmt, with_use_src),
+            vec!["`deck.card`: the namespace `deck` is not in scope -- declare its vocabulary in `vocabularies` and write `::use(deck)`"]
+        );
+        let _ = fs::remove_dir_all(&no_vault_dir);
+
         let _ = fs::remove_dir_all(&root);
     }
 
@@ -723,7 +769,8 @@ mod tests {
         let root = vault("ctmt_eval_expressions");
 
         fn ctmt_errors(file: &Path, src: &str) -> Vec<String> {
-            match check_ctmt(file, src, false) {
+            let vault = tomet_load::Vault::discover(file);
+            match check_ctmt(file, src, &vault, false) {
                 CheckFileResult::Checked { stderr_lines, .. } => stderr_lines,
                 _ => panic!("expected CheckFileResult::Checked"),
             }

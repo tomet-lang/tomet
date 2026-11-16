@@ -102,7 +102,16 @@ impl<'a> Node<'a> {
             Node::Value(Value::Hole(h)) => Some(h.span),
             Node::Value(Value::Interp(it)) => Some(it.span),
             Node::Value(Value::TypeSeat(t)) => Some(t.span),
+            Node::Value(Value::Call(_, args)) => (!args.span().is_dummy()).then_some(args.span()),
             Node::Value(_) => None,
+        }
+    }
+
+    /// The `Value::Call` this node is, with its arguments and source span.
+    pub fn call(self) -> Option<(&'a str, &'a tomet_ast::Tuple, Span)> {
+        match self {
+            Node::Value(Value::Call(name, args)) => Some((name.as_str(), args, args.span())),
+            _ => None,
         }
     }
 

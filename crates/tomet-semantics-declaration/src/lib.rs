@@ -18,9 +18,9 @@
 //! - (Shape here, meaning injected)
 //!   | [`DeclKind`] is the closed list of the standard declarations. Each has a [`Spec`]: its
 //!   | positional slots, whether it may be written once or many times, where it may be written
-//!   | ([`Scope`]), and what its parentheses hold ([`Shape`]). Reading and checking the ones both hosts have (`kind version meta macro
-//!   | var`) is here. Standard declarations are counted here, in one place for both hosts; the
-//!   | validator's singleton check covers only user-vocabulary elements. What the `.tmt`-only
+//!   | ([`Scope`]), and what its parentheses hold ([`Shape`]). Reading and checking the ones both hosts have (`kind id version meta macro
+//!   | var use`) is here. Standard declarations are counted here, in one place for both hosts; the
+//!   | validator's singleton check covers only user-vocabulary elements. What the host-resolved
 //!   | ones *do* -- `use` binds a vocabulary, `blueprint` is instantiated, `config` fills the
 //!   | settings -- stays with the host, which matches on [`DeclKind`]. This crate never calls the
 //!   | host back.

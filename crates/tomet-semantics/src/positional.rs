@@ -3,7 +3,7 @@ use tomet_scalar::Scalar;
 use tomet_semantics_core::{Slots, TupleView};
 use tomet_tree::ValueExt;
 
-use crate::vocabulary::{Bindings, ElementDecl};
+use crate::vocabulary::{Bindings, ConstructorDecl, ElementDecl};
 
 /// One table, keyed on the bare name alone.
 ///
@@ -146,6 +146,14 @@ pub fn declaration_args_view_in<'a>(
     bindings: &Bindings,
 ) -> Option<TupleView<'a, 'static>> {
     args_view_in(Some(&declaration.name), &declaration.data, bindings)
+}
+
+/// Views a constructor call's `args` through the positional slots `constructor` declares.
+pub fn constructor_args_view<'a>(
+    args: &'a Tuple,
+    constructor: &ConstructorDecl,
+) -> TupleView<'a, 'static> {
+    TupleView::with_owned_slots(args, constructor.positional_keys())
 }
 
 /// Views `args` through the signature slots that `name` has.

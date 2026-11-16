@@ -30,7 +30,7 @@ use tomet_ast::{File, Name, Value};
 use tomet_tree::ValueExt;
 use tomet_type::{Type, TypeError};
 
-use tomet_semantics_core::{admits, parse_type_spec};
+use tomet_semantics_core::{TupleView, admits, is_placeholder, parse_type_spec};
 
 use tomet_declaration::DeclKind;
 
@@ -96,6 +96,164 @@ pub struct ElementDecl {
     pub content_allow: Option<ContentAllow>,
 }
 
+/// One constructor, as a vocabulary declares it with `::constructor`.
+///
+/// A constructor builds a data value (`ns.name(...)`) from a tuple of arguments;
+/// unlike [`ElementDecl`], it has no `display`, `region`, `singleton`, or `content`.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct ConstructorDecl {
+    /// `(args)`, in declaration order.
+    pub params: Vec<ParamDecl>,
+}
+
+/// The keys a `::constructor` entry may have.
+pub const CONSTRUCTOR_KEYS: [&str; 2] = ["about", "args"];
+
+/// The keys an entry of `args:` may have.
+pub const PARAM_KEYS: [&str; 5] = ["type", "positional", "required", "default", "about"];
+
+/// Something wrong with how a `::constructor` entry is declared.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ConstructorProblem {
+    pub name: String,
+    pub reason: String,
+}
+
+/// A constructor call (`namespace.name(...)`) read against its vocabulary definition.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Constructed {
+    /// The constructor's name (`"upstream"` for `catasto.upstream(...)`).
+    pub name: String,
+    /// The arguments by parameter name, with positional values mapped to their names and
+    /// `default`s applied.
+    pub args: BTreeMap<String, Value>,
+}
+
+impl Constructed {
+    /// The value of argument `name`, if supplied or defaulted.
+    pub fn get(&self, name: &str) -> Option<&Value> {
+        self.args.get(name)
+    }
+}
+
+/// Why a value could not be read as a constructor call of a vocabulary.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum CallError {
+    /// The value is not a namespaced `Value::Call` (`namespace.name(...)`).
+    NotACall,
+    /// The call's namespace is not the vocabulary's namespace.
+    WrongNamespace {
+        call: String,
+        expected: String,
+        found: String,
+    },
+    /// The vocabulary declares no constructor of this name.
+    UnknownConstructor {
+        call: String,
+        namespace: String,
+        constructor: String,
+        known: Vec<String>,
+    },
+    /// An argument was supplied both by position and by name.
+    DuplicateArgument { call: String, argument: String },
+    /// More positional values were supplied than the constructor has positional slots.
+    TooManyPositionalArguments {
+        call: String,
+        slots: Vec<String>,
+        given: usize,
+    },
+    /// A named argument is not declared by the constructor.
+    UnknownArgument { call: String, argument: String },
+    /// A required argument was not supplied.
+    MissingRequiredArgument { call: String, argument: String },
+    /// An argument's value does not fit the `type:` its parameter declares.
+    InvalidArgument {
+        call: String,
+        argument: String,
+        ty: String,
+        reason: String,
+    },
+}
+
+impl std::fmt::Display for CallError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            CallError::NotACall => write!(f, "not a namespaced constructor call"),
+            CallError::WrongNamespace {
+                call,
+                expected,
+                found,
+            } => write!(
+                f,
+                "`{call}` is in the namespace `{found}`, not `{expected}`"
+            ),
+            CallError::UnknownConstructor {
+                call,
+                namespace,
+                constructor,
+                known,
+            } => {
+                if known.is_empty() {
+                    write!(
+                        f,
+                        "`{call}`: the namespace `{namespace}` declares no constructor `{constructor}`"
+                    )
+                } else {
+                    let list: Vec<String> = known.iter().map(|k| format!("`{k}`")).collect();
+                    write!(
+                        f,
+                        "`{call}`: the namespace `{namespace}` declares no constructor `{constructor}`; \
+                         its constructors are {}",
+                        list.join(", ")
+                    )
+                }
+            }
+            CallError::DuplicateArgument { call, argument } => write!(
+                f,
+                "`{call}`: the argument `{argument}` is written both by position and by name"
+            ),
+            CallError::TooManyPositionalArguments { call, slots, given } => {
+                if slots.is_empty() {
+                    write!(f, "`{call}` takes no positional arguments, found {given}")
+                } else if slots.len() == 1 {
+                    write!(
+                        f,
+                        "`{call}` takes at most 1 positional argument (`{}`), found {given}",
+                        slots[0]
+                    )
+                } else {
+                    let list: Vec<String> = slots.iter().map(|s| format!("`{s}`")).collect();
+                    write!(
+                        f,
+                        "`{call}` takes at most {} positional arguments ({}), found {given}",
+                        slots.len(),
+                        list.join(", ")
+                    )
+                }
+            }
+            CallError::UnknownArgument { call, argument } => write!(
+                f,
+                "`{call}` has no argument `{argument}`; its vocabulary \
+                 declares the ones it takes under `args:`"
+            ),
+            CallError::MissingRequiredArgument { call, argument } => {
+                write!(f, "`{call}` requires the argument `{argument}`")
+            }
+            CallError::InvalidArgument {
+                call,
+                argument,
+                ty,
+                reason,
+            } => write!(
+                f,
+                "`{call}`'s argument `{argument}` is declared `type: {ty}`, but {reason}"
+            ),
+        }
+    }
+}
+
+impl std::error::Error for CallError {}
+
 /// `content: ( allow: )`'s value -- what a vocabulary's own element may hold
 /// in `[content]`/`|content` (`Vec<Block>`, see `tmtroot/docs/spec/
 /// feature/content-shape.tmt`).
@@ -128,23 +286,43 @@ impl ParamDecl {
 impl ElementDecl {
     /// The positional slots, in declaration order.
     pub fn positional_keys(&self) -> Vec<String> {
-        self.params
-            .iter()
-            .filter(|p| p.positional)
-            .map(|p| p.name.clone())
-            .collect()
+        positional_keys_of(&self.params)
     }
 
     pub fn param(&self, name: &str) -> Option<&ParamDecl> {
-        self.params.iter().find(|p| p.name == name)
+        param_of(&self.params, name)
     }
 }
 
-/// The elements one namespace declares.
+impl ConstructorDecl {
+    /// The positional slots, in declaration order.
+    pub fn positional_keys(&self) -> Vec<String> {
+        positional_keys_of(&self.params)
+    }
+
+    pub fn param(&self, name: &str) -> Option<&ParamDecl> {
+        param_of(&self.params, name)
+    }
+}
+
+fn positional_keys_of(params: &[ParamDecl]) -> Vec<String> {
+    params
+        .iter()
+        .filter(|p| p.positional)
+        .map(|p| p.name.clone())
+        .collect()
+}
+
+fn param_of<'a>(params: &'a [ParamDecl], name: &str) -> Option<&'a ParamDecl> {
+    params.iter().find(|p| p.name == name)
+}
+
+/// The elements and constructors one namespace declares.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct Vocabulary {
     pub namespace: String,
     pub elements: BTreeMap<String, ElementDecl>,
+    pub constructors: BTreeMap<String, ConstructorDecl>,
     /// `::vocabulary(ns, open: true)` -- any name resolves in this
     /// namespace, declared or not.
     ///
@@ -210,6 +388,7 @@ pub fn builtin_doc_vocabularies() -> Vec<Vocabulary> {
         Vocabulary {
             namespace: "doc.index".to_string(),
             elements: BTreeMap::new(),
+            constructors: BTreeMap::new(),
             open: false,
         },
         Vocabulary {
@@ -239,6 +418,7 @@ pub fn builtin_doc_vocabularies() -> Vec<Vocabulary> {
                     ],
                 },
             )]),
+            constructors: BTreeMap::new(),
             open: false,
         },
     ]
@@ -272,24 +452,37 @@ impl Vocabulary {
         let mut vocab = Vocabulary {
             namespace,
             elements: BTreeMap::new(),
+            constructors: BTreeMap::new(),
             open,
         };
 
         for declaration in &doc.header {
-            if classify_declaration_lenient(declaration)
-                != ElementKind::Declaration(DeclKind::Element)
-            {
-                continue;
-            }
-            let Some(entries) = crate::data::declaration_entries(declaration) else {
-                continue;
-            };
-            if let Some(tuple) = entries.as_tuple() {
-                for (name, decl) in tuple.named() {
-                    vocab
-                        .elements
-                        .insert(name.to_string(), decl_from_value(decl));
+            match classify_declaration_lenient(declaration) {
+                ElementKind::Declaration(DeclKind::Element) => {
+                    let Some(entries) = crate::data::declaration_entries(declaration) else {
+                        continue;
+                    };
+                    if let Some(tuple) = entries.as_tuple() {
+                        for (name, decl) in tuple.named() {
+                            vocab
+                                .elements
+                                .insert(name.to_string(), decl_from_value(decl));
+                        }
+                    }
                 }
+                ElementKind::Declaration(DeclKind::Constructor) => {
+                    let Some(entries) = crate::data::declaration_entries(declaration) else {
+                        continue;
+                    };
+                    if let Some(tuple) = entries.as_tuple() {
+                        for (name, decl) in tuple.named() {
+                            vocab
+                                .constructors
+                                .insert(name.to_string(), constructor_from_value(decl));
+                        }
+                    }
+                }
+                _ => {}
             }
         }
 
@@ -355,6 +548,201 @@ impl Vocabulary {
         }
         problems
     }
+
+    /// Reads a constructor call (`Value::Call` with head `namespace.name`) against this
+    /// vocabulary, returning the constructor's name and its arguments by parameter name
+    /// (with positional arguments mapped through [`TupleView`] and `default`s applied).
+    ///
+    /// ```
+    /// use tomet_ast::Value;
+    /// use tomet_ast_parser::{parse_file, parse_value};
+    /// use tomet_scalar::Scalar;
+    /// use tomet_semantics::Vocabulary;
+    ///
+    /// let vocab_doc = parse_file(
+    ///     r#"::kind(vocabulary)
+    /// ::vocabulary(catasto, version: "1.0.0")
+    /// ::constructor(
+    ///   upstream: (
+    ///     args: (
+    ///       name: (type: string, positional: true, required: true)
+    ///       path: (type: string, required: true)
+    ///     )
+    ///   )
+    /// )
+    /// "#,
+    /// )
+    /// .unwrap();
+    /// let vocab = Vocabulary::from_file(&vocab_doc).unwrap();
+    /// let call = parse_value(r#"catasto.upstream(commonfiles, path: ".editorconfig")"#).unwrap();
+    ///
+    /// let constructed = vocab.read_call(&call).unwrap();
+    /// assert_eq!(constructed.name, "upstream");
+    /// assert_eq!(
+    ///     constructed.get("name"),
+    ///     Some(&Value::Scalar(Scalar::Text("commonfiles".into())))
+    /// );
+    /// assert_eq!(
+    ///     constructed.get("path"),
+    ///     Some(&Value::Scalar(Scalar::Text(".editorconfig".into())))
+    /// );
+    /// ```
+    pub fn read_call(&self, value: &Value) -> Result<Constructed, CallError> {
+        read_call(value, self)
+    }
+}
+
+/// Reads a constructor call (`Value::Call` with head `namespace.name`) against `vocabulary`,
+/// returning the constructor's name and its arguments by parameter name (with positional arguments
+/// mapped through [`TupleView`] and `default`s applied).
+///
+/// See [`Vocabulary::read_call`] for an example.
+pub fn read_call(value: &Value, vocabulary: &Vocabulary) -> Result<Constructed, CallError> {
+    let Value::Call(head, args) = value else {
+        return Err(CallError::NotACall);
+    };
+    let Some((namespace, constructor)) = head.split_once('.') else {
+        return Err(CallError::NotACall);
+    };
+    if namespace != vocabulary.namespace {
+        return Err(CallError::WrongNamespace {
+            call: head.clone(),
+            expected: vocabulary.namespace.clone(),
+            found: namespace.to_string(),
+        });
+    }
+    let Some(decl) = vocabulary.constructors.get(constructor) else {
+        let known = vocabulary.constructors.keys().cloned().collect();
+        return Err(CallError::UnknownConstructor {
+            call: head.clone(),
+            namespace: namespace.to_string(),
+            constructor: constructor.to_string(),
+            known,
+        });
+    };
+    let view = crate::positional::constructor_args_view(args, decl);
+    if let Some(err) = check_call_params(head, &decl.params, Some(&view)).into_iter().next() {
+        return Err(err);
+    }
+
+    let mut by_name = BTreeMap::new();
+    for param in &decl.params {
+        if let Some(val) = view
+            .get(&param.name)
+            .cloned()
+            .or_else(|| param.default.clone())
+        {
+            if let Some(ty) = param.declared_type()
+                && !is_placeholder(&val)
+                && let Err(mismatch) = admits(&ty, &val)
+            {
+                return Err(CallError::InvalidArgument {
+                    call: head.clone(),
+                    argument: param.name.clone(),
+                    ty: ty.to_string(),
+                    reason: mismatch.to_string(),
+                });
+            }
+            by_name.insert(param.name.clone(), val);
+        }
+    }
+
+    Ok(Constructed {
+        name: constructor.to_string(),
+        args: by_name,
+    })
+}
+
+/// Checks `view` against `params`, returning every argument problem found.
+///
+/// Shared between element/declaration argument validation and constructor call checking/reading.
+pub fn check_call_params(
+    call: &str,
+    params: &[ParamDecl],
+    view: Option<&TupleView<'_, '_>>,
+) -> Vec<CallError> {
+    let mut errors = Vec::new();
+    let Some(view) = view else {
+        for param in params.iter().filter(|p| p.required) {
+            errors.push(CallError::MissingRequiredArgument {
+                call: call.to_string(),
+                argument: param.name.clone(),
+            });
+        }
+        return errors;
+    };
+
+    let tuple = view.tuple();
+    let unnamed_count = tuple.entries().filter(|e| e.name().is_none()).count();
+    let slots = view.slots();
+    let mut has_duplicate_positional = false;
+    for i in 0..unnamed_count.min(slots.len()) {
+        if let Some(slot) = slots.get(i)
+            && tuple.entries().any(|e| e.name() == Some(slot))
+        {
+            has_duplicate_positional = true;
+            errors.push(CallError::DuplicateArgument {
+                call: call.to_string(),
+                argument: slot.to_string(),
+            });
+        }
+    }
+    if unnamed_count > slots.len() {
+        let slot_names = (0..slots.len())
+            .filter_map(|i| slots.get(i).map(str::to_string))
+            .collect();
+        errors.push(CallError::TooManyPositionalArguments {
+            call: call.to_string(),
+            slots: slot_names,
+            given: unnamed_count,
+        });
+    }
+
+    for (key, _) in tuple.named() {
+        if !key.is_empty() && !params.iter().any(|p| p.name == key) {
+            errors.push(CallError::UnknownArgument {
+                call: call.to_string(),
+                argument: key.to_string(),
+            });
+        }
+    }
+
+    for param in params {
+        let value = if has_duplicate_positional {
+            let pos_idx = (0..slots.len()).find(|&i| slots.get(i) == Some(param.name.as_str()));
+            tuple
+                .entries()
+                .find(|e| e.name() == Some(param.name.as_str()))
+                .map(|e| e.value())
+                .or_else(|| {
+                    pos_idx
+                        .filter(|&i| i < unnamed_count)
+                        .and_then(|i| tuple.nth_unnamed(i))
+                })
+        } else {
+            view.get(&param.name)
+        };
+        if let Some(value) = value {
+            if let Some(ty) = param.declared_type()
+                && !is_placeholder(value)
+                && let Err(mismatch) = admits(&ty, value)
+            {
+                errors.push(CallError::InvalidArgument {
+                    call: call.to_string(),
+                    argument: param.name.clone(),
+                    ty: ty.to_string(),
+                    reason: mismatch.to_string(),
+                });
+            }
+        } else if param.required {
+            errors.push(CallError::MissingRequiredArgument {
+                call: call.to_string(),
+                argument: param.name.clone(),
+            });
+        }
+    }
+
+    errors
 }
 
 /// Every vocabulary a vault declares, with whatever went wrong.
@@ -443,6 +831,12 @@ impl LoadedVocabularies {
             self.errors.push(format!(
                 "{label}: `{}`'s parameter `{}`: {}",
                 problem.element, problem.param, problem.reason
+            ));
+        }
+        for (_, problem) in constructor_problems_in(doc) {
+            self.errors.push(format!(
+                "{label}: `{}` in `::constructor`: {}",
+                problem.name, problem.reason
             ));
         }
 
@@ -592,6 +986,14 @@ impl Bindings {
         };
         vocab.elements.get(&name.name)
     }
+
+    /// The vocabulary in scope for `namespace`, if any.
+    pub fn vocabulary_in_scope(&self, namespace: &str) -> Option<&Vocabulary> {
+        match self.kind.as_ref() {
+            Some(kind) if kind.namespace == namespace => Some(kind),
+            _ => self.used.get(namespace),
+        }
+    }
 }
 
 /// The namespaces a document asks for with `::use`.
@@ -680,6 +1082,168 @@ fn decl_from_value(decl: &Value) -> ElementDecl {
         params: decl.get("args").map(params_from_value).unwrap_or_default(),
         content_allow: decl.get("content").and_then(content_allow_from_value),
     }
+}
+
+/// One entry of `::constructor()`: the map of fields a constructor declares.
+fn constructor_from_value(decl: &Value) -> ConstructorDecl {
+    ConstructorDecl {
+        params: decl.get("args").map(params_from_value).unwrap_or_default(),
+    }
+}
+
+/// Validates every `::constructor` declaration in `doc`, returning each problem paired with the
+/// span of the `::constructor` declaration where it was found.
+pub fn constructor_problems_in<B>(doc: &File<B>) -> Vec<(tomet_span::Span, ConstructorProblem)> {
+    let mut problems = Vec::new();
+    let mut seen_constructors = std::collections::HashSet::new();
+
+    for declaration in &doc.header {
+        if classify_declaration_lenient(declaration)
+            != ElementKind::Declaration(DeclKind::Constructor)
+        {
+            continue;
+        }
+        let span = declaration.span;
+        let Some(entries) = crate::data::declaration_entries(declaration) else {
+            continue;
+        };
+        let Some(tuple) = entries.as_tuple() else {
+            continue;
+        };
+        if !tuple.has_no_unnamed() {
+            continue;
+        }
+        for (ctor_name, decl) in tuple.named() {
+            if !seen_constructors.insert(ctor_name.to_string()) {
+                problems.push((
+                    span,
+                    ConstructorProblem {
+                        name: ctor_name.to_string(),
+                        reason: format!("duplicate constructor `{ctor_name}`"),
+                    },
+                ));
+            }
+            let Some(fields) = decl.as_tuple().filter(|t| t.has_no_unnamed()) else {
+                problems.push((
+                    span,
+                    ConstructorProblem {
+                        name: ctor_name.to_string(),
+                        reason: "a constructor is declared as a map: `(about: ..., args: ...)`"
+                            .to_string(),
+                    },
+                ));
+                continue;
+            };
+            for (field_key, field_val) in fields.named() {
+                match field_key {
+                    "about" => {}
+                    "args" => {
+                        let Some(args_tuple) = field_val.as_tuple().filter(|t| t.has_no_unnamed())
+                        else {
+                            problems.push((
+                                span,
+                                ConstructorProblem {
+                                    name: format!("{ctor_name}.args"),
+                                    reason: "`args` is declared as a map: `(name: (type: ..., ...))`"
+                                        .to_string(),
+                                },
+                            ));
+                            continue;
+                        };
+                        for (param_name, param_val) in args_tuple.named() {
+                            let target_name = format!("{ctor_name}.{param_name}");
+                            let Some(param_fields) =
+                                param_val.as_tuple().filter(|t| t.has_no_unnamed())
+                            else {
+                                problems.push((
+                                    span,
+                                    ConstructorProblem {
+                                        name: target_name,
+                                        reason: "an argument is declared as a map: `(type: ..., positional: ..., required: ..., default: ..., about: ...)`".to_string(),
+                                    },
+                                ));
+                                continue;
+                            };
+                            let mut parsed_ty: Option<Result<Type, TypeError>> = None;
+                            for (pkey, pval) in param_fields.named() {
+                                match pkey {
+                                    "type" => {
+                                        let res = parse_type_spec(pval);
+                                        if let Err(err) = &res {
+                                            problems.push((
+                                                span,
+                                                ConstructorProblem {
+                                                    name: target_name.clone(),
+                                                    reason: err.to_string(),
+                                                },
+                                            ));
+                                        }
+                                        parsed_ty = Some(res);
+                                    }
+                                    "positional" | "required" => {
+                                        if let Err(mismatch) =
+                                            admits(&Type::bare(tomet_type::Kind::Bool), pval)
+                                        {
+                                            problems.push((
+                                                span,
+                                                ConstructorProblem {
+                                                    name: target_name.clone(),
+                                                    reason: format!("`{pkey}`: {mismatch}"),
+                                                },
+                                            ));
+                                        }
+                                    }
+                                    "default" | "about" => {}
+                                    other => {
+                                        problems.push((
+                                            span,
+                                            ConstructorProblem {
+                                                name: target_name.clone(),
+                                                reason: format!(
+                                                    "unknown field `{other}`; an argument has {}",
+                                                    PARAM_KEYS
+                                                        .map(|k| format!("`{k}`"))
+                                                        .join(", ")
+                                                ),
+                                            },
+                                        ));
+                                    }
+                                }
+                            }
+                            if let (Some(Ok(ty)), Some(default)) =
+                                (parsed_ty.as_ref(), param_fields.get("default"))
+                                && let Err(mismatch) = admits(ty, default)
+                            {
+                                problems.push((
+                                    span,
+                                    ConstructorProblem {
+                                        name: target_name,
+                                        reason: format!(
+                                            "`default` is not of `type: {ty}`: {mismatch}"
+                                        ),
+                                    },
+                                ));
+                            }
+                        }
+                    }
+                    other => {
+                        problems.push((
+                            span,
+                            ConstructorProblem {
+                                name: ctor_name.to_string(),
+                                reason: format!(
+                                    "unknown field `{other}`; a constructor has {}",
+                                    CONSTRUCTOR_KEYS.map(|k| format!("`{k}`")).join(", ")
+                                ),
+                            },
+                        ));
+                    }
+                }
+            }
+        }
+    }
+
+    problems
 }
 
 /// The `content: ( allow: )` an element declares, if any.
@@ -1300,5 +1864,164 @@ mod tests {
             "{:?}",
             loaded.errors
         );
+    }
+
+    const CATASTO_VOCAB: &str = r#"::kind(vocabulary)
+::vocabulary(catasto, version: "1.0.0")
+::constructor(
+  git: (
+    about: | A Git repository.
+    args: (
+      url: (
+        type: string
+        positional: true
+        required: true
+        about: | The repository URL.
+      )
+      rev: (
+        type: string
+        default: main
+        about: | A tag, branch or commit.
+      )
+      root: (
+        type: string
+        about: | The directory inside the repository that paths are relative to.
+      )
+    )
+  )
+  upstream: (
+    about: | A file of a named upstream.
+    args: (
+      name: (
+        type: string
+        positional: true
+        required: true
+        about: | The name given in `::upstreams`.
+      )
+      path: (
+        type: string
+        required: true
+        about: | The file inside the upstream.
+      )
+    )
+  )
+)
+"#;
+
+    #[test]
+    fn reads_constructors_and_their_parameters() {
+        let v = vocab(CATASTO_VOCAB);
+        assert_eq!(v.namespace, "catasto");
+        assert_eq!(
+            v.constructors.keys().collect::<Vec<_>>(),
+            ["git", "upstream"]
+        );
+
+        let git = &v.constructors["git"];
+        assert_eq!(git.positional_keys(), ["url"]);
+        assert_eq!(
+            git.params.iter().map(|p| p.name.as_str()).collect::<Vec<_>>(),
+            ["url", "rev", "root"]
+        );
+        let url = git.param("url").unwrap();
+        assert!(url.positional);
+        assert!(url.required);
+        assert_eq!(url.declared_type(), Some(Type::bare(Kind::String)));
+        let rev = git.param("rev").unwrap();
+        assert!(!rev.positional);
+        assert!(!rev.required);
+        assert_eq!(
+            rev.default,
+            Some(Value::Scalar(tomet_scalar::Scalar::Text("main".into())))
+        );
+
+        let upstream = &v.constructors["upstream"];
+        assert_eq!(upstream.positional_keys(), ["name"]);
+        assert!(upstream.param("name").unwrap().required);
+        assert!(upstream.param("path").unwrap().required);
+        assert!(!upstream.param("path").unwrap().positional);
+    }
+
+    #[test]
+    fn reads_a_constructor_call_by_names_with_defaults_and_checks_types() {
+        let v = vocab(CATASTO_VOCAB);
+        let text = |s: &str| Value::Scalar(tomet_scalar::Scalar::Text(s.into()));
+
+        // 1. catasto.upstream(commonfiles, path: ".editorconfig") -> name = commonfiles, path = ".editorconfig"
+        let call = tomet_ast_parser::parse_value(
+            r#"catasto.upstream(commonfiles, path: ".editorconfig")"#,
+        )
+        .unwrap();
+        let read = v.read_call(&call).unwrap();
+        assert_eq!(read.name, "upstream");
+        assert_eq!(read.get("name"), Some(&text("commonfiles")));
+        assert_eq!(read.get("path"), Some(&text(".editorconfig")));
+        assert_eq!(
+            read.args,
+            BTreeMap::from([
+                ("name".to_string(), text("commonfiles")),
+                ("path".to_string(), text(".editorconfig")),
+            ])
+        );
+
+        // 2. catasto.git("https://github.com/tomet-lang/commonfiles.git") applies default rev = main
+        let git_call = tomet_ast_parser::parse_value(
+            r#"catasto.git("https://github.com/tomet-lang/commonfiles.git")"#,
+        )
+        .unwrap();
+        let git_read = read_call(&git_call, &v).unwrap();
+        assert_eq!(git_read.name, "git");
+        assert_eq!(
+            git_read.get("url"),
+            Some(&text("https://github.com/tomet-lang/commonfiles.git"))
+        );
+        assert_eq!(git_read.get("rev"), Some(&text("main")));
+        assert_eq!(git_read.get("root"), None);
+
+        // 3. Explicit rev overrides default, root is included when given
+        let git_full = tomet_ast_parser::parse_value(
+            r#"catasto.git("https://github.com/tomet-lang/commonfiles.git", rev: v1, root: base)"#,
+        )
+        .unwrap();
+        let git_full_read = v.read_call(&git_full).unwrap();
+        assert_eq!(git_full_read.get("rev"), Some(&text("v1")));
+        assert_eq!(git_full_read.get("root"), Some(&text("base")));
+
+        // 4. Errors: wrong namespace, unknown constructor, unknown argument, missing required,
+        //    type mismatch, too many positional, positional + same name written twice
+        for (src, expected) in [
+            (
+                r#"other.upstream(commonfiles, path: ".editorconfig")"#,
+                "`other.upstream` is in the namespace `other`, not `catasto`",
+            ),
+            (
+                r#"catasto.svn("https://example.com")"#,
+                "`catasto.svn`: the namespace `catasto` declares no constructor `svn`; its constructors are `git`, `upstream`",
+            ),
+            (
+                r#"catasto.upstream(commonfiles, path: ".editorconfig", extra: 1)"#,
+                "`catasto.upstream` has no argument `extra`; its vocabulary declares the ones it takes under `args:`",
+            ),
+            (
+                r#"catasto.upstream(commonfiles)"#,
+                "`catasto.upstream` requires the argument `path`",
+            ),
+            (
+                r#"catasto.upstream((1, 2), path: ".editorconfig")"#,
+                "`catasto.upstream`'s argument `name` is declared `type: string`, but a list is not a string",
+            ),
+            (
+                r#"catasto.upstream(commonfiles, ".editorconfig")"#,
+                "`catasto.upstream` takes at most 1 positional argument (`name`), found 2",
+            ),
+            (
+                r#"catasto.upstream(commonfiles, name: other, path: ".editorconfig")"#,
+                "`catasto.upstream`: the argument `name` is written both by position and by name",
+            ),
+        ] {
+            let val = tomet_ast_parser::parse_value(src).unwrap();
+            let err = v.read_call(&val).unwrap_err();
+            assert_eq!(err.to_string(), expected, "{src}");
+        }
     }
 }

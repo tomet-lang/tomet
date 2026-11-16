@@ -143,6 +143,29 @@ pub enum Diagnostic {
         takes: usize,
         span: Span,
     },
+    /// A constructor call `namespace.name(...)` whose namespace is not in scope, or whose
+    /// vocabulary declares no constructor `name`.
+    UnknownConstructor {
+        name: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        unbound_namespace: Option<String>,
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        known: Vec<String>,
+        span: Span,
+    },
+    /// More positional arguments were written than the element or constructor has positional slots.
+    TooManyPositionalArguments {
+        element: String,
+        slots: Vec<String>,
+        given: usize,
+        span: Span,
+    },
+    /// An argument was supplied both by position and by name.
+    DuplicateArgument {
+        element: String,
+        argument: String,
+        span: Span,
+    },
     /// `@draft[ ... ]` -- the document says it is unfinished here.
     ///
     /// A warning, not an error: an unfinished document is a normal state
@@ -334,6 +357,9 @@ impl Diagnostic {
             Diagnostic::InvalidArgument { span, .. } => *span,
             Diagnostic::MissingRequiredArgument { span, .. } => *span,
             Diagnostic::TooManyArguments { span, .. } => *span,
+            Diagnostic::UnknownConstructor { span, .. } => *span,
+            Diagnostic::TooManyPositionalArguments { span, .. } => *span,
+            Diagnostic::DuplicateArgument { span, .. } => *span,
             Diagnostic::Draft { span, .. } => *span,
             Diagnostic::Fixme { span, .. } => *span,
             Diagnostic::Conflict { span, .. } => *span,
@@ -536,6 +562,71 @@ impl Diagnostic {
                 write!(
                     f,
                     "`{element}` takes at most {takes} arguments: the name, then an optional version"
+                )
+            }
+            Diagnostic::UnknownConstructor {
+                name,
+                unbound_namespace,
+                known,
+                ..
+            } => {
+                if let Some(namespace) = unbound_namespace {
+                    write!(
+                        f,
+                        "`{name}`: the namespace `{namespace}` is not in scope -- declare its \
+                         vocabulary in `vocabularies` and write `::use({namespace})`"
+                    )
+                } else {
+                    let (namespace, local) = name.split_once('.').unwrap_or(("", name.as_str()));
+                    if known.is_empty() {
+                        write!(
+                            f,
+                            "`{name}`: the namespace `{namespace}` declares no constructor `{local}`"
+                        )
+                    } else {
+                        let list: Vec<String> = known.iter().map(|k| format!("`{k}`")).collect();
+                        write!(
+                            f,
+                            "`{name}`: the namespace `{namespace}` declares no constructor `{local}`; \
+                             its constructors are {}",
+                            list.join(", ")
+                        )
+                    }
+                }
+            }
+            Diagnostic::TooManyPositionalArguments {
+                element,
+                slots,
+                given,
+                ..
+            } => {
+                if slots.is_empty() {
+                    write!(
+                        f,
+                        "`{element}` takes no positional arguments, found {given}"
+                    )
+                } else if slots.len() == 1 {
+                    write!(
+                        f,
+                        "`{element}` takes at most 1 positional argument (`{}`), found {given}",
+                        slots[0]
+                    )
+                } else {
+                    let list: Vec<String> = slots.iter().map(|s| format!("`{s}`")).collect();
+                    write!(
+                        f,
+                        "`{element}` takes at most {} positional arguments ({}), found {given}",
+                        slots.len(),
+                        list.join(", ")
+                    )
+                }
+            }
+            Diagnostic::DuplicateArgument {
+                element, argument, ..
+            } => {
+                write!(
+                    f,
+                    "`{element}`: the argument `{argument}` is written both by position and by name"
                 )
             }
             Diagnostic::Draft { note, .. } => {

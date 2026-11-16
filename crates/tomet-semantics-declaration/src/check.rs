@@ -859,13 +859,27 @@ mod tests {
             )])),
             None,
         );
-        // `use` is Scope::Tmt
+        // `use` is Scope::Both
         assert!(check_declarations(std::slice::from_ref(&use_decl), Host::Tmt).is_empty());
-        let problems = check_declarations(&[use_decl], Host::Ctmt);
+        assert!(check_declarations(&[use_decl], Host::Ctmt).is_empty());
+
+        let export_decl = Declaration::new(
+            "export",
+            Some(Tuple::from_named([(
+                "type".into(),
+                Value::Scalar(Scalar::Text("commonmark".into())),
+            )])),
+            None,
+        );
+        // `export` is Scope::Tmt
+        assert!(check_declarations(std::slice::from_ref(&export_decl), Host::Tmt).is_empty());
+        let problems = check_declarations(&[export_decl], Host::Ctmt);
         assert_eq!(problems.len(), 1);
         assert_eq!(
             problems[0].1,
-            Problem::NotForThisHost { declaration: "use" }
+            Problem::NotForThisHost {
+                declaration: "export"
+            }
         );
     }
 

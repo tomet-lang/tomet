@@ -678,6 +678,7 @@ mod tests {
             "macro",
             "var",
             "element",
+            "constructor",
             "use",
             "blueprint",
             "version",

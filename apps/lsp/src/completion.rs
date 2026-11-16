@@ -356,6 +356,8 @@ fn describe_kind(name: &str) -> &'static str {
         "macro" => "Macro definition: name to template",
         "var" => "Variable declaration: type, default, about",
         "use" => "Bind a vocabulary as a namespace",
+        "element" => "Element declaration in a vocabulary",
+        "constructor" => "Constructor declaration in a vocabulary",
         "references" => "Remote connection container",
         "id" => "Identity of this document, unique in the vault",
         "link" => "Link to a url, file, or document",
