@@ -125,7 +125,7 @@ fn check_ctmt_declarations_reports_expected_diagnostics() {
     check_ctmt_declarations(&declared, &mut errors);
     assert_eq!(errors, vec![]);
 
-    // 2. Non-standard declarations are passed over; NotForThisHost, Repeated, InvalidVersion, and InvalidDefinition are reported
+    // 2. Non-standard declarations are passed over; NotForThisHost, Repeated, and InvalidDefinition are reported
     let decls = vec![
         Declaration::new("upstreams", None, None),
         Declaration::new("foo.bar", None, None),
@@ -183,7 +183,7 @@ fn check_ctmt_declarations_reports_expected_diagnostics() {
         |e| matches!(e, Diagnostic::DuplicateSingleton { name, first, duplicate } if name == "meta" && *first == spans[3] && *duplicate == spans[4])
     ));
     assert!(errors.iter().any(
-        |e| matches!(e, Diagnostic::InvalidVersion { element, found, .. } if element == "kind" && found == "the text \"abc\"")
+        |e| matches!(e, Diagnostic::InvalidDefinition { declaration: "kind", name, reason, .. } if name == "version" && reason == "the text \"abc\" is not a version such as `1.10.0`")
     ));
     assert!(errors.iter().any(
         |e| matches!(e, Diagnostic::InvalidDefinition { declaration: "macro", name, .. } if name == "bad")

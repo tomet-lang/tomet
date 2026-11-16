@@ -15,7 +15,7 @@ use crate::vars::{VarDecl, read_var_decls};
 
 /// The name of the kind a `::kind(...)` declares: `::kind(j.daily)` or `::kind(kind: j.daily)`.
 ///
-/// The second positional slot, the major version, is not part of the name.
+/// The second positional slot, the version of the kind's definition, is not part of the name.
 pub fn kind_name(declaration: &Declaration) -> Option<String> {
     let args = declaration.args_view()?;
     args.get("kind").and_then(text)

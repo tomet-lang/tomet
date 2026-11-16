@@ -2,30 +2,64 @@
 
 use super::*;
 
-/// `1.0` is the semver habit this check exists for.
+/// The version slot of `::kind` and `::use` takes a `version`, the same type `::version` takes.
 #[test]
-fn a_version_that_is_not_an_integer_of_one_or_more_is_reported() {
-    for (src, element, found) in [
-        ("::kind(note, 1.0)\n", "kind", "the number `1.0`"),
-        ("::kind(note, \"x\")\n", "kind", "the text \"x\""),
-        ("::kind(note, 0)\n", "kind", "the integer `0`"),
-        ("::kind(note, -1)\n", "kind", "the integer `-1`"),
+fn kind_use_and_version_accept_and_reject_the_same_values() {
+    let accepted = [
+        "1",
+        "0",
+        "1.0",
+        "1.10",
+        "1.0.0",
+        "\"1.0.0\"",
+        "1.0.0-beta",
+        "1.0.0+5",
+    ];
+    assert!(version_problems("::kind(note)\n::use(ns)\n").is_empty());
+    for ver in accepted {
+        for src in [
+            format!("::kind(note, {ver})\n"),
+            format!("::kind(note, version: {ver})\n"),
+            format!("::kind(note)\n::use(ns, {ver})\n"),
+            format!("::kind(note)\n::use(ns, version: {ver})\n"),
+            format!("::version({ver})\n"),
+        ] {
+            assert!(
+                version_problems(&src).is_empty(),
+                "{src}: {:?}",
+                version_problems(&src)
+            );
+        }
+    }
+
+    let rejected = [
+        ("-1", "the integer `-1` is not a version such as `1.10.0`"),
+        ("abc", "the text \"abc\" is not a version such as `1.10.0`"),
+        ("\"1.\"", "the text \"1.\" is not a version such as `1.10.0`"),
+        ("\".1\"", "the text \".1\" is not a version such as `1.10.0`"),
         (
-            "::kind(note)\n::use(deck, 1.0)\n",
-            "use",
-            "the number `1.0`",
+            "\"1..2\"",
+            "the text \"1..2\" is not a version such as `1.10.0`",
         ),
-        ("::kind(note)\n::use(deck, 0)\n", "use", "the integer `0`"),
-    ] {
-        let errors = validate_document(&parse(src));
-        assert!(
-            errors.iter().any(|e| matches!(
-                e,
-                Diagnostic::InvalidVersion { element: el, found: f, .. }
-                    if el == element && f == found
-            )),
-            "{src:?}: {errors:?}"
-        );
+        ("\"\"", "the text \"\" is not a version such as `1.10.0`"),
+        ("true", "`true` is not a version such as `1.10.0`"),
+        ("(1, 2)", "a list is not a version such as `1.10.0`"),
+        ("none", "`none` is not a version such as `1.10.0`"),
+    ];
+    for (ver, reason) in rejected {
+        for (decl, src) in [
+            ("kind", format!("::kind(note, {ver})\n")),
+            ("kind", format!("::kind(note, version: {ver})\n")),
+            ("use", format!("::kind(note)\n::use(ns, {ver})\n")),
+            ("use", format!("::kind(note)\n::use(ns, version: {ver})\n")),
+            ("version", format!("::version({ver})\n")),
+        ] {
+            assert_eq!(
+                version_problems(&src),
+                [format!("`version` in `::{decl}`: {reason}")],
+                "{src}"
+            );
+        }
     }
 }
 
@@ -48,15 +82,9 @@ fn kind_and_use_take_a_name_and_a_version_and_nothing_more() {
 
 #[test]
 fn the_version_messages_say_what_to_write() {
-    let errors = validate_document(&parse("::kind(note, 1.0)\n"));
-    let message = errors
-        .iter()
-        .find(|e| matches!(e, Diagnostic::InvalidVersion { .. }))
-        .expect("an invalid version is reported")
-        .to_string();
     assert_eq!(
-        message,
-        "the version in `::kind(...)` must be an integer of 1 or more, found the number `1.0`"
+        version_problems("::kind(note, abc)\n"),
+        ["`version` in `::kind`: the text \"abc\" is not a version such as `1.10.0`"]
     );
 
     let errors = validate_document(&parse("::kind(note, 1, 2)\n"));

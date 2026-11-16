@@ -408,13 +408,6 @@ pub fn check_document_declarations(doc: &File, errors: &mut Vec<Diagnostic>) {
     for (idx, problem) in check_declarations(&decls, Host::Tmt) {
         let span = spans[idx];
         match problem {
-            Problem::InvalidVersion { declaration, found } => {
-                errors.push(Diagnostic::InvalidVersion {
-                    element: declaration.to_string(),
-                    found,
-                    span,
-                });
-            }
             Problem::TooManyArguments { declaration, takes } => {
                 errors.push(Diagnostic::TooManyArguments {
                     element: declaration.to_string(),
@@ -539,13 +532,6 @@ pub fn check_ctmt_declarations(declarations: &[Declared], errors: &mut Vec<Diagn
                 errors.push(Diagnostic::RetiredDeclaration {
                     written,
                     instead,
-                    span,
-                });
-            }
-            Problem::InvalidVersion { declaration, found } => {
-                errors.push(Diagnostic::InvalidVersion {
-                    element: declaration.to_string(),
-                    found,
                     span,
                 });
             }

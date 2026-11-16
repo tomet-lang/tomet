@@ -114,10 +114,9 @@ fn a_datetime_field_has_to_read_as_one() {
     );
 }
 
-/// A document names only the major version, as an integer of 1 or more, and it
-/// may leave the version out.
+/// A document may write a version after the name in `::kind` and `::use`, or leave it out.
 #[test]
-fn a_version_after_the_name_of_kind_and_use_is_fine_when_it_is_an_integer() {
+fn a_version_after_the_name_of_kind_and_use_is_fine_when_it_is_a_version() {
     for src in [
         "::kind(note)\n::use(deck)\n",
         "::kind(note, 1)\n::use(deck, 3)\n",
@@ -127,8 +126,8 @@ fn a_version_after_the_name_of_kind_and_use_is_fine_when_it_is_an_integer() {
         assert!(
             !errors.iter().any(|e| matches!(
                 e,
-                Diagnostic::InvalidVersion { .. } | Diagnostic::TooManyArguments { .. }
-            )),
+                Diagnostic::InvalidDefinition { name, .. } if name == "version"
+            ) || matches!(e, Diagnostic::TooManyArguments { .. })),
             "{src:?}: {errors:?}"
         );
     }

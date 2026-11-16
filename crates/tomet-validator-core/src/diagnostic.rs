@@ -136,13 +136,6 @@ pub enum Diagnostic {
         argument: String,
         span: Span,
     },
-    /// The version after the name in `::kind(name, 2)` or `::use(ns, 2)` is not an
-    /// integer of 1 or more. `found` is the value as written.
-    InvalidVersion {
-        element: String,
-        found: String,
-        span: Span,
-    },
     /// A built-in element that takes a fixed number of positional arguments was
     /// given more: `::kind(a, 1, 2)`.
     TooManyArguments {
@@ -340,7 +333,6 @@ impl Diagnostic {
             Diagnostic::UnknownArgument { span, .. } => *span,
             Diagnostic::InvalidArgument { span, .. } => *span,
             Diagnostic::MissingRequiredArgument { span, .. } => *span,
-            Diagnostic::InvalidVersion { span, .. } => *span,
             Diagnostic::TooManyArguments { span, .. } => *span,
             Diagnostic::Draft { span, .. } => *span,
             Diagnostic::Fixme { span, .. } => *span,
@@ -539,12 +531,6 @@ impl Diagnostic {
                 element, argument, ..
             } => {
                 write!(f, "`{element}` requires the argument `{argument}`")
-            }
-            Diagnostic::InvalidVersion { element, found, .. } => {
-                write!(
-                    f,
-                    "the version in `::{element}(...)` must be an integer of 1 or more, found {found}"
-                )
             }
             Diagnostic::TooManyArguments { element, takes, .. } => {
                 write!(

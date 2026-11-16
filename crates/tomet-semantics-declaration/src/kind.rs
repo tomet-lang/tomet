@@ -13,7 +13,7 @@
 /// (`::fields`, `::macros`, ...) are retired; see [`DeclKind::retired`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum DeclKind {
-    /// `::kind(name, 2)`: what kind of document this is, and the major version of that kind.
+    /// `::kind(name, 2)`: what kind of document this is, and the version of that kind's definition.
     Kind,
     /// `::id(std.config)`: the identity of this document, unique across the documents of a vault.
     Id,
@@ -176,7 +176,7 @@ const fn spec(
 /// Every standard declaration, in the order they are listed to people.
 const SPECS: [Spec; 17] = [
     Spec {
-        // The second slot is the major version of that kind, an integer of 1 or more, and may be
+        // The second slot is the version of that kind's definition, a `version`, and may be
         // left out. The validator checks the value; nothing reads it yet.
         positional: &["kind", "version"],
         ..spec(
@@ -318,8 +318,7 @@ const SPECS: [Spec; 17] = [
     ),
     Spec {
         // The namespace to bring into scope. The vault says where it lives, so this names it, not
-        // its file. The second slot is the version wanted, an integer of 1 or more, and may be
-        // left out.
+        // its file. The second slot is the version wanted, a `version`, and may be left out.
         //
         // One per vocabulary brought in; the two axes -- where it may sit and how often -- are
         // independent, and this is the proof.

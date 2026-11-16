@@ -22,11 +22,6 @@ use crate::vars::{VarDecl, read_var_decls};
 /// an element's span, and a `.ctmt` checker will do the same for a file header.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Problem {
-    /// A version argument in a declaration that is not an integer of 1 or more.
-    InvalidVersion {
-        declaration: &'static str,
-        found: String,
-    },
     /// More arguments were supplied than the declaration takes positional slots for.
     TooManyArguments {
         declaration: &'static str,
@@ -78,12 +73,6 @@ pub enum Problem {
 impl std::fmt::Display for Problem {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Problem::InvalidVersion { declaration, found } => {
-                write!(
-                    f,
-                    "the version in `::{declaration}(...)` must be an integer of 1 or more, found {found}"
-                )
-            }
             Problem::TooManyArguments { declaration, takes } => {
                 write!(
                     f,
@@ -145,15 +134,6 @@ impl std::fmt::Display for Problem {
                 )
             }
         }
-    }
-}
-
-/// What was found where a version goes, for the sentence that says it is not one: a scalar as
-/// [`Scalar::describe`] says it (`` the number `1.0` ``, `` the text "2" ``).
-fn describe_version(value: &Value) -> String {
-    match value {
-        Value::Scalar(s) => s.describe(),
-        _ => "a value that is not a number".to_string(),
     }
 }
 
@@ -297,16 +277,8 @@ fn check_version_slot(
         ));
     }
 
-    if let Some(version) = view.get("version")
-        && !matches!(version.as_scalar(), Some(Scalar::Int(n)) if *n >= 1)
-    {
-        problems.push((
-            idx,
-            Problem::InvalidVersion {
-                declaration: name,
-                found: describe_version(version),
-            },
-        ));
+    if let Some(version) = view.get("version") {
+        check_version(idx, name, version, problems);
     }
 }
 
@@ -340,14 +312,22 @@ fn check_declared_version(
     name: &'static str,
     problems: &mut Vec<(usize, Problem)>,
 ) {
-    let Some(written) = written_version(decl, kind) else {
-        return;
-    };
+    if let Some(written) = written_version(decl, kind) {
+        check_version(idx, name, &written, problems);
+    }
+}
+
+fn check_version(
+    idx: usize,
+    name: &'static str,
+    written: &Value,
+    problems: &mut Vec<(usize, Problem)>,
+) {
     // Not known until it is evaluated (`{$ ... }`) or filled (`<$...>`).
-    if is_placeholder(&written) {
+    if is_placeholder(written) {
         return;
     }
-    if let Err(mismatch) = admits(&Type::bare(Kind::Version), &written) {
+    if let Err(mismatch) = admits(&Type::bare(Kind::Version), written) {
         problems.push((
             idx,
             Problem::InvalidDefinition {
@@ -587,7 +567,7 @@ mod tests {
             "kind",
             Some(Tuple::from_named([
                 ("kind".into(), Value::Scalar(Scalar::Text("note".into()))),
-                ("version".into(), Value::Scalar(Scalar::Float(1.0))),
+                ("version".into(), Value::Scalar(Scalar::Text("abc".into()))),
             ])),
             None,
         );
@@ -595,14 +575,15 @@ mod tests {
         assert_eq!(problems.len(), 1);
         assert_eq!(
             problems[0].1,
-            Problem::InvalidVersion {
+            Problem::InvalidDefinition {
                 declaration: "kind",
-                found: "the number `1.0`".into(),
+                name: "version".into(),
+                reason: "the text \"abc\" is not a version such as `1.10.0`".into(),
             }
         );
         assert_eq!(
             problems[0].1.to_string(),
-            "the version in `::kind(...)` must be an integer of 1 or more, found the number `1.0`"
+            "`version` in `::kind`: the text \"abc\" is not a version such as `1.10.0`"
         );
 
         let mut too_many_tuple = Tuple::from_named([
@@ -626,6 +607,66 @@ mod tests {
             problems[0].1.to_string(),
             "`use` takes at most 2 arguments: the name, then an optional version"
         );
+    }
+
+    #[test]
+    fn kind_use_and_version_accept_and_reject_the_same_values() {
+        let accepted = [
+            "1",
+            "0",
+            "1.0",
+            "1.10",
+            "1.0.0",
+            "\"1.0.0\"",
+            "1.0.0-beta",
+            "1.0.0+5",
+        ];
+        assert!(problems_of("::use(ns)\n").is_empty());
+        for ver in accepted {
+            for src in [
+                format!("::kind(note, {ver})\n"),
+                format!("::kind(note, version: {ver})\n"),
+                format!("::use(ns, {ver})\n"),
+                format!("::use(ns, version: {ver})\n"),
+                format!("::version({ver})\n"),
+            ] {
+                assert!(problems_of(&src).is_empty(), "{src}: {:?}", problems_of(&src));
+            }
+        }
+
+        let rejected = [
+            ("-1", "the integer `-1` is not a version such as `1.10.0`"),
+            ("abc", "the text \"abc\" is not a version such as `1.10.0`"),
+            ("\"1.\"", "the text \"1.\" is not a version such as `1.10.0`"),
+            ("\".1\"", "the text \".1\" is not a version such as `1.10.0`"),
+            (
+                "\"1..2\"",
+                "the text \"1..2\" is not a version such as `1.10.0`",
+            ),
+            ("\"\"", "the text \"\" is not a version such as `1.10.0`"),
+            ("true", "`true` is not a version such as `1.10.0`"),
+            ("(1, 2)", "a list is not a version such as `1.10.0`"),
+            ("none", "`none` is not a version such as `1.10.0`"),
+        ];
+        for (ver, expected_reason) in rejected {
+            for (decl, src) in [
+                ("kind", format!("::kind(note, {ver})\n")),
+                ("kind", format!("::kind(note, version: {ver})\n")),
+                ("use", format!("::use(ns, {ver})\n")),
+                ("use", format!("::use(ns, version: {ver})\n")),
+                ("version", format!("::version({ver})\n")),
+            ] {
+                assert_eq!(
+                    problems_of(&src),
+                    [Problem::InvalidDefinition {
+                        declaration: decl,
+                        name: "version".into(),
+                        reason: expected_reason.into(),
+                    }],
+                    "{src}"
+                );
+            }
+        }
     }
 
     #[test]
@@ -695,6 +736,10 @@ mod tests {
     #[test]
     fn unevaluated_expressions_in_version_are_skipped() {
         for src in [
+            "::kind(note, $(expr.ver))\n",
+            "::kind(note, <$version>)\n",
+            "::use(deck, $(expr.ver))\n",
+            "::use(deck, <$version>)\n",
             "::version($(expr.ver))\n",
             "::vocabulary(deck, version: $(expr.ver))\n",
             "::blueprint(note){ version: $(expr.ver) }\n",
@@ -776,7 +821,7 @@ mod tests {
 
     #[test]
     fn parsed_document_checked_through_declarations() {
-        let doc = parse("::kind(note, 1.0)\n::use(deck, 1, 2)\n");
+        let doc = parse("::kind(note, abc)\n::use(deck, 1, 2)\n");
         let found = declarations(&doc);
         let decls: Vec<_> = found.into_iter().map(|f| f.declaration).collect();
         let problems = check_declarations(&decls, Host::Tmt);
@@ -785,9 +830,10 @@ mod tests {
             problems[0],
             (
                 0,
-                Problem::InvalidVersion {
+                Problem::InvalidDefinition {
                     declaration: "kind",
-                    found: "the number `1.0`".into(),
+                    name: "version".into(),
+                    reason: "the text \"abc\" is not a version such as `1.10.0`".into(),
                 }
             )
         );

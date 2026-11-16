@@ -679,15 +679,15 @@ mod tests {
         );
         check(&upstreams_file, false, true, false).expect("::upstreams checks clean");
 
-        // 3. The same file with ::kind(catalog, 1.0) added reports version problem only
-        let bad_kind_src = "::kind(catalog, 1.0)\n::upstreams(){\n  vocabularies: (git: \"https://github.com/tomet-lang/vocabularies.git\", rev: main, root: vocabularies)\n}\nkey: 1\n";
+        // 3. The same file with ::kind(catalog, abc) added reports version problem only
+        let bad_kind_src = "::kind(catalog, abc)\n::upstreams(){\n  vocabularies: (git: \"https://github.com/tomet-lang/vocabularies.git\", rev: main, root: vocabularies)\n}\nkey: 1\n";
         let bad_kind_file = root.join("upstreams_bad_kind.ctmt");
         fs::write(&bad_kind_file, bad_kind_src).unwrap();
         let msgs = ctmt_messages(&bad_kind_file, bad_kind_src);
         assert_eq!(msgs.len(), 1);
         assert_eq!(
             msgs[0],
-            "the version in `::kind(...)` must be an integer of 1 or more, found the number `1.0`"
+            "`version` in `::kind`: the text \"abc\" is not a version such as `1.10.0`"
         );
         assert!(!msgs[0].contains("upstreams"));
         let err = check(&bad_kind_file, false, true, false).expect_err("bad ::kind version fails");
