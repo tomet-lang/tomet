@@ -1,13 +1,15 @@
 //! Methods: what a value of a given type can be asked to do.
 //!
 //! A method works on its receiver and the arguments it is given, and never
-//! converts either: `.join` joins scalars, `.contains` asks a tuple or a
-//! string the question that suits it, and a type with no such method says so.
+//! converts either: `.join` joins scalars or one-paragraph fragments,
+//! `.contains` asks a tuple or a string the question that suits it, and a type
+//! with no such method says so.
 
 use std::cmp::Ordering;
 
 use tomet_ast::{Tuple, TupleEntry};
 use tomet_scalar::Scalar;
+use tomet_span::Span;
 
 use super::args::Args;
 use super::context::EvalContext;
@@ -22,7 +24,7 @@ pub(crate) fn call_method(
     args: Args,
     cx: &EvalContext,
 ) -> Result<EvalValue, EvalError> {
-    match (&receiver, member) {
+    match (receiver, member) {
         (EvalValue::Tuple(tuple), "filter") => {
             let f = function_arg(member, args)?;
             let mut kept = Vec::new();
@@ -71,11 +73,7 @@ pub(crate) fn call_method(
                     separator.type_name(),
                 ));
             };
-            let parts = tuple
-                .unnamed()
-                .map(scalar_text)
-                .collect::<Result<Vec<_>, _>>()?;
-            Ok(EvalValue::Scalar(Scalar::Text(parts.join(&separator))))
+            join_tuple(tuple, separator)
         }
         (EvalValue::Tuple(tuple), "contains") => {
             let [needle] = take::<1>(member, args)?;
@@ -175,7 +173,7 @@ pub(crate) fn call_method(
                 ));
             };
             Ok(EvalValue::Scalar(Scalar::Text(
-                super::datetime::format_datetime(value, &format),
+                super::datetime::format_datetime(&value, &format),
             )))
         }
         (EvalValue::DateTime(value), "at") => {
@@ -207,10 +205,95 @@ pub(crate) fn call_method(
                 text.contains(needle.as_str()),
             )))
         }
-        _ => Err(EvalError::UnknownMember {
-            on: receiver.type_name(),
+        (other, _) => Err(EvalError::UnknownMember {
+            on: other.type_name(),
             member: member.to_string(),
         }),
+    }
+}
+
+/// Joins a sequence of scalars into a single text scalar, or a sequence of
+/// one-paragraph fragments into a single one-paragraph fragment separated by
+/// the given text.
+///
+/// An empty sequence gives empty text, because a fragment of no blocks cannot
+/// stand in the inline position.
+fn join_tuple(tuple: Tuple<EvalValue>, separator: String) -> Result<EvalValue, EvalError> {
+    let mut items = tuple.into_unnamed();
+    let Some(first) = items.next() else {
+        return Ok(EvalValue::Scalar(Scalar::Text(String::new())));
+    };
+
+    if matches!(&first, EvalValue::Fragment(_)) {
+        let span = Span::default();
+        let mut combined_inlines = Vec::new();
+        combined_inlines.extend(extract_single_paragraph(first, 0)?);
+
+        for (offset, item) in items.enumerate() {
+            let index = offset + 1;
+            let inlines = extract_single_paragraph(item, index)?;
+            combined_inlines.push(tomet_ast::Inline::Text(tomet_ast::Text::new(
+                separator.clone(),
+                span,
+            )));
+            combined_inlines.extend(inlines);
+        }
+
+        Ok(EvalValue::Fragment(vec![tomet_ast::Block::Paragraph(
+            tomet_ast::Paragraph::new(combined_inlines, span),
+        )]))
+    } else {
+        let mut parts = Vec::new();
+        parts.push(scalar_text(&first).map_err(|e| wrap_join_scalar_error(e, 0))?);
+
+        for (offset, item) in items.enumerate() {
+            let index = offset + 1;
+            parts.push(scalar_text(&item).map_err(|e| wrap_join_scalar_error(e, index))?);
+        }
+
+        Ok(EvalValue::Scalar(Scalar::Text(parts.join(&separator))))
+    }
+}
+
+fn wrap_join_scalar_error(err: EvalError, index: usize) -> EvalError {
+    match err {
+        EvalError::TypeMismatch { expected, got, .. } => EvalError::TypeMismatch {
+            what: format!("element {index} of `.join`"),
+            expected,
+            got,
+        },
+        other => other,
+    }
+}
+
+fn extract_single_paragraph(
+    val: EvalValue,
+    index: usize,
+) -> Result<Vec<tomet_ast::Inline>, EvalError> {
+    match val {
+        EvalValue::Fragment(blocks) => match <[tomet_ast::Block; 1]>::try_from(blocks) {
+            Ok([tomet_ast::Block::Paragraph(p)]) => Ok(p.content),
+            Ok([_non_paragraph]) => Err(EvalError::mismatch(
+                format!("element {index} of `.join`"),
+                "a one-paragraph fragment",
+                "non-paragraph block",
+            )),
+            Err(blocks) if blocks.is_empty() => Err(EvalError::mismatch(
+                format!("element {index} of `.join`"),
+                "a one-paragraph fragment",
+                "fragment of zero blocks",
+            )),
+            Err(_) => Err(EvalError::mismatch(
+                format!("element {index} of `.join`"),
+                "a one-paragraph fragment",
+                "fragment of several blocks",
+            )),
+        },
+        other => Err(EvalError::mismatch(
+            format!("element {index} of `.join`"),
+            "a one-paragraph fragment",
+            other.type_name(),
+        )),
     }
 }
 

@@ -492,8 +492,8 @@ fn render_link(cx: &MarkdownCtx, el: ElementView<'_>) -> String {
                 // already take for a link.
                 TargetScheme::Url if unlabeled => target.to_string(),
                 // A path is not: written bare it is text, where HTML makes
-                // an anchor of it. The target is the path as written, as it
-                // is in HTML -- not where the document is exported to.
+                // an anchor of it. The converter writes the target it is
+                // handed; where a `tmt:` link points is decided before rendering.
                 _ if unlabeled => format!("[{target}]({target})"),
                 _ => format!("[{text}]({target})"),
             }

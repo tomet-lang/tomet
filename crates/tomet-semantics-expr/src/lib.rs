@@ -535,9 +535,10 @@ fn builtin(name: &str, args: Args, cx: &EvalContext) -> Result<EvalValue, EvalEr
             arithmetic(name, &a, &b)
         }
         "include" => include::include(args, cx),
-        "link" => match args.exactly(name, 1)?.pop() {
-            Some(target) => fragments::link_fragment(&target),
-            None => unreachable!("`exactly` returned one value"),
+        "link" => match args.between(name, 1, 2)?.as_slice() {
+            [target] => fragments::link_fragment(target, None),
+            [target, label] => fragments::link_fragment(target, Some(label)),
+            _ => unreachable!("`between` returned 1 or 2 values"),
         },
         "emoji" => match args.exactly(name, 1)?.pop() {
             Some(EvalValue::Scalar(Scalar::Text(name))) => {

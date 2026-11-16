@@ -40,17 +40,27 @@ pub fn rebase_relative_links(blocks: Vec<Block>, from: &str, to: &str) -> Vec<Bl
         let Some(resolved) = resolve(&from_dir, path) else {
             return;
         };
+        let to_parts: Vec<&str> = resolved.iter().map(String::as_str).collect();
+        let rel = relative_to(&to_dir, &to_parts);
+        let rel_target = if rel.starts_with("../") {
+            rel
+        } else {
+            format!("./{rel}")
+        };
         set_target(
             element,
-            format!("{}{anchor}", relative_to(&to_dir, &resolved)),
+            format!("{}{anchor}", rel_target),
         );
     });
     holder.body
 }
 
 /// The directory part of a vault-relative path, as components.
-fn directory(path: &str) -> Vec<&str> {
-    let mut parts: Vec<&str> = path.split('/').filter(|p| !p.is_empty()).collect();
+pub(crate) fn directory(path: &str) -> Vec<&str> {
+    let mut parts: Vec<&str> = path
+        .split('/')
+        .filter(|p| !p.is_empty() && *p != ".")
+        .collect();
     parts.pop();
     parts
 }
@@ -70,24 +80,27 @@ fn resolve(base: &[&str], relative: &str) -> Option<Vec<String>> {
     Some(out)
 }
 
-/// `target` spelled relative to `from`, both as components from the vault root.
-fn relative_to(from: &[&str], target: &[String]) -> String {
+/// `to` spelled relative to `from`, both as path components.
+///
+/// Returns the common relative path: `../` for each level remaining in `from`,
+/// followed by the remaining components of `to`.
+pub(crate) fn relative_to(from: &[&str], to: &[&str]) -> String {
     let common = from
         .iter()
-        .zip(target)
-        .take_while(|(a, b)| **a == b.as_str())
+        .zip(to)
+        .take_while(|(a, b)| *a == *b)
         .count();
     let ups = from.len() - common;
-    let rest = target[common..].join("/");
+    let rest = to[common..].join("/");
     if ups == 0 {
-        format!("./{rest}")
+        rest
     } else {
         format!("{}{rest}", "../".repeat(ups))
     }
 }
 
 /// Writes a link's target back, whether it was given as the one argument or as `target:`.
-fn set_target(element: &mut Element, target: String) {
+pub(crate) fn set_target(element: &mut Element, target: String) {
     let Some(args) = &mut element.data.args else {
         return;
     };
@@ -95,6 +108,23 @@ fn set_target(element: &mut Element, target: String) {
         *value = Value::Scalar(Scalar::Text(target));
     } else if let Some(value) = args.nth_unnamed_mut(0) {
         *value = Value::Scalar(Scalar::Text(target));
+    } else {
+        let scheme_key = args
+            .named()
+            .find_map(|(k, _)| crate::elements::target::is_explicit_scheme(k).then_some(k.to_string()));
+        if let Some(scheme) = scheme_key {
+            match args.rename(&scheme, "target") {
+                Ok(true) => {
+                    if let Some(value) = args.get_mut("target") {
+                        *value = Value::Scalar(Scalar::Text(target));
+                    }
+                }
+                Ok(false) => {}
+                Err(err) => unreachable!(
+                    "no `target` key was present, so renaming `{scheme}` to `target` cannot fail with duplicate key: {err:?}"
+                ),
+            }
+        }
     }
 }
 
@@ -175,5 +205,40 @@ mod tests {
             .body;
         let moved = rebase_relative_links(blocks.clone(), "docs/guide.tmt", "here.tmt");
         assert_eq!(moved, blocks);
+    }
+
+    #[test]
+    fn set_target_handles_all_link_forms() {
+        use tomet_ast::{Name, Tuple};
+        use tomet_tree::element_new;
+
+        // Form 1: Hand-written bare scheme prefix without space: @link(tmt:x.tmt)
+        // Parses as named entry [("tmt", "x.tmt")]; reaches scheme_key rename branch.
+        let mut f1 = tomet_ast_parser::parse_file("@link(tmt:x.tmt)\n").unwrap();
+        let Block::Element(el1) = &mut f1.body[0] else { panic!() };
+        set_target(el1, "out/x.md".to_string());
+        assert_eq!(link_target_of(el1.as_view()).unwrap().1, "out/x.md");
+
+        // Form 2: Hand-written bare scheme prefix with space: @link(tmt: x.tmt)
+        // Parses as named entry [("tmt", "x.tmt")]; reaches scheme_key rename branch.
+        let mut f2 = tomet_ast_parser::parse_file("@link(tmt: x.tmt)\n").unwrap();
+        let Block::Element(el2) = &mut f2.body[0] else { panic!() };
+        set_target(el2, "out/x.md".to_string());
+        assert_eq!(link_target_of(el2.as_view()).unwrap().1, "out/x.md");
+
+        // Form 3: Hand-written explicit target key: @link(target: tmt:x.tmt)
+        // Parses as named entry [("target", "tmt:x.tmt")]; reaches args.get_mut("target") branch.
+        let mut f3 = tomet_ast_parser::parse_file("@link(target: tmt:x.tmt)\n").unwrap();
+        let Block::Element(el3) = &mut f3.body[0] else { panic!() };
+        set_target(el3, "out/x.md".to_string());
+        assert_eq!(link_target_of(el3.as_view()).unwrap().1, "out/x.md");
+
+        // Form 4: Expression-generated link from d.link()
+        // Produces unnamed argument Tuple::from_unnamed([Value::Scalar(Scalar::Text("tmt:..."))]);
+        // reaches args.nth_unnamed_mut(0) branch.
+        let mut el4 = element_new(Name::bare("link"));
+        el4.data.args = Some(Tuple::from_unnamed([Value::Scalar(Scalar::Text("tmt:x.tmt".to_string()))]));
+        set_target(&mut el4, "out/x.md".to_string());
+        assert_eq!(link_target_of(el4.as_view()).unwrap().1, "out/x.md");
     }
 }

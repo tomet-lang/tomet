@@ -437,6 +437,42 @@ mod tests {
         let _ = fs::remove_dir_all(&root);
     }
 
+    #[test]
+    fn language_bar_query_from_vault_prepares_joined_links() {
+        let root = vault_fixture("tomet_test_load_lang_bar");
+        fs::write(
+            root.join(tomet_load_config::VAULT_CONFIG_FILE),
+            "::kind(config)\n::field(lang: (type: string), lang_name: (type: string))\n",
+        )
+        .expect("config");
+        fs::write(
+            root.join("readme.tmt"),
+            "::meta(lang: \"en\", lang_name: \"English\")\n\n{$ vault::docs\n    .filter(d => d::filename == \"readme.tmt\")\n    .sort(d => d::meta.lang)\n    .map(d => d.link(d::meta.lang_name))\n    .join(\" | \") }\n",
+        )
+        .expect("readme");
+        fs::create_dir_all(root.join("locales").join("ja")).expect("ja dir");
+        fs::write(
+            root.join("locales").join("ja").join("readme.tmt"),
+            "::meta(lang: \"ja\", lang_name: \"日本語\")\n\n=[ 日本語 ]\n",
+        )
+        .expect("ja readme");
+
+        let vault = Vault::discover(&root);
+        let (doc, _) = vault
+            .prepared_file(&root.join("readme.tmt"))
+            .expect("prepared");
+        assert_eq!(
+            flat(&doc),
+            [
+                "link:tmt:readme.tmt",
+                " | ",
+                "link:tmt:locales/ja/readme.tmt"
+            ]
+        );
+
+        let _ = fs::remove_dir_all(&root);
+    }
+
     /// The reason `prepare` is a separate door from `file`: a caller
     /// that only wants one file read gets it as written, expressions and all.
     #[test]

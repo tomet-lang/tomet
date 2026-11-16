@@ -393,7 +393,7 @@ fn connects_of(part: &Part) -> &[Connect] {
     }
 }
 
-/// Calls on a part: `.item(n)` and `.link()`.
+/// Calls on a part: `.item(n)` and `.link(label)`.
 pub(crate) fn part_method(
     doc: &DocRef,
     part: &Part,
@@ -402,11 +402,15 @@ pub(crate) fn part_method(
 ) -> Result<EvalValue, EvalError> {
     match member {
         "link" => {
-            args.exactly(".link", 0)?;
-            super::fragments::link_fragment(&EvalValue::Part {
-                doc: doc.clone(),
-                part: Box::new(part.clone()),
-            })
+            let mut args = args.between(".link", 0, 1)?;
+            let label = args.pop();
+            super::fragments::link_fragment(
+                &EvalValue::Part {
+                    doc: doc.clone(),
+                    part: Box::new(part.clone()),
+                },
+                label.as_ref(),
+            )
         }
         "item" => {
             let [index]: [EvalValue; 1] = args
@@ -478,6 +482,7 @@ pub(crate) fn document_connect(
     }
 }
 
+/// Calls on a document: `.item(n)` and `.link(label)`.
 pub(crate) fn document_method(
     doc: &DocRef,
     member: &str,
@@ -493,8 +498,12 @@ pub(crate) fn document_method(
             root_item(doc, &index, cx)
         }
         "link" => {
-            args.exactly(".link", 0)?;
-            super::fragments::link_fragment(&EvalValue::Document(doc.clone()))
+            let mut args = args.between(".link", 0, 1)?;
+            let label = args.pop();
+            super::fragments::link_fragment(
+                &EvalValue::Document(doc.clone()),
+                label.as_ref(),
+            )
         }
         _ => Err(EvalError::UnknownMember {
             on: "document",

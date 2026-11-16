@@ -54,8 +54,12 @@ fn export_single_file(
         check,
         project_root: &project_root,
         vault: &vault,
+        scope: ExportScope::SingleFile {
+            target_file: file_path,
+            override_out,
+        },
     };
-    match export_one(&settings, file_path, override_out) {
+    match export_one(&settings, file_path) {
         Ok(out) => {
             for line in out.stdout_lines {
                 println!("{line}");
@@ -109,44 +113,105 @@ pub(crate) fn report_stale(stale: &StaleExports, check: bool) -> anyhow::Result<
     ))
 }
 
-/// What stays the same for every file of one export run.
+/// Distinguishes a single-file export run from a directory export run.
+///
+/// In a single-file export, `--out` applies only to the file being exported,
+/// while any other document reached via `tmt:` is located by its own declared path.
+/// In a directory export, `--out` relocates all documents under the directory together.
 #[derive(Clone, Copy)]
-struct ExportSettings<'a> {
-    override_type: Option<&'a str>,
-    advanced: bool,
-    check: bool,
-    project_root: &'a Path,
-    vault: &'a Vault,
+pub(crate) enum ExportScope<'a> {
+    SingleFile {
+        target_file: &'a Path,
+        override_out: Option<&'a Path>,
+    },
+    Directory {
+        dir_path: &'a Path,
+        override_out: Option<&'a Path>,
+    },
 }
 
-fn export_one(
-    settings: &ExportSettings,
+/// What stays the same for every file of one export run.
+#[derive(Clone, Copy)]
+pub(crate) struct ExportSettings<'a> {
+    pub(crate) override_type: Option<&'a str>,
+    pub(crate) advanced: bool,
+    pub(crate) check: bool,
+    pub(crate) project_root: &'a Path,
+    pub(crate) vault: &'a Vault,
+    pub(crate) scope: ExportScope<'a>,
+}
+
+/// Determines which formats a document is exported to and where each is written,
+/// according to the document's `::export` configuration and the run's settings.
+///
+/// Returns pairs of `(ExportType, Option<PathBuf>)`. A destination of `None` indicates
+/// that output goes to stdout (when a single format is exported and no output path is declared
+/// or overridden).
+///
+/// Output destination rules for `--out`:
+/// - In a directory export:
+///   - Documents outside the directory being exported are not written in this run (returns empty).
+///   - When `--out DIR` is provided, every document under the directory is placed under `DIR`,
+///     preserving its subdirectory structure: `DIR/<parent>/<stem>.<ext>`.
+/// - In a single-file export:
+///   - `--out` applies only to the single file being exported. Other documents reached via `tmt:`
+///     follow their own declared `::export` paths or fallback.
+///   - If multiple formats are exported, or if `--out` points to an existing directory or ends with
+///     a trailing slash (`/` or `\`), `--out` is treated as a directory: `DIR/<stem>.<ext>`.
+///   - Otherwise, `--out` is treated as the output file path.
+/// - Fallback when `--out` does not apply:
+///   - If the document declares an export path in `::export`, it is resolved relative to the project root.
+///   - Otherwise, if exactly one format is exported, output goes to stdout (`None`).
+///   - If multiple formats are exported without declared paths, each is written to `{stem}.{ext}`.
+pub(crate) fn document_export_destinations(
+    doc: &tomet_ast::File,
     file_path: &Path,
-    override_out: Option<&Path>,
-) -> anyhow::Result<OneFileExport> {
-    let ExportSettings {
-        override_type,
-        advanced,
-        check,
-        project_root,
-        vault,
-    } = *settings;
+    settings: &ExportSettings<'_>,
+) -> Vec<(ExportType, Option<PathBuf>)> {
+    let file_doc_ref = settings.vault.doc_ref(file_path);
 
-    let src = fs::read_to_string(file_path)?;
-    // `vault.parse` and not `vault.document`, so the source text is still
-    // in hand for `format_parse_error`'s pointer-at-the-column report.
-    let (mut doc, _bindings) = vault
-        .parse(&src)
-        .map_err(|e| anyhow::anyhow!("{}", format_parse_error(file_path, &src, &e)))?;
+    // Compute scope-specific directory/target info once.
+    // In a directory export, any document outside the directory being exported
+    // is not written in this run, so its destination is omitted and links to it remain unchanged.
+    let (dir_out_parent, is_single_target) = match settings.scope {
+        ExportScope::Directory {
+            dir_path,
+            override_out,
+        } => {
+            let dir_doc_ref = settings.vault.doc_ref(dir_path);
+            let is_under = dir_doc_ref.0.is_empty()
+                || file_doc_ref.0 == dir_doc_ref.0
+                || file_doc_ref.0.starts_with(&format!("{}/", dir_doc_ref.0));
+            if !is_under {
+                return Vec::new();
+            }
+            let parent = override_out.map(|_| {
+                let rel_str = if dir_doc_ref.0.is_empty() {
+                    file_doc_ref.0.as_str()
+                } else if file_doc_ref.0 == dir_doc_ref.0 {
+                    ""
+                } else {
+                    &file_doc_ref.0[dir_doc_ref.0.len() + 1..]
+                };
+                let rel_path = Path::new(rel_str);
+                rel_path.parent().unwrap_or_else(|| Path::new("")).to_path_buf()
+            });
+            (parent, false)
+        }
+        ExportScope::SingleFile {
+            target_file,
+            override_out,
+        } => {
+            let is_target = override_out.is_some()
+                && file_doc_ref.0 == settings.vault.doc_ref(target_file).0;
+            (None, is_target)
+        }
+    };
 
-    // Every `{$ ... }` is resolved before anything renders, so every converter
-    // is handed its value and none of them needs to know expressions exist.
-    vault.prepare(&mut doc, file_path);
-
-    let config = document_config(&doc);
+    let config = document_config(doc);
 
     // Determine target formats to export
-    let targets = if let Some(t_str) = override_type {
+    let targets = if let Some(t_str) = settings.override_type {
         if t_str.eq_ignore_ascii_case("all") {
             if !config.export_type.is_empty() {
                 config.export_type.clone()
@@ -162,82 +227,147 @@ fn export_one(
         vec![ExportType::CommonMark]
     };
 
+    let targets_len = targets.len();
+    let stem = file_path
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .unwrap_or("output");
+
+    targets
+        .into_iter()
+        .map(move |target| {
+            let ext = match &target {
+                ExportType::CommonMark => "md",
+                ExportType::Html => "html",
+                ExportType::Typst => "typ",
+                ExportType::Pandoc => "json",
+                ExportType::Custom(s) => s.as_str(),
+            };
+
+            // Scope decides only the destination that `--out` imposes (if any)
+            let out_override = match settings.scope {
+                ExportScope::Directory {
+                    override_out: Some(out_dir),
+                    ..
+                } => {
+                    let parent = dir_out_parent.as_deref().unwrap_or_else(|| Path::new(""));
+                    Some(out_dir.join(parent).join(format!("{stem}.{ext}")))
+                }
+                ExportScope::SingleFile {
+                    override_out: Some(out),
+                    ..
+                } if is_single_target => {
+                    if out.is_dir()
+                        || out.to_string_lossy().ends_with('/')
+                        || out.to_string_lossy().ends_with('\\')
+                        || targets_len > 1
+                    {
+                        Some(out.join(format!("{stem}.{ext}")))
+                    } else {
+                        Some(out.to_path_buf())
+                    }
+                }
+                _ => None,
+            };
+
+            // Shared fallback when `--out` does not impose a destination
+            let out_path = if let Some(p) = out_override {
+                Some(p)
+            } else if let Some(cfg_path) = config.export_path_for(&target) {
+                Some(tomet_indexer::resolve_document_relative(
+                    file_path,
+                    cfg_path,
+                    settings.project_root,
+                ))
+            } else if targets_len == 1 {
+                None
+            } else {
+                Some(PathBuf::from(format!("{stem}.{ext}")))
+            };
+
+            (target, out_path)
+        })
+        .collect()
+}
+
+fn export_one(
+    settings: &ExportSettings,
+    file_path: &Path,
+) -> anyhow::Result<OneFileExport> {
+    let ExportSettings {
+        advanced,
+        check,
+        vault,
+        ..
+    } = *settings;
+
+    let src = fs::read_to_string(file_path)?;
+    // `vault.parse` and not `vault.document`, so the source text is still
+    // in hand for `format_parse_error`'s pointer-at-the-column report.
+    let (mut doc, _bindings) = vault
+        .parse(&src)
+        .map_err(|e| anyhow::anyhow!("{}", format_parse_error(file_path, &src, &e)))?;
+
+    // Every `{$ ... }` is resolved before anything renders, so every converter
+    // is handed its value and none of them needs to know expressions exist.
+    vault.prepare(&mut doc, file_path);
+
+    let destinations = document_export_destinations(&doc, file_path, settings);
+
     let mut out = OneFileExport {
         stdout_lines: Vec::new(),
         stdout_raw: Vec::new(),
         stale_paths: Vec::new(),
     };
 
-    for target in &targets {
-        let ext = match target {
-            ExportType::CommonMark => "md",
-            ExportType::Html => "html",
-            ExportType::Typst => "typ",
-            ExportType::Pandoc => "json",
-            ExportType::Custom(s) => s.as_str(),
-        };
-
-        let out_path = if let Some(out_dir) = override_out {
-            if out_dir.is_dir()
-                || (override_out.is_some() && (targets.len() > 1 || file_path.is_dir()))
-            {
-                let stem = file_path
-                    .file_stem()
-                    .and_then(|s| s.to_str())
-                    .unwrap_or("output");
-                Some(out_dir.join(format!("{stem}.{ext}")))
-            } else {
-                Some(out_dir.to_path_buf())
-            }
-        } else if let Some(cfg_path) = config.export_path_for(target) {
-            // A path a document declares means the same thing here as it
-            // does in a link: bare is measured from the project root,
-            // `./`/`../` from the document's own directory. Never from
-            // the process's working directory: `tmtroot/readme.tmt`
-            // declaring `README.ja.md` would land at the repository root
-            // or under `docs/` depending on where you stood, and
-            // `--check` would only agree with itself from one of them.
-            Some(tomet_indexer::resolve_document_relative(
-                file_path,
-                cfg_path,
-                project_root,
-            ))
-        } else if targets.len() == 1 {
-            None
-        } else {
-            let stem = file_path
-                .file_stem()
-                .and_then(|s| s.to_str())
-                .unwrap_or("output");
-            Some(PathBuf::from(format!("{stem}.{ext}")))
-        };
-
+    for (target, out_path) in destinations {
         // Under `--check`, if there is no destination output path, there is no
         // artifact on disk to compare against. Skip rendering entirely.
         if check && out_path.is_none() {
             continue;
         }
 
+        let mut render_doc = doc.clone();
+        if let Some(dest) = &out_path {
+            let dest_str = dest.to_string_lossy().replace('\\', "/");
+            tomet_semantics::rewrite_export_links(
+                &mut render_doc,
+                &dest_str,
+                |vault_path| {
+                    let target_file = vault.root.join(vault_path);
+                    let (target_doc, _) = vault.file(&target_file).ok()?;
+                    let target_dests =
+                        document_export_destinations(&target_doc, &target_file, settings);
+                    for (fmt, path) in target_dests {
+                        if fmt == target {
+                            return path.map(|p| p.to_string_lossy().replace('\\', "/"));
+                        }
+                    }
+                    None
+                },
+            );
+        }
+
         let rendered = match target {
-            ExportType::CommonMark => tomet_markdown::to_markdown(&doc),
+            ExportType::CommonMark => tomet_markdown::to_markdown(&render_doc),
             // Pandoc's AST, not a rendering -- `pandoc -f json` turns it
             // into whatever format is actually wanted.
-            ExportType::Pandoc => serde_json::to_string(&tomet_pandoc::to_pandoc(&doc))?,
+            ExportType::Pandoc => serde_json::to_string(&tomet_pandoc::to_pandoc(&render_doc))?,
             ExportType::Html => {
                 let filename_title = file_path
                     .file_stem()
                     .and_then(|s| s.to_str())
                     .unwrap_or("Tomet");
-                let title = meta_title(&doc).unwrap_or_else(|| filename_title.to_string());
+                let title = meta_title(&render_doc).unwrap_or_else(|| filename_title.to_string());
                 let options = tomet_html::RenderOptions {
                     number_headings: advanced,
                     auto_slug_headings: advanced,
                     lang: None,
                     ..Default::default()
                 };
-                tomet_html::render_page_with(&doc, &title, &options)
+                tomet_html::render_page_with(&render_doc, &title, &options)
             }
-            ExportType::Typst => tomet_typst::to_typst(&doc),
+            ExportType::Typst => tomet_typst::to_typst(&render_doc),
             ExportType::Custom(fmt) => {
                 return Err(anyhow::anyhow!("unsupported export type: {fmt}"));
             }
@@ -304,6 +434,10 @@ fn export_directory(
         check,
         project_root: &project_root,
         vault: &vault,
+        scope: ExportScope::Directory {
+            dir_path,
+            override_out,
+        },
     };
 
     // Phase 1: Process documents in parallel governed by jobserver tokens
@@ -311,17 +445,7 @@ fn export_directory(
         .par_iter()
         .map(|file| {
             let _token = jobserver_gate::acquire();
-            let relative_out = if let Some(out_dir) = override_out {
-                if let Ok(rel) = file.strip_prefix(dir_path) {
-                    let parent = rel.parent().unwrap_or_else(|| Path::new(""));
-                    Some(out_dir.join(parent))
-                } else {
-                    Some(out_dir.to_path_buf())
-                }
-            } else {
-                None
-            };
-            export_one(&settings, file, relative_out.as_deref()).map_err(|e| e.to_string())
+            export_one(&settings, file).map_err(|e| e.to_string())
         })
         .collect();
     jobserver_gate::reclaim_implicit_token();
@@ -536,5 +660,334 @@ mod tests {
         assert!(exported_text.contains("# Hello Export"));
 
         let _ = fs::remove_dir_all(&temp_dir);
+    }
+
+    #[test]
+    fn language_bar_and_relative_links_end_to_end() {
+        let root = std::env::temp_dir().join(format!("tomet_test_lang_bar_{}", nanoid::nanoid!()));
+        let _ = fs::remove_dir_all(&root);
+        fs::create_dir_all(root.join("locales/ja")).expect("create dirs");
+        fs::create_dir_all(root.join("locales/zh")).expect("create dirs");
+        fs::create_dir_all(root.join("docs")).expect("create dirs");
+
+        fs::write(
+            root.join(tomet_load_config::VAULT_CONFIG_FILE),
+            "::kind(config)\n::field(lang: (type: string), lang_name: (type: string))\n",
+        )
+        .expect("write config");
+
+        let bar_expr = "{$ vault::docs\n    \
+                .filter(d => d::filename == \"readme.tmt\")\n    \
+                .sort(d => d::meta.lang)\n    \
+                .map(d => d.link(d::meta.lang_name))\n    \
+                .join(\" | \") }\n\n";
+
+        fs::write(
+            root.join("readme.tmt"),
+            format!(
+                "::export(type: commonmark, path: \"out/README.md\")\n\
+                 ::meta(lang: \"en\", lang_name: \"English\")\n\n\
+                 {bar_expr}\
+                 See also @link(tmt:plain.tmt)[No Export Doc].\n"
+            ),
+        )
+        .expect("write root readme");
+
+        fs::write(
+            root.join("locales/ja/readme.tmt"),
+            format!(
+                "::export(type: commonmark, path: \"out/README.ja.md\")\n\
+                 ::meta(lang: \"ja\", lang_name: \"Japanese\")\n\n\
+                 {bar_expr}\
+                 #[ Japanese Readme ]\n"
+            ),
+        )
+        .expect("write ja readme");
+
+        fs::write(
+            root.join("locales/zh/readme.tmt"),
+            format!(
+                "::export(type: commonmark, path: \"out/README.zh-CN.md\")\n\
+                 ::meta(lang: \"zh\", lang_name: \"Chinese\")\n\n\
+                 {bar_expr}\
+                 #[ Chinese Readme ]\n"
+            ),
+        )
+        .expect("write zh readme");
+
+        fs::write(
+            root.join("docs/note.tmt"),
+            "::export(type: commonmark, path: \"out/docs/note.md\")\n\n\
+             Back to @link(tmt:readme.tmt)[Root Readme].\n",
+        )
+        .expect("write docs note");
+
+        fs::write(
+            root.join("plain.tmt"),
+            "#[ Plain Document without export ]\n",
+        )
+        .expect("write plain doc");
+
+        // Real export run
+        export_cmd(&root, None, None, false, false).expect("export succeeds");
+
+        let readme_out = fs::read_to_string(root.join("out/README.md")).expect("read out/README.md");
+        // In English readme, bar lists all three languages including English itself
+        assert!(
+            readme_out.contains("[English](README.md)"),
+            "expected [English](README.md) in: {readme_out}"
+        );
+        assert!(
+            readme_out.contains("[Japanese](README.ja.md)"),
+            "expected [Japanese](README.ja.md) in: {readme_out}"
+        );
+        assert!(
+            readme_out.contains("[Chinese](README.zh-CN.md)"),
+            "expected [Chinese](README.zh-CN.md) in: {readme_out}"
+        );
+        // Target without ::export keeps vault-relative source path
+        assert!(
+            readme_out.contains("[No Export Doc](plain.tmt)"),
+            "expected [No Export Doc](plain.tmt) in: {readme_out}"
+        );
+
+        let ja_out = fs::read_to_string(root.join("out/README.ja.md")).expect("read out/README.ja.md");
+        // In Japanese readme, bar lists Japanese itself with its own file name README.ja.md
+        assert!(
+            ja_out.contains("[English](README.md)"),
+            "expected [English](README.md) in: {ja_out}"
+        );
+        assert!(
+            ja_out.contains("[Japanese](README.ja.md)"),
+            "expected [Japanese](README.ja.md) in: {ja_out}"
+        );
+        assert!(
+            ja_out.contains("[Chinese](README.zh-CN.md)"),
+            "expected [Chinese](README.zh-CN.md) in: {ja_out}"
+        );
+
+        let zh_out = fs::read_to_string(root.join("out/README.zh-CN.md")).expect("read out/README.zh-CN.md");
+        // In Chinese readme, bar lists Chinese itself with its own file name README.zh-CN.md
+        assert!(
+            zh_out.contains("[English](README.md)"),
+            "expected [English](README.md) in: {zh_out}"
+        );
+        assert!(
+            zh_out.contains("[Japanese](README.ja.md)"),
+            "expected [Japanese](README.ja.md) in: {zh_out}"
+        );
+        assert!(
+            zh_out.contains("[Chinese](README.zh-CN.md)"),
+            "expected [Chinese](README.zh-CN.md) in: {zh_out}"
+        );
+
+        let note_out = fs::read_to_string(root.join("out/docs/note.md")).expect("read out/docs/note.md");
+        // Document in subdirectory gets ../ relative link to root
+        assert!(
+            note_out.contains("[Root Readme](../README.md)"),
+            "expected [Root Readme](../README.md) in: {note_out}"
+        );
+
+        // Export check agrees with real export
+        export_cmd(&root, None, None, false, true).expect("--check passes on fresh export");
+
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn html_and_commonmark_in_one_run_give_right_extension() {
+        let root = std::env::temp_dir().join(format!("tomet_test_multi_fmt_{}", nanoid::nanoid!()));
+        let _ = fs::remove_dir_all(&root);
+        fs::create_dir_all(&root).expect("create dir");
+
+        fs::write(
+            root.join(tomet_load_config::VAULT_CONFIG_FILE),
+            "::kind(config)\n",
+        )
+        .expect("write config");
+
+        fs::write(
+            root.join("source.tmt"),
+            "::export(\n  \
+               type: (commonmark, html)\n  \
+               path: (commonmark: \"out/source.md\", html: \"out/source.html\")\n\
+             )\n\n\
+             See @link(tmt:target.tmt)[The Target].\n",
+        )
+        .expect("write source");
+
+        fs::write(
+            root.join("target.tmt"),
+            "::export(\n  \
+               type: (commonmark, html)\n  \
+               path: (commonmark: \"out/target.md\", html: \"out/target.html\")\n\
+             )\n\n\
+             #[ Target Content ]\n",
+        )
+        .expect("write target");
+
+        export_cmd(&root, None, None, false, false).expect("export multi formats");
+
+        let md_out = fs::read_to_string(root.join("out/source.md")).expect("read source.md");
+        assert!(
+            md_out.contains("[The Target](target.md)"),
+            "expected [The Target](target.md) in: {md_out}"
+        );
+
+        let html_out = fs::read_to_string(root.join("out/source.html")).expect("read source.html");
+        assert!(
+            html_out.contains("href=\"target.html\""),
+            "expected href=\"target.html\" in: {html_out}"
+        );
+
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn directory_export_with_override_out_relocates_together() {
+        let root = std::env::temp_dir().join(format!("tomet_test_dir_out_{}", nanoid::nanoid!()));
+        let _ = fs::remove_dir_all(&root);
+        fs::create_dir_all(root.join("src/sub")).expect("create dirs");
+        let dest = root.join("dist");
+
+        fs::write(
+            root.join("src").join(tomet_load_config::VAULT_CONFIG_FILE),
+            "::kind(config)\n",
+        )
+        .expect("write config");
+
+        fs::write(
+            root.join("src/root.tmt"),
+            "See @link(tmt:sub/child.tmt)[Child].\n",
+        )
+        .expect("write root doc");
+
+        fs::write(
+            root.join("src/sub/child.tmt"),
+            "Back to @link(tmt:root.tmt)[Root].\n",
+        )
+        .expect("write child doc");
+
+        export_cmd(&root.join("src"), None, Some(&dest), false, false)
+            .expect("export directory with --out");
+
+        let root_out = fs::read_to_string(dest.join("root.md")).expect("read dist/root.md");
+        assert!(
+            root_out.contains("[Child](sub/child.md)"),
+            "expected [Child](sub/child.md) in: {root_out}"
+        );
+
+        let child_out = fs::read_to_string(dest.join("sub/child.md")).expect("read dist/sub/child.md");
+        assert!(
+            child_out.contains("[Root](../root.md)"),
+            "expected [Root](../root.md) in: {child_out}"
+        );
+
+        export_cmd(&root.join("src"), None, Some(&dest), false, true)
+            .expect("--check passes with --out");
+
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    /// In a directory export, a `tmt:` link to a document outside the exported
+    /// directory is not written in this run, so it must keep its vault-relative source path
+    /// both with and without `--out`.
+    #[test]
+    fn directory_export_target_outside_dir_is_not_rewritten() {
+        let root = std::env::temp_dir().join(format!("tomet_test_f6_{}", nanoid::nanoid!()));
+        let _ = fs::remove_dir_all(&root);
+        fs::create_dir_all(root.join("docs")).expect("create docs dir");
+
+        fs::write(
+            root.join(tomet_load_config::VAULT_CONFIG_FILE),
+            "::kind(config)\n",
+        )
+        .expect("write config");
+
+        fs::write(
+            root.join("readme.tmt"),
+            "::export(type: commonmark, path: \"out/README.md\")\n\n#[ Root Readme ]\n",
+        )
+        .expect("write root readme");
+
+        fs::write(
+            root.join("docs/guide.tmt"),
+            "::export(type: commonmark, path: \"out/docs/guide.md\")\n\n\
+             See @link(tmt:readme.tmt)[Root Readme].\n",
+        )
+        .expect("write guide");
+
+        // 1. Directory export of "docs" without --out
+        export_cmd(&root.join("docs"), None, None, false, false).expect("export docs without --out");
+        let guide_out = fs::read_to_string(root.join("out/docs/guide.md")).expect("read guide");
+        assert!(
+            guide_out.contains("[Root Readme](readme.tmt)"),
+            "expected [Root Readme](readme.tmt) in: {guide_out}"
+        );
+
+        // 2. Directory export of "docs" with --out
+        let dist = root.join("dist");
+        export_cmd(&root.join("docs"), None, Some(&dist), false, false)
+            .expect("export docs with --out");
+        let dist_guide = fs::read_to_string(dist.join("guide.md")).expect("read dist guide");
+        assert!(
+            dist_guide.contains("[Root Readme](readme.tmt)"),
+            "expected [Root Readme](readme.tmt) in: {dist_guide}"
+        );
+
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    /// Verifies `--out` behavior across single-file and directory exports.
+    #[test]
+    fn single_file_and_directory_out_behaviors() {
+        let root = std::env::temp_dir().join(format!("tomet_test_f5_{}", nanoid::nanoid!()));
+        let _ = fs::remove_dir_all(&root);
+        fs::create_dir_all(&root).expect("create dir");
+
+        fs::write(
+            root.join(tomet_load_config::VAULT_CONFIG_FILE),
+            "::kind(config)\n",
+        )
+        .expect("write config");
+
+        let doc_src = root.join("doc.tmt");
+        fs::write(
+            &doc_src,
+            "::export(type: commonmark)\n\n#[ Hello Document ]\n",
+        )
+        .expect("write doc.tmt");
+
+        // Case 1: Single file with trailing slash -> treated as directory
+        let out_slash_dir = root.join("slash_out");
+        let slash_str = format!("{}/", out_slash_dir.display());
+        let slash_path = Path::new(&slash_str);
+        export_cmd(&doc_src, None, Some(slash_path), false, false).expect("export trailing slash");
+        assert!(out_slash_dir.join("doc.md").is_file());
+
+        // Case 2: Single file with existing directory
+        let existing_dir = root.join("existing_dir");
+        fs::create_dir_all(&existing_dir).expect("create existing dir");
+        export_cmd(&doc_src, None, Some(&existing_dir), false, false).expect("export existing dir");
+        assert!(existing_dir.join("doc.md").is_file());
+
+        // Case 3: Single file with custom file path
+        let custom_file = root.join("custom_dest.md");
+        export_cmd(&doc_src, None, Some(&custom_file), false, false).expect("export file path");
+        assert!(custom_file.is_file());
+
+        // Case 4: Single file with multiple formats -> treated as directory
+        let multi_src = root.join("multi.tmt");
+        fs::write(
+            &multi_src,
+            "::export(type: (commonmark, html))\n\n#[ Multi Document ]\n",
+        )
+        .expect("write multi.tmt");
+        let multi_dir = root.join("multi_out");
+        export_cmd(&multi_src, None, Some(&multi_dir), false, false).expect("export multi format");
+        assert!(multi_dir.join("multi.md").is_file());
+        assert!(multi_dir.join("multi.html").is_file());
+
+        let _ = fs::remove_dir_all(&root);
     }
 }

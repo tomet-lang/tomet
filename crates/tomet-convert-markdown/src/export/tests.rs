@@ -472,8 +472,8 @@ fn link_doc(target: &str, label: Option<&str>) -> File {
 }
 
 /// A path with no label is a link and not bare text -- HTML makes an
-/// anchor of the same thing. The target is the path as written, as it is
-/// in HTML.
+/// anchor of the same thing. The converter writes the target it is handed;
+/// where a `tmt:` link points is decided before rendering.
 #[test]
 fn an_unlabeled_path_link_is_a_link() {
     assert_eq!(
