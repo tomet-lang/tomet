@@ -148,19 +148,11 @@ impl std::fmt::Display for Problem {
     }
 }
 
-/// A version value the way a reader wrote it: strings quoted, floats with their
-/// point (`1.0`, not `1`).
-fn version_as_written(value: &Value) -> String {
+/// What was found where a version goes, for the sentence that says it is not one: a scalar as
+/// [`Scalar::describe`] says it (`` the number `1.0` ``, `` the text "2" ``).
+fn describe_version(value: &Value) -> String {
     match value {
-        Value::Scalar(s) => match s {
-            Scalar::Text(s) => format!("{s:?}"),
-            Scalar::Float(f) => format!("{f:?}"),
-            Scalar::Number(text) => text.clone(),
-            Scalar::Int(n) => n.to_string(),
-            Scalar::Bool(b) => b.to_string(),
-            Scalar::None => "none".to_string(),
-            Scalar::Auto => "auto".to_string(),
-        },
+        Value::Scalar(s) => s.describe(),
         _ => "a value that is not a number".to_string(),
     }
 }
@@ -312,7 +304,7 @@ fn check_version_slot(
             idx,
             Problem::InvalidVersion {
                 declaration: name,
-                found: version_as_written(version),
+                found: describe_version(version),
             },
         ));
     }
@@ -605,12 +597,12 @@ mod tests {
             problems[0].1,
             Problem::InvalidVersion {
                 declaration: "kind",
-                found: "1.0".into(),
+                found: "the number `1.0`".into(),
             }
         );
         assert_eq!(
             problems[0].1.to_string(),
-            "the version in `::kind(...)` must be an integer of 1 or more, found 1.0"
+            "the version in `::kind(...)` must be an integer of 1 or more, found the number `1.0`"
         );
 
         let mut too_many_tuple = Tuple::from_named([
@@ -693,7 +685,7 @@ mod tests {
                         "blueprint"
                     },
                     name: "version".into(),
-                    reason: "`abc` is not a version such as `1.10.0`".into(),
+                    reason: "the text \"abc\" is not a version such as `1.10.0`".into(),
                 }]
             );
             assert!(bad(name, "1.10").is_empty(), "{name}");
@@ -776,7 +768,8 @@ mod tests {
             Problem::InvalidDefinition {
                 declaration: "var",
                 name: "n".into(),
-                reason: "`default` is not a value of `type: int`: `3` is not an integer".into(),
+                reason: "`default` is not a value of `type: int`: the text \"3\" is not an integer"
+                    .into(),
             }
         );
     }
@@ -794,7 +787,7 @@ mod tests {
                 0,
                 Problem::InvalidVersion {
                     declaration: "kind",
-                    found: "1.0".into(),
+                    found: "the number `1.0`".into(),
                 }
             )
         );

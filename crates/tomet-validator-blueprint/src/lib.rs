@@ -224,7 +224,7 @@ pub fn validate_against_schema(
                             errors.push(Diagnostic::InvalidFieldValue {
                                 field: req.key.clone(),
                                 field_type: ty.to_string(),
-                                value: describe_value(val),
+                                value: tomet_validator_core::diagnostic::written_value(val),
                                 span: *field_span,
                             });
                         }
@@ -347,32 +347,6 @@ fn collect_doc_sections<'a>(blocks: &'a [Block], doc_sections: &mut Vec<&'a Sect
             doc_sections.push(sec);
             collect_doc_sections(&sec.blocks, doc_sections);
         }
-    }
-}
-
-/// A value as a reader would have written it, for a message.
-fn describe_value(value: &Value) -> String {
-    match value {
-        Value::Scalar(s) => match s {
-            Scalar::Text(text) | Scalar::Number(text) => text.clone(),
-            Scalar::Bool(b) => b.to_string(),
-            Scalar::Int(n) => n.to_string(),
-            Scalar::Float(n) => n.to_string(),
-            Scalar::None => "none".to_string(),
-            Scalar::Auto => "auto".to_string(),
-        },
-        Value::Tuple(tuple) => {
-            if tuple.is_empty() {
-                "an empty tuple".to_string()
-            } else if tuple.has_no_named() {
-                "a list".to_string()
-            } else if tuple.has_no_unnamed() {
-                "a map".to_string()
-            } else {
-                "a list with named entries".to_string()
-            }
-        }
-        _ => "something else".to_string(),
     }
 }
 

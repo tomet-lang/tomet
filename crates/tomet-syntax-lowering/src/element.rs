@@ -796,17 +796,16 @@ fn construct_string(args: &Tuple) -> std::result::Result<Value, String> {
     use tomet_scalar::Scalar;
     let text = match at_most_one("string", args)? {
         None => String::new(),
-        Some(Value::Scalar(s)) => match s {
-            Scalar::Text(s) => s.clone(),
-            Scalar::Int(i) => i.to_string(),
-            Scalar::Bool(b) => b.to_string(),
-            Scalar::None => "none".to_string(),
-            Scalar::Auto => "auto".to_string(),
-            Scalar::Number(text) => text.clone(),
-            Scalar::Float(f) if f.is_finite() => tomet_scalar::float_text(*f),
-            Scalar::Float(f) if f.is_nan() => "nan".to_string(),
-            Scalar::Float(f) => (if *f > 0.0 { "inf" } else { "-inf" }).to_string(),
-        },
+        // A float with no finite value is the word `float(...)` was given to make it.
+        Some(Value::Scalar(Scalar::Float(f))) if f.is_nan() => "nan".to_string(),
+        Some(Value::Scalar(Scalar::Float(f))) if f.is_infinite() => {
+            (if *f > 0.0 { "inf" } else { "-inf" }).to_string()
+        }
+        // What the scalar says; `none` says nothing, and `string(none)` is the text `none`.
+        Some(Value::Scalar(s)) => s
+            .text()
+            .map(|text| text.into_owned())
+            .unwrap_or_else(|| "none".to_string()),
         Some(other) => return Err(format!("string() takes a scalar, got {other:?}")),
     };
     Ok(Value::Scalar(Scalar::Text(text)))

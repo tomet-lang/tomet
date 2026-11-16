@@ -31,15 +31,7 @@ impl Datum {
     /// What it is, for a sentence: `` the integer `6` `` or `` the text "doc-" ``.
     pub fn describe(&self) -> String {
         match self {
-            Datum::Scalar(s) => match s {
-                Scalar::None => "`none`".to_string(),
-                Scalar::Auto => "`auto`".to_string(),
-                Scalar::Bool(b) => format!("`{b}`"),
-                Scalar::Int(n) => format!("the integer `{n}`"),
-                Scalar::Float(n) => format!("the number `{n:?}`"),
-                Scalar::Number(n) => format!("the number `{n}`"),
-                Scalar::Text(text) => format!("the text {}", quoted(text)),
-            },
+            Datum::Scalar(s) => s.describe(),
             Datum::Seq(_) => "a list".to_string(),
         }
     }
@@ -60,15 +52,11 @@ impl Datum {
 impl fmt::Display for Datum {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Datum::Scalar(s) => match s {
-                Scalar::None => f.write_str("none"),
-                Scalar::Auto => f.write_str("auto"),
-                Scalar::Bool(b) => write!(f, "{b}"),
-                Scalar::Int(n) => write!(f, "{n}"),
-                Scalar::Float(n) => write!(f, "{n:?}"),
-                Scalar::Number(n) => f.write_str(n),
-                Scalar::Text(text) => f.write_str(&quoted(text)),
-            },
+            // A text is always quoted here, so that it never reads as a number or a keyword. A float
+            // with no finite value has no bare word, and this form has no other spelling for it
+            // (`Type::build` refuses one), so it falls back to its text.
+            Datum::Scalar(Scalar::Text(text)) => f.write_str(&quoted(text)),
+            Datum::Scalar(s) => f.write_str(&s.bare().or_else(|| s.text()).unwrap_or_default()),
             Datum::Seq(items) => match items.as_slice() {
                 [] => f.write_str("()"),
                 [only] => write!(f, "({only},)"),

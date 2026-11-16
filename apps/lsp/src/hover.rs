@@ -9,6 +9,7 @@ use tomet_semantics::{
     declaration_args_view, element_args_view, heading_level,
 };
 use tomet_span::Span;
+use tomet_spelling::scalar_spelling;
 use tomet_tree::{
     ValueExt, for_each_declaration, for_each_element, for_each_interpolation, for_each_list_item,
 };
@@ -201,12 +202,7 @@ fn declaration_hover(positions: &TextPositions<'_>, declaration: &Declaration) -
             .as_ref()
             .and_then(|v| {
                 v.get("version").map(|v| match v {
-                    Value::Scalar(s) => match s {
-                        Scalar::Text(s) | Scalar::Number(s) => s.clone(),
-                        Scalar::Int(i) => i.to_string(),
-                        Scalar::Float(f) => f.to_string(),
-                        _ => format!("{v:?}"),
-                    },
+                    Value::Scalar(s) => scalar_spelling(s),
                     _ => format!("{v:?}"),
                 })
             })
@@ -559,15 +555,12 @@ fn evaluate_for_hover(
 
 fn render_value(value: &EvalValue) -> String {
     match value {
-        EvalValue::Scalar(s) => match s {
-            Scalar::None => "none".to_string(),
-            Scalar::Auto => "auto".to_string(),
-            Scalar::Bool(b) => b.to_string(),
-            Scalar::Int(i) => i.to_string(),
-            Scalar::Float(f) => f.to_string(),
-            Scalar::Number(s) => s.clone(),
-            Scalar::Text(s) => s.clone(),
-        },
+        // A result as it reads, not as it is written: a text is itself (a macro that makes a link
+        // is shown as the link), and `none`, which has no text, is shown as `none`.
+        EvalValue::Scalar(s) => s
+            .text()
+            .map(|text| text.into_owned())
+            .unwrap_or_else(|| "none".to_string()),
         EvalValue::Tuple(tuple) => {
             let entries: Vec<String> = tuple
                 .entries()

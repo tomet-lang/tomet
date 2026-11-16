@@ -687,7 +687,7 @@ mod tests {
         assert_eq!(msgs.len(), 1);
         assert_eq!(
             msgs[0],
-            "the version in `::kind(...)` must be an integer of 1 or more, found 1.0"
+            "the version in `::kind(...)` must be an integer of 1 or more, found the number `1.0`"
         );
         assert!(!msgs[0].contains("upstreams"));
         let err = check(&bad_kind_file, false, true, false).expect_err("bad ::kind version fails");

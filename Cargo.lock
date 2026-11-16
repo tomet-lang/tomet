@@ -2186,6 +2186,7 @@ dependencies = [
  "tomet-scalar",
  "tomet-semantics",
  "tomet-span",
+ "tomet-spelling",
  "tomet-tree",
  "tomet-validator",
 ]
@@ -2525,6 +2526,7 @@ dependencies = [
  "tomet-semantics",
  "tomet-semantics-core",
  "tomet-span",
+ "tomet-spelling",
  "tomet-tree",
  "tomet-type",
 ]

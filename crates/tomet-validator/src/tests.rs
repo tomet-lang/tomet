@@ -1126,12 +1126,16 @@ fn a_version_after_the_name_of_kind_and_use_is_fine_when_it_is_an_integer() {
 #[test]
 fn a_version_that_is_not_an_integer_of_one_or_more_is_reported() {
     for (src, element, found) in [
-        ("::kind(note, 1.0)\n", "kind", "1.0"),
-        ("::kind(note, \"x\")\n", "kind", "\"x\""),
-        ("::kind(note, 0)\n", "kind", "0"),
-        ("::kind(note, -1)\n", "kind", "-1"),
-        ("::kind(note)\n::use(deck, 1.0)\n", "use", "1.0"),
-        ("::kind(note)\n::use(deck, 0)\n", "use", "0"),
+        ("::kind(note, 1.0)\n", "kind", "the number `1.0`"),
+        ("::kind(note, \"x\")\n", "kind", "the text \"x\""),
+        ("::kind(note, 0)\n", "kind", "the integer `0`"),
+        ("::kind(note, -1)\n", "kind", "the integer `-1`"),
+        (
+            "::kind(note)\n::use(deck, 1.0)\n",
+            "use",
+            "the number `1.0`",
+        ),
+        ("::kind(note)\n::use(deck, 0)\n", "use", "the integer `0`"),
     ] {
         let errors = validate_document(&parse(src));
         assert!(
@@ -1172,7 +1176,7 @@ fn the_version_messages_say_what_to_write() {
         .to_string();
     assert_eq!(
         message,
-        "the version in `::kind(...)` must be an integer of 1 or more, found 1.0"
+        "the version in `::kind(...)` must be an integer of 1 or more, found the number `1.0`"
     );
 
     let errors = validate_document(&parse("::kind(note, 1, 2)\n"));
@@ -1218,17 +1222,17 @@ fn a_declared_version_is_held_to_the_version_type() {
     for (bad, needle) in [
         (
             "::vocabulary(deck, version: \"abc\")\n",
-            "`abc` is not a version",
+            "the text \"abc\" is not a version",
         ),
         (
             "::vocabulary(deck, version: \"1.0.0_beta\")\n",
-            "`1.0.0_beta`",
+            "the text \"1.0.0_beta\"",
         ),
         (
             "::blueprint(note){ version: true }\n",
             "`true` is not a version",
         ),
-        ("::version(v1)\n", "`v1` is not a version"),
+        ("::version(v1)\n", "the text \"v1\" is not a version"),
     ] {
         let found = version_problems(bad);
         assert_eq!(found.len(), 1, "{bad}: {found:?}");
@@ -1310,11 +1314,26 @@ fn an_argument_is_held_to_the_type_its_parameter_declares() {
         );
     }
     for (bad, needle) in [
-        ("@entry(id: abc)", "`abc` is not a non-negative integer"),
-        ("@entry(id: -1)", "`-1` is not a non-negative integer"),
-        ("@entry(id: \"3\")", "`3` is not a non-negative integer"),
-        ("@entry(rev: 1.0.0_beta)", "`1.0.0_beta` is not a version"),
-        ("@entry(done: yes)", "`yes` is not `true` or `false`"),
+        (
+            "@entry(id: abc)",
+            "the text \"abc\" is not a non-negative integer",
+        ),
+        (
+            "@entry(id: -1)",
+            "the integer `-1` is not a non-negative integer",
+        ),
+        (
+            "@entry(id: \"3\")",
+            "the text \"3\" is not a non-negative integer",
+        ),
+        (
+            "@entry(rev: 1.0.0_beta)",
+            "the text \"1.0.0_beta\" is not a version",
+        ),
+        (
+            "@entry(done: yes)",
+            "the text \"yes\" is not `true` or `false`",
+        ),
         ("@entry(label: (a))", "a list is not a string"),
         ("@entry(tags: 5)", "is not a list"),
     ] {
@@ -1454,7 +1473,7 @@ fn check_ctmt_declarations_reports_expected_diagnostics() {
         |e| matches!(e, Diagnostic::DuplicateSingleton { name, first, duplicate } if name == "meta" && *first == spans[3] && *duplicate == spans[4])
     ));
     assert!(errors.iter().any(
-        |e| matches!(e, Diagnostic::InvalidVersion { element, found, .. } if element == "kind" && found == "\"abc\"")
+        |e| matches!(e, Diagnostic::InvalidVersion { element, found, .. } if element == "kind" && found == "the text \"abc\"")
     ));
     assert!(errors.iter().any(
         |e| matches!(e, Diagnostic::InvalidDefinition { declaration: "macro", name, .. } if name == "bad")
@@ -1653,23 +1672,23 @@ fn a_type_seat_default_that_is_not_of_its_type_is_an_error() {
     for (seat, needle) in [
         (
             "<$int(default: \"three\")>",
-            "`default`: `three` is not an integer",
+            "`default`: the text \"three\" is not an integer",
         ),
         (
             "<$date(default: \"soon\")>",
-            "`default`: `soon` is not a date",
+            "`default`: the text \"soon\" is not a date",
         ),
         (
             "<$bool(default: \"yes\")>",
-            "`default`: `yes` is not `true` or `false`",
+            "`default`: the text \"yes\" is not `true` or `false`",
         ),
         (
             "<$list(string, default: 3)>",
-            "`default`: `3` is not a list of a string",
+            "`default`: the integer `3` is not a list of a string",
         ),
         (
             "<$uuid(default: \"not-a-uuid\")>",
-            "`default`: `not-a-uuid` is not a UUID",
+            "`default`: the text \"not-a-uuid\" is not a UUID",
         ),
     ] {
         let found = seat_diagnostics(&format!("::blueprint(note)\n::meta(x: {seat})\n"));

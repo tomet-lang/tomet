@@ -8,6 +8,8 @@
 //!   `@name(`, an interpolation call's `$name(`.
 //! - [`write_key`] / [`key_text`]: a map key, bare when [`is_bare_key`] says the parser reads it
 //!   as itself.
+//! - [`write_scalar`] / [`scalar_spelling`]: any scalar. What is bare is [`Scalar::bare`]'s; this
+//!   adds the quotes of a text and the call of a float with no finite value.
 //! - [`write_scalar_string`] / [`scalar_text`]: a string value, bare when no other value could be
 //!   read from the same text.
 //! - [`write_quoted`] / [`quoted_text`]: a string inside `"..."`, whatever it holds.
@@ -159,6 +161,35 @@ pub fn write_scalar_string(s: &str, out: &mut String) {
     }
 }
 
+/// Writes a scalar as source the parser reads back as the same scalar: the bare word of
+/// [`Scalar::bare`] where it has one, a text by [`write_scalar_string`], and a float with no finite
+/// value as the call that makes one, `float(nan)`, `float(inf)`, `float(-inf)`.
+pub fn write_scalar(scalar: &Scalar, out: &mut String) {
+    match scalar {
+        Scalar::Text(s) => write_scalar_string(s, out),
+        Scalar::Float(f) if f.is_nan() => out.push_str("float(nan)"),
+        Scalar::Float(f) if f.is_infinite() => {
+            out.push_str(if *f > 0.0 {
+                "float(inf)"
+            } else {
+                "float(-inf)"
+            });
+        }
+        _ => out.push_str(
+            &scalar
+                .bare()
+                .expect("a text and a non-finite float are handled above"),
+        ),
+    }
+}
+
+/// [`write_scalar`] as an owned string.
+pub fn scalar_spelling(scalar: &Scalar) -> String {
+    let mut out = String::new();
+    write_scalar(scalar, &mut out);
+    out
+}
+
 /// [`write_scalar_string`] as an owned string.
 pub fn scalar_text(s: &str) -> String {
     let mut out = String::with_capacity(s.len() + 2);
@@ -183,6 +214,27 @@ pub fn fence_line_requires_marker(line: &str, fence_len: usize) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_scalar_is_written_as_the_parser_reads_it() {
+        for (scalar, want) in [
+            (Scalar::None, "none"),
+            (Scalar::Auto, "auto"),
+            (Scalar::Bool(false), "false"),
+            (Scalar::Int(-3), "-3"),
+            (Scalar::Float(1.0), "1.0"),
+            (Scalar::Number("1.10".into()), "1.10"),
+            (Scalar::Text("plain".into()), "plain"),
+            (Scalar::Text("has space".into()), "\"has space\""),
+            (Scalar::Text("none".into()), "\"none\""),
+            (Scalar::Text("1.5".into()), "\"1.5\""),
+            (Scalar::Float(f64::NAN), "float(nan)"),
+            (Scalar::Float(f64::INFINITY), "float(inf)"),
+            (Scalar::Float(f64::NEG_INFINITY), "float(-inf)"),
+        ] {
+            assert_eq!(scalar_spelling(&scalar), want, "{scalar:?}");
+        }
+    }
 
     #[test]
     fn a_name_is_bare_and_anything_else_is_quoted() {

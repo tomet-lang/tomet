@@ -2,6 +2,15 @@
 //!
 //! A scalar is typeless: it is readable with no schema (the tree is readable without evaluating anything).
 //! A type is a set of values, so values sit below types; the type crate depends on this one, never the reverse.
+//!
+//! A scalar is written three ways, for three purposes, and each has one place:
+//!
+//! - its content text, [`Scalar::text`]: what a scalar says in output. `none` says nothing, so a caller that wants an
+//!   empty text for it maps that itself;
+//! - its source spelling: [`Scalar::bare`] is the one bare word that [`Scalar::from_bare`] reads back as the same
+//!   scalar, so the writer cannot drift from the reader. The part that needs a grammar (the quotes around a text that is
+//!   not bare, a float with no finite value) is `tomet-spelling`'s;
+//! - its description, [`Scalar::describe`]: what a message calls a value, as in `` the integer `6` ``.
 
 use std::borrow::Cow;
 
@@ -128,6 +137,39 @@ impl Scalar {
         })
     }
 
+    /// The one bare word that [`from_bare`](Scalar::from_bare) reads back as this scalar, or `None` when no bare word
+    /// does: a text that would read as something else (`true`, `1.5`, `none`) or as nothing (empty), and a float with
+    /// no finite value.
+    ///
+    /// `from_bare(bare(s)) == s` for every `s` that `from_bare` produces. (A [`Scalar::Number`] built by hand from a
+    /// canonical text, `Number("8")`, reads back as the integer it is.)
+    pub fn bare(&self) -> Option<Cow<'_, str>> {
+        match self {
+            Scalar::None => Some(Cow::Borrowed("none")),
+            Scalar::Float(f) if !f.is_finite() => None,
+            Scalar::Text(s)
+                if s.is_empty() || !matches!(Scalar::from_bare(s), Ok(Scalar::Text(_))) =>
+            {
+                None
+            }
+            _ => self.text(),
+        }
+    }
+
+    /// What a message calls this value: `` `none` ``, `` the integer `6` ``, `` the number `1.5` ``,
+    /// `` the text "doc-" ``.
+    pub fn describe(&self) -> String {
+        match self {
+            Scalar::None => "`none`".to_string(),
+            Scalar::Auto => "`auto`".to_string(),
+            Scalar::Bool(b) => format!("`{b}`"),
+            Scalar::Int(n) => format!("the integer `{n}`"),
+            Scalar::Float(f) => format!("the number `{}`", float_text(*f)),
+            Scalar::Number(text) => format!("the number `{text}`"),
+            Scalar::Text(text) => format!("the text {text:?}"),
+        }
+    }
+
     /// The number a [`Scalar::Float`] or [`Scalar::Number`] is, as an `f64`.
     pub fn as_number(&self) -> Option<f64> {
         match self {
@@ -175,6 +217,68 @@ mod tests {
                 Err(err_msg) => assert_eq!(got.unwrap_err(), *err_msg, "case {src}"),
             }
         }
+    }
+
+    /// The writer is held to the reader: every word `from_bare` reads is written back by `bare` as a word that reads
+    /// as the same scalar.
+    #[test]
+    fn bare_is_the_inverse_of_from_bare() {
+        for word in [
+            "none",
+            "auto",
+            "true",
+            "false",
+            "0",
+            "42",
+            "-42",
+            "-0",
+            "1.5",
+            "-1.5",
+            "1.10",
+            "1e3",
+            "999999999999999999999999999999",
+            "1.10.0",
+            "007",
+            "2026-10-25",
+            "hello",
+        ] {
+            let scalar = Scalar::from_bare(word).unwrap();
+            let written = scalar
+                .bare()
+                .unwrap_or_else(|| panic!("`{word}` has a bare word"));
+            assert_eq!(Scalar::from_bare(&written).unwrap(), scalar, "`{word}`");
+        }
+    }
+
+    #[test]
+    fn bare_is_none_where_no_bare_word_reads_back() {
+        for scalar in [
+            Scalar::Text("true".into()),
+            Scalar::Text("none".into()),
+            Scalar::Text("1.5".into()),
+            Scalar::Text(String::new()),
+            Scalar::Float(f64::NAN),
+            Scalar::Float(f64::INFINITY),
+            Scalar::Float(f64::NEG_INFINITY),
+        ] {
+            assert_eq!(scalar.bare(), None, "{scalar:?}");
+        }
+        assert_eq!(Scalar::None.bare().as_deref(), Some("none"));
+        assert_eq!(Scalar::Float(1.0).bare().as_deref(), Some("1.0"));
+    }
+
+    #[test]
+    fn describe_says_what_a_value_is() {
+        assert_eq!(Scalar::None.describe(), "`none`");
+        assert_eq!(Scalar::Auto.describe(), "`auto`");
+        assert_eq!(Scalar::Bool(true).describe(), "`true`");
+        assert_eq!(Scalar::Int(6).describe(), "the integer `6`");
+        assert_eq!(Scalar::Float(1.0).describe(), "the number `1.0`");
+        assert_eq!(
+            Scalar::Number("1.10".into()).describe(),
+            "the number `1.10`"
+        );
+        assert_eq!(Scalar::Text("doc-".into()).describe(), "the text \"doc-\"");
     }
 
     #[test]

@@ -785,36 +785,9 @@ fn field_value_error(
     (!well_formed).then(|| Diagnostic::InvalidFieldValue {
         field: field.to_string(),
         field_type: field_type.clone(),
-        value: describe_value(value),
+        value: diagnostic::written_value(value),
         span,
     })
-}
-
-/// A value as a reader would have written it, for a message.
-fn describe_value(value: &tomet_ast::Value) -> String {
-    use tomet_ast::Value;
-    use tomet_scalar::Scalar;
-    match value {
-        Value::Scalar(s) => match s {
-            Scalar::Text(text) | Scalar::Number(text) => text.clone(),
-            Scalar::Bool(b) => b.to_string(),
-            Scalar::Int(n) => n.to_string(),
-            Scalar::Float(n) => n.to_string(),
-            Scalar::None | Scalar::Auto => "something else".to_string(),
-        },
-        Value::Tuple(tuple) => {
-            if tuple.is_empty() {
-                "an empty tuple".to_string()
-            } else if tuple.has_no_named() {
-                "a list".to_string()
-            } else if tuple.has_no_unnamed() {
-                "a map".to_string()
-            } else {
-                "a list with named entries".to_string()
-            }
-        }
-        _ => "something else".to_string(),
-    }
 }
 
 pub fn check_dangling_anchors(doc: &File, errors: &mut Vec<Diagnostic>) {

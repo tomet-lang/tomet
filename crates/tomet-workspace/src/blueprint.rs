@@ -985,7 +985,7 @@ mod tests {
         );
         assert!(
             lines[2].ends_with(
-                ":8:4: error: type seat `<$int(default: \"x\")>`: `default`: `x` is not an integer"
+                ":8:4: error: type seat `<$int(default: \"x\")>`: `default`: the text \"x\" is not an integer"
             ),
             "{shown}"
         );

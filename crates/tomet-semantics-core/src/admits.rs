@@ -156,15 +156,7 @@ pub fn describe_tuple(tuple: &Tuple) -> &'static str {
 /// A short sentence fragment naming what `value` is, for an error sentence.
 pub fn describe_value(value: &Value) -> String {
     match value {
-        Value::Scalar(s) => match s {
-            Scalar::Text(text) => format!("`{text}`"),
-            Scalar::Bool(b) => format!("`{b}`"),
-            Scalar::Int(n) => format!("`{n}`"),
-            Scalar::Float(n) => format!("`{n}`"),
-            Scalar::None => "none".to_string(),
-            Scalar::Auto => "auto".to_string(),
-            Scalar::Number(text) => format!("`{text}`"),
-        },
+        Value::Scalar(s) => s.describe(),
         Value::Tuple(tuple) => describe_tuple(tuple).to_string(),
         Value::Call(name, _) => format!("`{name}(...)`"),
         Value::Interp(_) => "`{$ ... }`".to_string(),
@@ -333,13 +325,19 @@ mod tests {
             assert_eq!(admits_default(&t(fits)), Ok(()), "{fits}");
         }
         for (misfit, said) in [
-            ("int(default: \"three\")", "`three` is not an integer"),
+            (
+                "int(default: \"three\")",
+                "the text \"three\" is not an integer",
+            ),
             (
                 "list(string, length: 3, default: (\"a\"))",
                 "a list of 1 items is not a list of 3 items, each a string",
             ),
-            ("list(int, default: (1, \"b\"))", "`b` is not an integer"),
-            ("date(default: \"soon\")", "`soon` is not a date"),
+            (
+                "list(int, default: (1, \"b\"))",
+                "the text \"b\" is not an integer",
+            ),
+            ("date(default: \"soon\")", "the text \"soon\" is not a date"),
         ] {
             let err = admits_default(&t(misfit)).unwrap_err();
             assert!(err.to_string().starts_with(said), "{misfit}: {err}");

@@ -4,8 +4,7 @@
 //! for a named entry and the value alone for an unnamed one.
 
 use tomet_ast::{Tuple, Value};
-use tomet_scalar::Scalar;
-use tomet_spelling::{write_key, write_scalar_string};
+use tomet_spelling::{write_key, write_scalar};
 
 pub fn print_value(value: &Value) -> String {
     let mut out = String::new();
@@ -28,15 +27,7 @@ fn write_value(value: &Value, out: &mut String, top_level: bool) {
                 out.push(')');
             }
         }
-        Value::Scalar(s) => match s {
-            Scalar::Text(s) => write_scalar_string(s, out),
-            Scalar::Int(i) => out.push_str(&i.to_string()),
-            Scalar::Float(f) => write_float(*f, out),
-            Scalar::Number(text) => out.push_str(text),
-            Scalar::Bool(b) => out.push_str(if *b { "true" } else { "false" }),
-            Scalar::None => out.push_str("none"),
-            Scalar::Auto => out.push_str("auto"),
-        },
+        Value::Scalar(s) => write_scalar(s, out),
         Value::Call(name, args) => {
             out.push_str(name);
             out.push('(');
@@ -122,20 +113,4 @@ fn write_top_level_lines(tuple: &Tuple, out: &mut String) {
         out.push_str(": ");
         write_value(value, out, false);
     }
-}
-
-pub fn write_float(f: f64, out: &mut String) {
-    if f.is_nan() {
-        out.push_str("float(nan)");
-    } else if f.is_infinite() {
-        out.push_str(if f > 0.0 { "float(inf)" } else { "float(-inf)" });
-    } else {
-        out.push_str(&tomet_scalar::float_text(f));
-    }
-}
-
-pub fn float_text(f: f64) -> String {
-    let mut out = String::new();
-    write_float(f, &mut out);
-    out
 }

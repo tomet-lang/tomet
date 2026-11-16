@@ -228,7 +228,9 @@ fn test_rfc3339_with_offset_formatting() {
 fn test_none_value_rendering() {
     let rendered =
         render_value_inner_with_config(&Value::Scalar(Scalar::None), &PrinterConfig::default());
-    assert_eq!(rendered, "");
+    assert_eq!(rendered, "none");
+    // A YAML `title:` is a null: written `title: none`, which the parser reads back. A bare
+    // `title:` is "expected a value" to it.
     let md = "---\ntitle:\n---\n\n# Document\n";
     let doc = tomet_markdown::from_markdown(md);
     let cfg = PrinterConfig {
@@ -239,9 +241,10 @@ fn test_none_value_rendering() {
         ..Default::default()
     };
     let printed = document_to_tm_with_config(&doc, &cfg);
-    assert!(printed.contains("title:\n"));
+    assert!(printed.contains("title: none\n"));
     assert!(!printed.contains("title: null"));
     assert!(!printed.contains("title: \"\""));
+    tomet_ast_parser::parse_file(&printed).expect("what the printer wrote reads back");
 }
 
 #[test]

@@ -3,7 +3,19 @@ use std::fmt;
 use tomet_cst::TextRange;
 use tomet_declaration::Problem;
 use tomet_position::LineIndex;
+use tomet_semantics_core::admits::describe_tuple;
 use tomet_span::Span;
+use tomet_spelling::scalar_spelling;
+
+/// A value as a reader wrote it, to stand between backticks in a message: a scalar as the parser
+/// reads it back (`none`, `"has space"`, `1.0`), a tuple by what it is.
+pub fn written_value(value: &tomet_ast::Value) -> String {
+    match value {
+        tomet_ast::Value::Scalar(s) => scalar_spelling(s),
+        tomet_ast::Value::Tuple(tuple) => describe_tuple(tuple).to_string(),
+        _ => "something else".to_string(),
+    }
+}
 
 /// How much a [`Diagnostic`] matters.
 ///

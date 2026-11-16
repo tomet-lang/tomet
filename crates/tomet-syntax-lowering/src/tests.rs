@@ -496,6 +496,23 @@ fn dotted_declaration_heads_are_refused_with_advice() {
     }
 }
 
+/// `tomet_spelling::write_scalar` writes a float with no finite value as the call that makes it;
+/// this is the reading it is held to.
+#[test]
+fn a_float_with_no_finite_value_is_read_from_the_call_that_writes_it() {
+    use tomet_scalar::Scalar;
+    for (src, holds) in [
+        ("float(nan)", f64::is_nan as fn(f64) -> bool),
+        ("float(inf)", |f| f == f64::INFINITY),
+        ("float(-inf)", |f| f == f64::NEG_INFINITY),
+    ] {
+        let Value::Scalar(Scalar::Float(f)) = value(src).unwrap() else {
+            panic!("`{src}` is not a float");
+        };
+        assert!(holds(f), "`{src}` read as {f}");
+    }
+}
+
 #[test]
 fn positions_only_on_the_left_for_all_four_paren_kinds() {
     const WANT_ERR: &str = "a value without a name must come before the named ones";

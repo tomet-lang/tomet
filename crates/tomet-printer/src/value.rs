@@ -9,8 +9,7 @@ use crate::element::{render_element_value, render_interp, render_type_seat};
 use crate::inline::render_content_blocks;
 use tomet_ast::{Block, Declaration, Entry, Group, Tuple, Value};
 use tomet_config::{FieldConfig, PrinterConfig};
-use tomet_scalar::Scalar;
-use tomet_spelling::{key_text, scalar_text};
+use tomet_spelling::{key_text, scalar_spelling};
 use tomet_style::{ColonSpacing, GroupLayout, ValueAlignment};
 use tomet_tree::ValueExt;
 
@@ -37,10 +36,9 @@ pub(crate) fn render_nested(v: &Value, config: &PrinterConfig) -> String {
 #[deny(clippy::wildcard_enum_match_arm)]
 pub(crate) fn render_value_inner_with_config(v: &Value, config: &PrinterConfig) -> String {
     match v {
-        // A text is spelled, quoted where it has to be; every other scalar is written as it was
-        // (formatting must not turn `1.10` into `1.1`), and `none` is empty.
-        Value::Scalar(Scalar::Text(s)) => scalar_text(s),
-        Value::Scalar(s) => s.text().map(|text| text.into_owned()).unwrap_or_default(),
+        // As the parser reads it back: a text quoted where it has to be, `none` as `none`, a number
+        // as written (formatting must not turn `1.10` into `1.1`).
+        Value::Scalar(s) => scalar_spelling(s),
         Value::Tuple(tuple) => render_tuple(tuple, config),
         Value::Call(name, args) => {
             format!("{name}({})", render_args(args, config))
@@ -174,9 +172,6 @@ fn render_meta_field_value(
     field_cfg: Option<&FieldConfig>,
     config: &PrinterConfig,
 ) -> String {
-    if let Value::Scalar(Scalar::None) = v {
-        return String::new();
-    }
     if let Some(cfg) = field_cfg {
         if let Some(s) = v.as_str()
             && (cfg.format.as_deref() == Some("rfc3339")
@@ -286,6 +281,7 @@ pub(crate) fn render_meta_declaration(declaration: &Declaration, config: &Printe
 mod tests {
     use super::*;
     use tomet_ast::Group;
+    use tomet_scalar::Scalar;
 
     fn render_value_inner(v: &Value) -> String {
         render_value_inner_with_config(v, &PrinterConfig::default())
@@ -348,7 +344,11 @@ mod tests {
             render_value_inner(&Value::Scalar(Scalar::Text("has space".to_string()))),
             "\"has space\""
         );
-        assert_eq!(render_value_inner(&Value::Scalar(Scalar::None)), "");
+        assert_eq!(render_value_inner(&Value::Scalar(Scalar::None)), "none");
+        assert_eq!(
+            render_value_inner(&Value::Scalar(Scalar::Float(f64::NAN))),
+            "float(nan)"
+        );
         assert_eq!(render_value_inner(&Value::Scalar(Scalar::Auto)), "auto");
     }
 

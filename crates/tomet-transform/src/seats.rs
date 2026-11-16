@@ -551,7 +551,7 @@ mod tests {
         );
         assert_eq!(
             found[2].to_string(),
-            "type seat `<$int(default: \"three\")>`: `default`: `three` is not an integer"
+            "type seat `<$int(default: \"three\")>`: `default`: the text \"three\" is not an integer"
         );
         assert!(
             found[3]
@@ -689,7 +689,7 @@ mod tests {
             ),
             (
                 SeatReason::DefaultNotOfType(mismatch),
-                "`default`: `x` is not an integer",
+                "`default`: the text \"x\" is not an integer",
             ),
             (
                 SeatReason::NoIdForm { ty: "int".into() },
