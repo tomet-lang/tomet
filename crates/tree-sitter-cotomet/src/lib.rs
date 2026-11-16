@@ -12,16 +12,13 @@
 //!
 //! -| **A `:` ends a key only at the start of an entry.** The parser reads
 //!  | `note: see: this` as the text `see: this`, and so does the grammar; but
-//!  | in a file or a `{...}` an entry that starts `x: y` is a pair, and a bare
+//!  | in a file or a tuple an entry that starts `x: y` is a pair, and a bare
 //!  | scalar there holds a `:` only when text runs straight on after it
 //!  | (`12:30`). Entries need no separator in the grammar, where the parser
 //!  | wants a newline or a `,` (it reads the rest of the line as one scalar).
 //! -| **A bare scalar is not typed here.** `null`, `true`, `false` and a
 //!  | number are the highlight query's business, decided from the node's
 //!  | text, so the tree has one `scalar` node for all of them.
-//! -| **Call and sequence elements are values only.** `list(a: 1)` and
-//!  | `(a: 1)` are errors here as they are for the parser, but `(a: b)` reads
-//!  | as the scalar `a: b`, which the parser also does.
 //! -| **A top-level bare value is accepted.** A `.ctmt` file is `key: value`
 //!  | entries only (`cotomet_syntax::parse_file`); the grammar reads a stray
 //!  | value as the value it is.
@@ -93,13 +90,13 @@ mod tests {
             "// only a comment\n",
             "a: 1\nb: two words\nc: true, d: null\n",
             "\"tmtroot/a.tmt\": \"../a.tmt\"\n",
-            "m: { x: 1, y: { z: 2 } }\n",
-            "m: {\n  x: 1\n  y: 2\n}\n",
+            "m: ( x: 1, y: ( z: 2 ) )\n",
+            "m: (\n  x: 1\n  y: 2\n)\n",
             "l: (1, 2, 3)\n",
             "l: (\n  a,\n  b\n)\n",
             "n: ()\none: (x)\nnested: ((a), (b, c), ())\nname: string(abc)\n",
             "t: list(string)\n",
-            "m: { l: (1), n: ({ k: v }, \"s\") }\n",
+            "m: ( l: (1), n: (( k: v ), \"s\") )\n",
             "url: https://example.com/a//b\n",
             "path: ../vocab/x.tmt\nabs: /usr/bin\n",
             "k:\n  v\n",
@@ -114,6 +111,13 @@ mod tests {
                 !tree.root_node().has_error(),
                 "{src:?} -> {}",
                 tree.root_node().to_sexp()
+            );
+        }
+        for bad in ["m: { x: 1, y: 2 }\n", "m: { l: (1) }\n"] {
+            let tree = parse(bad);
+            assert!(
+                tree.root_node().has_error(),
+                "expected error for value-position braced map in cotomet: {bad:?}"
             );
         }
     }
@@ -138,11 +142,15 @@ mod tests {
         );
         assert_eq!(
             sexp("l: (a)\n"),
-            "(source_file (pair key: (key) value: (sequence (scalar (word)))))"
+            "(source_file (pair key: (key) value: (tuple (scalar (word)))))"
         );
         assert_eq!(
             sexp("l: ()\n"),
-            "(source_file (pair key: (key) value: (sequence)))"
+            "(source_file (pair key: (key) value: (tuple)))"
+        );
+        assert_eq!(
+            sexp("l: (a: 1, b)\n"),
+            "(source_file (pair key: (key) value: (tuple (pair key: (key) value: (scalar (word))) (scalar (word)))))"
         );
         // a word with nothing after it is a value, not a key
         assert_eq!(sexp("x\n"), "(source_file (scalar (word)))");

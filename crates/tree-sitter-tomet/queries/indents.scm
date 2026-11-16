@@ -14,13 +14,10 @@
 (value_group
   "}" @end) @indent
 
-(braced_map
-  "}" @end) @indent
-
 (call
   ")" @end) @indent
 
-(sequence
+(tuple
   ")" @end) @indent
 
 (unordered_list) @indent

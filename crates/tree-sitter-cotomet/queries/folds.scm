@@ -2,6 +2,6 @@
 
 [
   (map)
-  (sequence)
+  (tuple)
   (call)
 ] @fold

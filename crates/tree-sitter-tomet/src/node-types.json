@@ -4,11 +4,35 @@
     "named": true,
     "fields": {},
     "children": {
-      "multiple": false,
+      "multiple": true,
       "required": false,
       "types": [
         {
-          "type": "value",
+          "type": "call",
+          "named": true
+        },
+        {
+          "type": "interpolation",
+          "named": true
+        },
+        {
+          "type": "map_entry",
+          "named": true
+        },
+        {
+          "type": "scalar",
+          "named": true
+        },
+        {
+          "type": "string",
+          "named": true
+        },
+        {
+          "type": "tuple",
+          "named": true
+        },
+        {
+          "type": "type_seat",
           "named": true
         }
       ]
@@ -34,21 +58,6 @@
     }
   },
   {
-    "type": "braced_map",
-    "named": true,
-    "fields": {},
-    "children": {
-      "multiple": false,
-      "required": false,
-      "types": [
-        {
-          "type": "map",
-          "named": true
-        }
-      ]
-    }
-  },
-  {
     "type": "call",
     "named": true,
     "fields": {
@@ -68,10 +77,6 @@
       "required": false,
       "types": [
         {
-          "type": "braced_map",
-          "named": true
-        },
-        {
           "type": "call",
           "named": true
         },
@@ -80,15 +85,19 @@
           "named": true
         },
         {
+          "type": "map_entry",
+          "named": true
+        },
+        {
           "type": "scalar",
           "named": true
         },
         {
-          "type": "sequence",
+          "type": "string",
           "named": true
         },
         {
-          "type": "string",
+          "type": "tuple",
           "named": true
         },
         {
@@ -1421,10 +1430,6 @@
         "required": false,
         "types": [
           {
-            "type": "braced_map",
-            "named": true
-          },
-          {
             "type": "call",
             "named": true
           },
@@ -1437,11 +1442,11 @@
             "named": true
           },
           {
-            "type": "sequence",
+            "type": "string",
             "named": true
           },
           {
-            "type": "string",
+            "type": "tuple",
             "named": true
           },
           {
@@ -1835,45 +1840,6 @@
     "fields": {}
   },
   {
-    "type": "sequence",
-    "named": true,
-    "fields": {},
-    "children": {
-      "multiple": true,
-      "required": false,
-      "types": [
-        {
-          "type": "braced_map",
-          "named": true
-        },
-        {
-          "type": "call",
-          "named": true
-        },
-        {
-          "type": "interpolation",
-          "named": true
-        },
-        {
-          "type": "scalar",
-          "named": true
-        },
-        {
-          "type": "sequence",
-          "named": true
-        },
-        {
-          "type": "string",
-          "named": true
-        },
-        {
-          "type": "type_seat",
-          "named": true
-        }
-      ]
-    }
-  },
-  {
     "type": "strikeout",
     "named": true,
     "fields": {},
@@ -2083,6 +2049,45 @@
           }
         ]
       }
+    }
+  },
+  {
+    "type": "tuple",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "call",
+          "named": true
+        },
+        {
+          "type": "interpolation",
+          "named": true
+        },
+        {
+          "type": "map_entry",
+          "named": true
+        },
+        {
+          "type": "scalar",
+          "named": true
+        },
+        {
+          "type": "string",
+          "named": true
+        },
+        {
+          "type": "tuple",
+          "named": true
+        },
+        {
+          "type": "type_seat",
+          "named": true
+        }
+      ]
     }
   },
   {

@@ -12,10 +12,6 @@
           "named": true
         },
         {
-          "type": "map",
-          "named": true
-        },
-        {
           "type": "pair",
           "named": true
         },
@@ -24,11 +20,11 @@
           "named": true
         },
         {
-          "type": "sequence",
+          "type": "string",
           "named": true
         },
         {
-          "type": "string",
+          "type": "tuple",
           "named": true
         }
       ]
@@ -58,7 +54,7 @@
           "named": true
         },
         {
-          "type": "map",
+          "type": "pair",
           "named": true
         },
         {
@@ -66,11 +62,11 @@
           "named": true
         },
         {
-          "type": "sequence",
+          "type": "string",
           "named": true
         },
         {
-          "type": "string",
+          "type": "tuple",
           "named": true
         }
       ]
@@ -129,10 +125,6 @@
           "named": true
         },
         {
-          "type": "map",
-          "named": true
-        },
-        {
           "type": "pair",
           "named": true
         },
@@ -141,11 +133,11 @@
           "named": true
         },
         {
-          "type": "sequence",
+          "type": "string",
           "named": true
         },
         {
-          "type": "string",
+          "type": "tuple",
           "named": true
         }
       ]
@@ -178,19 +170,15 @@
             "named": true
           },
           {
-            "type": "map",
-            "named": true
-          },
-          {
             "type": "scalar",
             "named": true
           },
           {
-            "type": "sequence",
+            "type": "string",
             "named": true
           },
           {
-            "type": "string",
+            "type": "tuple",
             "named": true
           }
         ]
@@ -228,37 +216,6 @@
     }
   },
   {
-    "type": "sequence",
-    "named": true,
-    "fields": {},
-    "children": {
-      "multiple": true,
-      "required": false,
-      "types": [
-        {
-          "type": "call",
-          "named": true
-        },
-        {
-          "type": "map",
-          "named": true
-        },
-        {
-          "type": "scalar",
-          "named": true
-        },
-        {
-          "type": "sequence",
-          "named": true
-        },
-        {
-          "type": "string",
-          "named": true
-        }
-      ]
-    }
-  },
-  {
     "type": "source_file",
     "named": true,
     "root": true,
@@ -276,10 +233,6 @@
           "named": true
         },
         {
-          "type": "map",
-          "named": true
-        },
-        {
           "type": "pair",
           "named": true
         },
@@ -288,11 +241,11 @@
           "named": true
         },
         {
-          "type": "sequence",
+          "type": "string",
           "named": true
         },
         {
-          "type": "string",
+          "type": "tuple",
           "named": true
         }
       ]
@@ -308,6 +261,37 @@
       "types": [
         {
           "type": "escape_sequence",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "tuple",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "call",
+          "named": true
+        },
+        {
+          "type": "pair",
+          "named": true
+        },
+        {
+          "type": "scalar",
+          "named": true
+        },
+        {
+          "type": "string",
+          "named": true
+        },
+        {
+          "type": "tuple",
           "named": true
         }
       ]

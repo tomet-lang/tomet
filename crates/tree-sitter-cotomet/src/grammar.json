@@ -204,11 +204,7 @@
         },
         {
           "type": "SYMBOL",
-          "name": "map"
-        },
-        {
-          "type": "SYMBOL",
-          "name": "sequence"
+          "name": "tuple"
         },
         {
           "type": "SYMBOL",
@@ -229,11 +225,7 @@
         },
         {
           "type": "SYMBOL",
-          "name": "map"
-        },
-        {
-          "type": "SYMBOL",
-          "name": "sequence"
+          "name": "tuple"
         },
         {
           "type": "SYMBOL",
@@ -250,7 +242,7 @@
         }
       ]
     },
-    "sequence": {
+    "tuple": {
       "type": "SEQ",
       "members": [
         {
@@ -264,7 +256,11 @@
             "members": [
               {
                 "type": "SYMBOL",
-                "name": "_value"
+                "name": "pair"
+              },
+              {
+                "type": "SYMBOL",
+                "name": "_bare_value"
               },
               {
                 "type": "STRING",
@@ -333,7 +329,11 @@
             "members": [
               {
                 "type": "SYMBOL",
-                "name": "_value"
+                "name": "pair"
+              },
+              {
+                "type": "SYMBOL",
+                "name": "_bare_value"
               },
               {
                 "type": "STRING",

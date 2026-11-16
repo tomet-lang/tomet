@@ -113,17 +113,6 @@
 //!  | `tomet-parser` reads left to right and takes the first (a `---` that
 //!  | closes a break never opens the next one). Not an `ERROR`. Pinned by
 //!  | `consecutive_pipe_form_breaks_pair_up_the_other_way_round`.
-//! -| **A bare call or sequence occupying the *whole* `(args)`/`{value}`
-//!  | doesn't parse, unlike the same value under a named key (`a: (b, c)`,
-//!  | `a: list(string)`, which work fine).** `@id(list(a, b))` and
-//!  | `::meta((a, b))` both land in an `ERROR` even with `$.call` as an
-//!  | alternative to `args_group`/`value_group`'s shared `value` rule -- that
-//!  | changes nothing: whatever conflicts an
-//!  | identifier-then-`(` at that exact position with, it isn't decided by
-//!  | `value`'s own alternatives. Not root-caused. `tomet-parser` accepts
-//!  | both (`lower_single_value_from_children` reads a lone call or `(...)`
-//!  | before its scalar fallback); `$.sequence` is reached through
-//!  | `_entry_value` only, so a named key is the form this grammar covers.
 //!
 //! `scanner.c` (see its own module doc) makes a bare, colon-less,
 //! identifier-shaped scalar directly inside `(...)`/`{...}` (e.g. a bare
@@ -132,27 +121,26 @@
 //! `scalar` wherever a value stands.
 //!
 //! `_value_scalar`'s regex (see its own comment in `grammar.js`) keeps a
-//! `key: (...)` map entry (e.g. `tags: (a, b)`) from being GLR-merged
+//! `key: (...)` tuple entry (e.g. `tags: (a, b)`) from being GLR-merged
 //! with a second, spurious top-level reading of the same text, which
-//! would wrap the whole map in an `ERROR` -- not just when that entry is
-//! last in the map with no trailing comma, but for an earlier, non-last
-//! `key: (...)` entry too. The regex excludes space/tab from its
-//! character class: otherwise it could match a lone leading space
-//! (between `:` and the value) as a complete one-character token in its
-//! own right, and tree-sitter's lexer would take that real, if useless,
-//! token match over skipping the space as `extras` first -- the same
-//! class of bug `SCALAR`/`LIST_MARKER_GAP` exist to route around.
+//! would wrap the whole tuple in an `ERROR` -- not just when that entry is
+//! last with no trailing comma, but for an earlier, non-last entry too.
+//! The regex excludes space/tab from its character class: otherwise it
+//! could match a lone leading space (between `:` and the value) as a
+//! complete one-character token in its own right, and tree-sitter's lexer
+//! would take that real, if useless, token match over skipping the space
+//! as `extras` first -- the same class of bug `SCALAR`/`LIST_MARKER_GAP`
+//! exist to route around.
 //!
-//! `conflicts: [$.map, $.children]` (both declared with no `prec.right`
-//! of their own) resolves another ambiguity: a bare newline right before
-//! a `map`/`children`-holding group's `}`/`)`, with nothing else after
-//! it, is genuinely ambiguous with only one token of lookahead ("is this
-//! newline the start of another entry, or the group's own trailing
-//! gap?"), and always guessing "another entry" is a dead end whenever
-//! nothing valid actually follows. GLR tries both and keeps whichever one
-//! doesn't dead-end. `-` vs `punctuation` is handled the same class of
-//! way: `punctuation`'s `-` (see its own comment in `grammar.js`) is the
-//! exact same shared token as the list markers', not a second, competing
+//! `conflicts: [$._tuple_items, $._entry_sep, $.map, $.children]` resolves
+//! another ambiguity: a bare newline right before a group's `}`/`)`, with
+//! nothing else after it, is genuinely ambiguous with only one token of
+//! lookahead ("is this newline the start of another entry, or the group's
+//! own trailing gap?"), and always guessing "another entry" is a dead end
+//! whenever nothing valid actually follows. GLR tries both and keeps
+//! whichever one doesn't dead-end. `-` vs `punctuation` is handled the
+//! same class of way: `punctuation`'s `-` (see its own comment in `grammar.js`)
+//! is the exact same shared token as the list markers', not a second, competing
 //! definition that would always win tree-sitter's lexer-level tie
 //! regardless of what (if anything) validly followed.
 //!
@@ -448,7 +436,7 @@ mod tests {
                 vec!["identifier", "string"],
             ),
             ("@x(\"a/b\": 1, c: 2)\n", vec!["string", "identifier"]),
-            ("@x(){ k: { \"c d\": 3 } }\n", vec!["identifier", "string"]),
+            ("@x(){ k: (\"c d\": 3) }\n", vec!["identifier", "string"]),
         ] {
             let tree = parse(src);
             let root = tree.root_node();
@@ -539,16 +527,10 @@ mod tests {
             "=[ Title ]::{ id: intro, tag: main }\n",
             "@task[ Task A ]::{ id: taskA, priority: high }\n",
             "@id(taskA)::{ priority: high, tag: dev }\n",
-            // A bare positional `(...)` occupying the whole `(args)`
-            // value -- as opposed to `a: (...)` under a named key,
-            // which already works (see `parses_sequence_syntax_in_values`)
-            // -- doesn't reach `sequence` in this grammar yet
-            // (`args_group`'s own `value` rule, unlike `_entry_value`,
-            // still trips over it). Genuine `tomet-parser` syntax, not
-            // covered here: named-key form exercises the same
-            // sequence + colon-connect interaction without hitting
-            // that gap.
+            // A tuple under a named key, and a tuple that is the whole
+            // `(args)`: both are the one container.
             "@id(ids: (taskA, taskB))::{ tag: house }\n",
+            "@id((taskA, taskB))::{ tag: house }\n",
         ] {
             let tree = parse(src);
             assert!(
@@ -670,14 +652,16 @@ mod tests {
     /// short, high-priority identifier match preempt `_value_scalar`'s otherwise-longer match
     /// for the same text. See `call`'s own comment in `grammar.js`.
     #[test]
-    fn parses_sequence_syntax_in_values() {
+    fn parses_tuple_syntax_in_values() {
         for src in [
             "@x(a: ())\n",
             "@x(a: (card))\n",
             "@x(a: (card, ns.mycard))\n",
             "@x(a: (b, (c)))\n",
             "@x(a: ((b), (c, d), ()))\n",
-            "@x(a: ({ k: 1 }, \"s\", 2))\n",
+            "@x(a: ((k: 1), \"s\", 2))\n",
+            "@x(a: (w: 10, h: 20))\n",
+            "@x(a: (a, b, sep: \",\"))\n",
             "::workspace(ignore: (\"a\", \"b\"), unswept: (\"c\"))\n",
         ] {
             let tree = parse(src);
@@ -688,12 +672,21 @@ mod tests {
                 root.to_sexp()
             );
             assert!(
-                tree_contains_kind(root, "sequence"),
-                "expected a sequence node for {src:?}"
+                tree_contains_kind(root, "tuple"),
+                "expected a tuple node for {src:?}"
             );
             assert!(
                 !tree_contains_kind(root, "call"),
                 "a bare `(...)` is not a call for {src:?}"
+            );
+        }
+
+        // A braced map at value position is an error now.
+        for bad in ["@x(a: { k: 1 })\n", "@x(a: ({ k: 1 }, \"s\", 2))\n"] {
+            let tree = parse(bad);
+            assert!(
+                tree.root_node().has_error(),
+                "expected error for value-position braced map {bad:?}"
             );
         }
     }
@@ -1160,9 +1153,15 @@ mod tests {
     }
 
     #[test]
-    fn parses_colon_less_braced_maps() {
-        let src = "::settings() {\n  elements {\n    bookmark {\n      title: { type: string }\n    }\n  }\n}\n";
-        let tree = parse(src);
+    fn a_value_braced_map_is_an_error_and_the_tuple_parses() {
+        // Value-position braced map and colon-less map entries are an error now.
+        let bad = "::settings() {\n  elements {\n    bookmark {\n      title: { type: string }\n    }\n  }\n}\n";
+        let tree = parse(bad);
+        assert!(tree.root_node().has_error());
+
+        // The unified tuple container parses cleanly.
+        let tuple_src = "::settings(\n  elements: (\n    bookmark: (\n      title: (type: string)\n    )\n  )\n)\n";
+        let tree = parse(tuple_src);
         assert!(!tree.root_node().has_error());
     }
 
@@ -1452,7 +1451,7 @@ mod tests {
             ("*em <$int>* **strong <$int>** ~~gone <$int>~~\n", 3),
             ("@a[ <$int> ]\n@b[ x\n<$int>\ny ]\n", 2),
             ("<?(h)>[ <$int> ]\n", 1),
-            // A value: the whole `(args)`, a pair, a sequence, a `{value}`.
+            // A value: the whole `(args)`, a pair, a tuple, a `{value}`.
             ("::id(<$uuid(default: auto)>)\n", 1),
             ("@x(<$int>)\n", 1),
             ("@x(key: <$string>)\n", 1),

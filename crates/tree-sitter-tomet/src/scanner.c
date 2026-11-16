@@ -307,10 +307,8 @@ bool tree_sitter_tomet_external_scanner_scan(void *payload, TSLexer *lexer,
   // a value is. Without this the `$` or `$name` alone would be taken as the
   // scalar and the `(...)` after it read as a group. (`{$ expr }` starts with
   // the `{`, which is a scalar terminator already.)
-  bool after_dollar = false;
   if (lexer->lookahead == '$') {
     lexer->advance(lexer, false);
-    after_dollar = true;
     if (lexer->lookahead == '(') {
       return false;
     }
@@ -327,16 +325,12 @@ bool tree_sitter_tomet_external_scanner_scan(void *payload, TSLexer *lexer,
     while (is_ident_continue(lexer->lookahead)) {
       lexer->advance(lexer, false);
     }
-    if (after_dollar && lexer->lookahead == '(') {
+    // `name(` is a call, whose callee the grammar reads as an `identifier`
+    // (`call`), not the start of a scalar.
+    if (lexer->lookahead == '(') {
       return false;
     }
     if (lexer->lookahead == ':') {
-      return false;
-    }
-    while (lexer->lookahead == ' ' || lexer->lookahead == '\t') {
-      lexer->advance(lexer, false);
-    }
-    if (lexer->lookahead == '{') {
       return false;
     }
   }

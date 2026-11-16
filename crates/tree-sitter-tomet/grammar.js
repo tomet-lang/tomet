@@ -48,6 +48,11 @@ module.exports = grammar({
   // grammar's phrasing).
   conflicts: ($) => [
     [$.section],
+    // After an entry, a `,` is either the separator before another entry
+    // or a trailing comma before the `)`; the token after the `,` says
+    // which, and one token of lookahead cannot see it yet.
+    [$._tuple_items],
+    [$._entry_sep, $._tuple_items],
     [$.map],
     [$.children],
     // `(a)` is a group or the start of `(a) => ...`; only the `=>` after the
@@ -854,7 +859,7 @@ module.exports = grammar({
     args_group: ($) =>
       seq(
         token(prec(1, "(")),
-        optional(seq(optional($._blank_gap), $.value)),
+        optional($._tuple_items),
         optional($._blank_gap),
         ")",
       ),
@@ -1070,105 +1075,60 @@ module.exports = grammar({
     // YAML costs the entire surrounding block's highlighting.
     map_entry: ($) =>
       seq(
-        field(
-          "key",
-          choice(
-            alias(token(prec(1, /[A-Za-z_][A-Za-z0-9_.-]*/)), $.identifier),
-            $.string,
-          ),
-        ),
-        choice(
-          seq(":", optional(field("value", $._entry_value))),
-          field("value", $.braced_map),
-        ),
+        field("key", choice($.identifier, $.string)),
+        ":",
+        optional(field("value", $._entry_value)),
       ),
-    // `$._element_name` is also listed bare (not just inside `$.call`):
-    // once its token wins the lexer's length-tie against
-    // `_value_scalar` for an identifier-shaped word (see `call`'s own
-    // comment), the *only* thing that could reduce it at all -- with
-    // no `(` following -- has to be a plain, paren-less value alias
-    // living at this same choice, or an ordinary bare word (`variant:
-    // info`) turns into a dead end instead of a scalar. Aliased to
-    // `$.scalar`, the same node `_value_scalar` already produces, so
-    // this is invisible in the tree either way.
-    // `name(arg, arg, ...)` -- an immediately-resolved literal
-    // (`string(a)`) or a type (`list(string)`), mirroring
-    // `tomet_ast::Value::Call`. A sequence is not a call: see `sequence`.
-    // Deliberately a *plain*, unprecedented regex -- not `_element_name`
-    // (which is `token(prec(1, ...))`, aliased to `$.identifier`, this
-    // grammar's declared `word` token) and not wrapped in `token(prec(...))`
-    // itself. Both were tried and both broke a real, pre-existing case:
-    // `url:https://example.com` -- `_value_scalar`'s colon-inclusive
-    // regex matches the whole scheme URI, strictly longer than the
-    // bare word `https` a precedence-boosted (or `word`-aliased)
-    // callee token would match up to its `:` -- and longest match is
-    // supposed to always win regardless of precedence, but empirically
-    // did not once either of those was in play (suspected interaction
-    // with tree-sitter's `word`/keyword-extraction fast path, not
-    // fully root-caused -- this plain-token form is the confirmed
-    // workaround, not a chosen design). Confirmed clean now: a bare
-    // scheme URI still parses as one scalar, and `list(string)` still
-    // reaches this rule -- see this crate's own tests and
-    // `.agents/tasks/rule-connect-mvp.md` for what was actually tried.
-    //
-    // Reuses no shared name-token at all for the same reason; matches
-    // `_element_name`'s *pattern* (an ASCII identifier, optionally
-    // `.`-separated) without matching its *token*, since sharing the
-    // token is what caused the regression above.
+    // `name(arg, ...)`: the callee is the ordinary `identifier` token. It
+    // is not taken for a scalar because the external `SCALAR` token
+    // (`scanner.c`) declines an identifier-shaped run that `(` follows
+    // directly, and one that `:` follows (a key), so both reach the
+    // grammar's own rules instead.
     call: ($) =>
       seq(
-        field(
-          "name",
-          alias(
-            /[A-Za-z_][A-Za-z0-9_-]*(\.[A-Za-z_][A-Za-z0-9_-]*)*/,
-            $.identifier,
-          ),
-        ),
+        field("name", $.identifier),
         "(",
-        optional(seq($._entry_value, repeat(seq(",", $._entry_value)))),
+        optional($._tuple_items),
+        optional($._blank_gap),
         ")",
       ),
-    // `_entry_value`'s own plain-word fallback: once `call`'s callee
-    // token is a live alternative here, an argument or value that is
-    // just a bare word with nothing following it (`variant: info`,
-    // or `list(card)`'s own `card`) needs *something* to reduce to,
-    // or it dead-ends instead of becoming a scalar -- aliased to
-    // `$.scalar`, the same node `_value_scalar` already produces, so
-    // this is invisible in the tree either way. Whether a bare word is
-    // read as *this* or as the start of `call` is then an ordinary,
-    // unambiguous one-token-lookahead decision: shift `(` to continue
-    // into a call, or reduce on anything else.
-    // `(a, b)` -- a bare `(` where a value goes is a sequence
-    // (`tomet_ast::Value::Seq`): a value has no infix arithmetic, so no
-    // parenthesis there can group anything. `()` is empty and `(x)` has
-    // one element. Its elements are values, never `key: value` entries.
-    sequence: ($) =>
+    // `(a, b)` / `(k: v)` / `(a, k: v)` -- a tuple, the one container
+    // of the language (`tomet_ast::Value::Tuple`). `()` is empty and
+    // `(x)` has one entry. Holds named entries (`map_entry`) and unnamed
+    // values uniformly.
+    tuple: ($) =>
       seq(
         "(",
-        optional(seq($._entry_value, repeat(seq(",", $._entry_value)))),
+        optional($._tuple_items),
+        optional($._blank_gap),
         ")",
       ),
-    // `[a, b]` (a `$.seq` rule) used to be a third alternative here.
-    // Retired in `tomet-parser`: `[`/`]` already mean `[content]` at
-    // the element level, and `(a, b)` (`$.sequence`) is the sole
-    // list-value spelling.
+    _tuple_items: ($) =>
+      seq(
+        optional($._blank_gap),
+        $._tuple_entry,
+        repeat(seq($._entry_sep, $._tuple_entry)),
+        optional(seq(",", optional($._blank_gap))),
+      ),
+    _tuple_entry: ($) => choice($.map_entry, $._unnamed_entry),
+    _unnamed_entry: ($) =>
+      choice(
+        $.call,
+        $.tuple,
+        $.string,
+        $.type_seat,
+        $.interpolation,
+        $.scalar,
+      ),
     _entry_value: ($) =>
       choice(
         $.call,
-        $.sequence,
+        $.tuple,
         $.string,
-        $.braced_map,
         $.type_seat,
         $.interpolation,
         $._value_scalar,
-        alias(/[A-Za-z_][A-Za-z0-9_-]*(\.[A-Za-z_][A-Za-z0-9_-]*)*/, $.scalar),
-      ),
-    braced_map: ($) =>
-      seq(
-        token(prec(1, "{")),
-        optional(seq(optional($._blank_gap), $.map)),
-        optional($._blank_gap),
-        "}",
+        alias($.identifier, $.scalar),
       ),
     string: (_$) => choice(/"([^"\\]|\\.)*"/, /'[^'\n]*'/),
     // The literal `[` in `_value_scalar`/`scalar`'s classes below (and
@@ -1182,7 +1142,7 @@ module.exports = grammar({
     // regenerating for `line_comment`/`block_comment` below required
     // running that command against the pre-existing rules too.
     // Colon-inclusive raw scalar text (numbers, bools, urls, paths, ...)
-    // -- used for actual *value* positions (`_entry_value`, sequence
+    // -- used for actual *value* positions (`_entry_value`, tuple
     // items), where colons are common and never mean "this starts a
     // nested key". Aliased to the same visible `scalar` node type as
     // the top-level one below.

@@ -4,16 +4,15 @@
 // `tomet-tests` package) for how drift from the parser is caught.
 //
 // A standalone cotomet file (`.ctmt`) is `key: value` lines. Entries end at a
-// newline or a `,`; a value is a quoted string, a `{...}` map, a `(...)`
-// sequence, a `name(...)` call (`list(string)` among them), or a bare scalar, which may hold spaces
+// newline or a `,`; a value is a quoted string, a `(...)`
+// tuple, a `name(...)` call (`list(string)` among them), or a bare scalar, which may hold spaces
 // (`hello world`) and stops at a `,` `)` `}` or a `//` comment.
 //
 // A file may open with declarations about itself: `::name`, then `(args)`
 // and optionally a `{map}`, on one line (`::kind(catalog, 2)`,
 // `::meta(title: "x")`). The `(args)` are required, even when empty
-// (`::meta()`); a `{map}` alone (`::meta{ a: 1 }`) is not a declaration. The
-// parser wants them before the first entry; the grammar accepts one wherever
-// an entry may stand.
+// (`::meta()`). The parser wants them before the first entry; the grammar
+// accepts one wherever an entry may stand.
 //
 // A key and the first word of a bare scalar are the same token (`word`), and
 // the token after it says which it was: `:` makes it a key, `(` a callee.
@@ -83,35 +82,34 @@ module.exports = grammar({
         field("value", $._value),
       ),
 
-    // A value after a `:` or inside a call's parentheses: its scalar may
+    // A value after a `:`: its scalar may
     // hold a `:` of its own (`note: see: this`, as the parser reads it).
-    _value: ($) => choice($.string, $.map, $.sequence, $.call, $.scalar),
+    _value: ($) => choice($.string, $.tuple, $.call, $.scalar),
 
-    // A value where an entry could start instead, in a file or a `{...}`.
+    // A value where an entry could start instead, in a file or inside a tuple.
     // There the first word and the `:` after it make a key, so a bare
     // scalar holds no `:` of its own.
     _bare_value: ($) =>
       choice(
         $.string,
-        $.map,
-        $.sequence,
+        $.tuple,
         $.call,
         alias($._bare_scalar, $.scalar),
       ),
 
-    // `(a, b)`: a `(` where a value goes. `()` is empty, `(x)` has one
-    // element. Elements may run over several lines.
-    sequence: ($) => seq("(", repeat(choice($._value, ",", $._newline)), ")"),
+    // `(a, b)` / `(k: v)`: a tuple, the one container of the language.
+    // Holds named and unnamed entries.
+    tuple: ($) => seq("(", repeat(choice($.pair, $._bare_value, ",", $._newline)), ")"),
 
     map: ($) => seq("{", repeat($._item), "}"),
 
     // `name(arg, ...)`, the `(` right after the name. Arguments may
-    // run over several lines.
+    // run over several lines and hold named and unnamed entries.
     call: ($) =>
       seq(
         field("function", alias($.word, $.name)),
         token.immediate("("),
-        repeat(choice($._value, ",", $._newline)),
+        repeat(choice($.pair, $._bare_value, ",", $._newline)),
         ")",
       ),
 

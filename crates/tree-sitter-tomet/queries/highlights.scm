@@ -100,8 +100,8 @@
 ; `(args)`/`[content]`/`{value}` group delimiters.
 (args_group "(" @punctuation.bracket)
 (args_group ")" @punctuation.bracket)
-(sequence "(" @punctuation.bracket)
-(sequence ")" @punctuation.bracket)
+(tuple "(" @punctuation.bracket)
+(tuple ")" @punctuation.bracket)
 (content_group "[" @punctuation.bracket)
 (content_group "]" @punctuation.bracket)
 (content_group) @variable.parameter @variable.other

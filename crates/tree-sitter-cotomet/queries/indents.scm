@@ -1,10 +1,10 @@
-; Indent hints for cotomet: a `{...}` map, and a `(...)` sequence or a
+; Indent hints for cotomet: a `{...}` map, and a `(...)` tuple or a
 ; `name(...)` call that runs over several lines.
 
 (map
   "}" @end) @indent
 
-(sequence
+(tuple
   ")" @end) @indent
 
 (call
