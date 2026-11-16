@@ -3,6 +3,14 @@
 //! When a document is exported in a given format, links and embeds pointing to
 //! a document via `tmt:` (including the document itself) are rewritten to point at
 //! the target's output file, relative to the directory of the output file being exported.
+//!
+//! When a target document is not exported in the format being rendered, but the document
+//! being exported has a destination file that lies within the vault root, the link points
+//! at the target's source file, as a path relative to the directory of the document's output file.
+//! In every other case (output goes to stdout, destination lies outside the vault root,
+//! or the target does not exist as a file), the target remains as written.
+
+use std::borrow::Cow;
 
 use tomet_ast::File;
 use tomet_tree::for_each_element_mut;
@@ -10,33 +18,78 @@ use tomet_tree::for_each_element_mut;
 use crate::elements::target::link_target_of;
 use crate::rebase::{directory, relative_to, set_target};
 
+/// The export destination of the document whose links are being rewritten.
+///
+/// The variant names describe where the destination lies (inside or outside the vault root,
+/// or stdout). The paths of the destination, of target documents and of target source files
+/// must be in the same form (both relative to the same base, or all absolute); the function
+/// does not check this.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ExportDestination<'a> {
+    /// The document is exported to a destination file inside the vault root.
+    InsideVault(Cow<'a, str>),
+    /// The document is exported to a destination file outside the vault root
+    /// (e.g. `--out` to an external directory where vault layout cannot be assumed).
+    OutsideVault(Cow<'a, str>),
+    /// The document has no destination file (output goes to stdout).
+    Stdout,
+}
+
+/// What a target document resolves to for export link rewriting.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ExportTarget<S> {
+    /// The target document is exported in this format to the given destination path.
+    Exported(S),
+    /// The target document exists as a source file at the given path,
+    /// but is not exported in this format in this run.
+    Source(S),
+}
+
 /// Rewrites `tmt:` links in `doc` for an export to `current_dest`.
 ///
 /// Every link or embed target of the form `tmt:<vault-path>[#anchor]` pointing to
-/// a document (including a link naming the document itself) is rewritten using `lookup`.
+/// a document (including a link naming the document itself) is resolved using `lookup`.
 ///
-/// If `lookup(vault_path)` returns `Some(target_dest)`:
-/// - The target points at that output file, as a path relative to the directory of
+/// The variant names of `current_dest` describe where the destination lies. The paths
+/// of the destination, of target documents and of target source files must be in the same
+/// form (both relative to the same base, or all absolute); this function does not check this.
+///
+/// If `lookup(vault_path)` returns `Some(target_info)`:
+/// - If `target_info` is [`ExportTarget::Exported`]`(target_dest)`:
+///   The target points at that output file, as a path relative to the directory of
 ///   `current_dest`, with `/` separators. In particular, a link pointing to the document's
 ///   own vault path is rewritten to its own file name relative to its output directory.
+/// - If `target_info` is [`ExportTarget::Source`]`(source_path)`:
+///   When the document being exported has a destination file that lies inside the vault root
+///   ([`ExportDestination::InsideVault`]), the link points at the target's source file,
+///   as a path relative to the directory of the document's output file.
+///   When the document goes to stdout ([`ExportDestination::Stdout`]) or its destination
+///   lies outside the vault root ([`ExportDestination::OutsideVault`]), the target stays
+///   as written.
 /// - Any `#anchor` fragment is kept verbatim as written (heading-slug rules are not applied).
 ///
-/// If `lookup(vault_path)` returns `None` (for instance, when the target is not exported in
-/// this format or goes to stdout):
+/// If `lookup(vault_path)` returns `None` (for instance, when the target file does not
+/// exist on disk in the vault):
 /// - The target stays as it was (the vault-relative source path).
 ///
 /// Targets pointing inside the document via the empty-path form `tmt:#id`, `id:` and `ref:`
 /// targets, `file:`, `https:` and plain relative paths (`./`, `../`) are not touched.
 pub fn rewrite_export_links<F, S>(
     doc: &mut File,
-    current_dest: &str,
+    current_dest: ExportDestination<'_>,
     lookup: F,
 ) where
-    F: Fn(&str) -> Option<S>,
+    F: Fn(&str) -> Option<ExportTarget<S>>,
     S: AsRef<str>,
 {
-    let norm_dest = current_dest.replace('\\', "/");
-    let from_dir = directory(&norm_dest);
+    let (dest_path, is_inside_vault) = match &current_dest {
+        ExportDestination::InsideVault(p) => (Some(p.as_ref()), true),
+        ExportDestination::OutsideVault(p) => (Some(p.as_ref()), false),
+        ExportDestination::Stdout => (None, false),
+    };
+
+    let norm_dest = dest_path.map(|p| p.replace('\\', "/"));
+    let from_dir = norm_dest.as_deref().map(directory);
 
     for_each_element_mut(doc, |element| {
         let Some((_, target)) = link_target_of(element.as_view()) else {
@@ -58,18 +111,35 @@ pub fn rewrite_export_links<F, S>(
             return;
         }
 
-        // Look up the target document's exported destination; if unexported, leave the link as written.
-        let Some(target_dest) = lookup(bare_path) else {
+        // Look up the target document; if it does not exist as a file, leave as written.
+        let Some(target_info) = lookup(bare_path) else {
             return;
         };
 
-        let norm_target = target_dest.as_ref().replace('\\', "/");
-        let to_parts: Vec<&str> = norm_target
-            .split('/')
-            .filter(|p| !p.is_empty() && *p != ".")
-            .collect();
-        let rel = relative_to(&from_dir, &to_parts);
-        set_target(element, format!("{rel}{anchor}"));
+        let rebase = |from: &[&str], to_str: &str| {
+            let norm_to = to_str.replace('\\', "/");
+            let to_parts: Vec<&str> = norm_to
+                .split('/')
+                .filter(|p| !p.is_empty() && *p != ".")
+                .collect();
+            let rel = relative_to(from, &to_parts);
+            format!("{rel}{anchor}")
+        };
+
+        match target_info {
+            ExportTarget::Exported(target_dest) => {
+                if let Some(from) = &from_dir {
+                    set_target(element, rebase(from, target_dest.as_ref()));
+                }
+            }
+            ExportTarget::Source(source_path) => {
+                if is_inside_vault
+                    && let Some(from) = &from_dir
+                {
+                    set_target(element, rebase(from, source_path.as_ref()));
+                }
+            }
+        }
     });
 }
 
@@ -94,9 +164,9 @@ mod tests {
         let mut doc = tomet_ast_parser::parse_file(src).unwrap();
         rewrite_export_links(
             &mut doc,
-            "out/README.md",
+            ExportDestination::InsideVault("out/README.md".into()),
             |path| match path {
-                "locales/ja/readme.tmt" => Some("out/README.ja.md"),
+                "locales/ja/readme.tmt" => Some(ExportTarget::Exported("out/README.ja.md")),
                 _ => None,
             },
         );
@@ -111,8 +181,8 @@ mod tests {
         let mut doc_same = tomet_ast_parser::parse_file(src_same).unwrap();
         rewrite_export_links(
             &mut doc_same,
-            "out/README.md",
-            |_| Some("out/README.ja.md"),
+            ExportDestination::InsideVault("out/README.md".into()),
+            |_| Some(ExportTarget::Exported("out/README.ja.md")),
         );
         assert_eq!(extract_targets(&doc_same), vec!["README.ja.md"]);
 
@@ -121,8 +191,8 @@ mod tests {
         let mut doc_sub = tomet_ast_parser::parse_file(src_sub).unwrap();
         rewrite_export_links(
             &mut doc_sub,
-            "out/README.md",
-            |_| Some("out/sub/guide.md"),
+            ExportDestination::InsideVault("out/README.md".into()),
+            |_| Some(ExportTarget::Exported("out/sub/guide.md")),
         );
         assert_eq!(extract_targets(&doc_sub), vec!["sub/guide.md"]);
 
@@ -131,8 +201,8 @@ mod tests {
         let mut doc_parent = tomet_ast_parser::parse_file(src_parent).unwrap();
         rewrite_export_links(
             &mut doc_parent,
-            "out/docs/note.md",
-            |_| Some("out/README.md"),
+            ExportDestination::InsideVault("out/docs/note.md".into()),
+            |_| Some(ExportTarget::Exported("out/README.md")),
         );
         assert_eq!(extract_targets(&doc_parent), vec!["../README.md"]);
     }
@@ -145,9 +215,9 @@ mod tests {
         let mut doc = tomet_ast_parser::parse_file(src).unwrap();
         rewrite_export_links(
             &mut doc,
-            "out/README.ja.md",
+            ExportDestination::InsideVault("out/README.ja.md".into()),
             |path| match path {
-                "locales/ja/readme.tmt" => Some("out/README.ja.md"),
+                "locales/ja/readme.tmt" => Some(ExportTarget::Exported("out/README.ja.md")),
                 _ => None,
             },
         );
@@ -164,8 +234,8 @@ mod tests {
         let mut doc = tomet_ast_parser::parse_file(src).unwrap();
         rewrite_export_links(
             &mut doc,
-            "out/README.md",
-            |_| Some("out/other.md"),
+            ExportDestination::InsideVault("out/README.md".into()),
+            |_| Some(ExportTarget::Exported("out/other.md")),
         );
         assert_eq!(extract_targets(&doc), vec!["tmt:#local-anchor"]);
     }
@@ -177,8 +247,8 @@ mod tests {
         let mut doc = tomet_ast_parser::parse_file(src).unwrap();
         rewrite_export_links(
             &mut doc,
-            "out/README.ja.md",
-            |_| None::<&str>,
+            ExportDestination::InsideVault("out/README.ja.md".into()),
+            |_| None::<ExportTarget<&str>>,
         );
         assert_eq!(extract_targets(&doc), vec!["tmt:locales/ja/readme.tmt"]);
     }
@@ -189,8 +259,8 @@ mod tests {
         let mut doc = tomet_ast_parser::parse_file(src).unwrap();
         rewrite_export_links(
             &mut doc,
-            "out/README.md",
-            |_| None::<&str>,
+            ExportDestination::InsideVault("out/README.md".into()),
+            |_| None::<ExportTarget<&str>>,
         );
         assert_eq!(extract_targets(&doc), vec!["tmt:missing/doc.tmt"]);
     }
@@ -209,8 +279,8 @@ mod tests {
         let mut doc = tomet_ast_parser::parse_file(src).unwrap();
         rewrite_export_links(
             &mut doc,
-            "out/README.md",
-            |_| Some("out/other.md"),
+            ExportDestination::InsideVault("out/README.md".into()),
+            |_| Some(ExportTarget::Exported("out/other.md")),
         );
         let targets = extract_targets(&doc);
         assert_eq!(
@@ -237,8 +307,8 @@ mod tests {
         let mut doc = tomet_ast_parser::parse_file(src).unwrap();
         rewrite_export_links(
             &mut doc,
-            "out/README.md",
-            |_| Some("out/README.ja.md"),
+            ExportDestination::InsideVault("out/README.md".into()),
+            |_| Some(ExportTarget::Exported("out/README.ja.md")),
         );
         assert_eq!(extract_targets(&doc), vec!["README.ja.md"]);
     }
@@ -249,8 +319,8 @@ mod tests {
         let mut doc = tomet_ast_parser::parse_file(src).unwrap();
         rewrite_export_links(
             &mut doc,
-            "out/README.md",
-            |_| Some("out/README.ja.md"),
+            ExportDestination::InsideVault("out/README.md".into()),
+            |_| Some(ExportTarget::Exported("out/README.ja.md")),
         );
         assert_eq!(extract_targets(&doc), vec!["README.ja.md"]);
     }
@@ -261,8 +331,8 @@ mod tests {
         let mut doc = tomet_ast_parser::parse_file(src).unwrap();
         rewrite_export_links(
             &mut doc,
-            "out/README.md",
-            |_| Some("out/README.ja.md"),
+            ExportDestination::InsideVault("out/README.md".into()),
+            |_| Some(ExportTarget::Exported("out/README.ja.md")),
         );
         assert_eq!(extract_targets(&doc), vec!["README.ja.md"]);
     }
@@ -273,9 +343,121 @@ mod tests {
         let mut doc = tomet_ast_parser::parse_file(src).unwrap();
         rewrite_export_links(
             &mut doc,
-            "out/README.md",
-            |_| Some("out/diagrams/arch.svg"),
+            ExportDestination::InsideVault("out/README.md".into()),
+            |_| Some(ExportTarget::Exported("out/diagrams/arch.svg")),
         );
         assert_eq!(extract_targets(&doc), vec!["diagrams/arch.svg"]);
+    }
+
+    #[test]
+    fn unexported_target_relative_from_docs_directory() {
+        let src = "@link(tmt:tmtroot/docs/why/root.tmt)\n";
+        let mut doc = tomet_ast_parser::parse_file(src).unwrap();
+        rewrite_export_links(
+            &mut doc,
+            ExportDestination::InsideVault("docs/quick_start.md".into()),
+            |path| match path {
+                "tmtroot/docs/why/root.tmt" => {
+                    Some(ExportTarget::Source("tmtroot/docs/why/root.tmt"))
+                }
+                _ => None,
+            },
+        );
+        assert_eq!(extract_targets(&doc), vec!["../tmtroot/docs/why/root.tmt"]);
+    }
+
+    #[test]
+    fn unexported_target_relative_from_root() {
+        let src = "@link(tmt:tmtroot/docs/why/root.tmt)\n";
+        let mut doc = tomet_ast_parser::parse_file(src).unwrap();
+        rewrite_export_links(
+            &mut doc,
+            ExportDestination::InsideVault("README.md".into()),
+            |path| match path {
+                "tmtroot/docs/why/root.tmt" => {
+                    Some(ExportTarget::Source("tmtroot/docs/why/root.tmt"))
+                }
+                _ => None,
+            },
+        );
+        assert_eq!(extract_targets(&doc), vec!["tmtroot/docs/why/root.tmt"]);
+    }
+
+    #[test]
+    fn unexported_target_relative_from_deeper_directory() {
+        let src = "@link(tmt:tmtroot/docs/why/root.tmt)\n";
+        let mut doc = tomet_ast_parser::parse_file(src).unwrap();
+        rewrite_export_links(
+            &mut doc,
+            ExportDestination::InsideVault("docs/sub/deep/page.md".into()),
+            |path| match path {
+                "tmtroot/docs/why/root.tmt" => {
+                    Some(ExportTarget::Source("tmtroot/docs/why/root.tmt"))
+                }
+                _ => None,
+            },
+        );
+        assert_eq!(
+            extract_targets(&doc),
+            vec!["../../../tmtroot/docs/why/root.tmt"]
+        );
+    }
+
+    #[test]
+    fn unexported_target_anchor_kept() {
+        let src = "@link(tmt:tmtroot/spec/tome.tmt#syntax)\n";
+        let mut doc = tomet_ast_parser::parse_file(src).unwrap();
+        rewrite_export_links(
+            &mut doc,
+            ExportDestination::InsideVault("docs/quick_start.md".into()),
+            |path| match path {
+                "tmtroot/spec/tome.tmt" => Some(ExportTarget::Source("tmtroot/spec/tome.tmt")),
+                _ => None,
+            },
+        );
+        assert_eq!(
+            extract_targets(&doc),
+            vec!["../tmtroot/spec/tome.tmt#syntax"]
+        );
+    }
+
+    #[test]
+    fn unexported_target_with_no_destination_stdout_stays_untouched() {
+        let src = "@link(tmt:tmtroot/docs/why/root.tmt)\n";
+        let mut doc = tomet_ast_parser::parse_file(src).unwrap();
+        rewrite_export_links(
+            &mut doc,
+            ExportDestination::Stdout,
+            |path| match path {
+                "tmtroot/docs/why/root.tmt" => {
+                    Some(ExportTarget::Source("tmtroot/docs/why/root.tmt"))
+                }
+                _ => None,
+            },
+        );
+        assert_eq!(
+            extract_targets(&doc),
+            vec!["tmt:tmtroot/docs/why/root.tmt"]
+        );
+    }
+
+    #[test]
+    fn unexported_target_with_destination_outside_vault_root_stays_untouched() {
+        let src = "@link(tmt:tmtroot/docs/why/root.tmt)\n";
+        let mut doc = tomet_ast_parser::parse_file(src).unwrap();
+        rewrite_export_links(
+            &mut doc,
+            ExportDestination::OutsideVault("/tmp/dist/quick_start.md".into()),
+            |path| match path {
+                "tmtroot/docs/why/root.tmt" => {
+                    Some(ExportTarget::Source("tmtroot/docs/why/root.tmt"))
+                }
+                _ => None,
+            },
+        );
+        assert_eq!(
+            extract_targets(&doc),
+            vec!["tmt:tmtroot/docs/why/root.tmt"]
+        );
     }
 }

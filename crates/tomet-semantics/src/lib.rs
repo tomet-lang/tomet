@@ -73,7 +73,7 @@ pub use elements::target::{
     EXPLICIT_SCHEMES, TargetScheme, link_target, link_target_of, path_target, path_target_of,
     target_scheme,
 };
-pub use export_links::rewrite_export_links;
+pub use export_links::{ExportDestination, ExportTarget, rewrite_export_links};
 pub use flatten::{
     EXACT_DATA_KEY, FlatData, POSITIONAL_KEY, flatten_data, flatten_element_data, is_attribute_key,
     value_to_json,

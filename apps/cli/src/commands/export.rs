@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 
 use rayon::prelude::*;
 use tomet_load::Vault;
-use tomet_semantics::{ExportType, document_config};
+use tomet_semantics::{ExportDestination, ExportTarget, ExportType, document_config};
 
 use crate::util::{format_parse_error, meta_title};
 
@@ -290,6 +290,39 @@ pub(crate) fn document_export_destinations(
         .collect()
 }
 
+/// Categorizes the destination for export link rewriting.
+///
+/// Determines whether `out_path` is a destination within the vault root,
+/// outside the vault root, or absent (stdout).
+fn export_destination_for(
+    out_path: Option<&Path>,
+    vault_root: &Path,
+) -> ExportDestination<'static> {
+    let Some(dest) = out_path else {
+        return ExportDestination::Stdout;
+    };
+    let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+    let abs_root = if vault_root.is_absolute() {
+        vault_root.to_path_buf()
+    } else {
+        cwd.join(vault_root)
+    };
+    let abs_dest = if dest.is_absolute() {
+        dest.to_path_buf()
+    } else {
+        cwd.join(dest)
+    };
+    let norm_root = tomet_indexer::normalize_join(&abs_root, Path::new(""));
+    let norm_dest = tomet_indexer::normalize_join(&abs_dest, Path::new(""));
+    let norm_dest_str = norm_dest.to_string_lossy().replace('\\', "/");
+
+    if norm_dest.starts_with(&norm_root) {
+        ExportDestination::InsideVault(std::borrow::Cow::Owned(norm_dest_str))
+    } else {
+        ExportDestination::OutsideVault(std::borrow::Cow::Owned(norm_dest_str))
+    }
+}
+
 fn export_one(
     settings: &ExportSettings,
     file_path: &Path,
@@ -320,6 +353,8 @@ fn export_one(
         stale_paths: Vec::new(),
     };
 
+    let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+
     for (target, out_path) in destinations {
         // Under `--check`, if there is no destination output path, there is no
         // artifact on disk to compare against. Skip rendering entirely.
@@ -328,25 +363,38 @@ fn export_one(
         }
 
         let mut render_doc = doc.clone();
-        if let Some(dest) = &out_path {
-            let dest_str = dest.to_string_lossy().replace('\\', "/");
-            tomet_semantics::rewrite_export_links(
-                &mut render_doc,
-                &dest_str,
-                |vault_path| {
-                    let target_file = vault.root.join(vault_path);
-                    let (target_doc, _) = vault.file(&target_file).ok()?;
-                    let target_dests =
-                        document_export_destinations(&target_doc, &target_file, settings);
-                    for (fmt, path) in target_dests {
-                        if fmt == target {
-                            return path.map(|p| p.to_string_lossy().replace('\\', "/"));
-                        }
+        let export_dest = export_destination_for(out_path.as_deref(), &vault.root);
+        tomet_semantics::rewrite_export_links(
+            &mut render_doc,
+            export_dest,
+            |vault_path| {
+                let target_file = vault.root.join(vault_path);
+                let Ok((target_doc, _)) = vault.file(&target_file) else {
+                    // Target file does not exist on disk in the vault; left as written.
+                    return None;
+                };
+                let target_dests =
+                    document_export_destinations(&target_doc, &target_file, settings);
+                for (fmt, path) in target_dests {
+                    if let (true, Some(p)) = (fmt == target, path) {
+                        let abs_p = if p.is_absolute() { p } else { cwd.join(p) };
+                        let norm_p = tomet_indexer::normalize_join(&abs_p, Path::new(""));
+                        return Some(ExportTarget::Exported(
+                            norm_p.to_string_lossy().replace('\\', "/"),
+                        ));
                     }
-                    None
-                },
-            );
-        }
+                }
+                let abs_target = if target_file.is_absolute() {
+                    target_file
+                } else {
+                    cwd.join(&target_file)
+                };
+                let norm_target = tomet_indexer::normalize_join(&abs_target, Path::new(""));
+                Some(ExportTarget::Source(
+                    norm_target.to_string_lossy().replace('\\', "/"),
+                ))
+            },
+        );
 
         let rendered = match target {
             ExportType::CommonMark => tomet_markdown::to_markdown(&render_doc),
@@ -745,10 +793,10 @@ mod tests {
             readme_out.contains("[Chinese](README.zh-CN.md)"),
             "expected [Chinese](README.zh-CN.md) in: {readme_out}"
         );
-        // Target without ::export keeps vault-relative source path
+        // Target without ::export points at its source file relative to the document's output directory
         assert!(
-            readme_out.contains("[No Export Doc](plain.tmt)"),
-            "expected [No Export Doc](plain.tmt) in: {readme_out}"
+            readme_out.contains("[No Export Doc](../plain.tmt)"),
+            "expected [No Export Doc](../plain.tmt) in: {readme_out}"
         );
 
         let ja_out = fs::read_to_string(root.join("out/README.ja.md")).expect("read out/README.ja.md");
@@ -917,16 +965,17 @@ mod tests {
         )
         .expect("write guide");
 
-        // 1. Directory export of "docs" without --out
+        // 1. Directory export of "docs" without --out (destination inside vault root points to target source file)
         export_cmd(&root.join("docs"), None, None, false, false).expect("export docs without --out");
         let guide_out = fs::read_to_string(root.join("out/docs/guide.md")).expect("read guide");
         assert!(
-            guide_out.contains("[Root Readme](readme.tmt)"),
-            "expected [Root Readme](readme.tmt) in: {guide_out}"
+            guide_out.contains("[Root Readme](../../readme.tmt)"),
+            "expected [Root Readme](../../readme.tmt) in: {guide_out}"
         );
 
-        // 2. Directory export of "docs" with --out
-        let dist = root.join("dist");
+        // 2. Directory export of "docs" with --out outside the vault root keeps target as written
+        let dist = std::env::temp_dir().join(format!("tomet_test_f6_dist_{}", nanoid::nanoid!()));
+        let _ = fs::remove_dir_all(&dist);
         export_cmd(&root.join("docs"), None, Some(&dist), false, false)
             .expect("export docs with --out");
         let dist_guide = fs::read_to_string(dist.join("guide.md")).expect("read dist guide");
@@ -934,6 +983,7 @@ mod tests {
             dist_guide.contains("[Root Readme](readme.tmt)"),
             "expected [Root Readme](readme.tmt) in: {dist_guide}"
         );
+        let _ = fs::remove_dir_all(&dist);
 
         let _ = fs::remove_dir_all(&root);
     }
@@ -987,6 +1037,50 @@ mod tests {
         export_cmd(&multi_src, None, Some(&multi_dir), false, false).expect("export multi format");
         assert!(multi_dir.join("multi.md").is_file());
         assert!(multi_dir.join("multi.html").is_file());
+
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    /// A document in a subdirectory linking to a non-exported document
+    /// rewrites the link to point at the target's source file relative to the output directory.
+    #[test]
+    fn subdirectory_document_linking_to_non_exported_document() {
+        let root = std::env::temp_dir().join(format!("tomet_test_sub_unexp_{}", nanoid::nanoid!()));
+        let _ = fs::remove_dir_all(&root);
+        fs::create_dir_all(root.join("docs")).expect("create dirs");
+        fs::create_dir_all(root.join("tmtroot/why")).expect("create dirs");
+
+        fs::write(
+            root.join(tomet_load_config::VAULT_CONFIG_FILE),
+            "::kind(config)\n",
+        )
+        .expect("write config");
+
+        fs::write(
+            root.join("tmtroot/why/root.tmt"),
+            "#[ Why Tomet ]\n\nExplanation text.\n",
+        )
+        .expect("write why doc");
+
+        fs::write(
+            root.join("docs/quick_start.tmt"),
+            "::export(type: commonmark, path: \"docs/quick_start.md\")\n\n\
+             See @link(tmt:tmtroot/why/root.tmt)[Why Tomet].\n",
+        )
+        .expect("write quick start");
+
+        export_cmd(&root.join("docs/quick_start.tmt"), None, None, false, false)
+            .expect("export succeeds");
+
+        let qs_out = fs::read_to_string(root.join("docs/quick_start.md"))
+            .expect("read quick_start.md");
+        assert!(
+            qs_out.contains("[Why Tomet](../tmtroot/why/root.tmt)"),
+            "expected [Why Tomet](../tmtroot/why/root.tmt) in: {qs_out}"
+        );
+
+        export_cmd(&root.join("docs/quick_start.tmt"), None, None, false, true)
+            .expect("--check passes on fresh export");
 
         let _ = fs::remove_dir_all(&root);
     }
