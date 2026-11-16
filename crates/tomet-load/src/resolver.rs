@@ -1,6 +1,6 @@
 //! The evaluator's view of a vault on disk.
 
-use std::path::{Component, Path, PathBuf};
+use std::path::Path;
 use std::sync::Arc;
 
 use tomet_ast::{Block, File};
@@ -27,51 +27,11 @@ impl<'v> DiskResolver<'v> {
         let rel = path.strip_prefix(&self.vault.root).unwrap_or(path);
         Some(DocRef(rel.to_str()?.replace('\\', "/")))
     }
-
-    fn vault_relative_path(&self, raw: &str) -> Result<PathBuf, String> {
-        if raw.starts_with('/') || raw.starts_with('\\') || Path::new(raw).is_absolute() {
-            return Err(format!("`{raw}` is not inside the vault"));
-        }
-        let mut normalized = PathBuf::new();
-        for comp in Path::new(raw).components() {
-            match comp {
-                Component::Normal(c) => normalized.push(c),
-                Component::CurDir => {}
-                Component::ParentDir => {
-                    if !normalized.pop() {
-                        return Err(format!("`{raw}` is not inside the vault"));
-                    }
-                }
-                Component::RootDir | Component::Prefix(_) => {
-                    return Err(format!("`{raw}` is not inside the vault"));
-                }
-            }
-        }
-        let path = self.vault.root.join(&normalized);
-        if path.exists() {
-            let canonical_root = self.vault.root.canonicalize().map_err(|e| e.to_string())?;
-            let canonical_target = path.canonicalize().map_err(|e| e.to_string())?;
-            if !canonical_target.starts_with(&canonical_root) {
-                return Err(format!("`{raw}` is not inside the vault"));
-            }
-        }
-        Ok(path)
-    }
-
-    fn document_path(&self, doc: &DocRef) -> Result<PathBuf, String> {
-        let path = self
-            .vault_relative_path(&doc.0)
-            .map_err(|_| format!("`{}` is not a document of this vault", doc.0))?;
-        if !tomet_indexer::is_tm_file(&path) {
-            return Err(format!("`{}` is not a document of this vault", doc.0));
-        }
-        Ok(path)
-    }
 }
 
 impl Resolver for DiskResolver<'_> {
     fn document(&self, doc: &DocRef) -> Result<Arc<File>, String> {
-        let path = self.document_path(doc)?;
+        let path = self.vault.document_path(&doc.0)?;
         if let Some(cached) = self.vault.cached_file(&doc.0) {
             return Ok(cached);
         }
@@ -91,12 +51,7 @@ impl Resolver for DiskResolver<'_> {
     }
 
     fn dir_docs(&self, dir: &DirRef) -> Result<Vec<DocRef>, String> {
-        let abs = self
-            .vault_relative_path(&dir.0)
-            .map_err(|_| format!("`{}` is not a directory of this vault", dir.0))?;
-        if !abs.is_dir() {
-            return Err("not a directory".to_string());
-        }
+        let abs = self.vault.directory_path(&dir.0)?;
         Ok(
             tomet_indexer::collect_tm_files_with_config(&abs, &self.vault.config, &self.vault.root)
                 .iter()
@@ -111,7 +66,7 @@ impl Resolver for DiskResolver<'_> {
     }
 
     fn source(&self, doc: &DocRef) -> Result<String, String> {
-        let path = self.document_path(doc)?;
+        let path = self.vault.document_path(&doc.0)?;
         std::fs::read_to_string(&path).map_err(|e| e.to_string())
     }
 
@@ -301,6 +256,18 @@ mod tests {
         let resolver = vault.resolver();
 
         // 1. Normal document, ./a.tmt, and sub/../a.tmt still work
+        assert_eq!(
+            vault.document_path("notes/rust.tmt").unwrap(),
+            root.join("notes/rust.tmt")
+        );
+        assert_eq!(
+            vault.document_path("./notes/rust.tmt").unwrap(),
+            root.join("notes/rust.tmt")
+        );
+        assert_eq!(
+            vault.document_path("notes/deep/../rust.tmt").unwrap(),
+            root.join("notes/rust.tmt")
+        );
         assert!(resolver.document(&DocRef("notes/rust.tmt".into())).is_ok());
         assert_eq!(
             resolver.source(&DocRef("notes/rust.tmt".into())).unwrap(),
@@ -328,6 +295,10 @@ mod tests {
         );
 
         // 2. Uppercase .TMT works according to the indexer's extension test (case-insensitive)
+        assert_eq!(
+            vault.document_path("notes/deep/UPPER.TMT").unwrap(),
+            root.join("notes/deep/UPPER.TMT")
+        );
         assert!(
             resolver
                 .document(&DocRef("notes/deep/UPPER.TMT".into()))
@@ -341,6 +312,10 @@ mod tests {
         );
 
         // 3. Non-document in vault: data.txt refused without leaking content
+        assert_eq!(
+            vault.document_path("data.txt").unwrap_err(),
+            "`data.txt` is not a document of this vault"
+        );
         let err_doc = resolver
             .document(&DocRef("data.txt".into()))
             .unwrap_err();
@@ -351,6 +326,10 @@ mod tests {
         assert!(!err_src.contains("SECRET"));
 
         // 4. Leaving vault via ../x.tmt refused without leaking content
+        assert_eq!(
+            vault.document_path("../outside_secret.tmt").unwrap_err(),
+            "`../outside_secret.tmt` is not a document of this vault"
+        );
         let err_rel = resolver
             .document(&DocRef("../outside_secret.tmt".into()))
             .unwrap_err();
@@ -364,6 +343,12 @@ mod tests {
 
         // 5. Absolute path refused without leaking content
         let abs_path_str = outside_secret_file.to_str().unwrap().to_string();
+        assert!(
+            vault
+                .document_path(&abs_path_str)
+                .unwrap_err()
+                .contains("not a document of this vault")
+        );
         let err_abs = resolver
             .document(&DocRef(abs_path_str.clone()))
             .unwrap_err();
@@ -374,6 +359,12 @@ mod tests {
         assert!(!err_abs_src.contains("SECRET"));
 
         // 6. Leaving vault via sub/../../x.tmt refused without leaking content
+        assert!(
+            vault
+                .document_path("notes/../../outside_secret.tmt")
+                .unwrap_err()
+                .contains("not a document of this vault")
+        );
         let err_sub = resolver
             .document(&DocRef("notes/../../outside_secret.tmt".into()))
             .unwrap_err();
@@ -390,6 +381,12 @@ mod tests {
         {
             let sym_file = root.join("notes/sym_outside.tmt");
             std::os::unix::fs::symlink(&outside_secret_file, &sym_file).expect("symlink file");
+            assert!(
+                vault
+                    .document_path("notes/sym_outside.tmt")
+                    .unwrap_err()
+                    .contains("not a document of this vault")
+            );
             let err_sym = resolver
                 .document(&DocRef("notes/sym_outside.tmt".into()))
                 .unwrap_err();
@@ -403,11 +400,23 @@ mod tests {
 
             let sym_dir = root.join("notes/sym_dir");
             std::os::unix::fs::symlink(&outside_dir, &sym_dir).expect("symlink dir");
+            assert!(
+                vault
+                    .directory_path("notes/sym_dir")
+                    .unwrap_err()
+                    .contains("not a directory of this vault")
+            );
             let err_sym_dir = resolver
                 .dir_docs(&DirRef("notes/sym_dir".into()))
                 .unwrap_err();
             assert!(err_sym_dir.contains("not a directory of this vault"));
             assert!(!err_sym_dir.contains("SECRET"));
+            assert!(
+                vault
+                    .document_path("notes/sym_dir/nested.tmt")
+                    .unwrap_err()
+                    .contains("not a document of this vault")
+            );
             let err_sym_dir_doc = resolver
                 .document(&DocRef("notes/sym_dir/nested.tmt".into()))
                 .unwrap_err();
@@ -415,11 +424,40 @@ mod tests {
             assert!(!err_sym_dir_doc.contains("SECRET"));
         }
 
-        // 8. Directory escaping: addr(dir:..) and absolute directory
+        // 8. Directory cases: in-vault directories, non-directory, and escaping
+        assert_eq!(vault.directory_path("notes").unwrap(), root.join("notes"));
+        assert_eq!(
+            vault.directory_path("notes/deep").unwrap(),
+            root.join("notes/deep")
+        );
+        assert_eq!(vault.directory_path("").unwrap(), root);
+        assert_eq!(
+            vault.directory_path("nope").unwrap_err(),
+            "not a directory"
+        );
+        assert_eq!(
+            vault.directory_path("data.txt").unwrap_err(),
+            "not a directory"
+        );
+        assert_eq!(
+            vault.directory_path("notes/rust.tmt").unwrap_err(),
+            "not a directory"
+        );
+
+        assert_eq!(
+            vault.directory_path("..").unwrap_err(),
+            "`..` is not a directory of this vault"
+        );
         let err_dir_parent = resolver.dir_docs(&DirRef("..".into())).unwrap_err();
         assert!(err_dir_parent.contains("not a directory of this vault"));
         assert!(!err_dir_parent.contains("SECRET"));
 
+        assert!(
+            vault
+                .directory_path("notes/../../..")
+                .unwrap_err()
+                .contains("not a directory of this vault")
+        );
         let err_dir_deep = resolver
             .dir_docs(&DirRef("notes/../../..".into()))
             .unwrap_err();
@@ -427,6 +465,12 @@ mod tests {
         assert!(!err_dir_deep.contains("SECRET"));
 
         let outside_dir_str = outside.to_str().unwrap().to_string();
+        assert!(
+            vault
+                .directory_path(&outside_dir_str)
+                .unwrap_err()
+                .contains("not a directory of this vault")
+        );
         let err_dir_abs = resolver.dir_docs(&DirRef(outside_dir_str)).unwrap_err();
         assert!(err_dir_abs.contains("not a directory of this vault"));
         assert!(!err_dir_abs.contains("SECRET"));

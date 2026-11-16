@@ -368,7 +368,10 @@ fn export_one(
             &mut render_doc,
             export_dest,
             |vault_path| {
-                let target_file = vault.root.join(vault_path);
+                let Ok(target_file) = vault.document_path(vault_path) else {
+                    // Not a document of this vault; left as written.
+                    return None;
+                };
                 let Ok((target_doc, _)) = vault.file(&target_file) else {
                     // Target file does not exist on disk in the vault; left as written.
                     return None;
@@ -1083,5 +1086,110 @@ mod tests {
             .expect("--check passes on fresh export");
 
         let _ = fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn export_link_lookup_stays_inside_the_vault_regardless_of_working_directory() {
+        use std::process::Command;
+
+        let base = std::env::temp_dir().join(format!(
+            "tomet_test_export_vault_boundary_{}",
+            nanoid::nanoid!()
+        ));
+        let _ = fs::remove_dir_all(&base);
+        let vault = base.join("vault");
+        let outside_dir = base.join("outside_dir");
+        fs::create_dir_all(vault.join("sub")).expect("create vault dirs");
+        fs::create_dir_all(&outside_dir).expect("create outside dir");
+
+        let outside_doc = base.join("outside.tmt");
+        fs::write(&outside_doc, "::kind(doc)\n#[ Outside Doc ]\n").expect("write outside doc");
+        let outside_txt = base.join("outside-secret.txt");
+        fs::write(&outside_txt, "secret\n").expect("write outside txt");
+
+        fs::write(
+            vault.join(tomet_load_config::VAULT_CONFIG_FILE),
+            "::kind(config)\n",
+        )
+        .expect("write config");
+        fs::write(vault.join("data.txt"), "inside-txt\n").expect("write data.txt");
+        fs::write(vault.join("sub/ex.tmt"), "::kind(doc)\n#[ Sub Ex ]\n").expect("write sub/ex.tmt");
+
+        #[cfg(unix)]
+        let has_symlink = {
+            let sym_file = vault.join("sym_out.tmt");
+            std::os::unix::fs::symlink(&outside_doc, &sym_file).is_ok()
+        };
+        #[cfg(not(unix))]
+        let has_symlink = false;
+
+        let link_body = if has_symlink {
+            "@link(tmt:../outside.tmt)[outside-doc] @link(tmt:../outside-secret.txt)[outside-txt] @link(tmt:data.txt)[inside-txt] @link(tmt:sym_out.tmt)[sym-doc] @link(tmt:sub/ex.tmt)[ok]\n"
+        } else {
+            "@link(tmt:../outside.tmt)[outside-doc] @link(tmt:../outside-secret.txt)[outside-txt] @link(tmt:data.txt)[inside-txt] @link(tmt:sub/ex.tmt)[ok]\n"
+        };
+
+        fs::write(
+            vault.join("l.tmt"),
+            format!("::export(type: commonmark, path: \"out/l.md\")\n\n{link_body}"),
+        )
+        .expect("write l.tmt");
+
+        let bin = option_env!("CARGO_BIN_EXE_tomet")
+            .map(PathBuf::from)
+            .unwrap_or_else(|| {
+                std::env::current_exe()
+                    .unwrap()
+                    .parent()
+                    .unwrap()
+                    .parent()
+                    .unwrap()
+                    .join("tomet")
+            });
+
+        // Run 1: from the vault directory
+        let out1 = Command::new(&bin)
+            .current_dir(&vault)
+            .args(["export", "l.tmt"])
+            .output()
+            .expect("run export from vault dir");
+        assert!(
+            out1.status.success(),
+            "export from vault dir failed: {}",
+            String::from_utf8_lossy(&out1.stderr)
+        );
+        let content1 = fs::read_to_string(vault.join("out/l.md")).expect("read out/l.md after run 1");
+
+        assert!(content1.contains("[outside-doc](../outside.tmt)"));
+        assert!(content1.contains("[outside-txt](../outside-secret.txt)"));
+        assert!(content1.contains("[inside-txt](data.txt)"));
+        if has_symlink {
+            assert!(content1.contains("[sym-doc](sym_out.tmt)"));
+        }
+        assert!(content1.contains("[ok](../sub/ex.tmt)"));
+
+        // Remove out/l.md before run 2
+        fs::remove_file(vault.join("out/l.md")).expect("remove out/l.md");
+
+        // Run 2: from another working directory
+        let l_tmt_path = vault.join("l.tmt");
+        let out2 = Command::new(&bin)
+            .current_dir(&outside_dir)
+            .args(["export", l_tmt_path.to_str().unwrap()])
+            .output()
+            .expect("run export from outside dir");
+        assert!(
+            out2.status.success(),
+            "export from outside dir failed: {}",
+            String::from_utf8_lossy(&out2.stderr)
+        );
+        let content2 = fs::read_to_string(vault.join("out/l.md")).expect("read out/l.md after run 2");
+
+        assert_eq!(
+            content1, content2,
+            "export output must not depend on working directory"
+        );
+
+        let _ = fs::remove_dir_all(&base);
     }
 }

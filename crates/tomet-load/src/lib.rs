@@ -73,7 +73,7 @@
 
 use std::collections::HashMap;
 use std::ops::Deref;
-use std::path::{Path, PathBuf};
+use std::path::{Component, Path, PathBuf};
 use std::sync::{Arc, Mutex, OnceLock};
 
 use dictionary::load_dictionaries;
@@ -97,8 +97,9 @@ pub use tomet_vault::{Prepared, Unresolved, UnresolvedKind};
 /// Everything that is only computation -- [`parse`](tomet_vault::Vault::parse),
 /// [`bindings`](tomet_vault::Vault::bindings), the `config`/`root` fields --
 /// is the inner vault's, reached through `Deref`. What is added here is
-/// finding it ([`Vault::discover`]), reading a file in it
-/// ([`Vault::file`]), and the vault-wide table an index query is
+/// finding it ([`Vault::discover`]), resolving document and directory paths
+/// within it ([`Vault::document_path`], [`Vault::directory_path`]), reading a
+/// file in it ([`Vault::file`]), and the vault-wide table an index query is
 /// answered from, which is a walk of the disk.
 ///
 /// "Vault" is the directory the config file sits in: `find_config_file`
@@ -205,6 +206,60 @@ impl Vault {
             .lock()
             .expect("the document cache is never held across a panic")
             .remove(&self.doc_ref(path).0);
+    }
+
+    fn vault_relative_path(&self, raw: &str) -> Result<PathBuf, String> {
+        if raw.starts_with('/') || raw.starts_with('\\') || Path::new(raw).is_absolute() {
+            return Err(format!("`{raw}` is not inside the vault"));
+        }
+        let mut normalized = PathBuf::new();
+        for comp in Path::new(raw).components() {
+            match comp {
+                Component::Normal(c) => normalized.push(c),
+                Component::CurDir => {}
+                Component::ParentDir => {
+                    if !normalized.pop() {
+                        return Err(format!("`{raw}` is not inside the vault"));
+                    }
+                }
+                Component::RootDir | Component::Prefix(_) => {
+                    return Err(format!("`{raw}` is not inside the vault"));
+                }
+            }
+        }
+        let path = self.root.join(&normalized);
+        if path.exists() {
+            let canonical_root = self.root.canonicalize().map_err(|e| e.to_string())?;
+            let canonical_target = path.canonicalize().map_err(|e| e.to_string())?;
+            if !canonical_target.starts_with(&canonical_root) {
+                return Err(format!("`{raw}` is not inside the vault"));
+            }
+        }
+        Ok(path)
+    }
+
+    /// Resolves `raw` as a document of this vault, ensuring it stays within the vault root
+    /// and has a `.tmt` or `.tm` extension.
+    pub fn document_path(&self, raw: &str) -> Result<PathBuf, String> {
+        let path = self
+            .vault_relative_path(raw)
+            .map_err(|_| format!("`{raw}` is not a document of this vault"))?;
+        if !tomet_indexer::is_tm_file(&path) {
+            return Err(format!("`{raw}` is not a document of this vault"));
+        }
+        Ok(path)
+    }
+
+    /// Resolves `raw` as a directory of this vault, ensuring it stays within the vault root
+    /// and is a directory on disk.
+    pub fn directory_path(&self, raw: &str) -> Result<PathBuf, String> {
+        let path = self
+            .vault_relative_path(raw)
+            .map_err(|_| format!("`{raw}` is not a directory of this vault"))?;
+        if !path.is_dir() {
+            return Err("not a directory".to_string());
+        }
+        Ok(path)
     }
 
     /// Reads, parses, and binds one file in this vault.
