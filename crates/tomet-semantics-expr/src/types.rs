@@ -6,7 +6,8 @@
 //! `auto` for `default` -- into the arguments `build` takes, and `build`'s
 //! refusals come out as [`EvalError::BadType`] in its own words.
 
-use tomet_ast::{InterpExpr, InterpExprKind, Value};
+use tomet_ast::{InterpExpr, InterpExprKind};
+use tomet_semantics_core::admits::value_to_datum;
 use tomet_type::{Arg, Datum, Kind, Type, TypeError};
 
 use super::context::EvalContext;
@@ -79,7 +80,7 @@ fn argument(ty: &str, value: EvalValue) -> Result<Arg, EvalError> {
     value
         .to_ast()
         .as_ref()
-        .and_then(datum)
+        .and_then(value_to_datum)
         .map(Arg::Datum)
         .ok_or_else(|| {
             EvalError::mismatch(
@@ -88,28 +89,6 @@ fn argument(ty: &str, value: EvalValue) -> Result<Arg, EvalError> {
                 value.type_name(),
             )
         })
-}
-
-/// The plain value a data value is, or `None` for one that is more than that
-/// (a map, an element, content).
-fn datum(value: &Value) -> Option<Datum> {
-    Some(match value {
-        Value::None => Datum::None,
-        Value::Auto => Datum::Auto,
-        Value::Bool(b) => Datum::Bool(*b),
-        Value::Int(n) => Datum::Int(*n),
-        Value::Float(n) => Datum::Float(*n),
-        Value::Number(text) => text
-            .parse::<i64>()
-            .ok()
-            .map(Datum::Int)
-            .or_else(|| text.parse::<f64>().ok().map(Datum::Float))?,
-        Value::String(text) => Datum::Text(text.clone()),
-        Value::Tuple(tuple) if tuple.has_no_named() => {
-            Datum::Seq(tuple.unnamed().map(datum).collect::<Option<_>>()?)
-        }
-        _ => return None,
-    })
 }
 
 /// What a seat holds is a type, so a head that is no name of one is an unknown type, in the type

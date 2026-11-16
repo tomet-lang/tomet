@@ -24,7 +24,7 @@ mod values;
 
 use super::*;
 use tomet_ast::{
-    Block, Element, Group, Inline, InterpExpr, InterpExprKind, Literal, Name, Paragraph, Placement,
+    Block, Element, Group, Inline, InterpExpr, InterpExprKind, Name, Paragraph, Placement,
     SoftBreak, Tuple, TupleEntry, Value,
 };
 pub(crate) use tomet_cst_parser::parse_cst;

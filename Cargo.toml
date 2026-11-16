@@ -23,6 +23,7 @@ members = [
   #= Base -- foundational primitives; depends on nothing above the base layer
   "crates/tomet-base-span",
   "crates/tomet-base-position",
+  "crates/tomet-base-scalar",
   "crates/tomet-base-type",
   "crates/tomet-base-id",
   "crates/tomet-base-sort",
@@ -132,6 +133,7 @@ tomet   = { path = "crates/tomet", version = "0.5.0" }
 #--- Base ---
 tomet-id       = { path = "crates/tomet-base-id", version = "0.5.0" }
 tomet-position = { path = "crates/tomet-base-position", version = "0.5.0" }
+tomet-scalar   = { path = "crates/tomet-base-scalar", version = "0.5.0" }
 tomet-sort     = { path = "crates/tomet-base-sort", version = "0.5.0" }
 tomet-span     = { path = "crates/tomet-base-span", version = "0.5.0" }
 tomet-type     = { path = "crates/tomet-base-type", version = "0.5.0" }

@@ -329,6 +329,20 @@ pub fn scalar_text(value: &EvalValue) -> Option<String> {
     value.scalar_text()
 }
 
+impl From<tomet_scalar::Scalar> for EvalValue {
+    fn from(s: tomet_scalar::Scalar) -> Self {
+        match s {
+            tomet_scalar::Scalar::None => EvalValue::None,
+            tomet_scalar::Scalar::Auto => EvalValue::Auto,
+            tomet_scalar::Scalar::Bool(b) => EvalValue::Bool(b),
+            tomet_scalar::Scalar::Int(i) => EvalValue::Int(i),
+            tomet_scalar::Scalar::Float(f) => EvalValue::Float(f),
+            tomet_scalar::Scalar::Number(n) => EvalValue::Number(n),
+            tomet_scalar::Scalar::Text(t) => EvalValue::String(t),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

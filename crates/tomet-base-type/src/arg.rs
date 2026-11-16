@@ -7,6 +7,8 @@
 
 use std::fmt;
 
+use tomet_scalar::Scalar;
+
 use crate::Type;
 use crate::text::write_quoted;
 
@@ -14,27 +16,30 @@ use crate::text::write_quoted;
 /// `length` or `prefix` is when they are written.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Datum {
-    None,
-    Auto,
-    Bool(bool),
-    Int(i64),
-    /// A finite number; [`Type::build`] refuses any other.
-    Float(f64),
-    Text(String),
+    Scalar(Scalar),
     /// `(a, b, c)`.
     Seq(Vec<Datum>),
+}
+
+impl From<Scalar> for Datum {
+    fn from(s: Scalar) -> Self {
+        Datum::Scalar(s)
+    }
 }
 
 impl Datum {
     /// What it is, for a sentence: `` the integer `6` `` or `` the text "doc-" ``.
     pub fn describe(&self) -> String {
         match self {
-            Datum::None => "`none`".to_string(),
-            Datum::Auto => "`auto`".to_string(),
-            Datum::Bool(b) => format!("`{b}`"),
-            Datum::Int(n) => format!("the integer `{n}`"),
-            Datum::Float(n) => format!("the number `{n:?}`"),
-            Datum::Text(text) => format!("the text {}", quoted(text)),
+            Datum::Scalar(s) => match s {
+                Scalar::None => "`none`".to_string(),
+                Scalar::Auto => "`auto`".to_string(),
+                Scalar::Bool(b) => format!("`{b}`"),
+                Scalar::Int(n) => format!("the integer `{n}`"),
+                Scalar::Float(n) => format!("the number `{n:?}`"),
+                Scalar::Number(n) => format!("the number `{n}`"),
+                Scalar::Text(text) => format!("the text {}", quoted(text)),
+            },
             Datum::Seq(_) => "a list".to_string(),
         }
     }
@@ -43,7 +48,8 @@ impl Datum {
     /// spelling for the others.
     pub(crate) fn is_finite(&self) -> bool {
         match self {
-            Datum::Float(n) => n.is_finite(),
+            Datum::Scalar(Scalar::Float(n)) => n.is_finite(),
+            Datum::Scalar(Scalar::Number(text)) => text.parse::<f64>().is_ok_and(|f| f.is_finite()),
             Datum::Seq(items) => items.iter().all(Datum::is_finite),
             _ => true,
         }
@@ -54,14 +60,15 @@ impl Datum {
 impl fmt::Display for Datum {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Datum::None => f.write_str("none"),
-            Datum::Auto => f.write_str("auto"),
-            Datum::Bool(b) => write!(f, "{b}"),
-            Datum::Int(n) => write!(f, "{n}"),
-            // The shortest text that reads back as the same number, with a `.`
-            // or an exponent so that it does not read back as an integer.
-            Datum::Float(n) => write!(f, "{n:?}"),
-            Datum::Text(text) => f.write_str(&quoted(text)),
+            Datum::Scalar(s) => match s {
+                Scalar::None => f.write_str("none"),
+                Scalar::Auto => f.write_str("auto"),
+                Scalar::Bool(b) => write!(f, "{b}"),
+                Scalar::Int(n) => write!(f, "{n}"),
+                Scalar::Float(n) => write!(f, "{n:?}"),
+                Scalar::Number(n) => f.write_str(n),
+                Scalar::Text(text) => f.write_str(&quoted(text)),
+            },
             Datum::Seq(items) => match items.as_slice() {
                 [] => f.write_str("()"),
                 [only] => write!(f, "({only},)"),

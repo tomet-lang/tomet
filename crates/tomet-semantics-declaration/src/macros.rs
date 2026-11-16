@@ -8,7 +8,8 @@
 //! where an argument goes, and the definition (`check_declarations`) and the call (the evaluator)
 //! both ask this module what one is, so they cannot disagree.
 
-use tomet_ast::{InterpExprKind, Interpolation, Literal, Value};
+use tomet_ast::{InterpExprKind, Interpolation, Value};
+use tomet_scalar::Scalar;
 use tomet_tree::for_each_interpolation_in_value;
 
 /// A place in a template that an argument fills: `$(1)`, the first positional argument, or
@@ -22,7 +23,7 @@ pub enum Placeholder {
 /// The placeholder an interpolation of a block macro's body is, or `None` if it is an expression.
 pub fn placeholder_of(interp: &Interpolation) -> Option<Placeholder> {
     match &interp.expr.kind {
-        InterpExprKind::Literal(Literal::Int(n)) if *n >= 1 => {
+        InterpExprKind::Literal(Scalar::Int(n)) if *n >= 1 => {
             Some(Placeholder::Positional(*n as usize))
         }
         InterpExprKind::Identifier(name) if is_ident_placeholder(name) => {

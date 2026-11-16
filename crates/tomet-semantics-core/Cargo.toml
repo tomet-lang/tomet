@@ -7,8 +7,9 @@ license.workspace    = true
 repository.workspace = true
 
 [dependencies]
-tomet-ast  = { workspace = true }
-tomet-type = { workspace = true }
+tomet-ast    = { workspace = true }
+tomet-scalar = { workspace = true }
+tomet-type   = { workspace = true }
 
 [dev-dependencies]
 tomet-ast-parser = { workspace = true }

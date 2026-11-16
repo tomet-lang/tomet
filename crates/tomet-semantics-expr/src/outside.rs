@@ -10,7 +10,8 @@
 //! sorted here, and a test holds the sorting to the list of functions, so a function added there
 //! has to be given a verdict here.
 
-use tomet_ast::{File, InterpExpr, InterpExprKind, Literal};
+use tomet_ast::{File, InterpExpr, InterpExprKind};
+use tomet_scalar::Scalar;
 use tomet_span::Span;
 
 use crate::address;
@@ -202,7 +203,7 @@ fn walk(expr: &InterpExpr, own: &OwnNames, out: &mut Vec<Reaching>) {
                             walk(object, own, out);
                         }
                         (_, "addr") => match &object.kind {
-                            InterpExprKind::Literal(Literal::String(text)) => {
+                            InterpExprKind::Literal(Scalar::Text(text)) => {
                                 if let Some(scheme) = address::outside_scheme(text) {
                                     push(Reach::Address(scheme));
                                 }

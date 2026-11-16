@@ -39,7 +39,7 @@ pub(crate) fn render_value_inner_with_config(v: &Value, config: &PrinterConfig) 
         Value::Auto => "auto".to_string(),
         Value::Bool(b) => b.to_string(),
         Value::Int(i) => i.to_string(),
-        Value::Float(f) => Value::float_text(*f),
+        Value::Float(f) => tomet_scalar::float_text(*f),
         // As written: formatting must not turn `1.10` into `1.1`.
         Value::Number(text) => text.clone(),
         Value::String(s) => scalar_text(s),

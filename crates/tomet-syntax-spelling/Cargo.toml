@@ -7,4 +7,5 @@ license.workspace    = true
 repository.workspace = true
 
 [dependencies]
-tomet-type = { workspace = true }
+tomet-scalar = { workspace = true }
+tomet-type   = { workspace = true }

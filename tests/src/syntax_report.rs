@@ -1298,16 +1298,18 @@ fn value_str(v: &Value) -> String {
 }
 
 fn interp_str(expr: &InterpExpr) -> String {
-    use tomet_ast::{InterpExprKind as K, Literal};
+    use tomet_ast::InterpExprKind as K;
+    use tomet_scalar::Scalar;
     match &expr.kind {
         K::Identifier(name) => name.clone(),
         K::Id(name) => format!("#{name}"),
-        K::Literal(Literal::Int(i)) => i.to_string(),
-        K::Literal(Literal::Float(f)) => f.to_string(),
-        K::Literal(Literal::String(s)) => format!("{s:?}"),
-        K::Literal(Literal::Bool(b)) => b.to_string(),
-        K::Literal(Literal::None) => "none".to_string(),
-        K::Literal(Literal::Auto) => "auto".to_string(),
+        K::Literal(Scalar::Int(i)) => i.to_string(),
+        K::Literal(Scalar::Float(f)) => f.to_string(),
+        K::Literal(Scalar::Number(n)) => n.clone(),
+        K::Literal(Scalar::Text(s)) => format!("{s:?}"),
+        K::Literal(Scalar::Bool(b)) => b.to_string(),
+        K::Literal(Scalar::None) => "none".to_string(),
+        K::Literal(Scalar::Auto) => "auto".to_string(),
         K::Call { callee, args } => {
             let inner: Vec<String> = args.iter().map(interp_str).collect();
             format!("{}({})", interp_str(callee), inner.join(", "))

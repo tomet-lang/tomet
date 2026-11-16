@@ -642,16 +642,6 @@ impl<'de> Deserialize<'de> for Tuple {
 }
 
 impl Value {
-    /// How an `f64` is written when it is a [`Value::Float`]: the shortest text
-    /// that reads back as the same number, always with a `.` or an exponent.
-    ///
-    /// This is the one definition. The reader keeps a number as a `Float` only
-    /// when the text it was written as is this text, and the printer writes a
-    /// `Float` with it, so a `Float` is always what its text says.
-    pub fn float_text(f: f64) -> String {
-        format!("{f:?}")
-    }
-
     /// The text a bare scalar was written as, for a target that wants text: a
     /// `string` argument given `2024`, `true` or `1.10`.
     ///
@@ -664,7 +654,7 @@ impl Value {
             Value::Auto => Cow::Borrowed("auto"),
             Value::String(s) | Value::Number(s) => Cow::Borrowed(s.as_str()),
             Value::Int(i) => Cow::Owned(i.to_string()),
-            Value::Float(f) => Cow::Owned(Value::float_text(*f)),
+            Value::Float(f) => Cow::Owned(tomet_scalar::float_text(*f)),
             Value::Bool(b) => Cow::Borrowed(if *b { "true" } else { "false" }),
             _ => return None,
         })
@@ -679,6 +669,20 @@ impl Value {
             Value::Float(f) => Some(*f),
             Value::Number(text) => text.parse::<f64>().ok().filter(|f| f.is_finite()),
             _ => None,
+        }
+    }
+}
+
+impl From<tomet_scalar::Scalar> for Value {
+    fn from(s: tomet_scalar::Scalar) -> Self {
+        match s {
+            tomet_scalar::Scalar::None => Value::None,
+            tomet_scalar::Scalar::Auto => Value::Auto,
+            tomet_scalar::Scalar::Bool(b) => Value::Bool(b),
+            tomet_scalar::Scalar::Int(i) => Value::Int(i),
+            tomet_scalar::Scalar::Float(f) => Value::Float(f),
+            tomet_scalar::Scalar::Number(n) => Value::Number(n),
+            tomet_scalar::Scalar::Text(t) => Value::String(t),
         }
     }
 }
@@ -1669,7 +1673,7 @@ pub struct InterpExpr {
 pub enum InterpExprKind {
     Identifier(String),
     Id(String),
-    Literal(Literal),
+    Literal(tomet_scalar::Scalar),
     Call {
         callee: Box<InterpExpr>,
         args: Vec<InterpExpr>,
@@ -1821,7 +1825,7 @@ impl InterpExpr {
         match &self.kind {
             InterpExprKind::Addr { .. } => InterpSpelling::Call,
             InterpExprKind::Call { callee, .. } if callee.is_name_chain() => InterpSpelling::Call,
-            InterpExprKind::Literal(Literal::Int(n)) if *n >= 0 => InterpSpelling::Reference,
+            InterpExprKind::Literal(tomet_scalar::Scalar::Int(n)) if *n >= 0 => InterpSpelling::Reference,
             _ if self.is_reference() => InterpSpelling::Reference,
             _ => InterpSpelling::Gate,
         }
@@ -1868,9 +1872,15 @@ impl fmt::Display for InterpExpr {
         match &self.kind {
             InterpExprKind::Identifier(name) => f.write_str(name),
             InterpExprKind::Id(name) => write!(f, "#{name}"),
-            InterpExprKind::Literal(Literal::Int(i)) => write!(f, "{i}"),
-            InterpExprKind::Literal(Literal::Float(x)) => write!(f, "{x}"),
-            InterpExprKind::Literal(Literal::String(s)) => write_quoted(f, s),
+            InterpExprKind::Literal(scalar) => match scalar {
+                tomet_scalar::Scalar::Int(i) => write!(f, "{i}"),
+                tomet_scalar::Scalar::Float(x) => write!(f, "{x}"),
+                tomet_scalar::Scalar::Number(s) => write!(f, "{s}"),
+                tomet_scalar::Scalar::Text(s) => write_quoted(f, s),
+                tomet_scalar::Scalar::Bool(b) => write!(f, "{b}"),
+                tomet_scalar::Scalar::None => f.write_str("none"),
+                tomet_scalar::Scalar::Auto => f.write_str("auto"),
+            },
             InterpExprKind::Call { callee, args } => {
                 write!(f, "{callee}(")?;
                 for (i, arg) in args.iter().enumerate() {
@@ -1881,9 +1891,6 @@ impl fmt::Display for InterpExpr {
                 }
                 f.write_str(")")
             }
-            InterpExprKind::Literal(Literal::Bool(b)) => write!(f, "{b}"),
-            InterpExprKind::Literal(Literal::None) => f.write_str("none"),
-            InterpExprKind::Literal(Literal::Auto) => f.write_str("auto"),
             InterpExprKind::Member { object, member } => write!(f, "{object}.{member}"),
             InterpExprKind::Connect { object, member } => write!(f, "{object}::{member}"),
             InterpExprKind::NamedArg { name, value } => write!(f, "{name}: {value}"),
@@ -1962,16 +1969,6 @@ fn addr_text_is_safe_raw(text: &str) -> bool {
         }
     }
     depth == 0
-}
-
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub enum Literal {
-    Int(i64),
-    Float(f64),
-    String(String),
-    Bool(bool),
-    None,
-    Auto,
 }
 
 /// A Tomet file: its `::name(...)` declarations in the preamble header, followed by its body.
@@ -2213,7 +2210,7 @@ mod tests {
 
     fn int_expr(n: i64) -> InterpExpr {
         InterpExpr {
-            kind: InterpExprKind::Literal(Literal::Int(n)),
+            kind: InterpExprKind::Literal(tomet_scalar::Scalar::Int(n)),
             span: Span::dummy(),
         }
     }

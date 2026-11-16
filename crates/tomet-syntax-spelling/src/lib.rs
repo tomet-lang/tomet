@@ -13,6 +13,7 @@
 //! - [`write_quoted`] / [`quoted_text`]: a string inside `"..."`, whatever it holds.
 //! - [`fence_line_requires_marker`]: whether a line inside a fenced code block requires a line
 //!   marker (` `` `) to avoid being read as a line marker or closing fence.
+use tomet_scalar::Scalar;
 use tomet_type::{Kind, Type};
 
 /// Whether `key` is read back as itself when written without quotes.
@@ -25,7 +26,7 @@ use tomet_type::{Kind, Type};
 ///
 /// A key with any other character, a non-ASCII letter included, is quoted.
 pub fn is_bare_key(key: &str) -> bool {
-    matches!(key, "true" | "false" | "none" | "auto") || is_number_key(key) || is_name(key)
+    Scalar::is_value_keyword(key) || is_number_key(key) || is_name(key)
 }
 
 fn is_number_key(key: &str) -> bool {
@@ -41,7 +42,7 @@ fn is_number_key(key: &str) -> bool {
 /// (after a `_`, `-` or `.`) is followed by `.` and a digit, which reads as a float. A lone `true`,
 /// `false`, `none` or `auto` is a value and not a name.
 pub fn is_name(name: &str) -> bool {
-    if matches!(name, "true" | "false" | "none" | "auto") {
+    if Scalar::is_value_keyword(name) {
         return false;
     }
     let bytes = name.as_bytes();
@@ -140,10 +141,10 @@ pub fn write_scalar_string(s: &str, out: &mut String) {
         Some('&' | '*' | '!' | '%' | '@' | '`' | '|' | '>' | '?' | '-' | '~')
     );
 
-    let is_keyword_or_number = matches!(s, "none" | "auto" | "null" | "true" | "false") || is_number(s);
+    let is_non_text_scalar = !matches!(Scalar::from_bare(s), Ok(Scalar::Text(_)));
 
     let needs_quotes = s.is_empty()
-        || is_keyword_or_number
+        || is_non_text_scalar
         || s.trim() != s
         || starts_with_special
         || s.contains("<$")
@@ -163,46 +164,6 @@ pub fn scalar_text(s: &str) -> String {
     let mut out = String::with_capacity(s.len() + 2);
     write_scalar_string(s, &mut out);
     out
-}
-
-/// Whether the parser reads `s`, bare, as a number.
-fn is_number(s: &str) -> bool {
-    let b = s.as_bytes();
-    let digits = |mut i: usize| {
-        let start = i;
-        while b.get(i).is_some_and(u8::is_ascii_digit) {
-            i += 1;
-        }
-        (i > start).then_some(i)
-    };
-    let mut i = usize::from(b.first() == Some(&b'-'));
-    match b.get(i) {
-        Some(b'0') => i += 1,
-        Some(b'1'..=b'9') => {
-            let Some(next_i) = digits(i) else {
-                return false;
-            };
-            i = next_i;
-        }
-        _ => return false,
-    }
-    if b.get(i) == Some(&b'.') {
-        let Some(next_i) = digits(i + 1) else {
-            return false;
-        };
-        i = next_i;
-    }
-    if matches!(b.get(i), Some(b'e' | b'E')) {
-        i += 1;
-        if matches!(b.get(i), Some(b'+' | b'-')) {
-            i += 1;
-        }
-        let Some(next_i) = digits(i) else {
-            return false;
-        };
-        i = next_i;
-    }
-    i == b.len()
 }
 
 /// Whether `line` requires a line marker (` `` `) when written inside a fenced code block
@@ -294,6 +255,70 @@ mod tests {
         assert_eq!(scalar_text("<name>"), "<name>");
         assert_eq!(scalar_text("hello \"world\""), "\"hello \\\"world\\\"\"");
         assert_eq!(scalar_text("line1\nline2"), "\"line1\\nline2\"");
+    }
+
+    #[test]
+    fn scalar_text_and_from_bare_agreement() {
+        let sample = [
+            // Keywords
+            "none",
+            "auto",
+            "true",
+            "false",
+            "null",
+            // Numbers
+            "42",
+            "-42",
+            "0",
+            "-0",
+            "1.10",
+            "1e3",
+            "1.5",
+            "-1.5",
+            // Empty and padded text
+            "",
+            " ",
+            " padded ",
+            "   ",
+            // Datetime (bare exception)
+            "2026-06-17T05:52:44Z",
+            "2026-10-25",
+            // Plain text
+            "plain",
+            "hello",
+        ];
+
+        for s in sample {
+            let written = scalar_text(s);
+            if !written.starts_with('"') {
+                // When written bare, from_bare must read it back as Text(s)
+                // (or datetime exception)
+                assert_eq!(
+                    Scalar::from_bare(&written),
+                    if Type::bare(Kind::Datetime).holds_text(s) == Some(true) {
+                        // A bare datetime is either a JSON number shape (date like 2026-10-25 is Text)
+                        // or Text.
+                        Ok(Scalar::Text(s.to_string()))
+                    } else {
+                        Ok(Scalar::Text(s.to_string()))
+                    },
+                    "for bare {s}"
+                );
+            } else {
+                // When written quoted, from_bare on bare `s` must NOT be Text(s)
+                // (or holds special characters / whitespace)
+                let reads_as_other = !matches!(Scalar::from_bare(s), Ok(Scalar::Text(_)));
+                let has_special = s.is_empty()
+                    || s.trim() != s
+                    || s.contains(['"', '\'', ':', ',', '(', ')', '[', ']', '{', '}', '\n', '\r', '\t', ' '])
+                    || matches!(s.chars().next(), Some('&' | '*' | '!' | '%' | '@' | '`' | '|' | '>' | '?' | '-' | '~'))
+                    || s.contains("<$");
+                assert!(
+                    reads_as_other || has_special,
+                    "quoted string {s:?} should have required quotes"
+                );
+            }
+        }
     }
 
     #[test]

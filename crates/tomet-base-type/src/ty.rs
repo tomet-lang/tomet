@@ -146,7 +146,7 @@ impl Type {
     /// built. [`Kind::auto`] is the same question asked of the kind alone.
     pub fn auto(&self) -> Option<AutoFill> {
         match self.default {
-            Some(Datum::Auto) => self.kind().auto(),
+            Some(Datum::Scalar(tomet_scalar::Scalar::Auto)) => self.kind().auto(),
             _ => None,
         }
     }

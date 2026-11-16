@@ -25,6 +25,7 @@ use time::OffsetDateTime;
 use tomet_ast::{File, TypeSeat, Value};
 use tomet_expr::{EvalContext, EvalError, evaluate_type};
 use tomet_id::IdSpec;
+use tomet_scalar::Scalar;
 use tomet_semantics_core::{Mismatch, admits_default, datum_value};
 use tomet_span::Span;
 use tomet_tree::{Node, fill_type_seats_in_file, for_each_node, for_each_type_seat};
@@ -185,7 +186,7 @@ impl Filler<'_> {
                     _ => datetime_text(moment),
                 }))
             }
-            (None, Some(datum)) if *datum != Datum::Auto => {
+            (None, Some(datum)) if *datum != Datum::Scalar(Scalar::Auto) => {
                 admits_default(ty).map_err(SeatReason::DefaultNotOfType)?;
                 Ok(datum_value(datum))
             }

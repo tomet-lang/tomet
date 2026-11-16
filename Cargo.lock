@@ -1505,6 +1505,7 @@ dependencies = [
  "serde",
  "tomet-ast",
  "tomet-ast-parser",
+ "tomet-scalar",
  "tomet-spelling",
 ]
 
@@ -1795,6 +1796,7 @@ version = "0.5.0"
 dependencies = [
  "serde",
  "serde_json",
+ "tomet-scalar",
  "tomet-span",
  "unicode-width",
 ]
@@ -1809,6 +1811,7 @@ dependencies = [
  "tomet-lexer",
  "tomet-lowering",
  "tomet-position",
+ "tomet-scalar",
  "tomet-span",
  "tomet-tree",
 ]
@@ -1928,6 +1931,7 @@ version = "0.5.0"
 dependencies = [
  "tomet-ast",
  "tomet-ast-parser",
+ "tomet-scalar",
  "tomet-semantics-core",
  "tomet-span",
  "tomet-tree",
@@ -1971,7 +1975,9 @@ dependencies = [
  "tomet-ast",
  "tomet-ast-parser",
  "tomet-declaration",
+ "tomet-scalar",
  "tomet-semantics",
+ "tomet-semantics-core",
  "tomet-span",
  "tomet-tree",
  "tomet-type",
@@ -2030,6 +2036,7 @@ name = "tomet-id"
 version = "0.5.0"
 dependencies = [
  "nanoid",
+ "tomet-scalar",
  "tomet-type",
  "uuid",
 ]
@@ -2140,6 +2147,7 @@ dependencies = [
  "tomet-cst-parser",
  "tomet-lexer",
  "tomet-position",
+ "tomet-scalar",
  "tomet-span",
  "tomet-tree",
  "unicode-width",
@@ -2184,6 +2192,7 @@ dependencies = [
  "tomet-expr",
  "tomet-html",
  "tomet-printer",
+ "tomet-scalar",
  "tomet-semantics",
  "tomet-span",
  "tomet-tree",
@@ -2227,6 +2236,7 @@ dependencies = [
  "tomet-ast-parser",
  "tomet-config",
  "tomet-markdown",
+ "tomet-scalar",
  "tomet-semantics",
  "tomet-span",
  "tomet-spelling",
@@ -2243,6 +2253,13 @@ dependencies = [
  "pythonize",
  "serde",
  "tomet",
+]
+
+[[package]]
+name = "tomet-scalar"
+version = "0.5.0"
+dependencies = [
+ "serde",
 ]
 
 [[package]]
@@ -2277,6 +2294,7 @@ version = "0.5.0"
 dependencies = [
  "tomet-ast",
  "tomet-ast-parser",
+ "tomet-scalar",
  "tomet-type",
 ]
 
@@ -2319,6 +2337,7 @@ dependencies = [
 name = "tomet-spelling"
 version = "0.5.0"
 dependencies = [
+ "tomet-scalar",
  "tomet-type",
 ]
 
@@ -2367,6 +2386,7 @@ dependencies = [
  "tomet-markdown",
  "tomet-pandoc",
  "tomet-printer",
+ "tomet-scalar",
  "tomet-semantics",
  "tomet-spelling",
  "tomet-style",
@@ -2399,6 +2419,7 @@ dependencies = [
  "tomet-ast-parser",
  "tomet-expr",
  "tomet-id",
+ "tomet-scalar",
  "tomet-search",
  "tomet-semantics",
  "tomet-semantics-core",
@@ -2419,6 +2440,9 @@ dependencies = [
 [[package]]
 name = "tomet-type"
 version = "0.5.0"
+dependencies = [
+ "tomet-scalar",
+]
 
 [[package]]
 name = "tomet-typst"

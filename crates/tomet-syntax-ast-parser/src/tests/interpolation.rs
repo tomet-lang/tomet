@@ -22,12 +22,13 @@ pub(super) fn describe(expr: &InterpExpr) -> String {
     match &expr.kind {
         InterpExprKind::Identifier(name) => format!("Identifier({name})"),
         InterpExprKind::Id(name) => format!("Id({name})"),
-        InterpExprKind::Literal(Literal::Int(i)) => format!("Int({i})"),
-        InterpExprKind::Literal(Literal::Float(f)) => format!("Float({f})"),
-        InterpExprKind::Literal(Literal::String(s)) => format!("String({s:?})"),
-        InterpExprKind::Literal(Literal::Bool(b)) => format!("Bool({b})"),
-        InterpExprKind::Literal(Literal::None) => "None".to_string(),
-        InterpExprKind::Literal(Literal::Auto) => "Auto".to_string(),
+        InterpExprKind::Literal(tomet_scalar::Scalar::Int(i)) => format!("Int({i})"),
+        InterpExprKind::Literal(tomet_scalar::Scalar::Float(f)) => format!("Float({f})"),
+        InterpExprKind::Literal(tomet_scalar::Scalar::Number(n)) => format!("Number({n})"),
+        InterpExprKind::Literal(tomet_scalar::Scalar::Text(s)) => format!("String({s:?})"),
+        InterpExprKind::Literal(tomet_scalar::Scalar::Bool(b)) => format!("Bool({b})"),
+        InterpExprKind::Literal(tomet_scalar::Scalar::None) => "None".to_string(),
+        InterpExprKind::Literal(tomet_scalar::Scalar::Auto) => "Auto".to_string(),
         InterpExprKind::Binary { op, lhs, rhs } => {
             format!("({} {} {})", describe(lhs), op.symbol(), describe(rhs))
         }

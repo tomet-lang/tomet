@@ -1,0 +1,191 @@
+//! The scalar a document can hold -- `none`, `auto`, a boolean, an integer, a float, a number kept as written, a text -- and the one grammar that reads a bare word as one and writes one back.
+//!
+//! A scalar is typeless: it is readable with no schema (the tree is readable without evaluating anything).
+//! A type is a set of values, so values sit below types; the type crate depends on this one, never the reverse.
+
+use std::borrow::Cow;
+
+use serde::{Deserialize, Serialize};
+
+/// The scalar values a document can hold.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum Scalar {
+    None,
+    Auto,
+    Bool(bool),
+    Int(i64),
+    Float(f64),
+    /// A number kept as written, because reading it as an `i64` or `f64` would change it:
+    /// `1.10` (an `f64` prints `1.1`), `1e3`, `-0`, or an integer too large for an `i64`.
+    Number(String),
+    Text(String),
+}
+
+/// The error message returned when a bare `null` is encountered.
+pub const NULL_ERROR: &str = "a bare `null` is an error: write `none`";
+
+/// What a bare scalar's text is, by the JSON number grammar.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum NumberShape {
+    Int,
+    Float,
+}
+
+/// Classifies a string according to the JSON number grammar.
+fn classify_number(s: &str) -> Option<NumberShape> {
+    let b = s.as_bytes();
+    let digits = |mut i: usize| {
+        let start = i;
+        while b.get(i).is_some_and(u8::is_ascii_digit) {
+            i += 1;
+        }
+        (i > start).then_some(i)
+    };
+    let mut i = usize::from(b.first() == Some(&b'-'));
+    match b.get(i)? {
+        b'0' => i += 1,
+        b'1'..=b'9' => i = digits(i)?,
+        _ => return None,
+    }
+    let mut float = false;
+    if b.get(i) == Some(&b'.') {
+        i = digits(i + 1)?;
+        float = true;
+    }
+    if matches!(b.get(i), Some(b'e' | b'E')) {
+        i += 1;
+        if matches!(b.get(i), Some(b'+' | b'-')) {
+            i += 1;
+        }
+        i = digits(i)?;
+        float = true;
+    }
+    (i == b.len()).then_some(if float {
+        NumberShape::Float
+    } else {
+        NumberShape::Int
+    })
+}
+
+/// How an `f64` is written: the shortest text that reads back as the same number,
+/// always with a `.` or an exponent.
+pub fn float_text(f: f64) -> String {
+    format!("{f:?}")
+}
+
+impl Scalar {
+    /// Whether `s` is a keyword that stands for a value (`none`, `auto`, `true`, `false`):
+    /// a word [`from_bare`](Scalar::from_bare) reads as one of those and not as a number or text.
+    /// The keywords are written once, in `from_bare`.
+    pub fn is_value_keyword(s: &str) -> bool {
+        matches!(
+            Scalar::from_bare(s),
+            Ok(Scalar::None | Scalar::Auto | Scalar::Bool(_))
+        )
+    }
+
+    /// Reads a bare word as a scalar value.
+    ///
+    /// - `null` produces an error saying "a bare `null` is an error: write `none`".
+    /// - `none`, `auto`, `true`, `false` produce the corresponding variant.
+    /// - Numbers following the JSON number grammar produce [`Scalar::Int`], [`Scalar::Float`],
+    ///   or [`Scalar::Number`] if reading would alter the text (such as `-0`, `1.10`, `1e3`,
+    ///   or values exceeding `i64`).
+    /// - Any other word produces [`Scalar::Text`].
+    pub fn from_bare(s: &str) -> Result<Self, String> {
+        match s {
+            "null" => return Err(NULL_ERROR.to_string()),
+            "none" => return Ok(Scalar::None),
+            "auto" => return Ok(Scalar::Auto),
+            "true" => return Ok(Scalar::Bool(true)),
+            "false" => return Ok(Scalar::Bool(false)),
+            _ => {}
+        }
+        match classify_number(s) {
+            Some(NumberShape::Int) => Ok(match s.parse::<i64>() {
+                Ok(i) if i.to_string() == s => Scalar::Int(i),
+                _ => Scalar::Number(s.to_string()),
+            }),
+            Some(NumberShape::Float) => Ok(match s.parse::<f64>() {
+                Ok(f) if f.is_finite() && float_text(f) == s => Scalar::Float(f),
+                _ => Scalar::Number(s.to_string()),
+            }),
+            None => Ok(Scalar::Text(s.to_string())),
+        }
+    }
+
+    /// The text a scalar was written as.
+    ///
+    /// Returns `None` for [`Scalar::None`], as `none` is absence and has no string text.
+    pub fn text(&self) -> Option<Cow<'_, str>> {
+        Some(match self {
+            Scalar::Auto => Cow::Borrowed("auto"),
+            Scalar::Text(s) | Scalar::Number(s) => Cow::Borrowed(s.as_str()),
+            Scalar::Int(i) => Cow::Owned(i.to_string()),
+            Scalar::Float(f) => Cow::Owned(float_text(*f)),
+            Scalar::Bool(b) => Cow::Borrowed(if *b { "true" } else { "false" }),
+            Scalar::None => return None,
+        })
+    }
+
+    /// The number a [`Scalar::Float`] or [`Scalar::Number`] is, as an `f64`.
+    pub fn as_number(&self) -> Option<f64> {
+        match self {
+            Scalar::Float(f) => Some(*f),
+            Scalar::Number(text) => text.parse::<f64>().ok().filter(|f| f.is_finite()),
+            _ => None,
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn bare_word_scalar_table() {
+        let cases: &[(&str, Result<Scalar, &str>)] = &[
+            ("null", Err("a bare `null` is an error: write `none`")),
+            ("none", Ok(Scalar::None)),
+            ("auto", Ok(Scalar::Auto)),
+            ("true", Ok(Scalar::Bool(true))),
+            ("false", Ok(Scalar::Bool(false))),
+            ("42", Ok(Scalar::Int(42))),
+            ("-42", Ok(Scalar::Int(-42))),
+            ("0", Ok(Scalar::Int(0))),
+            ("-0", Ok(Scalar::Number("-0".to_string()))),
+            ("1.5", Ok(Scalar::Float(1.5))),
+            ("-1.5", Ok(Scalar::Float(-1.5))),
+            ("1.10", Ok(Scalar::Number("1.10".to_string()))),
+            ("1e3", Ok(Scalar::Number("1e3".to_string()))),
+            (
+                "999999999999999999999999999999",
+                Ok(Scalar::Number("999999999999999999999999999999".to_string())),
+            ),
+            ("1.10.0", Ok(Scalar::Text("1.10.0".to_string()))),
+            ("007", Ok(Scalar::Text("007".to_string()))),
+            ("2026-10-25", Ok(Scalar::Text("2026-10-25".to_string()))),
+            ("hello", Ok(Scalar::Text("hello".to_string()))),
+        ];
+
+        for (src, want) in cases {
+            let got = Scalar::from_bare(src);
+            match want {
+                Ok(expected) => assert_eq!(&got.unwrap(), expected, "case {src}"),
+                Err(err_msg) => assert_eq!(got.unwrap_err(), *err_msg, "case {src}"),
+            }
+        }
+    }
+
+    #[test]
+    fn scalar_text_representations() {
+        assert_eq!(Scalar::None.text(), None);
+        assert_eq!(Scalar::Auto.text().as_deref(), Some("auto"));
+        assert_eq!(Scalar::Bool(true).text().as_deref(), Some("true"));
+        assert_eq!(Scalar::Bool(false).text().as_deref(), Some("false"));
+        assert_eq!(Scalar::Int(42).text().as_deref(), Some("42"));
+        assert_eq!(Scalar::Float(1.5).text().as_deref(), Some("1.5"));
+        assert_eq!(Scalar::Number("1.10".into()).text().as_deref(), Some("1.10"));
+        assert_eq!(Scalar::Text("hello".into()).text().as_deref(), Some("hello"));
+    }
+}

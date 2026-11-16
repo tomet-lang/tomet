@@ -1,6 +1,6 @@
 use crate::error::Result;
 use tomet_ast::{
-    BinaryOp, InterpExpr, InterpExprKind, InterpSpelling, Interpolation, Literal, TypeSeat,
+    BinaryOp, InterpExpr, InterpExprKind, InterpSpelling, Interpolation, TypeSeat,
 };
 use tomet_cst::SyntaxNode;
 use tomet_lexer::Cursor;
@@ -642,7 +642,7 @@ fn parse_interp_primary(cur: &mut Cursor, start_pos: usize) -> Result<InterpExpr
         Some('"') => {
             let s = parse_quoted(cur)?;
             Ok(InterpExpr {
-                kind: InterpExprKind::Literal(Literal::String(s)),
+                kind: InterpExprKind::Literal(tomet_scalar::Scalar::Text(s)),
                 span: cur.span_from(start_pos),
             })
         }
@@ -710,12 +710,11 @@ fn parse_interp_primary(cur: &mut Cursor, start_pos: usize) -> Result<InterpExpr
             // The same words the `.tmt` value syntax reads as values. They
             // are values, not keywords: nothing else in an expression is
             // reserved by its spelling.
-            let kind = match name.as_str() {
-                "null" => return Err(err(start_pos, "a bare `null` is an error: write `none`")),
-                "true" => InterpExprKind::Literal(Literal::Bool(true)),
-                "false" => InterpExprKind::Literal(Literal::Bool(false)),
-                "none" => InterpExprKind::Literal(Literal::None),
-                "auto" => InterpExprKind::Literal(Literal::Auto),
+            let kind = match tomet_scalar::Scalar::from_bare(&name) {
+                Err(msg) => return Err(err(start_pos, msg)),
+                Ok(scalar) if tomet_scalar::Scalar::is_value_keyword(&name) => {
+                    InterpExprKind::Literal(scalar)
+                }
                 _ => InterpExprKind::Identifier(name),
             };
             Ok(InterpExpr {
@@ -762,24 +761,28 @@ fn parse_interp_number(cur: &mut Cursor, start: usize) -> Result<InterpExpr> {
     if digits.is_empty() {
         return Err(err(cur.pos(), "expected digits"));
     }
-    let mut is_float = false;
     if cur.peek() == Some('.') && cur.peek_at(1).is_some_and(|c| c.is_ascii_digit()) {
-        is_float = true;
         cur.bump();
         cur.eat_while(|c| c.is_ascii_digit());
     }
+    if cur.peek().is_some_and(|c| matches!(c, 'e' | 'E')) {
+        let mut look = *cur;
+        look.bump();
+        if look.peek().is_some_and(|c| matches!(c, '+' | '-')) {
+            look.bump();
+        }
+        if look.peek().is_some_and(|c| c.is_ascii_digit()) {
+            *cur = look;
+            cur.eat_while(|c| c.is_ascii_digit());
+        }
+    }
     let text = cur.slice_from(start);
-    let literal = if is_float {
-        text.parse::<f64>()
-            .map(Literal::Float)
-            .map_err(|_| err(start, "invalid float literal"))?
-    } else {
-        text.parse::<i64>()
-            .map(Literal::Int)
-            .map_err(|_| err(start, "invalid integer literal"))?
-    };
+    let scalar = tomet_scalar::Scalar::from_bare(text).map_err(|m| err(start, m))?;
+    if matches!(scalar, tomet_scalar::Scalar::Text(_)) {
+        return Err(err(start, "invalid number literal"));
+    }
     Ok(InterpExpr {
-        kind: InterpExprKind::Literal(literal),
+        kind: InterpExprKind::Literal(scalar),
         span: cur.span_from(start),
     })
 }

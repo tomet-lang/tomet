@@ -1,6 +1,7 @@
 //! Type admission and conformance checking for AST [`Value`]s.
 
 use tomet_ast::{Tuple, Value};
+use tomet_scalar::Scalar;
 use tomet_type::{Datum, Kind, Type};
 
 /// A value that is not of the type it was held to.
@@ -83,12 +84,7 @@ pub fn is_placeholder(value: &Value) -> bool {
 /// `(a, b)` a list.
 pub fn datum_value(datum: &Datum) -> Value {
     match datum {
-        Datum::None => Value::None,
-        Datum::Auto => Value::Auto,
-        Datum::Bool(b) => Value::Bool(*b),
-        Datum::Int(n) => Value::Int(*n),
-        Datum::Float(n) => Value::Float(*n),
-        Datum::Text(text) => Value::String(text.clone()),
+        Datum::Scalar(s) => Value::from(s.clone()),
         Datum::Seq(items) => Value::Tuple(Tuple::from_unnamed(items.iter().map(datum_value))),
     }
 }
@@ -98,9 +94,33 @@ pub fn datum_value(datum: &Datum) -> Value {
 /// made up when it is needed and is no value to read here.
 pub fn default_value(ty: &Type) -> Option<Value> {
     match ty.default()? {
-        Datum::Auto => None,
+        Datum::Scalar(Scalar::Auto) => None,
         datum => Some(datum_value(datum)),
     }
+}
+
+/// The plain value a data value is, or `None` for one that is more than that
+/// (a map, an element, content, etc.).
+pub fn value_to_datum(value: &Value) -> Option<Datum> {
+    Some(match value {
+        Value::None => Datum::Scalar(Scalar::None),
+        Value::Auto => Datum::Scalar(Scalar::Auto),
+        Value::Bool(b) => Datum::Scalar(Scalar::Bool(*b)),
+        Value::Int(n) => Datum::Scalar(Scalar::Int(*n)),
+        Value::Float(n) => Datum::Scalar(Scalar::Float(*n)),
+        Value::Number(text) => match text.parse::<i64>() {
+            Ok(n) => Datum::Scalar(Scalar::Int(n)),
+            Err(_) => {
+                let s = Scalar::from_bare(text).ok()?;
+                Datum::Scalar(s)
+            }
+        },
+        Value::String(text) => Datum::Scalar(Scalar::Text(text.clone())),
+        Value::Tuple(tuple) if tuple.has_no_named() => {
+            Datum::Seq(tuple.unnamed().map(value_to_datum).collect::<Option<_>>()?)
+        }
+        _ => return None,
+    })
 }
 
 /// [`admits`] for the `default` a type is written with, when it is a value written out: whether it
@@ -255,11 +275,11 @@ mod tests {
     #[test]
     fn a_datum_is_the_value_a_document_holds() {
         let datum = Datum::Seq(vec![
-            Datum::None,
-            Datum::Bool(true),
-            Datum::Int(3),
-            Datum::Float(1.5),
-            Datum::Text("a".to_string()),
+            Datum::Scalar(Scalar::None),
+            Datum::Scalar(Scalar::Bool(true)),
+            Datum::Scalar(Scalar::Int(3)),
+            Datum::Scalar(Scalar::Float(1.5)),
+            Datum::Scalar(Scalar::Text("a".to_string())),
             Datum::Seq(vec![]),
         ]);
         assert_eq!(

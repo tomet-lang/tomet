@@ -58,7 +58,7 @@
 
 use std::collections::HashMap;
 
-use tomet_ast::{BinaryOp, InterpExpr, InterpExprKind, Literal, Tuple, TupleEntry, Value};
+use tomet_ast::{BinaryOp, InterpExpr, InterpExprKind, Tuple, TupleEntry, Value};
 use tomet_declaration::{Arity, Placeholder, is_ident_placeholder, placeholder_of};
 use tomet_tree::fill_interpolations;
 
@@ -148,14 +148,7 @@ pub(crate) fn apply(
 
 fn eval(expr: &InterpExpr, cx: &EvalContext, env: &Env) -> Result<EvalValue, EvalError> {
     match &expr.kind {
-        InterpExprKind::Literal(literal) => Ok(match literal {
-            Literal::Int(i) => EvalValue::Int(*i),
-            Literal::Float(f) => EvalValue::Float(*f),
-            Literal::String(s) => EvalValue::String(s.clone()),
-            Literal::Bool(b) => EvalValue::Bool(*b),
-            Literal::None => EvalValue::None,
-            Literal::Auto => EvalValue::Auto,
-        }),
+        InterpExprKind::Literal(literal) => Ok(EvalValue::from(literal.clone())),
         InterpExprKind::Group(inner) => eval(inner, cx, env),
         InterpExprKind::Seq(items) => {
             let mut entries = Vec::with_capacity(items.len());

@@ -127,7 +127,7 @@ pub fn write_float(f: f64, out: &mut String) {
     } else if f.is_infinite() {
         out.push_str(if f > 0.0 { "float(inf)" } else { "float(-inf)" });
     } else {
-        out.push_str(&Value::float_text(f));
+        out.push_str(&tomet_scalar::float_text(f));
     }
 }
 

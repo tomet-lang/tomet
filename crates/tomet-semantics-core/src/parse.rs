@@ -1,7 +1,9 @@
 //! Reading type specifications from AST [`Value`]s.
 
 use tomet_ast::Value;
-use tomet_type::{Arg, Datum, Type, TypeError};
+use tomet_type::{Arg, Type, TypeError};
+
+use crate::admits::value_to_datum;
 
 /// Reads a `type:` specification as it is written in an AST [`Value`].
 ///
@@ -34,19 +36,10 @@ pub fn parse_type_spec(spec: &Value) -> Result<Type, TypeError> {
 /// One argument of a call: a type where a string or a call is written, and a
 /// plain value for a scalar (which `build` refuses where it is not wanted).
 fn arg(value: &Value) -> Result<Arg, TypeError> {
-    let datum = match value {
-        Value::String(_) | Value::Call(..) => return parse_type_spec(value).map(Arg::Type),
-        Value::None => Datum::None,
-        Value::Bool(b) => Datum::Bool(*b),
-        Value::Int(n) => Datum::Int(*n),
-        Value::Float(n) => Datum::Float(*n),
-        Value::Number(text) => match text.parse::<i64>() {
-            Ok(n) => Datum::Int(n),
-            Err(_) => Datum::Float(value.as_number().ok_or(TypeError::NotAType)?),
-        },
-        _ => return Err(TypeError::NotAType),
-    };
-    Ok(Arg::Datum(datum))
+    match value {
+        Value::String(_) | Value::Call(..) => parse_type_spec(value).map(Arg::Type),
+        _ => value_to_datum(value).map(Arg::Datum).ok_or(TypeError::NotAType),
+    }
 }
 
 #[cfg(test)]

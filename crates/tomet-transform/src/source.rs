@@ -111,6 +111,7 @@ impl Source for FixedSource {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use tomet_scalar::Scalar;
     use tomet_type::{Arg, Datum, Type};
 
     fn id_form(name: &str) -> IdSpec {
@@ -139,8 +140,8 @@ mod tests {
                 "nanoid",
                 &[],
                 &[
-                    ("length", Arg::Datum(Datum::Int(6))),
-                    ("prefix", Arg::Datum(Datum::Text(prefix.to_string()))),
+                    ("length", Arg::Datum(Datum::Scalar(Scalar::Int(6)))),
+                    ("prefix", Arg::Datum(Datum::Scalar(Scalar::Text(prefix.to_string())))),
                 ],
             )
             .expect("a type")

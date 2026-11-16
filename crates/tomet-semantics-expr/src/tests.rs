@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use tomet_scalar::Scalar;
 use tomet_type::{AutoFill, Datum, Kind, Type, TypeError};
 
 use super::*;
@@ -2506,7 +2507,7 @@ fn auto_is_read_as_the_default_of_a_type_and_a_keyword_value() {
     let EvalValue::Type(made) = out("uuid(default: auto)").unwrap() else {
         panic!("a type");
     };
-    assert_eq!(made.default(), Some(&Datum::Auto));
+    assert_eq!(made.default(), Some(&Datum::Scalar(Scalar::Auto)));
     assert_eq!(made.auto(), Some(AutoFill::Id));
 }
 

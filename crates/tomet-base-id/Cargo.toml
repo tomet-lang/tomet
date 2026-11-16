@@ -11,3 +11,6 @@ tomet-type = { workspace = true }
 #--- Crates.io ---
 nanoid = { workspace = true }
 uuid   = { workspace = true }
+
+[dev-dependencies]
+tomet-scalar = { workspace = true }

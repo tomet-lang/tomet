@@ -1,7 +1,8 @@
 //! Reverse URL-to-macro pattern matching and rewriting.
 
 use std::collections::HashMap;
-use tomet_ast::{File, InterpExpr, InterpExprKind, Interpolation, Literal, Value};
+use tomet_ast::{File, InterpExpr, InterpExprKind, Interpolation, Value};
+use tomet_scalar::Scalar;
 use tomet_semantics::{ElementKind, classify_std_lenient};
 use tomet_span::Span;
 use tomet_tree::{DataExt, for_each_element_mut};
@@ -100,8 +101,8 @@ impl MacroPattern {
             .iter()
             .map(|a| {
                 node(InterpExprKind::Literal(match a.parse::<i64>() {
-                    Ok(n) if n.to_string() == *a => Literal::Int(n),
-                    _ => Literal::String(a.clone()),
+                    Ok(n) if n.to_string() == *a => Scalar::Int(n),
+                    _ => Scalar::Text(a.clone()),
                 }))
             })
             .collect();

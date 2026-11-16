@@ -698,7 +698,7 @@ fn value_to_plain(v: &Value) -> String {
         Value::Auto => "auto".to_string(),
         Value::Bool(b) => b.to_string(),
         Value::Int(i) => i.to_string(),
-        Value::Float(f) => Value::float_text(*f),
+        Value::Float(f) => tomet_scalar::float_text(*f),
         Value::Number(text) => text.clone(),
         Value::String(s) => s.clone(),
         Value::Tuple(tuple) => {

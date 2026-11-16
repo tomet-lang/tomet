@@ -1,0 +1,10 @@
+[package]
+name                 = "tomet-scalar"
+version.workspace    = true
+edition.workspace    = true
+description          = "The scalar a document can hold -- none, auto, a boolean, an integer, a float, a number kept as written, a text -- and the one grammar that reads a bare word as one and writes one back."
+license.workspace    = true
+repository.workspace = true
+
+[dependencies]
+serde = { workspace = true }

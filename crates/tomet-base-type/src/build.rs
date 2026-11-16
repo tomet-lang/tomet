@@ -2,6 +2,8 @@
 //! whether it is one.
 
 use crate::ty::Form;
+use tomet_scalar::Scalar;
+
 use crate::{Arg, Datum, Kind, Type, TypeError};
 
 impl Type {
@@ -53,14 +55,14 @@ impl Type {
 
         // `auto` has one place; anything else is refused before the
         // parameters are read, so that it is not taken for a wrong value.
-        if let Some(Arg::Datum(Datum::Auto)) = positional.first() {
+        if let Some(Arg::Datum(Datum::Scalar(Scalar::Auto))) = positional.first() {
             return Err(TypeError::AutoElsewhere {
                 ty: kind,
                 argument: "item".to_string(),
             });
         }
         for (key, arg) in named {
-            if *key != "default" && matches!(arg, Arg::Datum(Datum::Auto)) {
+            if *key != "default" && matches!(arg, Arg::Datum(Datum::Scalar(Scalar::Auto))) {
                 return Err(TypeError::AutoElsewhere {
                     ty: kind,
                     argument: key.to_string(),
@@ -145,7 +147,7 @@ fn item_of(kind: Kind, arg: &Arg) -> Result<Type, TypeError> {
 /// A `length`: a whole number of at least `least`.
 fn length_of(kind: Kind, arg: &Arg, least: usize) -> Result<usize, TypeError> {
     match arg {
-        Arg::Datum(Datum::Int(n)) if usize::try_from(*n).is_ok_and(|n| n >= least) => {
+        Arg::Datum(Datum::Scalar(Scalar::Int(n))) if usize::try_from(*n).is_ok_and(|n| n >= least) => {
             Ok(usize::try_from(*n).unwrap_or(least))
         }
         _ => Err(wrong(
@@ -164,7 +166,7 @@ fn length_of(kind: Kind, arg: &Arg, least: usize) -> Result<usize, TypeError> {
 /// A `prefix`: text, where an empty one is none.
 fn prefix_of(kind: Kind, arg: &Arg) -> Result<Option<String>, TypeError> {
     match arg {
-        Arg::Datum(Datum::Text(prefix)) => Ok((!prefix.is_empty()).then(|| prefix.clone())),
+        Arg::Datum(Datum::Scalar(Scalar::Text(prefix))) => Ok((!prefix.is_empty()).then(|| prefix.clone())),
         _ => Err(wrong(kind, "prefix", "text", arg)),
     }
 }
@@ -172,8 +174,8 @@ fn prefix_of(kind: Kind, arg: &Arg) -> Result<Option<String>, TypeError> {
 /// A `default`: `auto` when the kind makes a value up, or a plain value.
 fn default_of(kind: Kind, arg: &Arg) -> Result<Datum, TypeError> {
     match arg {
-        Arg::Datum(Datum::Auto) if kind.auto().is_some() => Ok(Datum::Auto),
-        Arg::Datum(Datum::Auto) => Err(TypeError::AutoNotAllowed { ty: kind }),
+        Arg::Datum(Datum::Scalar(Scalar::Auto)) if kind.auto().is_some() => Ok(Datum::Scalar(Scalar::Auto)),
+        Arg::Datum(Datum::Scalar(Scalar::Auto)) => Err(TypeError::AutoNotAllowed { ty: kind }),
         Arg::Datum(datum) if datum.is_finite() => Ok(datum.clone()),
         Arg::Datum(_) => Err(wrong(
             kind,
@@ -188,7 +190,7 @@ fn default_of(kind: Kind, arg: &Arg) -> Result<Datum, TypeError> {
 /// An `overwrite`: a boolean (`true` or `false`).
 fn overwrite_of(kind: Kind, arg: &Arg) -> Result<bool, TypeError> {
     match arg {
-        Arg::Datum(Datum::Bool(b)) => Ok(*b),
+        Arg::Datum(Datum::Scalar(Scalar::Bool(b))) => Ok(*b),
         _ => Err(wrong(kind, "overwrite", "true or false", arg)),
     }
 }

@@ -170,7 +170,7 @@ impl<'a> Reader<'a> {
     fn datum(&mut self) -> Result<Datum, TypeError> {
         self.skip_space();
         match self.peek() {
-            Some('"') => Ok(Datum::Text(self.string()?)),
+            Some('"') => Ok(Datum::Scalar(tomet_scalar::Scalar::Text(self.string()?))),
             Some('(') => {
                 self.eat('(');
                 let mut items = Vec::new();
@@ -214,32 +214,25 @@ impl<'a> Reader<'a> {
     /// `None` when it is none of them (so a name). `start` is where it began,
     /// for the error of a number that is not one.
     fn literal(&mut self, word: &str, start: usize) -> Result<Option<Datum>, TypeError> {
-        match word {
-            "null" => {
+        let scalar = match tomet_scalar::Scalar::from_bare(word) {
+            Ok(s) => s,
+            Err(_) => {
                 self.at = start;
-                return Err(self.malformed("a bare `null` is an error: write `none`"));
+                return Err(self.malformed(tomet_scalar::NULL_ERROR));
             }
-            "none" => return Ok(Some(Datum::None)),
-            "auto" => return Ok(Some(Datum::Auto)),
-            "true" => return Ok(Some(Datum::Bool(true))),
-            "false" => return Ok(Some(Datum::Bool(false))),
-            _ => {}
-        }
-        let first = word.chars().next();
-        let numeric = first.is_some_and(|c| c.is_ascii_digit())
-            || (word.len() > 1 && matches!(first, Some('-' | '+')));
-        if !numeric {
-            return Ok(None);
-        }
-        if let Ok(n) = word.parse::<i64>() {
-            return Ok(Some(Datum::Int(n)));
-        }
-        match word.parse::<f64>() {
-            Ok(n) if n.is_finite() => Ok(Some(Datum::Float(n))),
-            _ => {
-                self.at = start;
-                Err(self.malformed("a number"))
+        };
+        match scalar {
+            tomet_scalar::Scalar::Text(_) => {
+                let first = word.chars().next();
+                if first.is_some_and(|c| c.is_ascii_digit())
+                    || (word.len() > 1 && matches!(first, Some('-' | '+')))
+                {
+                    self.at = start;
+                    return Err(self.malformed("a number"));
+                }
+                Ok(None)
             }
+            other => Ok(Some(Datum::from(other))),
         }
     }
 

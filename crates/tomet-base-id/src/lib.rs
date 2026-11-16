@@ -89,16 +89,17 @@ impl IdSpec {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use tomet_scalar::Scalar;
     use tomet_type::{Arg, Datum};
 
     /// The type `name` with the arguments given: what a vault's `id` settings come to.
     fn ty(name: &str, prefix: Option<&str>, length: Option<i64>) -> Type {
         let mut named = Vec::new();
         if let Some(length) = length {
-            named.push(("length", Arg::Datum(Datum::Int(length))));
+            named.push(("length", Arg::Datum(Datum::Scalar(Scalar::Int(length)))));
         }
         if let Some(prefix) = prefix {
-            named.push(("prefix", Arg::Datum(Datum::Text(prefix.to_string()))));
+            named.push(("prefix", Arg::Datum(Datum::Scalar(Scalar::Text(prefix.to_string())))));
         }
         Type::build(name, &[], &named).expect("a type")
     }

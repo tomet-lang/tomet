@@ -659,7 +659,9 @@ fn lower_single_value_from_children(
     if raw_scalars {
         Ok(Value::String(trimmed.to_string()))
     } else {
-        scalar_from_text(trimmed).map_err(|m| err(start, m))
+        tomet_scalar::Scalar::from_bare(trimmed)
+            .map(Value::from)
+            .map_err(|m| err(start, m))
     }
 }
 
@@ -761,69 +763,6 @@ fn is_block_placed_in_group(node: &SyntaxNode) -> bool {
     ends_line
 }
 
-/// What a bare scalar's text is, by the JSON number grammar.
-enum NumberShape {
-    Int,
-    Float,
-}
-
-fn classify_number(s: &str) -> Option<NumberShape> {
-    let b = s.as_bytes();
-    let digits = |mut i: usize| {
-        let start = i;
-        while b.get(i).is_some_and(u8::is_ascii_digit) {
-            i += 1;
-        }
-        (i > start).then_some(i)
-    };
-    let mut i = usize::from(b.first() == Some(&b'-'));
-    match b.get(i)? {
-        b'0' => i += 1,
-        b'1'..=b'9' => i = digits(i)?,
-        _ => return None,
-    }
-    let mut float = false;
-    if b.get(i) == Some(&b'.') {
-        i = digits(i + 1)?;
-        float = true;
-    }
-    if matches!(b.get(i), Some(b'e' | b'E')) {
-        i += 1;
-        if matches!(b.get(i), Some(b'+' | b'-')) {
-            i += 1;
-        }
-        i = digits(i)?;
-        float = true;
-    }
-    (i == b.len()).then_some(if float {
-        NumberShape::Float
-    } else {
-        NumberShape::Int
-    })
-}
-
-pub fn scalar_from_text(s: &str) -> std::result::Result<Value, String> {
-    match s {
-        "null" => return Err("a bare `null` is an error: write `none`".to_string()),
-        "none" => return Ok(Value::None),
-        "auto" => return Ok(Value::Auto),
-        "true" => return Ok(Value::Bool(true)),
-        "false" => return Ok(Value::Bool(false)),
-        _ => {}
-    }
-    match classify_number(s) {
-        Some(NumberShape::Int) => Ok(match s.parse::<i64>() {
-            Ok(i) if i.to_string() == s => Value::Int(i),
-            _ => Value::Number(s.to_string()),
-        }),
-        Some(NumberShape::Float) => Ok(match s.parse::<f64>() {
-            Ok(f) if f.is_finite() && Value::float_text(f) == s => Value::Float(f),
-            _ => Value::Number(s.to_string()),
-        }),
-        None => Ok(Value::String(s.to_string())),
-    }
-}
-
 pub fn resolve_call(name: &str, args: Tuple) -> std::result::Result<Value, String> {
     match name {
         "string" => construct_string(&args),
@@ -852,7 +791,7 @@ fn construct_string(args: &Tuple) -> std::result::Result<Value, String> {
         Some(Value::None) => "none".to_string(),
         Some(Value::Auto) => "auto".to_string(),
         Some(Value::Number(text)) => text.clone(),
-        Some(Value::Float(f)) if f.is_finite() => Value::float_text(*f),
+        Some(Value::Float(f)) if f.is_finite() => tomet_scalar::float_text(*f),
         Some(Value::Float(f)) if f.is_nan() => "nan".to_string(),
         Some(Value::Float(f)) => (if *f > 0.0 { "inf" } else { "-inf" }).to_string(),
         Some(other) => return Err(format!("string() takes a scalar, got {other:?}")),
