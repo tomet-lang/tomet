@@ -28,6 +28,11 @@ pub trait Resolver {
     /// `None` when the document lacks them. A key that is not declared and
     /// not present is absent from the map.
     fn meta(&self, doc: &DocRef) -> Result<EvalValue, String>;
+    /// The raw source text of `doc` as written on disk.
+    ///
+    /// For the document being evaluated itself, this reads the saved file on disk;
+    /// unsaved buffer state is not used.
+    fn source(&self, doc: &DocRef) -> Result<String, String>;
     /// Prepares `blocks`, which were read from `doc`, as `doc` itself would
     /// be prepared: its own expressions evaluated in its own context, its
     /// macros, its `self`. This is what makes an included file mean what it
@@ -118,6 +123,9 @@ impl Resolver for NoResolver {
     }
     fn meta(&self, doc: &DocRef) -> Result<EvalValue, String> {
         Err(format!("no vault to read the metadata of `{}` from", doc.0))
+    }
+    fn source(&self, doc: &DocRef) -> Result<String, String> {
+        Err(format!("no vault to read the source of `{}` from", doc.0))
     }
     fn prepare_blocks(
         &self,

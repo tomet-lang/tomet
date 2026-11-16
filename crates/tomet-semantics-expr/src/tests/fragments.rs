@@ -527,3 +527,159 @@ fn unicode_takes_a_code_point_as_a_number_or_hex_text() {
         Err(EvalError::TypeMismatch { got: "bool", .. })
     ));
 }
+
+fn zero_element_spans(el: &mut tomet_ast::Element) {
+    use tomet_ast::Block;
+    el.span = tomet_span::Span::default();
+    if let Some(content) = &mut el.content {
+        for block in content {
+            if let Block::Paragraph(p) = block {
+                p.span = tomet_span::Span::default();
+                for inline in &mut p.content {
+                    if let tomet_ast::Inline::Raw(r) = inline {
+                        r.span = tomet_span::Span::default();
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// Pins that `raw(text, lang: ...)` builds an element structurally equal to a parsed fenced block.
+/// The test must fail if the representation of a fenced block ever changes.
+#[test]
+fn raw_matches_parsed_fenced_block_structurally() {
+    use tomet_ast::Block;
+    // 1. With lang
+    let parsed_file = tomet_ast_parser::parse_file("```tmt\nhello world\n```\n").unwrap();
+    let mut parsed_el = match parsed_file.body.into_iter().next().unwrap() {
+        Block::Element(el) => el,
+        other => panic!("expected Block::Element, got {other:?}"),
+    };
+    let raw_val = out(r#"raw("hello world", lang: "tmt")"#).unwrap();
+    let EvalValue::Fragment(raw_blocks) = raw_val else {
+        panic!("expected Fragment");
+    };
+    let mut raw_el = match <[Block; 1]>::try_from(raw_blocks).unwrap()[0].clone() {
+        Block::Element(el) => el,
+        other => panic!("expected Block::Element, got {other:?}"),
+    };
+    zero_element_spans(&mut parsed_el);
+    zero_element_spans(&mut raw_el);
+    assert_eq!(parsed_el, raw_el);
+
+    // 2. Without lang
+    let parsed_no_lang = tomet_ast_parser::parse_file("```\nhello world\n```\n").unwrap();
+    let mut parsed_no_lang_el = match parsed_no_lang.body.into_iter().next().unwrap() {
+        Block::Element(el) => el,
+        other => panic!("expected Block::Element, got {other:?}"),
+    };
+    let raw_no_lang_val = out(r#"raw("hello world")"#).unwrap();
+    let EvalValue::Fragment(raw_no_lang_blocks) = raw_no_lang_val else {
+        panic!("expected Fragment");
+    };
+    let mut raw_no_lang_el = match <[Block; 1]>::try_from(raw_no_lang_blocks).unwrap()[0].clone() {
+        Block::Element(el) => el,
+        other => panic!("expected Block::Element, got {other:?}"),
+    };
+    zero_element_spans(&mut parsed_no_lang_el);
+    zero_element_spans(&mut raw_no_lang_el);
+    assert_eq!(parsed_no_lang_el, raw_no_lang_el);
+}
+
+#[test]
+fn raw_errors_report_expected_type_and_argument_shape() {
+    // No argument
+    assert_eq!(
+        out("raw()"),
+        Err(EvalError::WrongArgCount {
+            function: "raw".to_string(),
+            expected: "1".to_string(),
+            got: 0,
+        })
+    );
+
+    // Two positional arguments
+    assert_eq!(
+        out(r#"raw("a", "b")"#),
+        Err(EvalError::WrongArgCount {
+            function: "raw".to_string(),
+            expected: "1".to_string(),
+            got: 2,
+        })
+    );
+
+    // First argument is not a text scalar
+    assert_eq!(
+        out("raw(none)"),
+        Err(EvalError::TypeMismatch {
+            what: "`raw`".to_string(),
+            expected: "a text scalar".to_string(),
+            got: "none",
+        })
+    );
+    assert_eq!(
+        out("raw((1, 2))"),
+        Err(EvalError::TypeMismatch {
+            what: "`raw`".to_string(),
+            expected: "a text scalar".to_string(),
+            got: "tuple",
+        })
+    );
+    assert_eq!(
+        out("raw(1)"),
+        Err(EvalError::TypeMismatch {
+            what: "`raw`".to_string(),
+            expected: "a text scalar".to_string(),
+            got: "int",
+        })
+    );
+    assert_eq!(
+        in_vault("raw(self)"),
+        Err(EvalError::TypeMismatch {
+            what: "`raw`".to_string(),
+            expected: "a text scalar".to_string(),
+            got: "document",
+        })
+    );
+    assert_eq!(
+        in_vault("raw(self.link())"),
+        Err(EvalError::TypeMismatch {
+            what: "`raw`".to_string(),
+            expected: "a text scalar".to_string(),
+            got: "fragment",
+        })
+    );
+    assert_eq!(
+        in_vault("raw(#c1)"),
+        Err(EvalError::TypeMismatch {
+            what: "`raw`".to_string(),
+            expected: "a text scalar".to_string(),
+            got: "element",
+        })
+    );
+
+    // lang is not a text scalar
+    assert_eq!(
+        out(r#"raw("a", lang: 1)"#),
+        Err(EvalError::TypeMismatch {
+            what: "`raw`'s `lang:`".to_string(),
+            expected: "a text scalar".to_string(),
+            got: "int",
+        })
+    );
+    assert_eq!(
+        out(r#"raw("a", lang: none)"#),
+        Err(EvalError::TypeMismatch {
+            what: "`raw`'s `lang:`".to_string(),
+            expected: "a text scalar".to_string(),
+            got: "none",
+        })
+    );
+
+    // Any other named argument
+    assert_eq!(
+        out(r#"raw("a", other: "x")"#),
+        Err(EvalError::Message("`raw` takes `lang:`, not `other:`".to_string()))
+    );
+}

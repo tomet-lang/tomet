@@ -465,6 +465,10 @@ pub const FUNCTIONS: &[(&str, &str)] = &[
         "A document's content, put here `include(tmt(\"path\"))`",
     ),
     ("link", "A link to a document or an element `link(target)`"),
+    (
+        "raw",
+        "A raw code block from text `raw(text, lang: \"...\")`",
+    ),
     ("add", "Arithmetic addition function `add(a, b)`"),
     ("sub", "Arithmetic subtraction function `sub(a, b)`"),
     ("mul", "Arithmetic multiplication function `mul(a, b)`"),
@@ -540,6 +544,7 @@ fn builtin(name: &str, args: Args, cx: &EvalContext) -> Result<EvalValue, EvalEr
             [target, label] => fragments::link_fragment(target, Some(label)),
             _ => unreachable!("`between` returned 1 or 2 values"),
         },
+        "raw" => fragments::raw_fragment(args),
         "emoji" => match args.exactly(name, 1)?.pop() {
             Some(EvalValue::Scalar(Scalar::Text(name))) => {
                 let key = name.trim().trim_matches(':');

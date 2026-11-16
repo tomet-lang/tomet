@@ -28,6 +28,7 @@ const PLACEMENT_FUNCTIONS: &[&str] = &["link"];
 #[cfg(test)]
 const INSIDE_FUNCTIONS: &[&str] = &[
     "add", "sub", "mul", "div", "mod", "not", "exists", "emoji", "unicode", "version", "addr",
+    "raw",
 ];
 
 /// What an expression takes from outside the file.
@@ -286,6 +287,7 @@ mod tests {
             "macro.mine(1)",
             "var.name",
             "self::kind",
+            "self::source",
             "self.item(0)",
             "#intro",
             "self#intro",
@@ -314,6 +316,10 @@ mod tests {
         assert_eq!(reaches("self::meta.created"), vec![Reach::FieldType]);
         assert_eq!(
             reaches("tmt(\"a.tmt\").kind"),
+            vec![Reach::OtherDocument("tmt")]
+        );
+        assert_eq!(
+            reaches("tmt(\"a.tmt\")::source"),
             vec![Reach::OtherDocument("tmt")]
         );
         assert_eq!(reaches("ref(\"note\")"), vec![Reach::OtherDocument("ref")]);

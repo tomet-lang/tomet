@@ -101,6 +101,10 @@ impl Resolver for Overlay<'_> {
         }
     }
 
+    fn source(&self, doc: &DocRef) -> Result<String, String> {
+        self.inner.source(doc)
+    }
+
     fn prepare_blocks(
         &self,
         doc: &DocRef,

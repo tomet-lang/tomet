@@ -255,6 +255,31 @@ fn a_type_in_the_text_has_no_place_there() {
 }
 
 #[test]
+fn raw_placement_alone_on_line_gives_block_and_inline_is_type_mismatch() {
+    // 1. Block position (alone on a line): resolves to Block::Element(raw)
+    let (doc, unresolved) = run("{$ raw(\"fn main() {}\", lang: \"rust\") }\n");
+    assert!(unresolved.is_empty(), "unresolved: {unresolved:?}");
+    assert_eq!(doc.body.len(), 1);
+    match &doc.body[0] {
+        Block::Element(el) => {
+            assert_eq!(el.name.to_string(), "raw");
+            assert_eq!(el.placement, tomet_ast::Placement::Block);
+        }
+        other => panic!("expected Block::Element, got {other:?}"),
+    }
+
+    // 2. Inline position (inside a paragraph): fragment of more than one paragraph is rejected
+    let (doc, unresolved) = run("Look: {$ raw(\"fn main() {}\", lang: \"rust\") }\n");
+    assert_eq!(unresolved.len(), 1);
+    let reason = reasons(&unresolved)[0];
+    assert!(
+        reason.contains("cannot go inside a paragraph"),
+        "expected mismatch reason, got: {reason}"
+    );
+    assert_eq!(text_of(&doc), "Look: $raw(\"fn main() {}\", lang: \"rust\")");
+}
+
+#[test]
 fn an_expression_that_fails_is_written_back_as_its_own_source() {
     let (doc, unresolved) = run("Hi $(nope) there $gh(1).\n");
     assert_eq!(text_of(&doc), "Hi $(nope) there $gh(1).");

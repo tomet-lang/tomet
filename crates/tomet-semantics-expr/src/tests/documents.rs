@@ -211,10 +211,84 @@ fn document_members() {
         EvalValue::Scalar(Scalar::None)
     );
     assert_eq!(
+        in_vault("self::source").unwrap(),
+        text(HERE.strip_suffix('\n').unwrap())
+    );
+    assert_eq!(
+        in_vault("tmt(\"docs/a.tmt\")::source").unwrap(),
+        text(DOC_A.strip_suffix('\n').unwrap())
+    );
+    assert_eq!(
+        in_vault("self.source"),
+        Err(EvalError::Retired {
+            written: ".source".to_string(),
+            instead: "`.` reads the data keys of a node, and `::` reaches what hangs off it; write `::source`".to_string(),
+        })
+    );
+    assert_eq!(
         in_vault("self.nope"),
         Err(EvalError::UnknownMember {
             on: "document",
             member: "nope".to_string()
+        })
+    );
+}
+
+#[test]
+fn document_source_edge_cases_and_trailing_line_breaks() {
+    let resolver = MemoryResolver::new()
+        .with_source("lf.tmt", "one\ntwo\n")
+        .unwrap()
+        .with_source("crlf.tmt", "one\r\ntwo\r\n")
+        .unwrap()
+        .with_source("none.tmt", "one\ntwo")
+        .unwrap()
+        .with_source("double_lf.tmt", "one\ntwo\n\n")
+        .unwrap()
+        .with_source("double_crlf.tmt", "one\r\ntwo\r\n\r\n")
+        .unwrap()
+        .with_source("empty.tmt", "")
+        .unwrap();
+
+    assert_eq!(
+        in_resolver(&resolver, "tmt(\"lf.tmt\")::source").unwrap(),
+        text("one\ntwo")
+    );
+    assert_eq!(
+        in_resolver(&resolver, "tmt(\"crlf.tmt\")::source").unwrap(),
+        text("one\r\ntwo")
+    );
+    assert_eq!(
+        in_resolver(&resolver, "tmt(\"none.tmt\")::source").unwrap(),
+        text("one\ntwo")
+    );
+    assert_eq!(
+        in_resolver(&resolver, "tmt(\"double_lf.tmt\")::source").unwrap(),
+        text("one\ntwo\n")
+    );
+    assert_eq!(
+        in_resolver(&resolver, "tmt(\"double_crlf.tmt\")::source").unwrap(),
+        text("one\r\ntwo\r\n")
+    );
+    assert_eq!(
+        in_resolver(&resolver, "tmt(\"empty.tmt\")::source").unwrap(),
+        text("")
+    );
+
+    // Document that cannot be loaded/found is an Unresolved error
+    assert_eq!(
+        in_resolver(&resolver, "tmt(\"missing.tmt\")::source"),
+        Err(EvalError::Unresolved(
+            "document `missing.tmt`: not found".to_string()
+        ))
+    );
+
+    // Elements do not have ::source (documents only)
+    assert_eq!(
+        in_vault("#c1::source"),
+        Err(EvalError::UnknownMember {
+            on: "element",
+            member: "source".to_string(),
         })
     );
 }

@@ -352,6 +352,58 @@ fn raw_block_uses_fence_and_lang() {
 }
 
 #[test]
+fn raw_export_fence_selection_and_roundtrip() {
+    let cases = [
+        ("multiline", "line 1\nline 2\nline 3", "```"),
+        ("backticks_inline", "code with `inline`", "```"),
+        ("fence_inside", "before\n```\nafter", "````"),
+        ("four_backticks", "before\n````\nafter", "`````"),
+        ("leading_spaces", "   four spaces\n  two spaces", "```"),
+        ("empty", "", "```"),
+    ];
+    for (_name, code, expected_fence) in cases {
+        let doc = make_raw_block(code, Some("tmt"));
+        let md = to_markdown(&doc);
+        assert!(
+            md.starts_with(&format!("{expected_fence}tmt\n")),
+            "expected fence {expected_fence} for {code:?}, got:\n{md}"
+        );
+        let re_doc = crate::import::from_markdown(&md);
+        match &re_doc.body[0] {
+            Block::Element(el) => {
+                let roundtripped = el.content.as_deref().map(blocks_to_plain).unwrap_or_default();
+                assert_eq!(roundtripped, code, "roundtrip mismatch for code {code:?}");
+            }
+            other => panic!("expected Block::Element, got {other:?}"),
+        }
+    }
+}
+
+fn make_raw_block(code: &str, lang: Option<&str>) -> File {
+    let el = Element {
+        name: Name::bare("raw"),
+        placement: Placement::Block,
+        data: Data {
+            args: lang.map(|l| {
+                Tuple::from_named([(
+                    "lang".to_string(),
+                    Value::Scalar(Scalar::Text(l.to_string())),
+                )])
+            }),
+            value: None,
+        },
+        content: Some(wrap_content(vec![Inline::Raw(RawText::new(
+            code,
+            Span::dummy(),
+        ))])),
+        id: None,
+        connects: Vec::new(),
+        span: Span::dummy(),
+    };
+    doc_from_blocks(vec![Block::Element(el)])
+}
+
+#[test]
 fn raw_inline_uses_backticks() {
     let el = Element {
         name: Name::bare("raw"),

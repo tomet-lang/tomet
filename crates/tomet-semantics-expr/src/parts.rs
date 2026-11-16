@@ -427,14 +427,25 @@ pub(crate) fn part_method(
     }
 }
 
+/// Strips only one final line break (`\n` or `\r\n`) from the very end of the text.
+fn strip_final_line_break(s: &str) -> &str {
+    if let Some(stripped) = s.strip_suffix("\r\n") {
+        stripped
+    } else if let Some(stripped) = s.strip_suffix('\n') {
+        stripped
+    } else {
+        s
+    }
+}
+
 // ---- members of a document and a directory -----------------------------------
 
-/// `doc.member`: a document holds no data of its own to read with a dot. Its path, filename, meta
-/// and kind are reached with `::`, and the error says so.
+/// `doc.member`: a document holds no data of its own to read with a dot. Its path, filename, meta,
+/// kind and source are reached with `::`, and the error says so.
 pub(crate) fn document_member(doc: &DocRef, member: &str) -> Result<EvalValue, EvalError> {
     let _ = doc;
     match member {
-        "path" | "filename" | "meta" | "kind" => Err(moved_to_connect(member)),
+        "path" | "filename" | "meta" | "kind" | "source" => Err(moved_to_connect(member)),
         _ => Err(EvalError::UnknownMember {
             on: "document",
             member: member.to_string(),
@@ -452,7 +463,7 @@ fn moved_to_connect(member: &str) -> EvalError {
     }
 }
 
-/// `doc::member`: the document's `path`, `filename`, `meta`, `kind` and `id`; `doc` is the document
+/// `doc::member`: the document's `path`, `filename`, `source`, `meta`, `kind` and `id`; `doc` is the document
 /// itself, as it is for every node in it.
 pub(crate) fn document_connect(
     doc: &DocRef,
@@ -475,6 +486,14 @@ pub(crate) fn document_connect(
             .map(|s| EvalValue::Scalar(Scalar::Text(s.to_string())))
             .unwrap_or(EvalValue::Scalar(Scalar::None))),
         "doc" => Ok(EvalValue::Document(doc.clone())),
+        "source" => {
+            let raw = cx
+                .resolver
+                .source(doc)
+                .map_err(|why| EvalError::Unresolved(format!("document `{}`: {why}", doc.0)))?;
+            let stripped = strip_final_line_break(&raw);
+            Ok(EvalValue::Scalar(Scalar::Text(stripped.to_string())))
+        }
         _ => Err(EvalError::UnknownMember {
             on: "document",
             member: member.to_string(),

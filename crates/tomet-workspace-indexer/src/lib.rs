@@ -305,7 +305,8 @@ pub fn is_ctmt_file(p: &Path) -> bool {
         .is_some_and(|ext| ext.eq_ignore_ascii_case("ctmt"))
 }
 
-fn is_tm_file(p: &Path) -> bool {
+/// Whether `p` is a tomet document file (`.tmt` or `.tm`).
+pub fn is_tm_file(p: &Path) -> bool {
     p.extension()
         .and_then(|ext| ext.to_str())
         .map(|ext| ext.eq_ignore_ascii_case("tm") || ext.eq_ignore_ascii_case("tmt"))

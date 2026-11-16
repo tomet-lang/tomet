@@ -16,6 +16,7 @@ use super::value::{DirRef, DocRef, EvalValue};
 #[derive(Default)]
 pub struct MemoryResolver {
     docs: BTreeMap<String, Arc<File>>,
+    sources: BTreeMap<String, String>,
 }
 
 impl MemoryResolver {
@@ -37,6 +38,7 @@ impl MemoryResolver {
     ) -> Result<Self, tomet_ast_parser::Error> {
         let doc = tomet_ast_parser::parse_file(source)?;
         self.docs.insert(path.to_string(), Arc::new(doc));
+        self.sources.insert(path.to_string(), source.to_string());
         Ok(self)
     }
 }
@@ -84,6 +86,13 @@ impl Resolver for MemoryResolver {
             Some(meta) => EvalValue::from_ast(&meta, doc),
             None => EvalValue::Tuple(Tuple::new()),
         })
+    }
+
+    fn source(&self, doc: &DocRef) -> Result<String, String> {
+        self.sources
+            .get(&doc.0)
+            .cloned()
+            .ok_or_else(|| "not found".to_string())
     }
 
     fn prepare_blocks(

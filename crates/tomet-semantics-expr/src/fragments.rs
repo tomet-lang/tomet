@@ -1,10 +1,11 @@
-//! Values that are trees: what `link` builds.
+//! Values that are trees: what `link` and `raw` build.
 
-use tomet_ast::{Block, Inline, Name, Paragraph, Text, Tuple, Value};
+use tomet_ast::{Block, Inline, Name, Paragraph, Placement, RawText, Text, Tuple, Value};
 use tomet_scalar::Scalar;
 use tomet_span::Span;
-use tomet_tree::element_new;
+use tomet_tree::{ElementExt, element_new};
 
+use super::args::Args;
 use super::error::EvalError;
 use super::value::EvalValue;
 
@@ -69,4 +70,69 @@ pub(crate) fn link_fragment(
         vec![Inline::Element(link)],
         span,
     ))]))
+}
+
+/// Builds a raw code block fragment: `raw(text, lang: "...")`.
+pub(crate) fn raw_fragment(args: Args) -> Result<EvalValue, EvalError> {
+    let mut lang = None;
+    for (name, value) in &args.named {
+        match (name.as_str(), value) {
+            ("lang", EvalValue::Scalar(Scalar::Text(text))) => {
+                lang = Some(text.clone());
+            }
+            ("lang", other) => {
+                return Err(EvalError::mismatch(
+                    "`raw`'s `lang:`",
+                    "a text scalar",
+                    other.type_name(),
+                ));
+            }
+            (other, _) => {
+                return Err(EvalError::message(format!(
+                    "`raw` takes `lang:`, not `{other}:`"
+                )));
+            }
+        }
+    }
+    let mut positional = args.positional;
+    if positional.is_empty() {
+        return Err(EvalError::WrongArgCount {
+            function: "raw".to_string(),
+            expected: "1".to_string(),
+            got: 0,
+        });
+    }
+    if positional.len() > 1 {
+        return Err(EvalError::WrongArgCount {
+            function: "raw".to_string(),
+            expected: "1".to_string(),
+            got: positional.len(),
+        });
+    }
+    let code = match positional.remove(0) {
+        EvalValue::Scalar(Scalar::Text(text)) => text,
+        other => {
+            return Err(EvalError::mismatch(
+                "`raw`",
+                "a text scalar",
+                other.type_name(),
+            ));
+        }
+    };
+
+    let span = Span::default();
+    let mut element = element_new(Name::bare("raw"))
+        .with_placement(Placement::Block)
+        .with_span(span)
+        .with_content(vec![Block::Paragraph(Paragraph::new(
+            vec![Inline::Raw(RawText::new(code, span))],
+            span,
+        ))]);
+    if let Some(l) = lang {
+        element.data.args = Some(Tuple::from_named(vec![(
+            "lang".to_string(),
+            Value::Scalar(Scalar::Text(l)),
+        )]));
+    }
+    Ok(EvalValue::Fragment(vec![Block::Element(element)]))
 }
