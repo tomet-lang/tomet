@@ -7,7 +7,7 @@
 //! refusals come out as [`EvalError::BadType`] in its own words.
 
 use tomet_ast::{InterpExpr, InterpExprKind};
-use tomet_semantics_core::admits::value_to_datum;
+use tomet_semantics_core::value_to_datum;
 use tomet_type::{Arg, Datum, Kind, Type, TypeError};
 
 use super::context::EvalContext;

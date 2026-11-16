@@ -24,4 +24,3 @@ tomet-crate = { package = "tomet", path = "../../crates/tomet", features = [
 #--- Crates.io ---
 pyo3      = { workspace = true, features = ["auto-initialize"] }
 pythonize = { workspace = true }
-serde     = { workspace = true }

@@ -1,6 +1,6 @@
 //! Attribute, value and escaping helpers shared by the renderers.
 
-use tomet_ast::{Block, Data, Id, Inline, Tuple, Value};
+use tomet_ast::{Block, Data, Id, Inline, Tuple};
 use tomet_semantics::{EXACT_DATA_KEY, flatten_data, is_attribute_key};
 use tomet_tree::ValueExt;
 
@@ -67,8 +67,8 @@ pub(crate) fn split_attrs(attrs: Option<&Tuple>) -> (Option<String>, Vec<(String
     if let Some(tuple) = attrs {
         for (k, v) in tuple.named() {
             match k {
-                "cssclass" => class = Some(value_to_plain(v)),
-                _ => data.push((k.to_string(), value_to_plain(v))),
+                "cssclass" => class = Some(v.plain_text()),
+                _ => data.push((k.to_string(), v.plain_text())),
             }
         }
     }
@@ -123,7 +123,7 @@ pub(crate) fn push_data_attr(out: &mut String, key: &str, value: &str) {
 /// invisible to the reader.
 ///
 /// They are not dropped in silence: `as_data` returns a `Value::Tuple` for
-/// every group, and `value_to_plain` answers `""` for every map, so a
+/// every group, and `plain_text` answers `""` for every map, so a
 /// `tm-value` span built from it would never be written.
 ///
 /// A key `(args)` already spent is skipped rather than written twice,
@@ -173,10 +173,6 @@ pub(crate) fn push_data_attrs(out: &mut String, args: Option<&Tuple>, skip: &[&s
             escape_attr(&exact)
         ));
     }
-}
-
-pub(crate) fn value_to_plain(v: &Value) -> String {
-    v.plain_text()
 }
 
 pub(crate) fn escape_html(s: &str) -> String {

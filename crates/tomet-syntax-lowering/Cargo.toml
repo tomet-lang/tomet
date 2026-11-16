@@ -14,8 +14,6 @@ tomet-position = { workspace = true }
 tomet-scalar   = { workspace = true }
 tomet-span     = { workspace = true }
 tomet-tree     = { workspace = true }
-#--- Crates.io ---
-unicode-width = { workspace = true }
 
 [dev-dependencies]
 tomet-cst-parser = { workspace = true }

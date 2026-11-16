@@ -64,6 +64,7 @@ const SCALARS: &[&str] = &[
     "a$b",
     "a\nb",
     "a\tb",
+    "a\rb",
     "a\"b",
     "a\\b",
     "a: b",

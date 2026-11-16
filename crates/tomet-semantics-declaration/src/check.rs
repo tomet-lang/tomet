@@ -7,7 +7,7 @@
 
 use tomet_ast::Value;
 use tomet_scalar::Scalar;
-use tomet_semantics_core::admits::{admits, is_placeholder};
+use tomet_semantics_core::{admits, is_placeholder};
 use tomet_type::{Kind, Type};
 
 use crate::declaration::{Declaration, EntriesError};

@@ -14,7 +14,18 @@ pub fn is_interp_ident_char(c: char) -> bool {
     c.is_ascii_alphanumeric() || c == '_' || c == '-'
 }
 
-/// Reads a `"..."` string, with `\"`, `\\`, `\n`, `\t` escapes.
+/// The character an escape `\c` stands for inside `"..."`: `\n`, `\r` and `\t` are a line feed, a
+/// carriage return and a tab, and any other character stands for itself (`\"`, `\\`).
+pub(crate) fn unescape(c: char) -> char {
+    match c {
+        'n' => '\n',
+        'r' => '\r',
+        't' => '\t',
+        other => other,
+    }
+}
+
+/// Reads a `"..."` string, with `\"`, `\\`, `\n`, `\r`, `\t` escapes.
 pub fn parse_quoted(cur: &mut Cursor) -> Result<String> {
     let start = cur.pos();
     if !cur.eat_str("\"") {
@@ -26,11 +37,7 @@ pub fn parse_quoted(cur: &mut Cursor) -> Result<String> {
             None => return Err(err(start, "unterminated string")),
             Some('"') => break,
             Some('\\') => match cur.bump() {
-                Some('"') => out.push('"'),
-                Some('\\') => out.push('\\'),
-                Some('n') => out.push('\n'),
-                Some('t') => out.push('\t'),
-                Some(other) => out.push(other),
+                Some(escaped) => out.push(unescape(escaped)),
                 None => return Err(err(start, "unterminated string")),
             },
             Some(c) => out.push(c),
@@ -709,7 +716,7 @@ fn parse_interp_primary(cur: &mut Cursor, start_pos: usize) -> Result<InterpExpr
             // are values, not keywords: nothing else in an expression is
             // reserved by its spelling.
             let kind = match tomet_scalar::Scalar::from_bare(&name) {
-                Err(msg) => return Err(err(start_pos, msg)),
+                Err(msg) => return Err(err(start_pos, msg.to_string())),
                 Ok(scalar) if tomet_scalar::Scalar::is_value_keyword(&name) => {
                     InterpExprKind::Literal(scalar)
                 }
@@ -775,7 +782,7 @@ fn parse_interp_number(cur: &mut Cursor, start: usize) -> Result<InterpExpr> {
         }
     }
     let text = cur.slice_from(start);
-    let scalar = tomet_scalar::Scalar::from_bare(text).map_err(|m| err(start, m))?;
+    let scalar = tomet_scalar::Scalar::from_bare(text).map_err(|m| err(start, m.to_string()))?;
     if matches!(scalar, tomet_scalar::Scalar::Text(_)) {
         return Err(err(start, "invalid number literal"));
     }

@@ -309,13 +309,6 @@ impl EvalValue {
     }
 }
 
-/// The text of a bare scalar, if that is what the value is.
-///
-/// See [`EvalValue::scalar_text`].
-pub fn scalar_text(value: &EvalValue) -> Option<String> {
-    value.scalar_text()
-}
-
 impl From<tomet_scalar::Scalar> for EvalValue {
     fn from(s: tomet_scalar::Scalar) -> Self {
         EvalValue::Scalar(s)

@@ -5,7 +5,6 @@ use crate::RenderCtx;
 use crate::block::render_content_blocks;
 use crate::util::{
     blocks_to_plain, escape_attr, escape_html, id_attr, push_named_attrs, split_attrs,
-    value_to_plain,
 };
 use tomet_ast::{ElementView, Value};
 use tomet_semantics::element_args_view;
@@ -70,7 +69,7 @@ pub(crate) fn render_raw_element(el: ElementView<'_>, out: &mut String, inline: 
     let lang = args
         .as_ref()
         .and_then(|a| a.get("lang"))
-        .map(value_to_plain)
+        .map(ValueExt::plain_text)
         .unwrap_or_default();
     let code = el.content.map(blocks_to_plain).unwrap_or_default();
     let attrs = el.data.value.as_ref().map(|v| v.as_data());

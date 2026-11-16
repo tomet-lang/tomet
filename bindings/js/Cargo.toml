@@ -15,7 +15,6 @@ tomet = { workspace = true, features = [
   "highlight",
   "printer",
 ] }
-tomet-cst = { workspace = true }
 tomet-links = { workspace = true }
 tomet-transform = { workspace = true }
 #--- Crates.io ---

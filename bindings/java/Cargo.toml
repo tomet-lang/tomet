@@ -17,5 +17,4 @@ tomet = { workspace = true, features = [
 ] }
 #--- Crates.io ---
 jni        = { workspace = true }
-serde      = { workspace = true }
 serde_json = { workspace = true }

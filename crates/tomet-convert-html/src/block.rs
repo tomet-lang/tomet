@@ -4,12 +4,13 @@
 use crate::elements::{HeadingState, render_element, render_interp};
 use crate::util::{
     escape_attr, escape_html, id_attr, inlines_to_plain, push_data_attr, push_named_attrs,
-    split_attrs, value_to_plain,
+    split_attrs,
 };
 use crate::{HeadingInfo, RenderCtx};
 use tomet_ast::{Block, ElementView, Inline, List, Paragraph, Section, Value};
 use tomet_semantics::{ElementKind, classify_std_lenient, heading_level};
 use tomet_span::Span;
+use tomet_tree::ValueExt;
 
 /// Dispatches one top-level document block, and -- when
 /// `RenderOptions::emit_source_spans` is set -- tags whatever it emits as
@@ -247,14 +248,14 @@ fn render_list(cx: &RenderCtx, list: &List, out: &mut String) {
         if let Some(marker) = &item.data.args {
             out.push_str("<span class=\"tm-list-marker\"");
             for (k, v) in marker.named() {
-                push_data_attr(out, k, &value_to_plain(v));
+                push_data_attr(out, k, &v.plain_text());
             }
             if let Some(first_unnamed) = marker.nth_unnamed(0) {
                 match first_unnamed {
                     Value::Element(_) | Value::Interp(_) => {}
                     other => out.push_str(&format!(
                         " data-marker=\"{}\"",
-                        escape_attr(&value_to_plain(other))
+                        escape_attr(&other.plain_text())
                     )),
                 }
             }
@@ -266,7 +267,7 @@ fn render_list(cx: &RenderCtx, list: &List, out: &mut String) {
                     }
                     Value::Interp(interp) => render_interp(interp, out),
                     other => {
-                        let text = value_to_plain(other);
+                        let text = other.plain_text();
                         if !text.is_empty() {
                             out.push_str(&format!("[{}]", escape_html(&text)));
                         }

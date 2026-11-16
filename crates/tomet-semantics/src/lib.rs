@@ -88,8 +88,8 @@ pub use positional::{
 };
 pub use rebase::rebase_relative_links;
 pub use tomet_declaration::DeclKind;
+/// The view the `*_args_view` functions return, so a caller can name it without the core crate.
 pub use tomet_semantics_core::TupleView;
-pub use tomet_semantics_core::admits::{Mismatch, admits};
 pub use tomet_tree::{ElementExt, ValueExt};
 pub use vocabulary::{
     Bindings, ContentAllow, ElementDecl, LoadedVocabularies, ParamDecl, RESERVED_ELEMENT_NAMES,

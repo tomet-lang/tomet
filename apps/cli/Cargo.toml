@@ -19,7 +19,6 @@ tomet-ast-parser         = { workspace = true }
 tomet-config             = { workspace = true }
 tomet-convert-standalone = { workspace = true }
 tomet-declaration        = { workspace = true }
-tomet-expr               = { workspace = true }
 tomet-formatter          = { workspace = true }
 tomet-html               = { workspace = true }
 tomet-indexer            = { workspace = true }
@@ -34,7 +33,6 @@ tomet-scalar             = { workspace = true }
 tomet-semantics          = { workspace = true }
 tomet-spec               = { workspace = true }
 tomet-stats              = { workspace = true }
-tomet-tree               = { workspace = true }
 tomet-typst              = { workspace = true }
 tomet-validator          = { workspace = true }
 tomet-workspace          = { workspace = true }
@@ -43,13 +41,10 @@ anyhow         = { workspace = true }
 clap           = { workspace = true }
 jobserver-gate = { workspace = true }
 mimalloc       = { workspace = true }
-nanoid         = { workspace = true }
 rayon          = { workspace = true }
-serde          = { workspace = true }
 serde_json     = { workspace = true }
-toml           = { workspace = true }
-uuid           = { workspace = true }
-walkdir        = { workspace = true }
 
 [dev-dependencies]
 jobserver = { workspace = true }
+nanoid    = { workspace = true }
+uuid      = { workspace = true }

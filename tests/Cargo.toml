@@ -75,7 +75,6 @@ tomet-config        = { workspace = true }
 tomet-cst           = { workspace = true }
 tomet-cst-parser    = { workspace = true }
 tomet-edit          = { workspace = true }
-tomet-expr          = { workspace = true }
 tomet-formatter     = { workspace = true }
 tomet-html          = { workspace = true }
 tomet-load-config   = { workspace = true }

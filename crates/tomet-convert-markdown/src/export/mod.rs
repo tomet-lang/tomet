@@ -353,7 +353,7 @@ fn render_raw(el: ElementView<'_>, inline: bool) -> String {
             .args
             .as_ref()
             .and_then(|a| a.get("lang").or_else(|| a.nth_unnamed(0)))
-            .map(value_to_plain)
+            .map(ValueExt::plain_text)
             .unwrap_or_default();
         let fence = fence_for(&code);
         format!("{fence}{lang}\n{code}\n{fence}")
@@ -686,38 +686,7 @@ fn conflict_sides(el: ElementView<'_>) -> (Vec<Block>, Vec<Block>) {
 fn push_data_attrs(out: &mut String, args: &Tuple) {
     for (k, v) in args.named() {
         if is_attribute_key(k) {
-            out.push_str(&format!(
-                " data-{k}=\"{}\"",
-                escape_attr(&value_to_plain(v))
-            ));
+            out.push_str(&format!(" data-{k}=\"{}\"", escape_attr(&v.plain_text())));
         }
-    }
-}
-
-#[deny(clippy::wildcard_enum_match_arm)]
-fn value_to_plain(v: &Value) -> String {
-    match v {
-        // The text a scalar was written as; `none` has none, so it is empty here.
-        Value::Scalar(s) => s.text().map(|text| text.into_owned()).unwrap_or_default(),
-        Value::Tuple(tuple) => {
-            if tuple.has_no_named() {
-                tuple
-                    .unnamed()
-                    .map(value_to_plain)
-                    .collect::<Vec<_>>()
-                    .join(", ")
-            } else {
-                String::new()
-            }
-        }
-        // A call is validation-only (e.g. a `type: list(string)`)
-        // and has no rendered form.
-        Value::Call(..) => String::new(),
-        // An embedded element has no scalar form either -- same as `Map`.
-        Value::Element(_) => String::new(),
-        // An interpolation is not known until it is evaluated.
-        Value::Interp(_) | Value::Hole(_) | Value::TypeSeat(_) => String::new(),
-        // Block content has no scalar form either -- same as `Map`.
-        Value::Blocks(_) => String::new(),
     }
 }

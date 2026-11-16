@@ -218,7 +218,7 @@ impl<'a> Reader<'a> {
             Ok(s) => s,
             Err(_) => {
                 self.at = start;
-                return Err(self.malformed(tomet_scalar::NULL_ERROR));
+                return Err(self.malformed("`none`, not `null`"));
             }
         };
         match scalar {

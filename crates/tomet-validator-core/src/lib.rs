@@ -16,7 +16,7 @@ use tomet_ast::{Block, ElementView, File, Inline};
 use tomet_cst::{SyntaxNode, TextRange};
 use tomet_semantics::DeclKind;
 use tomet_semantics::{Bindings, Shape};
-use tomet_semantics_core::admits::{admits, is_placeholder};
+use tomet_semantics_core::{admits, is_placeholder};
 use tomet_span::Span;
 use tomet_tree::{Node, Place, Visit};
 

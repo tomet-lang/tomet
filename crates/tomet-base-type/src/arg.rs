@@ -10,7 +10,7 @@ use std::fmt;
 use tomet_scalar::Scalar;
 
 use crate::Type;
-use crate::text::write_quoted;
+use crate::text::quoted;
 
 /// A plain value: what a `default` holds when it is written out, and what
 /// `length` or `prefix` is when they are written.
@@ -77,12 +77,6 @@ impl fmt::Display for Datum {
             },
         }
     }
-}
-
-fn quoted(text: &str) -> String {
-    let mut out = String::new();
-    write_quoted(text, &mut out);
-    out
 }
 
 /// One argument of a type, as it was written: a type (`list(string)`'s item) or a

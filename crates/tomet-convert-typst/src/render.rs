@@ -421,7 +421,7 @@ fn render_raw(el: ElementView<'_>, inline: bool) -> String {
     let lang = args
         .as_ref()
         .and_then(|t| t.get("lang"))
-        .map(value_to_plain)
+        .map(ValueExt::plain_text)
         .unwrap_or_default();
     let code = el.content.map(blocks_to_plain).unwrap_or_default();
     if inline {
@@ -615,7 +615,7 @@ fn render_ruby(cx: &TypstCtx, el: ElementView<'_>) -> String {
     let rt = args
         .as_ref()
         .and_then(|t| t.get("rt"))
-        .map(value_to_plain)
+        .map(ValueExt::plain_text)
         .unwrap_or_default();
     let content = content_to_typst(cx, el);
     if rt.is_empty() {
@@ -713,36 +713,4 @@ fn escape_typst_string(s: &str) -> String {
         out.push(c);
     }
     out
-}
-
-fn value_to_plain(v: &Value) -> String {
-    match v {
-        // The text a scalar was written as: `1.0` stays `1.0`, `1.10` stays `1.10`;
-        // `none` has none, so it is empty here.
-        Value::Scalar(s) => s.text().map(|text| text.into_owned()).unwrap_or_default(),
-        Value::Tuple(tuple) => {
-            if tuple.has_no_named() {
-                tuple
-                    .unnamed()
-                    .map(value_to_plain)
-                    .collect::<Vec<_>>()
-                    .join(", ")
-            } else {
-                String::new()
-            }
-        }
-        // A call is validation-only (e.g. a `type: list(string)`)
-        // and has no rendered form.
-        Value::Call(..) => String::new(),
-        // An embedded element has no scalar form either.
-        // Typst has no path from here into `element_to_typst` (this
-        // function only ever reads a plain arg like `lang`/`pkg`, never a
-        // whole nested element), so this stays unrendered rather than
-        // half-rendering it out of context.
-        Value::Element(_) => String::new(),
-        // An interpolation is not known until it is evaluated.
-        Value::Interp(_) | Value::Hole(_) | Value::TypeSeat(_) => String::new(),
-        // Block content has no scalar form either.
-        Value::Blocks(_) => String::new(),
-    }
 }

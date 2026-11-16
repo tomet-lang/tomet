@@ -5,13 +5,13 @@
 //! whether it is of the type that carries it ([`admits_default`]), and which values are not known
 //! until they are evaluated or filled ([`is_placeholder`]).
 
-pub mod admits;
-pub mod parse;
-pub mod positional;
+mod admits;
+mod parse;
+mod positional;
 
 pub use admits::{
     Mismatch, admits, admits_default, datum_value, default_value, describe_tuple, describe_value,
-    is_placeholder,
+    is_placeholder, value_to_datum,
 };
 pub use parse::parse_type_spec;
 pub use positional::{Slots, TupleView};

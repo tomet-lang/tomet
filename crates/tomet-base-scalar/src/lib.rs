@@ -34,8 +34,17 @@ pub enum Scalar {
     Text(String),
 }
 
-/// The error message returned when a bare `null` is encountered.
-pub const NULL_ERROR: &str = "a bare `null` is an error: write `none`";
+/// What [`Scalar::from_bare`] refuses: a bare `null`. A document says nothing with `none`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct BareNull;
+
+impl std::fmt::Display for BareNull {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("a bare `null` is an error: write `none`")
+    }
+}
+
+impl std::error::Error for BareNull {}
 
 /// What a bare scalar's text is, by the JSON number grammar.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -99,15 +108,15 @@ impl Scalar {
 
     /// Reads a bare word as a scalar value.
     ///
-    /// - `null` produces an error saying "a bare `null` is an error: write `none`".
+    /// - `null` is [`BareNull`].
     /// - `none`, `auto`, `true`, `false` produce the corresponding variant.
     /// - Numbers following the JSON number grammar produce [`Scalar::Int`], [`Scalar::Float`],
     ///   or [`Scalar::Number`] if reading would alter the text (such as `-0`, `1.10`, `1e3`,
     ///   or values exceeding `i64`).
     /// - Any other word produces [`Scalar::Text`].
-    pub fn from_bare(s: &str) -> Result<Self, String> {
+    pub fn from_bare(s: &str) -> Result<Self, BareNull> {
         match s {
-            "null" => return Err(NULL_ERROR.to_string()),
+            "null" => return Err(BareNull),
             "none" => return Ok(Scalar::None),
             "auto" => return Ok(Scalar::Auto),
             "true" => return Ok(Scalar::Bool(true)),
@@ -218,7 +227,7 @@ mod tests {
             let got = Scalar::from_bare(src);
             match want {
                 Ok(expected) => assert_eq!(&got.unwrap(), expected, "case {src}"),
-                Err(err_msg) => assert_eq!(got.unwrap_err(), *err_msg, "case {src}"),
+                Err(err_msg) => assert_eq!(got.unwrap_err().to_string(), *err_msg, "case {src}"),
             }
         }
     }

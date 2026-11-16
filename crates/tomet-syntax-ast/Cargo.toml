@@ -7,8 +7,9 @@ license.workspace    = true
 repository.workspace = true
 
 [dependencies]
-tomet-scalar = { workspace = true }
-tomet-span   = { workspace = true }
+tomet-scalar   = { workspace = true }
+tomet-span     = { workspace = true }
+tomet-spelling = { workspace = true }
 #--- Crates.io ---
 serde         = { workspace = true }
 unicode-width = { workspace = true }

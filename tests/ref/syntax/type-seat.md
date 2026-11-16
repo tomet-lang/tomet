@@ -20,7 +20,7 @@
 
 <div data-tm-kind="memo" data-key=""></div>
 
-<div data-tm-kind="memo" data-id="" data-tags=", "></div>
+<div data-tm-kind="memo" data-id="" data-tags=""></div>
 
 <div data-tm-kind="memo"></div>
 

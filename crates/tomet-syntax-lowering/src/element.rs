@@ -5,6 +5,7 @@
 //! They fold CST nodes into AST values and groups without re-reading source text.
 
 use crate::error::{Error, Result};
+use crate::interp::unescape;
 use crate::lower::error_node::lower_error;
 use crate::lower::form::{LoweredSlot, lower_element, lower_slot, slot_of};
 use crate::lower::groups::{lower_content, lower_embedded};
@@ -671,7 +672,7 @@ fn lower_single_value_from_children(
     } else {
         tomet_scalar::Scalar::from_bare(trimmed)
             .map(Value::from)
-            .map_err(|m| err(start, m))
+            .map_err(|m| err(start, m.to_string()))
     }
 }
 
@@ -705,11 +706,7 @@ pub(crate) fn unescape_quoted_string(text: &str, offset: usize) -> Result<String
         }
         if c == '\\' {
             match chars.next() {
-                Some('"') => out.push('"'),
-                Some('\\') => out.push('\\'),
-                Some('n') => out.push('\n'),
-                Some('t') => out.push('\t'),
-                Some(other) => out.push(other),
+                Some(escaped) => out.push(unescape(escaped)),
                 None => return Err(err(offset, "unterminated string")),
             }
         } else {

@@ -10,7 +10,7 @@
 //!   as itself.
 //! - [`write_scalar`] / [`scalar_spelling`]: any scalar. What is bare is [`Scalar::bare`]'s; this
 //!   adds the quotes of a text and the call of a float with no finite value.
-//! - [`write_scalar_string`] / [`scalar_text`]: a string value, bare when no other value could be
+//! - [`write_scalar_string`] / [`string_spelling`]: a string value, bare when no other value could be
 //!   read from the same text.
 //! - [`write_quoted`] / [`quoted_text`]: a string inside `"..."`, whatever it holds.
 //! - [`fence_line_requires_marker`]: whether a line inside a fenced code block requires a line
@@ -195,7 +195,7 @@ pub fn scalar_spelling(scalar: &Scalar) -> String {
 }
 
 /// [`write_scalar_string`] as an owned string.
-pub fn scalar_text(s: &str) -> String {
+pub fn string_spelling(s: &str) -> String {
     let mut out = String::with_capacity(s.len() + 2);
     write_scalar_string(s, &mut out);
     out
@@ -296,27 +296,33 @@ mod tests {
 
     #[test]
     fn a_scalar_string_is_quoted_when_bare_it_would_be_something_else() {
-        assert_eq!(scalar_text("plain"), "plain");
-        assert_eq!(scalar_text("2026-06-17T05:52:44Z"), "2026-06-17T05:52:44Z");
+        assert_eq!(string_spelling("plain"), "plain");
+        assert_eq!(
+            string_spelling("2026-06-17T05:52:44Z"),
+            "2026-06-17T05:52:44Z"
+        );
         for quoted in [
             "true", "false", "none", "auto", "null", "123", "45.67", "", " a", "a b",
         ] {
-            assert_eq!(scalar_text(quoted), format!("\"{quoted}\""));
+            assert_eq!(string_spelling(quoted), format!("\"{quoted}\""));
         }
         // Text shaped like an interpolation is a string like any other: quoted, never read as the
         // interpolation.
-        assert_eq!(scalar_text("$(x)"), "\"$(x)\"");
-        assert_eq!(scalar_text("$f(x)"), "\"$f(x)\"");
+        assert_eq!(string_spelling("$(x)"), "\"$(x)\"");
+        assert_eq!(string_spelling("$f(x)"), "\"$f(x)\"");
         // Likewise text shaped like a type seat, wherever in the string it is; a name tag is text.
-        assert_eq!(scalar_text("<$date>"), "\"<$date>\"");
-        assert_eq!(scalar_text("a<$list(int)>b"), "\"a<$list(int)>b\"");
-        assert_eq!(scalar_text("<name>"), "<name>");
-        assert_eq!(scalar_text("hello \"world\""), "\"hello \\\"world\\\"\"");
-        assert_eq!(scalar_text("line1\nline2"), "\"line1\\nline2\"");
+        assert_eq!(string_spelling("<$date>"), "\"<$date>\"");
+        assert_eq!(string_spelling("a<$list(int)>b"), "\"a<$list(int)>b\"");
+        assert_eq!(string_spelling("<name>"), "<name>");
+        assert_eq!(
+            string_spelling("hello \"world\""),
+            "\"hello \\\"world\\\"\""
+        );
+        assert_eq!(string_spelling("line1\nline2"), "\"line1\\nline2\"");
     }
 
     #[test]
-    fn scalar_text_and_from_bare_agreement() {
+    fn string_spelling_and_from_bare_agreement() {
         let sample = [
             // Keywords
             "none",
@@ -347,7 +353,7 @@ mod tests {
         ];
 
         for s in sample {
-            let written = scalar_text(s);
+            let written = string_spelling(s);
             if !written.starts_with('"') {
                 // When written bare, from_bare must read it back as Text(s)
                 // (or datetime exception)

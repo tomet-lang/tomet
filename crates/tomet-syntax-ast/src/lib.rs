@@ -52,7 +52,7 @@
 #![allow(clippy::large_enum_variant)]
 
 use serde::{Deserialize, Serialize};
-use std::fmt::{self, Write as _};
+use std::fmt;
 use tomet_span::Span;
 
 /// A pure data value: the subset of Tomet with a direct serde
@@ -1823,10 +1823,8 @@ impl InterpExpr {
 /// with Rust's `{:?}` and the printer wrapped it in bare quotes, so a
 /// string containing `"` printed back as source that will not parse.
 ///
-/// Escaping here is exactly what `parse_quoted` reads back: `"`, `\`,
-/// newline and tab. Not `{:?}`, which also emits `\r` and `\u{...}`
-/// escapes the parser does not know -- it would turn a carriage return
-/// into the letter `r`.
+/// A string literal is written by [`tomet_spelling::quoted_text`], which is what the parser reads
+/// back. Not `{:?}`, which also emits `\u{...}` escapes the parser does not know.
 impl fmt::Display for InterpExpr {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match &self.kind {
@@ -1836,7 +1834,7 @@ impl fmt::Display for InterpExpr {
                 tomet_scalar::Scalar::Int(i) => write!(f, "{i}"),
                 tomet_scalar::Scalar::Float(x) => write!(f, "{x}"),
                 tomet_scalar::Scalar::Number(s) => write!(f, "{s}"),
-                tomet_scalar::Scalar::Text(s) => write_quoted(f, s),
+                tomet_scalar::Scalar::Text(s) => f.write_str(&tomet_spelling::quoted_text(s)),
                 tomet_scalar::Scalar::Bool(b) => write!(f, "{b}"),
                 tomet_scalar::Scalar::None => f.write_str("none"),
                 tomet_scalar::Scalar::Auto => f.write_str("auto"),
@@ -1863,7 +1861,7 @@ impl fmt::Display for InterpExpr {
                     write!(f, "addr({text})")
                 } else {
                     f.write_str("addr(")?;
-                    write_quoted(f, text)?;
+                    f.write_str(&tomet_spelling::quoted_text(text))?;
                     f.write_str(")")
                 }
             }
@@ -1891,21 +1889,6 @@ impl fmt::Display for InterpExpr {
             }
         }
     }
-}
-
-/// A string literal as `parse_quoted` reads it back.
-fn write_quoted(f: &mut fmt::Formatter<'_>, s: &str) -> fmt::Result {
-    f.write_str("\"")?;
-    for c in s.chars() {
-        match c {
-            '"' => f.write_str("\\\"")?,
-            '\\' => f.write_str("\\\\")?,
-            '\n' => f.write_str("\\n")?,
-            '\t' => f.write_str("\\t")?,
-            other => f.write_char(other)?,
-        }
-    }
-    f.write_str("\"")
 }
 
 /// Whether `addr(` can be written back in its raw form: the text must read

@@ -1548,15 +1548,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "serde_spanned"
-version = "1.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6662b5879511e06e8999a8a235d848113e942c9124f211511b16466ee2995f26"
-dependencies = [
- "serde_core",
-]
-
-[[package]]
 name = "serde_yaml"
 version = "0.9.34+deprecated"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1800,6 +1791,7 @@ dependencies = [
  "serde_json",
  "tomet-scalar",
  "tomet-span",
+ "tomet-spelling",
  "unicode-width",
 ]
 
@@ -1846,14 +1838,12 @@ dependencies = [
  "mimalloc",
  "nanoid",
  "rayon",
- "serde",
  "serde_json",
  "tomet-ast",
  "tomet-ast-parser",
  "tomet-config",
  "tomet-convert-standalone",
  "tomet-declaration",
- "tomet-expr",
  "tomet-formatter",
  "tomet-html",
  "tomet-indexer",
@@ -1868,13 +1858,10 @@ dependencies = [
  "tomet-semantics",
  "tomet-spec",
  "tomet-stats",
- "tomet-tree",
  "tomet-typst",
  "tomet-validator",
  "tomet-workspace",
- "toml",
  "uuid",
- "walkdir",
 ]
 
 [[package]]
@@ -1905,7 +1892,6 @@ dependencies = [
  "tomet-printer",
  "tomet-scalar",
  "tomet-span",
- "tomet-tree",
  "tomet-type",
  "tomet-validator-profile",
  "tomet-vault",
@@ -1924,10 +1910,6 @@ version = "0.5.0"
 dependencies = [
  "tomet-cst",
  "tomet-lexer",
- "tomet-position",
- "tomet-span",
- "tomet-tree",
- "unicode-width",
 ]
 
 [[package]]
@@ -1948,7 +1930,6 @@ name = "tomet-deps"
 version = "0.5.0"
 dependencies = [
  "serde",
- "tomet-address",
  "tomet-ast",
  "tomet-ast-parser",
  "tomet-semantics",
@@ -1960,14 +1941,12 @@ name = "tomet-edit"
 version = "0.5.0"
 dependencies = [
  "getrandom 0.2.17",
- "tomet-address",
  "tomet-ast",
  "tomet-ast-parser",
  "tomet-config",
  "tomet-cst",
  "tomet-cst-parser",
  "tomet-spelling",
- "tomet-tree",
  "tomet-validator",
  "tomet-vault",
 ]
@@ -1994,7 +1973,6 @@ version = "0.5.0"
 dependencies = [
  "tomet-ast",
  "tomet-ast-parser",
- "tomet-cst",
  "tomet-position",
  "tomet-span",
  "tomet-tree",
@@ -2029,7 +2007,6 @@ version = "0.5.0"
 dependencies = [
  "tomet-ast",
  "tomet-ast-parser",
- "tomet-expr",
  "tomet-printer",
  "tomet-scalar",
  "tomet-semantics",
@@ -2067,7 +2044,6 @@ name = "tomet-java"
 version = "0.5.0"
 dependencies = [
  "jni",
- "serde",
  "serde_json",
  "tomet",
 ]
@@ -2082,7 +2058,6 @@ dependencies = [
  "serde",
  "serde-wasm-bindgen",
  "tomet",
- "tomet-cst",
  "tomet-links",
  "tomet-transform",
  "wasm-bindgen",
@@ -2126,11 +2101,9 @@ dependencies = [
  "tomet-links",
  "tomet-load-config",
  "tomet-scalar",
- "tomet-search",
  "tomet-semantics",
  "tomet-sort",
  "tomet-tome",
- "tomet-transform",
  "tomet-validator",
  "tomet-vault",
  "tomet-workspace",
@@ -2159,7 +2132,6 @@ dependencies = [
  "tomet-scalar",
  "tomet-span",
  "tomet-tree",
- "unicode-width",
 ]
 
 [[package]]
@@ -2195,12 +2167,10 @@ dependencies = [
 name = "tomet-markdown"
 version = "0.5.0"
 dependencies = [
- "nanoid",
  "pulldown-cmark",
  "serde_yaml",
  "tomet-ast",
  "tomet-ast-parser",
- "tomet-expr",
  "tomet-html",
  "tomet-printer",
  "tomet-scalar",
@@ -2217,6 +2187,7 @@ dependencies = [
  "tomet-cst",
  "tomet-cst-parser",
  "tomet-edit",
+ "tomet-spelling",
 ]
 
 [[package]]
@@ -2263,7 +2234,6 @@ version = "0.5.0"
 dependencies = [
  "pyo3",
  "pythonize",
- "serde",
  "tomet",
 ]
 
@@ -2361,7 +2331,6 @@ name = "tomet-stats"
 version = "0.5.0"
 dependencies = [
  "serde",
- "serde_json",
  "tomet-address",
  "tomet-ast",
  "tomet-ast-parser",
@@ -2394,7 +2363,6 @@ dependencies = [
  "tomet-cst",
  "tomet-cst-parser",
  "tomet-edit",
- "tomet-expr",
  "tomet-formatter",
  "tomet-html",
  "tomet-load-config",
@@ -2476,7 +2444,6 @@ dependencies = [
 name = "tomet-validator"
 version = "0.5.0"
 dependencies = [
- "serde",
  "tomet-ast",
  "tomet-ast-parser",
  "tomet-cst",
@@ -2568,7 +2535,6 @@ dependencies = [
  "tomet-declaration",
  "tomet-expr",
  "tomet-scalar",
- "tomet-search",
  "tomet-semantics",
  "tomet-span",
  "tomet-transform",
@@ -2596,7 +2562,6 @@ dependencies = [
  "tomet-semantics",
  "tomet-span",
  "tomet-transform",
- "tomet-tree",
 ]
 
 [[package]]
@@ -2605,45 +2570,6 @@ version = "0.5.0"
 dependencies = [
  "zed_extension_api",
 ]
-
-[[package]]
-name = "toml"
-version = "0.9.12+spec-1.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cf92845e79fc2e2def6a5d828f0801e29a2f8acc037becc5ab08595c7d5e9863"
-dependencies = [
- "indexmap",
- "serde_core",
- "serde_spanned",
- "toml_datetime",
- "toml_parser",
- "toml_writer",
- "winnow 0.7.15",
-]
-
-[[package]]
-name = "toml_datetime"
-version = "0.7.5+spec-1.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "92e1cfed4a3038bc5a127e35a2d360f145e1f4b971b551a2ba5fd7aedf7e1347"
-dependencies = [
- "serde_core",
-]
-
-[[package]]
-name = "toml_parser"
-version = "1.1.3+spec-1.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1d38ac1cf9b95face32296c0a3ede1fdc270627c9d9c02a7274dd6d960dc4d56"
-dependencies = [
- "winnow 1.0.4",
-]
-
-[[package]]
-name = "toml_writer"
-version = "1.1.2+spec-1.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7d56353a2a665ad0f41a421187180aab746c8c325620617ad883a99a1cbe66d2"
 
 [[package]]
 name = "topological-sort"
@@ -2985,18 +2911,6 @@ name = "windows_x86_64_msvc"
 version = "0.42.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9aec5da331524158c6d1a4ac0ab1541149c0b9505fde06423b02f5ef0106b9f0"
-
-[[package]]
-name = "winnow"
-version = "0.7.15"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "df79d97927682d2fd8adb29682d1140b343be4ac0f08fd68b7765d9c059d3945"
-
-[[package]]
-name = "winnow"
-version = "1.0.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "23b97319f7b8343df12cc98938e5c3eb436064524c8d2b4e30a1d3a36eecdf81"
 
 [[package]]
 name = "wit-bindgen"

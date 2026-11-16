@@ -8,7 +8,6 @@ repository.workspace = true
 
 [dependencies]
 tomet-ast       = { workspace = true }
-tomet-expr      = { workspace = true }
 tomet-printer   = { workspace = true }
 tomet-scalar    = { workspace = true }
 tomet-semantics = { workspace = true }

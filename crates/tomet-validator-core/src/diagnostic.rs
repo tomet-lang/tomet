@@ -3,7 +3,7 @@ use std::fmt;
 use tomet_cst::TextRange;
 use tomet_declaration::Problem;
 use tomet_position::LineIndex;
-use tomet_semantics_core::admits::describe_tuple;
+use tomet_semantics_core::describe_tuple;
 use tomet_span::Span;
 use tomet_spelling::scalar_spelling;
 

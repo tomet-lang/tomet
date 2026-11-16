@@ -9,7 +9,6 @@ repository.workspace = true
 [dependencies]
 tomet-ast       = { workspace = true }
 tomet-config    = { workspace = true }
-tomet-scalar    = { workspace = true }
 tomet-semantics = { workspace = true }
 tomet-spelling  = { workspace = true }
 tomet-style     = { workspace = true }
@@ -19,4 +18,5 @@ tomet-type      = { workspace = true }
 [dev-dependencies]
 tomet-ast-parser = { workspace = true }
 tomet-markdown   = { workspace = true }
+tomet-scalar     = { workspace = true }
 tomet-span       = { workspace = true }

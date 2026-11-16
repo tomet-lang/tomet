@@ -91,6 +91,25 @@ mod tests {
     }
 
     #[test]
+    fn a_float_key_is_written_as_the_float_is_written() {
+        struct FloatKeyed(f64);
+        impl Serialize for FloatKeyed {
+            fn serialize<S: serde::Serializer>(
+                &self,
+                s: S,
+            ) -> std::result::Result<S::Ok, S::Error> {
+                use serde::ser::SerializeMap;
+                let mut map = s.serialize_map(Some(1))?;
+                map.serialize_entry(&self.0, &1)?;
+                map.end()
+            }
+        }
+        let text = to_string(&FloatKeyed(1.0)).unwrap();
+        assert_eq!(text.trim(), "1.0: 1");
+        assert!(to_string(&FloatKeyed(1.5)).unwrap().contains("1.5"));
+    }
+
+    #[test]
     fn missing_optional_fields_deserialize_to_none() {
         #[derive(Debug, PartialEq, Serialize, Deserialize)]
         struct Small {

@@ -15,5 +15,4 @@ tomet-tree      = { workspace = true }
 serde = { workspace = true }
 
 [dev-dependencies]
-serde_json       = { workspace = true }
 tomet-ast-parser = { workspace = true }

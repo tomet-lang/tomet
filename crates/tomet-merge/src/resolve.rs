@@ -9,6 +9,7 @@ use crate::conflict::{ConflictError, ConflictKind, Found, Side, bracketed_inner,
 use crate::markers::{
     extract_conflict_block_side, extract_conflict_inline_side, unquote_scalar_display,
 };
+use tomet_spelling::quoted_text;
 
 /// Which side of one `@conflict` a caller picked, or that they edited a
 /// fresh replacement by hand, or kept both versions. `A`/`B` match
@@ -184,7 +185,7 @@ fn value(marker: &Found, resolution: &ConflictResolution) -> String {
                     format!("[ {a_inner} {b_inner} ]")
                 }
             }
-            None if a.starts_with('"') && b.starts_with('"') => quoted(&format!(
+            None if a.starts_with('"') && b.starts_with('"') => quoted_text(&format!(
                 "{} / {}",
                 unquote_scalar_display(a),
                 unquote_scalar_display(b)
@@ -198,7 +199,7 @@ fn value(marker: &Found, resolution: &ConflictResolution) -> String {
                 format!("[ {text} ]")
             }
         }
-        ConflictResolution::Rewritten(text) => quoted(text),
+        ConflictResolution::Rewritten(text) => quoted_text(text),
     }
 }
 
@@ -214,10 +215,6 @@ fn indented(text: &str) -> String {
         })
         .collect::<Vec<_>>()
         .join("\n")
-}
-
-fn quoted(text: &str) -> String {
-    format!("\"{}\"", text.replace('\\', "\\\\").replace('"', "\\\""))
 }
 
 #[cfg(test)]
@@ -293,6 +290,15 @@ mod tests {
         assert_eq!(
             resolve_all(src, Rewritten("a \"b\"".into())).unwrap(),
             "@x(){ k: \"a \\\"b\\\"\", s: \"a \\\"b\\\"\" }\n"
+        );
+    }
+
+    #[test]
+    fn a_rewritten_value_keeps_its_line_breaks_as_escapes() {
+        let src = "@x(){ s: @conflict(a: \"one\", b: \"two\") }\n";
+        assert_eq!(
+            resolve_all(src, Rewritten("a\nb\r\tc".into())).unwrap(),
+            "@x(){ s: \"a\\nb\\r\\tc\" }\n"
         );
     }
 

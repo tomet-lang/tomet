@@ -255,13 +255,12 @@ fn finish_map(s: MapSerializer) -> Result<Value> {
     }
 }
 
+/// A map key is the text of a scalar that has one (`1.0` stays `1.0`); `none` and `auto` are not keys.
 fn value_to_key_string(v: Value) -> Result<String> {
     match v {
-        Value::Scalar(Scalar::Text(s)) => Ok(s),
-        Value::Scalar(Scalar::Int(i)) => Ok(i.to_string()),
-        Value::Scalar(Scalar::Bool(b)) => Ok(b.to_string()),
-        Value::Scalar(Scalar::Float(f)) => Ok(f.to_string()),
-        Value::Scalar(Scalar::Number(text)) => Ok(text),
+        Value::Scalar(ref s) if !matches!(s, Scalar::None | Scalar::Auto) => {
+            Ok(s.text().map(|text| text.into_owned()).unwrap_or_default())
+        }
         other => Err(Error::msg(format!(
             "map keys must be strings or simple scalars, got {other:?}"
         ))),

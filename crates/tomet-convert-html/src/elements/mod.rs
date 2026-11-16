@@ -18,14 +18,13 @@ pub(crate) use text::{
 };
 
 use crate::block::push_span_attrs;
-use crate::util::{
-    escape_attr, escape_html, id_attr, push_data_attrs, push_value_data_attrs, value_to_plain,
-};
+use crate::util::{escape_attr, escape_html, id_attr, push_data_attrs, push_value_data_attrs};
 use crate::{CustomElementCtx, RenderCtx};
 use tomet_ast::{BodyView, ElementView, Entry, Group, Interpolation};
 use tomet_semantics::{
     classify_std_lenient, comment_text, element_args_view_in, extract_tags, is_directive,
 };
+use tomet_tree::ValueExt;
 
 pub(crate) fn render_element(cx: &RenderCtx, el: ElementView<'_>, out: &mut String, inline: bool) {
     let kind = classify_std_lenient(el);
@@ -75,7 +74,7 @@ fn render_task_element(cx: &RenderCtx, el: ElementView<'_>, out: &mut String, in
     let status = element_args_view_in(el, cx.bindings)
         .as_ref()
         .and_then(|a| a.get("status"))
-        .map(value_to_plain)
+        .map(ValueExt::plain_text)
         .unwrap_or_else(|| " ".to_string());
     let checked = matches!(status.as_str(), "x" | "X" | "done");
     let tag = if inline { "span" } else { "div" };

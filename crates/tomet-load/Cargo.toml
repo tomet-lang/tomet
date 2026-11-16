@@ -15,11 +15,9 @@ tomet-expr        = { workspace = true }
 tomet-indexer     = { workspace = true }
 tomet-links       = { workspace = true }
 tomet-load-config = { workspace = true }
-tomet-search      = { workspace = true }
 tomet-semantics   = { workspace = true }
 tomet-sort        = { workspace = true }
 tomet-tome        = { workspace = true }
-tomet-transform   = { workspace = true }
 tomet-validator   = { workspace = true }
 tomet-vault       = { workspace = true }
 tomet-workspace   = { workspace = true }

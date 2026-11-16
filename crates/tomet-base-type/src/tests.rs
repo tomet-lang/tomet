@@ -613,7 +613,7 @@ fn a_text_that_is_not_well_formed_says_where() {
     );
     assert_eq!(
         refused("string(default: null)").to_string(),
-        "`string(default: null)` is not a type: expected a bare `null` is an error: write `none` at byte 16"
+        "`string(default: null)` is not a type: expected `none`, not `null` at byte 16"
     );
     assert_eq!(
         refused("list(string").to_string(),
