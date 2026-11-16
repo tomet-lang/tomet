@@ -4,6 +4,7 @@ use crate::RenderCtx;
 use crate::block::render_inlines;
 use crate::util::{id_attr, push_named_attrs, split_attrs};
 use tomet_ast::{ElementView, Value};
+use tomet_scalar::Scalar;
 use tomet_semantics::element_args_view;
 
 pub(crate) fn render_table_element(cx: &RenderCtx, el: ElementView<'_>, out: &mut String) {
@@ -25,7 +26,7 @@ pub(crate) fn render_table_element(cx: &RenderCtx, el: ElementView<'_>, out: &mu
         .as_ref()
         .and_then(|a| a.get("header"))
         .map(|v| match v {
-            Value::Bool(b) => *b,
+            Value::Scalar(Scalar::Bool(b)) => *b,
             _ => true,
         })
         .unwrap_or(true);

@@ -18,6 +18,7 @@
 //! use `.` as a namespace separator, but map keys deliberately do not.
 
 use tomet_ast::{ElementView, Tuple, Value};
+use tomet_scalar::Scalar;
 use tomet_tree::scalar_string;
 
 /// The attribute a consumer should read instead of the flat projection
@@ -146,22 +147,24 @@ pub fn tuple_to_json(tuple: &Tuple) -> serde_json::Value {
 /// inverse, checked against it in `assert_json_round_trip`.
 pub fn value_to_json(v: &Value) -> serde_json::Value {
     match v {
-        Value::None => serde_json::Value::Null,
-        Value::Auto => panic!("`auto` has no JSON representation"),
-        Value::Bool(b) => serde_json::Value::Bool(*b),
-        Value::Int(i) => serde_json::Value::from(*i),
-        Value::Float(f) => serde_json::Number::from_f64(*f)
-            .map(serde_json::Value::Number)
-            // JSON has no NaN or infinity; a string keeps the value
-            // visible rather than turning it into null.
-            .unwrap_or_else(|| serde_json::Value::String(f.to_string())),
-        // JSON here has no arbitrary-precision number, so a kept-as-written number
-        // is the `f64` it spells; one beyond an `f64` is its text.
-        Value::Number(text) => match v.as_number().and_then(serde_json::Number::from_f64) {
-            Some(n) => serde_json::Value::Number(n),
-            None => serde_json::Value::String(text.clone()),
+        Value::Scalar(s) => match s {
+            Scalar::None => serde_json::Value::Null,
+            Scalar::Auto => panic!("`auto` has no JSON representation"),
+            Scalar::Bool(b) => serde_json::Value::Bool(*b),
+            Scalar::Int(i) => serde_json::Value::from(*i),
+            Scalar::Float(f) => serde_json::Number::from_f64(*f)
+                .map(serde_json::Value::Number)
+                // JSON has no NaN or infinity; a string keeps the value
+                // visible rather than turning it into null.
+                .unwrap_or_else(|| serde_json::Value::String(f.to_string())),
+            // JSON here has no arbitrary-precision number, so a kept-as-written number
+            // is the `f64` it spells; one beyond an `f64` is its text.
+            Scalar::Number(text) => match s.as_number().and_then(serde_json::Number::from_f64) {
+                Some(n) => serde_json::Value::Number(n),
+                None => serde_json::Value::String(text.clone()),
+            },
+            Scalar::Text(s) => serde_json::Value::String(s.clone()),
         },
-        Value::String(s) => serde_json::Value::String(s.clone()),
         Value::Tuple(tuple) => tuple_to_json(tuple),
         Value::Call(name, args) => {
             let mut obj = serde_json::Map::new();
@@ -251,12 +254,12 @@ mod tests {
     fn flat_data_projects_without_an_exact_copy() {
         let el = el_with(
             Some(tuple_named(&[
-                ("a", Value::Int(1)),
+                ("a", Value::Scalar(Scalar::Int(1))),
                 (
                     "tags",
                     Value::Tuple(Tuple::from_unnamed([
-                        Value::String("p".into()),
-                        Value::String("q".into()),
+                        Value::Scalar(Scalar::Text("p".into())),
+                        Value::Scalar(Scalar::Text("q".into())),
                     ])),
                 ),
             ])),
@@ -279,8 +282,8 @@ mod tests {
         // `data-m=""` and lose `{ k: v }` entirely.
         let el = el_with(
             Some(tuple_named(&[
-                ("a", Value::Int(1)),
-                ("m", map(&[("k", Value::String("v".into()))])),
+                ("a", Value::Scalar(Scalar::Int(1))),
+                ("m", map(&[("k", Value::Scalar(Scalar::Text("v".into())))])),
             ])),
             None,
         );
@@ -297,11 +300,14 @@ mod tests {
         let el = el_with(
             Some(tuple_named(&[(
                 "url",
-                Value::String("https://e.com".into()),
+                Value::Scalar(Scalar::Text("https://e.com".into())),
             )])),
             Some(tuple_named(&[
-                ("id", Value::String("b1".into())),
-                ("meta", map(&[("author", Value::String("alice".into()))])),
+                ("id", Value::Scalar(Scalar::Text("b1".into()))),
+                (
+                    "meta",
+                    map(&[("author", Value::Scalar(Scalar::Text("alice".into())))]),
+                ),
             ])),
         );
         let data = flatten_element_data(el.as_view());
@@ -323,7 +329,10 @@ mod tests {
     #[test]
     fn into_pairs_appends_the_exact_copy() {
         let el = el_with(
-            Some(tuple_named(&[("m", map(&[("k", Value::Int(1))]))])),
+            Some(tuple_named(&[(
+                "m",
+                map(&[("k", Value::Scalar(Scalar::Int(1)))]),
+            )])),
             None,
         );
         let pairs = flatten_element_data(el.as_view()).into_pairs();
@@ -336,7 +345,7 @@ mod tests {
         assert_eq!(
             scalar_string(&Value::Tuple(Tuple::from_unnamed([map(&[(
                 "k",
-                Value::Int(1)
+                Value::Scalar(Scalar::Int(1))
             )])]))),
             None
         );
@@ -345,8 +354,8 @@ mod tests {
     #[test]
     fn a_list_projects_like_a_sequence() {
         let list = Value::Tuple(Tuple::from_unnamed([
-            Value::String("a".into()),
-            Value::String("b".into()),
+            Value::Scalar(Scalar::Text("a".into())),
+            Value::Scalar(Scalar::Text("b".into())),
         ]));
         assert_eq!(scalar_string(&list), Some("a, b".to_string()));
 

@@ -36,13 +36,15 @@ fn parses_list_value_markers_and_trailing_attrs() {
             );
             assert_eq!(
                 items[0].data.args,
-                Some(Tuple::from_unnamed(vec![Value::String("T".into())]))
+                Some(Tuple::from_unnamed(vec![Value::Scalar(Scalar::Text(
+                    "T".into()
+                ))]))
             );
             assert_eq!(
                 item_attrs(&items[0]),
                 Some(Tuple::from_named(vec![(
                     "tag".into(),
-                    Value::String("dev".into())
+                    Value::Scalar(Scalar::Text("dev".into()))
                 )]))
             );
 
@@ -52,13 +54,15 @@ fn parses_list_value_markers_and_trailing_attrs() {
             );
             assert_eq!(
                 items[1].data.args,
-                Some(Tuple::from_unnamed(vec![Value::String("?".into())]))
+                Some(Tuple::from_unnamed(vec![Value::Scalar(Scalar::Text(
+                    "?".into()
+                ))]))
             );
             assert_eq!(
                 item_attrs(&items[1]),
                 Some(Tuple::from_named(vec![(
                     "id".into(),
-                    Value::String("task1".into())
+                    Value::Scalar(Scalar::Text("task1".into()))
                 )]))
             );
         }
@@ -93,7 +97,7 @@ fn list_item_ending_in_an_element_does_not_error_on_a_trailing_brace() {
                         link.data.value,
                         Some(Group::from_map(Tuple::from_named(vec![(
                             "id".into(),
-                            Value::String("breakfast".into())
+                            Value::Scalar(Scalar::Text("breakfast".into()))
                         )]))),
                         "{bare:?}"
                     );
@@ -117,7 +121,7 @@ fn list_item_ending_in_an_element_does_not_error_on_a_trailing_brace() {
                     item_attrs(&items[0]),
                     Some(Tuple::from_named(vec![(
                         "id".into(),
-                        Value::String("breakfast".into())
+                        Value::Scalar(Scalar::Text("breakfast".into()))
                     )])),
                     "{src:?}"
                 );
@@ -169,8 +173,11 @@ fn list_marker_supports_explicit_key_value() {
             assert_eq!(
                 items[0].data.args,
                 Some(Tuple::from_named(vec![
-                    ("color".into(), Value::String("red".into())),
-                    ("priority".into(), Value::String("high".into())),
+                    ("color".into(), Value::Scalar(Scalar::Text("red".into()))),
+                    (
+                        "priority".into(),
+                        Value::Scalar(Scalar::Text("high".into()))
+                    ),
                 ]))
             );
         }
@@ -186,7 +193,9 @@ fn list_marker_quoted_scalar_avoids_colon_misparse() {
             let items = &list.items;
             assert_eq!(
                 items[0].data.args,
-                Some(Tuple::from_unnamed(vec![Value::String("12:01".into())]))
+                Some(Tuple::from_unnamed(vec![Value::Scalar(Scalar::Text(
+                    "12:01".into()
+                ))]))
             );
         }
         other => panic!("expected list, got {other:?}"),
@@ -267,7 +276,10 @@ fn full_form_list_item_supports_a_bare_trailing_connect() {
             let items = &list.items;
             assert_eq!(
                 items[0].data.args,
-                Some(Tuple::from_named(vec![("x".into(), Value::Int(1))]))
+                Some(Tuple::from_named(vec![(
+                    "x".into(),
+                    Value::Scalar(Scalar::Int(1))
+                )]))
             );
         }
         other => panic!("expected list, got {other:?}"),
@@ -279,7 +291,10 @@ fn full_form_list_item_supports_a_bare_trailing_connect() {
             let items = &list.items;
             assert_eq!(
                 item_attrs(&items[0]),
-                Some(Tuple::from_named(vec![("y".into(), Value::Int(2))]))
+                Some(Tuple::from_named(vec![(
+                    "y".into(),
+                    Value::Scalar(Scalar::Int(2))
+                )]))
             );
         }
         other => panic!("expected list, got {other:?}"),
@@ -295,11 +310,17 @@ fn full_form_list_item_supports_a_bare_trailing_connect() {
             let items = &list.items;
             assert_eq!(
                 items[0].data.args,
-                Some(Tuple::from_named(vec![("x".into(), Value::Int(1))]))
+                Some(Tuple::from_named(vec![(
+                    "x".into(),
+                    Value::Scalar(Scalar::Int(1))
+                )]))
             );
             assert_eq!(
                 item_attrs(&items[0]),
-                Some(Tuple::from_named(vec![("y".into(), Value::Int(2))]))
+                Some(Tuple::from_named(vec![(
+                    "y".into(),
+                    Value::Scalar(Scalar::Int(2))
+                )]))
             );
         }
         other => panic!("expected list, got {other:?}"),
@@ -403,11 +424,17 @@ fn combine_notation_supports_a_bare_trailing_connect() {
             let item = &list.items[0];
             assert_eq!(
                 item.data.args,
-                Some(Tuple::from_named(vec![("x".into(), Value::Int(1))]))
+                Some(Tuple::from_named(vec![(
+                    "x".into(),
+                    Value::Scalar(Scalar::Int(1))
+                )]))
             );
             assert_eq!(
                 item_attrs(item),
-                Some(Tuple::from_named(vec![("y".into(), Value::Int(2))]))
+                Some(Tuple::from_named(vec![(
+                    "y".into(),
+                    Value::Scalar(Scalar::Int(2))
+                )]))
             );
         }
         other => panic!("expected list, got {other:?}"),

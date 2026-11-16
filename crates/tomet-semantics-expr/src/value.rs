@@ -28,6 +28,7 @@ use time::OffsetDateTime;
 use tomet_ast::{
     Block, Connect, Declaration, Element, InterpExpr, List, ListItem, Section, Tuple, Value,
 };
+use tomet_scalar::Scalar;
 use tomet_type::{Type, Version};
 
 /// A document, by vault-relative path with `/` separators. A reference: the
@@ -162,16 +163,9 @@ impl std::fmt::Debug for Env {
 /// What an expression evaluates to.
 #[derive(Debug, Clone, PartialEq)]
 pub enum EvalValue {
-    None,
-    Auto,
-    Bool(bool),
-    Int(i64),
-    Float(f64),
-    /// A number kept as it was written, because reading it as an `i64` or an
-    /// `f64` would change it: `1.10` (an `f64` prints `1.1`), `1e3`, `-0`, or an
-    /// integer too large for an `i64`.
-    Number(String),
-    String(String),
+    /// A scalar value: `none`, `auto`, a boolean, an integer, a float,
+    /// a number kept as written, or text. See [`Scalar`].
+    Scalar(Scalar),
     /// A tuple of values: the one data container of the evaluator, matching [`Tuple`](tomet_ast::Tuple).
     Tuple(Tuple<EvalValue>),
     /// A call literal, kept as written (`list(string)`, `enum(a, b)`).
@@ -200,13 +194,15 @@ impl EvalValue {
     /// The name used in error messages.
     pub fn type_name(&self) -> &'static str {
         match self {
-            EvalValue::None => "none",
-            EvalValue::Auto => "auto",
-            EvalValue::Bool(_) => "bool",
-            EvalValue::Int(_) => "int",
-            EvalValue::Float(_) => "float",
-            EvalValue::Number(_) => "number",
-            EvalValue::String(_) => "string",
+            EvalValue::Scalar(s) => match s {
+                Scalar::None => "none",
+                Scalar::Auto => "auto",
+                Scalar::Bool(_) => "bool",
+                Scalar::Int(_) => "int",
+                Scalar::Float(_) => "float",
+                Scalar::Number(_) => "number",
+                Scalar::Text(_) => "string",
+            },
             EvalValue::Tuple(_) => "tuple",
             EvalValue::Call(..) => "call",
             EvalValue::Part { .. } => "element",
@@ -225,13 +221,7 @@ impl EvalValue {
     /// from, for the elements it may contain.
     pub fn from_ast(value: &Value, doc: &DocRef) -> EvalValue {
         match value {
-            Value::None => EvalValue::None,
-            Value::Auto => EvalValue::Auto,
-            Value::Bool(b) => EvalValue::Bool(*b),
-            Value::Int(i) => EvalValue::Int(*i),
-            Value::Float(f) => EvalValue::Float(*f),
-            Value::Number(text) => EvalValue::Number(text.clone()),
-            Value::String(s) => EvalValue::String(s.clone()),
+            Value::Scalar(s) => EvalValue::Scalar(s.clone()),
             Value::Tuple(tuple) => {
                 EvalValue::Tuple(tuple.clone().map_values(|v| Self::from_ast(&v, doc)))
             }
@@ -259,13 +249,7 @@ impl EvalValue {
     /// namespaces and types, and a section or a list (which are not elements).
     pub fn to_ast(&self) -> Option<Value> {
         Some(match self {
-            EvalValue::None => Value::None,
-            EvalValue::Auto => Value::Auto,
-            EvalValue::Bool(b) => Value::Bool(*b),
-            EvalValue::Int(i) => Value::Int(*i),
-            EvalValue::Float(f) => Value::Float(*f),
-            EvalValue::Number(text) => Value::Number(text.clone()),
-            EvalValue::String(s) => Value::String(s.clone()),
+            EvalValue::Scalar(s) => Value::Scalar(s.clone()),
             EvalValue::Tuple(tuple) => Value::Tuple(
                 tuple
                     .clone()
@@ -289,7 +273,7 @@ impl EvalValue {
                 }
             },
             EvalValue::Fragment(blocks) => Value::Blocks(blocks.clone()),
-            EvalValue::Version(v) => Value::String(v.to_string()),
+            EvalValue::Version(v) => Value::Scalar(Scalar::Text(v.to_string())),
             EvalValue::Document(_)
             | EvalValue::Directory(_)
             | EvalValue::DateTime(_)
@@ -308,17 +292,20 @@ impl EvalValue {
     /// Returns `None` for non-scalar values (such as sequences, maps, parts,
     /// documents, directories, fragments, functions, namespaces, or types).
     pub fn scalar_text(&self) -> Option<String> {
-        Some(match self {
-            EvalValue::None => String::new(),
-            EvalValue::Auto => "auto".to_string(),
-            EvalValue::Bool(b) => b.to_string(),
-            EvalValue::Int(i) => i.to_string(),
-            EvalValue::Float(f) => f.to_string(),
-            EvalValue::Number(text) => text.clone(),
-            EvalValue::String(s) => s.clone(),
-            EvalValue::Version(v) => v.to_string(),
-            _ => return None,
-        })
+        match self {
+            EvalValue::Scalar(Scalar::None) => Some(String::new()),
+            EvalValue::Scalar(s) => s.text().map(|c| c.into_owned()),
+            EvalValue::Version(v) => Some(v.to_string()),
+            _ => None,
+        }
+    }
+
+    /// Returns a reference to the inner [`Scalar`], if this value is one.
+    pub fn as_scalar(&self) -> Option<&Scalar> {
+        match self {
+            EvalValue::Scalar(s) => Some(s),
+            _ => None,
+        }
     }
 }
 
@@ -331,15 +318,7 @@ pub fn scalar_text(value: &EvalValue) -> Option<String> {
 
 impl From<tomet_scalar::Scalar> for EvalValue {
     fn from(s: tomet_scalar::Scalar) -> Self {
-        match s {
-            tomet_scalar::Scalar::None => EvalValue::None,
-            tomet_scalar::Scalar::Auto => EvalValue::Auto,
-            tomet_scalar::Scalar::Bool(b) => EvalValue::Bool(b),
-            tomet_scalar::Scalar::Int(i) => EvalValue::Int(i),
-            tomet_scalar::Scalar::Float(f) => EvalValue::Float(f),
-            tomet_scalar::Scalar::Number(n) => EvalValue::Number(n),
-            tomet_scalar::Scalar::Text(t) => EvalValue::String(t),
-        }
+        EvalValue::Scalar(s)
     }
 }
 
@@ -354,9 +333,9 @@ mod tests {
 
     #[test]
     fn number_preserved_to_eval_and_back() {
-        let ast = Value::Number("1.10".into());
+        let ast = Value::Scalar(Scalar::Number("1.10".into()));
         let eval = EvalValue::from_ast(&ast, &doc());
-        assert_eq!(eval, EvalValue::Number("1.10".into()));
+        assert_eq!(eval, EvalValue::Scalar(Scalar::Number("1.10".into())));
         assert_eq!(eval.type_name(), "number");
         assert_eq!(eval.to_ast(), Some(ast));
     }
@@ -364,13 +343,15 @@ mod tests {
     #[test]
     fn data_values_cross_to_eval_values_and_back() {
         let ast = Value::Tuple(Tuple::from_named([
-            ("n".into(), Value::Int(1)),
+            ("n".into(), Value::Scalar(Scalar::Int(1))),
             (
                 "tags".into(),
-                Value::Tuple(Tuple::from_unnamed([Value::String("a".into())])),
+                Value::Tuple(Tuple::from_unnamed([Value::Scalar(Scalar::Text(
+                    "a".into(),
+                ))])),
             ),
-            ("ok".into(), Value::Bool(true)),
-            ("nothing".into(), Value::None),
+            ("ok".into(), Value::Scalar(Scalar::Bool(true))),
+            ("nothing".into(), Value::Scalar(Scalar::None)),
         ]));
         let eval = EvalValue::from_ast(&ast, &doc());
         assert_eq!(eval.to_ast(), Some(ast));
@@ -378,14 +359,20 @@ mod tests {
 
     #[test]
     fn a_tuple_and_a_call_are_kept() {
-        let list = Value::Tuple(Tuple::from_unnamed([Value::Int(1), Value::Int(2)]));
+        let list = Value::Tuple(Tuple::from_unnamed([
+            Value::Scalar(Scalar::Int(1)),
+            Value::Scalar(Scalar::Int(2)),
+        ]));
         assert_eq!(
             EvalValue::from_ast(&list, &doc()),
-            EvalValue::Tuple(Tuple::from_unnamed([EvalValue::Int(1), EvalValue::Int(2)]))
+            EvalValue::Tuple(Tuple::from_unnamed([
+                EvalValue::Scalar(Scalar::Int(1)),
+                EvalValue::Scalar(Scalar::Int(2))
+            ]))
         );
         let other = Value::Call(
             "enum".into(),
-            Tuple::from_unnamed([Value::String("a".into())]),
+            Tuple::from_unnamed([Value::Scalar(Scalar::Text("a".into()))]),
         );
         assert!(matches!(
             EvalValue::from_ast(&other, &doc()),
@@ -402,9 +389,15 @@ mod tests {
         );
 
         let mut mixed = Tuple::new();
-        mixed.try_push_unnamed(Value::Int(10)).unwrap();
-        mixed.try_push_named("k", Value::Int(20)).unwrap();
-        mixed.try_push_unnamed(Value::Int(30)).unwrap();
+        mixed
+            .try_push_unnamed(Value::Scalar(Scalar::Int(10)))
+            .unwrap();
+        mixed
+            .try_push_named("k", Value::Scalar(Scalar::Int(20)))
+            .unwrap();
+        mixed
+            .try_push_unnamed(Value::Scalar(Scalar::Int(30)))
+            .unwrap();
         let eval = EvalValue::from_ast(&Value::Tuple(mixed.clone()), &doc());
         let back = eval.to_ast().expect("converts back to AST value");
         assert_eq!(back, Value::Tuple(mixed));
@@ -427,7 +420,7 @@ mod tests {
         // One of them anywhere inside makes the whole thing not data.
         assert_eq!(
             EvalValue::Tuple(Tuple::from_unnamed([
-                EvalValue::Int(1),
+                EvalValue::Scalar(Scalar::Int(1)),
                 EvalValue::Document(doc())
             ]))
             .to_ast(),
@@ -437,32 +430,52 @@ mod tests {
 
     #[test]
     fn an_env_finds_the_innermost_binding_and_does_not_disturb_the_outer() {
-        let outer = Env::new().bind("x", EvalValue::Int(1));
+        let outer = Env::new().bind("x", EvalValue::Scalar(Scalar::Int(1)));
         let inner = outer
-            .bind("x", EvalValue::Int(2))
-            .bind("y", EvalValue::Int(3));
-        assert_eq!(inner.get("x"), Some(&EvalValue::Int(2)));
-        assert_eq!(inner.get("y"), Some(&EvalValue::Int(3)));
-        assert_eq!(outer.get("x"), Some(&EvalValue::Int(1)));
+            .bind("x", EvalValue::Scalar(Scalar::Int(2)))
+            .bind("y", EvalValue::Scalar(Scalar::Int(3)));
+        assert_eq!(inner.get("x"), Some(&EvalValue::Scalar(Scalar::Int(2))));
+        assert_eq!(inner.get("y"), Some(&EvalValue::Scalar(Scalar::Int(3))));
+        assert_eq!(outer.get("x"), Some(&EvalValue::Scalar(Scalar::Int(1))));
         assert_eq!(outer.get("y"), None);
     }
 
     #[test]
     fn test_eval_value_scalar_text() {
-        assert_eq!(EvalValue::None.scalar_text().as_deref(), Some(""));
-        assert_eq!(EvalValue::Auto.scalar_text().as_deref(), Some("auto"));
-        assert_eq!(EvalValue::Bool(true).scalar_text().as_deref(), Some("true"));
-        assert_eq!(EvalValue::Int(42).scalar_text().as_deref(), Some("42"));
         assert_eq!(
-            EvalValue::Float(3.14).scalar_text().as_deref(),
+            EvalValue::Scalar(Scalar::None).scalar_text().as_deref(),
+            Some("")
+        );
+        assert_eq!(
+            EvalValue::Scalar(Scalar::Auto).scalar_text().as_deref(),
+            Some("auto")
+        );
+        assert_eq!(
+            EvalValue::Scalar(Scalar::Bool(true))
+                .scalar_text()
+                .as_deref(),
+            Some("true")
+        );
+        assert_eq!(
+            EvalValue::Scalar(Scalar::Int(42)).scalar_text().as_deref(),
+            Some("42")
+        );
+        assert_eq!(
+            EvalValue::Scalar(Scalar::Float(3.14))
+                .scalar_text()
+                .as_deref(),
             Some("3.14")
         );
         assert_eq!(
-            EvalValue::Number("1.10".into()).scalar_text().as_deref(),
+            EvalValue::Scalar(Scalar::Number("1.10".into()))
+                .scalar_text()
+                .as_deref(),
             Some("1.10")
         );
         assert_eq!(
-            EvalValue::String("hello".into()).scalar_text().as_deref(),
+            EvalValue::Scalar(Scalar::Text("hello".into()))
+                .scalar_text()
+                .as_deref(),
             Some("hello")
         );
         assert_eq!(

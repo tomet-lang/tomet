@@ -1,6 +1,7 @@
 use std::path::{Path, PathBuf};
 
 use tomet_ast::{Block, Element, File, Inline, Paragraph, Text, Tuple, Value};
+use tomet_scalar::Scalar;
 use tomet_semantics::{
     ElementKind, TargetScheme, classify_std_lenient, link_target, target_scheme,
 };
@@ -222,17 +223,19 @@ pub fn resolve_document_links<F>(
 fn update_element_target(el: &mut Element, new_target: String) {
     if let Some(tuple) = &mut el.data.args {
         if let Some(v) = tuple.get_mut("target") {
-            *v = Value::String(new_target);
+            *v = Value::Scalar(Scalar::Text(new_target));
         } else if tuple.contains_key("ref") {
             tuple.remove("ref");
-            tuple.set("target", Value::String(new_target));
+            tuple.set("target", Value::Scalar(Scalar::Text(new_target)));
         } else if let Some(v) = tuple.nth_unnamed_mut(0) {
-            *v = Value::String(new_target);
+            *v = Value::Scalar(Scalar::Text(new_target));
         } else {
-            tuple.set("target", Value::String(new_target));
+            tuple.set("target", Value::Scalar(Scalar::Text(new_target)));
         }
     } else {
-        el.data.args = Some(Tuple::from_unnamed([Value::String(new_target)]));
+        el.data.args = Some(Tuple::from_unnamed([Value::Scalar(Scalar::Text(
+            new_target,
+        ))]));
     }
 }
 

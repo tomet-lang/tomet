@@ -167,10 +167,10 @@ pub fn process_file_internal(mut doc: tomet::ast::File, opts: &ProcessOptions) -
     // 1. Meta & Title from ::meta(title: ...)
     let meta = tomet::declaration::document_meta(&doc);
     let meta_title = meta.as_ref().and_then(|v| match v {
-        tomet::ast::Value::Tuple(m) => m.get("title").and_then(|val| match val {
-            tomet::ast::Value::String(s) => Some(s.clone()),
-            _ => None,
-        }),
+        tomet::ast::Value::Tuple(m) => m
+            .get("title")
+            .and_then(|val| val.as_scalar().and_then(|s| s.text()))
+            .map(|t| t.into_owned()),
         _ => None,
     });
 

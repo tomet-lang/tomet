@@ -159,6 +159,7 @@ pub fn declarations_from_header(header: &[tomet_ast::Declaration]) -> Vec<Found>
 #[cfg(test)]
 mod tests {
     use super::*;
+    use tomet_scalar::Scalar;
 
     fn parse(src: &str) -> File {
         tomet_ast_parser::parse_file(src).expect("parses")
@@ -175,19 +176,28 @@ mod tests {
         let kind = &found[0].declaration;
         assert_eq!(kind.name, "kind");
         let view0 = kind.args_view().unwrap();
-        assert_eq!(view0.get("kind"), Some(&Value::String("config".into())));
-        assert_eq!(view0.get("0"), Some(&Value::String("config".into())));
-        assert_eq!(view0.get("version"), Some(&Value::Int(2)));
-        assert_eq!(view0.get("1"), Some(&Value::Int(2)));
+        assert_eq!(
+            view0.get("kind"),
+            Some(&Value::Scalar(Scalar::Text("config".into())))
+        );
+        assert_eq!(
+            view0.get("0"),
+            Some(&Value::Scalar(Scalar::Text("config".into())))
+        );
+        assert_eq!(view0.get("version"), Some(&Value::Scalar(Scalar::Int(2))));
+        assert_eq!(view0.get("1"), Some(&Value::Scalar(Scalar::Int(2))));
         assert_eq!(
             kind.args.as_ref(),
             Some(&Tuple::from_unnamed([
-                Value::String("config".into()),
-                Value::Int(2),
+                Value::Scalar(Scalar::Text("config".into())),
+                Value::Scalar(Scalar::Int(2)),
             ]))
         );
         let view1 = found[1].declaration.args_view().unwrap();
-        assert_eq!(view1.get("id"), Some(&Value::String("x".into())));
+        assert_eq!(
+            view1.get("id"),
+            Some(&Value::Scalar(Scalar::Text("x".into())))
+        );
         assert_eq!(view1.get("0"), None);
         assert_eq!(found[1].declaration.data, None);
     }
@@ -214,7 +224,7 @@ mod tests {
     }
 
     fn text(s: &str) -> Value {
-        Value::String(s.into())
+        Value::Scalar(Scalar::Text(s.into()))
     }
 
     #[test]

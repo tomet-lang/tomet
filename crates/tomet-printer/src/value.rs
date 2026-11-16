@@ -9,8 +9,10 @@ use crate::element::{render_element_value, render_interp, render_type_seat};
 use crate::inline::render_content_blocks;
 use tomet_ast::{Block, Declaration, Entry, Group, Tuple, Value};
 use tomet_config::{FieldConfig, PrinterConfig};
+use tomet_scalar::Scalar;
 use tomet_spelling::{key_text, scalar_text};
 use tomet_style::{ColonSpacing, GroupLayout, ValueAlignment};
+use tomet_tree::ValueExt;
 
 /// What stands between the colon of a link's `target` and its value: a space unless asked not to.
 fn link_colon(config: &PrinterConfig) -> &'static str {
@@ -35,14 +37,10 @@ pub(crate) fn render_nested(v: &Value, config: &PrinterConfig) -> String {
 #[deny(clippy::wildcard_enum_match_arm)]
 pub(crate) fn render_value_inner_with_config(v: &Value, config: &PrinterConfig) -> String {
     match v {
-        Value::None => String::new(),
-        Value::Auto => "auto".to_string(),
-        Value::Bool(b) => b.to_string(),
-        Value::Int(i) => i.to_string(),
-        Value::Float(f) => tomet_scalar::float_text(*f),
-        // As written: formatting must not turn `1.10` into `1.1`.
-        Value::Number(text) => text.clone(),
-        Value::String(s) => scalar_text(s),
+        // A text is spelled, quoted where it has to be; every other scalar is written as it was
+        // (formatting must not turn `1.10` into `1.1`), and `none` is empty.
+        Value::Scalar(Scalar::Text(s)) => scalar_text(s),
+        Value::Scalar(s) => s.text().map(|text| text.into_owned()).unwrap_or_default(),
         Value::Tuple(tuple) => render_tuple(tuple, config),
         Value::Call(name, args) => {
             format!("{name}({})", render_args(args, config))
@@ -176,11 +174,11 @@ fn render_meta_field_value(
     field_cfg: Option<&FieldConfig>,
     config: &PrinterConfig,
 ) -> String {
-    if let Value::None = v {
+    if let Value::Scalar(Scalar::None) = v {
         return String::new();
     }
     if let Some(cfg) = field_cfg {
-        if let Value::String(s) = v
+        if let Some(s) = v.as_str()
             && (cfg.format.as_deref() == Some("rfc3339")
                 || cfg
                     .field_type
@@ -206,10 +204,10 @@ fn render_meta_field_value(
             return s;
         }
     }
-    if let Value::String(s) = v
+    if let Some(s) = v.as_str()
         && tomet_type::datetime::parse_datetime_parts(s).is_some()
     {
-        return s.clone();
+        return s.to_string();
     }
     render_value_inner_with_config(v, config)
 }
@@ -303,8 +301,8 @@ mod tests {
     fn a_nested_map_keeps_its_parens() {
         assert_eq!(
             render_value(&map(&[
-                ("id", Value::String("c1".into())),
-                ("m", map(&[("k", Value::String("v".into()))])),
+                ("id", Value::Scalar(Scalar::Text("c1".into()))),
+                ("m", map(&[("k", Value::Scalar(Scalar::Text("v".into())))]))
             ])),
             "(id: c1, m: (k: v))"
         );
@@ -314,8 +312,8 @@ mod tests {
     fn a_map_inside_a_sequence_keeps_its_parens() {
         assert_eq!(
             render_value_inner(&Value::Tuple(Tuple::from_unnamed(vec![
-                map(&[("k", Value::Int(1))]),
-                Value::Int(2),
+                map(&[("k", Value::Scalar(Scalar::Int(1)))]),
+                Value::Scalar(Scalar::Int(2)),
             ]))),
             "((k: 1), 2)"
         );
@@ -323,7 +321,10 @@ mod tests {
 
     #[test]
     fn a_top_level_map_is_still_wrapped_once() {
-        assert_eq!(render_value(&map(&[("a", Value::Int(1))])), "(a: 1)");
+        assert_eq!(
+            render_value(&map(&[("a", Value::Scalar(Scalar::Int(1)))])),
+            "(a: 1)"
+        );
     }
 
     #[test]
@@ -331,7 +332,7 @@ mod tests {
         assert_eq!(
             render_value_inner(&Value::Call(
                 "enum".into(),
-                Tuple::from_unnamed(vec![Value::String("card".into())])
+                Tuple::from_unnamed(vec![Value::Scalar(Scalar::Text("card".into()))])
             )),
             "enum(card)"
         );
@@ -340,22 +341,24 @@ mod tests {
     #[test]
     fn render_value_inner_quotes_strings_needing_it() {
         assert_eq!(
-            render_value_inner(&Value::String("plain".to_string())),
+            render_value_inner(&Value::Scalar(Scalar::Text("plain".to_string()))),
             "plain"
         );
         assert_eq!(
-            render_value_inner(&Value::String("has space".to_string())),
+            render_value_inner(&Value::Scalar(Scalar::Text("has space".to_string()))),
             "\"has space\""
         );
-        assert_eq!(render_value_inner(&Value::None), "");
-        assert_eq!(render_value_inner(&Value::Auto), "auto");
+        assert_eq!(render_value_inner(&Value::Scalar(Scalar::None)), "");
+        assert_eq!(render_value_inner(&Value::Scalar(Scalar::Auto)), "auto");
     }
 
     #[test]
     fn render_args_handles_target() {
         let cfg = PrinterConfig::default();
-        let reference =
-            Tuple::from_named([("target".to_string(), Value::String("ref:name".to_string()))]);
+        let reference = Tuple::from_named([(
+            "target".to_string(),
+            Value::Scalar(Scalar::Text("ref:name".to_string())),
+        )]);
         assert_eq!(render_args(&reference, &cfg), "target: \"ref:name\"");
 
         let cfg_no_space = PrinterConfig {
@@ -376,7 +379,7 @@ mod tests {
         let mut el = tomet_tree::declaration_new("meta");
         el.data.args = Some(Tuple::from_named([(
             "id".to_string(),
-            Value::String("doc-12345678".to_string()),
+            Value::Scalar(Scalar::Text("doc-12345678".to_string())),
         )]));
         let cfg = PrinterConfig::default();
         assert_eq!(
@@ -390,7 +393,7 @@ mod tests {
         let mut el = tomet_tree::declaration_new("meta");
         el.data.args = Some(Tuple::from_named([(
             "id".to_string(),
-            Value::String("doc-12345678".to_string()),
+            Value::Scalar(Scalar::Text("doc-12345678".to_string())),
         )]));
         assert_eq!(
             render_meta_declaration(&el, &PrinterConfig::default()),
@@ -409,7 +412,7 @@ mod tests {
         let mut el = tomet_tree::declaration_new("meta");
         el.data.args = Some(Tuple::from_named([(
             "id".to_string(),
-            Value::String("doc-12345678".to_string()),
+            Value::Scalar(Scalar::Text("doc-12345678".to_string())),
         )]));
         let cfg = PrinterConfig {
             meta: tomet_config::MetaConfig {
@@ -426,7 +429,7 @@ mod tests {
 
     #[test]
     fn the_fields_of_a_meta_are_aligned_when_values_are_to_be() {
-        let text = |s: &str| Value::String(s.to_string());
+        let text = |s: &str| Value::Scalar(Scalar::Text(s.to_string()));
         let mut el = tomet_tree::declaration_new("meta");
         el.data.args = Some(Tuple::from_named([
             ("id".to_string(), text("x")),
@@ -462,7 +465,7 @@ mod tests {
 
     #[test]
     fn a_meta_field_wider_than_the_limit_is_left_out_of_the_alignment() {
-        let text = |s: &str| Value::String(s.to_string());
+        let text = |s: &str| Value::Scalar(Scalar::Text(s.to_string()));
         let mut el = tomet_tree::declaration_new("meta");
         el.data.args = Some(Tuple::from_named([
             ("id".to_string(), text("x")),
@@ -495,12 +498,15 @@ mod tests {
     fn the_fields_of_a_meta_keep_their_per_field_rules_on_separate_lines() {
         let mut el = tomet_tree::declaration_new("meta");
         el.data.args = Some(Tuple::from_named([
-            ("title".to_string(), Value::String("T".to_string())),
+            (
+                "title".to_string(),
+                Value::Scalar(Scalar::Text("T".to_string())),
+            ),
             (
                 "tags".to_string(),
                 Value::Tuple(Tuple::from_unnamed(vec![
-                    Value::String("a".to_string()),
-                    Value::String("b".to_string()),
+                    Value::Scalar(Scalar::Text("a".to_string())),
+                    Value::Scalar(Scalar::Text("b".to_string())),
                 ])),
             ),
         ]));
@@ -527,10 +533,13 @@ mod tests {
     #[test]
     fn a_brace_body_on_a_meta_is_printed_not_dropped() {
         let mut el = tomet_tree::declaration_new("meta");
-        el.data.args = Some(Tuple::from_named([("a".to_string(), Value::Int(1))]));
+        el.data.args = Some(Tuple::from_named([(
+            "a".to_string(),
+            Value::Scalar(Scalar::Int(1)),
+        )]));
         el.data.value = Some(Group::from_map(Tuple::from_named([(
             "b".to_string(),
-            Value::Int(2),
+            Value::Scalar(Scalar::Int(2)),
         )])));
         let mut cfg = PrinterConfig::default();
         cfg.meta.field_layout = Some(tomet_style::GroupLayout::OnePerLine);
@@ -541,8 +550,8 @@ mod tests {
     fn render_meta_declaration_quotes_keys_that_are_not_identifiers() {
         let mut el = tomet_tree::declaration_new("meta");
         el.data.args = Some(Tuple::from_named([
-            ("plain.key".to_string(), Value::Int(1)),
-            ("tmtroot/a b.tmt".to_string(), Value::Int(2)),
+            ("plain.key".to_string(), Value::Scalar(Scalar::Int(1))),
+            ("tmtroot/a b.tmt".to_string(), Value::Scalar(Scalar::Int(2))),
         ]));
         let cfg = PrinterConfig {
             meta: tomet_config::MetaConfig {

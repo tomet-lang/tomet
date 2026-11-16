@@ -2,6 +2,7 @@
 //! `tomet_ast::Value` entries for the synthesized `::meta` block.
 
 use tomet_ast::{Tuple, Value};
+use tomet_scalar::Scalar;
 
 pub(super) fn extract_yaml_frontmatter(src: &str) -> (Option<Vec<(String, Value)>>, &str) {
     let trimmed = src.trim_start();
@@ -52,13 +53,13 @@ pub(super) fn extract_yaml_frontmatter(src: &str) -> (Option<Vec<(String, Value)
 
 fn yaml_to_value(v: serde_yaml::Value) -> Value {
     match v {
-        serde_yaml::Value::Null => Value::None,
-        serde_yaml::Value::Bool(b) => Value::Bool(b),
+        serde_yaml::Value::Null => Value::Scalar(Scalar::None),
+        serde_yaml::Value::Bool(b) => Value::Scalar(Scalar::Bool(b)),
         serde_yaml::Value::Number(n) => {
             if let Some(i) = n.as_i64() {
-                Value::Int(i)
+                Value::Scalar(Scalar::Int(i))
             } else {
-                Value::Float(n.as_f64().unwrap_or_default())
+                Value::Scalar(Scalar::Float(n.as_f64().unwrap_or_default()))
             }
         }
         serde_yaml::Value::String(s) => {
@@ -75,12 +76,12 @@ fn yaml_to_value(v: serde_yaml::Value) -> Value {
                     '"', '\'', ':', ',', '(', ')', '[', ']', '{', '}', '\n', '\r', '\t', ' ',
                 ]) {
                     let escaped = target.replace('\\', "\\\\").replace('"', "\\\"");
-                    Value::String(format!("@link(ref:\"{escaped}\")"))
+                    Value::Scalar(Scalar::Text(format!("@link(ref:\"{escaped}\")")))
                 } else {
-                    Value::String(format!("@link(ref:{target})"))
+                    Value::Scalar(Scalar::Text(format!("@link(ref:{target})")))
                 }
             } else {
-                Value::String(s)
+                Value::Scalar(Scalar::Text(s))
             }
         }
         serde_yaml::Value::Sequence(items) => {
@@ -108,6 +109,7 @@ fn yaml_key_to_string(k: serde_yaml::Value) -> String {
 mod tests {
     use crate::import::from_markdown;
     use tomet_ast::{Name, Tuple, Value};
+    use tomet_scalar::Scalar;
 
     #[test]
     fn yaml_frontmatter_converts_to_meta() {
@@ -120,9 +122,15 @@ mod tests {
         assert_eq!(
             declaration.data.args,
             Some(Tuple::from_named([
-                ("title".to_string(), Value::String("Hello".to_string())),
-                ("author".to_string(), Value::String("Alice".to_string())),
-                ("draft".to_string(), Value::Bool(false)),
+                (
+                    "title".to_string(),
+                    Value::Scalar(Scalar::Text("Hello".to_string()))
+                ),
+                (
+                    "author".to_string(),
+                    Value::Scalar(Scalar::Text("Alice".to_string()))
+                ),
+                ("draft".to_string(), Value::Scalar(Scalar::Bool(false))),
             ]))
         );
     }
@@ -138,12 +146,15 @@ mod tests {
         assert_eq!(
             declaration.data.args,
             Some(Tuple::from_named([
-                ("title".to_string(), Value::String("Doc".to_string())),
+                (
+                    "title".to_string(),
+                    Value::Scalar(Scalar::Text("Doc".to_string()))
+                ),
                 (
                     "tags".to_string(),
                     Value::Tuple(Tuple::from_unnamed(vec![
-                        Value::String("rust".to_string()),
-                        Value::String("tomet".to_string()),
+                        Value::Scalar(Scalar::Text("rust".to_string())),
+                        Value::Scalar(Scalar::Text("tomet".to_string())),
                     ]))
                 ),
             ]))
@@ -162,8 +173,8 @@ mod tests {
             Some(Tuple::from_named([(
                 "topics".to_string(),
                 Value::Tuple(Tuple::from_unnamed(vec![
-                    Value::String("@link(ref:@Templater)".to_string()),
-                    Value::String("@link(ref:@QuickAdd)".to_string()),
+                    Value::Scalar(Scalar::Text("@link(ref:@Templater)".to_string())),
+                    Value::Scalar(Scalar::Text("@link(ref:@QuickAdd)".to_string())),
                 ]))
             )]))
         );

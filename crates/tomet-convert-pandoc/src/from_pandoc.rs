@@ -36,6 +36,7 @@ use tomet_ast::{
     Block as TmBlock, Declaration, Element, File, Group, Id, Inline as TmInline, LineBreak, List,
     Name, Paragraph, Placement, RawText, Section, SoftBreak, Text, Tuple, TupleEntry, Value,
 };
+use tomet_scalar::Scalar;
 use tomet_semantics::{EXACT_DATA_KEY, comment_element};
 use tomet_span::Span;
 
@@ -53,15 +54,15 @@ pub fn from_pandoc(doc: &PandocDoc) -> File {
     let mut blocks = Vec::new();
     // Pandoc's `id` is the identity of the document: the declaration `::id(...)`, not a field of `::meta`.
     let mut meta = doc.meta.clone();
-    let id = meta
-        .remove("id")
-        .and_then(|value| match meta_value_to_value(&value) {
-            Value::String(text) => Some(text),
-            other => other.scalar_text().map(|text| text.into_owned()),
-        });
+    let id = meta.remove("id").and_then(|value| {
+        meta_value_to_value(&value)
+            .as_scalar()
+            .and_then(|s| s.text())
+            .map(|text| text.into_owned())
+    });
     if let Some(id) = id {
         let mut id_declaration = declaration_new("id");
-        id_declaration.data.args = Some(Tuple::from_unnamed([Value::String(id)]));
+        id_declaration.data.args = Some(Tuple::from_unnamed([Value::Scalar(Scalar::Text(id))]));
         header.push(id_declaration);
     }
     if !meta.is_empty() {
@@ -135,8 +136,8 @@ fn meta_declaration(meta: &crate::ast::Meta) -> Declaration {
 
 fn meta_value_to_value(v: &MetaValue) -> Value {
     match v {
-        MetaValue::MetaString(s) => Value::String(s.clone()),
-        MetaValue::MetaBool(b) => Value::Bool(*b),
+        MetaValue::MetaString(s) => Value::Scalar(Scalar::Text(s.clone())),
+        MetaValue::MetaBool(b) => Value::Scalar(Scalar::Bool(*b)),
         MetaValue::MetaList(items) => {
             Value::Tuple(Tuple::from_unnamed(items.iter().map(meta_value_to_value)))
         }
@@ -148,8 +149,8 @@ fn meta_value_to_value(v: &MetaValue) -> Value {
         // Metadata written as inlines flattens back to its text. Tomet
         // metadata values are plain data, so nothing is lost that was
         // there to begin with.
-        MetaValue::MetaInlines(inlines) => Value::String(inlines_to_text(inlines)),
-        MetaValue::MetaBlocks(blocks) => Value::String(
+        MetaValue::MetaInlines(inlines) => Value::Scalar(Scalar::Text(inlines_to_text(inlines))),
+        MetaValue::MetaBlocks(blocks) => Value::Scalar(Scalar::Text(
             blocks
                 .iter()
                 .map(|b| match b {
@@ -158,7 +159,7 @@ fn meta_value_to_value(v: &MetaValue) -> Value {
                 })
                 .collect::<Vec<_>>()
                 .join("\n"),
-        ),
+        )),
     }
 }
 
@@ -195,7 +196,7 @@ fn block_element(block: &Block) -> Element {
     let el = match block {
         Block::Header(level, attr, inlines) => {
             let mut el = named_element("heading", attr);
-            el.data.args = Some(Tuple::from_unnamed([Value::Int(*level)]));
+            el.data.args = Some(Tuple::from_unnamed([Value::Scalar(Scalar::Int(*level))]));
             el.content = Some(wrap_inline_content(inlines_from_pandoc(inlines)));
             el
         }
@@ -207,7 +208,7 @@ fn block_element(block: &Block) -> Element {
             if let Some(lang) = attr.1.iter().find(|c| !c.starts_with(CLASS_PREFIX)) {
                 el.data.args = Some(Tuple::from_named([(
                     "lang".to_string(),
-                    Value::String(lang.clone()),
+                    Value::Scalar(Scalar::Text(lang.clone())),
                 )]));
             }
             el.content = Some(vec![TmBlock::Paragraph(Paragraph::new(
@@ -229,7 +230,7 @@ fn block_element(block: &Block) -> Element {
             let mut el = element_new(Name::bare("raw"));
             el.data.args = Some(Tuple::from_named([(
                 "lang".to_string(),
-                Value::String(format.clone()),
+                Value::Scalar(Scalar::Text(format.clone())),
             )]));
             el.content = Some(vec![TmBlock::Paragraph(Paragraph::new(
                 vec![TmInline::Raw(RawText::new(text.clone(), Span::dummy()))],
@@ -346,10 +347,13 @@ fn table_element(parts: &TableParts) -> Element {
     // reader's default is that row 0 is the header.
     let mut args: Vec<(String, Value)> = Vec::new();
     if head.1.is_empty() {
-        args.push(("header".to_string(), Value::Bool(false)));
+        args.push(("header".to_string(), Value::Scalar(Scalar::Bool(false))));
     }
     if let Some(align) = colspecs.first().and_then(|c| alignment_name(&c.0)) {
-        args.push(("align".to_string(), Value::String(align.to_string())));
+        args.push((
+            "align".to_string(),
+            Value::Scalar(Scalar::Text(align.to_string())),
+        ));
     }
     if !args.is_empty() {
         el.data.args = Some(Tuple::from_named(args));
@@ -501,13 +505,21 @@ fn inline_from_pandoc(inline: &Inline) -> TmInline {
         Inline::Quoted(_, inner) => inline_element("quote", &Attr::empty(), inner),
         Inline::Link(attr, text, target) => {
             let mut el = named_element("link", attr);
-            merge_arg(&mut el, "target", Value::String(target.0.clone()));
+            merge_arg(
+                &mut el,
+                "target",
+                Value::Scalar(Scalar::Text(target.0.clone())),
+            );
             el.content = Some(wrap_inline_content(inlines_from_pandoc(text)));
             TmInline::Element(el)
         }
         Inline::Image(attr, alt, target) => {
             let mut el = named_element("embed", attr);
-            merge_arg(&mut el, "target", Value::String(target.0.clone()));
+            merge_arg(
+                &mut el,
+                "target",
+                Value::Scalar(Scalar::Text(target.0.clone())),
+            );
             el.content = Some(wrap_inline_content(inlines_from_pandoc(alt)));
             TmInline::Element(el)
         }
@@ -630,7 +642,7 @@ fn extract_data_from_attr(attr: &Attr) -> (Option<Tuple>, Option<Group>) {
         if k == EXACT_DATA_KEY {
             continue;
         }
-        entries.push((k.clone(), Value::String(v.clone())));
+        entries.push((k.clone(), Value::Scalar(Scalar::Text(v.clone()))));
     }
     let value = if !entries.is_empty() {
         Some(Group::from_map(Tuple::from_named(entries)))
@@ -686,14 +698,14 @@ fn parse_name(name: &str) -> Name {
 
 fn json_to_value(v: &serde_json::Value) -> Value {
     match v {
-        serde_json::Value::Null => Value::None,
-        serde_json::Value::Bool(b) => Value::Bool(*b),
+        serde_json::Value::Null => Value::Scalar(Scalar::None),
+        serde_json::Value::Bool(b) => Value::Scalar(Scalar::Bool(*b)),
         serde_json::Value::Number(n) => n
             .as_i64()
-            .map(Value::Int)
-            .or_else(|| n.as_f64().map(Value::Float))
-            .unwrap_or(Value::None),
-        serde_json::Value::String(s) => Value::String(s.clone()),
+            .map(|i| Value::Scalar(Scalar::Int(i)))
+            .or_else(|| n.as_f64().map(|f| Value::Scalar(Scalar::Float(f))))
+            .unwrap_or(Value::Scalar(Scalar::None)),
+        serde_json::Value::String(s) => Value::Scalar(Scalar::Text(s.clone())),
         serde_json::Value::Array(items) => {
             Value::Tuple(Tuple::from_unnamed(items.iter().map(json_to_value)))
         }
@@ -875,19 +887,22 @@ mod tests {
             el.data.args,
             Some(Tuple::from_named([(
                 "url".to_string(),
-                Value::String("x".to_string())
+                Value::Scalar(Scalar::Text("x".to_string()))
             )]))
         );
         let value = el.data.value.as_ref().map(|v| v.as_data()).unwrap();
         assert_eq!(
             value,
             Tuple::from_named([
-                ("id".to_string(), Value::String("c1".to_string())),
+                (
+                    "id".to_string(),
+                    Value::Scalar(Scalar::Text("c1".to_string()))
+                ),
                 (
                     "m".to_string(),
                     Value::Tuple(Tuple::from_named([(
                         "k".to_string(),
-                        Value::String("v".to_string())
+                        Value::Scalar(Scalar::Text("v".to_string()))
                     )]))
                 ),
             ])
@@ -908,7 +923,7 @@ mod tests {
             el.data.value.as_ref().map(|v| v.as_data()),
             Some(Tuple::from_named([(
                 "a".to_string(),
-                Value::String("1".to_string())
+                Value::Scalar(Scalar::Text("1".to_string()))
             )]))
         );
     }
@@ -922,8 +937,11 @@ mod tests {
         assert_eq!(
             declaration.data.args,
             Some(Tuple::from_named([
-                ("draft".to_string(), Value::Bool(true)),
-                ("title".to_string(), Value::String("Hello".to_string())),
+                ("draft".to_string(), Value::Scalar(Scalar::Bool(true))),
+                (
+                    "title".to_string(),
+                    Value::Scalar(Scalar::Text("Hello".to_string()))
+                ),
             ]))
         );
     }
@@ -977,17 +995,20 @@ mod tests {
 
     #[test]
     fn the_json_bridge_is_symmetric() {
-        assert_json_round_trip(&Value::None);
-        assert_json_round_trip(&Value::Bool(true));
-        assert_json_round_trip(&Value::Int(-7));
-        assert_json_round_trip(&Value::String("x".into()));
+        assert_json_round_trip(&Value::Scalar(Scalar::None));
+        assert_json_round_trip(&Value::Scalar(Scalar::Bool(true)));
+        assert_json_round_trip(&Value::Scalar(Scalar::Int(-7)));
+        assert_json_round_trip(&Value::Scalar(Scalar::Text("x".into())));
         assert_json_round_trip(&Value::Tuple(Tuple::from_unnamed([
-            Value::Int(1),
-            Value::String("a".into()),
+            Value::Scalar(Scalar::Int(1)),
+            Value::Scalar(Scalar::Text("a".into())),
         ])));
         assert_json_round_trip(&Value::Tuple(Tuple::from_named([(
             "m".to_string(),
-            Value::Tuple(Tuple::from_named([("k".to_string(), Value::Int(1))])),
+            Value::Tuple(Tuple::from_named([(
+                "k".to_string(),
+                Value::Scalar(Scalar::Int(1)),
+            )])),
         )])));
     }
 }

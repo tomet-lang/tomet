@@ -9,6 +9,7 @@ use crate::util::{
 };
 use tomet_ast::{ElementView, Value};
 use tomet_semantics::element_args_view;
+use tomet_tree::ValueExt;
 
 /// A bare `---` break is a plain `<hr>`; a titled one (`---[ Title ]---`,
 /// the break's `content`) wraps two `<hr>`s
@@ -49,10 +50,7 @@ pub(crate) fn render_ruby_element(cx: &RenderCtx, el: ElementView<'_>, out: &mut
     let rt = args
         .as_ref()
         .and_then(|a| a.get("rt"))
-        .and_then(|v| match v {
-            Value::String(s) => Some(s.as_str()),
-            _ => None,
-        })
+        .and_then(Value::as_str)
         .unwrap_or("");
 
     out.push_str("<ruby>");

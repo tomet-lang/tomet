@@ -2,6 +2,7 @@ use std::path::Path;
 
 use tomet_config::PrinterConfig;
 use tomet_expr::MemoryResolver;
+use tomet_scalar::Scalar;
 use tomet_vault::Vault;
 
 use super::*;
@@ -13,7 +14,7 @@ fn vault() -> Vault {
     let mut config = PrinterConfig::default();
     config.macros.insert(
         "gh".to_string(),
-        Value::String("https://github.com/x/issues/$(1)".to_string()),
+        Value::Scalar(Scalar::Text("https://github.com/x/issues/$(1)".to_string())),
     );
     let note = tomet_ast_parser::parse_file("::macro(note: [ Note: $(1) ])\n").expect("parses");
     config
@@ -23,7 +24,7 @@ fn vault() -> Vault {
         "topic".to_string(),
         tomet_declaration::VarDecl {
             ty: tomet_type::Type::bare(tomet_type::Kind::String),
-            default: Some(Value::String("general".to_string())),
+            default: Some(Value::Scalar(Scalar::Text("general".to_string()))),
             about: None,
         },
     ));

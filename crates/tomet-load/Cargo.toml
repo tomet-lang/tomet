@@ -23,3 +23,6 @@ tomet-transform   = { workspace = true }
 tomet-validator   = { workspace = true }
 tomet-vault       = { workspace = true }
 tomet-workspace   = { workspace = true }
+
+[dev-dependencies]
+tomet-scalar = { workspace = true }

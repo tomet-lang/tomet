@@ -2,6 +2,7 @@
 
 use tomet_ast::{Block, File, ListItem, Section, Tuple, Value};
 use tomet_config::{ConfigEntrySpec, ConfigGroupSpec, PrinterConfig};
+use tomet_scalar::Scalar;
 use tomet_tree::declaration_new;
 
 use crate::util::{code, dummy, inlines, list, paragraph, paragraphs, plain_item, text};
@@ -27,7 +28,9 @@ pub fn document(
     intro_paragraphs: &[&str],
 ) -> File {
     let mut id = declaration_new("id");
-    id.data.args = Some(Tuple::from_unnamed([Value::String(doc_id.to_string())]));
+    id.data.args = Some(Tuple::from_unnamed([Value::Scalar(Scalar::Text(
+        doc_id.to_string(),
+    ))]));
 
     let mut blocks = vec![Block::Section(Section::new(1, vec![text(title)], dummy()))];
 

@@ -51,10 +51,6 @@ fn matcher(name: &str) -> Option<Name> {
     Some(Name::bare(name))
 }
 
-fn string(s: &str) -> Value {
-    Value::String(s.to_string())
-}
-
 #[test]
 fn holes_sit_in_running_text() {
     let items = inlines("adr-<?int(n)>-<?(slug)>.md");
@@ -67,7 +63,12 @@ fn a_single_argument_is_the_value_itself() {
         panic!("expected a hole");
     };
     assert_eq!(hole.matcher, matcher("int"));
-    assert_eq!(hole.data.args, Some(Tuple::from_unnamed(vec![string("n")])));
+    assert_eq!(
+        hole.data.args,
+        Some(Tuple::from_unnamed(vec![Value::Scalar(Scalar::Text(
+            "n".into()
+        ))]))
+    );
 }
 
 #[test]
@@ -94,7 +95,12 @@ fn the_parens_may_be_left_out() {
 fn the_matcher_may_be_left_out() {
     let hole = hole("<?(n)>");
     assert_eq!(hole.matcher, None);
-    assert_eq!(hole.data.args, Some(Tuple::from_unnamed(vec![string("n")])));
+    assert_eq!(
+        hole.data.args,
+        Some(Tuple::from_unnamed(vec![Value::Scalar(Scalar::Text(
+            "n".into()
+        ))]))
+    );
 }
 
 #[test]
@@ -103,7 +109,9 @@ fn content_is_a_sub_pattern() {
     assert_eq!(hole.matcher, None);
     assert_eq!(
         hole.data.args,
-        Some(Tuple::from_unnamed(vec![string("id")]))
+        Some(Tuple::from_unnamed(vec![Value::Scalar(Scalar::Text(
+            "id".into()
+        ))]))
     );
     let content = hole.content.expect("content");
     assert_eq!(shape(first_para(&content)), r#""adr-" <?int> "-" <?>"#);
@@ -115,7 +123,10 @@ fn several_arguments_are_unkeyed_entries() {
     assert_eq!(hole.matcher, matcher("int"));
     assert_eq!(
         hole.data.args,
-        Some(Tuple::from_unnamed(vec![string("n"), string("x")]))
+        Some(Tuple::from_unnamed(vec![
+            Value::Scalar(Scalar::Text("n".into())),
+            Value::Scalar(Scalar::Text("x".into()))
+        ]))
     );
 }
 
@@ -134,7 +145,10 @@ fn a_content_literal_is_a_value() {
     let Some(args) = &hole.data.args else {
         panic!("expected args, got {:?}", hole.data.args);
     };
-    assert_eq!(args.nth_unnamed(0), Some(&string("doc")));
+    assert_eq!(
+        args.nth_unnamed(0),
+        Some(&Value::Scalar(Scalar::Text("doc".into())))
+    );
     let Some(Value::Tuple(branches)) = args.nth_unnamed(1) else {
         panic!("expected a tuple, got {:?}", args.nth_unnamed(1));
     };
@@ -148,7 +162,10 @@ fn a_content_literal_is_a_value_in_positional_position_too() {
     let Some(args) = &hole.data.args else {
         panic!("expected args, got {:?}", hole.data.args);
     };
-    assert_eq!(args.nth_unnamed(0), Some(&string("items")));
+    assert_eq!(
+        args.nth_unnamed(0),
+        Some(&Value::Scalar(Scalar::Text("items".into())))
+    );
     assert!(matches!(args.nth_unnamed(1), Some(Value::Blocks(_))));
 }
 
@@ -268,12 +285,16 @@ fn a_quoted_argument_is_never_formatting() {
     assert_eq!(first.matcher, matcher("string"));
     assert_eq!(
         first.data.args,
-        Some(Tuple::from_unnamed(vec![string("__init__.py")]))
+        Some(Tuple::from_unnamed(vec![Value::Scalar(Scalar::Text(
+            "__init__.py".into()
+        ))]))
     );
 
     let second = hole(r#"<?string("_private_.rs")>"#);
     assert_eq!(
         second.data.args,
-        Some(Tuple::from_unnamed(vec![string("_private_.rs")]))
+        Some(Tuple::from_unnamed(vec![Value::Scalar(Scalar::Text(
+            "_private_.rs".into()
+        ))]))
     );
 }

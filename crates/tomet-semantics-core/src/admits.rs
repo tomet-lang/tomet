@@ -31,16 +31,20 @@ impl std::error::Error for Mismatch {}
 /// its item type when it has one. A type's `default` is not looked at: it is
 /// what a value is when there is none, not a rule for the ones there are.
 pub fn admits(ty: &Type, value: &Value) -> Result<(), Mismatch> {
-    let integer = || match value {
-        Value::Int(n) => Some(*n),
-        Value::Number(text) => text.parse::<i64>().ok(),
+    let integer = || match value.as_scalar() {
+        Some(Scalar::Int(n)) => Some(*n),
+        Some(Scalar::Number(text)) => text.parse::<i64>().ok(),
         _ => None,
     };
     let fits = match ty.kind() {
         Kind::Int => integer().is_some(),
         Kind::Uint => integer().is_some_and(|n| n >= 0),
-        Kind::Float => matches!(value, Value::Int(_)) || value.as_number().is_some(),
-        Kind::Bool => matches!(value, Value::Bool(_)),
+        Kind::Float => match value.as_scalar() {
+            Some(Scalar::Int(_)) => true,
+            Some(s) => s.as_number().is_some(),
+            None => false,
+        },
+        Kind::Bool => matches!(value.as_scalar(), Some(Scalar::Bool(_))),
         Kind::List => match value {
             Value::Tuple(tuple) if tuple.has_no_named() => {
                 if let Some(item_type) = ty.item() {
@@ -58,10 +62,11 @@ pub fn admits(ty: &Type, value: &Value) -> Result<(), Mismatch> {
             }
             _ => false,
         },
-        Kind::String | Kind::Nanoid => value.scalar_text().is_some(),
+        Kind::String | Kind::Nanoid => value.as_scalar().and_then(|s| s.text()).is_some(),
         Kind::Datetime | Kind::Date | Kind::Version | Kind::Uuid => value
-            .scalar_text()
-            .is_some_and(|text| ty.holds_text(&text) == Some(true)),
+            .as_scalar()
+            .and_then(|s| s.text())
+            .is_some_and(|text| ty.holds_text(text.as_ref()) == Some(true)),
     };
     if fits {
         Ok(())
@@ -103,19 +108,16 @@ pub fn default_value(ty: &Type) -> Option<Value> {
 /// (a map, an element, content, etc.).
 pub fn value_to_datum(value: &Value) -> Option<Datum> {
     Some(match value {
-        Value::None => Datum::Scalar(Scalar::None),
-        Value::Auto => Datum::Scalar(Scalar::Auto),
-        Value::Bool(b) => Datum::Scalar(Scalar::Bool(*b)),
-        Value::Int(n) => Datum::Scalar(Scalar::Int(*n)),
-        Value::Float(n) => Datum::Scalar(Scalar::Float(*n)),
-        Value::Number(text) => match text.parse::<i64>() {
-            Ok(n) => Datum::Scalar(Scalar::Int(n)),
-            Err(_) => {
-                let s = Scalar::from_bare(text).ok()?;
-                Datum::Scalar(s)
-            }
+        Value::Scalar(s) => match s {
+            Scalar::Number(text) => match text.parse::<i64>() {
+                Ok(n) => Datum::Scalar(Scalar::Int(n)),
+                Err(_) => {
+                    let s = Scalar::from_bare(text).ok()?;
+                    Datum::Scalar(s)
+                }
+            },
+            s => Datum::Scalar(s.clone()),
         },
-        Value::String(text) => Datum::Scalar(Scalar::Text(text.clone())),
         Value::Tuple(tuple) if tuple.has_no_named() => {
             Datum::Seq(tuple.unnamed().map(value_to_datum).collect::<Option<_>>()?)
         }
@@ -154,14 +156,16 @@ pub fn describe_tuple(tuple: &Tuple) -> &'static str {
 /// A short sentence fragment naming what `value` is, for an error sentence.
 pub fn describe_value(value: &Value) -> String {
     match value {
-        Value::String(text) => format!("`{text}`"),
-        Value::Bool(b) => format!("`{b}`"),
-        Value::Int(n) => format!("`{n}`"),
-        Value::Float(n) => format!("`{n}`"),
-        Value::None => "none".to_string(),
-        Value::Auto => "auto".to_string(),
+        Value::Scalar(s) => match s {
+            Scalar::Text(text) => format!("`{text}`"),
+            Scalar::Bool(b) => format!("`{b}`"),
+            Scalar::Int(n) => format!("`{n}`"),
+            Scalar::Float(n) => format!("`{n}`"),
+            Scalar::None => "none".to_string(),
+            Scalar::Auto => "auto".to_string(),
+            Scalar::Number(text) => format!("`{text}`"),
+        },
         Value::Tuple(tuple) => describe_tuple(tuple).to_string(),
-        Value::Number(text) => format!("`{text}`"),
         Value::Call(name, _) => format!("`{name}(...)`"),
         Value::Interp(_) => "`{$ ... }`".to_string(),
         Value::Hole(_) => "`<?...>`".to_string(),
@@ -176,7 +180,7 @@ mod tests {
     use super::*;
 
     fn text(s: &str) -> Value {
-        Value::String(s.to_string())
+        Value::Scalar(Scalar::Text(s.to_string()))
     }
 
     fn seq(items: Vec<Value>) -> Value {
@@ -195,28 +199,37 @@ mod tests {
     #[test]
     fn admits_intended_values() {
         let cases: &[(Type, Value)] = &[
-            (t("string"), Value::String("hi".to_string())),
-            (t("string"), Value::Int(2024)),
-            (t("string"), Value::Bool(true)),
-            (t("string"), Value::Number("1.10".to_string())),
+            (t("string"), Value::Scalar(Scalar::Text("hi".to_string()))),
+            (t("string"), Value::Scalar(Scalar::Int(2024))),
+            (t("string"), Value::Scalar(Scalar::Bool(true))),
+            (
+                t("string"),
+                Value::Scalar(Scalar::Number("1.10".to_string())),
+            ),
             (t("nanoid"), text("short-id")),
-            (t("nanoid"), Value::Int(12345678)),
-            (t("int"), Value::Int(-3)),
-            (t("int"), Value::Number("-0".to_string())),
-            (t("float"), Value::Number("1.10".to_string())),
-            (t("uint"), Value::Int(0)),
-            (t("float"), Value::Float(1.5)),
-            (t("float"), Value::Int(2)),
-            (t("bool"), Value::Bool(false)),
+            (t("nanoid"), Value::Scalar(Scalar::Int(12345678))),
+            (t("int"), Value::Scalar(Scalar::Int(-3))),
+            (t("int"), Value::Scalar(Scalar::Number("-0".to_string()))),
+            (
+                t("float"),
+                Value::Scalar(Scalar::Number("1.10".to_string())),
+            ),
+            (t("uint"), Value::Scalar(Scalar::Int(0))),
+            (t("float"), Value::Scalar(Scalar::Float(1.5))),
+            (t("float"), Value::Scalar(Scalar::Int(2))),
+            (t("bool"), Value::Scalar(Scalar::Bool(false))),
             (t("datetime"), text("2026-10-25")),
             (t("datetime"), text("2026-10-25T14:30:00Z")),
             (t("date"), text("2026-10-25")),
             (t("date"), text("2024-02-29")),
             (t("version"), text("1.10.0")),
             (t("version"), text("1.0.0-beta")),
-            (t("version"), Value::Int(1)),
-            (t("version"), Value::Float(1.5)),
-            (t("version"), Value::Number("1.10".to_string())),
+            (t("version"), Value::Scalar(Scalar::Int(1))),
+            (t("version"), Value::Scalar(Scalar::Float(1.5))),
+            (
+                t("version"),
+                Value::Scalar(Scalar::Number("1.10".to_string())),
+            ),
             (t("uuid"), text("123E4567-E89B-12D3-A456-426614174000")),
             (t("uuid"), text("123e4567-e89b-12d3-a456-426614174000")),
             (
@@ -224,31 +237,40 @@ mod tests {
                 text("u:123e4567-e89b-12d3-a456-426614174000"),
             ),
             (t("nanoid(length: 4, prefix: \"n-\")"), text("anything")),
-            (t("string(default: \"x\")"), Value::Int(2024)),
+            (
+                t("string(default: \"x\")"),
+                Value::Scalar(Scalar::Int(2024)),
+            ),
             (t("list(length: 2)"), seq(vec![text("a"), text("b")])),
             (t("list(int, length: 0)"), seq(vec![])),
             (t("list"), seq(vec![])),
             (t("list"), seq(vec![text("a")])),
-            (t("list(int)"), seq(vec![Value::Int(1), Value::Int(2)])),
+            (
+                t("list(int)"),
+                seq(vec![
+                    Value::Scalar(Scalar::Int(1)),
+                    Value::Scalar(Scalar::Int(2)),
+                ]),
+            ),
         ];
         for (ty, value) in cases {
             assert_eq!(admits(ty, value), Ok(()), "{ty}: {value:?}");
         }
 
         let bad_cases: &[(Type, Value)] = &[
-            (t("string"), Value::None),
+            (t("string"), Value::Scalar(Scalar::None)),
             (t("string"), seq(vec![])),
-            (t("int"), Value::Float(1.0)),
-            (t("uint"), Value::Int(-1)),
-            (t("float"), Value::Bool(true)),
-            (t("bool"), Value::Int(1)),
-            (t("datetime"), Value::Int(2026)),
+            (t("int"), Value::Scalar(Scalar::Float(1.0))),
+            (t("uint"), Value::Scalar(Scalar::Int(-1))),
+            (t("float"), Value::Scalar(Scalar::Bool(true))),
+            (t("bool"), Value::Scalar(Scalar::Int(1))),
+            (t("datetime"), Value::Scalar(Scalar::Int(2026))),
             (t("datetime"), text("not a date")),
             (t("version"), text("1.0.0_beta")),
-            (t("version"), Value::Bool(true)),
-            (t("version"), Value::None),
-            (t("version"), Value::Float(1e21)),
-            (t("date"), Value::Int(2026)),
+            (t("version"), Value::Scalar(Scalar::Bool(true))),
+            (t("version"), Value::Scalar(Scalar::None)),
+            (t("version"), Value::Scalar(Scalar::Float(1e21))),
+            (t("date"), Value::Scalar(Scalar::Int(2026))),
             (t("date"), text("2026-02-29")),
             (t("date"), text("2026-10-25T14:30:00Z")),
             (t("uuid"), text("not-a-uuid")),
@@ -260,11 +282,14 @@ mod tests {
             (t("list(string, length: 1)"), seq(vec![])),
             (t("nanoid"), seq(vec![])),
             (t("nanoid"), map(vec![("k".into(), text("v"))])),
-            (t("list"), Value::Int(3)),
+            (t("list"), Value::Scalar(Scalar::Int(3))),
             (t("list"), map(vec![("k".into(), text("v"))])),
             (
                 t("list(int)"),
-                seq(vec![Value::Int(1), Value::String("not an int".into())]),
+                seq(vec![
+                    Value::Scalar(Scalar::Int(1)),
+                    Value::Scalar(Scalar::Text("not an int".into())),
+                ]),
             ),
         ];
         for (ty, value) in bad_cases {
@@ -285,10 +310,10 @@ mod tests {
         assert_eq!(
             datum_value(&datum),
             seq(vec![
-                Value::None,
-                Value::Bool(true),
-                Value::Int(3),
-                Value::Float(1.5),
+                Value::Scalar(Scalar::None),
+                Value::Scalar(Scalar::Bool(true)),
+                Value::Scalar(Scalar::Int(3)),
+                Value::Scalar(Scalar::Float(1.5)),
                 text("a"),
                 seq(vec![]),
             ])
@@ -323,7 +348,10 @@ mod tests {
 
     #[test]
     fn only_a_written_default_is_a_value() {
-        assert_eq!(default_value(&t("int(default: 3)")), Some(Value::Int(3)));
+        assert_eq!(
+            default_value(&t("int(default: 3)")),
+            Some(Value::Scalar(Scalar::Int(3)))
+        );
         assert_eq!(default_value(&t("uuid(default: auto)")), None);
         assert_eq!(default_value(&t("int")), None);
     }

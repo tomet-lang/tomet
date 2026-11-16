@@ -69,7 +69,7 @@ pub(crate) fn meta_title(doc: &tomet_ast::File) -> Option<String> {
         return None;
     };
     match tuple.get("title") {
-        Some(tomet_ast::Value::String(s)) => Some(s.clone()),
+        Some(tomet_ast::Value::Scalar(tomet_scalar::Scalar::Text(s))) => Some(s.clone()),
         _ => None,
     }
 }

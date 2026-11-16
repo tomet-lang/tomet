@@ -762,6 +762,7 @@ fn field_value_error(
     span: Span,
 ) -> Option<Diagnostic> {
     use tomet_ast::Value;
+    use tomet_scalar::Scalar;
     use tomet_type::Type;
 
     let field_type = field_types.get(field)?;
@@ -770,14 +771,15 @@ fn field_value_error(
         .ok()
         .filter(|ty| ty.has_text_form())?;
     let well_formed = match value {
-        Value::None => true,
+        Value::Scalar(Scalar::None) => true,
         // `{$ ... }` keeps its place in the tree until it is evaluated, and `<$...>` until it is
         // filled, and what either comes to is not known here.
         _ if is_placeholder(value) => true,
         // A scalar is the text it was written as: a bare `1.10` is the
         // version `1.10`, and `2026` is not a datetime.
         scalar => scalar
-            .scalar_text()
+            .as_scalar()
+            .and_then(|s| s.text())
             .is_some_and(|text| text.is_empty() || ty.holds_text(&text) == Some(true)),
     };
     (!well_formed).then(|| Diagnostic::InvalidFieldValue {
@@ -791,12 +793,15 @@ fn field_value_error(
 /// A value as a reader would have written it, for a message.
 fn describe_value(value: &tomet_ast::Value) -> String {
     use tomet_ast::Value;
+    use tomet_scalar::Scalar;
     match value {
-        Value::String(text) => text.clone(),
-        Value::Bool(b) => b.to_string(),
-        Value::Int(n) => n.to_string(),
-        Value::Float(n) => n.to_string(),
-        Value::Number(text) => text.clone(),
+        Value::Scalar(s) => match s {
+            Scalar::Text(text) | Scalar::Number(text) => text.clone(),
+            Scalar::Bool(b) => b.to_string(),
+            Scalar::Int(n) => n.to_string(),
+            Scalar::Float(n) => n.to_string(),
+            Scalar::None | Scalar::Auto => "something else".to_string(),
+        },
         Value::Tuple(tuple) => {
             if tuple.is_empty() {
                 "an empty tuple".to_string()

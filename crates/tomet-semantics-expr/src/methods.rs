@@ -7,6 +7,7 @@
 use std::cmp::Ordering;
 
 use tomet_ast::{Tuple, TupleEntry};
+use tomet_scalar::Scalar;
 
 use super::args::Args;
 use super::context::EvalContext;
@@ -27,8 +28,10 @@ pub(crate) fn call_method(
             let mut kept = Vec::new();
             for item in tuple.unnamed() {
                 match super::apply(&f, vec![item.clone()], cx)? {
-                    EvalValue::Bool(true) => kept.push(TupleEntry::unnamed(item.clone())),
-                    EvalValue::Bool(false) => {}
+                    EvalValue::Scalar(Scalar::Bool(true)) => {
+                        kept.push(TupleEntry::unnamed(item.clone()))
+                    }
+                    EvalValue::Scalar(Scalar::Bool(false)) => {}
                     other => {
                         return Err(EvalError::mismatch(
                             "the function given to `.filter`",
@@ -61,7 +64,7 @@ pub(crate) fn call_method(
         }
         (EvalValue::Tuple(tuple), "join") => {
             let [separator] = take::<1>(member, args)?;
-            let EvalValue::String(separator) = separator else {
+            let EvalValue::Scalar(Scalar::Text(separator)) = separator else {
                 return Err(EvalError::mismatch(
                     "`.join`",
                     "a string separator",
@@ -72,19 +75,19 @@ pub(crate) fn call_method(
                 .unnamed()
                 .map(scalar_text)
                 .collect::<Result<Vec<_>, _>>()?;
-            Ok(EvalValue::String(parts.join(&separator)))
+            Ok(EvalValue::Scalar(Scalar::Text(parts.join(&separator))))
         }
         (EvalValue::Tuple(tuple), "contains") => {
             let [needle] = take::<1>(member, args)?;
-            Ok(EvalValue::Bool(
+            Ok(EvalValue::Scalar(Scalar::Bool(
                 tuple.unnamed().any(|i| values_equal(i, &needle)),
-            ))
+            )))
         }
         (EvalValue::Tuple(tuple), "has") => {
             let [key] = take::<1>(member, args)?;
             let key_str = match &key {
-                EvalValue::String(s) => s.clone(),
-                EvalValue::Int(i) => i.to_string(),
+                EvalValue::Scalar(Scalar::Text(s)) => s.clone(),
+                EvalValue::Scalar(Scalar::Int(i)) => i.to_string(),
                 _ => {
                     return Err(EvalError::mismatch(
                         "`.has` on a tuple",
@@ -93,18 +96,20 @@ pub(crate) fn call_method(
                     ));
                 }
             };
-            Ok(EvalValue::Bool(tuple.index_of(&key_str).is_some()))
+            Ok(EvalValue::Scalar(Scalar::Bool(
+                tuple.index_of(&key_str).is_some(),
+            )))
         }
         (EvalValue::Tuple(tuple), "len") => {
             take::<0>(member, args)?;
             let count = tuple.unnamed().count();
-            Ok(EvalValue::Int(count as i64))
+            Ok(EvalValue::Scalar(Scalar::Int(count as i64)))
         }
         (EvalValue::Tuple(tuple), "item") => {
             let [index] = take::<1>(member, args)?;
             let i = match &index {
-                EvalValue::Int(i) => *i,
-                EvalValue::Number(text) => text.parse::<i64>().map_err(|_| {
+                EvalValue::Scalar(Scalar::Int(i)) => *i,
+                EvalValue::Scalar(Scalar::Number(text)) => text.parse::<i64>().map_err(|_| {
                     EvalError::mismatch("`item`", "an integer index", index.type_name())
                 })?,
                 _ => {
@@ -124,8 +129,8 @@ pub(crate) fn call_method(
         (EvalValue::Tuple(tuple), "get") => {
             let [key, default] = take::<2>(member, args)?;
             let key_str = match &key {
-                EvalValue::String(s) => s.clone(),
-                EvalValue::Int(i) => i.to_string(),
+                EvalValue::Scalar(Scalar::Text(s)) => s.clone(),
+                EvalValue::Scalar(Scalar::Int(i)) => i.to_string(),
                 _ => {
                     return Err(EvalError::mismatch(
                         "`.get`",
@@ -162,20 +167,20 @@ pub(crate) fn call_method(
         }
         (EvalValue::DateTime(value), "format") => {
             let [format] = take::<1>(member, args)?;
-            let EvalValue::String(format) = format else {
+            let EvalValue::Scalar(Scalar::Text(format)) = format else {
                 return Err(EvalError::mismatch(
                     "`.format`",
                     "a format string",
                     format.type_name(),
                 ));
             };
-            Ok(EvalValue::String(super::datetime::format_datetime(
-                value, &format,
+            Ok(EvalValue::Scalar(Scalar::Text(
+                super::datetime::format_datetime(value, &format),
             )))
         }
         (EvalValue::DateTime(value), "at") => {
             let [offset] = take::<1>(member, args)?;
-            let EvalValue::String(offset) = offset else {
+            let EvalValue::Scalar(Scalar::Text(offset)) = offset else {
                 return Err(EvalError::mismatch(
                     "`.at`",
                     "an offset string such as \"+09:00\"",
@@ -189,16 +194,18 @@ pub(crate) fn call_method(
             })?;
             Ok(EvalValue::DateTime(value.to_offset(offset)))
         }
-        (EvalValue::String(text), "contains") => {
+        (EvalValue::Scalar(Scalar::Text(text)), "contains") => {
             let [needle] = take::<1>(member, args)?;
-            let EvalValue::String(needle) = needle else {
+            let EvalValue::Scalar(Scalar::Text(needle)) = needle else {
                 return Err(EvalError::mismatch(
                     "`.contains` on a string",
                     "a string",
                     needle.type_name(),
                 ));
             };
-            Ok(EvalValue::Bool(text.contains(needle.as_str())))
+            Ok(EvalValue::Scalar(Scalar::Bool(
+                text.contains(needle.as_str()),
+            )))
         }
         _ => Err(EvalError::UnknownMember {
             on: receiver.type_name(),
@@ -209,7 +216,7 @@ pub(crate) fn call_method(
 
 /// The text of a scalar, for `.join` and macro expansion. Only scalars (other than `none`) have one.
 pub(crate) fn scalar_text(value: &EvalValue) -> Result<String, EvalError> {
-    if matches!(value, EvalValue::None) {
+    if matches!(value, EvalValue::Scalar(Scalar::None)) {
         return Err(EvalError::mismatch(
             "turning a value into text",
             "a string, number or bool",
@@ -228,8 +235,8 @@ pub(crate) fn scalar_text(value: &EvalValue) -> Result<String, EvalError> {
 /// `item(n)`: zero-based, no negative index.
 pub(crate) fn index_into(items: &[EvalValue], index: &EvalValue) -> Result<EvalValue, EvalError> {
     let i = match index {
-        EvalValue::Int(i) => *i,
-        EvalValue::Number(text) => text
+        EvalValue::Scalar(Scalar::Int(i)) => *i,
+        EvalValue::Scalar(Scalar::Number(text)) => text
             .parse::<i64>()
             .map_err(|_| EvalError::mismatch("`item`", "an integer index", index.type_name()))?,
         _ => {
@@ -269,12 +276,12 @@ fn function_arg(member: &str, args: Args) -> Result<Closure, EvalError> {
 /// How alike two sort keys must be to be put in order at all.
 fn key_class(key: &EvalValue) -> Result<u8, EvalError> {
     match key {
-        EvalValue::Int(_) | EvalValue::Float(_) | EvalValue::Number(_) => {
+        EvalValue::Scalar(Scalar::Int(_) | Scalar::Float(_) | Scalar::Number(_)) => {
             // A NaN is a number with no place in an order.
             compare(key, key)?;
             Ok(0)
         }
-        EvalValue::String(_) => Ok(1),
+        EvalValue::Scalar(Scalar::Text(_)) => Ok(1),
         EvalValue::DateTime(_) => Ok(2),
         EvalValue::Version(_) => Ok(3),
         other => Err(EvalError::NotComparable {
@@ -299,8 +306,8 @@ fn sort(items: &[EvalValue], args: Args, cx: &EvalContext) -> Result<EvalValue, 
     };
     let descending = match positional.next() {
         None => false,
-        Some(EvalValue::String(order)) if order == "asc" => false,
-        Some(EvalValue::String(order)) if order == "desc" => true,
+        Some(EvalValue::Scalar(Scalar::Text(order))) if order == "asc" => false,
+        Some(EvalValue::Scalar(Scalar::Text(order))) if order == "desc" => true,
         Some(_) => {
             return Err(EvalError::message(
                 "the order given to `.sort` must be \"asc\" or \"desc\"",
@@ -316,7 +323,7 @@ fn sort(items: &[EvalValue], args: Args, cx: &EvalContext) -> Result<EvalValue, 
     let mut absent = Vec::new();
     for item in items {
         match super::apply(&f, vec![item.clone()], cx)? {
-            EvalValue::None => absent.push(item.clone()),
+            EvalValue::Scalar(Scalar::None) => absent.push(item.clone()),
             key => keyed.push((key, item.clone())),
         }
     }

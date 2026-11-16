@@ -2,22 +2,24 @@
 
 use std::cmp::Ordering;
 
+use tomet_scalar::Scalar;
+
 use super::error::EvalError;
 use super::value::EvalValue;
 
 fn number(value: &EvalValue) -> Option<f64> {
     match value {
-        EvalValue::Int(i) => Some(*i as f64),
-        EvalValue::Float(f) => Some(*f),
-        EvalValue::Number(text) => text.parse::<f64>().ok(),
+        EvalValue::Scalar(Scalar::Int(i)) => Some(*i as f64),
+        EvalValue::Scalar(Scalar::Float(f)) => Some(*f),
+        EvalValue::Scalar(Scalar::Number(text)) => text.parse::<f64>().ok(),
         _ => None,
     }
 }
 
 fn as_i64(value: &EvalValue) -> Option<i64> {
     match value {
-        EvalValue::Int(i) => Some(*i),
-        EvalValue::Number(text) => text.parse::<i64>().ok(),
+        EvalValue::Scalar(Scalar::Int(i)) => Some(*i),
+        EvalValue::Scalar(Scalar::Number(text)) => text.parse::<i64>().ok(),
         _ => None,
     }
 }
@@ -30,10 +32,7 @@ pub(crate) fn values_equal(a: &EvalValue, b: &EvalValue) -> bool {
     match (a, b) {
         _ if as_i64(a).is_some() && as_i64(b).is_some() => as_i64(a) == as_i64(b),
         _ if number(a).is_some() && number(b).is_some() => number(a) == number(b),
-        (V::None, V::None) => true,
-        (V::Auto, V::Auto) => true,
-        (V::Bool(x), V::Bool(y)) => x == y,
-        (V::String(x), V::String(y)) => x == y,
+        (V::Scalar(x), V::Scalar(y)) => x == y,
         (V::Tuple(x), V::Tuple(y)) => {
             x.len() == y.len()
                 && x.entries()
@@ -71,7 +70,7 @@ pub(crate) fn compare(a: &EvalValue, b: &EvalValue) -> Result<Ordering, EvalErro
         right: b.type_name(),
     };
     match (a, b) {
-        (V::String(x), V::String(y)) => Ok(x.cmp(y)),
+        (V::Scalar(Scalar::Text(x)), V::Scalar(Scalar::Text(y))) => Ok(x.cmp(y)),
         (V::DateTime(x), V::DateTime(y)) => Ok(x.cmp(y)),
         (V::Version(x), V::Version(y)) => Ok(x.cmp(y)),
         _ => {
@@ -96,9 +95,9 @@ enum Number {
 impl Number {
     fn of(function: &str, value: &EvalValue) -> Result<Number, EvalError> {
         match value {
-            EvalValue::Int(i) => Ok(Number::Int(*i)),
-            EvalValue::Float(f) => Ok(Number::Float(*f)),
-            EvalValue::Number(text) => {
+            EvalValue::Scalar(Scalar::Int(i)) => Ok(Number::Int(*i)),
+            EvalValue::Scalar(Scalar::Float(f)) => Ok(Number::Float(*f)),
+            EvalValue::Scalar(Scalar::Number(text)) => {
                 if let Ok(i) = text.parse::<i64>() {
                     Ok(Number::Int(i))
                 } else if let Ok(f) = text.parse::<f64>() {
@@ -135,19 +134,20 @@ pub(crate) fn arithmetic(
     b: &EvalValue,
 ) -> Result<EvalValue, EvalError> {
     let (x, y) = (Number::of(function, a)?, Number::of(function, b)?);
-    let float = |f: fn(f64, f64) -> f64| EvalValue::Float(f(x.as_f64(), y.as_f64()));
+    let float =
+        |f: fn(f64, f64) -> f64| EvalValue::Scalar(Scalar::Float(f(x.as_f64(), y.as_f64())));
     Ok(match (function, x, y) {
         ("add", Number::Int(i), Number::Int(j)) => i
             .checked_add(j)
-            .map(EvalValue::Int)
+            .map(|n| EvalValue::Scalar(Scalar::Int(n)))
             .unwrap_or_else(|| float(|p, q| p + q)),
         ("sub", Number::Int(i), Number::Int(j)) => i
             .checked_sub(j)
-            .map(EvalValue::Int)
+            .map(|n| EvalValue::Scalar(Scalar::Int(n)))
             .unwrap_or_else(|| float(|p, q| p - q)),
         ("mul", Number::Int(i), Number::Int(j)) => i
             .checked_mul(j)
-            .map(EvalValue::Int)
+            .map(|n| EvalValue::Scalar(Scalar::Int(n)))
             .unwrap_or_else(|| float(|p, q| p * q)),
         ("add", ..) => float(|p, q| p + q),
         ("sub", ..) => float(|p, q| p - q),
@@ -163,7 +163,7 @@ pub(crate) fn arithmetic(
             if j == 0 {
                 return Err(EvalError::DivisionByZero);
             }
-            EvalValue::Int(i.wrapping_rem(j))
+            EvalValue::Scalar(Scalar::Int(i.wrapping_rem(j)))
         }
         ("mod", ..) => {
             if y.as_f64() == 0.0 {

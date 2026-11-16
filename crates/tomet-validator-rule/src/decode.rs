@@ -2,6 +2,7 @@
 //! `args` into a usable [`RuleArgs`].
 
 use tomet_ast::{Connect, Name, Value};
+use tomet_scalar::Scalar;
 
 /// The decoded arguments of one `::rule(...)` connect.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -28,14 +29,14 @@ pub fn decode_rule_args(connect: &Connect) -> Option<RuleArgs> {
     };
     let mut allow = Vec::with_capacity(items_tuple.len());
     for item in items_tuple.unnamed() {
-        let Value::String(s) = item else {
+        let Value::Scalar(Scalar::Text(s)) = item else {
             return None;
         };
         allow.push(name_from_dotted(s));
     }
 
     let direct = match args.get("direct") {
-        Some(Value::Bool(b)) => *b,
+        Some(Value::Scalar(Scalar::Bool(b))) => *b,
         Some(_) => return None,
         None => false,
     };

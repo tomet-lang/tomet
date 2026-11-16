@@ -10,6 +10,7 @@ repository.workspace = true
 tomet-address        = { workspace = true }
 tomet-ast            = { workspace = true }
 tomet-declaration    = { workspace = true }
+tomet-scalar         = { workspace = true }
 tomet-semantics-core = { workspace = true }
 tomet-span           = { workspace = true }
 tomet-tree           = { workspace = true }

@@ -7,6 +7,7 @@ use std::sync::Arc;
 use tomet_ast::{Block, File, Tuple, TupleEntry, Value};
 use tomet_config::{FieldConfig, PrinterConfig};
 use tomet_expr::{DirRef, DocRef, EvalValue, PreparedBlocks, Resolver, typed_value};
+use tomet_scalar::Scalar;
 use tomet_type::{Kind, Type};
 
 /// The document's `::meta`, typed by the settings' `meta` declarations.
@@ -58,7 +59,7 @@ fn typed(field: &FieldConfig, value: Option<(&Value, &DocRef)>) -> EvalValue {
         (Some(ty), None) if ty.kind() == Kind::List => EvalValue::Tuple(Tuple::new()),
         (Some(ty), Some((value, doc))) => typed_value(&ty, value, doc),
         (None, Some((value, doc))) => EvalValue::from_ast(value, doc),
-        (_, None) => EvalValue::None,
+        (_, None) => EvalValue::Scalar(Scalar::None),
     }
 }
 
@@ -156,15 +157,15 @@ mod tests {
         assert_eq!(
             field(&meta, "tags"),
             Some(&EvalValue::Tuple(Tuple::from_unnamed(vec![
-                EvalValue::String("rust".into())
+                EvalValue::Scalar(Scalar::Text("rust".into()))
             ])))
         );
         let meta = meta_of("::meta(tags: (a, b))\n");
         assert_eq!(
             field(&meta, "tags"),
             Some(&EvalValue::Tuple(Tuple::from_unnamed(vec![
-                EvalValue::String("a".into()),
-                EvalValue::String("b".into())
+                EvalValue::Scalar(Scalar::Text("a".into())),
+                EvalValue::Scalar(Scalar::Text("b".into()))
             ])))
         );
     }
@@ -174,25 +175,34 @@ mod tests {
     #[test]
     fn a_text_field_is_the_text_it_was_written_as() {
         let meta = meta_of("::meta(rev: 1.10, title: 2024)\n");
-        assert_eq!(field(&meta, "rev"), Some(&EvalValue::String("1.10".into())));
+        assert_eq!(
+            field(&meta, "rev"),
+            Some(&EvalValue::Scalar(Scalar::Text("1.10".into())))
+        );
         assert_eq!(
             field(&meta, "title"),
-            Some(&EvalValue::String("2024".into()))
+            Some(&EvalValue::Scalar(Scalar::Text("2024".into())))
         );
         // not declared: read as it is, preserving the written number
         let meta = meta_of("::meta(other: 1.10)\n");
         assert_eq!(
             field(&meta, "other"),
-            Some(&EvalValue::Number("1.10".into()))
+            Some(&EvalValue::Scalar(Scalar::Number("1.10".into())))
         );
     }
 
     #[test]
     fn a_declared_field_the_document_lacks_is_none() {
         let meta = meta_of("::meta(tags: a)\n");
-        assert_eq!(field(&meta, "title"), Some(&EvalValue::None));
-        assert_eq!(field(&meta, "created"), Some(&EvalValue::None));
-        assert_eq!(field(&meta, "note"), Some(&EvalValue::None));
+        assert_eq!(
+            field(&meta, "title"),
+            Some(&EvalValue::Scalar(Scalar::None))
+        );
+        assert_eq!(
+            field(&meta, "created"),
+            Some(&EvalValue::Scalar(Scalar::None))
+        );
+        assert_eq!(field(&meta, "note"), Some(&EvalValue::Scalar(Scalar::None)));
     }
 
     #[test]
@@ -205,7 +215,7 @@ mod tests {
         let meta = meta_of("::meta(created: yesterday)\n");
         assert_eq!(
             field(&meta, "created"),
-            Some(&EvalValue::String("yesterday".into()))
+            Some(&EvalValue::Scalar(Scalar::Text("yesterday".into())))
         );
     }
 
@@ -227,14 +237,20 @@ mod tests {
         let meta = meta_of("::meta(title: A)\n");
         assert_eq!(field(&meta, "draft"), None);
         let meta = meta_of("::meta(draft: true)\n");
-        assert_eq!(field(&meta, "draft"), Some(&EvalValue::Bool(true)));
+        assert_eq!(
+            field(&meta, "draft"),
+            Some(&EvalValue::Scalar(Scalar::Bool(true)))
+        );
     }
 
     #[test]
     fn a_document_without_meta_still_has_the_declared_fields() {
         let meta = meta_of("Just text.\n");
         assert_eq!(field(&meta, "tags"), Some(&EvalValue::Tuple(Tuple::new())));
-        assert_eq!(field(&meta, "title"), Some(&EvalValue::None));
+        assert_eq!(
+            field(&meta, "title"),
+            Some(&EvalValue::Scalar(Scalar::None))
+        );
     }
 
     #[test]
@@ -248,7 +264,7 @@ mod tests {
         let overlay = Overlay {
             path: DocRef("a.tmt".into()),
             snapshot: rewritten.clone(),
-            meta: EvalValue::String("overlaid".into()),
+            meta: EvalValue::Scalar(Scalar::Text("overlaid".into())),
             inner: &inner,
         };
         assert!(Arc::ptr_eq(
@@ -257,12 +273,12 @@ mod tests {
         ));
         assert_eq!(
             overlay.meta(&DocRef("a.tmt".into())),
-            Ok(EvalValue::String("overlaid".into()))
+            Ok(EvalValue::Scalar(Scalar::Text("overlaid".into())))
         );
         assert!(overlay.document(&DocRef("b.tmt".into())).is_ok());
         assert_ne!(
             overlay.meta(&DocRef("b.tmt".into())),
-            Ok(EvalValue::String("overlaid".into()))
+            Ok(EvalValue::Scalar(Scalar::Text("overlaid".into())))
         );
     }
 }

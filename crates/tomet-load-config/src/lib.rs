@@ -260,18 +260,18 @@ mod tests {
         );
         assert_eq!(
             deep_cfg.macros["m"],
-            tomet_ast::Value::String("inner".to_string())
+            tomet_ast::Value::Scalar(tomet_scalar::Scalar::Text("inner".to_string()))
         );
         assert_eq!(
             deep_cfg.macros["v"],
-            tomet_ast::Value::String("vault".to_string())
+            tomet_ast::Value::Scalar(tomet_scalar::Scalar::Text("vault".to_string()))
         );
 
         let (shallow_cfg, _, _) = find_config_file(&shallow).unwrap();
         assert_eq!(shallow_cfg.format.table_max_col_width, Some(60));
         assert_eq!(
             shallow_cfg.macros["m"],
-            tomet_ast::Value::String("outer".to_string())
+            tomet_ast::Value::Scalar(tomet_scalar::Scalar::Text("outer".to_string()))
         );
     }
 

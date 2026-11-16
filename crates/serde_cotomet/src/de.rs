@@ -1,5 +1,6 @@
 use serde::de::{self, Deserialize, IntoDeserializer, Visitor};
 use tomet_ast::Value;
+use tomet_scalar::Scalar;
 
 use crate::error::{Error, Result, Segment};
 
@@ -7,7 +8,7 @@ pub fn from_value<T: for<'de> Deserialize<'de>>(value: Value) -> Result<T> {
     T::deserialize(ValueDeserializer(value))
 }
 
-/// An integer target reads a [`Value::Number`] that is a whole number (`-0`, or
+/// An integer target reads a [`Scalar::Number`](tomet_scalar::Scalar::Number) that is a whole number (`-0`, or
 /// one past an `i64`) as the integer it spells, to the width the target has.
 macro_rules! deserialize_integer {
     ($($method:ident)*) => {$(
@@ -15,7 +16,7 @@ macro_rules! deserialize_integer {
             match self.0 {
                 // The narrowest visit that holds it: a primitive's visitor takes its own
                 // width and the next one up, not `i128` for every width.
-                Value::Number(text) => {
+                Value::Scalar(Scalar::Number(text)) => {
                     if let Ok(n) = text.parse::<i64>() {
                         visitor.visit_i64(n)
                     } else if let Ok(n) = text.parse::<u64>() {
@@ -34,12 +35,12 @@ macro_rules! deserialize_integer {
     )*};
 }
 
-/// A float target reads a [`Value::Number`] as the number it spells.
+/// A float target reads a [`Scalar::Number`](tomet_scalar::Scalar::Number) as the number it spells.
 macro_rules! deserialize_float {
     ($($method:ident)*) => {$(
         fn $method<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value> {
             match self.0 {
-                Value::Number(text) => match text.parse::<f64>() {
+                Value::Scalar(Scalar::Number(text)) => match text.parse::<f64>() {
                     Ok(f) if f.is_finite() => visitor.visit_f64(f),
                     _ => Err(Error::msg(format!("`{text}` is out of range for a float"))),
                 },
@@ -58,19 +59,22 @@ impl<'de> de::Deserializer<'de> for ValueDeserializer {
     type Error = Error;
 
     fn deserialize_any<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value> {
+        use tomet_scalar::Scalar;
         match self.0 {
-            Value::None => visitor.visit_unit(),
-            Value::Auto => Err(Error::msg("`auto` has no serde equivalent")),
-            Value::Bool(b) => visitor.visit_bool(b),
-            Value::Int(i) => visitor.visit_i64(i),
-            Value::Float(f) => visitor.visit_f64(f),
-            // A target that does not say what it wants gets the number it is, as
-            // `serde_json` gives an `f64`; one too large to be one gets its text.
-            Value::Number(text) => match text.parse::<f64>() {
-                Ok(f) if f.is_finite() => visitor.visit_f64(f),
-                _ => visitor.visit_string(text),
+            Value::Scalar(s) => match s {
+                Scalar::None => visitor.visit_unit(),
+                Scalar::Auto => Err(Error::msg("`auto` has no serde equivalent")),
+                Scalar::Bool(b) => visitor.visit_bool(b),
+                Scalar::Int(i) => visitor.visit_i64(i),
+                Scalar::Float(f) => visitor.visit_f64(f),
+                // A target that does not say what it wants gets the number it is, as
+                // `serde_json` gives an `f64`; one too large to be one gets its text.
+                Scalar::Number(text) => match text.parse::<f64>() {
+                    Ok(f) if f.is_finite() => visitor.visit_f64(f),
+                    _ => visitor.visit_string(text),
+                },
+                Scalar::Text(s) => visitor.visit_string(s),
             },
-            Value::String(s) => visitor.visit_string(s),
             Value::Tuple(tuple) => {
                 if tuple.is_empty() {
                     visitor.visit_map(MapAccess {
@@ -115,7 +119,7 @@ impl<'de> de::Deserializer<'de> for ValueDeserializer {
 
     fn deserialize_option<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value> {
         match self.0 {
-            Value::None => visitor.visit_none(),
+            Value::Scalar(Scalar::None) => visitor.visit_none(),
             other => visitor.visit_some(ValueDeserializer(other)),
         }
     }
@@ -169,7 +173,7 @@ impl<'de> de::Deserializer<'de> for ValueDeserializer {
         visitor: V,
     ) -> Result<V::Value> {
         match self.0 {
-            Value::String(s) => visitor.visit_enum(s.into_deserializer()),
+            Value::Scalar(Scalar::Text(s)) => visitor.visit_enum(s.into_deserializer()),
             Value::Tuple(tuple) if tuple.len() == 1 && tuple.has_no_unnamed() => {
                 let (variant, value) = tuple.into_named().next().unwrap();
                 visitor.visit_enum(EnumAccess { variant, value })
@@ -184,7 +188,12 @@ impl<'de> de::Deserializer<'de> for ValueDeserializer {
     /// and `1.10` are each the text they were typed as. Nothing is lost on the
     /// way, which is what a number that is really a version or a revision needs.
     fn deserialize_string<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value> {
-        match self.0.scalar_text().map(std::borrow::Cow::into_owned) {
+        match self
+            .0
+            .as_scalar()
+            .and_then(|s| s.text())
+            .map(std::borrow::Cow::into_owned)
+        {
             Some(text) => visitor.visit_string(text),
             None => self.deserialize_any(visitor),
         }
@@ -246,7 +255,7 @@ impl<'de> de::MapAccess<'de> for MapAccess {
         match self.iter.next() {
             Some((k, v)) => {
                 self.value = Some((k.clone(), v));
-                seed.deserialize(ValueDeserializer(Value::String(k)))
+                seed.deserialize(ValueDeserializer(Value::Scalar(Scalar::Text(k))))
                     .map(Some)
             }
             None => Ok(None),
@@ -277,7 +286,9 @@ impl<'de> de::EnumAccess<'de> for EnumAccess {
         self,
         seed: S,
     ) -> Result<(S::Value, VariantAccess)> {
-        let v = seed.deserialize(ValueDeserializer(Value::String(self.variant.clone())))?;
+        let v = seed.deserialize(ValueDeserializer(Value::Scalar(Scalar::Text(
+            self.variant.clone(),
+        ))))?;
         Ok((
             v,
             VariantAccess {

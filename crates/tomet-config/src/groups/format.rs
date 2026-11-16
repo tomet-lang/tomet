@@ -3,6 +3,7 @@
 use super::parse_flag;
 use std::collections::BTreeMap;
 use tomet_ast::Value;
+use tomet_scalar::Scalar;
 use tomet_spec_derive::Config;
 use tomet_style::{
     BracketSpacing, ColonSpacing, ContentLayout, FenceLines, GroupOrder, ParagraphSeparator,
@@ -114,10 +115,9 @@ fn parse_element_configs(value: &Value) -> Option<BTreeMap<String, ElementConfig
                     }
                     "adjust_width" => {
                         elem_cfg.table_adjust_width = match prop_v {
-                            Value::Auto => Some("auto".to_string()),
-                            Value::Bool(b) => Some(b.to_string()),
-                            Value::String(s) => Some(s.clone()),
-                            _ => None,
+                            Value::Scalar(Scalar::Auto) => Some("auto".to_string()),
+                            Value::Scalar(Scalar::Bool(b)) => Some(b.to_string()),
+                            _ => prop_v.as_str().map(String::from),
                         };
                     }
                     "max_col_width" => {

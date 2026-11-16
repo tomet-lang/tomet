@@ -147,7 +147,9 @@ fn item_of(kind: Kind, arg: &Arg) -> Result<Type, TypeError> {
 /// A `length`: a whole number of at least `least`.
 fn length_of(kind: Kind, arg: &Arg, least: usize) -> Result<usize, TypeError> {
     match arg {
-        Arg::Datum(Datum::Scalar(Scalar::Int(n))) if usize::try_from(*n).is_ok_and(|n| n >= least) => {
+        Arg::Datum(Datum::Scalar(Scalar::Int(n)))
+            if usize::try_from(*n).is_ok_and(|n| n >= least) =>
+        {
             Ok(usize::try_from(*n).unwrap_or(least))
         }
         _ => Err(wrong(
@@ -166,7 +168,9 @@ fn length_of(kind: Kind, arg: &Arg, least: usize) -> Result<usize, TypeError> {
 /// A `prefix`: text, where an empty one is none.
 fn prefix_of(kind: Kind, arg: &Arg) -> Result<Option<String>, TypeError> {
     match arg {
-        Arg::Datum(Datum::Scalar(Scalar::Text(prefix))) => Ok((!prefix.is_empty()).then(|| prefix.clone())),
+        Arg::Datum(Datum::Scalar(Scalar::Text(prefix))) => {
+            Ok((!prefix.is_empty()).then(|| prefix.clone()))
+        }
         _ => Err(wrong(kind, "prefix", "text", arg)),
     }
 }
@@ -174,7 +178,9 @@ fn prefix_of(kind: Kind, arg: &Arg) -> Result<Option<String>, TypeError> {
 /// A `default`: `auto` when the kind makes a value up, or a plain value.
 fn default_of(kind: Kind, arg: &Arg) -> Result<Datum, TypeError> {
     match arg {
-        Arg::Datum(Datum::Scalar(Scalar::Auto)) if kind.auto().is_some() => Ok(Datum::Scalar(Scalar::Auto)),
+        Arg::Datum(Datum::Scalar(Scalar::Auto)) if kind.auto().is_some() => {
+            Ok(Datum::Scalar(Scalar::Auto))
+        }
         Arg::Datum(Datum::Scalar(Scalar::Auto)) => Err(TypeError::AutoNotAllowed { ty: kind }),
         Arg::Datum(datum) if datum.is_finite() => Ok(datum.clone()),
         Arg::Datum(_) => Err(wrong(

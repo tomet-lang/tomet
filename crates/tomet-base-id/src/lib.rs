@@ -99,7 +99,10 @@ mod tests {
             named.push(("length", Arg::Datum(Datum::Scalar(Scalar::Int(length)))));
         }
         if let Some(prefix) = prefix {
-            named.push(("prefix", Arg::Datum(Datum::Scalar(Scalar::Text(prefix.to_string())))));
+            named.push((
+                "prefix",
+                Arg::Datum(Datum::Scalar(Scalar::Text(prefix.to_string()))),
+            ));
         }
         Type::build(name, &[], &named).expect("a type")
     }

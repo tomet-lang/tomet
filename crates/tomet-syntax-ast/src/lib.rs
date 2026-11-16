@@ -3,6 +3,7 @@
 //! Shared AST and `Value` data models for the Tomet toolchain ([`File`], [`Block`],
 //! [`Inline`], [`Element`], [`ElementView`], [`BodyView`], [`Declaration`], [`Interpolation`],
 //! [`Hole`], [`TypeSeat`], [`ListItem`], [`Value`], [`Tuple`], [`TupleEntry`], [`Span`]).
+//! A [`Value`] holds a [`Scalar`](tomet_scalar::Scalar) for scalar data.
 //!
 //! =[ Design Policy ]
 //!
@@ -56,30 +57,13 @@ use tomet_span::Span;
 
 /// A pure data value: the subset of Tomet with a direct serde
 /// equivalent (no headings, prose, or links).
+///
+/// A scalar value is held in [`Value::Scalar`], wrapping [`tomet_scalar::Scalar`].
 #[derive(Debug, Clone, PartialEq)]
 pub enum Value {
-    None,
-    Auto,
-    Bool(bool),
-    Int(i64),
-    Float(f64),
-    /// A number kept as it was written, because reading it as an `i64` or an
-    /// `f64` would change it: `1.10` (an `f64` prints `1.1`), `1e3`, `-0`, or an
-    /// integer too large for an `i64`.
-    ///
-    /// Only these. A number that survives being read keeps being an
-    /// [`Int`](Value::Int) or a [`Float`](Value::Float), so a value has one
-    /// representation; whether `1.5` is a number is not in doubt, and whether
-    /// `1.10` is a number, a version or a string is for the type that reads it
-    /// to say. `1.10.0`, `007` and `2026-10-25` are not numbers by the JSON
-    /// grammar and never come here: they are [`String`](Value::String)s.
-    ///
-    /// The text is a valid JSON number, so it parses as an `f64` (or fails only
-    /// for a magnitude beyond one). Read it with
-    /// [`as_number`](Value::as_number); the text it was written as, whatever the
-    /// scalar, is [`scalar_text`](Value::scalar_text).
-    Number(String),
-    String(String),
+    /// A scalar value: `none`, `auto`, a boolean, an integer, a float,
+    /// a number kept as written, or text. See [`tomet_scalar::Scalar`].
+    Scalar(tomet_scalar::Scalar),
     /// `(a, b, k: v)` -- an ordered run of entries, each with a
     /// name or without one. `()` is the empty tuple and `(x)` is a tuple with
     /// one unnamed entry. See [`Tuple`].
@@ -642,32 +626,10 @@ impl<'de> Deserialize<'de> for Tuple {
 }
 
 impl Value {
-    /// The text a bare scalar was written as, for a target that wants text: a
-    /// `string` argument given `2024`, `true` or `1.10`.
-    ///
-    /// `None` for what is not a scalar (`none`, a tuple, a call, an element) --
-    /// those have no single text. A [`String`](Value::String) is itself,
-    /// whether it was quoted or not: the reader does not keep the difference.
-    pub fn scalar_text(&self) -> Option<std::borrow::Cow<'_, str>> {
-        use std::borrow::Cow;
-        Some(match self {
-            Value::Auto => Cow::Borrowed("auto"),
-            Value::String(s) | Value::Number(s) => Cow::Borrowed(s.as_str()),
-            Value::Int(i) => Cow::Owned(i.to_string()),
-            Value::Float(f) => Cow::Owned(tomet_scalar::float_text(*f)),
-            Value::Bool(b) => Cow::Borrowed(if *b { "true" } else { "false" }),
-            _ => return None,
-        })
-    }
-
-    /// The number a [`Float`](Value::Float) or [`Number`](Value::Number) is, as
-    /// an `f64`. A `Number` too large for one is `None`. (An [`Int`](Value::Int)
-    /// is not read as a float here: the caller asked for the kept-as-written
-    /// kinds, and has `as_i64` for the rest.)
-    pub fn as_number(&self) -> Option<f64> {
+    /// The scalar this value is, if it is one.
+    pub fn as_scalar(&self) -> Option<&tomet_scalar::Scalar> {
         match self {
-            Value::Float(f) => Some(*f),
-            Value::Number(text) => text.parse::<f64>().ok().filter(|f| f.is_finite()),
+            Value::Scalar(s) => Some(s),
             _ => None,
         }
     }
@@ -675,15 +637,7 @@ impl Value {
 
 impl From<tomet_scalar::Scalar> for Value {
     fn from(s: tomet_scalar::Scalar) -> Self {
-        match s {
-            tomet_scalar::Scalar::None => Value::None,
-            tomet_scalar::Scalar::Auto => Value::Auto,
-            tomet_scalar::Scalar::Bool(b) => Value::Bool(b),
-            tomet_scalar::Scalar::Int(i) => Value::Int(i),
-            tomet_scalar::Scalar::Float(f) => Value::Float(f),
-            tomet_scalar::Scalar::Number(n) => Value::Number(n),
-            tomet_scalar::Scalar::Text(t) => Value::String(t),
-        }
+        Value::Scalar(s)
     }
 }
 
@@ -693,19 +647,23 @@ impl Serialize for Value {
         S: serde::Serializer,
     {
         match self {
-            Value::None => serializer.serialize_none(),
-            Value::Auto => Err(serde::ser::Error::custom("`auto` has no JSON representation")),
-            Value::Bool(b) => serializer.serialize_bool(*b),
-            Value::Int(i) => serializer.serialize_i64(*i),
-            Value::Float(f) => serializer.serialize_f64(*f),
-            // A number on the wire is an f64: that is the most a serializer
-            // that has no arbitrary-precision number can say. One that cannot
-            // be one (too large) is sent as the text it was written as.
-            Value::Number(text) => match text.parse::<f64>() {
-                Ok(f) if f.is_finite() => serializer.serialize_f64(f),
-                _ => serializer.serialize_str(text),
+            Value::Scalar(s) => match s {
+                tomet_scalar::Scalar::None => serializer.serialize_none(),
+                tomet_scalar::Scalar::Auto => Err(serde::ser::Error::custom(
+                    "`auto` has no JSON representation",
+                )),
+                tomet_scalar::Scalar::Bool(b) => serializer.serialize_bool(*b),
+                tomet_scalar::Scalar::Int(i) => serializer.serialize_i64(*i),
+                tomet_scalar::Scalar::Float(f) => serializer.serialize_f64(*f),
+                // A number on the wire is an f64: that is the most a serializer
+                // that has no arbitrary-precision number can say. One that cannot
+                // be one (too large) is sent as the text it was written as.
+                tomet_scalar::Scalar::Number(text) => match text.parse::<f64>() {
+                    Ok(f) if f.is_finite() => serializer.serialize_f64(f),
+                    _ => serializer.serialize_str(text),
+                },
+                tomet_scalar::Scalar::Text(s) => serializer.serialize_str(s),
             },
-            Value::String(s) => serializer.serialize_str(s),
             Value::Tuple(tuple) => tuple.serialize(serializer),
             Value::Call(name, args) => {
                 use serde::ser::SerializeMap;
@@ -752,35 +710,35 @@ impl<'de> Deserialize<'de> for Value {
             }
 
             fn visit_bool<E>(self, v: bool) -> Result<Self::Value, E> {
-                Ok(Value::Bool(v))
+                Ok(Value::Scalar(tomet_scalar::Scalar::Bool(v)))
             }
 
             fn visit_i64<E>(self, v: i64) -> Result<Self::Value, E> {
-                Ok(Value::Int(v))
+                Ok(Value::Scalar(tomet_scalar::Scalar::Int(v)))
             }
 
             fn visit_u64<E>(self, v: u64) -> Result<Self::Value, E> {
-                Ok(Value::Int(v as i64))
+                Ok(Value::Scalar(tomet_scalar::Scalar::Int(v as i64)))
             }
 
             fn visit_f64<E>(self, v: f64) -> Result<Self::Value, E> {
-                Ok(Value::Float(v))
+                Ok(Value::Scalar(tomet_scalar::Scalar::Float(v)))
             }
 
             fn visit_str<E>(self, v: &str) -> Result<Self::Value, E> {
-                Ok(Value::String(v.to_string()))
+                Ok(Value::Scalar(tomet_scalar::Scalar::Text(v.to_string())))
             }
 
             fn visit_string<E>(self, v: String) -> Result<Self::Value, E> {
-                Ok(Value::String(v))
+                Ok(Value::Scalar(tomet_scalar::Scalar::Text(v)))
             }
 
             fn visit_none<E>(self) -> Result<Self::Value, E> {
-                Ok(Value::None)
+                Ok(Value::Scalar(tomet_scalar::Scalar::None))
             }
 
             fn visit_unit<E>(self) -> Result<Self::Value, E> {
-                Ok(Value::None)
+                Ok(Value::Scalar(tomet_scalar::Scalar::None))
             }
 
             // An array and an object are a tuple, read as `Tuple` reads them.
@@ -1825,7 +1783,9 @@ impl InterpExpr {
         match &self.kind {
             InterpExprKind::Addr { .. } => InterpSpelling::Call,
             InterpExprKind::Call { callee, .. } if callee.is_name_chain() => InterpSpelling::Call,
-            InterpExprKind::Literal(tomet_scalar::Scalar::Int(n)) if *n >= 0 => InterpSpelling::Reference,
+            InterpExprKind::Literal(tomet_scalar::Scalar::Int(n)) if *n >= 0 => {
+                InterpSpelling::Reference
+            }
             _ if self.is_reference() => InterpSpelling::Reference,
             _ => InterpSpelling::Gate,
         }
@@ -1995,7 +1955,7 @@ mod tests {
     use super::*;
 
     fn int(n: i64) -> Value {
-        Value::Int(n)
+        Value::Scalar(tomet_scalar::Scalar::Int(n))
     }
 
     fn tuple(entries: impl IntoIterator<Item = (Option<&'static str>, i64)>) -> Tuple {
@@ -2081,12 +2041,12 @@ mod tests {
     #[test]
     fn test_element_view_and_list_item_as_element_view() {
         let name = Name::bare("item");
-        let args_tuple = Tuple::from_unnamed([Value::Int(42)]);
+        let args_tuple = Tuple::from_unnamed([Value::Scalar(tomet_scalar::Scalar::Int(42))]);
         let data = Data {
             args: Some(args_tuple.clone()),
             value: Some(Group::from_map(Tuple::from_named([(
                 "key".to_string(),
-                Value::String("val".to_string()),
+                Value::Scalar(tomet_scalar::Scalar::Text("val".to_string())),
             )]))),
         };
         let content_blocks = vec![Block::Paragraph(Paragraph::new(
@@ -2265,7 +2225,10 @@ mod tests {
         );
 
         // All unnamed entries serialize to array
-        let unnamed = Tuple::from_unnamed([Value::Int(1), Value::Int(2)]);
+        let unnamed = Tuple::from_unnamed([
+            Value::Scalar(tomet_scalar::Scalar::Int(1)),
+            Value::Scalar(tomet_scalar::Scalar::Int(2)),
+        ]);
         assert_eq!(serde_json::to_string(&unnamed).unwrap(), "[1,2]");
         assert_eq!(
             serde_json::to_string(&Value::Tuple(unnamed.clone())).unwrap(),
@@ -2274,8 +2237,8 @@ mod tests {
 
         // All named entries serialize to object
         let named = Tuple::from_named([
-            ("a".to_string(), Value::Int(1)),
-            ("b".to_string(), Value::Int(2)),
+            ("a".to_string(), Value::Scalar(tomet_scalar::Scalar::Int(1))),
+            ("b".to_string(), Value::Scalar(tomet_scalar::Scalar::Int(2))),
         ]);
         assert_eq!(serde_json::to_string(&named).unwrap(), r#"{"a":1,"b":2}"#);
         assert_eq!(
@@ -2285,9 +2248,15 @@ mod tests {
 
         // Mixed serialize to object with unnamed entries keyed by their index among unnamed
         let mut mixed = Tuple::new();
-        mixed.try_push_unnamed(Value::Int(10)).unwrap();
-        mixed.try_push_named("foo", Value::Int(20)).unwrap();
-        mixed.try_push_unnamed(Value::Int(30)).unwrap();
+        mixed
+            .try_push_unnamed(Value::Scalar(tomet_scalar::Scalar::Int(10)))
+            .unwrap();
+        mixed
+            .try_push_named("foo", Value::Scalar(tomet_scalar::Scalar::Int(20)))
+            .unwrap();
+        mixed
+            .try_push_unnamed(Value::Scalar(tomet_scalar::Scalar::Int(30)))
+            .unwrap();
         assert_eq!(
             serde_json::to_string(&mixed).unwrap(),
             r#"{"0":10,"foo":20,"1":30}"#
@@ -2315,8 +2284,14 @@ mod tests {
             Value::Tuple(t) => {
                 assert_eq!(t.len(), 2);
                 assert!(t.has_no_named());
-                assert_eq!(t.nth_unnamed(0), Some(&Value::Int(1)));
-                assert_eq!(t.nth_unnamed(1), Some(&Value::Int(2)));
+                assert_eq!(
+                    t.nth_unnamed(0),
+                    Some(&Value::Scalar(tomet_scalar::Scalar::Int(1)))
+                );
+                assert_eq!(
+                    t.nth_unnamed(1),
+                    Some(&Value::Scalar(tomet_scalar::Scalar::Int(2)))
+                );
             }
             other => panic!("expected Tuple, got {other:?}"),
         }
@@ -2327,7 +2302,10 @@ mod tests {
             Value::Tuple(t) => {
                 assert_eq!(t.len(), 1);
                 assert!(t.has_no_unnamed());
-                assert_eq!(t.get("a"), Some(&Value::Int(1)));
+                assert_eq!(
+                    t.get("a"),
+                    Some(&Value::Scalar(tomet_scalar::Scalar::Int(1)))
+                );
             }
             other => panic!("expected Tuple, got {other:?}"),
         }
@@ -2335,7 +2313,10 @@ mod tests {
         // Call serialization with Tuple fields
         let call = Value::Call(
             "my_fn".to_string(),
-            Tuple::from_unnamed([Value::Int(1), Value::Int(2)]),
+            Tuple::from_unnamed([
+                Value::Scalar(tomet_scalar::Scalar::Int(1)),
+                Value::Scalar(tomet_scalar::Scalar::Int(2)),
+            ]),
         );
         assert_eq!(
             serde_json::to_string(&call).unwrap(),
@@ -2354,11 +2335,19 @@ mod tests {
         assert_eq!(from_arr, from_obj);
 
         // AST equality: (a, b) and ("0": a, "1": b) are the same tree
-        let unnamed_tuple =
-            Tuple::from_unnamed([Value::String("a".into()), Value::String("b".into())]);
+        let unnamed_tuple = Tuple::from_unnamed([
+            Value::Scalar(tomet_scalar::Scalar::Text("a".into())),
+            Value::Scalar(tomet_scalar::Scalar::Text("b".into())),
+        ]);
         let named_tuple = Tuple::from_named([
-            ("0".into(), Value::String("a".into())),
-            ("1".into(), Value::String("b".into())),
+            (
+                "0".into(),
+                Value::Scalar(tomet_scalar::Scalar::Text("a".into())),
+            ),
+            (
+                "1".into(),
+                Value::Scalar(tomet_scalar::Scalar::Text("b".into())),
+            ),
         ]);
         assert_eq!(unnamed_tuple, named_tuple);
     }

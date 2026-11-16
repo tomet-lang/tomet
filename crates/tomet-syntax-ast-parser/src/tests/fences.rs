@@ -91,7 +91,7 @@ fn parses_a_fenced_code_block_with_lang() {
                 el.data.args,
                 Some(Tuple::from_named(vec![(
                     "lang".to_string(),
-                    Value::String("rust".to_string())
+                    Value::Scalar(Scalar::Text("rust".to_string()))
                 )]))
             );
             assert_eq!(el.content, wrap(vec![Inline::Raw("fn main() {}".into())]));

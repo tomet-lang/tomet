@@ -1,5 +1,6 @@
 use super::*;
 use tomet_ast::Value;
+use tomet_tree::ValueExt;
 
 #[test]
 fn meta_element_has_no_visible_output() {
@@ -63,10 +64,8 @@ fn custom_element_hook_renders_doc_icon() {
             let get = |key: &str| {
                 args.as_ref()
                     .and_then(|a| a.get(key))
-                    .and_then(|v| match v {
-                        Value::String(s) => Some(s.clone()),
-                        _ => None,
-                    })
+                    .and_then(Value::as_str)
+                    .map(String::from)
             };
             let name = get("name")?;
             let pkg = get("pkg").unwrap_or_default();

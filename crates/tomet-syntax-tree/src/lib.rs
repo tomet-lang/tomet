@@ -110,6 +110,7 @@ where
 mod tests {
     use super::*;
     use tomet_ast::{Block, Inline, Name, Text, Tuple, Value};
+    use tomet_scalar::Scalar;
     use tomet_span::Span;
 
     fn parse(src: &str) -> tomet_ast::File {
@@ -118,7 +119,10 @@ mod tests {
 
     #[test]
     fn test_value_extension_traits() {
-        let val = Value::Tuple(Tuple::from_named([("id".into(), Value::Int(123))]));
+        let val = Value::Tuple(Tuple::from_named([(
+            "id".into(),
+            Value::Scalar(Scalar::Int(123)),
+        )]));
         assert_eq!(val.get("id").and_then(|v| v.as_i64()), Some(123));
         assert!(!val.is_empty());
     }
@@ -126,7 +130,8 @@ mod tests {
     #[test]
     fn test_element_extension_traits() {
         let mut el = element_new(Name::bare("card"));
-        el.data.set_prop("tag", Value::String("urgent".into()));
+        el.data
+            .set_prop("tag", Value::Scalar(Scalar::Text("urgent".into())));
         assert_eq!(
             el.data.get_attr("tag").and_then(|v| v.as_str()),
             Some("urgent")
@@ -141,7 +146,7 @@ mod tests {
         assert!(!el.data.has_prop_key("tag"));
 
         let removed = el.data.remove_prop("priority");
-        assert_eq!(removed, Some(Value::String("urgent".into())));
+        assert_eq!(removed, Some(Value::Scalar(Scalar::Text("urgent".into()))));
         assert_eq!(el.data.get_attr("priority"), None);
     }
 

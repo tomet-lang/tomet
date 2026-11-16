@@ -141,7 +141,10 @@ mod tests {
                 &[],
                 &[
                     ("length", Arg::Datum(Datum::Scalar(Scalar::Int(6)))),
-                    ("prefix", Arg::Datum(Datum::Scalar(Scalar::Text(prefix.to_string())))),
+                    (
+                        "prefix",
+                        Arg::Datum(Datum::Scalar(Scalar::Text(prefix.to_string()))),
+                    ),
                 ],
             )
             .expect("a type")

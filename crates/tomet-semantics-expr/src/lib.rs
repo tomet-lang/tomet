@@ -60,6 +60,7 @@ use std::collections::HashMap;
 
 use tomet_ast::{BinaryOp, InterpExpr, InterpExprKind, Tuple, TupleEntry, Value};
 use tomet_declaration::{Arity, Placeholder, is_ident_placeholder, placeholder_of};
+use tomet_scalar::Scalar;
 use tomet_tree::fill_interpolations;
 
 mod address;
@@ -259,11 +260,7 @@ fn member_value(value: EvalValue, member: &str) -> Result<EvalValue, EvalError> 
                     member: member.to_string(),
                 })
         }
-        EvalValue::String(_)
-        | EvalValue::Int(_)
-        | EvalValue::Float(_)
-        | EvalValue::Number(_)
-        | EvalValue::Bool(_) => {
+        EvalValue::Scalar(s) if !matches!(s, Scalar::None | Scalar::Auto) => {
             if member == "0" {
                 Ok(value)
             } else {
@@ -330,7 +327,7 @@ fn call(
                 EvalValue::Namespace(Namespace::Macro) => macro_call(member, args, cx),
                 EvalValue::Part { doc, part } => parts::part_method(&doc, &part, member, args),
                 EvalValue::Document(doc) => parts::document_method(&doc, member, args, cx),
-                EvalValue::String(text) if member == "addr" => {
+                EvalValue::Scalar(Scalar::Text(text)) if member == "addr" => {
                     args.exactly(".addr", 0)?;
                     address::address_value(&text, cx)
                 }
@@ -362,7 +359,7 @@ fn macro_call(name: &str, args: Args, cx: &EvalContext) -> Result<EvalValue, Eva
         .ok_or_else(|| EvalError::UnknownFunction(format!("macro.{name}")))?;
 
     match template {
-        Value::String(template) => {
+        Value::Scalar(Scalar::Text(template)) => {
             macro_args_fit(name, &Arity::of_text(template), &args)?;
             let mut text = template.clone();
             for (key, value) in &args.named {
@@ -373,7 +370,7 @@ fn macro_call(name: &str, args: Args, cx: &EvalContext) -> Result<EvalValue, Eva
             for (i, value) in args.positional.iter().enumerate() {
                 text = text.replace(&format!("$({})", i + 1), &methods::scalar_text(value)?);
             }
-            Ok(EvalValue::String(text))
+            Ok(EvalValue::Scalar(Scalar::Text(text)))
         }
         Value::Blocks(_) => {
             macro_args_fit(name, &Arity::of_body(template), &args)?;
@@ -503,7 +500,7 @@ fn is_function(name: &str) -> bool {
 fn builtin(name: &str, args: Args, cx: &EvalContext) -> Result<EvalValue, EvalError> {
     match name {
         "tmt" => match args.exactly(name, 1)?.pop() {
-            Some(EvalValue::String(path)) => {
+            Some(EvalValue::Scalar(Scalar::Text(path))) => {
                 Ok(EvalValue::Document(DocRef(parts::normalize_path(&path))))
             }
             Some(other) => Err(EvalError::mismatch(
@@ -514,7 +511,7 @@ fn builtin(name: &str, args: Args, cx: &EvalContext) -> Result<EvalValue, EvalEr
             None => unreachable!("`exactly` returned one value"),
         },
         "ref" => match args.exactly(name, 1)?.pop() {
-            Some(EvalValue::String(note)) => cx
+            Some(EvalValue::Scalar(Scalar::Text(note))) => cx
                 .resolver
                 .note(&note)
                 .map(EvalValue::Document)
@@ -539,10 +536,10 @@ fn builtin(name: &str, args: Args, cx: &EvalContext) -> Result<EvalValue, EvalEr
             None => unreachable!("`exactly` returned one value"),
         },
         "emoji" => match args.exactly(name, 1)?.pop() {
-            Some(EvalValue::String(name)) => {
+            Some(EvalValue::Scalar(Scalar::Text(name))) => {
                 let key = name.trim().trim_matches(':');
                 chars::emoji_for(key)
-                    .map(|emoji| EvalValue::String(emoji.to_string()))
+                    .map(|emoji| EvalValue::Scalar(Scalar::Text(emoji.to_string())))
                     .ok_or_else(|| EvalError::message(format!("unknown emoji `{key}`")))
             }
             Some(other) => Err(EvalError::mismatch("`emoji`", "a name", other.type_name())),
@@ -553,28 +550,30 @@ fn builtin(name: &str, args: Args, cx: &EvalContext) -> Result<EvalValue, EvalEr
             None => unreachable!("`exactly` returned one value"),
         },
         "not" => match args.exactly(name, 1)?.pop() {
-            Some(EvalValue::Bool(b)) => Ok(EvalValue::Bool(!b)),
+            Some(EvalValue::Scalar(Scalar::Bool(b))) => Ok(EvalValue::Scalar(Scalar::Bool(!b))),
             Some(other) => Err(EvalError::mismatch("`not`", "a bool", other.type_name())),
             None => unreachable!("`exactly` returned one value"),
         },
         "exists" => match args.exactly(name, 1)?.pop() {
-            Some(value) => Ok(EvalValue::Bool(value != EvalValue::None)),
+            Some(value) => Ok(EvalValue::Scalar(Scalar::Bool(
+                value != EvalValue::Scalar(Scalar::None),
+            ))),
             None => unreachable!("`exactly` returned one value"),
         },
         "version" => match args.exactly(name, 1)?.pop() {
-            Some(EvalValue::String(text)) => {
+            Some(EvalValue::Scalar(Scalar::Text(text))) => {
                 let v = tomet_type::Version::parse(text.trim()).ok_or_else(|| {
                     EvalError::message(format!("`{text}` is not a valid version"))
                 })?;
                 Ok(EvalValue::Version(v))
             }
             Some(EvalValue::Version(v)) => Ok(EvalValue::Version(v)),
-            Some(EvalValue::Int(n)) if n >= 0 => {
+            Some(EvalValue::Scalar(Scalar::Int(n))) if n >= 0 => {
                 let v = tomet_type::Version::parse(&n.to_string())
                     .ok_or_else(|| EvalError::message(format!("`{n}` is not a valid version")))?;
                 Ok(EvalValue::Version(v))
             }
-            Some(EvalValue::Number(text)) => {
+            Some(EvalValue::Scalar(Scalar::Number(text))) => {
                 let v = tomet_type::Version::parse(text.trim()).ok_or_else(|| {
                     EvalError::message(format!("`{text}` is not a valid version"))
                 })?;
@@ -593,7 +592,7 @@ fn builtin(name: &str, args: Args, cx: &EvalContext) -> Result<EvalValue, EvalEr
 
 fn truth(op: &str, value: EvalValue) -> Result<bool, EvalError> {
     match value {
-        EvalValue::Bool(b) => Ok(b),
+        EvalValue::Scalar(Scalar::Bool(b)) => Ok(b),
         other => Err(EvalError::mismatch(
             format!("`{op}`"),
             "a bool on both sides",
@@ -613,21 +612,21 @@ fn binary(
         // The right side is not evaluated once the left decides the answer.
         BinaryOp::And => {
             if !truth(BinaryOp::And.symbol(), eval(lhs, cx, env)?)? {
-                return Ok(EvalValue::Bool(false));
+                return Ok(EvalValue::Scalar(Scalar::Bool(false)));
             }
-            Ok(EvalValue::Bool(truth(
+            Ok(EvalValue::Scalar(Scalar::Bool(truth(
                 BinaryOp::And.symbol(),
                 eval(rhs, cx, env)?,
-            )?))
+            )?)))
         }
         BinaryOp::Or => {
             if truth(BinaryOp::Or.symbol(), eval(lhs, cx, env)?)? {
-                return Ok(EvalValue::Bool(true));
+                return Ok(EvalValue::Scalar(Scalar::Bool(true)));
             }
-            Ok(EvalValue::Bool(truth(
+            Ok(EvalValue::Scalar(Scalar::Bool(truth(
                 BinaryOp::Or.symbol(),
                 eval(rhs, cx, env)?,
-            )?))
+            )?)))
         }
         BinaryOp::Add | BinaryOp::Sub => {
             let (l, r) = (eval(lhs, cx, env)?, eval(rhs, cx, env)?);
@@ -636,7 +635,7 @@ fn binary(
         }
         _ => {
             let (l, r) = (eval(lhs, cx, env)?, eval(rhs, cx, env)?);
-            Ok(EvalValue::Bool(match op {
+            Ok(EvalValue::Scalar(Scalar::Bool(match op {
                 BinaryOp::Eq => values_equal(&l, &r),
                 BinaryOp::Ne => !values_equal(&l, &r),
                 BinaryOp::Lt => compare(&l, &r)?.is_lt(),
@@ -646,7 +645,7 @@ fn binary(
                 BinaryOp::Add | BinaryOp::Sub | BinaryOp::And | BinaryOp::Or => {
                     unreachable!("handled above")
                 }
-            }))
+            })))
         }
     }
 }
@@ -695,9 +694,9 @@ fn root_item_call(
 fn unicode_char(code: &EvalValue) -> Result<EvalValue, EvalError> {
     let bad = || EvalError::message(format!("`unicode` expects a code point, got {code:?}"));
     let point = match code {
-        EvalValue::Int(i) => u32::try_from(*i).map_err(|_| bad())?,
-        EvalValue::Number(text) => text.parse::<u32>().map_err(|_| bad())?,
-        EvalValue::String(text) => {
+        EvalValue::Scalar(Scalar::Int(i)) => u32::try_from(*i).map_err(|_| bad())?,
+        EvalValue::Scalar(Scalar::Number(text)) => text.parse::<u32>().map_err(|_| bad())?,
+        EvalValue::Scalar(Scalar::Text(text)) => {
             let digits = text
                 .trim()
                 .trim_start_matches("U+")
@@ -715,6 +714,6 @@ fn unicode_char(code: &EvalValue) -> Result<EvalValue, EvalError> {
         }
     };
     char::from_u32(point)
-        .map(|c| EvalValue::String(c.to_string()))
+        .map(|c| EvalValue::Scalar(Scalar::Text(c.to_string())))
         .ok_or_else(bad)
 }

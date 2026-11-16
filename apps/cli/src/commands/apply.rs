@@ -5,6 +5,7 @@ use anyhow::{Result, bail};
 use tomet_ast::Value;
 use tomet_config::PrinterConfig;
 use tomet_load_config::find_config_file;
+use tomet_scalar::Scalar;
 use tomet_workspace::{SeatsNotFilled, apply_blueprint_to_file};
 
 pub fn apply_cmd(
@@ -44,7 +45,7 @@ pub fn apply_cmd(
 
     let mut var_map = HashMap::new();
     for (k, v) in vars {
-        var_map.insert(k.clone(), Value::String(v.clone()));
+        var_map.insert(k.clone(), Value::Scalar(Scalar::Text(v.clone())));
     }
 
     let mut changed_count = 0;
@@ -164,7 +165,10 @@ mod tests {
         fs::write(&doc_path, "::kind(task)\n\nInitial notes.\n").unwrap();
 
         let mut vars = HashMap::new();
-        vars.insert("title".to_string(), Value::String("Task 1".into()));
+        vars.insert(
+            "title".to_string(),
+            Value::Scalar(Scalar::Text("Task 1".into())),
+        );
 
         let applied = apply_blueprint_to_file(
             &temp_dir,

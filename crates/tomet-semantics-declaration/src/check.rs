@@ -6,6 +6,7 @@
 //! singular declarations replaced (`::fields`) is reported with the name to write instead.
 
 use tomet_ast::Value;
+use tomet_scalar::Scalar;
 use tomet_semantics_core::admits::{admits, is_placeholder};
 use tomet_type::{Kind, Type};
 
@@ -151,13 +152,15 @@ impl std::fmt::Display for Problem {
 /// point (`1.0`, not `1`).
 fn version_as_written(value: &Value) -> String {
     match value {
-        Value::String(s) => format!("{s:?}"),
-        Value::Float(f) => format!("{f:?}"),
-        Value::Number(text) => text.clone(),
-        Value::Int(n) => n.to_string(),
-        Value::Bool(b) => b.to_string(),
-        Value::None => "none".to_string(),
-        Value::Auto => "auto".to_string(),
+        Value::Scalar(s) => match s {
+            Scalar::Text(s) => format!("{s:?}"),
+            Scalar::Float(f) => format!("{f:?}"),
+            Scalar::Number(text) => text.clone(),
+            Scalar::Int(n) => n.to_string(),
+            Scalar::Bool(b) => b.to_string(),
+            Scalar::None => "none".to_string(),
+            Scalar::Auto => "auto".to_string(),
+        },
         _ => "a value that is not a number".to_string(),
     }
 }
@@ -303,7 +306,7 @@ fn check_version_slot(
     }
 
     if let Some(version) = view.get("version")
-        && !matches!(version, Value::Int(n) if *n >= 1)
+        && !matches!(version.as_scalar(), Some(Scalar::Int(n)) if *n >= 1)
     {
         problems.push((
             idx,
@@ -422,7 +425,7 @@ fn check_macros(
 /// is a block macro, whose only interpolations are the places arguments go.
 fn macro_problem(template: &Value) -> Option<String> {
     match template {
-        Value::String(_) => None,
+        Value::Scalar(Scalar::Text(_)) => None,
         Value::Blocks(_) => {
             let expressions = crate::expressions_in_body(template);
             if expressions.is_empty() {
@@ -580,8 +583,8 @@ mod tests {
         let good_kind = Declaration::new(
             "kind",
             Some(Tuple::from_named([
-                ("kind".into(), Value::String("note".into())),
-                ("version".into(), Value::Int(1)),
+                ("kind".into(), Value::Scalar(Scalar::Text("note".into()))),
+                ("version".into(), Value::Scalar(Scalar::Int(1))),
             ])),
             None,
         );
@@ -591,8 +594,8 @@ mod tests {
         let bad_version = Declaration::new(
             "kind",
             Some(Tuple::from_named([
-                ("kind".into(), Value::String("note".into())),
-                ("version".into(), Value::Float(1.0)),
+                ("kind".into(), Value::Scalar(Scalar::Text("note".into()))),
+                ("version".into(), Value::Scalar(Scalar::Float(1.0))),
             ])),
             None,
         );
@@ -611,10 +614,12 @@ mod tests {
         );
 
         let mut too_many_tuple = Tuple::from_named([
-            ("target".into(), Value::String("deck".into())),
-            ("version".into(), Value::Int(1)),
+            ("target".into(), Value::Scalar(Scalar::Text("deck".into()))),
+            ("version".into(), Value::Scalar(Scalar::Int(1))),
         ]);
-        too_many_tuple.try_push_unnamed(Value::Int(2)).unwrap();
+        too_many_tuple
+            .try_push_unnamed(Value::Scalar(Scalar::Int(2)))
+            .unwrap();
         let too_many_args = Declaration::new("use", Some(too_many_tuple), None);
         let problems = check_declarations(&[too_many_args], Host::Tmt);
         assert_eq!(problems.len(), 1);
@@ -635,7 +640,10 @@ mod tests {
     fn declared_versions_held_to_version_type() {
         let good_ver = Declaration::new(
             "version",
-            Some(Tuple::from_named([("version".into(), Value::Float(1.10))])),
+            Some(Tuple::from_named([(
+                "version".into(),
+                Value::Scalar(Scalar::Float(1.10)),
+            )])),
             None,
         );
         assert!(check_declarations(&[good_ver], Host::Tmt).is_empty());
@@ -644,7 +652,7 @@ mod tests {
             "version",
             Some(Tuple::from_named([(
                 "version".into(),
-                Value::String("1.0-beta".into()),
+                Value::Scalar(Scalar::Text("1.0-beta".into())),
             )])),
             None,
         );
@@ -654,7 +662,7 @@ mod tests {
             "version",
             Some(Tuple::from_named([(
                 "version".into(),
-                Value::String("1.0.0_beta".into()),
+                Value::Scalar(Scalar::Text("1.0.0_beta".into())),
             )])),
             None,
         );
@@ -731,7 +739,10 @@ mod tests {
     fn macros_and_vars_checks() {
         let bad_macro = Declaration::new(
             "macro",
-            Some(Tuple::from_named([("gh".into(), Value::Int(42))])),
+            Some(Tuple::from_named([(
+                "gh".into(),
+                Value::Scalar(Scalar::Int(42)),
+            )])),
             None,
         );
         let problems = check_declarations(&[bad_macro], Host::Tmt);
@@ -752,8 +763,8 @@ mod tests {
             Some(Tuple::from_named([(
                 "n".into(),
                 Value::Tuple(Tuple::from_named([
-                    ("type".into(), Value::String("int".into())),
-                    ("default".into(), Value::String("3".into())),
+                    ("type".into(), Value::Scalar(Scalar::Text("int".into()))),
+                    ("default".into(), Value::Scalar(Scalar::Text("3".into()))),
                 ])),
             )])),
             None,
@@ -805,7 +816,7 @@ mod tests {
             "use",
             Some(Tuple::from_named([(
                 "target".into(),
-                Value::String("deck".into()),
+                Value::Scalar(Scalar::Text("deck".into())),
             )])),
             None,
         );
@@ -823,12 +834,16 @@ mod tests {
     fn repeated_singletons_are_reported() {
         let meta1 = Declaration::new(
             "id",
-            Some(Tuple::from_unnamed([Value::String("a".into())])),
+            Some(Tuple::from_unnamed([Value::Scalar(Scalar::Text(
+                "a".into(),
+            ))])),
             None,
         );
         let meta2 = Declaration::new(
             "id",
-            Some(Tuple::from_unnamed([Value::String("b".into())])),
+            Some(Tuple::from_unnamed([Value::Scalar(Scalar::Text(
+                "b".into(),
+            ))])),
             None,
         );
         let problems = check_declarations(&[meta1, meta2], Host::Ctmt);
@@ -853,7 +868,7 @@ mod tests {
             "use",
             Some(Tuple::from_named([(
                 "target".into(),
-                Value::String("a".into()),
+                Value::Scalar(Scalar::Text("a".into())),
             )])),
             None,
         );
@@ -861,7 +876,7 @@ mod tests {
             "use",
             Some(Tuple::from_named([(
                 "target".into(),
-                Value::String("b".into()),
+                Value::Scalar(Scalar::Text("b".into())),
             )])),
             None,
         );
@@ -984,9 +999,7 @@ mod tests {
             assert!(problems_of(src).is_empty(), "{src}: {:?}", problems_of(src));
         }
         // Invalid definitions are found.
-        for src in [
-            "::field(owner: (type: person))\n",
-        ] {
+        for src in ["::field(owner: (type: person))\n"] {
             let found = problems_of(src);
             assert!(
                 matches!(&found[..], [Problem::InvalidDefinition { name, .. }] if name == "owner"),
@@ -997,10 +1010,11 @@ mod tests {
 
     #[test]
     fn the_registrations_are_many_and_the_header_of_a_blueprint_is_one() {
+        assert!(problems_of("::blueprint(a: @file(a.tmt), b: @file(b.tmt))\n").is_empty());
         assert!(
-            problems_of("::blueprint(a: @file(a.tmt), b: @file(b.tmt))\n").is_empty()
+            problems_of("::format(meta: (always_newline: true), table: (max_col_width: 50))\n")
+                .is_empty()
         );
-        assert!(problems_of("::format(meta: (always_newline: true), table: (max_col_width: 50))\n").is_empty());
         assert_eq!(
             problems_of("::blueprint(a)\n::blueprint(b)\n"),
             [Problem::Repeated {

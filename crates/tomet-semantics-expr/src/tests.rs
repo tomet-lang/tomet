@@ -6,11 +6,11 @@ use tomet_type::{AutoFill, Datum, Kind, Type, TypeError};
 use super::*;
 
 fn int(i: i64) -> EvalValue {
-    EvalValue::Int(i)
+    EvalValue::Scalar(Scalar::Int(i))
 }
 
 fn text(s: &str) -> EvalValue {
-    EvalValue::String(s.to_string())
+    EvalValue::Scalar(Scalar::Text(s.to_string()))
 }
 
 fn seq(items: Vec<EvalValue>) -> EvalValue {
@@ -49,7 +49,7 @@ fn run_with(
 
 /// Evaluates with nothing in `var`.
 fn out(src: &str) -> Result<EvalValue, EvalError> {
-    run_with(src, &EvalValue::None, &HashMap::new())
+    run_with(src, &EvalValue::Scalar(Scalar::None), &HashMap::new())
 }
 
 /// Evaluates with `var` set.
@@ -60,12 +60,12 @@ fn with_var(src: &str, vars: EvalValue) -> Result<EvalValue, EvalError> {
 #[test]
 fn literals_evaluate_to_themselves() {
     assert_eq!(out("1").unwrap(), int(1));
-    assert_eq!(out("1.5").unwrap(), EvalValue::Float(1.5));
+    assert_eq!(out("1.5").unwrap(), EvalValue::Scalar(Scalar::Float(1.5)));
     assert_eq!(out("-3").unwrap(), int(-3));
     assert_eq!(out("\"hi\"").unwrap(), text("hi"));
-    assert_eq!(out("true").unwrap(), EvalValue::Bool(true));
-    assert_eq!(out("none").unwrap(), EvalValue::None);
-    assert_eq!(out("auto").unwrap(), EvalValue::Auto);
+    assert_eq!(out("true").unwrap(), EvalValue::Scalar(Scalar::Bool(true)));
+    assert_eq!(out("none").unwrap(), EvalValue::Scalar(Scalar::None));
+    assert_eq!(out("auto").unwrap(), EvalValue::Scalar(Scalar::Auto));
     assert!(tomet_ast_parser::parse_interpolation_str("{$ null }").is_err());
     assert_eq!(out("(1)").unwrap(), int(1));
     assert_eq!(out("()").unwrap(), seq(vec![]));
@@ -165,22 +165,46 @@ fn a_member_that_does_not_exist_is_named() {
 
 #[test]
 fn equality_compares_numbers_as_numbers_and_never_errors_across_types() {
-    assert_eq!(out("1 == 1.0").unwrap(), EvalValue::Bool(true));
-    assert_eq!(out("1 != 2").unwrap(), EvalValue::Bool(true));
-    assert_eq!(out("\"a\" == \"a\"").unwrap(), EvalValue::Bool(true));
-    assert_eq!(out("1 == \"1\"").unwrap(), EvalValue::Bool(false));
-    assert_eq!(out("none == true").unwrap(), EvalValue::Bool(false));
-    assert_eq!(out("none == none").unwrap(), EvalValue::Bool(true));
+    assert_eq!(
+        out("1 == 1.0").unwrap(),
+        EvalValue::Scalar(Scalar::Bool(true))
+    );
+    assert_eq!(
+        out("1 != 2").unwrap(),
+        EvalValue::Scalar(Scalar::Bool(true))
+    );
+    assert_eq!(
+        out("\"a\" == \"a\"").unwrap(),
+        EvalValue::Scalar(Scalar::Bool(true))
+    );
+    assert_eq!(
+        out("1 == \"1\"").unwrap(),
+        EvalValue::Scalar(Scalar::Bool(false))
+    );
+    assert_eq!(
+        out("none == true").unwrap(),
+        EvalValue::Scalar(Scalar::Bool(false))
+    );
+    assert_eq!(
+        out("none == none").unwrap(),
+        EvalValue::Scalar(Scalar::Bool(true))
+    );
 }
 
 #[test]
 fn ordering_takes_two_numbers_or_two_strings_and_nothing_else() {
-    assert_eq!(out("1 < 2").unwrap(), EvalValue::Bool(true));
-    assert_eq!(out("2 <= 2").unwrap(), EvalValue::Bool(true));
-    assert_eq!(out("1.5 > 1").unwrap(), EvalValue::Bool(true));
+    assert_eq!(out("1 < 2").unwrap(), EvalValue::Scalar(Scalar::Bool(true)));
+    assert_eq!(
+        out("2 <= 2").unwrap(),
+        EvalValue::Scalar(Scalar::Bool(true))
+    );
+    assert_eq!(
+        out("1.5 > 1").unwrap(),
+        EvalValue::Scalar(Scalar::Bool(true))
+    );
     assert_eq!(
         out("\"2026-01-02\" >= \"2026-01-01\"").unwrap(),
-        EvalValue::Bool(true)
+        EvalValue::Scalar(Scalar::Bool(true))
     );
     assert_eq!(
         out("1 < \"a\""),
@@ -201,10 +225,22 @@ fn ordering_takes_two_numbers_or_two_strings_and_nothing_else() {
 #[test]
 fn and_or_skip_the_right_side_once_the_left_decides() {
     // The right side names something that does not exist: it would fail if run.
-    assert_eq!(out("false && nope").unwrap(), EvalValue::Bool(false));
-    assert_eq!(out("true || nope").unwrap(), EvalValue::Bool(true));
-    assert_eq!(out("true && false").unwrap(), EvalValue::Bool(false));
-    assert_eq!(out("false || true").unwrap(), EvalValue::Bool(true));
+    assert_eq!(
+        out("false && nope").unwrap(),
+        EvalValue::Scalar(Scalar::Bool(false))
+    );
+    assert_eq!(
+        out("true || nope").unwrap(),
+        EvalValue::Scalar(Scalar::Bool(true))
+    );
+    assert_eq!(
+        out("true && false").unwrap(),
+        EvalValue::Scalar(Scalar::Bool(false))
+    );
+    assert_eq!(
+        out("false || true").unwrap(),
+        EvalValue::Scalar(Scalar::Bool(true))
+    );
     assert!(out("true && nope").is_err());
     assert!(out("false || nope").is_err());
 }
@@ -227,26 +263,41 @@ fn and_or_take_only_booleans() {
 
 #[test]
 fn not_and_exists() {
-    assert_eq!(out("not(true)").unwrap(), EvalValue::Bool(false));
+    assert_eq!(
+        out("not(true)").unwrap(),
+        EvalValue::Scalar(Scalar::Bool(false))
+    );
     assert!(matches!(
         out("not(0)"),
         Err(EvalError::TypeMismatch { got: "int", .. })
     ));
-    assert_eq!(out("exists(none)").unwrap(), EvalValue::Bool(false));
-    assert_eq!(out("exists(0)").unwrap(), EvalValue::Bool(true));
-    assert_eq!(out("exists(\"\")").unwrap(), EvalValue::Bool(true));
+    assert_eq!(
+        out("exists(none)").unwrap(),
+        EvalValue::Scalar(Scalar::Bool(false))
+    );
+    assert_eq!(
+        out("exists(0)").unwrap(),
+        EvalValue::Scalar(Scalar::Bool(true))
+    );
+    assert_eq!(
+        out("exists(\"\")").unwrap(),
+        EvalValue::Scalar(Scalar::Bool(true))
+    );
 }
 
 #[test]
 fn precedence_puts_comparison_before_and_before_or() {
     assert_eq!(
         out("1 < 2 && 3 > 2 || false").unwrap(),
-        EvalValue::Bool(true)
+        EvalValue::Scalar(Scalar::Bool(true))
     );
-    assert_eq!(out("false && true || true").unwrap(), EvalValue::Bool(true));
+    assert_eq!(
+        out("false && true || true").unwrap(),
+        EvalValue::Scalar(Scalar::Bool(true))
+    );
     assert_eq!(
         out("false && (true || true)").unwrap(),
-        EvalValue::Bool(false)
+        EvalValue::Scalar(Scalar::Bool(false))
     );
 }
 
@@ -255,12 +306,18 @@ fn arithmetic_functions_keep_integers_and_promote_on_overflow() {
     assert_eq!(out("add(1, 2)").unwrap(), int(3));
     assert_eq!(out("sub(5, 7)").unwrap(), int(-2));
     assert_eq!(out("mul(3, 4)").unwrap(), int(12));
-    assert_eq!(out("add(1, 1.5)").unwrap(), EvalValue::Float(2.5));
-    assert_eq!(out("div(7, 2)").unwrap(), EvalValue::Float(3.5));
+    assert_eq!(
+        out("add(1, 1.5)").unwrap(),
+        EvalValue::Scalar(Scalar::Float(2.5))
+    );
+    assert_eq!(
+        out("div(7, 2)").unwrap(),
+        EvalValue::Scalar(Scalar::Float(3.5))
+    );
     assert_eq!(out("mod(7, 3)").unwrap(), int(1));
     assert!(matches!(
         out("add(9223372036854775807, 1)").unwrap(),
-        EvalValue::Float(_)
+        EvalValue::Scalar(Scalar::Float(_))
     ));
     assert_eq!(out("div(1, 0)"), Err(EvalError::DivisionByZero));
     assert_eq!(out("mod(1, 0)"), Err(EvalError::DivisionByZero));
@@ -274,13 +331,19 @@ fn arithmetic_functions_keep_integers_and_promote_on_overflow() {
 fn plus_and_minus_are_the_functions_add_and_sub() {
     assert_eq!(out("1 + 2").unwrap(), int(3));
     assert_eq!(out("5 - 7").unwrap(), int(-2));
-    assert_eq!(out("1 + 1.5").unwrap(), EvalValue::Float(2.5));
+    assert_eq!(
+        out("1 + 1.5").unwrap(),
+        EvalValue::Scalar(Scalar::Float(2.5))
+    );
     assert_eq!(out("10 - 2 - 3").unwrap(), int(5));
-    assert_eq!(out("1 + 2 == 3").unwrap(), EvalValue::Bool(true));
+    assert_eq!(
+        out("1 + 2 == 3").unwrap(),
+        EvalValue::Scalar(Scalar::Bool(true))
+    );
     assert_eq!(out("add(1, 2) - 1").unwrap(), int(2));
     assert!(matches!(
         out("9223372036854775807 + 1").unwrap(),
-        EvalValue::Float(_)
+        EvalValue::Scalar(Scalar::Float(_))
     ));
     assert!(matches!(
         out("1 + \"a\""),
@@ -387,9 +450,15 @@ fn an_item_with_no_key_goes_last_whichever_way_the_rest_are_ordered() {
         "xs",
         seq(vec![
             map(vec![("k", int(2)), ("n", text("a"))]),
-            map(vec![("k", EvalValue::None), ("n", text("none1"))]),
+            map(vec![
+                ("k", EvalValue::Scalar(Scalar::None)),
+                ("n", text("none1")),
+            ]),
             map(vec![("k", int(1)), ("n", text("b"))]),
-            map(vec![("k", EvalValue::None), ("n", text("none2"))]),
+            map(vec![
+                ("k", EvalValue::Scalar(Scalar::None)),
+                ("n", text("none2")),
+            ]),
         ]),
     )]);
     assert_eq!(
@@ -401,7 +470,10 @@ fn an_item_with_no_key_goes_last_whichever_way_the_rest_are_ordered() {
         seq(vec![text("a"), text("b"), text("none1"), text("none2")])
     );
     // Only keys that exist have to agree: a number and a string still clash.
-    let clash = map(vec![("xs", seq(vec![int(1), EvalValue::None, text("a")]))]);
+    let clash = map(vec![(
+        "xs",
+        seq(vec![int(1), EvalValue::Scalar(Scalar::None), text("a")]),
+    )]);
     assert!(with_var("var.xs.sort(x => x)", clash).is_err());
 }
 
@@ -414,11 +486,11 @@ fn join_len_contains_and_item_on_a_list() {
     assert_eq!(with_var("var.xs.len()", xs()).unwrap(), int(3));
     assert_eq!(
         with_var("var.xs.contains(2)", xs()).unwrap(),
-        EvalValue::Bool(true)
+        EvalValue::Scalar(Scalar::Bool(true))
     );
     assert_eq!(
         with_var("var.xs.contains(9)", xs()).unwrap(),
-        EvalValue::Bool(false)
+        EvalValue::Scalar(Scalar::Bool(false))
     );
     assert_eq!(with_var("var.xs.item(1)", xs()).unwrap(), int(1));
     assert!(with_var("var.xs.item(7)", xs()).is_err());
@@ -432,7 +504,7 @@ fn join_takes_scalars_only() {
         with_var("var.xs.join(\",\")", nested),
         Err(EvalError::TypeMismatch { got: "tuple", .. })
     ));
-    let nulls = map(vec![("xs", seq(vec![EvalValue::None]))]);
+    let nulls = map(vec![("xs", seq(vec![EvalValue::Scalar(Scalar::None)]))]);
     assert!(with_var("var.xs.join(\",\")", nulls).is_err());
 }
 
@@ -442,7 +514,7 @@ fn an_empty_list_answers_contains_with_no_instead_of_failing() {
     let empty = map(vec![("tags", seq(vec![]))]);
     assert_eq!(
         with_var("var.tags.contains(\"rust\")", empty).unwrap(),
-        EvalValue::Bool(false)
+        EvalValue::Scalar(Scalar::Bool(false))
     );
 }
 
@@ -451,17 +523,17 @@ fn maps_and_strings_have_their_own_contains_and_get() {
     let m = map(vec![("m", map(vec![("a", int(1))]))]);
     assert_eq!(
         with_var("var.m.has(\"a\")", m.clone()).unwrap(),
-        EvalValue::Bool(true)
+        EvalValue::Scalar(Scalar::Bool(true))
     );
     assert_eq!(
         with_var("var.m.contains(\"a\")", m.clone()).unwrap(),
-        EvalValue::Bool(false)
+        EvalValue::Scalar(Scalar::Bool(false))
     );
     assert_eq!(with_var("var.m.get(\"a\", 0)", m.clone()).unwrap(), int(1));
     assert_eq!(with_var("var.m.get(\"z\", 0)", m).unwrap(), int(0));
     assert_eq!(
         out("\"hello\".contains(\"ell\")").unwrap(),
-        EvalValue::Bool(true)
+        EvalValue::Scalar(Scalar::Bool(true))
     );
     assert!(matches!(
         out("\"hello\".contains(1)"),
@@ -475,9 +547,9 @@ fn scalar_zero_member_and_tuple_operations() {
     let vars = map(vec![
         ("s", text("hello")),
         ("i", int(42)),
-        ("f", EvalValue::Float(1.5)),
-        ("n", EvalValue::Number("1.10".into())),
-        ("b", EvalValue::Bool(true)),
+        ("f", EvalValue::Scalar(Scalar::Float(1.5))),
+        ("n", EvalValue::Scalar(Scalar::Number("1.10".into()))),
+        ("b", EvalValue::Scalar(Scalar::Bool(true))),
         ("call", EvalValue::Call("func".into(), Tuple::new())),
         (
             "t_named",
@@ -489,15 +561,15 @@ fn scalar_zero_member_and_tuple_operations() {
     assert_eq!(with_var("var.i.0", vars.clone()).unwrap(), int(42));
     assert_eq!(
         with_var("var.f.0", vars.clone()).unwrap(),
-        EvalValue::Float(1.5)
+        EvalValue::Scalar(Scalar::Float(1.5))
     );
     assert_eq!(
         with_var("var.n.0", vars.clone()).unwrap(),
-        EvalValue::Number("1.10".into())
+        EvalValue::Scalar(Scalar::Number("1.10".into()))
     );
     assert_eq!(
         with_var("var.b.0", vars.clone()).unwrap(),
-        EvalValue::Bool(true)
+        EvalValue::Scalar(Scalar::Bool(true))
     );
 
     // Non-zero member on scalar is an error
@@ -636,7 +708,7 @@ fn scalar_zero_member_and_tuple_operations() {
             &cx_with_t
         )
         .unwrap(),
-        EvalValue::Bool(true)
+        EvalValue::Scalar(Scalar::Bool(true))
     );
     assert_eq!(
         evaluate(
@@ -646,7 +718,7 @@ fn scalar_zero_member_and_tuple_operations() {
             &cx_with_t
         )
         .unwrap(),
-        EvalValue::Bool(false)
+        EvalValue::Scalar(Scalar::Bool(false))
     );
     assert_eq!(
         evaluate(
@@ -656,7 +728,7 @@ fn scalar_zero_member_and_tuple_operations() {
             &cx_with_t
         )
         .unwrap(),
-        EvalValue::Bool(true)
+        EvalValue::Scalar(Scalar::Bool(true))
     );
     assert_eq!(
         evaluate(
@@ -666,7 +738,7 @@ fn scalar_zero_member_and_tuple_operations() {
             &cx_with_t
         )
         .unwrap(),
-        EvalValue::Bool(true)
+        EvalValue::Scalar(Scalar::Bool(true))
     );
     assert_eq!(
         evaluate(
@@ -676,7 +748,7 @@ fn scalar_zero_member_and_tuple_operations() {
             &cx_with_t
         )
         .unwrap(),
-        EvalValue::Bool(true)
+        EvalValue::Scalar(Scalar::Bool(true))
     );
     assert_eq!(
         evaluate(
@@ -913,10 +985,13 @@ fn a_macro_fills_positional_and_named_placeholders() {
     let mut macros = HashMap::new();
     macros.insert(
         "gh".to_string(),
-        Value::String("https://x/issues/$(1)".to_string()),
+        Value::Scalar(Scalar::Text("https://x/issues/$(1)".to_string())),
     );
-    macros.insert("who".to_string(), Value::String("hi $(name)".to_string()));
-    let run = |src: &str| run_with(src, &EvalValue::None, &macros);
+    macros.insert(
+        "who".to_string(),
+        Value::Scalar(Scalar::Text("hi $(name)".to_string())),
+    );
+    let run = |src: &str| run_with(src, &EvalValue::Scalar(Scalar::None), &macros);
     assert_eq!(run("macro.gh(12)").unwrap(), text("https://x/issues/12"));
     assert_eq!(run("macro.who(name: \"ann\")").unwrap(), text("hi ann"));
     assert_eq!(
@@ -930,9 +1005,9 @@ fn macro_bare_word_argument_is_unknown_name() {
     let mut macros = HashMap::new();
     macros.insert(
         "gh".to_string(),
-        Value::String("https://x/issues/$(1)".to_string()),
+        Value::Scalar(Scalar::Text("https://x/issues/$(1)".to_string())),
     );
-    let run = |src: &str| run_with(src, &EvalValue::None, &macros);
+    let run = |src: &str| run_with(src, &EvalValue::Scalar(Scalar::None), &macros);
     assert_eq!(
         run("macro.gh(tomet)"),
         Err(EvalError::UnknownName("tomet".to_string()))
@@ -944,9 +1019,9 @@ fn macro_non_placeholder_in_template_treated_as_plain_text() {
     let mut macros = HashMap::new();
     macros.insert(
         "env".to_string(),
-        Value::String("$(HOME)/bin:$(PATH:-/bin):$()".to_string()),
+        Value::Scalar(Scalar::Text("$(HOME)/bin:$(PATH:-/bin):$()".to_string())),
     );
-    let run = |src: &str| run_with(src, &EvalValue::None, &macros);
+    let run = |src: &str| run_with(src, &EvalValue::Scalar(Scalar::None), &macros);
     assert_eq!(
         run("macro.env(HOME: \"/root\")").unwrap(),
         text("/root/bin:$(PATH:-/bin):$()")
@@ -956,8 +1031,11 @@ fn macro_non_placeholder_in_template_treated_as_plain_text() {
 #[test]
 fn a_macro_cannot_be_named_without_being_called_and_has_no_bare_form() {
     let mut macros = HashMap::new();
-    macros.insert("gh".to_string(), Value::String("x".to_string()));
-    let run = |src: &str| run_with(src, &EvalValue::None, &macros);
+    macros.insert(
+        "gh".to_string(),
+        Value::Scalar(Scalar::Text("x".to_string())),
+    );
+    let run = |src: &str| run_with(src, &EvalValue::Scalar(Scalar::None), &macros);
     assert!(run("macro.gh").is_err());
     // The bare name is not a macro and not a function.
     assert_eq!(
@@ -1019,7 +1097,7 @@ fn in_vault(src: &str) -> Result<EvalValue, EvalError> {
 /// Evaluates as written in `here.tmt` of `resolver`.
 fn in_resolver(resolver: &MemoryResolver, src: &str) -> Result<EvalValue, EvalError> {
     let macros = HashMap::new();
-    let vars = EvalValue::None;
+    let vars = EvalValue::Scalar(Scalar::None);
     let cx = EvalContext {
         resolver,
         self_doc: DocRef("here.tmt".to_string()),
@@ -1062,7 +1140,10 @@ fn a_leading_hash_picks_an_element_of_the_current_document() {
 #[test]
 fn the_leading_hash_is_self_hash() {
     assert_eq!(in_vault("self#c1.n").unwrap(), in_vault("#c1.n").unwrap());
-    assert_eq!(in_vault("#c1 == self#c1").unwrap(), EvalValue::Bool(true));
+    assert_eq!(
+        in_vault("#c1 == self#c1").unwrap(),
+        EvalValue::Scalar(Scalar::Bool(true))
+    );
 }
 
 #[test]
@@ -1119,7 +1200,7 @@ fn a_key_called_id_or_name_is_the_authors_and_the_nodes_own_is_reached_with_a_do
     assert_eq!(eval("#u1::rule.allow.item(0)").unwrap(), text("card"));
     assert!(matches!(
         eval("#u1::connects.len()").unwrap(),
-        EvalValue::Int(1)
+        EvalValue::Scalar(Scalar::Int(1))
     ));
     assert_eq!(eval("#u1::doc::path").unwrap(), text("here.tmt"));
     // A node without that connect, or that key, is a mistake and says which.
@@ -1167,7 +1248,10 @@ fn the_members_a_document_and_a_directory_had_with_a_dot_are_retired_to_the_doub
             "{error}"
         );
     }
-    assert_eq!(in_vault("self::id").unwrap(), EvalValue::None);
+    assert_eq!(
+        in_vault("self::id").unwrap(),
+        EvalValue::Scalar(Scalar::None)
+    );
     assert_eq!(
         in_vault("tmt(\"docs/a.tmt\")::doc::path").unwrap(),
         text("docs/a.tmt")
@@ -1233,7 +1317,7 @@ fn document_members() {
     assert_eq!(in_vault("self::kind").unwrap(), text("note"));
     assert_eq!(
         in_vault("tmt(\"docs/a.tmt\")::kind").unwrap(),
-        EvalValue::None
+        EvalValue::Scalar(Scalar::None)
     );
     assert_eq!(
         in_vault("self.nope"),
@@ -1413,15 +1497,15 @@ fn format_keeps_the_values_own_offset() {
 fn datetimes_order_and_compare() {
     assert_eq!(
         with_var("var.early < var.late", with_dates()).unwrap(),
-        EvalValue::Bool(true)
+        EvalValue::Scalar(Scalar::Bool(true))
     );
     assert_eq!(
         with_var("var.late >= var.early", with_dates()).unwrap(),
-        EvalValue::Bool(true)
+        EvalValue::Scalar(Scalar::Bool(true))
     );
     assert_eq!(
         with_var("var.early == var.early", with_dates()).unwrap(),
-        EvalValue::Bool(true)
+        EvalValue::Scalar(Scalar::Bool(true))
     );
     // The same instant at two offsets is the same datetime.
     let same = map(vec![
@@ -1430,7 +1514,7 @@ fn datetimes_order_and_compare() {
     ]);
     assert_eq!(
         with_var("var.a == var.b", same).unwrap(),
-        EvalValue::Bool(true)
+        EvalValue::Scalar(Scalar::Bool(true))
     );
 }
 
@@ -1508,7 +1592,7 @@ fn a_datetime_has_its_parts_in_its_own_offset() {
     );
     assert_eq!(
         with_var("var.late.year == 2026", with_dates()).unwrap(),
-        EvalValue::Bool(true)
+        EvalValue::Scalar(Scalar::Bool(true))
     );
 }
 
@@ -1534,7 +1618,7 @@ fn at_gives_the_same_instant_in_another_offset() {
     // The instant is the same, so it compares equal.
     assert_eq!(
         with_var("var.late.at(\"Z\") == var.late", with_dates()).unwrap(),
-        EvalValue::Bool(true)
+        EvalValue::Scalar(Scalar::Bool(true))
     );
 }
 
@@ -1562,7 +1646,7 @@ fn link_target(value: &EvalValue) -> String {
     };
     assert_eq!(el.name, tomet_ast::Name::bare("link"));
     match el.data.args.as_ref().and_then(|args| args.nth_unnamed(0)) {
-        Some(tomet_ast::Value::String(target)) => target.clone(),
+        Some(tomet_ast::Value::Scalar(Scalar::Text(target))) => target.clone(),
         other => panic!("expected a string target, got {other:?}"),
     }
 }
@@ -1697,7 +1781,7 @@ fn include_in(
 ) -> Result<EvalValue, EvalError> {
     let resolver = guide_vault();
     let macros = HashMap::new();
-    let vars = EvalValue::None;
+    let vars = EvalValue::Scalar(Scalar::None);
     let cx = EvalContext {
         resolver: &resolver,
         self_doc: DocRef(host.to_string()),
@@ -1943,7 +2027,7 @@ fn list_vault() -> MemoryResolver {
 fn in_list_vault(src: &str) -> Result<EvalValue, EvalError> {
     let resolver = list_vault();
     let macros = HashMap::new();
-    let vars = EvalValue::None;
+    let vars = EvalValue::Scalar(Scalar::None);
     let cx = EvalContext {
         resolver: &resolver,
         self_doc: DocRef("here.tmt".to_string()),
@@ -1974,7 +2058,7 @@ fn item_on_a_list_counts_its_items() {
     assert_eq!(in_list_vault("#shopping.item(0)::id").unwrap(), text("i1"));
     assert_eq!(
         in_list_vault("#shopping.item(1)::id").unwrap(),
-        EvalValue::None
+        EvalValue::Scalar(Scalar::None)
     );
     assert!(in_list_vault("#shopping.item(3)").is_err());
 }
@@ -2053,7 +2137,7 @@ fn evaluate_data_returns_ast_value_or_fails_when_not_storable() {
         resolver: &NoResolver,
         self_doc: DocRef("here.tmt".to_string()),
         macros: &empty_map,
-        var: &EvalValue::None,
+        var: &EvalValue::Scalar(Scalar::None),
         var_unset: &[],
         includes: &[],
         heading_level: 0,
@@ -2062,7 +2146,7 @@ fn evaluate_data_returns_ast_value_or_fails_when_not_storable() {
 
     let expr = parse("add(1, 2)");
     let data = evaluate_data(&expr, &cx).unwrap();
-    assert_eq!(data, tomet_ast::Value::Int(3));
+    assert_eq!(data, tomet_ast::Value::Scalar(Scalar::Int(3)));
 
     let fn_expr = parse("x => x");
     let err = evaluate_data(&fn_expr, &cx).unwrap_err();
@@ -2080,7 +2164,7 @@ fn evaluate_data_returns_ast_value_or_fails_when_not_storable() {
 fn a_list_of_documents_is_a_list_that_cannot_be_stored_as_data() {
     let resolver = vault();
     let macros = HashMap::new();
-    let vars = EvalValue::None;
+    let vars = EvalValue::Scalar(Scalar::None);
     let cx = EvalContext {
         resolver: &resolver,
         self_doc: DocRef("here.tmt".to_string()),
@@ -2111,32 +2195,35 @@ fn a_list_of_documents_is_a_list_that_cannot_be_stored_as_data() {
 fn versions_order_and_compare() {
     assert_eq!(
         out("version(\"1.10\") > version(\"1.9\")").unwrap(),
-        EvalValue::Bool(true)
+        EvalValue::Scalar(Scalar::Bool(true))
     );
     assert_eq!(
         out("version(\"1.10.0\") == version(\"1.10\")").unwrap(),
-        EvalValue::Bool(true)
+        EvalValue::Scalar(Scalar::Bool(true))
     );
     assert_eq!(
         out("version(\"2.0.0\") > version(\"1.99.9\")").unwrap(),
-        EvalValue::Bool(true)
+        EvalValue::Scalar(Scalar::Bool(true))
     );
 }
 
 #[test]
 fn eval_value_number_preserves_written_representation_and_computes_numerically() {
-    let ast_num = tomet_ast::Value::Number("1.10".into());
+    let ast_num = tomet_ast::Value::Scalar(Scalar::Number("1.10".into()));
     let eval_num = EvalValue::from_ast(&ast_num, &DocRef("test.tmt".into()));
-    assert_eq!(eval_num, EvalValue::Number("1.10".into()));
+    assert_eq!(eval_num, EvalValue::Scalar(Scalar::Number("1.10".into())));
     assert_eq!(eval_num.scalar_text().as_deref(), Some("1.10"));
     assert_eq!(eval_num.type_name(), "number");
 
-    let vars = map(vec![("rev", EvalValue::Number("1.10".into()))]);
+    let vars = map(vec![(
+        "rev",
+        EvalValue::Scalar(Scalar::Number("1.10".into())),
+    )]);
 
     // Interpolation / expression value access preserves exact text
     assert_eq!(
         with_var("var.rev", vars.clone()).unwrap(),
-        EvalValue::Number("1.10".into())
+        EvalValue::Scalar(Scalar::Number("1.10".into()))
     );
     assert_eq!(
         with_var("var.rev", vars.clone())
@@ -2149,68 +2236,68 @@ fn eval_value_number_preserves_written_representation_and_computes_numerically()
     // Arithmetic via add / sub / mul
     assert_eq!(
         with_var("add(var.rev, 1)", vars.clone()).unwrap(),
-        EvalValue::Float(2.1)
+        EvalValue::Scalar(Scalar::Float(2.1))
     );
     assert_eq!(
         with_var("add(1, var.rev)", vars.clone()).unwrap(),
-        EvalValue::Float(2.1)
+        EvalValue::Scalar(Scalar::Float(2.1))
     );
     assert_eq!(
         with_var("sub(var.rev, 0.1)", vars.clone()).unwrap(),
-        EvalValue::Float(1.0)
+        EvalValue::Scalar(Scalar::Float(1.0))
     );
     assert_eq!(
         with_var("mul(var.rev, 2)", vars.clone()).unwrap(),
-        EvalValue::Float(2.2)
+        EvalValue::Scalar(Scalar::Float(2.2))
     );
 
     // Equality
     assert_eq!(
         with_var("var.rev == 1.1", vars.clone()).unwrap(),
-        EvalValue::Bool(true)
+        EvalValue::Scalar(Scalar::Bool(true))
     );
     assert_eq!(
         with_var("var.rev == 1.10", vars.clone()).unwrap(),
-        EvalValue::Bool(true)
+        EvalValue::Scalar(Scalar::Bool(true))
     );
     assert_eq!(
         with_var("var.rev != 1.2", vars.clone()).unwrap(),
-        EvalValue::Bool(true)
+        EvalValue::Scalar(Scalar::Bool(true))
     );
 
     // Ordering
     assert_eq!(
         with_var("var.rev > 1.0", vars.clone()).unwrap(),
-        EvalValue::Bool(true)
+        EvalValue::Scalar(Scalar::Bool(true))
     );
     assert_eq!(
         with_var("var.rev < 1.2", vars.clone()).unwrap(),
-        EvalValue::Bool(true)
+        EvalValue::Scalar(Scalar::Bool(true))
     );
     assert_eq!(
         with_var("var.rev >= 1.1", vars.clone()).unwrap(),
-        EvalValue::Bool(true)
+        EvalValue::Scalar(Scalar::Bool(true))
     );
     assert_eq!(
         with_var("var.rev <= 1.1", vars.clone()).unwrap(),
-        EvalValue::Bool(true)
+        EvalValue::Scalar(Scalar::Bool(true))
     );
 
     // Sorting in methods
     let list_vars = map(vec![(
         "items",
         seq(vec![
-            EvalValue::Number("1.10".into()),
-            EvalValue::Int(2),
-            EvalValue::Float(0.5),
+            EvalValue::Scalar(Scalar::Number("1.10".into())),
+            EvalValue::Scalar(Scalar::Int(2)),
+            EvalValue::Scalar(Scalar::Float(0.5)),
         ]),
     )]);
     assert_eq!(
         with_var("var.items.sort(x => x)", list_vars).unwrap(),
         seq(vec![
-            EvalValue::Float(0.5),
-            EvalValue::Number("1.10".into()),
-            EvalValue::Int(2),
+            EvalValue::Scalar(Scalar::Float(0.5)),
+            EvalValue::Scalar(Scalar::Number("1.10".into())),
+            EvalValue::Scalar(Scalar::Int(2)),
         ])
     );
 }
@@ -2245,7 +2332,7 @@ fn a_block_macro_is_its_blocks_with_the_places_filled_in() {
             block_macro("::macro(notice: [ Notice: $(msg) ])\n"),
         ),
     ]);
-    let run = |src: &str| run_with(src, &EvalValue::None, &macros);
+    let run = |src: &str| run_with(src, &EvalValue::Scalar(Scalar::None), &macros);
 
     let EvalValue::Fragment(blocks) = run("macro.card(\"Welcome\", \"Hello\")").unwrap() else {
         panic!("a block macro is a fragment");
@@ -2257,7 +2344,7 @@ fn a_block_macro_is_its_blocks_with_the_places_filled_in() {
         card.data.args,
         Some(tomet_ast::Tuple::from_named([(
             "title".to_string(),
-            Value::String("Welcome".to_string())
+            Value::Scalar(Scalar::Text("Welcome".to_string()))
         )]))
     );
     let Some([tomet_ast::Block::Paragraph(p)]) = card.content.as_deref() else {
@@ -2282,7 +2369,7 @@ fn a_block_macro_is_its_blocks_with_the_places_filled_in() {
 #[test]
 fn a_number_given_to_a_block_macro_stays_a_number_in_data() {
     let macros = macros_of(&[("n", block_macro("::macro(n: [\n@meter(of: $(1))\n])\n"))]);
-    let run = |src: &str| run_with(src, &EvalValue::None, &macros);
+    let run = |src: &str| run_with(src, &EvalValue::Scalar(Scalar::None), &macros);
     let EvalValue::Fragment(blocks) = run("macro.n(7)").unwrap() else {
         panic!("a block macro is a fragment");
     };
@@ -2293,7 +2380,7 @@ fn a_number_given_to_a_block_macro_stays_a_number_in_data() {
         el.data.args,
         Some(tomet_ast::Tuple::from_named([(
             "of".to_string(),
-            Value::Int(7)
+            Value::Scalar(Scalar::Int(7))
         )]))
     );
 }
@@ -2311,7 +2398,7 @@ fn a_block_macro_checks_its_arguments_as_a_text_macro_does() {
         ),
         ("none", block_macro("::macro(none: [ plain ])\n")),
     ]);
-    let run = |src: &str| run_with(src, &EvalValue::None, &macros);
+    let run = |src: &str| run_with(src, &EvalValue::Scalar(Scalar::None), &macros);
     assert_eq!(
         run("macro.card(\"only one\")"),
         Err(EvalError::WrongArgCount {
@@ -2339,8 +2426,8 @@ fn a_block_macro_checks_its_arguments_as_a_text_macro_does() {
 
 #[test]
 fn a_template_that_is_neither_a_string_nor_blocks_cannot_be_called() {
-    let macros = macros_of(&[("three", Value::Int(3))]);
-    let run = |src: &str| run_with(src, &EvalValue::None, &macros);
+    let macros = macros_of(&[("three", Value::Scalar(Scalar::Int(3)))]);
+    let run = |src: &str| run_with(src, &EvalValue::Scalar(Scalar::None), &macros);
     let Err(error) = run("macro.three()") else {
         panic!("a number is not a template");
     };
@@ -2364,7 +2451,7 @@ fn seat(src: &str) -> Result<Type, EvalError> {
         resolver: &NoResolver,
         self_doc: DocRef("here.tmt".to_string()),
         macros: &HashMap::new(),
-        var: &EvalValue::None,
+        var: &EvalValue::Scalar(Scalar::None),
         var_unset: &[],
         includes: &[],
         heading_level: 0,
@@ -2478,7 +2565,7 @@ fn a_function_wins_over_a_type_of_the_same_name() {
 
 #[test]
 fn auto_is_read_as_the_default_of_a_type_and_a_keyword_value() {
-    assert_eq!(out("auto").unwrap(), EvalValue::Auto);
+    assert_eq!(out("auto").unwrap(), EvalValue::Scalar(Scalar::Auto));
     assert!(matches!(
         out("add(1, auto)"),
         Err(EvalError::TypeMismatch { got: "auto", .. })
@@ -2501,7 +2588,9 @@ fn auto_is_read_as_the_default_of_a_type_and_a_keyword_value() {
     // Not as the default of anything but a type.
     assert_eq!(
         out("add(default: auto)"),
-        Err(EvalError::Message("`add` takes no named argument, got `default`".into()))
+        Err(EvalError::Message(
+            "`add` takes no named argument, got `default`".into()
+        ))
     );
     // As the default of a type it is the type's `auto`.
     let EvalValue::Type(made) = out("uuid(default: auto)").unwrap() else {
@@ -2517,7 +2606,9 @@ fn auto_is_admitted_for_the_kinds_that_make_a_value_up_and_refused_for_the_rest(
     // type (`a_type_seat_admits_auto_only_for_the_kinds_that_make_a_value_up`).
     assert_eq!(
         out("version(default: auto)"),
-        Err(EvalError::Message("`version` takes no named argument, got `default`".into()))
+        Err(EvalError::Message(
+            "`version` takes no named argument, got `default`".into()
+        ))
     );
     for kind in Kind::ALL
         .into_iter()
@@ -2604,7 +2695,7 @@ fn an_unknown_type_name_is_not_a_type() {
 fn an_argument_of_a_type_is_a_type_or_plain_data() {
     // A number that was kept as written is the number it is, and a version is its text.
     let vars = map(vec![
-        ("n", EvalValue::Number("8".to_string())),
+        ("n", EvalValue::Scalar(Scalar::Number("8".to_string()))),
         (
             "v",
             EvalValue::Version(tomet_type::Version::parse("1.2").unwrap()),
@@ -2642,15 +2733,21 @@ fn an_argument_of_a_type_is_a_type_or_plain_data() {
 fn types_are_equal_when_they_are_the_same_type_and_have_no_order() {
     assert_eq!(
         out("list(string) == list(string)").unwrap(),
-        EvalValue::Bool(true)
+        EvalValue::Scalar(Scalar::Bool(true))
     );
     assert_eq!(
         out("list(string) == list(string, length: 2)").unwrap(),
-        EvalValue::Bool(false)
+        EvalValue::Scalar(Scalar::Bool(false))
     );
-    assert_eq!(out("string != int").unwrap(), EvalValue::Bool(true));
+    assert_eq!(
+        out("string != int").unwrap(),
+        EvalValue::Scalar(Scalar::Bool(true))
+    );
     // Not the type's name as text, and not the text form.
-    assert_eq!(out("string == \"string\"").unwrap(), EvalValue::Bool(false));
+    assert_eq!(
+        out("string == \"string\"").unwrap(),
+        EvalValue::Scalar(Scalar::Bool(false))
+    );
     assert_eq!(
         out("string < int"),
         Err(EvalError::NotComparable {
@@ -2679,7 +2776,7 @@ fn a_type_is_not_data_and_not_text() {
         resolver: &NoResolver,
         self_doc: DocRef("here.tmt".to_string()),
         macros: &HashMap::new(),
-        var: &EvalValue::None,
+        var: &EvalValue::Scalar(Scalar::None),
         var_unset: &[],
         includes: &[],
         heading_level: 0,
@@ -2772,7 +2869,9 @@ fn a_type_seat_admits_auto_only_for_the_kinds_that_make_a_value_up() {
     );
     assert_eq!(
         seat("auto"),
-        Err(EvalError::Message("a type seat holds a type, and `auto` is a auto".into()))
+        Err(EvalError::Message(
+            "a type seat holds a type, and `auto` is a auto".into()
+        ))
     );
 }
 

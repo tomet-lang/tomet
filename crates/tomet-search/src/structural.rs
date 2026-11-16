@@ -4,6 +4,7 @@
 //! attribute/property key, and value content.
 
 use tomet_ast::{Data, Declaration, Element, File, Tuple, Value};
+use tomet_scalar::Scalar;
 use tomet_semantics::{classify_declaration_lenient, classify_std_lenient};
 use tomet_span::Span;
 use tomet_tree::{DataExt, for_each_declaration, for_each_element};
@@ -115,20 +116,17 @@ fn tuple_contains_str(tuple: &Tuple, sub: &str) -> bool {
 #[deny(clippy::wildcard_enum_match_arm)]
 fn value_contains_str(v: &Value, sub: &str) -> bool {
     match v {
-        Value::String(s) => s.contains(sub),
-        Value::Number(s) => s.contains(sub),
+        Value::Scalar(s) => match s {
+            Scalar::Text(s) | Scalar::Number(s) => s.contains(sub),
+            Scalar::None | Scalar::Auto | Scalar::Bool(_) | Scalar::Int(_) | Scalar::Float(_) => {
+                false
+            }
+        },
         Value::Tuple(tuple) => tuple_contains_str(tuple, sub),
         Value::Call(name, args) => name.contains(sub) || tuple_contains_str(args, sub),
         Value::Interp(it) => it.expr.to_string().contains(sub),
         Value::TypeSeat(seat) => seat.expr.to_string().contains(sub),
-        Value::None
-        | Value::Auto
-        | Value::Bool(_)
-        | Value::Int(_)
-        | Value::Float(_)
-        | Value::Element(_)
-        | Value::Hole(_)
-        | Value::Blocks(_) => false,
+        Value::Element(_) | Value::Hole(_) | Value::Blocks(_) => false,
     }
 }
 

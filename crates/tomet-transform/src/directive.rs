@@ -1,6 +1,7 @@
 //! Directive promotion and Value DSL normalization transformations.
 
 use tomet_ast::{Declaration, File, Tuple, Value};
+use tomet_scalar::Scalar;
 use tomet_semantics::DeclKind;
 use tomet_semantics::{ElementKind, classify_declaration_lenient};
 use tomet_tree::{DataExt, declaration_new, for_each_declaration_mut};
@@ -34,8 +35,8 @@ where
     };
 
     let is_empty = match &prop_val {
-        Value::None => true,
-        Value::String(s) => s.trim().is_empty(),
+        Value::Scalar(Scalar::None) => true,
+        Value::Scalar(Scalar::Text(s)) => s.trim().is_empty(),
         Value::Tuple(tuple) => tuple.is_empty(),
         _ => false,
     };

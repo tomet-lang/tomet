@@ -1,6 +1,7 @@
 //! Metadata element manipulation in documents.
 
 use tomet_ast::{File, Tuple, Value};
+use tomet_scalar::Scalar;
 use tomet_semantics::{classify_declaration_lenient, classify_std_lenient};
 use tomet_tree::{DataExt, declaration_new, for_each_declaration_mut, for_each_element_mut};
 
@@ -13,7 +14,8 @@ pub fn set_meta_in_doc(doc: &mut File, target_element: &str, key: &str, new_val:
         let kind = classify_std_lenient(el.as_view());
         if kind.as_str() == target_element {
             found = true;
-            el.data.set_prop(key, Value::String(new_val.to_string()));
+            el.data
+                .set_prop(key, Value::Scalar(Scalar::Text(new_val.to_string())));
         }
     });
     for_each_declaration_mut(doc, |declaration| {
@@ -22,7 +24,7 @@ pub fn set_meta_in_doc(doc: &mut File, target_element: &str, key: &str, new_val:
             found = true;
             declaration
                 .data
-                .set_prop(key, Value::String(new_val.to_string()));
+                .set_prop(key, Value::Scalar(Scalar::Text(new_val.to_string())));
         }
     });
 
@@ -32,7 +34,7 @@ pub fn set_meta_in_doc(doc: &mut File, target_element: &str, key: &str, new_val:
         let mut declaration = declaration_new(target_element);
         declaration.data.args = Some(Tuple::from_named([(
             key.to_string(),
-            Value::String(new_val.to_string()),
+            Value::Scalar(Scalar::Text(new_val.to_string())),
         )]));
         doc.header.insert(0, declaration);
     }

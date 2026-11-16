@@ -33,6 +33,7 @@ use tomet_ast::{
     Block, Data, Element, File, Inline, LineBreak, List, ListItem, Name, Paragraph, Placement,
     RawText, Section, SoftBreak, Text, Tuple, TupleEntry, Value,
 };
+use tomet_scalar::Scalar;
 use tomet_semantics::{ElementKind, classify_std_lenient, comment_element};
 use tomet_span::Span;
 use tomet_tree::{declaration_new, element_new, list, list_item};
@@ -162,14 +163,16 @@ pub fn from_markdown_with_options(src: &str, options: &ImportOptions) -> File {
             .and_then(|pos| {
                 entries[pos]
                     .1
-                    .scalar_text()
+                    .as_scalar()
+                    .and_then(|s| s.text())
                     .map(|text| (pos, text.into_owned()))
             });
         let had_id = id.is_some();
         if let Some((pos, text)) = id {
             entries.remove(pos);
             let mut id_declaration = declaration_new("id");
-            id_declaration.data.args = Some(Tuple::from_unnamed([Value::String(text)]));
+            id_declaration.data.args =
+                Some(Tuple::from_unnamed([Value::Scalar(Scalar::Text(text))]));
             header.push(id_declaration);
         }
         if !had_id || !entries.is_empty() {
@@ -415,9 +418,12 @@ fn end_frame(stack: &mut Vec<Frame>, tag_end: TagEnd, options: &ImportOptions) {
                     t.value = t.value.trim_start().to_string();
                 }
 
-                let mut entries = vec![TupleEntry::unnamed(Value::String(variant))];
+                let mut entries = vec![TupleEntry::unnamed(Value::Scalar(Scalar::Text(variant)))];
                 if let Some(t_str) = title {
-                    entries.push(TupleEntry::named("title", Value::String(t_str)));
+                    entries.push(TupleEntry::named(
+                        "title",
+                        Value::Scalar(Scalar::Text(t_str)),
+                    ));
                 }
                 let args = Tuple::from_entries(entries);
 
@@ -471,7 +477,7 @@ fn end_frame(stack: &mut Vec<Frame>, tag_end: TagEnd, options: &ImportOptions) {
             } else {
                 Some(Tuple::from_named([(
                     "lang".to_string(),
-                    Value::String(lang),
+                    Value::Scalar(Scalar::Text(lang)),
                 )]))
             };
             let el = Element {
@@ -522,7 +528,9 @@ fn end_frame(stack: &mut Vec<Frame>, tag_end: TagEnd, options: &ImportOptions) {
                             && s[close_idx..].starts_with(") ")
                         {
                             let inner = &s[1..close_idx];
-                            marker = Some(Tuple::from_unnamed([Value::String(inner.to_string())]));
+                            marker = Some(Tuple::from_unnamed([Value::Scalar(Scalar::Text(
+                                inner.to_string(),
+                            ))]));
                             let remainder = s[close_idx + 2..].to_string();
                             t.value = remainder;
                         }
@@ -548,9 +556,9 @@ fn end_frame(stack: &mut Vec<Frame>, tag_end: TagEnd, options: &ImportOptions) {
                                 } else {
                                     inner
                                 };
-                                marker = Some(Tuple::from_unnamed([Value::String(
+                                marker = Some(Tuple::from_unnamed([Value::Scalar(Scalar::Text(
                                     marker_val.to_string(),
-                                )]));
+                                ))]));
                                 let remainder = s[after_idx..].to_string();
                                 t.value = remainder;
                             }
@@ -598,7 +606,7 @@ fn end_frame(stack: &mut Vec<Frame>, tag_end: TagEnd, options: &ImportOptions) {
                 data: Data {
                     args: Some(Tuple::from_named([(
                         "target".to_string(),
-                        Value::String(dest),
+                        Value::Scalar(Scalar::Text(dest)),
                     )])),
                     value: None,
                 },
@@ -627,7 +635,7 @@ fn end_frame(stack: &mut Vec<Frame>, tag_end: TagEnd, options: &ImportOptions) {
                 data: Data {
                     args: Some(Tuple::from_named([(
                         "target".to_string(),
-                        Value::String(dest),
+                        Value::Scalar(Scalar::Text(dest)),
                     )])),
                     value: None,
                 },

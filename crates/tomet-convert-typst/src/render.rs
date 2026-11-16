@@ -4,11 +4,13 @@ use std::cell::RefCell;
 use std::collections::HashSet;
 
 use tomet_ast::{Block, ElementView, File, Inline, Interpolation, List, Placement, Section, Value};
+use tomet_scalar::Scalar;
 use tomet_semantics::{
     FootnoteRegistry, TargetScheme, classify_std_lenient, comment_text, element_args_view,
     extract_tags, heading_level, is_directive, link_target, parse_table_rows, path_target,
     target_scheme,
 };
+use tomet_tree::ValueExt;
 
 pub(crate) struct TypstCtx<'a> {
     pub(crate) footnotes: &'a FootnoteRegistry,
@@ -306,8 +308,10 @@ fn render_task(cx: &TypstCtx, el: ElementView<'_>, _inline: bool) -> String {
 fn task_status(el: ElementView<'_>) -> Option<String> {
     let args = element_args_view(el)?;
     match args.get("status") {
-        Some(Value::String(s)) => Some(s.clone()),
-        Some(Value::Bool(b)) => Some(if *b { "x".to_string() } else { " ".to_string() }),
+        Some(Value::Scalar(Scalar::Text(s))) => Some(s.clone()),
+        Some(Value::Scalar(Scalar::Bool(b))) => {
+            Some(if *b { "x".to_string() } else { " ".to_string() })
+        }
         _ => None,
     }
 }
@@ -391,19 +395,15 @@ fn callout_variant_and_title(el: ElementView<'_>) -> (String, Option<String>) {
     let mut title = None;
 
     if let Some(args) = el.data.args.as_ref() {
-        if let Some(v) = args.get("variant") {
-            if let Value::String(s) = v {
-                variant = Some(s.clone());
-            }
+        if let Some(s) = args.get("variant").and_then(Value::as_str) {
+            variant = Some(s.to_string());
         }
-        if let Some(v) = args.get("title") {
-            if let Value::String(s) = v {
-                title = Some(s.clone());
-            }
+        if let Some(s) = args.get("title").and_then(Value::as_str) {
+            title = Some(s.to_string());
         }
         if variant.is_none() {
-            if let Some(Value::String(s)) = args.nth_unnamed(0) {
-                variant = Some(s.clone());
+            if let Some(s) = args.nth_unnamed(0).and_then(Value::as_str) {
+                variant = Some(s.to_string());
             }
         }
     }
@@ -474,7 +474,7 @@ fn render_table(cx: &TypstCtx, el: ElementView<'_>) -> String {
         .as_ref()
         .and_then(|t| t.get("header"))
         .map(|v| match v {
-            Value::Bool(b) => *b,
+            Value::Scalar(Scalar::Bool(b)) => *b,
             _ => true,
         })
         .unwrap_or(true);
@@ -717,13 +717,9 @@ fn escape_typst_string(s: &str) -> String {
 
 fn value_to_plain(v: &Value) -> String {
     match v {
-        Value::None => String::new(),
-        Value::Auto => "auto".to_string(),
-        // The text a scalar was written as: `1.0` stays `1.0`, `1.10` stays `1.10`.
-        Value::Bool(_) | Value::Int(_) | Value::Float(_) | Value::Number(_) | Value::String(_) => v
-            .scalar_text()
-            .map(|text| text.into_owned())
-            .unwrap_or_default(),
+        // The text a scalar was written as: `1.0` stays `1.0`, `1.10` stays `1.10`;
+        // `none` has none, so it is empty here.
+        Value::Scalar(s) => s.text().map(|text| text.into_owned()).unwrap_or_default(),
         Value::Tuple(tuple) => {
             if tuple.has_no_named() {
                 tuple

@@ -1,9 +1,9 @@
 //! Whitespace-hygiene formatting preserving verbatim raw spans (fenced code
 //! blocks, and any `(content:raw)` element).
 
-use tomet_ast::{Block, ElementView, File, Value};
+use tomet_ast::{Block, ElementView, File};
 use tomet_ast_parser::parse_file;
-use tomet_tree::{Place, Visit, walk};
+use tomet_tree::{Place, ValueExt, Visit, walk};
 
 /// Normalizes whitespace (LF line endings, no trailing whitespace, collapsed excess
 /// blank lines, exactly one final newline) while losslessly preserving literal whitespace
@@ -72,7 +72,7 @@ pub(crate) fn is_raw_element(el: ElementView<'_>) -> bool {
         return true;
     }
     if let Some(args) = el.data.args.as_ref()
-        && matches!(args.get("content"), Some(Value::String(s)) if s == "raw")
+        && args.get("content").and_then(|v| v.as_str()) == Some("raw")
     {
         return true;
     }

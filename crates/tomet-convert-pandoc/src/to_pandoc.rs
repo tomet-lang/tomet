@@ -4,10 +4,12 @@ use tomet_ast::{
     Block as TmBlock, BodyView, ElementView, Entry, File, Group, Id, Inline as TmInline,
     Interpolation, List, Placement, Value,
 };
+use tomet_scalar::Scalar;
 use tomet_semantics::{
     ElementKind, TableRow, classify_std_lenient, comment_text, element_args_view, flatten_data,
     flatten_element_data, heading_level, is_directive, link_target, parse_table_rows, path_target,
 };
+use tomet_tree::ValueExt;
 
 use crate::ast::{
     Alignment, Attr, Block, Caption, Cell, ColSpec, ColWidth, Inline, ListAttributes, MetaValue,
@@ -59,14 +61,16 @@ pub fn to_pandoc(doc: &File) -> PandocDoc {
 #[deny(clippy::wildcard_enum_match_arm)]
 fn meta_value(v: &Value) -> MetaValue {
     match v {
-        Value::None => MetaValue::MetaString(String::new()),
-        Value::Auto => MetaValue::MetaString("auto".to_string()),
-        Value::Bool(b) => MetaValue::MetaBool(*b),
-        // The text it was written as: `1.10` is not `1.1` to a reader.
-        Value::Int(_) | Value::Float(_) | Value::Number(_) => {
-            MetaValue::MetaString(v.scalar_text().map(|t| t.into_owned()).unwrap_or_default())
-        }
-        Value::String(s) => MetaValue::MetaInlines(text_to_inlines(s)),
+        Value::Scalar(s) => match s {
+            Scalar::None => MetaValue::MetaString(String::new()),
+            Scalar::Auto => MetaValue::MetaString("auto".to_string()),
+            Scalar::Bool(b) => MetaValue::MetaBool(*b),
+            // The text it was written as: `1.10` is not `1.1` to a reader.
+            Scalar::Int(_) | Scalar::Float(_) | Scalar::Number(_) => {
+                MetaValue::MetaString(s.text().map(|t| t.into_owned()).unwrap_or_default())
+            }
+            Scalar::Text(s) => MetaValue::MetaInlines(text_to_inlines(s)),
+        },
         Value::Tuple(tuple) => {
             if tuple.has_no_named() {
                 MetaValue::MetaList(tuple.unnamed().map(meta_value).collect())
@@ -761,7 +765,7 @@ fn table_arg(el: ElementView<'_>, key: &str) -> Option<Value> {
 }
 
 fn table_has_header(el: ElementView<'_>) -> bool {
-    if let Some(Value::Bool(b)) = table_arg(el, "header") {
+    if let Some(Value::Scalar(Scalar::Bool(b))) = table_arg(el, "header") {
         b
     } else {
         true
@@ -769,7 +773,7 @@ fn table_has_header(el: ElementView<'_>) -> bool {
 }
 
 fn table_alignment(el: ElementView<'_>) -> Alignment {
-    if let Some(Value::String(s)) = table_arg(el, "align").as_ref() {
+    if let Some(s) = table_arg(el, "align").as_ref().and_then(Value::as_str) {
         let a = s.to_ascii_lowercase();
         if a == "left" {
             return Alignment::AlignLeft;

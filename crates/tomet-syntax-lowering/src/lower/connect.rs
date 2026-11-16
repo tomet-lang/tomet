@@ -186,7 +186,9 @@ pub(super) fn desugar_connect(node: &SyntaxNode, read: &mut Groups) -> Result<bo
     let args = connect.data.args.unwrap_or_default();
     if written == "id" {
         let id = if args.len() == 1 && args.has_no_named() {
-            args.nth_unnamed(0).and_then(Value::scalar_text)
+            args.nth_unnamed(0)
+                .and_then(Value::as_scalar)
+                .and_then(|s| s.text())
         } else {
             None
         };

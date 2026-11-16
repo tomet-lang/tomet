@@ -216,7 +216,11 @@ fn an_argument_must_be_of_the_sort_the_parameter_takes() {
         )
     );
     assert_eq!(
-        Type::build("list", &[], &[("length", Arg::Datum(Datum::Scalar(Scalar::Float(2.5))))]),
+        Type::build(
+            "list",
+            &[],
+            &[("length", Arg::Datum(Datum::Scalar(Scalar::Float(2.5))))]
+        ),
         wrong(
             Kind::List,
             "length",
@@ -245,7 +249,10 @@ fn an_argument_must_be_of_the_sort_the_parameter_takes() {
         Type::build(
             "float",
             &[],
-            &[("default", Arg::Datum(Datum::Scalar(Scalar::Float(f64::NAN))))]
+            &[(
+                "default",
+                Arg::Datum(Datum::Scalar(Scalar::Float(f64::NAN)))
+            )]
         ),
         wrong(
             Kind::Float,
@@ -306,7 +313,10 @@ fn an_item_has_no_default_of_its_own() {
     let ty = Type::build(
         "list",
         &[Arg::Type(bare(Kind::Int))],
-        &[("default", Arg::Datum(Datum::Seq(vec![Datum::Scalar(Scalar::Int(1))])))],
+        &[(
+            "default",
+            Arg::Datum(Datum::Seq(vec![Datum::Scalar(Scalar::Int(1))])),
+        )],
     )
     .unwrap();
     assert_eq!(
@@ -320,12 +330,13 @@ fn an_item_has_no_default_of_its_own() {
 #[test]
 fn every_kind_takes_a_given_default() {
     for kind in Kind::ALL {
-        let ty = Type::build(kind.name(), &[], &[("default", Arg::Datum(Datum::Scalar(Scalar::None)))]).unwrap();
-        assert_eq!(
-            ty.default(),
-            Some(&Datum::Scalar(Scalar::None)),
-            "{kind}"
-        );
+        let ty = Type::build(
+            kind.name(),
+            &[],
+            &[("default", Arg::Datum(Datum::Scalar(Scalar::None)))],
+        )
+        .unwrap();
+        assert_eq!(ty.default(), Some(&Datum::Scalar(Scalar::None)), "{kind}");
         assert_eq!(ty.auto(), None, "{kind}");
     }
 }
@@ -333,7 +344,11 @@ fn every_kind_takes_a_given_default() {
 #[test]
 fn auto_is_for_the_kinds_that_make_a_value_up_and_no_other() {
     for kind in Kind::ALL {
-        let built = Type::build(kind.name(), &[], &[("default", Arg::Datum(Datum::Scalar(Scalar::Auto)))]);
+        let built = Type::build(
+            kind.name(),
+            &[],
+            &[("default", Arg::Datum(Datum::Scalar(Scalar::Auto)))],
+        );
         match kind.auto() {
             Some(fill) => {
                 let ty = built.unwrap_or_else(|e| panic!("{kind}: {e}"));
@@ -348,9 +363,13 @@ fn auto_is_for_the_kinds_that_make_a_value_up_and_no_other() {
 #[test]
 fn what_auto_makes_up_is_an_id_or_the_moment() {
     let auto = |name: &str| {
-        Type::build(name, &[], &[("default", Arg::Datum(Datum::Scalar(Scalar::Auto)))])
-            .unwrap()
-            .auto()
+        Type::build(
+            name,
+            &[],
+            &[("default", Arg::Datum(Datum::Scalar(Scalar::Auto)))],
+        )
+        .unwrap()
+        .auto()
     };
     assert_eq!(auto("uuid"), Some(AutoFill::Id));
     assert_eq!(auto("nanoid"), Some(AutoFill::Id));
@@ -369,11 +388,19 @@ fn auto_is_the_value_of_default_and_of_nothing_else() {
         })
     };
     assert_eq!(
-        Type::build("nanoid", &[], &[("length", Arg::Datum(Datum::Scalar(Scalar::Auto)))]),
+        Type::build(
+            "nanoid",
+            &[],
+            &[("length", Arg::Datum(Datum::Scalar(Scalar::Auto)))]
+        ),
         elsewhere(Kind::Nanoid, "length")
     );
     assert_eq!(
-        Type::build("uuid", &[], &[("prefix", Arg::Datum(Datum::Scalar(Scalar::Auto)))]),
+        Type::build(
+            "uuid",
+            &[],
+            &[("prefix", Arg::Datum(Datum::Scalar(Scalar::Auto)))]
+        ),
         elsewhere(Kind::Uuid, "prefix")
     );
     assert_eq!(
@@ -381,12 +408,20 @@ fn auto_is_the_value_of_default_and_of_nothing_else() {
         elsewhere(Kind::List, "item")
     );
     assert_eq!(
-        Type::build("nanoid", &[], &[("overwrite", Arg::Datum(Datum::Scalar(Scalar::Auto)))]),
+        Type::build(
+            "nanoid",
+            &[],
+            &[("overwrite", Arg::Datum(Datum::Scalar(Scalar::Auto)))]
+        ),
         elsewhere(Kind::Nanoid, "overwrite")
     );
     // Not even where a kind has no `default: auto` to give it meaning.
     assert_eq!(
-        Type::build("string", &[], &[("default", Arg::Datum(Datum::Scalar(Scalar::Auto)))]),
+        Type::build(
+            "string",
+            &[],
+            &[("default", Arg::Datum(Datum::Scalar(Scalar::Auto)))]
+        ),
         Err(TypeError::AutoNotAllowed { ty: Kind::String })
     );
 }
@@ -395,7 +430,14 @@ fn auto_is_the_value_of_default_and_of_nothing_else() {
 fn the_messages_name_the_type_and_the_argument() {
     let message = |err: TypeError| err.to_string();
     assert_eq!(
-        message(Type::build("string", &[], &[("default", Arg::Datum(Datum::Scalar(Scalar::Auto)))]).unwrap_err()),
+        message(
+            Type::build(
+                "string",
+                &[],
+                &[("default", Arg::Datum(Datum::Scalar(Scalar::Auto)))]
+            )
+            .unwrap_err()
+        ),
         "`string` has no `default: auto`; only `datetime`, `date`, `uuid` and `nanoid` make a value up"
     );
     assert_eq!(
@@ -426,7 +468,14 @@ fn the_messages_name_the_type_and_the_argument() {
         "`list` takes 1 argument written by position (its item type), and 2 are written"
     );
     assert_eq!(
-        message(Type::build("nanoid", &[], &[("prefix", Arg::Datum(Datum::Scalar(Scalar::Auto)))]).unwrap_err()),
+        message(
+            Type::build(
+                "nanoid",
+                &[],
+                &[("prefix", Arg::Datum(Datum::Scalar(Scalar::Auto)))]
+            )
+            .unwrap_err()
+        ),
         "`nanoid`: `auto` is the value of `default` and of nothing else, not of `prefix`"
     );
     assert_eq!(
@@ -623,7 +672,9 @@ fn sample() -> Vec<Type> {
         Some(Arg::Datum(Datum::Scalar(Scalar::Float(0.1)))),
         Some(Arg::Datum(Datum::Scalar(Scalar::Float(1e21)))),
         Some(Arg::Datum(Datum::Scalar(Scalar::Float(3.0)))),
-        Some(Arg::Datum(Datum::Scalar(Scalar::Text("x y\n\"z\"".to_string())))),
+        Some(Arg::Datum(Datum::Scalar(Scalar::Text(
+            "x y\n\"z\"".to_string(),
+        )))),
         Some(Arg::Datum(Datum::Seq(vec![]))),
         Some(Arg::Datum(Datum::Seq(vec![
             Datum::Scalar(Scalar::Int(1)),

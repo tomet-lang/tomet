@@ -29,6 +29,7 @@ use ignore::WalkBuilder;
 use tomet_ast::{Tuple, Value};
 use tomet_ast_parser::parse_file;
 use tomet_config::PrinterConfig;
+use tomet_scalar::Scalar;
 use tomet_semantics::{classify_declaration_lenient, classify_std_lenient};
 
 pub mod workspace_scan;
@@ -379,12 +380,15 @@ pub fn document_fields(
         .unwrap_or(file)
         .to_string_lossy()
         .replace('\\', "/");
-    fields.insert("path".to_string(), Value::String(rel));
+    fields.insert("path".to_string(), Value::Scalar(Scalar::Text(rel)));
     if let Some(name) = file.file_name().and_then(|n| n.to_str()) {
-        fields.insert("filename".to_string(), Value::String(name.to_string()));
+        fields.insert(
+            "filename".to_string(),
+            Value::Scalar(Scalar::Text(name.to_string())),
+        );
     }
     if let Some(kind) = tomet_declaration::document_kind(doc) {
-        fields.insert("kind".to_string(), Value::String(kind));
+        fields.insert("kind".to_string(), Value::Scalar(Scalar::Text(kind)));
     }
     if let Some(meta) = tomet_declaration::document_meta(doc) {
         flatten_into("meta", &meta, &mut fields);
@@ -463,15 +467,12 @@ fn tuple_to_string(tuple: &Tuple) -> String {
 }
 
 fn value_to_string(v: &Value) -> String {
-    if let Some(text) = v.scalar_text() {
+    if let Some(text) = v.as_scalar().and_then(|s| s.text()) {
         return text.into_owned();
     }
     match v {
         // A hole and a type seat are a blueprint's, and have no value to index.
-        Value::None | Value::Auto | Value::Hole(_) | Value::TypeSeat(_) => String::new(),
-        Value::Bool(_) | Value::Int(_) | Value::Float(_) | Value::Number(_) | Value::String(_) => {
-            v.scalar_text().map(|t| t.into_owned()).unwrap_or_default()
-        }
+        Value::Scalar(_) | Value::Hole(_) | Value::TypeSeat(_) => String::new(),
         Value::Tuple(tuple) => tuple_to_string(tuple),
         Value::Call(name, args) => {
             format!("{name}{}", tuple_to_string(args))
@@ -643,18 +644,23 @@ mod metadata_table_tests {
         let fields = fields_of("#[ Title ]\n");
         assert_eq!(
             fields.get("path"),
-            Some(&Value::String("docs/guide/cheatsheet.tmt".to_string()))
+            Some(&Value::Scalar(Scalar::Text(
+                "docs/guide/cheatsheet.tmt".to_string()
+            )))
         );
         assert_eq!(
             fields.get("filename"),
-            Some(&Value::String("cheatsheet.tmt".to_string()))
+            Some(&Value::Scalar(Scalar::Text("cheatsheet.tmt".to_string())))
         );
     }
 
     #[test]
     fn kind_comes_from_the_kind_element() {
         let fields = fields_of("::kind(writ)\n\n#[ Title ]\n");
-        assert_eq!(fields.get("kind"), Some(&Value::String("writ".to_string())));
+        assert_eq!(
+            fields.get("kind"),
+            Some(&Value::Scalar(Scalar::Text("writ".to_string())))
+        );
         // No `::kind` means no row entry at all, which is what lets the
         // query pass tell "absent here" from "nobody has this field".
         assert_eq!(fields_of("#[ Title ]\n").get("kind"), None);
@@ -670,8 +676,8 @@ mod metadata_table_tests {
         assert_eq!(
             fields.get("meta.tags"),
             Some(&Value::Tuple(Tuple::from_unnamed([
-                Value::String("rust".to_string()),
-                Value::String("cli".to_string()),
+                Value::Scalar(Scalar::Text("rust".to_string())),
+                Value::Scalar(Scalar::Text("cli".to_string())),
             ])))
         );
     }
@@ -683,7 +689,9 @@ mod metadata_table_tests {
         assert!(matches!(fields.get("meta.url"), Some(Value::Tuple(_))));
         assert_eq!(
             fields.get("meta.url.wiki"),
-            Some(&Value::String("https://example.test".to_string()))
+            Some(&Value::Scalar(Scalar::Text(
+                "https://example.test".to_string()
+            )))
         );
     }
 }

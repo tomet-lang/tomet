@@ -1,6 +1,7 @@
 //! Documents, directories and the parts inside documents.
 
 use tomet_ast::{Block, Connect, File, Group, Tuple, Value};
+use tomet_scalar::Scalar;
 
 use super::args::Args;
 use super::context::EvalContext;
@@ -153,7 +154,7 @@ fn data(doc: &DocRef, args: &Option<Tuple>, value: &Option<Group>) -> EvalValue 
         }
         (Some(args_tuple), None) => Value::Tuple(args_tuple.clone()),
         (None, Some(val_tuple)) => Value::Tuple(val_tuple),
-        (None, None) => Value::None,
+        (None, None) => Value::Scalar(Scalar::None),
     };
     EvalValue::from_ast(&merged, doc)
 }
@@ -331,9 +332,9 @@ pub(crate) fn part_connect(
     match member {
         "id" => Ok(part
             .id()
-            .map(|id| EvalValue::String(id.to_string()))
-            .unwrap_or(EvalValue::None)),
-        "name" => Ok(EvalValue::String(match part {
+            .map(|id| EvalValue::Scalar(Scalar::Text(id.to_string())))
+            .unwrap_or(EvalValue::Scalar(Scalar::None))),
+        "name" => Ok(EvalValue::Scalar(Scalar::Text(match part {
             Part::Element(el) => el.name.to_string(),
             Part::Connect(conn) => conn.name.to_string(),
             Part::Declaration(d) => d.name.to_string(),
@@ -344,7 +345,7 @@ pub(crate) fn part_connect(
                 .unwrap_or_default(),
             Part::Section(_) => "section".to_string(),
             Part::List(_) => "list".to_string(),
-        })),
+        }))),
         "content" => Ok(EvalValue::Fragment(child_blocks(part))),
         "doc" => Ok(EvalValue::Document(doc.clone())),
         "meta" => Ok(part_meta(doc, part)),
@@ -455,18 +456,20 @@ pub(crate) fn document_connect(
     cx: &EvalContext,
 ) -> Result<EvalValue, EvalError> {
     match member {
-        "path" => Ok(EvalValue::String(doc.0.clone())),
-        "filename" => Ok(EvalValue::String(filename(&doc.0).to_string())),
+        "path" => Ok(EvalValue::Scalar(Scalar::Text(doc.0.clone()))),
+        "filename" => Ok(EvalValue::Scalar(Scalar::Text(
+            filename(&doc.0).to_string(),
+        ))),
         "meta" => cx
             .resolver
             .meta(doc)
             .map_err(|why| EvalError::Unresolved(format!("metadata of `{}`: {why}", doc.0))),
         "kind" => Ok(tomet_declaration::document_kind(&*load(doc, cx)?)
-            .map(EvalValue::String)
-            .unwrap_or(EvalValue::None)),
+            .map(|s| EvalValue::Scalar(Scalar::Text(s.to_string())))
+            .unwrap_or(EvalValue::Scalar(Scalar::None))),
         "id" => Ok(tomet_declaration::document_id(&*load(doc, cx)?)
-            .map(EvalValue::String)
-            .unwrap_or(EvalValue::None)),
+            .map(|s| EvalValue::Scalar(Scalar::Text(s.to_string())))
+            .unwrap_or(EvalValue::Scalar(Scalar::None))),
         "doc" => Ok(EvalValue::Document(doc.clone())),
         _ => Err(EvalError::UnknownMember {
             on: "document",

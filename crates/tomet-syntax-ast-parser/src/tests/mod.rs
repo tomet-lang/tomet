@@ -28,6 +28,7 @@ use tomet_ast::{
     SoftBreak, Tuple, TupleEntry, Value,
 };
 pub(crate) use tomet_cst_parser::parse_cst;
+pub(crate) use tomet_scalar::Scalar;
 use tomet_span::Span;
 
 /// A `SoftBreak` for test expectations -- span never matters, `Span`'s

@@ -469,7 +469,11 @@ pub(crate) fn lower_map_entry(
     if is_scheme_uri {
         let text = node.text().to_string();
         let trimmed = text.trim();
-        return Ok((None, Value::String(trimmed.to_string()), start));
+        return Ok((
+            None,
+            Value::Scalar(tomet_scalar::Scalar::Text(trimmed.to_string())),
+            start,
+        ));
     }
 
     if key_tokens.iter().any(|t| t.kind() == K::DOLLAR) {
@@ -588,7 +592,11 @@ fn lower_single_value_from_children(
             SyntaxElement::Node(n) => match n.kind() {
                 K::ERROR => return Err(lower_error(n)),
                 K::CONTENT => return Ok(Value::Blocks(lower_content(n)?)),
-                K::SLOT => return Ok(Value::String(n.text().to_string())),
+                K::SLOT => {
+                    return Ok(Value::Scalar(tomet_scalar::Scalar::Text(
+                        n.text().to_string(),
+                    )));
+                }
                 K::INLINE_FORM | K::BLOCK_FORM => {
                     return if is_interpolation(n) {
                         Ok(Value::Interp(crate::interp::lower_interpolation(n)?))
@@ -609,7 +617,7 @@ fn lower_single_value_from_children(
             SyntaxElement::Token(t) if t.kind() == K::STRING_LITERAL => {
                 let start = usize::from(t.text_range().start());
                 let s = unescape_quoted_string(t.text(), start)?;
-                return Ok(Value::String(s));
+                return Ok(Value::Scalar(tomet_scalar::Scalar::Text(s)));
             }
             _ => {}
         }
@@ -657,7 +665,9 @@ fn lower_single_value_from_children(
         return Err(err(pos, "expected ',' or a newline between entries"));
     }
     if raw_scalars {
-        Ok(Value::String(trimmed.to_string()))
+        Ok(Value::Scalar(tomet_scalar::Scalar::Text(
+            trimmed.to_string(),
+        )))
     } else {
         tomet_scalar::Scalar::from_bare(trimmed)
             .map(Value::from)
@@ -783,66 +793,72 @@ fn at_most_one<'a>(name: &str, args: &'a Tuple) -> std::result::Result<Option<&'
 }
 
 fn construct_string(args: &Tuple) -> std::result::Result<Value, String> {
-    Ok(Value::String(match at_most_one("string", args)? {
+    use tomet_scalar::Scalar;
+    let text = match at_most_one("string", args)? {
         None => String::new(),
-        Some(Value::String(s)) => s.clone(),
-        Some(Value::Int(i)) => i.to_string(),
-        Some(Value::Bool(b)) => b.to_string(),
-        Some(Value::None) => "none".to_string(),
-        Some(Value::Auto) => "auto".to_string(),
-        Some(Value::Number(text)) => text.clone(),
-        Some(Value::Float(f)) if f.is_finite() => tomet_scalar::float_text(*f),
-        Some(Value::Float(f)) if f.is_nan() => "nan".to_string(),
-        Some(Value::Float(f)) => (if *f > 0.0 { "inf" } else { "-inf" }).to_string(),
+        Some(Value::Scalar(s)) => match s {
+            Scalar::Text(s) => s.clone(),
+            Scalar::Int(i) => i.to_string(),
+            Scalar::Bool(b) => b.to_string(),
+            Scalar::None => "none".to_string(),
+            Scalar::Auto => "auto".to_string(),
+            Scalar::Number(text) => text.clone(),
+            Scalar::Float(f) if f.is_finite() => tomet_scalar::float_text(*f),
+            Scalar::Float(f) if f.is_nan() => "nan".to_string(),
+            Scalar::Float(f) => (if *f > 0.0 { "inf" } else { "-inf" }).to_string(),
+        },
         Some(other) => return Err(format!("string() takes a scalar, got {other:?}")),
-    }))
+    };
+    Ok(Value::Scalar(Scalar::Text(text)))
 }
 
 fn construct_int(args: &Tuple) -> std::result::Result<Value, String> {
+    use tomet_scalar::Scalar;
     match at_most_one("int", args)? {
-        None => Ok(Value::Int(0)),
-        Some(Value::Int(i)) => Ok(Value::Int(*i)),
-        Some(Value::Float(f)) => {
+        None => Ok(Value::Scalar(Scalar::Int(0))),
+        Some(Value::Scalar(Scalar::Int(i))) => Ok(Value::Scalar(Scalar::Int(*i))),
+        Some(Value::Scalar(Scalar::Float(f))) => {
             let f = *f;
             if f.is_finite() && f >= i64::MIN as f64 && f < i64::MAX as f64 {
-                Ok(Value::Int(f.trunc() as i64))
+                Ok(Value::Scalar(Scalar::Int(f.trunc() as i64)))
             } else {
                 Err(format!("float `{f}` is out of range for a 64-bit integer"))
             }
         }
-        Some(Value::Number(text)) => match text.parse::<f64>() {
+        Some(Value::Scalar(Scalar::Number(text))) => match text.parse::<f64>() {
             Ok(f) if f.is_finite() && f >= i64::MIN as f64 && f < i64::MAX as f64 => {
-                Ok(Value::Int(f.trunc() as i64))
+                Ok(Value::Scalar(Scalar::Int(f.trunc() as i64)))
             }
             _ => Err(format!(
                 "number `{text}` is out of range for a 64-bit integer"
             )),
         },
-        Some(Value::String(s)) => s
+        Some(Value::Scalar(Scalar::Text(s))) => s
             .trim()
             .parse::<i64>()
-            .map(Value::Int)
+            .map(|i| Value::Scalar(Scalar::Int(i)))
             .map_err(|_| format!("int() cannot convert `{}` to an integer", s.trim())),
         Some(other) => Err(format!("int() takes a number or a string, got {other:?}")),
     }
 }
 
 fn construct_float(args: &Tuple) -> std::result::Result<Value, String> {
+    use tomet_scalar::Scalar;
     match at_most_one("float", args)? {
-        None => Ok(Value::Float(0.0)),
-        Some(Value::Int(i)) => Ok(Value::Float(*i as f64)),
-        Some(Value::Float(f)) => Ok(Value::Float(*f)),
-        Some(Value::Number(text)) => match text.parse::<f64>() {
-            Ok(f) if f.is_finite() => Ok(Value::Float(f)),
+        None => Ok(Value::Scalar(Scalar::Float(0.0))),
+        Some(Value::Scalar(Scalar::Int(i))) => Ok(Value::Scalar(Scalar::Float(*i as f64))),
+        Some(Value::Scalar(Scalar::Float(f))) => Ok(Value::Scalar(Scalar::Float(*f))),
+        Some(Value::Scalar(Scalar::Number(text))) => match text.parse::<f64>() {
+            Ok(f) if f.is_finite() => Ok(Value::Scalar(Scalar::Float(f))),
             _ => Err(format!("float `{text}` is out of range")),
         },
-        Some(Value::String(s)) => {
+        Some(Value::Scalar(Scalar::Text(s))) => {
             let text = s.trim();
             let spells_non_finite = text
                 .trim_start_matches(['+', '-'])
                 .starts_with(|c: char| c.is_ascii_alphabetic());
             match text.parse::<f64>() {
-                Ok(f) if f.is_finite() || spells_non_finite => Ok(Value::Float(f)),
+                Ok(f) if f.is_finite() || spells_non_finite => Ok(Value::Scalar(Scalar::Float(f))),
                 Ok(_) => Err(format!("float `{text}` is out of range")),
                 Err(_) => Err(format!("float() cannot convert `{text}` to a float")),
             }

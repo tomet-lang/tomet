@@ -204,7 +204,10 @@ fn a_parenthesis_after_an_element_is_prose() {
         Inline::Element(el) => {
             assert_eq!(
                 el.data.args,
-                Some(Tuple::from_named(vec![("a".into(), Value::Int(1))]))
+                Some(Tuple::from_named(vec![(
+                    "a".into(),
+                    Value::Scalar(Scalar::Int(1))
+                )]))
             );
         }
         other => panic!("expected an element, got {other:?}"),
@@ -223,7 +226,10 @@ fn a_comment_between_groups_does_not_detach_the_next_group() {
         Block::Element(el) => {
             assert_eq!(
                 el.data.args,
-                Some(Tuple::from_named(vec![("a".into(), Value::Int(1))]))
+                Some(Tuple::from_named(vec![(
+                    "a".into(),
+                    Value::Scalar(Scalar::Int(1))
+                )]))
             );
             assert_eq!(el.content, wrap(vec![Inline::Text("content".into())]));
         }

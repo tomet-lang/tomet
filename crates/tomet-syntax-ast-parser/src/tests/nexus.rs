@@ -155,7 +155,7 @@ fn a_bare_name_in_a_value_is_a_string() {
         element(&doc.body[0]).data.args,
         Some(Tuple::from_named(vec![(
             "a".into(),
-            Value::String("@name".into())
+            Value::Scalar(Scalar::Text("@name".into()))
         )]))
     );
 }
@@ -457,7 +457,7 @@ fn nameless_connects_keep_working_on_a_valid_owner() {
         el.data.value,
         Some(Group::from_map(Tuple::from_named(vec![(
             "b".into(),
-            Value::Int(2)
+            Value::Scalar(Scalar::Int(2))
         )])))
     );
     assert!(el.connects.is_empty());
@@ -474,7 +474,10 @@ fn nameless_connects_keep_working_on_a_valid_owner() {
     pairs.sort_by(|a, b| a.0.cmp(&b.0));
     assert_eq!(
         pairs,
-        vec![("a".into(), Value::Int(1)), ("b".into(), Value::Int(2))]
+        vec![
+            ("a".into(), Value::Scalar(Scalar::Int(1))),
+            ("b".into(), Value::Scalar(Scalar::Int(2)))
+        ]
     );
 
     for src in [

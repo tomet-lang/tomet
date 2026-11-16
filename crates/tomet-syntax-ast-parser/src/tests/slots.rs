@@ -153,7 +153,9 @@ fn a_tag_in_a_value_is_its_text() {
     };
     assert_eq!(
         el.data.args,
-        Some(Tuple::from_unnamed(vec![Value::String("<name>".into())]))
+        Some(Tuple::from_unnamed(vec![Value::Scalar(Scalar::Text(
+            "<name>".into()
+        ))]))
     );
 
     let doc = parse_file("@opt(key: <name>)").unwrap();
@@ -164,7 +166,7 @@ fn a_tag_in_a_value_is_its_text() {
         el.data.args,
         Some(Tuple::from_named(vec![(
             "key".into(),
-            Value::String("<name>".into())
+            Value::Scalar(Scalar::Text("<name>".into()))
         )]))
     );
 }

@@ -6,6 +6,7 @@
 //! declaration (it goes in `default:`).
 
 use tomet_ast::{Block, Inline, Value};
+use tomet_scalar::Scalar;
 use tomet_semantics_core::parse_type_spec;
 use tomet_type::{Kind, Type};
 
@@ -76,7 +77,7 @@ impl VarDecl {
 /// element) is left out.
 fn plain_text(value: &Value) -> Option<String> {
     match value {
-        Value::String(text) => Some(text.trim().to_string()),
+        Value::Scalar(Scalar::Text(text)) => Some(text.trim().to_string()),
         Value::Blocks(blocks) => {
             let mut out = String::new();
             for block in blocks {
@@ -137,7 +138,7 @@ mod tests {
         assert_eq!(title.about.as_deref(), Some("題。"));
         let n = found[1].1.as_ref().unwrap();
         assert_eq!(n.ty, Type::bare(Kind::Int));
-        assert_eq!(n.default, Some(Value::Int(3)));
+        assert_eq!(n.default, Some(Value::Scalar(Scalar::Int(3))));
         assert!(!n.is_required());
     }
 

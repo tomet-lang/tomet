@@ -248,15 +248,7 @@ pub fn children<'a>(node: Node<'a>, f: &mut dyn FnMut(Node<'a>, Place)) {
                     f(Node::Block(b), Place::Content);
                 }
             }
-            Value::None
-            | Value::Auto
-            | Value::Interp(_)
-            | Value::TypeSeat(_)
-            | Value::Bool(_)
-            | Value::Int(_)
-            | Value::Float(_)
-            | Value::Number(_)
-            | Value::String(_) => {}
+            Value::Scalar(_) | Value::Interp(_) | Value::TypeSeat(_) => {}
         },
         Node::Entry(entry) => match entry {
             Entry::Pair(_, v) => f(Node::Value(v), Place::PairValue),
@@ -759,15 +751,7 @@ impl<S: Sink> MutWalk<'_, S> {
                     self.block(b);
                 }
             }
-            Value::None
-            | Value::Auto
-            | Value::Interp(_)
-            | Value::TypeSeat(_)
-            | Value::Bool(_)
-            | Value::Int(_)
-            | Value::Float(_)
-            | Value::Number(_)
-            | Value::String(_) => {}
+            Value::Scalar(_) | Value::Interp(_) | Value::TypeSeat(_) => {}
         }
     }
 }
@@ -911,7 +895,7 @@ impl<T: Fillable, F: FnMut(&T) -> Option<Value>> Filling<T, F> {
     /// What the node becomes in running text: the scalar text of its value, if it has any.
     fn text(&mut self, node: &T) -> Option<Text> {
         let filled = (self.fill)(node)?;
-        let text = filled.scalar_text()?.into_owned();
+        let text = filled.as_scalar()?.text()?.into_owned();
         Some(Text::new(text, node.span()))
     }
 }
@@ -1001,6 +985,7 @@ pub fn fill_type_seats_in_file(file: &mut File, fill: impl FnMut(&TypeSeat) -> O
 mod tests {
     use super::*;
     use tomet_ast::Block;
+    use tomet_scalar::Scalar;
 
     fn element_of(file: &File) -> &Element {
         match &file.body[0] {
@@ -1125,10 +1110,10 @@ mod tests {
         let mut file = tomet_ast_parser::parse_file(BODY).unwrap();
         let body = macro_body(&mut file);
         fill_interpolations(body, |i| match i.expr.to_string().as_str() {
-            "1" => Some(Value::String("Welcome".to_string())),
-            "3" => Some(Value::Int(5)),
-            "name" => Some(Value::Int(7)),
-            "2" => Some(Value::String("end".to_string())),
+            "1" => Some(Value::Scalar(Scalar::Text("Welcome".to_string()))),
+            "3" => Some(Value::Scalar(Scalar::Int(5))),
+            "name" => Some(Value::Scalar(Scalar::Int(7))),
+            "2" => Some(Value::Scalar(Scalar::Text("end".to_string()))),
             _ => None,
         });
         assert!(
@@ -1147,11 +1132,11 @@ mod tests {
         };
         assert_eq!(
             args.get("title"),
-            Some(&Value::String("Welcome".to_string()))
+            Some(&Value::Scalar(Scalar::Text("Welcome".to_string())))
         );
         assert_eq!(
             args.get("n"),
-            Some(&Value::Int(5)),
+            Some(&Value::Scalar(Scalar::Int(5))),
             "a number stays a number in data"
         );
         let Some([Block::Paragraph(p)]) = card.content.as_deref() else {
@@ -1177,7 +1162,7 @@ mod tests {
         let mut file = tomet_ast_parser::parse_file(BODY).unwrap();
         let body = macro_body(&mut file);
         fill_interpolations(body, |i| {
-            (i.expr.to_string() == "2").then_some(Value::Int(1))
+            (i.expr.to_string() == "2").then_some(Value::Scalar(Scalar::Int(1)))
         });
         assert_eq!(interpolations(body), ["1", "3", "name"]);
     }
@@ -1338,10 +1323,10 @@ text <$t_inline> more
         let mut file = tomet_ast_parser::parse_file(SEAT_BODY).unwrap();
         let body = macro_body(&mut file);
         fill_type_seats(body, |t| match t.expr.to_string().as_str() {
-            "string" => Some(Value::String("Welcome".to_string())),
-            "int" => Some(Value::Int(5)),
-            "name" => Some(Value::Int(7)),
-            "date" => Some(Value::String("end".to_string())),
+            "string" => Some(Value::Scalar(Scalar::Text("Welcome".to_string()))),
+            "int" => Some(Value::Scalar(Scalar::Int(5))),
+            "name" => Some(Value::Scalar(Scalar::Int(7))),
+            "date" => Some(Value::Scalar(Scalar::Text("end".to_string()))),
             _ => None,
         });
         assert!(seats(body).is_empty(), "{:?}", seats(body));
@@ -1356,11 +1341,11 @@ text <$t_inline> more
         };
         assert_eq!(
             args.get("title"),
-            Some(&Value::String("Welcome".to_string()))
+            Some(&Value::Scalar(Scalar::Text("Welcome".to_string())))
         );
         assert_eq!(
             args.get("n"),
-            Some(&Value::Int(5)),
+            Some(&Value::Scalar(Scalar::Int(5))),
             "a number stays a number in data"
         );
         let Some([Block::Paragraph(p)]) = card.content.as_deref() else {
@@ -1386,7 +1371,7 @@ text <$t_inline> more
         let mut file = tomet_ast_parser::parse_file(SEAT_BODY).unwrap();
         let body = macro_body(&mut file);
         fill_type_seats(body, |t| {
-            (t.expr.to_string() == "date").then_some(Value::Int(1))
+            (t.expr.to_string() == "date").then_some(Value::Scalar(Scalar::Int(1)))
         });
         assert_eq!(seats(body), ["string", "int", "name"]);
         // A value with no scalar text has no place in text; data takes it as it is.
@@ -1401,7 +1386,7 @@ text <$t_inline> more
         let mut asked = Vec::new();
         fill_type_seats_in_file(&mut file, |t| {
             asked.push(t.expr.to_string());
-            Some(Value::String("x".to_string()))
+            Some(Value::Scalar(Scalar::Text("x".to_string())))
         });
         assert_eq!(asked, shown);
         assert_eq!(asked.len(), SEAT_ORDER.len() + 1);
@@ -1412,7 +1397,7 @@ text <$t_inline> more
     fn a_type_seat_of_a_file_nothing_fills_is_left_as_written() {
         let mut file = tomet_ast_parser::parse_file(SEATS).unwrap();
         fill_type_seats_in_file(&mut file, |t| {
-            (t.expr.to_string() != "t_block").then(|| Value::String("x".to_string()))
+            (t.expr.to_string() != "t_block").then(|| Value::Scalar(Scalar::Text("x".to_string())))
         });
         assert_eq!(seat_names(&file), ["t_block"]);
     }
@@ -1422,10 +1407,10 @@ text <$t_inline> more
         let src = "::macro(m: [\n@card(title: <$string>, n: $(1))[ hi <$name> $(2) ]\n])\n";
         let mut file = tomet_ast_parser::parse_file(src).unwrap();
         let body = macro_body(&mut file);
-        fill_type_seats(body, |_| Some(Value::Int(9)));
+        fill_type_seats(body, |_| Some(Value::Scalar(Scalar::Int(9))));
         assert!(seats(body).is_empty());
         assert_eq!(interpolations(body), ["1", "2"]);
-        fill_interpolations(body, |_| Some(Value::Int(3)));
+        fill_interpolations(body, |_| Some(Value::Scalar(Scalar::Int(3))));
         assert!(interpolations(body).is_empty());
     }
 }

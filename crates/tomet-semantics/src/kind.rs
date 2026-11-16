@@ -635,6 +635,7 @@ pub fn shape_mismatch(el: ElementView<'_>) -> Option<(Shape, Shape)> {
 mod tests {
     use super::*;
     use tomet_ast::{Tuple, Value};
+    use tomet_scalar::Scalar;
     use tomet_tree::{ElementExt, declaration_new, element_new};
 
     #[test]
@@ -750,7 +751,7 @@ mod tests {
         let mut el = element_new(Name::bare("link"));
         el.data.args = Some(Tuple::from_named([(
             "target".to_string(),
-            Value::String("https://example.com".to_string()),
+            Value::Scalar(Scalar::Text("https://example.com".to_string())),
         )]));
         assert_eq!(classify_std_lenient(el.as_view()), ElementKind::Link);
     }
@@ -823,7 +824,7 @@ mod tests {
         let mut el = element_new(Name::bare("ruby"));
         el.data.args = Some(Tuple::from_named([(
             "rt".to_string(),
-            Value::String("かんじ".to_string()),
+            Value::Scalar(Scalar::Text("かんじ".to_string())),
         )]));
         assert_eq!(classify_std_lenient(el.as_view()), ElementKind::Ruby);
         assert_eq!(required_shape(&ElementKind::Ruby), Some(Shape::Inline));

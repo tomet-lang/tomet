@@ -4,6 +4,7 @@ use tomet_ast::{
     Block, Data, Entry, File, Group, Inline, Name, Paragraph, Section, Text, Tuple, Value,
 };
 use tomet_config::{FieldConfig, FormatConfig, MetaConfig};
+use tomet_scalar::Scalar;
 use tomet_span::Span;
 use tomet_style::{ContentLayout, GroupOrder, ParagraphSeparator};
 use tomet_tree::element_new;
@@ -225,7 +226,8 @@ fn test_rfc3339_with_offset_formatting() {
 
 #[test]
 fn test_none_value_rendering() {
-    let rendered = render_value_inner_with_config(&Value::None, &PrinterConfig::default());
+    let rendered =
+        render_value_inner_with_config(&Value::Scalar(Scalar::None), &PrinterConfig::default());
     assert_eq!(rendered, "");
     let md = "---\ntitle:\n---\n\n# Document\n";
     let doc = tomet_markdown::from_markdown(md);
@@ -415,7 +417,7 @@ fn test_codeblock_formatting() {
 fn test_container_children_indentation() {
     let note = |marker: i64, text: &str| {
         let mut el = element_new(Name::bare("item"));
-        el.data.args = Some(Tuple::from_unnamed([Value::Int(marker)]));
+        el.data.args = Some(Tuple::from_unnamed([Value::Scalar(Scalar::Int(marker))]));
         el.content = Some(vec![Block::Paragraph(Paragraph::new(
             vec![Inline::Text(text.into())],
             Span::dummy(),
@@ -438,9 +440,9 @@ fn test_container_children_indentation() {
 #[test]
 fn test_group_order_content_first() {
     let mut el = element_new(Name::bare("link"));
-    el.data.args = Some(Tuple::from_unnamed([Value::String(
+    el.data.args = Some(Tuple::from_unnamed([Value::Scalar(Scalar::Text(
         "https://example.com".to_string(),
-    )]));
+    ))]));
     el.content = Some(vec![Block::Paragraph(Paragraph::new(
         vec![Inline::Text("Example".into())],
         Span::dummy(),
@@ -817,7 +819,10 @@ fn a_block_value_in_a_group_keeps_every_block_it_holds() {
 /// `{value}`, `#(id)` or a `::connect`, it would not read back.
 #[test]
 fn an_element_without_a_primary_group_is_printed_with_an_empty_one() {
-    let value = Group::from_map(Tuple::from_named([("a".to_string(), Value::Int(1))]));
+    let value = Group::from_map(Tuple::from_named([(
+        "a".to_string(),
+        Value::Scalar(Scalar::Int(1)),
+    )]));
 
     let bare = element_new(Name::bare("memo"));
     let mut with_value = element_new(Name::bare("memo"));
@@ -828,7 +833,10 @@ fn an_element_without_a_primary_group_is_printed_with_an_empty_one() {
     with_connect.connects.push(tomet_ast::Connect {
         name: Name::bare("rule"),
         data: Data {
-            args: Some(Tuple::from_named([("k".to_string(), Value::Int(1))])),
+            args: Some(Tuple::from_named([(
+                "k".to_string(),
+                Value::Scalar(Scalar::Int(1)),
+            )])),
             value: None,
         },
         content: None,
@@ -860,14 +868,17 @@ fn an_element_that_has_a_primary_group_gets_no_extra_one() {
 #[test]
 fn a_named_connect_is_printed_on_a_primary_group() {
     let mut el = element_new(Name::bare("memo"));
-    el.data.args = Some(Tuple::from_named([("a".to_string(), Value::Int(1))]));
+    el.data.args = Some(Tuple::from_named([(
+        "a".to_string(),
+        Value::Scalar(Scalar::Int(1)),
+    )]));
     el.connects.push(tomet_ast::Connect {
         name: Name::bare("rule"),
         data: Data {
             args: None,
             value: Some(Group::from_map(Tuple::from_named([(
                 "k".to_string(),
-                Value::Int(1),
+                Value::Scalar(Scalar::Int(1)),
             )]))),
         },
         content: None,
@@ -938,7 +949,7 @@ fn a_thematic_break_is_printed_as_dashes_and_never_as_a_bare_hr() {
     let mut hr = element_new(Name::bare("hr"));
     hr.data.value = Some(Group::from_map(Tuple::from_named([(
         "a".to_string(),
-        Value::Int(1),
+        Value::Scalar(Scalar::Int(1)),
     )])));
     let doc = File::new(Vec::new(), vec![Block::Element(hr)], Span::dummy());
     assert_eq!(document_to_tm(&doc).trim(), "@hr(){ a: 1 }");

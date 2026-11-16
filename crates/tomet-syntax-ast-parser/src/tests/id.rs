@@ -37,7 +37,10 @@ fn id_may_come_before_its_groups_too() {
             assert_eq!(el.id, Some(Id("myid".into())));
             assert_eq!(
                 el.data.args,
-                Some(Tuple::from_named(vec![("a".into(), Value::Int(1))]))
+                Some(Tuple::from_named(vec![(
+                    "a".into(),
+                    Value::Scalar(Scalar::Int(1))
+                )]))
             );
         }
         other => panic!("expected element, got {other:?}"),
@@ -109,7 +112,7 @@ fn section_sugar_reads_a_trailing_id_and_attrs_together() {
                 s.data.value,
                 Some(Group::from_map(Tuple::from_named(vec![(
                     "tag".into(),
-                    Value::String("x".into())
+                    Value::Scalar(Scalar::Text("x".into()))
                 )])))
             );
             assert_eq!(s.title, vec![Inline::Text("Intro".into())]);
@@ -157,7 +160,7 @@ fn list_item_sugar_reads_a_trailing_id_and_attrs_together() {
         items[0].data.value,
         Some(Group::from_map(Tuple::from_named(vec![(
             "tag".into(),
-            Value::String("x".into())
+            Value::Scalar(Scalar::Text("x".into()))
         )])))
     );
 }

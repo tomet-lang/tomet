@@ -363,15 +363,7 @@ impl Pass<'_> {
             Value::Blocks(blocks) => {
                 Value::Blocks(blocks.into_iter().flat_map(|b| self.block(b)).collect())
             }
-            other @ (Value::None
-            | Value::Auto
-            | Value::Bool(_)
-            | Value::Int(_)
-            | Value::Float(_)
-            | Value::Number(_)
-            | Value::String(_)
-            | Value::Hole(_)
-            | Value::TypeSeat(_)) => other,
+            other @ (Value::Scalar(_) | Value::Hole(_) | Value::TypeSeat(_)) => other,
         }
     }
 

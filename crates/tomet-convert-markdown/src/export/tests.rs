@@ -1,7 +1,9 @@
 use super::*;
 use tomet_ast::{
     Data, Declaration, Element, File, Group, Name, Paragraph, Placement, RawText, Text, Tuple,
+    Value,
 };
+use tomet_scalar::Scalar;
 use tomet_span::Span;
 
 /// Wraps a flat inline sequence as `Element.content` (`Vec<Block>`) -- every fixture below is just one paragraph's worth.
@@ -85,10 +87,12 @@ fn adjacent_meta_blocks_have_no_visible_output() {
     fn meta_declaration(tag: &str) -> Declaration {
         let mut declaration = tomet_tree::declaration_new("meta");
         declaration.data = Data {
-            args: Some(Tuple::from_unnamed([Value::String(tag.to_string())])),
+            args: Some(Tuple::from_unnamed([Value::Scalar(Scalar::Text(
+                tag.to_string(),
+            ))])),
             value: Some(Group::from_map(Tuple::from_named([(
                 "key".to_string(),
-                Value::String("value".to_string()),
+                Value::Scalar(Scalar::Text("value".to_string())),
             )]))),
         };
         declaration
@@ -115,7 +119,7 @@ fn heading_element(level: i64, content: Vec<Inline>) -> Element {
         placement: Placement::Block,
 
         data: Data {
-            args: Some(Tuple::from_unnamed([Value::Int(level)])),
+            args: Some(Tuple::from_unnamed([Value::Scalar(Scalar::Int(level))])),
             value: None,
         },
 
@@ -261,7 +265,7 @@ fn link_round_trips() {
         data: Data {
             args: Some(Tuple::from_named([(
                 "target".to_string(),
-                Value::String("https://example.com".to_string()),
+                Value::Scalar(Scalar::Text("https://example.com".to_string())),
             )])),
             value: None,
         },
@@ -294,7 +298,7 @@ fn embed_becomes_image() {
         data: Data {
             args: Some(Tuple::from_named([(
                 "target".to_string(),
-                Value::String("pic.png".to_string()),
+                Value::Scalar(Scalar::Text("pic.png".to_string())),
             )])),
             value: None,
         },
@@ -327,7 +331,7 @@ fn raw_block_uses_fence_and_lang() {
         data: Data {
             args: Some(Tuple::from_named([(
                 "lang".to_string(),
-                Value::String("rust".to_string()),
+                Value::Scalar(Scalar::Text("rust".to_string())),
             )])),
             value: None,
         },
@@ -394,7 +398,7 @@ fn a_declaration_exports_as_nothing() {
     let mut declaration = tomet_tree::declaration_new("export");
     declaration.data.args = Some(Tuple::from_named([(
         "type".to_string(),
-        Value::String("commonmark".to_string()),
+        Value::Scalar(Scalar::Text("commonmark".to_string())),
     )]));
     let doc = File {
         header: vec![declaration],
@@ -423,13 +427,13 @@ fn wikilink_exports_to_markdown() {
     let mut el1 = tomet_tree::element_new(Name::bare("link"));
     el1.data.args = Some(Tuple::from_named([(
         "target".to_string(),
-        Value::String("ref:name".to_string()),
+        Value::Scalar(Scalar::Text("ref:name".to_string())),
     )]));
 
     let mut el2 = tomet_tree::element_new(Name::bare("link"));
     el2.data.args = Some(Tuple::from_named([(
         "target".to_string(),
-        Value::String("ref:name".to_string()),
+        Value::Scalar(Scalar::Text("ref:name".to_string())),
     )]));
     el2.content = Some(wrap_content(vec![Inline::Text(Text::new(
         "display",
@@ -453,7 +457,7 @@ fn link_doc(target: &str, label: Option<&str>) -> File {
     let mut el = tomet_tree::element_new(Name::bare("link"));
     el.data.args = Some(Tuple::from_named([(
         "target".to_string(),
-        Value::String(target.to_string()),
+        Value::Scalar(Scalar::Text(target.to_string())),
     )]));
     if let Some(label) = label {
         el.content = Some(wrap_content(vec![Inline::Text(Text::new(

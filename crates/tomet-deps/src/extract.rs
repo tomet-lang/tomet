@@ -48,7 +48,7 @@ pub fn extract_exports_hash(doc: &File) -> u64 {
                 if let Some(name) = entry.name() {
                     hash_bytes.extend_from_slice(name.as_bytes());
                 }
-                if let Some(text) = entry.value().scalar_text() {
+                if let Some(text) = entry.value().as_scalar().and_then(|s| s.text()) {
                     hash_bytes.extend_from_slice(text.as_bytes());
                 }
             }
@@ -56,7 +56,7 @@ pub fn extract_exports_hash(doc: &File) -> u64 {
         if let Some(val) = &declaration.data.value {
             for (k, v) in val.pairs() {
                 hash_bytes.extend_from_slice(k.as_bytes());
-                if let Some(text) = v.scalar_text() {
+                if let Some(text) = v.as_scalar().and_then(|s| s.text()) {
                     hash_bytes.extend_from_slice(text.as_bytes());
                 }
             }

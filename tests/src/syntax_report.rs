@@ -28,6 +28,7 @@ use tomet_ast::{
     Interpolation, List, ListItem, Placement, Tuple, TypeSeat, Value,
 };
 use tomet_ast_parser::parse_file;
+use tomet_scalar::Scalar;
 
 /// One documented construct: a heading it files under, a one-line note in
 /// Japanese, and the source to run through the parser.
@@ -1255,14 +1256,16 @@ fn tuple_str(tuple: &Tuple) -> String {
 
 fn value_str(v: &Value) -> String {
     match v {
-        Value::None => "none".to_string(),
-        Value::Auto => "auto".to_string(),
-        Value::Bool(b) => b.to_string(),
-        Value::Int(i) => i.to_string(),
-        Value::Float(f) => f.to_string(),
-        // Kept as written; named, so a report shows it was not read as a float.
-        Value::Number(text) => format!("number({text})"),
-        Value::String(s) => format!("{s:?}"),
+        Value::Scalar(s) => match s {
+            Scalar::None => "none".to_string(),
+            Scalar::Auto => "auto".to_string(),
+            Scalar::Bool(b) => b.to_string(),
+            Scalar::Int(i) => i.to_string(),
+            Scalar::Float(f) => f.to_string(),
+            // Kept as written; named, so a report shows it was not read as a float.
+            Scalar::Number(text) => format!("number({text})"),
+            Scalar::Text(s) => format!("{s:?}"),
+        },
         Value::Tuple(tuple) => tuple_str(tuple),
         Value::Call(name, args) => {
             format!("{name}({})", tuple_inner_str(args))

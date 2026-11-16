@@ -7,6 +7,7 @@ use tomet_ast::{
 use tomet_config::PrinterConfig;
 use tomet_spelling::{is_name, key_text};
 use tomet_style::{ContentLayout, GroupOrder};
+use tomet_tree::ValueExt;
 
 use crate::id::render_id;
 use crate::inline::{raw_content_text, render_content_blocks};
@@ -55,13 +56,8 @@ pub fn render_element(el: ElementView<'_>, config: &PrinterConfig) -> String {
                 .and_then(|args| {
                     args.get("lang")
                         .or_else(|| args.nth_unnamed(0))
-                        .and_then(|v| {
-                            if let Value::String(s) = v {
-                                Some(s.clone())
-                            } else {
-                                None
-                            }
-                        })
+                        .and_then(Value::as_str)
+                        .map(String::from)
                 })
                 .unwrap_or_default();
             let body = el.content.and_then(raw_content_text).unwrap_or_else(|| {

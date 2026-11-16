@@ -143,7 +143,7 @@ fn double_slash_inside_a_url_is_not_treated_as_a_comment() {
                     el.data.args,
                     Some(Tuple::from_named(vec![(
                         "target".to_string(),
-                        Value::String("https://example.com".to_string())
+                        Value::Scalar(Scalar::Text("https://example.com".to_string()))
                     )]))
                 );
             } else {
@@ -225,7 +225,7 @@ fn own_line_comment_works_inside_a_paren_group() {
         d.data.args,
         Some(Tuple::from_named(vec![(
             "format".into(),
-            Value::String("json".into())
+            Value::Scalar(Scalar::Text("json".into()))
         )]))
     );
 }
@@ -239,7 +239,7 @@ fn own_line_comment_works_inside_a_lightweight_value_group() {
         d.data.args,
         Some(Tuple::from_named(vec![(
             "key".into(),
-            Value::String("value".into())
+            Value::Scalar(Scalar::Text("value".into()))
         )]))
     );
 }
@@ -250,8 +250,8 @@ fn own_line_comment_works_inside_a_sequence() {
     assert_eq!(
         v,
         Value::Tuple(Tuple::from_unnamed(vec![
-            Value::String("a".into()),
-            Value::String("b".into())
+            Value::Scalar(Scalar::Text("a".into())),
+            Value::Scalar(Scalar::Text("b".into()))
         ]))
     );
 }
@@ -263,7 +263,7 @@ fn trailing_same_line_comment_after_a_scalar_value_is_stripped() {
         v,
         Value::Tuple(Tuple::from_named(vec![(
             "key".into(),
-            Value::String("value".into())
+            Value::Scalar(Scalar::Text("value".into()))
         )]))
     );
 }
@@ -278,7 +278,7 @@ fn bare_url_values_are_unaffected_by_trailing_comment_support() {
         v,
         Value::Tuple(Tuple::from_named(vec![(
             "url".into(),
-            Value::String("https://example.com/path".into())
+            Value::Scalar(Scalar::Text("https://example.com/path".into()))
         )]))
     );
 }
@@ -294,7 +294,7 @@ fn a_bare_scalar_starting_with_double_slash_needs_quoting() {
         quoted,
         Value::Tuple(Tuple::from_named(vec![(
             "path".into(),
-            Value::String("//example.com/x".into())
+            Value::Scalar(Scalar::Text("//example.com/x".into()))
         )]))
     );
     assert!(parse_value("path: //example.com/x").is_err());
@@ -330,7 +330,10 @@ fn comment_marker_inside_a_string_in_a_value_group_is_part_of_the_string() {
     match &doc.body[0] {
         Block::Element(el) => {
             let v = el.data.args.as_ref().unwrap();
-            assert_eq!(v.get("allow"), Some(&Value::String("spec/**/*.tmt".into())));
+            assert_eq!(
+                v.get("allow"),
+                Some(&Value::Scalar(Scalar::Text("spec/**/*.tmt".into())))
+            );
         }
         other => panic!("expected element, got {other:?}"),
     }

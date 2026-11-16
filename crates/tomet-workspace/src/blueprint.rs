@@ -565,6 +565,7 @@ pub fn apply_blueprint_to_file_with(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use tomet_scalar::Scalar;
     use tomet_transform::{FixedSource, SystemSource};
 
     fn vault(name: &str) -> PathBuf {
@@ -644,7 +645,7 @@ mod tests {
         let mut vars = HashMap::new();
         vars.insert(
             "title".to_string(),
-            Value::String("2026-09-01 Daily".into()),
+            Value::Scalar(Scalar::Text("2026-09-01 Daily".into())),
         );
 
         let created = create_file_from_blueprint(
@@ -683,7 +684,10 @@ mod tests {
             "::blueprint(note)\n::var(\n  author: (type: string)\n)\n::meta(\n  file: $(self::filename)\n  by: $(var.author)\n)\n",
         );
         let mut vars = HashMap::new();
-        vars.insert("author".to_string(), Value::String("Ann".into()));
+        vars.insert(
+            "author".to_string(),
+            Value::Scalar(Scalar::Text("Ann".into())),
+        );
 
         let content = instantiate_blueprint_file(
             &file,
@@ -713,7 +717,10 @@ mod tests {
         };
         assert!(made(&HashMap::new()).contains("Untitled"));
         let mut vars = HashMap::new();
-        vars.insert("title".to_string(), Value::String("Given".into()));
+        vars.insert(
+            "title".to_string(),
+            Value::Scalar(Scalar::Text("Given".into())),
+        );
         assert!(made(&vars).contains("Given"));
         let _ = fs::remove_dir_all(file.parent().unwrap());
     }
@@ -763,7 +770,7 @@ mod tests {
         let file = blueprint_file(name, src);
         let vars: HashMap<String, Value> = vars
             .iter()
-            .map(|(k, v)| (k.to_string(), Value::String(v.to_string())))
+            .map(|(k, v)| (k.to_string(), Value::Scalar(Scalar::Text(v.to_string()))))
             .collect();
         let made =
             instantiate_blueprint_file(&file, Path::new("n.tmt"), &vars, &PrinterConfig::default());
@@ -1150,7 +1157,10 @@ mod tests {
         .unwrap();
 
         let mut vars = HashMap::new();
-        vars.insert("title".to_string(), Value::String("Sprint 42".into()));
+        vars.insert(
+            "title".to_string(),
+            Value::Scalar(Scalar::Text("Sprint 42".into())),
+        );
 
         let applied = apply_blueprint_to_file(
             &root,
@@ -1204,7 +1214,10 @@ mod tests {
         fs::write(&doc_path, "Just some notes.\n").unwrap();
 
         let mut vars = HashMap::new();
-        vars.insert("title".to_string(), Value::String("Sprint 42".into()));
+        vars.insert(
+            "title".to_string(),
+            Value::Scalar(Scalar::Text("Sprint 42".into())),
+        );
 
         let applied = apply_blueprint_to_file(
             &root,
@@ -1237,7 +1250,10 @@ mod tests {
         fs::write(&doc_path, original).unwrap();
 
         let mut vars = HashMap::new();
-        vars.insert("title".to_string(), Value::String("Sprint 42".into()));
+        vars.insert(
+            "title".to_string(),
+            Value::Scalar(Scalar::Text("Sprint 42".into())),
+        );
 
         let applied = apply_blueprint_to_file(
             &root,

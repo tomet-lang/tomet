@@ -6,12 +6,12 @@ fn parses_flat_map() {
     assert_eq!(
         v,
         Value::Tuple(Tuple::from_named(vec![
-            ("title".into(), Value::String("value".into())),
+            ("title".into(), Value::Scalar(Scalar::Text("value".into()))),
             (
                 "tags".into(),
                 Value::Tuple(Tuple::from_unnamed(vec![
-                    Value::String("a".into()),
-                    Value::String("b".into())
+                    Value::Scalar(Scalar::Text("a".into())),
+                    Value::Scalar(Scalar::Text("b".into()))
                 ]))
             ),
         ]))
@@ -58,8 +58,8 @@ fn at_sigiled_call_in_a_value_position_is_an_element() {
     assert_eq!(
         el.data.args,
         Some(Tuple::from_entries(vec![
-            TupleEntry::unnamed(Value::String("triangle".to_string())),
-            TupleEntry::named("pkg", Value::String("lucide".to_string())),
+            TupleEntry::unnamed(Value::Scalar(Scalar::Text("triangle".to_string()))),
+            TupleEntry::named("pkg", Value::Scalar(Scalar::Text("lucide".to_string()))),
         ]))
     );
 }
@@ -89,31 +89,41 @@ fn positional_values_must_come_before_named_entries() {
     assert_eq!(
         parse_value(r#""star", pkg:"lucide""#).unwrap(),
         Value::Tuple(Tuple::from_entries(vec![
-            TupleEntry::unnamed(Value::String("star".into())),
-            TupleEntry::named("pkg", Value::String("lucide".into())),
+            TupleEntry::unnamed(Value::Scalar(Scalar::Text("star".into()))),
+            TupleEntry::named("pkg", Value::Scalar(Scalar::Text("lucide".into()))),
         ]))
     );
     let err = parse_value(r#"pkg:"lucide", "star""#).unwrap_err();
-    assert!(err
-        .to_string()
-        .contains("a value without a name must come before the named ones"));
+    assert!(
+        err.to_string()
+            .contains("a value without a name must come before the named ones")
+    );
 }
 
 #[test]
 fn parses_scalars() {
-    assert_eq!(parse_value("42").unwrap(), Value::Int(42));
-    assert_eq!(parse_value("-3.5").unwrap(), Value::Float(-3.5));
-    assert_eq!(parse_value("true").unwrap(), Value::Bool(true));
-    assert_eq!(parse_value("none").unwrap(), Value::None);
-    assert_eq!(parse_value("auto").unwrap(), Value::Auto);
-    assert_eq!(parse_value("hello").unwrap(), Value::String("hello".into()));
+    assert_eq!(parse_value("42").unwrap(), Value::Scalar(Scalar::Int(42)));
+    assert_eq!(
+        parse_value("-3.5").unwrap(),
+        Value::Scalar(Scalar::Float(-3.5))
+    );
+    assert_eq!(
+        parse_value("true").unwrap(),
+        Value::Scalar(Scalar::Bool(true))
+    );
+    assert_eq!(parse_value("none").unwrap(), Value::Scalar(Scalar::None));
+    assert_eq!(parse_value("auto").unwrap(), Value::Scalar(Scalar::Auto));
+    assert_eq!(
+        parse_value("hello").unwrap(),
+        Value::Scalar(Scalar::Text("hello".into()))
+    );
     let err = parse_value("null").expect_err("null is an error");
     assert!(err.to_string().contains("write `none`"));
 }
 
 #[test]
 fn a_bare_paren_group_is_a_sequence() {
-    let s = |t: &str| Value::String(t.into());
+    let s = |t: &str| Value::Scalar(Scalar::Text(t.into()));
     let seq = |items: Vec<Value>| Value::Tuple(Tuple::from_unnamed(items));
     // Empty, one element (no trailing comma needed), several.
     assert_eq!(parse_value("()").unwrap(), seq(vec![]));
@@ -138,8 +148,11 @@ fn a_bare_paren_group_is_a_sequence() {
     assert_eq!(
         parse_value("((k: 1), 2, \"q\")").unwrap(),
         seq(vec![
-            Value::Tuple(Tuple::from_named(vec![("k".into(), Value::Int(1))])),
-            Value::Int(2),
+            Value::Tuple(Tuple::from_named(vec![(
+                "k".into(),
+                Value::Scalar(Scalar::Int(1))
+            )])),
+            Value::Scalar(Scalar::Int(2)),
             s("q"),
         ])
     );
@@ -155,7 +168,13 @@ fn a_bare_paren_group_is_a_sequence() {
         parse_value("a: ()\nb: (1,\n  2)").unwrap(),
         Value::Tuple(Tuple::from_named(vec![
             ("a".into(), seq(vec![])),
-            ("b".into(), seq(vec![Value::Int(1), Value::Int(2)])),
+            (
+                "b".into(),
+                seq(vec![
+                    Value::Scalar(Scalar::Int(1)),
+                    Value::Scalar(Scalar::Int(2))
+                ])
+            ),
         ]))
     );
 }
@@ -168,7 +187,7 @@ fn a_list_call_is_not_a_sequence() {
         parse_value("list(card)").unwrap(),
         Value::Call(
             "list".into(),
-            Tuple::from_unnamed(vec![Value::String("card".into())])
+            Tuple::from_unnamed(vec![Value::Scalar(Scalar::Text("card".into()))])
         )
     );
     assert_eq!(
@@ -177,7 +196,7 @@ fn a_list_call_is_not_a_sequence() {
             "type".into(),
             Value::Call(
                 "list".into(),
-                Tuple::from_unnamed(vec![Value::String("string".into())])
+                Tuple::from_unnamed(vec![Value::Scalar(Scalar::Text("string".into()))])
             )
         )]))
     );
@@ -190,19 +209,22 @@ fn a_paren_tuple_at_value_position_takes_named_and_unnamed_entries() {
     let Some(Value::Tuple(inner)) = t.get("k") else {
         panic!()
     };
-    assert_eq!(inner.get("a"), Some(&Value::Int(1)));
+    assert_eq!(inner.get("a"), Some(&Value::Scalar(Scalar::Int(1))));
 
     let v = parse_value("k: (a, b: 2)").unwrap();
     let Value::Tuple(t) = v else { panic!() };
     let Some(Value::Tuple(inner)) = t.get("k") else {
         panic!()
     };
-    assert_eq!(inner.nth_unnamed(0), Some(&Value::String("a".into())));
-    assert_eq!(inner.get("b"), Some(&Value::Int(2)));
+    assert_eq!(
+        inner.nth_unnamed(0),
+        Some(&Value::Scalar(Scalar::Text("a".into())))
+    );
+    assert_eq!(inner.get("b"), Some(&Value::Scalar(Scalar::Int(2))));
 
     let v = parse_value("(x: 1)").unwrap();
     let Value::Tuple(inner) = v else { panic!() };
-    assert_eq!(inner.get("x"), Some(&Value::Int(1)));
+    assert_eq!(inner.get("x"), Some(&Value::Scalar(Scalar::Int(1))));
 }
 
 #[test]
@@ -221,18 +243,21 @@ fn only_the_literal_constructors_are_resolved() {
         parse_value("enum(card)").unwrap(),
         Value::Call(
             "enum".into(),
-            Tuple::from_unnamed(vec![Value::String("card".into())])
+            Tuple::from_unnamed(vec![Value::Scalar(Scalar::Text("card".into()))])
         )
     );
     assert_eq!(
         parse_value("k: int(\"5\")").unwrap(),
-        Value::Tuple(Tuple::from_named(vec![("k".into(), Value::Int(5))]))
+        Value::Tuple(Tuple::from_named(vec![(
+            "k".into(),
+            Value::Scalar(Scalar::Int(5))
+        )]))
     );
     assert_eq!(
         parse_value("k: string(1.50)").unwrap(),
         Value::Tuple(Tuple::from_named(vec![(
             "k".into(),
-            Value::String("1.50".into())
+            Value::Scalar(Scalar::Text("1.50".into()))
         )]))
     );
 }
@@ -241,7 +266,7 @@ fn only_the_literal_constructors_are_resolved() {
 fn a_name_without_a_trailing_paren_is_still_a_plain_scalar() {
     assert_eq!(
         parse_value("card-name").unwrap(),
-        Value::String("card-name".into())
+        Value::Scalar(Scalar::Text("card-name".into()))
     );
 }
 
@@ -252,7 +277,7 @@ fn preserves_colon_in_url_values() {
         v,
         Value::Tuple(Tuple::from_named(vec![(
             "url".into(),
-            Value::String("https://example.com/path".into())
+            Value::Scalar(Scalar::Text("https://example.com/path".into()))
         )]))
     );
 }
@@ -266,8 +291,11 @@ fn a_quoted_key_is_a_map_key() {
     assert_eq!(
         v,
         Value::Tuple(Tuple::from_named(vec![
-            ("tmtroot/a.tmt".into(), Value::String("../x".into())),
-            ("plain".into(), Value::Int(1)),
+            (
+                "tmtroot/a.tmt".into(),
+                Value::Scalar(Scalar::Text("../x".into()))
+            ),
+            ("plain".into(), Value::Scalar(Scalar::Int(1))),
         ]))
     );
 }
@@ -276,25 +304,34 @@ fn a_quoted_key_is_a_map_key() {
 fn bare_integer_and_quoted_numeric_keys_are_the_same_key() {
     assert_eq!(
         parse_value("(5: x)").unwrap(),
-        Value::Tuple(Tuple::from_named([("5".into(), Value::String("x".into()))]))
+        Value::Tuple(Tuple::from_named([(
+            "5".into(),
+            Value::Scalar(Scalar::Text("x".into()))
+        )]))
     );
     assert_eq!(
         parse_value("(\"5\": x)").unwrap(),
-        Value::Tuple(Tuple::from_named([("5".into(), Value::String("x".into()))]))
+        Value::Tuple(Tuple::from_named([(
+            "5".into(),
+            Value::Scalar(Scalar::Text("x".into()))
+        )]))
     );
     assert_eq!(
         parse_value("(404: x)").unwrap(),
-        Value::Tuple(Tuple::from_named([("404".into(), Value::String("x".into()))]))
+        Value::Tuple(Tuple::from_named([(
+            "404".into(),
+            Value::Scalar(Scalar::Text("x".into()))
+        )]))
     );
 
     // true, false, none, auto as keys work as text keys
     assert_eq!(
         parse_value("(true: 1, false: 2, none: 3, auto: 4)").unwrap(),
         Value::Tuple(Tuple::from_named([
-            ("true".into(), Value::Int(1)),
-            ("false".into(), Value::Int(2)),
-            ("none".into(), Value::Int(3)),
-            ("auto".into(), Value::Int(4)),
+            ("true".into(), Value::Scalar(Scalar::Int(1))),
+            ("false".into(), Value::Scalar(Scalar::Int(2))),
+            ("none".into(), Value::Scalar(Scalar::Int(3))),
+            ("auto".into(), Value::Scalar(Scalar::Int(4))),
         ]))
     );
 }
@@ -302,7 +339,10 @@ fn bare_integer_and_quoted_numeric_keys_are_the_same_key() {
 /// A quoted string that is not followed by `:` is still a value.
 #[test]
 fn a_quoted_string_without_a_colon_is_still_a_value() {
-    assert_eq!(parse_value("\"a/b\"").unwrap(), Value::String("a/b".into()));
+    assert_eq!(
+        parse_value("\"a/b\"").unwrap(),
+        Value::Scalar(Scalar::Text("a/b".into()))
+    );
 }
 
 /// A map holds a named key once, however it is spelled: in `(args)`, which
@@ -393,13 +433,16 @@ fn a_pipe_value_inside_nested_maps() {
 #[test]
 fn a_number_reading_would_change_keeps_its_text_in_an_argument() {
     for (src, want) in [
-        ("1.10", Value::Number("1.10".into())),
-        ("1e3", Value::Number("1e3".into())),
-        ("-0", Value::Number("-0".into())),
-        ("1.5", Value::Float(1.5)),
-        ("2024", Value::Int(2024)),
-        ("1.10.0", Value::String("1.10.0".into())),
-        ("2026-10-25", Value::String("2026-10-25".into())),
+        ("1.10", Value::Scalar(Scalar::Number("1.10".into()))),
+        ("1e3", Value::Scalar(Scalar::Number("1e3".into()))),
+        ("-0", Value::Scalar(Scalar::Number("-0".into()))),
+        ("1.5", Value::Scalar(Scalar::Float(1.5))),
+        ("2024", Value::Scalar(Scalar::Int(2024))),
+        ("1.10.0", Value::Scalar(Scalar::Text("1.10.0".into()))),
+        (
+            "2026-10-25",
+            Value::Scalar(Scalar::Text("2026-10-25".into())),
+        ),
     ] {
         let doc = parse_file(&format!("@x({src})\n")).unwrap();
         let Some(Block::Element(el)) = doc.body.first() else {

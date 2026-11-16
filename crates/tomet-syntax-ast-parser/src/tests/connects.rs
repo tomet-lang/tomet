@@ -8,8 +8,8 @@ fn section_supports_inline_colon_connection() {
             assert_eq!(
                 s.data.value,
                 Some(Group::from_map(Tuple::from_named(vec![
-                    ("id".into(), Value::String("intro".into())),
-                    ("tag".into(), Value::String("main".into())),
+                    ("id".into(), Value::Scalar(Scalar::Text("intro".into()))),
+                    ("tag".into(), Value::Scalar(Scalar::Text("main".into()))),
                 ])))
             );
         }
@@ -26,8 +26,11 @@ fn element_supports_inline_colon_connection() {
             assert_eq!(
                 el.data.value,
                 Some(Group::from_map(Tuple::from_named(vec![
-                    ("id".into(), Value::String("taskA".into())),
-                    ("priority".into(), Value::String("high".into())),
+                    ("id".into(), Value::Scalar(Scalar::Text("taskA".into()))),
+                    (
+                        "priority".into(),
+                        Value::Scalar(Scalar::Text("high".into()))
+                    ),
                 ])))
             );
         }
@@ -43,13 +46,18 @@ fn remote_id_target_element_supports_colon_connection() {
             assert_eq!(el.name, Name::bare("id"));
             assert_eq!(
                 el.data.args,
-                Some(Tuple::from_unnamed(vec![Value::String("taskA".into())]))
+                Some(Tuple::from_unnamed(vec![Value::Scalar(Scalar::Text(
+                    "taskA".into()
+                ))]))
             );
             assert_eq!(
                 el.data.value,
                 Some(Group::from_map(Tuple::from_named(vec![
-                    ("priority".into(), Value::String("high".into())),
-                    ("tag".into(), Value::String("dev".into())),
+                    (
+                        "priority".into(),
+                        Value::Scalar(Scalar::Text("high".into()))
+                    ),
+                    ("tag".into(), Value::Scalar(Scalar::Text("dev".into()))),
                 ])))
             );
         }
@@ -70,7 +78,9 @@ fn named_connect_reads_into_connects() {
                 rule.data.args,
                 Some(Tuple::from_named(vec![(
                     "allow".into(),
-                    Value::Tuple(Tuple::from_unnamed(vec![Value::String("card".into())]))
+                    Value::Tuple(Tuple::from_unnamed(vec![Value::Scalar(Scalar::Text(
+                        "card".into()
+                    ))]))
                 )]))
             );
         }
@@ -103,7 +113,7 @@ fn bare_colon_merge_is_unaffected_by_named_connect_support() {
                 el.data.value,
                 Some(Group::from_map(Tuple::from_named(vec![(
                     "b".into(),
-                    Value::Int(2)
+                    Value::Scalar(Scalar::Int(2))
                 )])))
             );
         }
@@ -128,12 +138,20 @@ fn sugar_list_item_and_heading_support_a_bare_connect() {
     // `::()`, `::{}` and the combined `::(){}` attach to a bracket-less
     // sugar body's own owner the same way they do for a bracketed one.
     for (src, expect_args, expect_value) in [
-        ("- content ::(x: 1)\n", Some(Value::Int(1)), None),
-        ("- content ::{y: 2}\n", None, Some(Value::Int(2))),
+        (
+            "- content ::(x: 1)\n",
+            Some(Value::Scalar(Scalar::Int(1))),
+            None,
+        ),
+        (
+            "- content ::{y: 2}\n",
+            None,
+            Some(Value::Scalar(Scalar::Int(2))),
+        ),
         (
             "- content ::(x: 1){y: 2}\n",
-            Some(Value::Int(1)),
-            Some(Value::Int(2)),
+            Some(Value::Scalar(Scalar::Int(1))),
+            Some(Value::Scalar(Scalar::Int(2))),
         ),
     ] {
         let doc = parse_file(src).unwrap_or_else(|e| panic!("{src:?} failed: {e}"));
@@ -168,13 +186,16 @@ fn sugar_list_item_and_heading_support_a_bare_connect() {
         Block::Section(s) => {
             assert_eq!(
                 s.data.args,
-                Some(Tuple::from_named(vec![("x".into(), Value::Int(1))]))
+                Some(Tuple::from_named(vec![(
+                    "x".into(),
+                    Value::Scalar(Scalar::Int(1))
+                )]))
             );
             assert_eq!(
                 s.data.value,
                 Some(Group::from_map(Tuple::from_named(vec![(
                     "y".into(),
-                    Value::Int(2)
+                    Value::Scalar(Scalar::Int(2))
                 )])))
             );
             assert_eq!(s.title, vec![Inline::Text("title".into())]);
@@ -228,7 +249,10 @@ fn sugar_connect_tolerates_one_blank_line_but_not_two() {
             let items = &list.items;
             assert_eq!(
                 item_attrs(&items[0]),
-                Some(Tuple::from_named(vec![("y".into(), Value::Int(2))]))
+                Some(Tuple::from_named(vec![(
+                    "y".into(),
+                    Value::Scalar(Scalar::Int(2))
+                )]))
             );
         }
         other => panic!("expected list, got {other:?}"),
@@ -256,7 +280,7 @@ fn sugar_connect_tolerates_one_blank_line_but_not_two() {
                 s.data.value,
                 Some(Group::from_map(Tuple::from_named(vec![(
                     "y".into(),
-                    Value::Int(2)
+                    Value::Scalar(Scalar::Int(2))
                 )])))
             );
         }
@@ -291,7 +315,9 @@ fn a_double_colon_connect_attaches_to_every_host() {
             connects[0].data.args,
             Some(Tuple::from_named(vec![(
                 "allow".into(),
-                Value::Tuple(Tuple::from_unnamed(vec![Value::String("card".into())]))
+                Value::Tuple(Tuple::from_unnamed(vec![Value::Scalar(Scalar::Text(
+                    "card".into()
+                ))]))
             )])),
             "{src:?}"
         );
@@ -308,7 +334,7 @@ fn a_nameless_double_colon_connect_merges_into_its_owner() {
         s.data.value,
         Some(Group::from_map(Tuple::from_named(vec![(
             "a".into(),
-            Value::Int(1)
+            Value::Scalar(Scalar::Int(1))
         )])))
     );
     assert!(s.connects.is_empty());

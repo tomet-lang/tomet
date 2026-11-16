@@ -3,6 +3,7 @@
 use clap::{Arg, Command};
 use tomet_ast::{Block, File, ListItem, Section, Tuple, Value};
 use tomet_config::PrinterConfig;
+use tomet_scalar::Scalar;
 use tomet_tree::declaration_new;
 
 use crate::util::{
@@ -20,7 +21,9 @@ pub fn render(root: &mut Command, doc_id: &str, notice: &str, config: &PrinterCo
 /// Builds a Tomet [`File`] AST representing the CLI command hierarchy and options.
 pub fn document(root: &mut Command, doc_id: &str, notice: &str) -> File {
     let mut id = declaration_new("id");
-    id.data.args = Some(Tuple::from_unnamed([Value::String(doc_id.to_string())]));
+    id.data.args = Some(Tuple::from_unnamed([Value::Scalar(Scalar::Text(
+        doc_id.to_string(),
+    ))]));
 
     let mut blocks = Vec::new();
     push_command(root, 1, &mut blocks);

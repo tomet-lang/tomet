@@ -3,6 +3,7 @@ use tomet_semantics::DeclKind;
 use lsp_types::{Hover, HoverContents, MarkupContent, MarkupKind, Position, Range, Uri};
 use tomet_ast::{Declaration, Element, File, InterpExpr, Tuple, Value};
 use tomet_expr::{DocRef, EvalContext, EvalValue, MemoryResolver, evaluate};
+use tomet_scalar::Scalar;
 use tomet_semantics::{
     ElementKind, TupleView, classify_declaration_lenient, classify_std_lenient,
     declaration_args_view, element_args_view, heading_level,
@@ -200,9 +201,12 @@ fn declaration_hover(positions: &TextPositions<'_>, declaration: &Declaration) -
             .as_ref()
             .and_then(|v| {
                 v.get("version").map(|v| match v {
-                    Value::String(s) => s.clone(),
-                    Value::Int(i) => i.to_string(),
-                    Value::Float(f) => f.to_string(),
+                    Value::Scalar(s) => match s {
+                        Scalar::Text(s) | Scalar::Number(s) => s.clone(),
+                        Scalar::Int(i) => i.to_string(),
+                        Scalar::Float(f) => f.to_string(),
+                        _ => format!("{v:?}"),
+                    },
                     _ => format!("{v:?}"),
                 })
             })
@@ -291,30 +295,21 @@ fn extract_table_aligns_from_args(args: Option<&TupleView<'_, '_>>) -> Vec<Strin
             Value::Tuple(tuple) => {
                 return tuple
                     .values()
-                    .filter_map(|item| match item {
-                        Value::String(s) => Some(s.clone()),
-                        _ => None,
-                    })
+                    .filter_map(Value::as_str)
+                    .map(String::from)
                     .collect();
             }
-            Value::String(s) => {
+            Value::Scalar(Scalar::Text(s)) => {
                 return vec![s.clone(); 50];
             }
             Value::Call(_, tuple) => {
                 return tuple
                     .values()
-                    .filter_map(|item| match item {
-                        Value::String(s) => Some(s.clone()),
-                        _ => None,
-                    })
+                    .filter_map(Value::as_str)
+                    .map(String::from)
                     .collect();
             }
-            Value::None
-            | Value::Auto
-            | Value::Bool(_)
-            | Value::Int(_)
-            | Value::Float(_)
-            | Value::Number(_)
+            Value::Scalar(_)
             | Value::Interp(_)
             | Value::Hole(_)
             | Value::TypeSeat(_)
@@ -455,7 +450,7 @@ fn find_interp_in_tuple(tuple: &Tuple) -> Option<tomet_ast::InterpExpr> {
 
 fn find_interp_in_value(val: &Value) -> Option<tomet_ast::InterpExpr> {
     match val {
-        Value::String(s) => {
+        Value::Scalar(Scalar::Text(s)) => {
             let trimmed = s.trim();
             if trimmed.starts_with('$')
                 && let Ok(parsed) = tomet_ast_parser::parse_file(trimmed)
@@ -482,15 +477,7 @@ fn find_interp_in_value(val: &Value) -> Option<tomet_ast::InterpExpr> {
                 None
             }
         }
-        Value::None
-        | Value::Auto
-        | Value::Bool(_)
-        | Value::Int(_)
-        | Value::Float(_)
-        | Value::Number(_)
-        | Value::Hole(_)
-        | Value::TypeSeat(_)
-        | Value::Blocks(_) => None,
+        Value::Scalar(_) | Value::Hole(_) | Value::TypeSeat(_) | Value::Blocks(_) => None,
     }
 }
 
@@ -572,13 +559,15 @@ fn evaluate_for_hover(
 
 fn render_value(value: &EvalValue) -> String {
     match value {
-        EvalValue::None => "none".to_string(),
-        EvalValue::Auto => "auto".to_string(),
-        EvalValue::Bool(b) => b.to_string(),
-        EvalValue::Int(i) => i.to_string(),
-        EvalValue::Float(f) => f.to_string(),
-        EvalValue::Number(s) => s.clone(),
-        EvalValue::String(s) => s.clone(),
+        EvalValue::Scalar(s) => match s {
+            Scalar::None => "none".to_string(),
+            Scalar::Auto => "auto".to_string(),
+            Scalar::Bool(b) => b.to_string(),
+            Scalar::Int(i) => i.to_string(),
+            Scalar::Float(f) => f.to_string(),
+            Scalar::Number(s) => s.clone(),
+            Scalar::Text(s) => s.clone(),
+        },
         EvalValue::Tuple(tuple) => {
             let entries: Vec<String> = tuple
                 .entries()

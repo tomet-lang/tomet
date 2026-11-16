@@ -163,7 +163,7 @@ impl Filler<'_> {
     fn value_of(&self, seat: &TypeSeat, in_text: bool) -> Result<Value, SeatReason> {
         let ty = evaluate_type(&seat.expr, self.cx).map_err(SeatReason::NotAType)?;
         let value = self.source_of(&ty)?;
-        if in_text && value.scalar_text().is_none() {
+        if in_text && value.as_scalar().and_then(|s| s.text()).is_none() {
             return Err(SeatReason::NoPlaceInText {
                 found: describe(&value),
             });
@@ -177,14 +177,14 @@ impl Filler<'_> {
             (Some(AutoFill::Id), _) => {
                 let spec =
                     IdSpec::new(ty).ok_or_else(|| SeatReason::NoIdForm { ty: ty.to_string() })?;
-                Ok(Value::String(self.source.id(&spec)))
+                Ok(Value::Scalar(Scalar::Text(self.source.id(&spec))))
             }
             (Some(AutoFill::Now), _) => {
                 let moment = self.moment.get_or_init(|| self.source.now());
-                Ok(Value::String(match ty.kind() {
+                Ok(Value::Scalar(Scalar::Text(match ty.kind() {
                     Kind::Date => date_text(moment),
                     _ => datetime_text(moment),
-                }))
+                })))
             }
             (None, Some(datum)) if *datum != Datum::Scalar(Scalar::Auto) => {
                 admits_default(ty).map_err(SeatReason::DefaultNotOfType)?;
@@ -302,18 +302,23 @@ mod tests {
     }
 
     fn text(value: &str) -> Value {
-        Value::String(value.to_string())
+        Value::Scalar(Scalar::Text(value.to_string()))
     }
 
     fn problems(src: &str) -> Vec<SeatProblem> {
-        made(src, EvalValue::None, &fixed(&[UUID, UUID, UUID])).expect_err("a stop")
+        made(
+            src,
+            EvalValue::Scalar(Scalar::None),
+            &fixed(&[UUID, UUID, UUID]),
+        )
+        .expect_err("a stop")
     }
 
     #[test]
     fn a_seat_with_default_auto_is_filled_with_an_id_drawn_for_its_type() {
         let (doc, report) = made(
             "::blueprint(note)\n::id(<$uuid(default: auto)>)\n::meta(\n  short: <$nanoid(length: 8, prefix: \"note-\", default: auto)>\n)\n",
-            EvalValue::None,
+            EvalValue::Scalar(Scalar::None),
             &fixed(&[UUID, "note-ab12cd34"]),
         )
         .unwrap();
@@ -344,7 +349,7 @@ mod tests {
         let asking = Asking(Cell::new(0));
         let (doc, _) = made(
             "::blueprint(note)\n::meta(a: <$nanoid(length: 6, prefix: \"n-\", default: auto)>)\n",
-            EvalValue::None,
+            EvalValue::Scalar(Scalar::None),
             &asking,
         )
         .unwrap();
@@ -356,7 +361,7 @@ mod tests {
     fn the_moment_is_a_datetime_in_the_offset_and_a_date_is_the_day_there() {
         let (doc, _) = made(
             "::blueprint(note)\n::meta(\n  created: <$datetime(default: auto)>\n  day: <$date(default: auto)>\n)\n",
-            EvalValue::None,
+            EvalValue::Scalar(Scalar::None),
             &fixed(&[]),
         )
         .unwrap();
@@ -367,7 +372,7 @@ mod tests {
         let late = FixedSource::at("2026-11-11T23:30:00-05:00").unwrap();
         let (doc, _) = made(
             "::blueprint(note)\n::meta(created: <$datetime(default: auto)>, day: <$date(default: auto)>)\n",
-            EvalValue::None,
+            EvalValue::Scalar(Scalar::None),
             &late,
         )
         .unwrap();
@@ -378,7 +383,7 @@ mod tests {
         let utc = FixedSource::at("2026-01-05T07:08:09Z").unwrap();
         let (doc, _) = made(
             "::blueprint(note)\n::meta(created: <$datetime(default: auto)>)\n",
-            EvalValue::None,
+            EvalValue::Scalar(Scalar::None),
             &utc,
         )
         .unwrap();
@@ -400,7 +405,7 @@ mod tests {
         let counting = Counting(Cell::new(0));
         let (doc, _) = made(
             "::blueprint(note)\n::meta(a: <$datetime(default: auto)>, b: <$date(default: auto)>, c: <$datetime(default: auto)>)\n",
-            EvalValue::None,
+            EvalValue::Scalar(Scalar::None),
             &counting,
         )
         .unwrap();
@@ -414,14 +419,14 @@ mod tests {
     fn a_default_written_out_is_the_value_in_its_own_kind() {
         let (doc, _) = made(
             "::blueprint(note)\n::meta(\n  count: <$int(default: 3)>\n  done: <$bool(default: false)>\n  title: <$string(default: \"Untitled\")>\n  ratio: <$float(default: 1.5)>\n)\n",
-            EvalValue::None,
+            EvalValue::Scalar(Scalar::None),
             &fixed(&[]),
         )
         .unwrap();
-        assert_eq!(field(&doc, "count"), Value::Int(3));
-        assert_eq!(field(&doc, "done"), Value::Bool(false));
+        assert_eq!(field(&doc, "count"), Value::Scalar(Scalar::Int(3)));
+        assert_eq!(field(&doc, "done"), Value::Scalar(Scalar::Bool(false)));
         assert_eq!(field(&doc, "title"), text("Untitled"));
-        assert_eq!(field(&doc, "ratio"), Value::Float(1.5));
+        assert_eq!(field(&doc, "ratio"), Value::Scalar(Scalar::Float(1.5)));
     }
 
     #[test]
@@ -431,8 +436,8 @@ mod tests {
             Tuple::try_from_entries([TupleEntry::named(
                 "tags".to_string(),
                 EvalValue::Tuple(Tuple::from_unnamed([
-                    EvalValue::String("a".into()),
-                    EvalValue::String("b".into()),
+                    EvalValue::Scalar(Scalar::Text("a".into())),
+                    EvalValue::Scalar(Scalar::Text("b".into())),
                 ])),
             )])
             .unwrap(),
@@ -453,7 +458,7 @@ mod tests {
     fn a_seat_in_prose_a_heading_and_on_a_line_of_its_own_is_its_text() {
         let (doc, _) = made(
             "::blueprint(note)\n\n=[ Notes of <$date(default: auto)> ]#(notes)\n\nWritten on <$date(default: auto)>, build <$int(default: 7)>.\n\n<$string(default: \"Fin\")>\n",
-            EvalValue::None,
+            EvalValue::Scalar(Scalar::None),
             &fixed(&[]),
         )
         .unwrap();
@@ -491,7 +496,7 @@ mod tests {
     fn a_seat_is_filled_wherever_it_sits_and_none_is_left() {
         let (doc, _) = made(
             "::blueprint(note)\n::meta(a: <$int(default: 1)>)\n::id(<$uuid(default: auto)>)\n\n=[ <$string(default: \"h\")> ]\n@card(n: <$int(default: 2)>)[ <$string(default: \"in\")> ]\n- item <$int(default: 3)>\n\n<$string(default: \"end\")>\n",
-            EvalValue::None,
+            EvalValue::Scalar(Scalar::None),
             &fixed(&[UUID]),
         )
         .unwrap();
@@ -560,7 +565,9 @@ mod tests {
         let vars = EvalValue::Tuple(
             Tuple::try_from_entries([TupleEntry::named(
                 "tags".to_string(),
-                EvalValue::Tuple(Tuple::from_unnamed([EvalValue::String("a".into())])),
+                EvalValue::Tuple(Tuple::from_unnamed([EvalValue::Scalar(Scalar::Text(
+                    "a".into(),
+                ))])),
             )])
             .unwrap(),
         );
@@ -604,7 +611,7 @@ mod tests {
             resolver: &NoResolver,
             self_doc: DocRef("a.tmt".into()),
             macros: &macros,
-            var: &EvalValue::None,
+            var: &EvalValue::Scalar(Scalar::None),
             var_unset: &[],
             includes: &[],
             heading_level: 0,
@@ -628,7 +635,7 @@ mod tests {
             resolver: &resolver,
             self_doc: DocRef("notes/plan.tmt".into()),
             macros: &macros,
-            var: &EvalValue::None,
+            var: &EvalValue::Scalar(Scalar::None),
             var_unset: &[],
             includes: &[],
             heading_level: 0,
@@ -658,19 +665,21 @@ mod tests {
     fn a_blueprint_with_no_seat_is_made_as_before() {
         let (doc, report) = made(
             "::blueprint(note)\n::meta(a: 1)\n",
-            EvalValue::None,
+            EvalValue::Scalar(Scalar::None),
             &fixed(&[]),
         )
         .unwrap();
         assert!(report.changed);
-        assert_eq!(field(&doc, "a"), Value::Int(1));
+        assert_eq!(field(&doc, "a"), Value::Scalar(Scalar::Int(1)));
     }
 
     #[test]
     fn the_reasons_read_as_one_line_each() {
-        let mismatch =
-            tomet_semantics_core::admits(&"int".parse().unwrap(), &Value::String("x".into()))
-                .unwrap_err();
+        let mismatch = tomet_semantics_core::admits(
+            &"int".parse().unwrap(),
+            &Value::Scalar(Scalar::Text("x".into())),
+        )
+        .unwrap_err();
         for (reason, said) in [
             (
                 SeatReason::NotAType(EvalError::BadType(tomet_type::TypeError::Unknown(

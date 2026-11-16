@@ -78,6 +78,7 @@ pub fn target_scheme(target: &str) -> (AddressKind, &str) {
 mod tests {
     use super::*;
     use tomet_ast::{Element, Name, Tuple, Value};
+    use tomet_scalar::Scalar;
     use tomet_tree::element_new;
 
     fn map_el(name: Name, entries: Vec<(&str, Value)>) -> Element {
@@ -89,7 +90,7 @@ mod tests {
     }
 
     fn s(v: &str) -> Value {
-        Value::String(v.to_string())
+        Value::Scalar(Scalar::Text(v.to_string()))
     }
 
     #[test]
@@ -222,7 +223,10 @@ mod tests {
 
     #[test]
     fn non_string_value_under_target_key_is_rejected() {
-        let el = map_el(Name::bare("link"), vec![("target", Value::Int(42))]);
+        let el = map_el(
+            Name::bare("link"),
+            vec![("target", Value::Scalar(Scalar::Int(42)))],
+        );
         assert_eq!(link_target_of(el.as_view()), None);
     }
 
@@ -242,7 +246,9 @@ mod path_tests {
 
     fn path_el(name: &str, value: &str) -> Element {
         let mut el = element_new(Name::bare(name));
-        el.data.args = Some(Tuple::from_unnamed([Value::String(value.to_string())]));
+        el.data.args = Some(Tuple::from_unnamed([Value::Scalar(
+            tomet_scalar::Scalar::Text(value.to_string()),
+        )]));
         el
     }
 

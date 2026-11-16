@@ -1,7 +1,5 @@
 use crate::error::Result;
-use tomet_ast::{
-    BinaryOp, InterpExpr, InterpExprKind, InterpSpelling, Interpolation, TypeSeat,
-};
+use tomet_ast::{BinaryOp, InterpExpr, InterpExprKind, InterpSpelling, Interpolation, TypeSeat};
 use tomet_cst::SyntaxNode;
 use tomet_lexer::Cursor;
 use tomet_span::Span;

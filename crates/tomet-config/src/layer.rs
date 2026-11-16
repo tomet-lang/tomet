@@ -17,6 +17,7 @@ use std::collections::HashMap;
 
 use tomet_ast::{Element, File, Value};
 use tomet_declaration::{DeclKind, VarDecl, document_entries};
+use tomet_scalar::Scalar;
 use tomet_tree::ValueExt;
 
 /// The settings, name tables, macros and variables one file declares, ready to be stacked.
@@ -174,7 +175,7 @@ fn registered_paths(table: &[(String, Value)]) -> Vec<String> {
 fn registered_path(value: &Value) -> Option<String> {
     match value {
         Value::Element(el) => file_target(el),
-        Value::String(path) => Some(path.clone()),
+        Value::Scalar(Scalar::Text(path)) => Some(path.clone()),
         _ => None,
     }
 }

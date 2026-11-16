@@ -14,6 +14,9 @@ tomet-ast-parser = { workspace = true }
 tomet-position   = { workspace = true }
 tomet-span       = { workspace = true }
 
+[dev-dependencies]
+tomet-scalar = { workspace = true }
+
 [features]
 default = []
 eval    = ["dep:cotomet-eval"]

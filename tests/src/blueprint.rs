@@ -4,6 +4,7 @@ use std::path::Path;
 
 use tomet_ast::Value;
 use tomet_config::{PrinterConfig, RegistryConfig};
+use tomet_scalar::Scalar;
 use tomet_transform::FixedSource;
 use tomet_validator::{Diagnostic, validate_against_blueprint, validate_document};
 use tomet_workspace::{
@@ -77,7 +78,10 @@ Reviewed on <$date(default: auto)>.
 
     // 3. Instantiate document via workspace, from a fixed clock and a fixed id
     let mut vars = HashMap::new();
-    vars.insert("author".to_string(), Value::String("Alice".into()));
+    vars.insert(
+        "author".to_string(),
+        Value::Scalar(Scalar::Text("Alice".into())),
+    );
 
     let doc_rel_path = Path::new("journal/2026-09-01.tmt");
     let created = create_file_from_blueprint_with(

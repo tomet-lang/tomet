@@ -92,6 +92,7 @@ mod tests {
     use std::fs;
     use std::path::PathBuf;
     use tomet_ast::Tuple;
+    use tomet_scalar::Scalar;
 
     const SETTINGS: &str = "::kind(config)
 ::field(
@@ -163,7 +164,7 @@ mod tests {
         assert_eq!(
             rust.get("tags"),
             Some(&EvalValue::Tuple(Tuple::from_unnamed(vec![
-                EvalValue::String("rust".into())
+                EvalValue::Scalar(Scalar::Text("rust".into()))
             ])))
         );
 
@@ -173,7 +174,7 @@ mod tests {
             panic!("meta is a tuple");
         };
         assert_eq!(go.get("tags"), Some(&EvalValue::Tuple(Tuple::new())));
-        assert_eq!(go.get("created"), Some(&EvalValue::None));
+        assert_eq!(go.get("created"), Some(&EvalValue::Scalar(Scalar::None)));
         let _ = fs::remove_dir_all(&root);
     }
 
@@ -203,7 +204,7 @@ mod tests {
         let vault = Vault::discover(&root);
         let resolver = vault.resolver();
         let macros = HashMap::new();
-        let var = EvalValue::None;
+        let var = EvalValue::Scalar(Scalar::None);
         let cx = EvalContext {
             resolver: &resolver,
             self_doc: DocRef("index.tmt".into()),
@@ -220,9 +221,9 @@ mod tests {
         .unwrap();
         assert_eq!(
             evaluate(&interp.expr, &cx).unwrap(),
-            EvalValue::Tuple(Tuple::from_unnamed(vec![EvalValue::String(
+            EvalValue::Tuple(Tuple::from_unnamed(vec![EvalValue::Scalar(Scalar::Text(
                 "notes/rust.tmt".into()
-            )]))
+            ))]))
         );
         let _ = fs::remove_dir_all(&root);
     }

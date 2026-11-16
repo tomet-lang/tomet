@@ -103,7 +103,7 @@ fn a_nexus_inside_a_value_is_held_to_it_too() {
         value("k: @name\n").unwrap(),
         Value::Tuple(Tuple::from_named(vec![(
             "k".into(),
-            Value::String("@name".into())
+            Value::Scalar(tomet_scalar::Scalar::Text("@name".into()))
         )]))
     );
     assert!(value("k: @name()\n").is_ok());
@@ -277,10 +277,22 @@ fn unnamed_entries_merge_when_both_are_tuples_or_only_one_side_has_them() {
     let Some(Value::Tuple(first)) = args.nth_unnamed(0) else {
         panic!("{args:?}")
     };
-    assert_eq!(first.get("x"), Some(&Value::Int(1)));
-    assert_eq!(first.get("y"), Some(&Value::Int(2)));
-    assert_eq!(args.get("k"), Some(&Value::Int(0)));
-    assert_eq!(args.nth_unnamed(1), Some(&Value::Int(3)));
+    assert_eq!(
+        first.get("x"),
+        Some(&Value::Scalar(tomet_scalar::Scalar::Int(1)))
+    );
+    assert_eq!(
+        first.get("y"),
+        Some(&Value::Scalar(tomet_scalar::Scalar::Int(2)))
+    );
+    assert_eq!(
+        args.get("k"),
+        Some(&Value::Scalar(tomet_scalar::Scalar::Int(0)))
+    );
+    assert_eq!(
+        args.nth_unnamed(1),
+        Some(&Value::Scalar(tomet_scalar::Scalar::Int(3)))
+    );
     // The first writer's entries stay as written; what only the second has comes after.
     assert_eq!(args.nth(1).and_then(|e| e.name()), Some("k"));
 }
@@ -296,12 +308,21 @@ fn merge_named_entries_disjoint_and_recursive() {
     let a_val = args.get("a").unwrap();
     match a_val {
         Value::Tuple(t) => {
-            assert_eq!(t.get("x"), Some(&Value::Int(1)));
-            assert_eq!(t.get("y"), Some(&Value::Int(3)));
+            assert_eq!(
+                t.get("x"),
+                Some(&Value::Scalar(tomet_scalar::Scalar::Int(1)))
+            );
+            assert_eq!(
+                t.get("y"),
+                Some(&Value::Scalar(tomet_scalar::Scalar::Int(3)))
+            );
         }
         other => panic!("expected tuple, got {other:?}"),
     }
-    assert_eq!(args.get("b"), Some(&Value::Int(2)));
+    assert_eq!(
+        args.get("b"),
+        Some(&Value::Scalar(tomet_scalar::Scalar::Int(2)))
+    );
 }
 
 #[test]
@@ -418,8 +439,14 @@ fn tuple_duplicate_keys_and_literal_constructors() {
     };
     let args = el.data.args.as_ref().unwrap();
     assert_eq!(args.len(), 2);
-    assert_eq!(args.get("404"), Some(&Value::String("x".into())));
-    assert_eq!(args.get("500"), Some(&Value::String("y".into())));
+    assert_eq!(
+        args.get("404"),
+        Some(&Value::Scalar(tomet_scalar::Scalar::Text("x".into())))
+    );
+    assert_eq!(
+        args.get("500"),
+        Some(&Value::Scalar(tomet_scalar::Scalar::Text("y".into())))
+    );
 }
 
 #[test]
@@ -434,17 +461,35 @@ fn value_starting_brace_is_error_and_middle_brace_is_scalar() {
         panic!()
     };
     let args = el.data.args.as_ref().unwrap();
-    assert_eq!(args.get("a"), Some(&Value::String("x {y}".into())));
+    assert_eq!(
+        args.get("a"),
+        Some(&Value::Scalar(tomet_scalar::Scalar::Text("x {y}".into())))
+    );
 }
 
 #[test]
 fn dotted_declaration_heads_are_refused_with_advice() {
     for (src, want) in [
-        ("::field.author(type: string)\n", "a declaration head has no dot: write `::field(author: (...))`"),
-        ("::macro.copyright(\"copy\")\n", "a declaration head has no dot: write `::macro(copyright: (...))`"),
-        ("::blueprint.x(a: 1)\n", "a declaration head has no dot: write `::blueprint(x: (...))`"),
-        ("::vocabulary.x(version: \"1.0.0\")\n", "a declaration head has no dot: write `::vocabulary(x: (...))`"),
-        ("::field.url.wiki(type: list)\n", "a declaration head has no dot: write `::field(url.wiki: (...))`"),
+        (
+            "::field.author(type: string)\n",
+            "a declaration head has no dot: write `::field(author: (...))`",
+        ),
+        (
+            "::macro.copyright(\"copy\")\n",
+            "a declaration head has no dot: write `::macro(copyright: (...))`",
+        ),
+        (
+            "::blueprint.x(a: 1)\n",
+            "a declaration head has no dot: write `::blueprint(x: (...))`",
+        ),
+        (
+            "::vocabulary.x(version: \"1.0.0\")\n",
+            "a declaration head has no dot: write `::vocabulary(x: (...))`",
+        ),
+        (
+            "::field.url.wiki(type: list)\n",
+            "a declaration head has no dot: write `::field(url.wiki: (...))`",
+        ),
     ] {
         let err = file(src).unwrap_err();
         assert_eq!(err.message, want, "{src}");
@@ -456,10 +501,20 @@ fn positions_only_on_the_left_for_all_four_paren_kinds() {
     const WANT_ERR: &str = "a value without a name must come before the named ones";
 
     // 1. Value tuple
-    for valid in ["(a, b, k: v)", "(1: a, 2: b)", "(\"1\": a, \"2\": b)", "(a, b)"] {
+    for valid in [
+        "(a, b, k: v)",
+        "(1: a, 2: b)",
+        "(\"1\": a, \"2\": b)",
+        "(a, b)",
+    ] {
         assert!(value(valid).is_ok(), "{valid}");
     }
-    for invalid in ["(a, k: v, b)", "(\"1\": a, b)", "(\"0\": a, b)", "(1: a, b)"] {
+    for invalid in [
+        "(a, k: v, b)",
+        "(\"1\": a, b)",
+        "(\"0\": a, b)",
+        "(1: a, b)",
+    ] {
         let err = value(invalid).unwrap_err();
         assert_eq!(err.message, WANT_ERR, "{invalid}");
     }
@@ -480,11 +535,7 @@ fn positions_only_on_the_left_for_all_four_paren_kinds() {
     }
 
     // 3. Element args
-    for valid in [
-        "@card(a, k: v)\n",
-        "@card(1: a, 2: b)\n",
-        "@card(a, b)\n",
-    ] {
+    for valid in ["@card(a, k: v)\n", "@card(1: a, 2: b)\n", "@card(a, b)\n"] {
         assert!(file(valid).is_ok(), "{valid}");
     }
     for invalid in [
@@ -497,11 +548,7 @@ fn positions_only_on_the_left_for_all_four_paren_kinds() {
     }
 
     // 4. Declaration args
-    for valid in [
-        "::use(a, k: v)\n",
-        "::decl(1: a, 2: b)\n",
-        "::use(a, b)\n",
-    ] {
+    for valid in ["::use(a, k: v)\n", "::decl(1: a, 2: b)\n", "::use(a, b)\n"] {
         assert!(file(valid).is_ok(), "{valid}");
     }
     for invalid in [

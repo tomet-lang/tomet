@@ -4,6 +4,7 @@
 //! for a named entry and the value alone for an unnamed one.
 
 use tomet_ast::{Tuple, Value};
+use tomet_scalar::Scalar;
 use tomet_spelling::{write_key, write_scalar_string};
 
 pub fn print_value(value: &Value) -> String {
@@ -27,13 +28,15 @@ fn write_value(value: &Value, out: &mut String, top_level: bool) {
                 out.push(')');
             }
         }
-        Value::String(s) => write_scalar_string(s, out),
-        Value::Int(i) => out.push_str(&i.to_string()),
-        Value::Float(f) => write_float(*f, out),
-        Value::Number(text) => out.push_str(text),
-        Value::Bool(b) => out.push_str(if *b { "true" } else { "false" }),
-        Value::None => out.push_str("none"),
-        Value::Auto => out.push_str("auto"),
+        Value::Scalar(s) => match s {
+            Scalar::Text(s) => write_scalar_string(s, out),
+            Scalar::Int(i) => out.push_str(&i.to_string()),
+            Scalar::Float(f) => write_float(*f, out),
+            Scalar::Number(text) => out.push_str(text),
+            Scalar::Bool(b) => out.push_str(if *b { "true" } else { "false" }),
+            Scalar::None => out.push_str("none"),
+            Scalar::Auto => out.push_str("auto"),
+        },
         Value::Call(name, args) => {
             out.push_str(name);
             out.push('(');

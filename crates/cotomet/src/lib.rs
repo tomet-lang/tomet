@@ -79,9 +79,10 @@ pub mod syntax {
 mod tests {
     use super::*;
     use tomet_ast::{Tuple, TupleEntry};
+    use tomet_scalar::Scalar;
 
     fn text(s: &str) -> Value {
-        Value::String(s.to_string())
+        Value::Scalar(Scalar::Text(s.to_string()))
     }
 
     fn map(entries: &[(&str, Value)]) -> Value {
@@ -144,9 +145,9 @@ mod tests {
         };
         assert_eq!(
             tuple.get("a"),
-            Some(&Value::String(
+            Some(&Value::Scalar(Scalar::Text(
                 "vocabularies/writ/writ@1.0.0.vocabulary.tmt".to_string()
-            ))
+            )))
         );
     }
 
@@ -161,7 +162,10 @@ mod tests {
             [
                 (
                     "kind".to_string(),
-                    Some(Tuple::from_unnamed([text("catalog"), Value::Int(2)])),
+                    Some(Tuple::from_unnamed([
+                        text("catalog"),
+                        Value::Scalar(Scalar::Int(2))
+                    ])),
                     None
                 ),
                 (
@@ -173,7 +177,7 @@ mod tests {
                     "meta".to_string(),
                     Some(Tuple::from_named([
                         ("id".to_string(), text("x")),
-                        ("n".to_string(), Value::Int(1)),
+                        ("n".to_string(), Value::Scalar(Scalar::Int(1))),
                     ])),
                     None
                 ),
@@ -181,7 +185,10 @@ mod tests {
         );
         assert_eq!(
             f.body,
-            map(&[("a/b", Value::Int(1)), ("m", map(&[("k", text("v"))]))])
+            map(&[
+                ("a/b", Value::Scalar(Scalar::Int(1))),
+                ("m", map(&[("k", text("v"))]))
+            ])
         );
     }
 
@@ -193,7 +200,10 @@ mod tests {
             [(
                 "x".to_string(),
                 Some(Tuple::from_unnamed([text("a"), text("b")])),
-                Some(Tuple::from_named([("c".to_string(), Value::Int(1))]))
+                Some(Tuple::from_named([(
+                    "c".to_string(),
+                    Value::Scalar(Scalar::Int(1))
+                )]))
             )]
         );
         let f = parse_file("::x{ c: 1 }(a)\n").unwrap();
@@ -217,7 +227,7 @@ mod tests {
             f.header[0].data.args,
             Some(Tuple::from_entries([
                 TupleEntry::unnamed(text("note")),
-                TupleEntry::named("version", Value::Int(2)),
+                TupleEntry::named("version", Value::Scalar(Scalar::Int(2))),
             ]))
         );
     }
@@ -283,7 +293,7 @@ mod tests {
         assert_eq!(
             parse_file("a: 1\n// note\n\"b/c\": (x)\n").unwrap().body,
             map(&[
-                ("a", Value::Int(1)),
+                ("a", Value::Scalar(Scalar::Int(1))),
                 ("b/c", Value::Tuple(Tuple::from_unnamed([text("x")]))),
             ])
         );

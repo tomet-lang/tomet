@@ -961,7 +961,8 @@ mod tests {
                 .expr;
             vault.evaluate(&doc, &host, &expr)
         };
-        let text = |s: &str| tomet_expr::EvalValue::String(s.to_string());
+        let text =
+            |s: &str| tomet_expr::EvalValue::Scalar(tomet_scalar::Scalar::Text(s.to_string()));
 
         assert_eq!(eval("self::meta.title").unwrap(), text("Host"));
         assert_eq!(

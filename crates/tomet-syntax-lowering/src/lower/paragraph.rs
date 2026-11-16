@@ -352,7 +352,7 @@ fn lower_autolink(node: &SyntaxNode) -> Element {
     element.data = Data {
         args: Some(Tuple::from_named(vec![(
             "target".to_string(),
-            Value::String(node.text().to_string()),
+            Value::Scalar(tomet_scalar::Scalar::Text(node.text().to_string())),
         )])),
         value: None,
     };

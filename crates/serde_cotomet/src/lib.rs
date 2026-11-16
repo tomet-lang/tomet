@@ -49,6 +49,7 @@ pub fn to_string<T: serde::Serialize + ?Sized>(value: &T) -> Result<String> {
 mod tests {
     use super::*;
     use serde::{Deserialize, Serialize};
+    use tomet_scalar::Scalar;
 
     #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
     struct Settings {
@@ -126,7 +127,7 @@ mod tests {
     fn call_syntax_has_no_serde_equivalent() {
         let err = de::from_value::<i32>(Value::Call(
             "enum".into(),
-            tomet_ast::Tuple::from_unnamed(vec![Value::String("card".into())]),
+            tomet_ast::Tuple::from_unnamed(vec![Value::Scalar(Scalar::Text("card".into()))]),
         ))
         .unwrap_err();
         let msg = err.to_string();
@@ -137,9 +138,9 @@ mod tests {
     fn deserialize_seq_and_tuple_take_unnamed_entries() {
         use tomet_ast::{Tuple, TupleEntry};
         let mixed = Value::Tuple(Tuple::from_entries(vec![
-            TupleEntry::unnamed(Value::Int(10)),
-            TupleEntry::named("a", Value::String("x".into())),
-            TupleEntry::unnamed(Value::Int(20)),
+            TupleEntry::unnamed(Value::Scalar(Scalar::Int(10))),
+            TupleEntry::named("a", Value::Scalar(Scalar::Text("x".into()))),
+            TupleEntry::unnamed(Value::Scalar(Scalar::Int(20))),
         ]));
         let seq: Vec<i64> = from_value(mixed.clone()).expect("seq takes unnamed entries");
         assert_eq!(seq, vec![10, 20]);
@@ -152,9 +153,9 @@ mod tests {
         use std::collections::BTreeMap;
         use tomet_ast::{Tuple, TupleEntry};
         let mixed = Value::Tuple(Tuple::from_entries(vec![
-            TupleEntry::unnamed(Value::Int(10)),
-            TupleEntry::named("label", Value::String("Inbox".into())),
-            TupleEntry::named("path", Value::String("notes/inbox".into())),
+            TupleEntry::unnamed(Value::Scalar(Scalar::Int(10))),
+            TupleEntry::named("label", Value::Scalar(Scalar::Text("Inbox".into()))),
+            TupleEntry::named("path", Value::Scalar(Scalar::Text("notes/inbox".into()))),
         ]));
         let bm: Bookmark = from_value(mixed.clone()).expect("struct takes named entries");
         assert_eq!(
@@ -238,8 +239,8 @@ mod tests {
         // Unnamed only -> seq
         assert_eq!(
             from_value::<AnyShape>(Value::Tuple(Tuple::from_unnamed(vec![
-                Value::Int(1),
-                Value::Int(2),
+                Value::Scalar(Scalar::Int(1)),
+                Value::Scalar(Scalar::Int(2)),
             ])))
             .unwrap(),
             AnyShape::Seq(vec![1, 2])
@@ -248,7 +249,7 @@ mod tests {
         assert_eq!(
             from_value::<AnyShape>(Value::Tuple(Tuple::from_named(vec![(
                 "k".into(),
-                Value::String("v".into()),
+                Value::Scalar(Scalar::Text("v".into())),
             )])))
             .unwrap(),
             AnyShape::Map(vec![("k".into(), "v".into())])
@@ -256,9 +257,9 @@ mod tests {
         // Mixed -> map with unnamed keyed by position among unnamed
         assert_eq!(
             from_value::<AnyShape>(Value::Tuple(Tuple::from_entries(vec![
-                TupleEntry::unnamed(Value::String("a".into())),
-                TupleEntry::named("k", Value::String("v".into())),
-                TupleEntry::unnamed(Value::String("b".into())),
+                TupleEntry::unnamed(Value::Scalar(Scalar::Text("a".into()))),
+                TupleEntry::named("k", Value::Scalar(Scalar::Text("v".into()))),
+                TupleEntry::unnamed(Value::Scalar(Scalar::Text("b".into()))),
             ])))
             .unwrap(),
             AnyShape::Map(vec![

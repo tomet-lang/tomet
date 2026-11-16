@@ -185,7 +185,13 @@ mod tests {
         assert_eq!(Scalar::Bool(false).text().as_deref(), Some("false"));
         assert_eq!(Scalar::Int(42).text().as_deref(), Some("42"));
         assert_eq!(Scalar::Float(1.5).text().as_deref(), Some("1.5"));
-        assert_eq!(Scalar::Number("1.10".into()).text().as_deref(), Some("1.10"));
-        assert_eq!(Scalar::Text("hello".into()).text().as_deref(), Some("hello"));
+        assert_eq!(
+            Scalar::Number("1.10".into()).text().as_deref(),
+            Some("1.10")
+        );
+        assert_eq!(
+            Scalar::Text("hello".into()).text().as_deref(),
+            Some("hello")
+        );
     }
 }

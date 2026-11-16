@@ -30,6 +30,7 @@ tomet-markdown           = { workspace = true }
 tomet-pandoc             = { workspace = true }
 tomet-position           = { workspace = true }
 tomet-printer            = { workspace = true }
+tomet-scalar             = { workspace = true }
 tomet-semantics          = { workspace = true }
 tomet-spec               = { workspace = true }
 tomet-stats              = { workspace = true }

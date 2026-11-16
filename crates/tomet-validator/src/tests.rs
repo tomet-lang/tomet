@@ -1,5 +1,6 @@
 use super::*;
 use tomet_ast::File;
+use tomet_scalar::Scalar;
 
 fn parse(source: &str) -> File {
     tomet_ast_parser::parse_file(source).expect("valid Tomet source")
@@ -1362,8 +1363,8 @@ fn check_ctmt_declarations_reports_expected_diagnostics() {
             Declaration::new(
                 "kind",
                 Some(Tuple::from_unnamed([
-                    Value::String("catalog".into()),
-                    Value::Int(1),
+                    Value::Scalar(Scalar::Text("catalog".into())),
+                    Value::Scalar(Scalar::Int(1)),
                 ])),
                 None,
             ),
@@ -1372,7 +1373,9 @@ fn check_ctmt_declarations_reports_expected_diagnostics() {
         Declared::new(
             Declaration::new(
                 "version",
-                Some(Tuple::from_unnamed([Value::String("1.0.0".into())])),
+                Some(Tuple::from_unnamed([Value::Scalar(Scalar::Text(
+                    "1.0.0".into(),
+                ))])),
                 None,
             ),
             Span::new(11, 25),
@@ -1382,7 +1385,7 @@ fn check_ctmt_declarations_reports_expected_diagnostics() {
                 "meta",
                 Some(Tuple::from_named([(
                     "author".into(),
-                    Value::String("me".into()),
+                    Value::Scalar(Scalar::Text("me".into())),
                 )])),
                 None,
             ),
@@ -1399,7 +1402,9 @@ fn check_ctmt_declarations_reports_expected_diagnostics() {
         Declaration::new("foo.bar", None, None),
         Declaration::new(
             "use",
-            Some(Tuple::from_unnamed([Value::String("deck".into())])),
+            Some(Tuple::from_unnamed([Value::Scalar(Scalar::Text(
+                "deck".into(),
+            ))])),
             None,
         ),
         Declaration::new("meta", None, None),
@@ -1407,14 +1412,17 @@ fn check_ctmt_declarations_reports_expected_diagnostics() {
         Declaration::new(
             "kind",
             Some(Tuple::from_unnamed([
-                Value::String("catalog".into()),
-                Value::String("abc".into()),
+                Value::Scalar(Scalar::Text("catalog".into())),
+                Value::Scalar(Scalar::Text("abc".into())),
             ])),
             None,
         ),
         Declaration::new(
             "macro",
-            Some(Tuple::from_named([("bad".into(), Value::Int(123))])),
+            Some(Tuple::from_named([(
+                "bad".into(),
+                Value::Scalar(Scalar::Int(123)),
+            )])),
             None,
         ),
     ];
@@ -1506,9 +1514,7 @@ fn a_retired_plural_declaration_is_reported_once_with_its_replacement() {
 /// Grouped declarations are held to their checks.
 #[test]
 fn declarations_are_checked() {
-    for src in [
-        "::field(owner: (type: person))\n",
-    ] {
+    for src in ["::field(owner: (type: person))\n"] {
         let errors = validate_document(&parse(src));
         assert_eq!(errors.len(), 1, "{src}: {errors:?}");
         assert!(

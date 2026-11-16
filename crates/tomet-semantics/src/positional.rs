@@ -1,4 +1,5 @@
 use tomet_ast::{Data, Declaration, ElementView, Name, Tuple, Value};
+use tomet_scalar::Scalar;
 use tomet_semantics_core::{Slots, TupleView};
 use tomet_tree::ValueExt;
 
@@ -98,7 +99,7 @@ fn recover_target_scheme_entry(first_positional_key: Option<&str>, tuple: &Tuple
     let scheme = scheme.to_string();
     let mut tuple = tuple.clone();
     if let Some(value) = tuple.get_mut(&scheme) {
-        *value = Value::String(format!("{scheme}:{}", value.plain_text()));
+        *value = Value::Scalar(Scalar::Text(format!("{scheme}:{}", value.plain_text())));
     }
     let _ = tuple.rename(&scheme, "target");
     Some(tuple)
@@ -173,15 +174,23 @@ fn args_view_in<'a>(
 mod tests {
     use super::*;
     use tomet_ast::{Name, Tuple, Value};
+    use tomet_scalar::Scalar;
     use tomet_tree::{ValueExt, element_new};
+
+    fn s(text: &str) -> Value {
+        Value::Scalar(Scalar::Text(text.to_string()))
+    }
+    fn i(n: i64) -> Value {
+        Value::Scalar(Scalar::Int(n))
+    }
 
     #[test]
     fn normalizes_raw_positional_arg() {
         let mut el = element_new(Name::bare("raw"));
-        el.data.args = Some(Tuple::from_unnamed([Value::String("rust".to_string())]));
+        el.data.args = Some(Tuple::from_unnamed([s("rust")]));
         let view = element_args_view(el.as_view()).unwrap();
-        assert_eq!(view.get("lang"), Some(&Value::String("rust".to_string())));
-        assert_eq!(view.get("0"), Some(&Value::String("rust".to_string())));
+        assert_eq!(view.get("lang"), Some(&s("rust")));
+        assert_eq!(view.get("0"), Some(&s("rust")));
         assert_eq!(view.entry_alias(0), Some("lang"));
         assert_eq!(view.tuple(), el.data.args.as_ref().unwrap());
     }
@@ -190,12 +199,12 @@ mod tests {
     fn normalizes_conflict_positional_args_by_written_order() {
         // `@conflict(1, 2)` -- two bare entries, no keys
         let mut el = element_new(Name::bare("conflict"));
-        el.data.args = Some(Tuple::from_unnamed([Value::Int(1), Value::Int(2)]));
+        el.data.args = Some(Tuple::from_unnamed([i(1), i(2)]));
         let view = element_args_view(el.as_view()).unwrap();
-        assert_eq!(view.get("a"), Some(&Value::Int(1)));
-        assert_eq!(view.get("0"), Some(&Value::Int(1)));
-        assert_eq!(view.get("b"), Some(&Value::Int(2)));
-        assert_eq!(view.get("1"), Some(&Value::Int(2)));
+        assert_eq!(view.get("a"), Some(&i(1)));
+        assert_eq!(view.get("0"), Some(&i(1)));
+        assert_eq!(view.get("b"), Some(&i(2)));
+        assert_eq!(view.get("1"), Some(&i(2)));
         assert_eq!(view.tuple(), el.data.args.as_ref().unwrap());
     }
 
@@ -204,27 +213,16 @@ mod tests {
         // `::kind(name, 2)` is two bare entries; `::kind(name)` is one scalar.
         for (sigil, name_key) in [("kind", "kind"), ("use", "target")] {
             let mut el = element_new(Name::bare(sigil));
-            el.data.args = Some(Tuple::from_unnamed([
-                Value::String("deck".to_string()),
-                Value::Int(2),
-            ]));
+            el.data.args = Some(Tuple::from_unnamed([s("deck"), i(2)]));
             let view = element_args_view(el.as_view()).unwrap();
-            assert_eq!(
-                view.get(name_key),
-                Some(&Value::String("deck".to_string())),
-                "@{sigil}(deck, 2)"
-            );
-            assert_eq!(view.get("version"), Some(&Value::Int(2)));
+            assert_eq!(view.get(name_key), Some(&s("deck")), "@{sigil}(deck, 2)");
+            assert_eq!(view.get("version"), Some(&i(2)));
             assert_eq!(view.tuple(), el.data.args.as_ref().unwrap());
 
             // the version may be left out
-            el.data.args = Some(Tuple::from_unnamed([Value::String("deck".to_string())]));
+            el.data.args = Some(Tuple::from_unnamed([s("deck")]));
             let view = element_args_view(el.as_view()).unwrap();
-            assert_eq!(
-                view.get(name_key),
-                Some(&Value::String("deck".to_string())),
-                "@{sigil}(deck)"
-            );
+            assert_eq!(view.get(name_key), Some(&s("deck")), "@{sigil}(deck)");
             assert_eq!(view.get("version"), None);
             assert_eq!(view.tuple(), el.data.args.as_ref().unwrap());
         }
@@ -233,30 +231,19 @@ mod tests {
     #[test]
     fn normalizes_embed_positional_arg() {
         let mut el = element_new(Name::bare("embed"));
-        el.data.args = Some(Tuple::from_unnamed([Value::String("foo.png".to_string())]));
+        el.data.args = Some(Tuple::from_unnamed([s("foo.png")]));
         let view = element_args_view(el.as_view()).unwrap();
-        assert_eq!(
-            view.get("target"),
-            Some(&Value::String("foo.png".to_string()))
-        );
+        assert_eq!(view.get("target"), Some(&s("foo.png")));
         assert_eq!(view.tuple(), el.data.args.as_ref().unwrap());
     }
 
     #[test]
     fn normalizes_link_positional_arg() {
         let mut el = element_new(Name::bare("link"));
-        el.data.args = Some(Tuple::from_unnamed([Value::String(
-            "https://example.com".to_string(),
-        )]));
+        el.data.args = Some(Tuple::from_unnamed([s("https://example.com")]));
         let view = element_args_view(el.as_view()).unwrap();
-        assert_eq!(
-            view.get("target"),
-            Some(&Value::String("https://example.com".to_string()))
-        );
-        assert_eq!(
-            view.get("0"),
-            Some(&Value::String("https://example.com".to_string()))
-        );
+        assert_eq!(view.get("target"), Some(&s("https://example.com")));
+        assert_eq!(view.get("0"), Some(&s("https://example.com")));
         assert_eq!(view.tuple(), el.data.args.as_ref().unwrap());
     }
 
@@ -290,15 +277,9 @@ mod tests {
         // only real key `@link` has) -- this recovers it back into one
         // `target` string.
         let mut el = element_new(Name::bare("link"));
-        el.data.args = Some(Tuple::from_named([(
-            "tmt".to_string(),
-            Value::String("foo/bar".to_string()),
-        )]));
+        el.data.args = Some(Tuple::from_named([("tmt".to_string(), s("foo/bar"))]));
         let view = element_args_view(el.as_view()).unwrap();
-        assert_eq!(
-            view.get("target"),
-            Some(&Value::String("tmt:foo/bar".to_string()))
-        );
+        assert_eq!(view.get("target"), Some(&s("tmt:foo/bar")));
     }
 
     #[test]
@@ -308,76 +289,55 @@ mod tests {
         // stays untouched.
         let mut el = element_new(Name::bare("link"));
         el.data.args = Some(Tuple::from_named([
-            ("tmt".to_string(), Value::String("foo".to_string())),
-            (
-                "predicate".to_string(),
-                Value::String("depends_on".to_string()),
-            ),
+            ("tmt".to_string(), s("foo")),
+            ("predicate".to_string(), s("depends_on")),
         ]));
         let view = element_args_view(el.as_view()).unwrap();
-        assert_eq!(
-            view.get("target"),
-            Some(&Value::String("tmt:foo".to_string()))
-        );
-        assert_eq!(
-            view.get("predicate"),
-            Some(&Value::String("depends_on".to_string()))
-        );
+        assert_eq!(view.get("target"), Some(&s("tmt:foo")));
+        assert_eq!(view.get("predicate"), Some(&s("depends_on")));
     }
 
     #[test]
     fn does_not_recover_when_target_key_already_present() {
         let mut el = element_new(Name::bare("link"));
         el.data.args = Some(Tuple::from_named([
-            ("target".to_string(), Value::String("tmt:foo".to_string())),
-            ("tmt".to_string(), Value::String("bar".to_string())),
+            ("target".to_string(), s("tmt:foo")),
+            ("tmt".to_string(), s("bar")),
         ]));
         let view = element_args_view(el.as_view()).unwrap();
-        assert_eq!(
-            view.get("target"),
-            Some(&Value::String("tmt:foo".to_string()))
-        );
-        assert_eq!(view.get("tmt"), Some(&Value::String("bar".to_string())));
+        assert_eq!(view.get("target"), Some(&s("tmt:foo")));
+        assert_eq!(view.get("tmt"), Some(&s("bar")));
     }
 
     #[test]
     fn does_not_recover_when_multiple_scheme_candidates_are_ambiguous() {
         let mut el = element_new(Name::bare("link"));
         el.data.args = Some(Tuple::from_named([
-            ("tmt".to_string(), Value::String("foo".to_string())),
-            ("id".to_string(), Value::String("bar".to_string())),
+            ("tmt".to_string(), s("foo")),
+            ("id".to_string(), s("bar")),
         ]));
         let view = element_args_view(el.as_view()).unwrap();
         assert_eq!(view.get("target"), None);
-        assert_eq!(view.get("tmt"), Some(&Value::String("foo".to_string())));
-        assert_eq!(view.get("id"), Some(&Value::String("bar".to_string())));
+        assert_eq!(view.get("tmt"), Some(&s("foo")));
+        assert_eq!(view.get("id"), Some(&s("bar")));
     }
 
     #[test]
     fn does_not_recover_for_non_link_embed_elements() {
         let mut el = element_new(Name::bare("caution"));
-        el.data.args = Some(Tuple::from_named([(
-            "tmt".to_string(),
-            Value::String("foo".to_string()),
-        )]));
+        el.data.args = Some(Tuple::from_named([("tmt".to_string(), s("foo"))]));
         let view = element_args_view(el.as_view()).unwrap();
         assert_eq!(view.get("target"), None);
-        assert_eq!(view.get("tmt"), Some(&Value::String("foo".to_string())));
+        assert_eq!(view.get("tmt"), Some(&s("foo")));
     }
 
     #[test]
     fn a_custom_element_gets_no_positional_inference() {
         let mut el = element_new(Name::namespaced("deck", "job"));
-        el.data.args = Some(Tuple::from_unnamed([
-            Value::String("Clean room".to_string()),
-            Value::String("high".to_string()),
-        ]));
+        el.data.args = Some(Tuple::from_unnamed([s("Clean room"), s("high")]));
         let view = element_args_view(el.as_view()).unwrap();
-        assert_eq!(
-            view.get("0"),
-            Some(&Value::String("Clean room".to_string()))
-        );
-        assert_eq!(view.get("1"), Some(&Value::String("high".to_string())));
+        assert_eq!(view.get("0"), Some(&s("Clean room")));
+        assert_eq!(view.get("1"), Some(&s("high")));
         assert_eq!(view.entry_alias(0), None);
         assert_eq!(view.entry_alias(1), None);
     }
@@ -385,52 +345,40 @@ mod tests {
     #[test]
     fn leaves_map_args_unchanged() {
         let mut el = element_new(Name::bare("raw"));
-        let tuple_val =
-            Tuple::from_named([("lang".to_string(), Value::String("rust".to_string()))]);
+        let tuple_val = Tuple::from_named([("lang".to_string(), s("rust"))]);
         el.data.args = Some(tuple_val.clone());
         let view = element_args_view(el.as_view()).unwrap();
-        assert_eq!(view.get("lang"), Some(&Value::String("rust".to_string())));
+        assert_eq!(view.get("lang"), Some(&s("rust")));
         assert_eq!(view.tuple(), &tuple_val);
     }
 
     #[test]
     fn normalizes_bare_scalar_list_marker_under_marker_key() {
-        let marker = Tuple::from_unnamed([Value::String("12:01".to_string())]);
+        let marker = Tuple::from_unnamed([s("12:01")]);
         let view = list_marker_view(&marker);
-        assert_eq!(
-            view.get("marker"),
-            Some(&Value::String("12:01".to_string()))
-        );
-        assert_eq!(view.get("0"), Some(&Value::String("12:01".to_string())));
+        assert_eq!(view.get("marker"), Some(&s("12:01")));
+        assert_eq!(view.get("0"), Some(&s("12:01")));
         assert_eq!(view.tuple(), &marker);
     }
 
     #[test]
     fn leaves_explicit_key_value_list_marker_unchanged() {
         let tuple_val = Tuple::from_named([
-            ("color".to_string(), Value::String("red".to_string())),
-            ("priority".to_string(), Value::String("high".to_string())),
+            ("color".to_string(), s("red")),
+            ("priority".to_string(), s("high")),
         ]);
         let view = list_marker_view(&tuple_val);
-        assert_eq!(view.get("color"), Some(&Value::String("red".to_string())));
-        assert_eq!(
-            view.get("priority"),
-            Some(&Value::String("high".to_string()))
-        );
+        assert_eq!(view.get("color"), Some(&s("red")));
+        assert_eq!(view.get("priority"), Some(&s("high")));
         assert_eq!(view.tuple(), &tuple_val);
     }
 
     #[test]
     fn an_element_with_no_positional_key_leaves_a_bare_scalar_alone() {
         let mut el = element_new(Name::namespaced("deck", "card"));
-        el.data.args = Some(Tuple::from_unnamed([Value::String(
-            "https://example.com".to_string(),
-        )]));
+        el.data.args = Some(Tuple::from_unnamed([s("https://example.com")]));
         let view = element_args_view(el.as_view()).unwrap();
-        assert_eq!(
-            view.get("0"),
-            Some(&Value::String("https://example.com".to_string()))
-        );
+        assert_eq!(view.get("0"), Some(&s("https://example.com")));
         assert_eq!(view.entry_alias(0), None);
         assert_eq!(view.tuple(), el.data.args.as_ref().unwrap());
     }
@@ -438,10 +386,10 @@ mod tests {
     #[test]
     fn normalizes_task_status_positional_arg() {
         let mut el = element_new(Name::bare("task"));
-        el.data.args = Some(Tuple::from_unnamed([Value::String("x".to_string())]));
+        el.data.args = Some(Tuple::from_unnamed([s("x")]));
         let view = element_args_view(el.as_view()).unwrap();
-        assert_eq!(view.get("status"), Some(&Value::String("x".to_string())));
-        assert_eq!(view.get("0"), Some(&Value::String("x".to_string())));
+        assert_eq!(view.get("status"), Some(&s("x")));
+        assert_eq!(view.get("0"), Some(&s("x")));
         assert_eq!(view.tuple(), el.data.args.as_ref().unwrap());
     }
 
@@ -463,29 +411,18 @@ mod tests {
         bindings.used.insert("deck".to_string(), vocab);
 
         let mut el = element_new(Name::namespaced("deck", "card"));
-        el.data.args = Some(Tuple::from_unnamed([Value::String(
-            "https://example.com".to_string(),
-        )]));
+        el.data.args = Some(Tuple::from_unnamed([s("https://example.com")]));
 
         // 1. Without vocabulary: position 0 is accessible, alias "target" is None
         let view_without = element_args_view_in(el.as_view(), &Bindings::default()).unwrap();
-        assert_eq!(
-            view_without.get("0"),
-            Some(&Value::String("https://example.com".to_string()))
-        );
+        assert_eq!(view_without.get("0"), Some(&s("https://example.com")));
         assert_eq!(view_without.get("target"), None);
         assert_eq!(view_without.entry_alias(0), None);
 
         // 2. With vocabulary: position 0 and alias "target" give the EXACT SAME value
         let view_with = element_args_view_in(el.as_view(), &bindings).unwrap();
-        assert_eq!(
-            view_with.get("0"),
-            Some(&Value::String("https://example.com".to_string()))
-        );
-        assert_eq!(
-            view_with.get("target"),
-            Some(&Value::String("https://example.com".to_string()))
-        );
+        assert_eq!(view_with.get("0"), Some(&s("https://example.com")));
+        assert_eq!(view_with.get("target"), Some(&s("https://example.com")));
         assert_eq!(view_with.get("0"), view_with.get("target"));
         assert_eq!(view_with.entry_alias(0), Some("target"));
 
@@ -499,20 +436,14 @@ mod tests {
         let mut el_named = element_new(Name::namespaced("deck", "card"));
         el_named.data.args = Some(
             Tuple::try_from_entries([
-                tomet_ast::TupleEntry::named("target", Value::String("named_url".to_string())),
-                tomet_ast::TupleEntry::unnamed(Value::String("positional_url".to_string())),
+                tomet_ast::TupleEntry::named("target", s("named_url")),
+                tomet_ast::TupleEntry::unnamed(s("positional_url")),
             ])
             .unwrap(),
         );
         let view_skipped = element_args_view_in(el_named.as_view(), &bindings).unwrap();
-        assert_eq!(
-            view_skipped.get("target"),
-            Some(&Value::String("named_url".to_string()))
-        );
-        assert_eq!(
-            view_skipped.get("0"),
-            Some(&Value::String("positional_url".to_string()))
-        );
+        assert_eq!(view_skipped.get("target"), Some(&s("named_url")));
+        assert_eq!(view_skipped.get("0"), Some(&s("positional_url")));
         assert_eq!(view_skipped.entry_alias(0), None);
     }
 }

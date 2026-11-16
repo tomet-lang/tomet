@@ -1,6 +1,7 @@
 //! Reading type specifications from AST [`Value`]s.
 
 use tomet_ast::Value;
+use tomet_scalar::Scalar;
 use tomet_type::{Arg, Type, TypeError};
 
 use crate::admits::value_to_datum;
@@ -21,7 +22,7 @@ use crate::admits::value_to_datum;
 /// What a type may be given is [`Type::build`]'s to say.
 pub fn parse_type_spec(spec: &Value) -> Result<Type, TypeError> {
     match spec {
-        Value::String(text) => text.parse(),
+        Value::Scalar(Scalar::Text(text)) => text.parse(),
         Value::Call(name, args) => {
             if !args.has_no_named() {
                 return Err(TypeError::NotAType);
@@ -37,8 +38,10 @@ pub fn parse_type_spec(spec: &Value) -> Result<Type, TypeError> {
 /// plain value for a scalar (which `build` refuses where it is not wanted).
 fn arg(value: &Value) -> Result<Arg, TypeError> {
     match value {
-        Value::String(_) | Value::Call(..) => parse_type_spec(value).map(Arg::Type),
-        _ => value_to_datum(value).map(Arg::Datum).ok_or(TypeError::NotAType),
+        Value::Scalar(Scalar::Text(_)) | Value::Call(..) => parse_type_spec(value).map(Arg::Type),
+        _ => value_to_datum(value)
+            .map(Arg::Datum)
+            .ok_or(TypeError::NotAType),
     }
 }
 
@@ -49,7 +52,7 @@ mod tests {
     use tomet_type::Kind;
 
     fn string(s: &str) -> Value {
-        Value::String(s.to_string())
+        Value::Scalar(Scalar::Text(s.to_string()))
     }
 
     fn call(name: &str, args: Vec<Value>) -> Value {
@@ -117,7 +120,7 @@ mod tests {
             })
         );
         assert_eq!(
-            parse_type_spec(&call("list", vec![Value::Int(3)]))
+            parse_type_spec(&call("list", vec![Value::Scalar(Scalar::Int(3))]))
                 .unwrap_err()
                 .to_string(),
             "`list`: `item` takes a type, found the integer `3`"
@@ -136,7 +139,13 @@ mod tests {
             Err(TypeError::Unknown("person".to_string()))
         );
 
-        assert_eq!(parse_type_spec(&Value::Int(42)), Err(TypeError::NotAType));
-        assert_eq!(parse_type_spec(&Value::None), Err(TypeError::NotAType));
+        assert_eq!(
+            parse_type_spec(&Value::Scalar(Scalar::Int(42))),
+            Err(TypeError::NotAType)
+        );
+        assert_eq!(
+            parse_type_spec(&Value::Scalar(Scalar::None)),
+            Err(TypeError::NotAType)
+        );
     }
 }

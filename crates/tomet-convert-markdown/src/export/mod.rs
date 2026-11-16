@@ -18,11 +18,13 @@ use escape::{escape_attr, escape_text, fence_for};
 use tomet_ast::{
     Block, ElementView, File, Inline, Interpolation, List, Placement, Section, Tuple, Value,
 };
+use tomet_scalar::Scalar;
 use tomet_semantics::{
     FootnoteRegistry, TargetScheme, classify_std_lenient, comment_text, element_args_view,
     extract_tags, heading_level, is_attribute_key, is_directive, link_target, path_target,
     target_scheme,
 };
+use tomet_tree::ValueExt;
 
 struct MarkdownCtx<'a> {
     footnotes: &'a FootnoteRegistry,
@@ -305,10 +307,7 @@ fn render_ruby(cx: &MarkdownCtx, el: ElementView<'_>) -> String {
     let rt = args
         .as_ref()
         .and_then(|a| a.get("rt"))
-        .and_then(|v| match v {
-            Value::String(s) => Some(s.as_str()),
-            _ => None,
-        })
+        .and_then(Value::as_str)
         .unwrap_or("");
     format!("<ruby>{}<rt>{rt}</rt></ruby>", content_to_md(cx, el))
 }
@@ -402,13 +401,15 @@ fn render_callout(cx: &MarkdownCtx, el: ElementView<'_>) -> String {
     let mut title = None;
 
     if let Some(args) = el.data.args.as_ref() {
-        if let Some(v) = args.get("variant").or_else(|| args.nth_unnamed(0)) {
-            if let Value::String(s) = v {
-                variant = Some(s.clone());
-            }
+        if let Some(s) = args
+            .get("variant")
+            .or_else(|| args.nth_unnamed(0))
+            .and_then(Value::as_str)
+        {
+            variant = Some(s.to_string());
         }
-        if let Some(Value::String(s)) = args.get("title") {
-            title = Some(s.clone());
+        if let Some(s) = args.get("title").and_then(Value::as_str) {
+            title = Some(s.to_string());
         }
     }
 
@@ -604,8 +605,10 @@ fn task_status(el: ElementView<'_>) -> Option<String> {
     let args = element_args_view(el)?;
     if let Some(v) = args.get("status") {
         match v {
-            Value::String(s) => Some(s.clone()),
-            Value::Bool(b) => Some(if *b { "x".to_string() } else { " ".to_string() }),
+            Value::Scalar(Scalar::Text(s)) => Some(s.clone()),
+            Value::Scalar(Scalar::Bool(b)) => {
+                Some(if *b { "x".to_string() } else { " ".to_string() })
+            }
             _ => None,
         }
     } else {
@@ -694,13 +697,8 @@ fn push_data_attrs(out: &mut String, args: &Tuple) {
 #[deny(clippy::wildcard_enum_match_arm)]
 fn value_to_plain(v: &Value) -> String {
     match v {
-        Value::None => String::new(),
-        Value::Auto => "auto".to_string(),
-        Value::Bool(b) => b.to_string(),
-        Value::Int(i) => i.to_string(),
-        Value::Float(f) => tomet_scalar::float_text(*f),
-        Value::Number(text) => text.clone(),
-        Value::String(s) => s.clone(),
+        // The text a scalar was written as; `none` has none, so it is empty here.
+        Value::Scalar(s) => s.text().map(|text| text.into_owned()).unwrap_or_default(),
         Value::Tuple(tuple) => {
             if tuple.has_no_named() {
                 tuple

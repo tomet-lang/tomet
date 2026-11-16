@@ -2,6 +2,7 @@ use std::collections::HashMap;
 
 use tomet_ast::{Block, Inline, Tuple, TupleEntry, Value};
 use tomet_expr::{DocRef, EvalContext, EvalValue, MemoryResolver, NoResolver, Resolver};
+use tomet_scalar::Scalar;
 
 use super::*;
 
@@ -47,7 +48,7 @@ fn run_in(src: &str, resolver: &dyn Resolver, vars: &EvalValue) -> (File, Vec<Un
     let mut macros = HashMap::new();
     macros.insert(
         "gh".to_string(),
-        Value::String("https://x/issues/$(1)".to_string()),
+        Value::Scalar(Scalar::Text("https://x/issues/$(1)".to_string())),
     );
     macros.insert("note".to_string(), block_macro("note", "Note: $(1)"));
     macros.insert(
@@ -74,7 +75,7 @@ fn run_in(src: &str, resolver: &dyn Resolver, vars: &EvalValue) -> (File, Vec<Un
 }
 
 fn run(src: &str) -> (File, Vec<Unresolved>) {
-    run_with(src, &EvalValue::None)
+    run_with(src, &EvalValue::Scalar(Scalar::None))
 }
 
 /// Every text node in the document, in order, joined with `|` between blocks.
@@ -280,17 +281,26 @@ fn macro_table_cases() {
     let mut macros = HashMap::new();
     macros.insert(
         "gh".to_string(),
-        Value::String("https://x/$(1)".to_string()),
+        Value::Scalar(Scalar::Text("https://x/$(1)".to_string())),
     );
-    macros.insert("two".to_string(), Value::String("$(1)-$(2)".to_string()));
-    macros.insert("named".to_string(), Value::String("hi $(who)".to_string()));
-    macros.insert("none".to_string(), Value::String("const".to_string()));
+    macros.insert(
+        "two".to_string(),
+        Value::Scalar(Scalar::Text("$(1)-$(2)".to_string())),
+    );
+    macros.insert(
+        "named".to_string(),
+        Value::Scalar(Scalar::Text("hi $(who)".to_string())),
+    );
+    macros.insert(
+        "none".to_string(),
+        Value::Scalar(Scalar::Text("const".to_string())),
+    );
     let resolver = vault();
     let cx = EvalContext {
         resolver: &resolver,
         self_doc: DocRef("here.tmt".to_string()),
         macros: &macros,
-        var: &EvalValue::None,
+        var: &EvalValue::Scalar(Scalar::None),
         var_unset: &[],
         includes: &[],
         heading_level: 0,
@@ -353,8 +363,8 @@ fn a_value_in_an_element_argument_keeps_its_type() {
     assert_eq!(
         el.data.args,
         Some(Tuple::from_named([
-            ("n".into(), Value::Int(3)),
-            ("label".into(), Value::String("x".into()))
+            ("n".into(), Value::Scalar(Scalar::Int(3))),
+            ("label".into(), Value::Scalar(Scalar::Text("x".into())))
         ]))
     );
 }
@@ -371,12 +381,12 @@ fn a_value_in_a_value_group_keeps_its_type_and_a_list_stays_a_list() {
     assert_eq!(
         tuple,
         &Tuple::from_named([
-            ("n".into(), Value::Int(2)),
+            ("n".into(), Value::Scalar(Scalar::Int(2))),
             (
                 "names".into(),
                 Value::Tuple(Tuple::from_unnamed([
-                    Value::String("docs/a.tmt".into()),
-                    Value::String("docs/b.tmt".into())
+                    Value::Scalar(Scalar::Text("docs/a.tmt".into())),
+                    Value::Scalar(Scalar::Text("docs/b.tmt".into()))
                 ]))
             ),
         ])
@@ -425,8 +435,11 @@ fn a_reference_is_answered_from_the_document_the_resolver_holds() {
 #[test]
 fn a_document_reads_var() {
     let vars = EvalValue::Tuple(
-        Tuple::try_from_entries([TupleEntry::named("title", EvalValue::String("Plan".into()))])
-            .unwrap(),
+        Tuple::try_from_entries([TupleEntry::named(
+            "title",
+            EvalValue::Scalar(Scalar::Text("Plan".into())),
+        )])
+        .unwrap(),
     );
     let (doc, unresolved) = run_with(
         "::meta(title: $(var.title))\n\nPlan for $(var.title)\n",
@@ -437,7 +450,10 @@ fn a_document_reads_var() {
     let Some(tuple) = &declaration.data.args else {
         panic!("the entries of `::meta(...)`");
     };
-    assert_eq!(tuple.get("title"), Some(&Value::String("Plan".into())));
+    assert_eq!(
+        tuple.get("title"),
+        Some(&Value::Scalar(Scalar::Text("Plan".into())))
+    );
     assert_eq!(text_of(&doc), "Plan for Plan");
 }
 
@@ -474,7 +490,7 @@ fn only_a_variable_that_has_no_value_yet_awaits_input() {
 fn with_no_vault_a_reference_to_another_document_fails_and_stays() {
     let mut doc = tomet_ast_parser::parse_file("see {$ tmt(\"x.tmt\")#a::id }\n").unwrap();
     let macros = HashMap::new();
-    let vars = EvalValue::None;
+    let vars = EvalValue::Scalar(Scalar::None);
     let cx = EvalContext {
         resolver: &NoResolver,
         self_doc: DocRef("here.tmt".into()),
@@ -507,9 +523,9 @@ fn a_macro_in_an_element_argument_is_expanded_and_stays_text() {
     };
     assert_eq!(
         link.data.args,
-        Some(Tuple::from_unnamed([Value::String(
+        Some(Tuple::from_unnamed([Value::Scalar(Scalar::Text(
             "https://x/issues/7".into()
-        )]))
+        ))]))
     );
 }
 
@@ -615,7 +631,7 @@ fn only_the_selected_expressions_are_resolved() {
         resolver: &resolver,
         self_doc: DocRef("here.tmt".to_string()),
         macros: &macros,
-        var: &EvalValue::None,
+        var: &EvalValue::Scalar(Scalar::None),
         var_unset: &[],
         includes: &[],
         heading_level: 0,
@@ -652,7 +668,7 @@ fn written_number_in_metadata_interpolates_as_written() {
         resolver: &resolver,
         self_doc: DocRef("doc.tmt".to_string()),
         macros: &HashMap::new(),
-        var: &EvalValue::None,
+        var: &EvalValue::Scalar(Scalar::None),
         var_unset: &[],
         includes: &[],
         heading_level: 0,
@@ -680,7 +696,7 @@ fn a_block_macro_on_its_own_line_is_its_blocks() {
         card.data.args,
         Some(Tuple::from_named([(
             "title".to_string(),
-            Value::String("Title".to_string())
+            Value::Scalar(Scalar::Text("Title".to_string()))
         )]))
     );
 }

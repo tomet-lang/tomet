@@ -1,6 +1,7 @@
 //! Extracts tags from an element (`@tag(...)`, `@tag[...]`).
 
 use tomet_ast::{Block, ElementView, Inline, List, Tuple, Value};
+use tomet_tree::ValueExt;
 
 /// Extracts a list of tag names from a tag element.
 /// Inspects `args` (as tuple) and `content` (as plain text).
@@ -27,16 +28,12 @@ fn extract_tags_from_tuple(tuple: &Tuple, tags: &mut Vec<String>) {
 }
 
 fn extract_tags_from_value(v: &Value, tags: &mut Vec<String>) {
-    match v {
-        Value::String(s) => {
-            if !s.is_empty() {
-                tags.push(s.clone());
-            }
+    if let Some(s) = v.as_str() {
+        if !s.is_empty() {
+            tags.push(s.to_string());
         }
-        Value::Tuple(tuple) => {
-            extract_tags_from_tuple(tuple, tags);
-        }
-        _ => {}
+    } else if let Value::Tuple(tuple) = v {
+        extract_tags_from_tuple(tuple, tags);
     }
 }
 
@@ -105,7 +102,9 @@ mod tests {
     #[test]
     fn extracts_tags_from_args_string() {
         let mut el = element_new(Name::bare("tag"));
-        el.data.args = Some(Tuple::from_unnamed([Value::String("rust".to_string())]));
+        el.data.args = Some(Tuple::from_unnamed([Value::Scalar(
+            tomet_scalar::Scalar::Text("rust".to_string()),
+        )]));
         assert_eq!(extract_tags(el.as_view()), vec!["rust"]);
     }
 
@@ -113,8 +112,8 @@ mod tests {
     fn extracts_tags_from_args_seq() {
         let mut el = element_new(Name::bare("tag"));
         el.data.args = Some(Tuple::from_unnamed([
-            Value::String("rust".to_string()),
-            Value::String("tomet".to_string()),
+            Value::Scalar(tomet_scalar::Scalar::Text("rust".to_string())),
+            Value::Scalar(tomet_scalar::Scalar::Text("tomet".to_string())),
         ]));
         assert_eq!(extract_tags(el.as_view()), vec!["rust", "tomet"]);
     }

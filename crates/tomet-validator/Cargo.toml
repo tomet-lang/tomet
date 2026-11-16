@@ -23,3 +23,4 @@ tomet-ast-parser  = { workspace = true }
 tomet-cst-parser  = { workspace = true }
 tomet-declaration = { workspace = true }
 tomet-position    = { workspace = true }
+tomet-scalar      = { workspace = true }

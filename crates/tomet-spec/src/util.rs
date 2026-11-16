@@ -3,6 +3,7 @@
 use tomet_ast::{
     Block, Element, Inline, List, ListItem, Name, Paragraph, Placement, RawText, Text, Tuple, Value,
 };
+use tomet_scalar::Scalar;
 use tomet_span::Span;
 use tomet_tree::{ElementExt, element_new};
 
@@ -33,7 +34,7 @@ pub fn code_block(body: &str) -> Element {
     let mut el = element_new(Name::bare("raw")).with_placement(Placement::Block);
     el.data.args = Some(Tuple::from_named([(
         "lang".to_string(),
-        Value::String("text".to_string()),
+        Value::Scalar(Scalar::Text("text".to_string())),
     )]));
     el.content = Some(vec![paragraph(vec![Inline::Raw(RawText::new(
         body,

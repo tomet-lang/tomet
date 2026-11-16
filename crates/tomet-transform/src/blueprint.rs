@@ -3,6 +3,7 @@
 use tomet_ast::{Block, File, Inline, Name, Section, Tuple, Value};
 use tomet_expr::{EvalContext, evaluate_type};
 use tomet_id::IdSpec;
+use tomet_scalar::Scalar;
 use tomet_semantics::DeclKind;
 use tomet_semantics::{ElementKind, classify_declaration_lenient, declaration_args_view};
 use tomet_semantics_core::admits;
@@ -157,7 +158,9 @@ pub fn instantiate_blueprint(
                 .to_string();
 
             declaration.name = Name::bare("kind");
-            declaration.data.args = Some(Tuple::from_unnamed([Value::String(target_kind)]));
+            declaration.data.args = Some(Tuple::from_unnamed([Value::Scalar(Scalar::Text(
+                target_kind,
+            ))]));
             // `{version, description}` describes the blueprint, not the
             // document it produces, so it does not survive promotion.
             declaration.data.value = None;
@@ -194,7 +197,9 @@ pub struct ApplyOutcome {
 /// Checks whether a document value satisfies a required type.
 pub fn value_satisfies_type(val: &Value, ty: &Type) -> bool {
     if let Some(spec) = IdSpec::new(ty) {
-        val.scalar_text().is_some_and(|text| spec.accepts(&text))
+        val.as_scalar()
+            .and_then(|s| s.text())
+            .is_some_and(|text| spec.accepts(&text))
     } else {
         admits(ty, val).is_ok()
     }
@@ -288,7 +293,7 @@ pub fn apply_blueprint(
                                 .as_ref()
                                 .and_then(|args| args.get("id"))
                                 .cloned()
-                                .unwrap_or(Value::None);
+                                .unwrap_or(Value::Scalar(Scalar::None));
                             if !value_satisfies_type(&doc_val, &ty) {
                                 overwrite_id = true;
                             }
@@ -380,7 +385,9 @@ pub fn apply_blueprint(
     let mut patch = File::default();
     if let Some(target_kind) = &add_kind {
         let mut kind_decl = declaration_new("kind");
-        kind_decl.data.args = Some(Tuple::from_unnamed([Value::String(target_kind.clone())]));
+        kind_decl.data.args = Some(Tuple::from_unnamed([Value::Scalar(Scalar::Text(
+            target_kind.clone(),
+        ))]));
         patch.header.push(kind_decl);
     }
     if add_id || overwrite_id {
@@ -505,6 +512,7 @@ mod tests {
     use std::collections::HashMap;
     use tomet_ast::{Tuple, TupleEntry};
     use tomet_expr::{DocRef, EvalValue, NoResolver};
+    use tomet_scalar::Scalar;
 
     fn instantiate(src: &str, vars: EvalValue) -> (File, Instantiated) {
         let mut doc = tomet_ast_parser::parse_file(src).unwrap();
@@ -536,7 +544,7 @@ mod tests {
     fn instantiating_leaves_one_kind() {
         let (doc, _) = instantiate(
             "::kind(blueprint)\n::blueprint(daily-note){\n  version: \"1.0\"\n}\n\n=[ Plan ]\n",
-            EvalValue::None,
+            EvalValue::Scalar(Scalar::None),
         );
 
         let mut kinds = Vec::new();
@@ -571,7 +579,7 @@ mod tests {
         let vars = EvalValue::Tuple(
             Tuple::try_from_entries([TupleEntry::named(
                 "title".to_string(),
-                EvalValue::String("Sprint 42".into()),
+                EvalValue::Scalar(Scalar::Text("Sprint 42".into())),
             )])
             .unwrap(),
         );
@@ -588,7 +596,9 @@ mod tests {
             .expect("expected a ::kind declaration");
         assert_eq!(
             kind.data.args,
-            Some(Tuple::from_unnamed([Value::String("daily-note".into())]))
+            Some(Tuple::from_unnamed([Value::Scalar(Scalar::Text(
+                "daily-note".into()
+            ))]))
         );
 
         let meta = top_level
@@ -599,8 +609,11 @@ mod tests {
             panic!("expected meta tuple");
         };
         let get = |key: &str| tuple.get(key).unwrap().clone();
-        assert_eq!(get("file"), Value::String("plan.tmt".into()));
-        assert_eq!(get("title"), Value::String("Sprint 42".into()));
+        assert_eq!(get("file"), Value::Scalar(Scalar::Text("plan.tmt".into())));
+        assert_eq!(
+            get("title"),
+            Value::Scalar(Scalar::Text("Sprint 42".into()))
+        );
     }
 
     #[test]
@@ -632,7 +645,7 @@ mod tests {
             resolver: &NoResolver,
             self_doc: DocRef("test.tmt".into()),
             macros: &macros,
-            var: &EvalValue::None,
+            var: &EvalValue::Scalar(Scalar::None),
             var_unset: &[],
             includes: &[],
             heading_level: 0,
@@ -660,7 +673,9 @@ mod tests {
             .expect("::kind");
         assert_eq!(
             kind.data.args,
-            Some(Tuple::from_unnamed([Value::String("task".into())]))
+            Some(Tuple::from_unnamed([Value::Scalar(Scalar::Text(
+                "task".into()
+            ))]))
         );
 
         let id = doc
@@ -670,7 +685,9 @@ mod tests {
             .expect("::id");
         assert_eq!(
             id.data.args,
-            Some(Tuple::from_unnamed([Value::String(UUID.into())]))
+            Some(Tuple::from_unnamed([Value::Scalar(Scalar::Text(
+                UUID.into()
+            ))]))
         );
 
         let meta = doc
@@ -680,7 +697,7 @@ mod tests {
             .expect("::meta");
         assert_eq!(
             meta.data.get_attr("title"),
-            Some(&Value::String("Untitled".into()))
+            Some(&Value::Scalar(Scalar::Text("Untitled".into())))
         );
 
         // Body has existing paragraph and added section
@@ -716,9 +733,9 @@ mod tests {
             .expect("::id");
         assert_eq!(
             id.data.args,
-            Some(Tuple::from_unnamed([Value::String(
+            Some(Tuple::from_unnamed([Value::Scalar(Scalar::Text(
                 "123e4567-e89b-12d3-a456-426614174000".into()
-            )]))
+            ))]))
         );
 
         let meta = doc
@@ -726,7 +743,10 @@ mod tests {
             .iter()
             .find(|d| classify_declaration_lenient(d) == ElementKind::Declaration(DeclKind::Meta))
             .expect("::meta");
-        assert_eq!(meta.data.get_attr("count"), Some(&Value::Int(42)));
+        assert_eq!(
+            meta.data.get_attr("count"),
+            Some(&Value::Scalar(Scalar::Int(42)))
+        );
     }
 
     #[test]
@@ -743,7 +763,9 @@ mod tests {
             .expect("::id");
         assert_eq!(
             id.data.args,
-            Some(Tuple::from_unnamed([Value::String(UUID.into())]))
+            Some(Tuple::from_unnamed([Value::Scalar(Scalar::Text(
+                UUID.into()
+            ))]))
         );
 
         let meta = doc
@@ -751,7 +773,10 @@ mod tests {
             .iter()
             .find(|d| classify_declaration_lenient(d) == ElementKind::Declaration(DeclKind::Meta))
             .expect("::meta");
-        assert_eq!(meta.data.get_attr("count"), Some(&Value::Int(99)));
+        assert_eq!(
+            meta.data.get_attr("count"),
+            Some(&Value::Scalar(Scalar::Int(99)))
+        );
     }
 
     #[test]
@@ -768,7 +793,9 @@ mod tests {
             .expect("::id");
         assert_eq!(
             id.data.args,
-            Some(Tuple::from_unnamed([Value::String("not-a-uuid".into())]))
+            Some(Tuple::from_unnamed([Value::Scalar(Scalar::Text(
+                "not-a-uuid".into()
+            ))]))
         );
 
         let meta = doc
@@ -778,7 +805,7 @@ mod tests {
             .expect("::meta");
         assert_eq!(
             meta.data.get_attr("count"),
-            Some(&Value::String("not-an-int".into()))
+            Some(&Value::Scalar(Scalar::Text("not-an-int".into())))
         );
     }
 
@@ -794,7 +821,7 @@ mod tests {
             resolver: &NoResolver,
             self_doc: DocRef("test.tmt".into()),
             macros: &macros,
-            var: &EvalValue::None,
+            var: &EvalValue::Scalar(Scalar::None),
             var_unset: &[],
             includes: &[],
             heading_level: 0,

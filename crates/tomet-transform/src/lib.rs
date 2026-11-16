@@ -40,6 +40,7 @@ mod tests {
     use super::*;
     use std::collections::HashMap;
     use tomet_ast::{Tuple, Value};
+    use tomet_scalar::Scalar;
 
     fn parse_doc(src: &str) -> tomet_ast::File {
         tomet_ast_parser::parse_file(src).expect("valid source")
@@ -61,7 +62,10 @@ mod tests {
 
     #[test]
     fn an_argument_stays_an_integer_only_when_it_is_written_as_one() {
-        let macros = HashMap::from([("p".to_string(), Value::String("https://x/$(1)".into()))]);
+        let macros = HashMap::from([(
+            "p".to_string(),
+            Value::Scalar(Scalar::Text("https://x/$(1)".into())),
+        )]);
         let set = MacroSet::from_map(&macros);
         for (url, call) in [
             ("https://x/7", "$macro.p(7)"),
@@ -80,10 +84,13 @@ mod tests {
     #[test]
     fn test_macro_pattern_and_set() {
         let mut macros = HashMap::new();
-        macros.insert("gh".into(), Value::String("https://github.com/$(1)".into()));
+        macros.insert(
+            "gh".into(),
+            Value::Scalar(Scalar::Text("https://github.com/$(1)".into())),
+        );
         macros.insert(
             "gh_issue".into(),
-            Value::String("https://github.com/$(1)/issues/$(2)".into()),
+            Value::Scalar(Scalar::Text("https://github.com/$(1)/issues/$(2)".into())),
         );
 
         let set = MacroSet::from_map(&macros);
@@ -126,7 +133,9 @@ mod tests {
                 ),
                 (
                     "note".into(),
-                    Some(Value::String("https://github.com/tomet/tomet".into()))
+                    Some(Value::Scalar(Scalar::Text(
+                        "https://github.com/tomet/tomet".into(),
+                    ))),
                 ),
             ]
         );
@@ -166,7 +175,9 @@ mod tests {
         });
         assert_eq!(
             id,
-            Some(Tuple::from_unnamed([Value::String("doc-1".into())]))
+            Some(Tuple::from_unnamed([Value::Scalar(Scalar::Text(
+                "doc-1".into()
+            ))]))
         );
         assert_eq!(meta_keys, vec!["title".to_string()]);
 

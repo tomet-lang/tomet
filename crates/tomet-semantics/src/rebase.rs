@@ -7,6 +7,7 @@
 //! (`tomet_expr::Resolver::rebase_links`), and a host that knows tomet documents calls this.
 
 use tomet_ast::{Block, Element, File, Value};
+use tomet_scalar::Scalar;
 use tomet_span::Span;
 use tomet_tree::for_each_element_mut;
 
@@ -91,9 +92,9 @@ fn set_target(element: &mut Element, target: String) {
         return;
     };
     if let Some(value) = args.get_mut("target") {
-        *value = Value::String(target);
+        *value = Value::Scalar(Scalar::Text(target));
     } else if let Some(value) = args.nth_unnamed_mut(0) {
-        *value = Value::String(target);
+        *value = Value::Scalar(Scalar::Text(target));
     }
 }
 

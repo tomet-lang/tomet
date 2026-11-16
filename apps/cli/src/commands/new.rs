@@ -5,6 +5,7 @@ use anyhow::Result;
 use tomet_ast::Value;
 use tomet_config::PrinterConfig;
 use tomet_load_config::find_config_file;
+use tomet_scalar::Scalar;
 use tomet_workspace::{create_file_from_blueprint, declaration_errors, list_blueprints};
 
 pub fn new_cmd(
@@ -60,7 +61,7 @@ pub fn new_cmd(
 
     let mut var_map = HashMap::new();
     for (k, v) in vars {
-        var_map.insert(k.clone(), Value::String(v.clone()));
+        var_map.insert(k.clone(), Value::Scalar(Scalar::Text(v.clone())));
     }
 
     let created =
@@ -125,9 +126,12 @@ mod tests {
         let mut var_map = HashMap::new();
         var_map.insert(
             "title".to_string(),
-            Value::String("New Auth Protocol".into()),
+            Value::Scalar(Scalar::Text("New Auth Protocol".into())),
         );
-        var_map.insert("author".to_string(), Value::String("Bob".into()));
+        var_map.insert(
+            "author".to_string(),
+            Value::Scalar(Scalar::Text("Bob".into())),
+        );
 
         let created = create_file_from_blueprint(
             &temp_dir,

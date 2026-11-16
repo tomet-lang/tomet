@@ -170,9 +170,9 @@ fn get_element_id(el: ElementView<'_>) -> Option<String> {
 }
 
 fn value_to_id(val: &tomet_ast::Value) -> Option<String> {
-    match val {
-        tomet_ast::Value::String(s) => Some(s.clone()),
-        tomet_ast::Value::Int(i) => Some(i.to_string()),
+    match val.as_scalar() {
+        Some(tomet_scalar::Scalar::Text(s)) => Some(s.clone()),
+        Some(tomet_scalar::Scalar::Int(i)) => Some(i.to_string()),
         _ => None,
     }
 }

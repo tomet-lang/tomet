@@ -10,8 +10,7 @@
 //!
 //! - (Data-only evaluation)
 //!   | Evaluates expressions in value positions of a `.ctmt` file, replacing
-//!   | expressions with their evaluated data values (`Value::String`, `Value::Int`,
-//!   | `Value::Float`, `Value::Bool`, `Value::Tuple`, `Value::None`, `Value::Auto`).
+//!   | expressions with their evaluated data values (`Value::Scalar`, `Value::Tuple`).
 //! - (No vault access)
 //!   | Evaluation runs with `NoResolver`. Address expressions (`$tmt(...)`, `$addr(...)`,
 //!   | `$ref(...)`, `$include(...)`) are rejected, and so is a type (`$list(string)`):
@@ -192,6 +191,7 @@ fn walk_value(value: Value, lines: &LineIndex, cx: &EvalContext, errors: &mut Ve
 mod tests {
     use super::*;
     use tomet_ast::Tuple;
+    use tomet_scalar::Scalar;
 
     #[test]
     fn macro_with_positional_and_named_arguments() {
@@ -209,13 +209,13 @@ nam: $macro.named(who: "world")
         };
         assert_eq!(
             tuple.get("pos"),
-            Some(&Value::String(
+            Some(&Value::Scalar(Scalar::Text(
                 "vocabularies/writ/writ@1.0.0.vocabulary.tmt".to_string()
-            ))
+            )))
         );
         assert_eq!(
             tuple.get("nam"),
-            Some(&Value::String("hello world".to_string()))
+            Some(&Value::Scalar(Scalar::Text("hello world".to_string())))
         );
     }
 
@@ -272,7 +272,10 @@ nam: $macro.named(who: "world")
         let Value::Tuple(tuple) = file.body else {
             panic!("expected tuple");
         };
-        assert_eq!(tuple.get("a"), Some(&Value::String("main".to_string())));
+        assert_eq!(
+            tuple.get("a"),
+            Some(&Value::Scalar(Scalar::Text("main".to_string())))
+        );
     }
 
     #[test]
@@ -285,8 +288,8 @@ nam: $macro.named(who: "world")
         assert_eq!(
             tuple.get("a"),
             Some(&Value::Tuple(Tuple::from_unnamed([
-                Value::String("a".to_string()),
-                Value::String("b".to_string())
+                Value::Scalar(Scalar::Text("a".to_string())),
+                Value::Scalar(Scalar::Text("b".to_string()))
             ])))
         );
     }
@@ -306,7 +309,7 @@ nam: $macro.named(who: "world")
         let src = "::var(cfg: (type: string, default: \"none\"))\na: $(var.cfg)\n";
         let passed = Value::Tuple(Tuple::from_named([(
             "host".to_string(),
-            Value::String("localhost".to_string()),
+            Value::Scalar(Scalar::Text("localhost".to_string())),
         )]));
         let file = eval_str(src, &[("cfg".to_string(), passed.clone())]).unwrap();
         let Value::Tuple(tuple) = file.body else {
@@ -320,13 +323,19 @@ nam: $macro.named(who: "world")
         let src = "::var(rev: (type: string, default: \"main\"))\na: $(var.rev)\n";
         let file = eval_str(
             src,
-            &[("rev".to_string(), Value::String("feature".to_string()))],
+            &[(
+                "rev".to_string(),
+                Value::Scalar(Scalar::Text("feature".to_string())),
+            )],
         )
         .unwrap();
         let Value::Tuple(tuple) = file.body else {
             panic!("expected tuple");
         };
-        assert_eq!(tuple.get("a"), Some(&Value::String("feature".to_string())));
+        assert_eq!(
+            tuple.get("a"),
+            Some(&Value::Scalar(Scalar::Text("feature".to_string())))
+        );
     }
 
     #[test]
@@ -343,7 +352,10 @@ nam: $macro.named(who: "world")
         let src2 = "::var(ok: (default: 1))\na: 1\n";
         let errs2 = eval_str(
             src2,
-            &[("unknown".to_string(), Value::String("x".to_string()))],
+            &[(
+                "unknown".to_string(),
+                Value::Scalar(Scalar::Text("x".to_string())),
+            )],
         )
         .unwrap_err();
         assert_eq!(errs2.len(), 1);
@@ -375,7 +387,7 @@ nam: $macro.named(who: "world")
         let Value::Tuple(tuple) = file.body else {
             panic!("expected tuple");
         };
-        assert_eq!(tuple.get("a"), Some(&Value::Int(3)));
+        assert_eq!(tuple.get("a"), Some(&Value::Scalar(Scalar::Int(3))));
     }
 
     #[test]
@@ -402,7 +414,7 @@ nam: $macro.named(who: "world")
         assert_eq!(
             tuple.get("items"),
             Some(&Value::Tuple(Tuple::from_unnamed([Value::Tuple(
-                Tuple::from_named([("num".to_string(), Value::Int(30))])
+                Tuple::from_named([("num".to_string(), Value::Scalar(Scalar::Int(30)))])
             )])))
         );
     }
@@ -416,7 +428,9 @@ nam: $macro.named(who: "world")
         };
         assert_eq!(
             tuple.get("a"),
-            Some(&Value::String("$macro.vocab(\"writ\")".to_string()))
+            Some(&Value::Scalar(Scalar::Text(
+                "$macro.vocab(\"writ\")".to_string()
+            )))
         );
     }
 

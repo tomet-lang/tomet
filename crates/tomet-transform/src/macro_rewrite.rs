@@ -129,7 +129,7 @@ impl MacroSet {
         let mut patterns: Vec<MacroPattern> = macros
             .iter()
             .filter_map(|(name, tmpl)| match tmpl {
-                Value::String(tmpl) => Some(MacroPattern::from_template(name, tmpl)),
+                Value::Scalar(Scalar::Text(tmpl)) => Some(MacroPattern::from_template(name, tmpl)),
                 _ => None,
             })
             .collect();
@@ -162,14 +162,14 @@ pub fn transform_link_targets_with_macros(doc: &mut File, macro_set: &MacroSet) 
             return;
         }
 
-        if let Some(Value::String(url)) = el.data.get_attr("target") {
+        if let Some(Value::Scalar(Scalar::Text(url))) = el.data.get_attr("target") {
             if let Some(macro_call) = macro_set.rewrite_url(url) {
                 el.data
                     .transform_prop("target", |_| Value::Interp(macro_call));
                 count += 1;
             }
         } else if let Some(tuple) = &mut el.data.args
-            && let Some(Value::String(url)) = tuple.nth_unnamed(0).cloned()
+            && let Some(Value::Scalar(Scalar::Text(url))) = tuple.nth_unnamed(0).cloned()
             && let Some(macro_call) = macro_set.rewrite_url(&url)
         {
             if let Some(v) = tuple.nth_unnamed_mut(0) {

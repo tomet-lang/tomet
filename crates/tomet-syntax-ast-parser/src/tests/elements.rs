@@ -11,7 +11,7 @@ fn parses_section_with_attrs() {
                 s.data.value,
                 Some(Group::from_map(Tuple::from_named(vec![(
                     "id".into(),
-                    Value::String("header1".into())
+                    Value::Scalar(Scalar::Text("header1".into()))
                 )])))
             );
         }
@@ -31,7 +31,7 @@ fn parses_link_with_order_free_groups() {
                 el.data.args,
                 Some(Tuple::from_named(vec![(
                     "target".into(),
-                    Value::String("https://example.com".into())
+                    Value::Scalar(Scalar::Text("https://example.com".into()))
                 )]))
             );
             assert_eq!(el.content, wrap(vec![Inline::Text("Wiki".into())]));

@@ -12,6 +12,7 @@
 
 use tomet_ast::{Tuple, TupleEntry, Value};
 use tomet_declaration::VarDecl;
+use tomet_scalar::Scalar;
 use tomet_type::{Kind, Type, Version};
 
 use crate::datetime::parse_datetime;
@@ -104,7 +105,7 @@ pub fn var_scope(
     for (name, decl) in decls {
         let given = passed.iter().rev().find(|(n, _)| n == name);
         let value = match (given, &decl.default) {
-            (Some((_, Value::String(text))), _) => Some(typed_value(
+            (Some((_, Value::Scalar(Scalar::Text(text)))), _) => Some(typed_value(
                 &decl.ty,
                 &read_text(name, &decl.ty, text)?,
                 doc,
@@ -135,29 +136,29 @@ fn read_text(name: &str, ty: &Type, text: &str) -> Result<Value, VarError> {
         why,
     };
     match ty.kind() {
-        Kind::String | Kind::Nanoid => Ok(Value::String(text.to_string())),
+        Kind::String | Kind::Nanoid => Ok(Value::Scalar(Scalar::Text(text.to_string()))),
         Kind::Int => text
             .trim()
             .parse::<i64>()
-            .map(Value::Int)
+            .map(|n| Value::Scalar(Scalar::Int(n)))
             .map_err(|_| bad(format!("`{text}` is not an integer"))),
         Kind::Uint => match text.trim().parse::<i64>() {
-            Ok(n) if n >= 0 => Ok(Value::Int(n)),
+            Ok(n) if n >= 0 => Ok(Value::Scalar(Scalar::Int(n))),
             _ => Err(bad(format!("`{text}` is not a non-negative integer"))),
         },
         Kind::Float => match text.trim().parse::<f64>() {
-            Ok(n) if n.is_finite() => Ok(Value::Float(n)),
+            Ok(n) if n.is_finite() => Ok(Value::Scalar(Scalar::Float(n))),
             _ => Err(bad(format!("`{text}` is not a number"))),
         },
         Kind::Bool => match text.trim() {
-            "true" => Ok(Value::Bool(true)),
-            "false" => Ok(Value::Bool(false)),
+            "true" => Ok(Value::Scalar(Scalar::Bool(true))),
+            "false" => Ok(Value::Scalar(Scalar::Bool(false))),
             _ => Err(bad(format!("`{text}` is not `true` or `false`"))),
         },
         Kind::Datetime | Kind::Date | Kind::Version | Kind::Uuid => {
             let trimmed = text.trim();
             if ty.holds_text(trimmed) == Some(true) {
-                Ok(Value::String(trimmed.to_string()))
+                Ok(Value::Scalar(Scalar::Text(trimmed.to_string())))
             } else {
                 Err(bad(format!("`{text}` is not {}", ty.describe())))
             }
@@ -173,9 +174,9 @@ fn read_text(name: &str, ty: &Type, text: &str) -> Result<Value, VarError> {
 /// `"1.10"` and not the number `1.1`, and `2024` for a `string` is `"2024"`.
 /// For any other type the value is read as it is, then [`shaped`].
 pub fn typed_value(ty: &Type, value: &Value, doc: &DocRef) -> EvalValue {
-    match (ty.kind(), value.scalar_text()) {
+    match (ty.kind(), value.as_scalar().and_then(|s| s.text())) {
         (Kind::String | Kind::Version | Kind::Uuid | Kind::Nanoid, Some(text)) => {
-            EvalValue::String(text.into_owned())
+            EvalValue::Scalar(Scalar::Text(text.into_owned()))
         }
         _ => shaped(ty, EvalValue::from_ast(value, doc)),
     }
@@ -190,40 +191,47 @@ pub fn typed_value(ty: &Type, value: &Value, doc: &DocRef) -> EvalValue {
 /// it: a variable's default or `--var`, and a `::meta` field alike.
 pub fn shaped(ty: &Type, value: EvalValue) -> EvalValue {
     match (ty.kind(), value) {
-        (Kind::Datetime, EvalValue::String(text)) => match parse_datetime(&text) {
+        (Kind::Datetime, EvalValue::Scalar(Scalar::Text(text))) => match parse_datetime(&text) {
             Some(parsed) => EvalValue::DateTime(parsed),
-            None => EvalValue::String(text),
+            None => EvalValue::Scalar(Scalar::Text(text)),
         },
-        (Kind::Date, EvalValue::String(text)) => {
+        (Kind::Date, EvalValue::Scalar(Scalar::Text(text))) => {
             match parse_datetime(&text).filter(|_| ty.holds_text(&text) == Some(true)) {
                 Some(parsed) => EvalValue::DateTime(parsed),
-                None => EvalValue::String(text),
+                None => EvalValue::Scalar(Scalar::Text(text)),
             }
         }
-        (Kind::Version, EvalValue::String(text)) => match Version::parse(text.trim()) {
+        (Kind::Version, EvalValue::Scalar(Scalar::Text(text))) => match Version::parse(text.trim())
+        {
             Some(v) => EvalValue::Version(v),
-            None => EvalValue::String(text),
+            None => EvalValue::Scalar(Scalar::Text(text)),
         },
-        (Kind::Version, EvalValue::Int(n)) if n >= 0 => match Version::parse(&n.to_string()) {
-            Some(v) => EvalValue::Version(v),
-            None => EvalValue::Int(n),
+        (Kind::Version, EvalValue::Scalar(Scalar::Int(n))) if n >= 0 => {
+            match Version::parse(&n.to_string()) {
+                Some(v) => EvalValue::Version(v),
+                None => EvalValue::Scalar(Scalar::Int(n)),
+            }
+        }
+        (Kind::Version, EvalValue::Scalar(Scalar::Number(text))) => {
+            match Version::parse(text.trim()) {
+                Some(v) => EvalValue::Version(v),
+                None => EvalValue::Scalar(Scalar::Number(text)),
+            }
+        }
+        (Kind::Float, EvalValue::Scalar(Scalar::Int(i))) => {
+            EvalValue::Scalar(Scalar::Float(i as f64))
+        }
+        (Kind::Float, EvalValue::Scalar(Scalar::Number(text))) => match text.parse::<f64>() {
+            Ok(f) => EvalValue::Scalar(Scalar::Float(f)),
+            Err(_) => EvalValue::Scalar(Scalar::Number(text)),
         },
-        (Kind::Version, EvalValue::Number(text)) => match Version::parse(text.trim()) {
-            Some(v) => EvalValue::Version(v),
-            None => EvalValue::Number(text),
+        (Kind::Int, EvalValue::Scalar(Scalar::Number(text))) => match text.parse::<i64>() {
+            Ok(i) => EvalValue::Scalar(Scalar::Int(i)),
+            Err(_) => EvalValue::Scalar(Scalar::Number(text)),
         },
-        (Kind::Float, EvalValue::Int(i)) => EvalValue::Float(i as f64),
-        (Kind::Float, EvalValue::Number(text)) => match text.parse::<f64>() {
-            Ok(f) => EvalValue::Float(f),
-            Err(_) => EvalValue::Number(text),
-        },
-        (Kind::Int, EvalValue::Number(text)) => match text.parse::<i64>() {
-            Ok(i) => EvalValue::Int(i),
-            Err(_) => EvalValue::Number(text),
-        },
-        (Kind::Uint, EvalValue::Number(text)) => match text.parse::<i64>() {
-            Ok(n) if n >= 0 => EvalValue::Int(n),
-            _ => EvalValue::Number(text),
+        (Kind::Uint, EvalValue::Scalar(Scalar::Number(text))) => match text.parse::<i64>() {
+            Ok(n) if n >= 0 => EvalValue::Scalar(Scalar::Int(n)),
+            _ => EvalValue::Scalar(Scalar::Number(text)),
         },
         (Kind::List, EvalValue::Tuple(tuple)) => match ty.item() {
             Some(item) => {
@@ -250,6 +258,7 @@ pub fn shaped(ty: &Type, value: EvalValue) -> EvalValue {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use tomet_scalar::Scalar;
 
     fn bare(kind: Kind) -> Type {
         Type::bare(kind)
@@ -268,21 +277,24 @@ mod tests {
     }
 
     fn passed(name: &str, text: &str) -> Vec<(String, Value)> {
-        vec![(name.to_string(), Value::String(text.to_string()))]
+        vec![(
+            name.to_string(),
+            Value::Scalar(Scalar::Text(text.to_string())),
+        )]
     }
 
     #[test]
     fn a_default_is_the_value_and_a_passed_text_wins() {
         let decls = vec![(
             "who".to_string(),
-            decl(None, Some(Value::String("me".to_string()))),
+            decl(None, Some(Value::Scalar(Scalar::Text("me".to_string())))),
         )];
         let scope = var_scope(&decls, &doc(), &[]).unwrap();
         assert_eq!(
             scope.values,
             EvalValue::Tuple(Tuple::from_named([(
                 "who".into(),
-                EvalValue::String("me".into())
+                EvalValue::Scalar(Scalar::Text("me".into()))
             )]))
         );
         let scope = var_scope(&decls, &doc(), &passed("who", "you")).unwrap();
@@ -290,7 +302,7 @@ mod tests {
             scope.values,
             EvalValue::Tuple(Tuple::from_named([(
                 "who".into(),
-                EvalValue::String("you".into())
+                EvalValue::Scalar(Scalar::Text("you".into()))
             )]))
         );
     }
@@ -327,7 +339,10 @@ mod tests {
         let scope = var_scope(&decls, &doc(), &passed("n", "3")).unwrap();
         assert_eq!(
             scope.values,
-            EvalValue::Tuple(Tuple::from_named([("n".into(), EvalValue::Int(3))]))
+            EvalValue::Tuple(Tuple::from_named([(
+                "n".into(),
+                EvalValue::Scalar(Scalar::Int(3))
+            )]))
         );
         for (name, text) in [("n", "three"), ("on", "yes"), ("at", "tomorrow")] {
             let err = var_scope(&decls, &doc(), &passed(name, text)).unwrap_err();
@@ -343,7 +358,7 @@ mod tests {
             "n".to_string(),
             decl(
                 Some(bare(Kind::Int)),
-                Some(Value::String("many".to_string())),
+                Some(Value::Scalar(Scalar::Text("many".to_string()))),
             ),
         )];
         let scope = var_scope(&decls, &doc(), &[]).unwrap();
@@ -351,7 +366,7 @@ mod tests {
             scope.values,
             EvalValue::Tuple(Tuple::from_named([(
                 "n".into(),
-                EvalValue::String("many".into())
+                EvalValue::Scalar(Scalar::Text("many".into()))
             )]))
         );
     }
@@ -363,17 +378,23 @@ mod tests {
                 "rev".to_string(),
                 decl(
                     Some(bare(Kind::Version)),
-                    Some(Value::Number("1.10".to_string())),
+                    Some(Value::Scalar(Scalar::Number("1.10".to_string()))),
                 ),
             ),
-            ("label".to_string(), decl(None, Some(Value::Int(2024)))),
+            (
+                "label".to_string(),
+                decl(None, Some(Value::Scalar(Scalar::Int(2024)))),
+            ),
         ];
         let scope = var_scope(&decls, &doc(), &[]).unwrap();
         assert_eq!(
             scope.values,
             EvalValue::Tuple(Tuple::from_named([
-                ("rev".into(), EvalValue::String("1.10".into())),
-                ("label".into(), EvalValue::String("2024".into())),
+                ("rev".into(), EvalValue::Scalar(Scalar::Text("1.10".into()))),
+                (
+                    "label".into(),
+                    EvalValue::Scalar(Scalar::Text("2024".into()))
+                ),
             ]))
         );
         // passed as text, a version is held to its form
@@ -383,7 +404,7 @@ mod tests {
             ok.values,
             EvalValue::Tuple(Tuple::from_named([(
                 "rev".into(),
-                EvalValue::String("1.10.0".into())
+                EvalValue::Scalar(Scalar::Text("1.10.0".into()))
             )]))
         );
         let ok_beta = var_scope(&decls, &doc(), &passed("rev", "1.0-beta")).unwrap();
@@ -391,7 +412,7 @@ mod tests {
             ok_beta.values,
             EvalValue::Tuple(Tuple::from_named([(
                 "rev".into(),
-                EvalValue::String("1.0-beta".into())
+                EvalValue::Scalar(Scalar::Text("1.0-beta".into()))
             )]))
         );
         assert!(var_scope(&decls, &doc(), &passed("rev", "1.0.0_beta")).is_err());
@@ -422,9 +443,9 @@ mod tests {
         assert_eq!(
             shaped(
                 &bare(Kind::Date),
-                EvalValue::String("2026-10-25T09:00".into())
+                EvalValue::Scalar(Scalar::Text("2026-10-25T09:00".into()))
             ),
-            EvalValue::String("2026-10-25T09:00".into())
+            EvalValue::Scalar(Scalar::Text("2026-10-25T09:00".into()))
         );
     }
 }

@@ -6,6 +6,7 @@
 use std::collections::BTreeMap;
 
 use tomet_ast::{File, Tuple, Value};
+use tomet_tree::ValueExt;
 
 use crate::declaration::{Declaration, declarations};
 use crate::kind::DeclKind;
@@ -236,16 +237,13 @@ pub fn document_vars<B>(doc: &File<B>) -> Vec<(String, VarDecl)> {
 
 /// The text of a string value.
 fn text(value: &Value) -> Option<String> {
-    match value {
-        Value::String(text) => Some(text.clone()),
-        _ => None,
-    }
+    value.as_str().map(String::from)
 }
 
 /// A version as written. A number the reader kept as written is its text; one it did not is the text
 /// it prints as.
 fn scalar_text_or_debug(value: &Value) -> String {
-    match value.scalar_text() {
+    match value.as_scalar().and_then(|s| s.text()) {
         Some(text) => text.into_owned(),
         None => format!("{value:?}"),
     }
@@ -254,6 +252,7 @@ fn scalar_text_or_debug(value: &Value) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use tomet_scalar::Scalar;
 
     fn parse(src: &str) -> File {
         tomet_ast_parser::parse_file(src).expect("parses")
@@ -412,7 +411,7 @@ mod tests {
             value,
             Value::Tuple(Tuple::from_named([(
                 "title".into(),
-                Value::String("Hello".into())
+                Value::Scalar(Scalar::Text("Hello".into())),
             )]))
         );
         assert_eq!(document_meta(&parse("#[ Hello ]\n")), None);
@@ -433,8 +432,11 @@ mod tests {
         let names: Vec<&str> = read.iter().map(|(name, _)| name.as_str()).collect();
         // A template of any kind is read; refusing a kind is `check`'s.
         assert_eq!(names, ["gh", "n", "wiki", "blk"]);
-        assert_eq!(read[0].1, Value::String("https://x/$(1)".to_string()));
-        assert_eq!(read[1].1, Value::Int(3));
+        assert_eq!(
+            read[0].1,
+            Value::Scalar(Scalar::Text("https://x/$(1)".to_string()))
+        );
+        assert_eq!(read[1].1, Value::Scalar(Scalar::Int(3)));
         assert!(matches!(read[3].1, Value::Blocks(_)));
         // no entries, no macros
         assert!(document_macros(&parse("::macro()\n")).is_empty());
@@ -446,7 +448,7 @@ mod tests {
         let vars = document_vars(&doc);
         assert_eq!(vars.len(), 2);
         assert_eq!(vars[0].0, "a");
-        assert_eq!(vars[0].1.default, Some(Value::Int(2)));
+        assert_eq!(vars[0].1.default, Some(Value::Scalar(Scalar::Int(2))));
         assert_eq!(vars[1].0, "b");
     }
 }

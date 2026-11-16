@@ -5,6 +5,7 @@ pub use tomet_search::structural::{
 };
 
 use tomet_ast::{Data, File, Name, Value};
+use tomet_scalar::Scalar;
 use tomet_semantics::{classify_declaration_lenient, classify_std_lenient};
 use tomet_tree::{DataExt, for_each_declaration_mut, for_each_element_mut};
 
@@ -61,8 +62,8 @@ fn apply_to(
         StructuralAction::RenameKey { old_key, new_key } => {
             usize::from(data.rename_prop_key(old_key, new_key))
         }
-        StructuralAction::ReplaceValue { key, new_value } => {
-            usize::from(data.replace_prop_value(key, Value::String(new_value.clone())))
-        }
+        StructuralAction::ReplaceValue { key, new_value } => usize::from(
+            data.replace_prop_value(key, Value::Scalar(Scalar::Text(new_value.clone()))),
+        ),
     }
 }

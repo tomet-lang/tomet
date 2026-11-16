@@ -12,7 +12,7 @@ fn bare_url_autolink_strips_trailing_punctuation() {
                     el.data.args,
                     Some(Tuple::from_named(vec![(
                         "target".into(),
-                        Value::String("https://example.com/foo".into())
+                        Value::Scalar(Scalar::Text("https://example.com/foo".into()))
                     )]))
                 );
             } else {
@@ -24,7 +24,7 @@ fn bare_url_autolink_strips_trailing_punctuation() {
                     el.data.args,
                     Some(Tuple::from_named(vec![(
                         "target".into(),
-                        Value::String("https://example.com/bar".into())
+                        Value::Scalar(Scalar::Text("https://example.com/bar".into()))
                     )]))
                 );
             } else {
@@ -48,7 +48,7 @@ fn bare_url_autolink_handles_parentheses() {
                     el.data.args,
                     Some(Tuple::from_named(vec![(
                         "target".into(),
-                        Value::String("https://example.com/foo".into())
+                        Value::Scalar(Scalar::Text("https://example.com/foo".into()))
                     )]))
                 );
             } else {
@@ -60,7 +60,7 @@ fn bare_url_autolink_handles_parentheses() {
                     el.data.args,
                     Some(Tuple::from_named(vec![(
                         "target".into(),
-                        Value::String("https://example.com/path(bar)".into())
+                        Value::Scalar(Scalar::Text("https://example.com/path(bar)".into()))
                     )]))
                 );
             } else {
@@ -82,7 +82,7 @@ fn bare_url_autolink_supports_http_https_mailto() {
                     el.data.args,
                     Some(Tuple::from_named(vec![(
                         "target".into(),
-                        Value::String("http://a.com".into())
+                        Value::Scalar(Scalar::Text("http://a.com".into()))
                     )]))
                 );
             }
@@ -92,7 +92,7 @@ fn bare_url_autolink_supports_http_https_mailto() {
                     el.data.args,
                     Some(Tuple::from_named(vec![(
                         "target".into(),
-                        Value::String("https://b.com".into())
+                        Value::Scalar(Scalar::Text("https://b.com".into()))
                     )]))
                 );
             }
@@ -102,7 +102,7 @@ fn bare_url_autolink_supports_http_https_mailto() {
                     el.data.args,
                     Some(Tuple::from_named(vec![(
                         "target".into(),
-                        Value::String("mailto:user@example.com".into())
+                        Value::Scalar(Scalar::Text("mailto:user@example.com".into()))
                     )]))
                 );
             }
@@ -139,16 +139,16 @@ fn bare_absolute_path_parses_as_a_plain_scalar() {
     // unambiguous and needs no scheme to disambiguate it.
     assert_eq!(
         parse_value("/readme.md").unwrap(),
-        Value::String("/readme.md".into())
+        Value::Scalar(Scalar::Text("/readme.md".into()))
     );
     let doc = parse_file("@link(/etc/hosts)[Hosts]\n").unwrap();
     match &doc.body[0] {
         Block::Element(el) => {
             assert_eq!(
                 el.data.args,
-                Some(Tuple::from_unnamed(vec![Value::String(
+                Some(Tuple::from_unnamed(vec![Value::Scalar(Scalar::Text(
                     "/etc/hosts".into()
-                )]))
+                ))]))
             );
         }
         other => panic!("expected element, got {other:?}"),
@@ -163,20 +163,20 @@ fn bare_scheme_uri_parses_as_one_scalar_not_a_map() {
     // thing to be read as one scalar instead.
     assert_eq!(
         parse_value("https://example.com/path").unwrap(),
-        Value::String("https://example.com/path".into())
+        Value::Scalar(Scalar::Text("https://example.com/path".into()))
     );
     assert_eq!(
         parse_value("file://some/where").unwrap(),
-        Value::String("file://some/where".into())
+        Value::Scalar(Scalar::Text("file://some/where".into()))
     );
     let doc = parse_file("@link(https://example.com)[Site]\n").unwrap();
     match &doc.body[0] {
         Block::Element(el) => {
             assert_eq!(
                 el.data.args,
-                Some(Tuple::from_unnamed(vec![Value::String(
+                Some(Tuple::from_unnamed(vec![Value::Scalar(Scalar::Text(
                     "https://example.com".into()
-                )]))
+                ))]))
             );
         }
         other => panic!("expected element, got {other:?}"),
@@ -193,7 +193,7 @@ fn explicit_key_colon_scheme_uri_is_still_a_map() {
         parse_value("url:https://example.com").unwrap(),
         Value::Tuple(Tuple::from_named(vec![(
             "url".into(),
-            Value::String("https://example.com".into())
+            Value::Scalar(Scalar::Text("https://example.com".into()))
         )]))
     );
 }
@@ -214,7 +214,9 @@ fn bare_url_autolink_preserves_query_param_placeholder() {
                 el.data.args,
                 Some(Tuple::from_named(vec![(
                     "target".into(),
-                    Value::String("http://127.0.0.1:8888/search?lang=ja&q=@query".into())
+                    Value::Scalar(Scalar::Text(
+                        "http://127.0.0.1:8888/search?lang=ja&q=@query".into()
+                    ))
                 )]))
             );
         }

@@ -4,22 +4,22 @@ use tomet_ast::{Tuple, Value};
 
 /// Extension trait providing accessors and inspections on [`Value`].
 pub trait ValueExt {
-    /// Returns `true` if this value is `Value::None`.
+    /// Returns `true` if this value is [`Scalar::None`](tomet_scalar::Scalar::None).
     fn is_none(&self) -> bool;
 
-    /// Returns the string slice if this value is a `Value::String`.
+    /// Returns the string slice if this value is a [`Scalar::Text`](tomet_scalar::Scalar::Text).
     fn as_str(&self) -> Option<&str>;
 
-    /// Returns the `bool` value if this value is a `Value::Bool`.
+    /// Returns the `bool` value if this value is a [`Scalar::Bool`](tomet_scalar::Scalar::Bool).
     fn as_bool(&self) -> Option<bool>;
 
-    /// Returns the `i64` value if this value is a `Value::Int`, or a `Value::Number`
+    /// Returns the `i64` value if this value is a [`Scalar::Int`](tomet_scalar::Scalar::Int), or a [`Scalar::Number`](tomet_scalar::Scalar::Number)
     /// that spells an integer an `i64` holds.
     fn as_i64(&self) -> Option<i64>;
 
-    /// Returns the `f64` value if this value is a `Value::Float`, or a `Value::Number`
+    /// Returns the `f64` value if this value is a [`Scalar::Float`](tomet_scalar::Scalar::Float), or a [`Scalar::Number`](tomet_scalar::Scalar::Number)
     /// that spells one (`1.10` is `1.1` here; the text it was written as is
-    /// [`Value::scalar_text`]).
+    /// [`Scalar::text`](tomet_scalar::Scalar::text)).
     fn as_f64(&self) -> Option<f64>;
 
     /// Returns the [`Tuple`] if this value is a `Value::Tuple`.
@@ -48,34 +48,34 @@ pub trait ValueExt {
 
 impl ValueExt for Value {
     fn is_none(&self) -> bool {
-        matches!(self, Value::None)
+        matches!(self, Value::Scalar(tomet_scalar::Scalar::None))
     }
 
     fn as_str(&self) -> Option<&str> {
         match self {
-            Value::String(s) => Some(s.as_str()),
+            Value::Scalar(tomet_scalar::Scalar::Text(s)) => Some(s.as_str()),
             _ => None,
         }
     }
 
     fn as_bool(&self) -> Option<bool> {
         match self {
-            Value::Bool(b) => Some(*b),
+            Value::Scalar(tomet_scalar::Scalar::Bool(b)) => Some(*b),
             _ => None,
         }
     }
 
     fn as_i64(&self) -> Option<i64> {
         match self {
-            Value::Int(i) => Some(*i),
+            Value::Scalar(tomet_scalar::Scalar::Int(i)) => Some(*i),
             // `-0`: kept as written, and the integer it spells.
-            Value::Number(text) => text.parse().ok(),
+            Value::Scalar(tomet_scalar::Scalar::Number(text)) => text.parse().ok(),
             _ => None,
         }
     }
 
     fn as_f64(&self) -> Option<f64> {
-        self.as_number()
+        self.as_scalar().and_then(|s| s.as_number())
     }
 
     fn as_tuple(&self) -> Option<&Tuple> {
@@ -108,8 +108,8 @@ impl ValueExt for Value {
 
     fn is_empty(&self) -> bool {
         match self {
-            Value::None => true,
-            Value::String(s) => s.is_empty(),
+            Value::Scalar(tomet_scalar::Scalar::None) => true,
+            Value::Scalar(tomet_scalar::Scalar::Text(s)) => s.is_empty(),
             Value::Tuple(tuple) => tuple.is_empty(),
             _ => false,
         }
@@ -126,15 +126,13 @@ impl ValueExt for Value {
 
 /// The flat string a value projects to, joining a non-empty unnamed tuple with `", "`, or `None` when it cannot project.
 ///
-/// Bare scalars delegate to [`Value::scalar_text`]; `Value::None` projects to an empty string.
+/// Bare scalars delegate to [`tomet_scalar::Scalar::text`]; `Scalar::None` projects to an empty string.
 /// Unnamed tuples project if every element projects. Named or empty tuples, calls, elements, blocks,
 /// interpolations, holes, and type seats return `None`.
 pub fn scalar_string(v: &Value) -> Option<String> {
-    if let Some(text) = v.scalar_text() {
-        return Some(text.into_owned());
-    }
     match v {
-        Value::None => Some(String::new()),
+        Value::Scalar(tomet_scalar::Scalar::None) => Some(String::new()),
+        Value::Scalar(s) => s.text().map(|text| text.into_owned()),
         Value::Tuple(tuple) if !tuple.is_empty() && tuple.has_no_named() => {
             let parts: Option<Vec<String>> = tuple.unnamed().map(scalar_string).collect();
             Some(parts?.join(", "))
@@ -149,53 +147,84 @@ mod tests {
 
     #[test]
     fn test_scalar_string_and_plain_text() {
-        assert_eq!(Value::None.scalar_string(), Some("".to_string()));
-        assert_eq!(Value::None.plain_text(), "");
-        assert_eq!(Value::Auto.scalar_string(), Some("auto".to_string()));
-        assert_eq!(Value::Auto.plain_text(), "auto");
+        use tomet_scalar::Scalar;
 
-        assert_eq!(Value::Bool(true).scalar_string(), Some("true".to_string()));
-        assert_eq!(Value::Int(42).scalar_string(), Some("42".to_string()));
-        assert_eq!(Value::Float(3.14).scalar_string(), Some("3.14".to_string()));
         assert_eq!(
-            Value::Number("1.10".into()).scalar_string(),
+            Value::Scalar(Scalar::None).scalar_string(),
+            Some("".to_string())
+        );
+        assert_eq!(Value::Scalar(Scalar::None).plain_text(), "");
+        assert_eq!(
+            Value::Scalar(Scalar::Auto).scalar_string(),
+            Some("auto".to_string())
+        );
+        assert_eq!(Value::Scalar(Scalar::Auto).plain_text(), "auto");
+
+        assert_eq!(
+            Value::Scalar(Scalar::Bool(true)).scalar_string(),
+            Some("true".to_string())
+        );
+        assert_eq!(
+            Value::Scalar(Scalar::Int(42)).scalar_string(),
+            Some("42".to_string())
+        );
+        assert_eq!(
+            Value::Scalar(Scalar::Float(3.14)).scalar_string(),
+            Some("3.14".to_string())
+        );
+        assert_eq!(
+            Value::Scalar(Scalar::Number("1.10".into())).scalar_string(),
             Some("1.10".to_string())
         );
         assert_eq!(
-            Value::String("hello".into()).scalar_string(),
+            Value::Scalar(Scalar::Text("hello".into())).scalar_string(),
             Some("hello".to_string())
         );
 
         let seq = Value::Tuple(Tuple::from_unnamed([
-            Value::String("a".into()),
-            Value::Int(1),
-            Value::Bool(false),
+            Value::Scalar(Scalar::Text("a".into())),
+            Value::Scalar(Scalar::Int(1)),
+            Value::Scalar(Scalar::Bool(false)),
         ]));
         assert_eq!(seq.scalar_string(), Some("a, 1, false".to_string()));
         assert_eq!(seq.plain_text(), "a, 1, false");
 
-        let map = Value::Tuple(Tuple::from_named([("k".into(), Value::Int(1))]));
+        let map = Value::Tuple(Tuple::from_named([(
+            "k".into(),
+            Value::Scalar(Scalar::Int(1)),
+        )]));
         assert_eq!(map.scalar_string(), None);
         assert_eq!(map.plain_text(), "");
 
-        let seq_with_map = Value::Tuple(Tuple::from_unnamed([Value::String("a".into()), map]));
+        let seq_with_map = Value::Tuple(Tuple::from_unnamed([
+            Value::Scalar(Scalar::Text("a".into())),
+            map,
+        ]));
         assert_eq!(seq_with_map.scalar_string(), None);
         assert_eq!(seq_with_map.plain_text(), "");
     }
 
     #[test]
     fn a_kept_number_is_read_as_the_number_it_spells() {
-        let one_ten = Value::Number("1.10".to_string());
+        use tomet_scalar::Scalar;
+
+        let one_ten = Value::Scalar(Scalar::Number("1.10".to_string()));
         assert_eq!(one_ten.as_f64(), Some(1.1));
         assert_eq!(one_ten.as_i64(), None);
-        assert_eq!(Value::Number("-0".to_string()).as_i64(), Some(0));
-        let big = Value::Number("12345678901234567890".to_string());
+        assert_eq!(
+            Value::Scalar(Scalar::Number("-0".to_string())).as_i64(),
+            Some(0)
+        );
+        let big = Value::Scalar(Scalar::Number("12345678901234567890".to_string()));
         assert_eq!(big.as_i64(), None);
         assert_eq!(big.as_f64(), Some(1.2345678901234567e19));
         // too large for an f64: there is no number to read, only the text
-        let huge = Value::Number("1e999".to_string());
+        let huge = Value::Scalar(Scalar::Number("1e999".to_string()));
         assert_eq!(huge.as_f64(), None);
-        assert_eq!(huge.scalar_text().as_deref(), Some("1e999"));
+        assert_eq!(
+            huge.as_scalar().and_then(|s| s.text()).as_deref(),
+            Some("1e999")
+        );
         // and it is not a string
         assert_eq!(one_ten.as_str(), None);
     }

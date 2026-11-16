@@ -39,6 +39,7 @@ pub use schema::{ConfigEntrySpec, ConfigGroupSpec, ConfigSpecProvider, all_confi
 pub use tomet_spec_derive::Config;
 
 use tomet_ast::{File, Tuple, Value};
+use tomet_scalar::Scalar;
 use tomet_style::GroupOrder;
 use tree::merge_entry;
 
@@ -105,7 +106,9 @@ impl Config {
             merge_entry(&mut root, "workspace", &entry);
         }
         let paths = |paths: Vec<String>| {
-            Value::Tuple(Tuple::from_unnamed(paths.into_iter().map(Value::String)))
+            Value::Tuple(Tuple::from_unnamed(
+                paths.into_iter().map(|p| Value::Scalar(Scalar::Text(p))),
+            ))
         };
         root.set("blueprints", paths(layer.blueprint_paths()));
         root.set("vocabularies", paths(layer.vocabulary_paths()));
@@ -469,15 +472,21 @@ mod tests {
         assert_eq!(note.group_order, Some(GroupOrder::ContentFirst));
         assert_eq!(note.no_space, Some(tomet_style::ColonSpacing::Tight));
         assert_eq!(note.content_style, Some(ContentLayout::Expanded));
-        assert_eq!(note.get("badge"), Some(&Value::String("important".into())));
+        assert_eq!(
+            note.get("badge"),
+            Some(&Value::Scalar(Scalar::Text("important".into())))
+        );
         assert_eq!(
             note.get("style.content"),
-            Some(&Value::String("expanded".into()))
+            Some(&Value::Scalar(Scalar::Text("expanded".into())))
         );
 
         let custom = cfg.element("custom").expect("custom exists");
-        assert_eq!(custom.get("color"), Some(&Value::String("blue".into())));
-        assert_eq!(custom.get("count"), Some(&Value::Int(5)));
+        assert_eq!(
+            custom.get("color"),
+            Some(&Value::Scalar(Scalar::Text("blue".into())))
+        );
+        assert_eq!(custom.get("count"), Some(&Value::Scalar(Scalar::Int(5))));
 
         assert_eq!(
             cfg.element_group_order("note"),

@@ -2,6 +2,7 @@ use lsp_types::{GotoDefinitionResponse, Location, Position, Uri};
 use tomet_ast::{
     Block, Connect, Declaration, Element, File, Inline, InterpExpr, InterpExprKind, List, Value,
 };
+use tomet_scalar::Scalar;
 use tomet_semantics::TargetScheme;
 use tomet_span::Span;
 use tomet_tree::{for_each_element, for_each_interpolation};
@@ -121,7 +122,7 @@ fn reference_in(el: &Element) -> Option<Reference> {
         }
     }
     if let Some(args) = &el.data.args {
-        if let Some(Value::String(s)) = args.get("id") {
+        if let Some(Value::Scalar(Scalar::Text(s))) = args.get("id") {
             return Some(Reference::Id(s.clone()));
         }
     }

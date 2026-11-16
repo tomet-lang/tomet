@@ -96,18 +96,14 @@ pub fn document_config<B>(doc: &File<B>) -> DocumentConfig {
 }
 
 fn process_export_type(v: &Value, config: &mut DocumentConfig) {
-    match v {
-        Value::String(s) => {
-            config.export_type.push(ExportType::parse(s));
-        }
-        Value::Tuple(tuple) => {
-            for item in tuple.unnamed() {
-                if let Value::String(s) = item {
-                    config.export_type.push(ExportType::parse(s));
-                }
+    if let Some(s) = v.as_str() {
+        config.export_type.push(ExportType::parse(s));
+    } else if let Value::Tuple(tuple) = v {
+        for item in tuple.unnamed() {
+            if let Some(s) = item.as_str() {
+                config.export_type.push(ExportType::parse(s));
             }
         }
-        _ => {}
     }
 }
 

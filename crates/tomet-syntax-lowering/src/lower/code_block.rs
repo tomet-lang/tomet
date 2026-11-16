@@ -63,7 +63,7 @@ pub(super) fn lower_code_block(node: &SyntaxNode) -> Result<Block> {
     if !lang.is_empty() {
         element.data.args = Some(Tuple::from_named(vec![(
             "lang".to_string(),
-            Value::String(lang),
+            Value::Scalar(tomet_scalar::Scalar::Text(lang)),
         )]));
     }
     Ok(Block::Element(element))

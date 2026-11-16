@@ -13,3 +13,6 @@ tomet-declaration = { workspace = true }
 tomet-expr        = { workspace = true }
 tomet-position    = { workspace = true }
 tomet-span        = { workspace = true }
+
+[dev-dependencies]
+tomet-scalar = { workspace = true }

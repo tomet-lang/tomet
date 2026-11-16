@@ -39,6 +39,7 @@ use std::path::Path;
 use tomet_ast::{Data, File, Name, Tuple, Value};
 use tomet_declaration::{Profile, document_profiles};
 use tomet_expr::{Reach, Resolver};
+use tomet_scalar::Scalar;
 use tomet_span::Span;
 use tomet_validator_profile::{Dirt, Finding, standalone_findings};
 use tomet_vault::Vault;
@@ -299,12 +300,18 @@ fn carry(vault: &Vault, groups: &[Place<'_>], decisions: &[Decision], document: 
 
 /// A variable as `::var` writes it: `{ type, default, about }`.
 fn var_declaration(decl: &tomet_declaration::VarDecl) -> Value {
-    let mut fields = vec![("type".to_string(), Value::String(decl.ty.to_string()))];
+    let mut fields = vec![(
+        "type".to_string(),
+        Value::Scalar(Scalar::Text(decl.ty.to_string())),
+    )];
     if let Some(default) = &decl.default {
         fields.push(("default".to_string(), default.clone()));
     }
     if let Some(about) = &decl.about {
-        fields.push(("about".to_string(), Value::String(about.clone())));
+        fields.push((
+            "about".to_string(),
+            Value::Scalar(Scalar::Text(about.clone())),
+        ));
     }
     Value::Tuple(Tuple::from_named(fields))
 }

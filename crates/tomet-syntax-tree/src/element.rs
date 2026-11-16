@@ -246,7 +246,7 @@ impl DataExt for Data {
         F: FnOnce(Value) -> Value,
     {
         if let Some(val_mut) = self.get_attr_mut(key) {
-            let old = std::mem::replace(val_mut, Value::None);
+            let old = std::mem::replace(val_mut, Value::Scalar(tomet_scalar::Scalar::None));
             *val_mut = f(old);
             true
         } else {

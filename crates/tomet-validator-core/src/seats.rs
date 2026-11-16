@@ -14,6 +14,7 @@ use std::collections::HashMap;
 
 use tomet_ast::{File, TypeSeat};
 use tomet_expr::{DocRef, EvalContext, EvalValue, NoResolver, OwnNames, evaluate_type};
+use tomet_scalar::Scalar;
 use tomet_semantics_core::admits_default;
 
 use crate::Diagnostic;
@@ -49,7 +50,7 @@ fn problem_with(seat: &TypeSeat) -> Option<String> {
         resolver: &NoResolver,
         self_doc: DocRef(String::new()),
         macros: &HashMap::new(),
-        var: &EvalValue::None,
+        var: &EvalValue::Scalar(Scalar::None),
         var_unset: &[],
         includes: &[],
         heading_level: 0,

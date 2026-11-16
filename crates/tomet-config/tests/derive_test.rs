@@ -4,6 +4,7 @@ use tomet_ast::{Tuple, Value};
 use tomet_config::Config;
 use tomet_config::all_config_specs;
 use tomet_config::schema::{ConfigEntrySpec, ConfigSpecProvider};
+use tomet_scalar::Scalar;
 use tomet_tree::ValueExt;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -74,14 +75,14 @@ fn test_flatten_and_custom_parser() {
             "section".to_string(),
             Value::Tuple(Tuple::from_named([(
                 "space_inside_brackets".to_string(),
-                Value::Bool(true),
+                Value::Scalar(Scalar::Bool(true)),
             )])),
         ),
         (
             "link".to_string(),
             Value::Tuple(Tuple::from_named([(
                 "group_order".to_string(),
-                Value::String("content".to_string()),
+                Value::Scalar(Scalar::Text("content".to_string())),
             )])),
         ),
         (
@@ -90,7 +91,7 @@ fn test_flatten_and_custom_parser() {
                 "style".to_string(),
                 Value::Tuple(Tuple::from_named([(
                     "content".to_string(),
-                    Value::String("quote".to_string()),
+                    Value::Scalar(Scalar::Text("quote".to_string())),
                 )])),
             )])),
         ),

@@ -1,5 +1,6 @@
 use serde::ser::{self, Serialize};
 use tomet_ast::{Tuple, Value};
+use tomet_scalar::Scalar;
 
 use crate::error::{Error, Result};
 
@@ -21,68 +22,77 @@ impl ser::Serializer for ValueSerializer {
     type SerializeStructVariant = MapSerializer;
 
     fn serialize_bool(self, v: bool) -> Result<Value> {
-        Ok(Value::Bool(v))
+        Ok(Value::Scalar(Scalar::Bool(v)))
     }
 
     fn serialize_i8(self, v: i8) -> Result<Value> {
-        Ok(Value::Int(v as i64))
+        Ok(Value::Scalar(Scalar::Int(v as i64)))
     }
     fn serialize_i16(self, v: i16) -> Result<Value> {
-        Ok(Value::Int(v as i64))
+        Ok(Value::Scalar(Scalar::Int(v as i64)))
     }
     fn serialize_i32(self, v: i32) -> Result<Value> {
-        Ok(Value::Int(v as i64))
+        Ok(Value::Scalar(Scalar::Int(v as i64)))
     }
     fn serialize_i64(self, v: i64) -> Result<Value> {
-        Ok(Value::Int(v))
+        Ok(Value::Scalar(Scalar::Int(v)))
     }
     fn serialize_u8(self, v: u8) -> Result<Value> {
-        Ok(Value::Int(v as i64))
+        Ok(Value::Scalar(Scalar::Int(v as i64)))
     }
     fn serialize_u16(self, v: u16) -> Result<Value> {
-        Ok(Value::Int(v as i64))
+        Ok(Value::Scalar(Scalar::Int(v as i64)))
     }
     fn serialize_u32(self, v: u32) -> Result<Value> {
-        Ok(Value::Int(v as i64))
+        Ok(Value::Scalar(Scalar::Int(v as i64)))
     }
     fn serialize_u64(self, v: u64) -> Result<Value> {
         // One that does not fit an `i64` is kept as the digits it is, not wrapped.
-        Ok(i64::try_from(v).map_or_else(|_| Value::Number(v.to_string()), Value::Int))
+        Ok(i64::try_from(v).map_or_else(
+            |_| Value::Scalar(Scalar::Number(v.to_string())),
+            |n| Value::Scalar(Scalar::Int(n)),
+        ))
     }
     fn serialize_i128(self, v: i128) -> Result<Value> {
-        Ok(i64::try_from(v).map_or_else(|_| Value::Number(v.to_string()), Value::Int))
+        Ok(i64::try_from(v).map_or_else(
+            |_| Value::Scalar(Scalar::Number(v.to_string())),
+            |n| Value::Scalar(Scalar::Int(n)),
+        ))
     }
     fn serialize_u128(self, v: u128) -> Result<Value> {
-        Ok(i64::try_from(v).map_or_else(|_| Value::Number(v.to_string()), Value::Int))
+        Ok(i64::try_from(v).map_or_else(
+            |_| Value::Scalar(Scalar::Number(v.to_string())),
+            |n| Value::Scalar(Scalar::Int(n)),
+        ))
     }
     fn serialize_f32(self, v: f32) -> Result<Value> {
-        Ok(Value::Float(v as f64))
+        Ok(Value::Scalar(Scalar::Float(v as f64)))
     }
     fn serialize_f64(self, v: f64) -> Result<Value> {
-        Ok(Value::Float(v))
+        Ok(Value::Scalar(Scalar::Float(v)))
     }
     fn serialize_char(self, v: char) -> Result<Value> {
-        Ok(Value::String(v.to_string()))
+        Ok(Value::Scalar(Scalar::Text(v.to_string())))
     }
     fn serialize_str(self, v: &str) -> Result<Value> {
-        Ok(Value::String(v.to_string()))
+        Ok(Value::Scalar(Scalar::Text(v.to_string())))
     }
     fn serialize_bytes(self, v: &[u8]) -> Result<Value> {
         Ok(Value::Tuple(Tuple::from_unnamed(
-            v.iter().map(|b| Value::Int(*b as i64)),
+            v.iter().map(|b| Value::Scalar(Scalar::Int(*b as i64))),
         )))
     }
     fn serialize_none(self) -> Result<Value> {
-        Ok(Value::None)
+        Ok(Value::Scalar(Scalar::None))
     }
     fn serialize_some<T: Serialize + ?Sized>(self, value: &T) -> Result<Value> {
         value.serialize(self)
     }
     fn serialize_unit(self) -> Result<Value> {
-        Ok(Value::None)
+        Ok(Value::Scalar(Scalar::None))
     }
     fn serialize_unit_struct(self, _name: &'static str) -> Result<Value> {
-        Ok(Value::None)
+        Ok(Value::Scalar(Scalar::None))
     }
     fn serialize_unit_variant(
         self,
@@ -90,7 +100,7 @@ impl ser::Serializer for ValueSerializer {
         _variant_index: u32,
         variant: &'static str,
     ) -> Result<Value> {
-        Ok(Value::String(variant.to_string()))
+        Ok(Value::Scalar(Scalar::Text(variant.to_string())))
     }
     fn serialize_newtype_struct<T: Serialize + ?Sized>(
         self,
@@ -247,11 +257,11 @@ fn finish_map(s: MapSerializer) -> Result<Value> {
 
 fn value_to_key_string(v: Value) -> Result<String> {
     match v {
-        Value::String(s) => Ok(s),
-        Value::Int(i) => Ok(i.to_string()),
-        Value::Bool(b) => Ok(b.to_string()),
-        Value::Float(f) => Ok(f.to_string()),
-        Value::Number(text) => Ok(text),
+        Value::Scalar(Scalar::Text(s)) => Ok(s),
+        Value::Scalar(Scalar::Int(i)) => Ok(i.to_string()),
+        Value::Scalar(Scalar::Bool(b)) => Ok(b.to_string()),
+        Value::Scalar(Scalar::Float(f)) => Ok(f.to_string()),
+        Value::Scalar(Scalar::Number(text)) => Ok(text),
         other => Err(Error::msg(format!(
             "map keys must be strings or simple scalars, got {other:?}"
         ))),

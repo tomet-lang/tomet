@@ -7,6 +7,7 @@
 use std::collections::HashMap;
 
 use tomet_ast::{Block, Connect, ElementView, File, Inline, Section, Value};
+use tomet_scalar::Scalar;
 use tomet_semantics::DeclKind;
 use tomet_semantics::{Bindings, ElementKind, classify_declaration_lenient, classify_std_lenient};
 use tomet_span::Span;
@@ -54,7 +55,7 @@ fn evaluate_type_seat(seat: &tomet_ast::TypeSeat) -> Option<Type> {
         resolver: &tomet_expr::NoResolver,
         self_doc: tomet_expr::DocRef(String::new()),
         macros: &HashMap::new(),
-        var: &tomet_expr::EvalValue::None,
+        var: &tomet_expr::EvalValue::Scalar(tomet_scalar::Scalar::None),
         var_unset: &[],
         includes: &[],
         heading_level: 0,
@@ -209,10 +210,13 @@ pub fn validate_against_schema(
             }
             Some((val_opt, field_span)) => {
                 if let Some(ty) = &req.expected_type {
-                    let val = val_opt.as_ref().unwrap_or(&Value::None);
+                    let default_none = Value::Scalar(Scalar::None);
+                    let val = val_opt.as_ref().unwrap_or(&default_none);
                     if !tomet_semantics_core::is_placeholder(val) {
                         let conforms = if let Some(spec) = tomet_id::IdSpec::new(ty) {
-                            val.scalar_text().is_some_and(|text| spec.accepts(&text))
+                            val.as_scalar()
+                                .and_then(|s| s.text())
+                                .is_some_and(|text| spec.accepts(&text))
                         } else {
                             tomet_semantics_core::admits(ty, val).is_ok()
                         };
@@ -349,11 +353,14 @@ fn collect_doc_sections<'a>(blocks: &'a [Block], doc_sections: &mut Vec<&'a Sect
 /// A value as a reader would have written it, for a message.
 fn describe_value(value: &Value) -> String {
     match value {
-        Value::String(text) => text.clone(),
-        Value::Bool(b) => b.to_string(),
-        Value::Int(n) => n.to_string(),
-        Value::Float(n) => n.to_string(),
-        Value::Number(text) => text.clone(),
+        Value::Scalar(s) => match s {
+            Scalar::Text(text) | Scalar::Number(text) => text.clone(),
+            Scalar::Bool(b) => b.to_string(),
+            Scalar::Int(n) => n.to_string(),
+            Scalar::Float(n) => n.to_string(),
+            Scalar::None => "none".to_string(),
+            Scalar::Auto => "auto".to_string(),
+        },
         Value::Tuple(tuple) => {
             if tuple.is_empty() {
                 "an empty tuple".to_string()
@@ -365,8 +372,6 @@ fn describe_value(value: &Value) -> String {
                 "a list with named entries".to_string()
             }
         }
-        Value::None => "none".to_string(),
-        Value::Auto => "auto".to_string(),
         _ => "something else".to_string(),
     }
 }

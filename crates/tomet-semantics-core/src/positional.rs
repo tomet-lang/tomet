@@ -211,9 +211,10 @@ impl<'a, 's, V: Clone> std::ops::Deref for TupleView<'a, 's, V> {
 mod tests {
     use super::*;
     use tomet_ast::{TupleEntry, Value};
+    use tomet_scalar::Scalar;
 
     fn text(s: &str) -> Value {
-        Value::String(s.to_string())
+        Value::Scalar(Scalar::Text(s.to_string()))
     }
 
     #[test]
@@ -230,12 +231,12 @@ mod tests {
 
     #[test]
     fn positional_entries_take_the_slots_in_the_order_written() {
-        let args = Tuple::from_unnamed([text("config"), Value::Int(2)]);
+        let args = Tuple::from_unnamed([text("config"), Value::Scalar(Scalar::Int(2))]);
         let view = TupleView::new(&args, &["kind", "version"]);
         assert_eq!(view.get("kind"), Some(&text("config")));
         assert_eq!(view.get("0"), Some(&text("config")));
-        assert_eq!(view.get("version"), Some(&Value::Int(2)));
-        assert_eq!(view.get("1"), Some(&Value::Int(2)));
+        assert_eq!(view.get("version"), Some(&Value::Scalar(Scalar::Int(2))));
+        assert_eq!(view.get("1"), Some(&Value::Scalar(Scalar::Int(2))));
         assert_eq!(view.entry_alias(0), Some("kind"));
         assert_eq!(view.entry_alias(1), Some("version"));
         assert!(!view.has_unaliased_unnamed());
@@ -246,12 +247,12 @@ mod tests {
         // `::kind(config, version: 2)`
         let args = Tuple::from_entries([
             TupleEntry::unnamed(text("config")),
-            TupleEntry::named("version", Value::Int(2)),
+            TupleEntry::named("version", Value::Scalar(Scalar::Int(2))),
         ]);
         let view = TupleView::new(&args, &["kind", "version"]);
         assert_eq!(view.get("kind"), Some(&text("config")));
         assert_eq!(view.get("0"), Some(&text("config")));
-        assert_eq!(view.get("version"), Some(&Value::Int(2)));
+        assert_eq!(view.get("version"), Some(&Value::Scalar(Scalar::Int(2))));
         assert_eq!(view.get("1"), None);
         assert_eq!(view.entry_alias(0), Some("kind"));
         assert_eq!(view.entry_alias(1), None);
@@ -280,11 +281,11 @@ mod tests {
     fn with_no_slots_all_unnamed_entries_are_unaliased() {
         let args = Tuple::from_entries([
             TupleEntry::unnamed(text("a")),
-            TupleEntry::named("k", Value::Int(1)),
+            TupleEntry::named("k", Value::Scalar(Scalar::Int(1))),
         ]);
         let view = TupleView::new(&args, &[]);
         assert_eq!(view.get("0"), Some(&text("a")));
-        assert_eq!(view.get("k"), Some(&Value::Int(1)));
+        assert_eq!(view.get("k"), Some(&Value::Scalar(Scalar::Int(1))));
         assert_eq!(view.entry_alias(0), None);
         assert!(view.has_unaliased_unnamed());
         assert_eq!(view.unaliased_unnamed_count(), 1);

@@ -684,18 +684,25 @@ fn decl_from_value(decl: &Value) -> ElementDecl {
 
 /// The `content: ( allow: )` an element declares, if any.
 fn content_allow_from_value(content: &Value) -> Option<ContentAllow> {
-    match content.get("allow")? {
-        Value::String(s) if s == "inline" => Some(ContentAllow::Inline),
-        Value::String(s) if s == "any" => Some(ContentAllow::Any),
-        // `(a, b)` -- a tuple with no named entries.
-        Value::Tuple(tuple) if tuple.has_no_named() => {
+    let allow = content.get("allow")?;
+    if let Some(s) = allow.as_str() {
+        match s {
+            "inline" => Some(ContentAllow::Inline),
+            "any" => Some(ContentAllow::Any),
+            _ => None,
+        }
+    } else if let Value::Tuple(tuple) = allow {
+        if tuple.has_no_named() {
             let mut names = Vec::with_capacity(tuple.len());
             for item in tuple.unnamed() {
                 names.push(name_from_dotted(item.as_str()?));
             }
             Some(ContentAllow::Names(names))
+        } else {
+            None
         }
-        _ => None,
+    } else {
+        None
     }
 }
 

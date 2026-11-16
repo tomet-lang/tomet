@@ -1,6 +1,7 @@
 //! Datetimes: reading them from text and writing them with a format string.
 
 use time::{Date, Month, OffsetDateTime, PrimitiveDateTime, Time, UtcOffset};
+use tomet_scalar::Scalar;
 use tomet_type::datetime::{parse_datetime_parts, parse_offset_seconds};
 
 use super::error::EvalError;
@@ -37,13 +38,13 @@ pub fn parse_offset(text: &str) -> Option<UtcOffset> {
 /// `.offset` is text, `+09:00`, and `+00:00` for UTC.
 pub(crate) fn member(value: &OffsetDateTime, member: &str) -> Result<EvalValue, EvalError> {
     Ok(match member {
-        "year" => EvalValue::Int(i64::from(value.year())),
-        "month" => EvalValue::Int(i64::from(u8::from(value.month()))),
-        "day" => EvalValue::Int(i64::from(value.day())),
-        "hour" => EvalValue::Int(i64::from(value.hour())),
-        "minute" => EvalValue::Int(i64::from(value.minute())),
-        "second" => EvalValue::Int(i64::from(value.second())),
-        "offset" => EvalValue::String(offset_text(value.offset())),
+        "year" => EvalValue::Scalar(Scalar::Int(i64::from(value.year()))),
+        "month" => EvalValue::Scalar(Scalar::Int(i64::from(u8::from(value.month())))),
+        "day" => EvalValue::Scalar(Scalar::Int(i64::from(value.day()))),
+        "hour" => EvalValue::Scalar(Scalar::Int(i64::from(value.hour()))),
+        "minute" => EvalValue::Scalar(Scalar::Int(i64::from(value.minute()))),
+        "second" => EvalValue::Scalar(Scalar::Int(i64::from(value.second()))),
+        "offset" => EvalValue::Scalar(Scalar::Text(offset_text(value.offset()))),
         _ => {
             return Err(EvalError::UnknownMember {
                 on: "datetime",

@@ -18,6 +18,7 @@
 //! A cycle, or a chain deeper than [`MAX_INCLUDE_DEPTH`], is an error.
 
 use tomet_ast::{Block, Element, Inline, Placement};
+use tomet_scalar::Scalar;
 
 use super::args::Args;
 use super::context::{EvalContext, Note};
@@ -92,8 +93,10 @@ impl Options {
         let mut heading = None;
         for (name, value) in &args.named {
             match (name.as_str(), value) {
-                ("level", EvalValue::Int(n)) if *n >= 1 => level = Some(*n as usize),
-                ("level", EvalValue::Number(text))
+                ("level", EvalValue::Scalar(Scalar::Int(n))) if *n >= 1 => {
+                    level = Some(*n as usize)
+                }
+                ("level", EvalValue::Scalar(Scalar::Number(text)))
                     if text.parse::<usize>().map(|n| n >= 1).unwrap_or(false) =>
                 {
                     level = Some(text.parse::<usize>().unwrap());
@@ -105,7 +108,7 @@ impl Options {
                         other.type_name(),
                     ));
                 }
-                ("heading", EvalValue::Bool(b)) => heading = Some(*b),
+                ("heading", EvalValue::Scalar(Scalar::Bool(b))) => heading = Some(*b),
                 ("heading", other) => {
                     return Err(EvalError::mismatch(
                         "`include`'s `heading:`",

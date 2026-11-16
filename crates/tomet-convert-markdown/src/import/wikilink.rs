@@ -6,6 +6,7 @@
 //! syntax on export.
 
 use tomet_ast::{Block, Element, File, Inline, List, Name, Text, Tuple, Value};
+use tomet_scalar::Scalar;
 use tomet_span::Span;
 use tomet_tree::element_new;
 
@@ -140,7 +141,7 @@ fn parse_urls_and_wikilinks(text: &str) -> Vec<Inline> {
                 let mut el = element_new(Name::bare("link"));
                 el.data.args = Some(Tuple::from_named([(
                     "target".to_string(),
-                    Value::String(url_str.to_string()),
+                    Value::Scalar(Scalar::Text(url_str.to_string())),
                 )]));
                 result.push(Inline::Element(el));
                 remaining = &remaining[u_end..];
@@ -160,7 +161,7 @@ fn parse_urls_and_wikilinks(text: &str) -> Vec<Inline> {
                     let mut el = element_new(Name::bare("link"));
                     el.data.args = Some(Tuple::from_named([(
                         "target".to_string(),
-                        Value::String(url_str.to_string()),
+                        Value::Scalar(Scalar::Text(url_str.to_string())),
                     )]));
                     result.push(Inline::Element(el));
                     remaining = &remaining[u_end..];
@@ -223,7 +224,7 @@ fn parse_one_wikilink(result: &mut Vec<Inline>, remaining: &mut &str, start_idx:
             let mut el = element_new(sigil);
             el.data.args = Some(Tuple::from_named([(
                 "target".to_string(),
-                Value::String(target_key_value(target)),
+                Value::Scalar(Scalar::Text(target_key_value(target))),
             )]));
             el.content = Some(vec![Block::Paragraph(tomet_ast::Paragraph::new(
                 vec![Inline::Text(Text::new(
@@ -238,7 +239,7 @@ fn parse_one_wikilink(result: &mut Vec<Inline>, remaining: &mut &str, start_idx:
             let mut el = element_new(sigil);
             el.data.args = Some(Tuple::from_named([(
                 "target".to_string(),
-                Value::String(target_key_value(target)),
+                Value::Scalar(Scalar::Text(target_key_value(target))),
             )]));
             el
         };

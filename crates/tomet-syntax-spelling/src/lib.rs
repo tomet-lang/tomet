@@ -242,7 +242,9 @@ mod tests {
     fn a_scalar_string_is_quoted_when_bare_it_would_be_something_else() {
         assert_eq!(scalar_text("plain"), "plain");
         assert_eq!(scalar_text("2026-06-17T05:52:44Z"), "2026-06-17T05:52:44Z");
-        for quoted in ["true", "false", "none", "auto", "null", "123", "45.67", "", " a", "a b"] {
+        for quoted in [
+            "true", "false", "none", "auto", "null", "123", "45.67", "", " a", "a b",
+        ] {
             assert_eq!(scalar_text(quoted), format!("\"{quoted}\""));
         }
         // Text shaped like an interpolation is a string like any other: quoted, never read as the
@@ -310,8 +312,13 @@ mod tests {
                 let reads_as_other = !matches!(Scalar::from_bare(s), Ok(Scalar::Text(_)));
                 let has_special = s.is_empty()
                     || s.trim() != s
-                    || s.contains(['"', '\'', ':', ',', '(', ')', '[', ']', '{', '}', '\n', '\r', '\t', ' '])
-                    || matches!(s.chars().next(), Some('&' | '*' | '!' | '%' | '@' | '`' | '|' | '>' | '?' | '-' | '~'))
+                    || s.contains([
+                        '"', '\'', ':', ',', '(', ')', '[', ']', '{', '}', '\n', '\r', '\t', ' ',
+                    ])
+                    || matches!(
+                        s.chars().next(),
+                        Some('&' | '*' | '!' | '%' | '@' | '`' | '|' | '>' | '?' | '-' | '~')
+                    )
                     || s.contains("<$");
                 assert!(
                     reads_as_other || has_special,
