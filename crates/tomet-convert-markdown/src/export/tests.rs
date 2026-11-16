@@ -701,3 +701,203 @@ fn a_type_seat_is_shown_as_written_in_a_block_and_in_text() {
         "<$list(string, length: 6)>\n\nid <$uuid> and <$date>\n\n"
     );
 }
+
+#[test]
+fn list_marker_rules_1_to_3_unordered() {
+    // 1. Lowercase `x` is a checked task item.
+    let doc = tomet_ast_parser::parse_file("- (x) done\n").unwrap();
+    assert_eq!(to_markdown(&doc), "- [x] done\n\n");
+
+    // 2. Empty tuple is an unchecked task item.
+    let doc = tomet_ast_parser::parse_file("- () unchecked\n- ( ) space unchecked\n").unwrap();
+    assert_eq!(to_markdown(&doc), "- [ ] unchecked\n- [ ] space unchecked\n\n");
+
+    // 3. Other scalar markers become bold labels.
+    let doc = tomet_ast_parser::parse_file("- (feat) New feature\n").unwrap();
+    assert_eq!(to_markdown(&doc), "- **feat**: New feature\n\n");
+
+    // Explicit key `marker:` produces the same output.
+    let doc = tomet_ast_parser::parse_file("- (marker: x) done\n- (marker: feat) New feature\n").unwrap();
+    assert_eq!(to_markdown(&doc), "- [x] done\n- **feat**: New feature\n\n");
+}
+
+#[test]
+fn list_marker_rule_4_ordered_list() {
+    let doc = tomet_ast_parser::parse_file("-. (x) done\n-. () todo\n-. (feat) feature\n").unwrap();
+    assert_eq!(to_markdown(&doc), "1. [x] done\n2. [ ] todo\n3. **feat**: feature\n\n");
+}
+
+#[test]
+fn list_marker_rule_5_multiline_item() {
+    let doc = tomet_ast_parser::parse_file("- (feat)| first line\n        | second line\n").unwrap();
+    assert_eq!(to_markdown(&doc), "- **feat**: first line\nsecond line\n\n");
+
+    let doc = tomet_ast_parser::parse_file("- (x)| first line\n     | second line\n").unwrap();
+    assert_eq!(to_markdown(&doc), "- [x] first line\nsecond line\n\n");
+
+    let doc = tomet_ast_parser::parse_file("- ()| first line\n    | second line\n").unwrap();
+    assert_eq!(to_markdown(&doc), "- [ ] first line\nsecond line\n\n");
+}
+
+#[test]
+fn list_marker_rule_6_item_id_and_nested_sublist() {
+    let doc = tomet_ast_parser::parse_file("- (feat)#(item-id) feature text\n  - (x) child done\n  - () child todo\n").unwrap();
+    assert_eq!(
+        to_markdown(&doc),
+        "- **feat**: feature text\n  - [x] child done\n  - [ ] child todo\n\n"
+    );
+}
+
+#[test]
+fn list_marker_scalar_types_number_boolean_and_quoted() {
+    // Number marker (12)
+    let doc = tomet_ast_parser::parse_file("- (12) number item\n").unwrap();
+    assert_eq!(to_markdown(&doc), "- **12**: number item\n\n");
+
+    // Boolean markers
+    let doc = tomet_ast_parser::parse_file("- (true) boolean true\n- (false) boolean false\n").unwrap();
+    assert_eq!(to_markdown(&doc), "- **true**: boolean true\n- **false**: boolean false\n\n");
+
+    // Quoted label
+    let doc = tomet_ast_parser::parse_file("- (\"Core Capabilities\") quoted text\n- (\"12:01\") quoted time\n").unwrap();
+    assert_eq!(
+        to_markdown(&doc),
+        "- **Core Capabilities**: quoted text\n- **12:01**: quoted time\n\n"
+    );
+
+    // Empty string label produces no label
+    let doc = tomet_ast_parser::parse_file("- (\"\") empty label\n").unwrap();
+    assert_eq!(to_markdown(&doc), "- empty label\n\n");
+}
+
+#[test]
+fn list_marker_label_escaping() {
+    let doc = tomet_ast_parser::parse_file("- (\"*bold*\") star\n- (\"_em_\") underscore\n- (\"[bracket]\") bracket\n- (\"`code`\") code\n").unwrap();
+    assert_eq!(
+        to_markdown(&doc),
+        "- **\\*bold\\***: star\n- **\\_em\\_**: underscore\n- **\\[bracket\\]**: bracket\n- **`code`**: code\n\n"
+    );
+}
+
+#[test]
+fn list_marker_undecided_shapes_remain_unchanged() {
+    // Uppercase X is a label
+    let doc = tomet_ast_parser::parse_file("- (X) uppercase x\n").unwrap();
+    assert_eq!(to_markdown(&doc), "- **X**: uppercase x\n\n");
+
+    // done is a label
+    let doc = tomet_ast_parser::parse_file("- (done) done label\n").unwrap();
+    assert_eq!(to_markdown(&doc), "- **done**: done label\n\n");
+
+    // todo is a label
+    let doc = tomet_ast_parser::parse_file("- (todo) todo label\n").unwrap();
+    assert_eq!(to_markdown(&doc), "- **todo**: todo label\n\n");
+
+    // Tuple marker
+    let doc = tomet_ast_parser::parse_file("- (marker: (1, 2)) tuple marker\n").unwrap();
+    assert_eq!(to_markdown(&doc), "- tuple marker\n\n");
+
+    // Marker with other keys beside it: marker is shown, other keys are not shown
+    let doc = tomet_ast_parser::parse_file("- (marker: x, priority: high) with extra keys\n").unwrap();
+    assert_eq!(to_markdown(&doc), "- [x] with extra keys\n\n");
+
+    let doc = tomet_ast_parser::parse_file("- (feat, priority: high) with extra keys label\n").unwrap();
+    assert_eq!(to_markdown(&doc), "- **feat**: with extra keys label\n\n");
+
+    // Two-space marker gives today's output (label)
+    let doc = tomet_ast_parser::parse_file("- (\"  \") two spaces\n").unwrap();
+    assert_eq!(to_markdown(&doc), "- **  **: two spaces\n\n");
+
+    // Tab marker gives today's output (label)
+    let doc = tomet_ast_parser::parse_file("- (\"\t\") tab\n").unwrap();
+    assert_eq!(to_markdown(&doc), "- **\t**: tab\n\n");
+
+    // Second unnamed value: first is marker, second is not shown
+    let doc = tomet_ast_parser::parse_file("- (a, b) two unnamed values\n").unwrap();
+    assert_eq!(to_markdown(&doc), "- **a**: two unnamed values\n\n");
+
+    // No marker key in tuple
+    let doc = tomet_ast_parser::parse_file("- (priority: high) no marker key\n").unwrap();
+    assert_eq!(to_markdown(&doc), "- no marker key\n\n");
+
+    // Time trap without quotes (parses as entry 12: 01, no marker key)
+    let doc = tomet_ast_parser::parse_file("- (12:01) bare time trap\n").unwrap();
+    assert_eq!(to_markdown(&doc), "- bare time trap\n\n");
+}
+
+#[test]
+fn list_marker_single_space_is_unchecked_task_item() {
+    // Unordered
+    let doc = tomet_ast_parser::parse_file("- (\" \") open\n").unwrap();
+    assert_eq!(to_markdown(&doc), "- [ ] open\n\n");
+
+    // Ordered
+    let doc = tomet_ast_parser::parse_file("-. (\" \") open\n").unwrap();
+    assert_eq!(to_markdown(&doc), "1. [ ] open\n\n");
+
+    // Nested
+    let doc = tomet_ast_parser::parse_file("- (\" \") parent\n  - (\" \") child\n").unwrap();
+    assert_eq!(to_markdown(&doc), "- [ ] parent\n  - [ ] child\n\n");
+
+    // ( ) and (" ") give the same output
+    let doc_empty_unordered = tomet_ast_parser::parse_file("- ( ) task\n").unwrap();
+    let doc_space_unordered = tomet_ast_parser::parse_file("- (\" \") task\n").unwrap();
+    assert_eq!(to_markdown(&doc_empty_unordered), to_markdown(&doc_space_unordered));
+
+    let doc_empty_ordered = tomet_ast_parser::parse_file("-. ( ) task\n").unwrap();
+    let doc_space_ordered = tomet_ast_parser::parse_file("-. (\" \") task\n").unwrap();
+    assert_eq!(to_markdown(&doc_empty_ordered), to_markdown(&doc_space_ordered));
+
+    let doc_empty_nested = tomet_ast_parser::parse_file("- ( ) parent\n  - ( ) child\n").unwrap();
+    let doc_space_nested = tomet_ast_parser::parse_file("- (\" \") parent\n  - (\" \") child\n").unwrap();
+    assert_eq!(to_markdown(&doc_empty_nested), to_markdown(&doc_space_nested));
+}
+
+#[test]
+fn list_marker_round_trip_task_lists() {
+    // - [ ] a and - [x] b
+    let md = "- [ ] a\n- [x] b\n";
+    let doc = crate::import::from_markdown(md);
+    assert_eq!(to_markdown(&doc), "- [ ] a\n- [x] b\n\n");
+
+    // Ordered 1. [ ] a
+    let md_ordered = "1. [ ] a\n";
+    let doc_ordered = crate::import::from_markdown(md_ordered);
+    assert_eq!(to_markdown(&doc_ordered), "1. [ ] a\n\n");
+
+    // Nested task list
+    let md_nested = "- [ ] parent\n  - [x] child\n";
+    let doc_nested = crate::import::from_markdown(md_nested);
+    assert_eq!(to_markdown(&doc_nested), "- [ ] parent\n  - [x] child\n\n");
+}
+
+#[test]
+fn list_marker_x_done_and_todo_are_labels() {
+    // Unordered
+    let doc_x = tomet_ast_parser::parse_file("- (X) uppercase x\n").unwrap();
+    assert_eq!(to_markdown(&doc_x), "- **X**: uppercase x\n\n");
+
+    let doc_done = tomet_ast_parser::parse_file("- (done) done label\n").unwrap();
+    assert_eq!(to_markdown(&doc_done), "- **done**: done label\n\n");
+
+    let doc_todo = tomet_ast_parser::parse_file("- (todo) todo label\n").unwrap();
+    assert_eq!(to_markdown(&doc_todo), "- **todo**: todo label\n\n");
+
+    // Ordered
+    let doc_x_ord = tomet_ast_parser::parse_file("-. (X) uppercase x\n").unwrap();
+    assert_eq!(to_markdown(&doc_x_ord), "1. **X**: uppercase x\n\n");
+
+    let doc_done_ord = tomet_ast_parser::parse_file("-. (done) done label\n").unwrap();
+    assert_eq!(to_markdown(&doc_done_ord), "1. **done**: done label\n\n");
+
+    let doc_todo_ord = tomet_ast_parser::parse_file("-. (todo) todo label\n").unwrap();
+    assert_eq!(to_markdown(&doc_todo_ord), "1. **todo**: todo label\n\n");
+
+    // x stays checked and X is the label **X**
+    let doc_both = tomet_ast_parser::parse_file("- (x) checked\n- (X) uppercase\n").unwrap();
+    assert_eq!(to_markdown(&doc_both), "- [x] checked\n- **X**: uppercase\n\n");
+
+    let doc_both_ord = tomet_ast_parser::parse_file("-. (x) checked\n-. (X) uppercase\n").unwrap();
+    assert_eq!(to_markdown(&doc_both_ord), "1. [x] checked\n2. **X**: uppercase\n\n");
+}
+

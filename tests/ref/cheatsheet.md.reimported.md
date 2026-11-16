@@ -35,10 +35,10 @@ sudo whoami ls --help
 1. number1
 2. number2
 
-- check
-- none
-- custom?
-- custom
+- [x] check
+- [ ] none
+- [ ] custom?
+- **TODO**: custom
 
 1. aaaa
 

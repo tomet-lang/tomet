@@ -16,13 +16,14 @@ mod tests;
 use escape::{escape_attr, escape_text, fence_for};
 
 use tomet_ast::{
-    Block, ElementView, File, Inline, Interpolation, List, Placement, Section, Tuple, Value,
+    Block, ElementView, File, Inline, Interpolation, List, ListItem, Placement, Section, Tuple,
+    Value,
 };
 use tomet_scalar::Scalar;
 use tomet_semantics::{
-    FootnoteRegistry, TargetScheme, classify_std_lenient, comment_text, element_args_view,
-    extract_tags, heading_level, is_attribute_key, is_directive, link_target, path_target,
-    target_scheme,
+    FootnoteRegistry, LIST_MARKER_POSITIONAL_KEY, TargetScheme, classify_std_lenient, comment_text,
+    element_args_view, extract_tags, heading_level, is_attribute_key, is_directive, link_target,
+    list_marker_view, path_target, target_scheme,
 };
 use tomet_tree::ValueExt;
 
@@ -108,6 +109,13 @@ fn render_list(cx: &MarkdownCtx, list: &List, out: &mut String) {
     out.push('\n');
 }
 
+/// Renders a list with the given indentation depth.
+///
+/// An item's marker tuple, when present, is rendered at the start of the item:
+/// an empty tuple or the text `" "` (one space) becomes an unchecked task (`[ ] `),
+/// lowercase `x` becomes a checked task (`[x] `), and other scalar values become
+/// a bold label (`**label**: `). Undecided marker shapes (tuple or map values,
+/// non-marker keys, or additional unkeyed values) emit no mark or label.
 fn render_list_with_indent(cx: &MarkdownCtx, list: &List, indent: usize, out: &mut String) {
     let ordered = list.ordered;
     let indent_str = "  ".repeat(indent);
@@ -126,15 +134,64 @@ fn render_list_with_indent(cx: &MarkdownCtx, list: &List, indent: usize, out: &m
             // no CommonMark form (see the module doc).
             out.push_str(&element_to_md(cx, element, false));
         } else {
-            // `args` (the `(...)` marker `Value`) has no CommonMark
-            // equivalent -- dropped on export, same as this crate's
-            // other documented lossy cases (see the module doc).
+            if let Some(prefix) = list_marker_prefix(item) {
+                out.push_str(&prefix);
+            }
             out.push_str(&blocks_to_md(cx, &item.content));
         }
         out.push('\n');
         if let Some(sub) = &item.sublist {
             render_list_with_indent(cx, sub, indent + 1, out);
         }
+    }
+}
+
+/// Resolves a list item's marker tuple to a CommonMark item prefix.
+///
+/// Looks up the marker entry under the positional marker key. Returns an
+/// unchecked task prefix for an empty tuple or the text `" "` (one space),
+/// a checked task prefix for lowercase `x`, or a bold label for other non-empty
+/// scalar values. Undecided shapes return `None`.
+fn list_marker_prefix(item: &ListItem) -> Option<String> {
+    let args = item.data.args.as_ref()?;
+    let view = list_marker_view(args);
+    let marker_text = if args.is_empty() {
+        None
+    } else {
+        let marker_val = view.get(LIST_MARKER_POSITIONAL_KEY)?;
+        let Value::Scalar(scalar) = marker_val else {
+            return None;
+        };
+        Some(scalar.text()?)
+    };
+
+    if args.is_empty() || marker_text.as_deref() == Some(" ") {
+        Some(if item.content.is_empty() {
+            "[ ]".to_string()
+        } else {
+            "[ ] ".to_string()
+        })
+    } else if marker_text.as_deref() == Some("x") {
+        Some(if item.content.is_empty() {
+            "[x]".to_string()
+        } else {
+            "[x] ".to_string()
+        })
+    } else if let Some(text) = marker_text {
+        if text.is_empty() {
+            None
+        } else {
+            let escaped = escape_text(&text);
+            if escaped.is_empty() {
+                None
+            } else if item.content.is_empty() {
+                Some(format!("**{escaped}**:"))
+            } else {
+                Some(format!("**{escaped}**: "))
+            }
+        }
+    } else {
+        None
     }
 }
 

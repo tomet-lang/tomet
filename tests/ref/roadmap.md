@@ -11,9 +11,9 @@
 - Template構文
 - `[]`のkey
 - コネクト構文2
-- Table記法
-- 独自DSL Settings
-- 独自DSL Value
+- **!**: Table記法
+- **!**: 独自DSL Settings
+- **!**: 独自DSL Value
 
 **構文を実装する**
 
