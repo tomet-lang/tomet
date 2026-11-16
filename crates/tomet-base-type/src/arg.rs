@@ -14,6 +14,10 @@ use crate::text::write_quoted;
 
 /// A plain value: what a `default` holds when it is written out, and what
 /// `length` or `prefix` is when they are written.
+///
+/// A [`Scalar`] or a list of them, a [`Scalar::Number`] included: a number kept as written, so the
+/// type's text form round-trips its own spelling and `length: 1.10` is refused as written, not
+/// read as `1.1`.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Datum {
     Scalar(Scalar),

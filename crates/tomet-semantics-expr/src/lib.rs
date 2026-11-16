@@ -40,6 +40,10 @@
 //!   | seat holds is read by [`evaluate_type`], with the types first, so a name it
 //!   | does not know is an unknown type ([`tomet_type::TypeError::Unknown`]) and not
 //!   | an unknown name of the expression language.
+//! - (Numbers are read as data's are)
+//!   | A number in an expression is read by [`tomet_scalar::Scalar::from_bare`], the reader of a
+//!   | bare word in data: `{$ 1.10 }` is the number `1.10` kept as written, not the float `1.1`,
+//!   | and an exponent (`1e3`) is read.
 //! - (No conversions)
 //!   | Operators and methods use the values they are given and convert none
 //!   | of them. `&&` and `||` skip their right side once the left decides,

@@ -132,6 +132,10 @@ pub fn quoted_text(s: &str) -> String {
 /// where it could be a number, a keyword, an empty or padded text, or holds a delimiter, a quote or
 /// a control character, or opens with a character that starts something, or holds a `<$`, which
 /// begins a type seat wherever it stands.
+///
+/// A datetime (`2026-06-17T05:52:44Z`) holds a `:`, which would have it quoted; it is written bare,
+/// because the parser reads it bare as the same text. This is the one place this crate asks the
+/// type crate a question.
 pub fn write_scalar_string(s: &str, out: &mut String) {
     if Type::bare(Kind::Datetime).holds_text(s) == Some(true) {
         out.push_str(s);

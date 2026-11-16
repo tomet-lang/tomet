@@ -19,7 +19,11 @@ use serde::{Deserialize, Serialize};
 /// The scalar values a document can hold.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum Scalar {
+    /// `none`: the value is nothing, and says so. It is not an absent key, which says nothing, and not
+    /// `auto`, which leaves the value to the system. JSON `null` is this value at the JSON boundary.
     None,
+    /// `auto`: the system supplies the value. A field takes it only where its schema says so, and a later layer
+    /// can write it to put a field back in the system's hands. It has no JSON form yet.
     Auto,
     Bool(bool),
     Int(i64),
