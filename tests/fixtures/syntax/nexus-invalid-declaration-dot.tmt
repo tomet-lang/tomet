@@ -1,0 +1,5 @@
+// A declaration head has no dot: `::macro.copyright("...")` is refused, and the entry goes inside the
+// parentheses, as `::macro(copyright: ...)`.
+
+::kind(fixture)
+::macro.copyright("(C) 2026 Tomet Projects")

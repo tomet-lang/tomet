@@ -2,7 +2,9 @@
 //!
 //! A nexus -- `@name`, a `::name` declaration or connect -- needs a primary group: `(args)`,
 //! `[content]`, or a `|` run. `{value}`, `#(id)` and a `::connect` only add to
-//! one and cannot stand alone. The grammar lives in `tomet-cst-parser` and
+//! one and cannot stand alone. A declaration's head is its name and nothing
+//! more: `::macro.copyright(...)` has a dot in it and is refused, the entry
+//! goes inside, as `::macro(copyright: ...)`. The grammar lives in `tomet-cst-parser` and
 //! `tomet-ast-parser`; this target pins it from the outside, with the corpus:
 //!
 //! - `syntax/nexus-invalid-*.tmt` are the forms that are refused, one to a
@@ -101,6 +103,16 @@ const REJECTED: &[(&str, &str, &str)] = &[
         "syntax/nexus-invalid-declaration-data.tmt",
         "4:1",
         "`::meta` needs a primary group",
+    ),
+    (
+        "syntax/nexus-invalid-declaration-dot-positional.tmt",
+        "5:1",
+        "a declaration head has no dot: write `::workspace(ignore: (...))`",
+    ),
+    (
+        "syntax/nexus-invalid-declaration-dot.tmt",
+        "5:1",
+        "a declaration head has no dot: write `::macro(copyright: (...))`",
     ),
     (
         "syntax/nexus-invalid-declaration-id.tmt",
@@ -296,25 +308,6 @@ fn the_twelve_declarations_read_their_parenthesised_arguments() {
         .find(|d| d.name.name == "blueprint" && d.data.value.is_some())
         .expect("no `::blueprint(...){...}` in the fixture");
     assert!(decl.data.args.is_some(), "`::blueprint(...)` names itself");
-}
-
-#[test]
-fn a_declaration_head_with_a_dot_is_refused() {
-    let src = read_fixture(Path::new("syntax/declaration-paths.tmt"));
-    let err = parse_file(&src).expect_err("declaration-paths.tmt must be refused");
-    assert!(
-        err.to_string()
-            .contains("a declaration head has no dot: write `::macro(copyright: (...))`"),
-        "expected advice for declaration-paths.tmt, got: {err}"
-    );
-
-    let src = read_fixture(Path::new("syntax/declaration-paths-positional.tmt"));
-    let err = parse_file(&src).expect_err("declaration-paths-positional.tmt must be refused");
-    assert!(
-        err.to_string()
-            .contains("a declaration head has no dot: write `::workspace(ignore: (...))`"),
-        "expected advice for declaration-paths-positional.tmt, got: {err}"
-    );
 }
 
 #[test]

@@ -80,20 +80,11 @@ pub fn read_fixture(rel: &Path) -> String {
 /// reality exactly, so a fixture that starts or stops parsing shows up as
 /// a failure rather than silently changing which files get covered.
 ///
-/// `key: [...]` is block content (`Value::Blocks`), the same grammar as an
-/// element's own `[content]`: a fixture that writes `[a, b]` as a list
-/// parses, but to one paragraph, not a sequence. `(a, b)` is the sole
-/// spelling for a *sequence*. `syntax/value-element.tmt`'s `icons: [...]`
-/// embeds `@`-elements in a `[...]` value position, which is exactly what
-/// that fixture exists to demonstrate.
-///
-/// The `syntax/nexus-invalid-*` fixtures are the standing entries: each is one
-/// form the nexus rule refuses (a `@name`, `::name` or `::name` with no primary
-/// group), kept apart because the parser stops at the first error. A nexus test
-/// holds each to the place and reason it is refused for.
+/// Every entry is a `syntax/nexus-invalid-*` fixture: one form the nexus rule
+/// refuses (a `@name` or `::name` with no primary group, or a `::name.path` head
+/// with a dot), kept apart because the parser stops at the first error. A nexus
+/// test holds each to the place and reason it is refused for.
 pub const KNOWN_UNPARSEABLE: &[&str] = &[
-    "syntax/declaration-paths-positional.tmt",
-    "syntax/declaration-paths.tmt",
     "syntax/nexus-invalid-bare-block.tmt",
     "syntax/nexus-invalid-bare-hr.tmt",
     "syntax/nexus-invalid-combine-data.tmt",
@@ -106,6 +97,8 @@ pub const KNOWN_UNPARSEABLE: &[&str] = &[
     "syntax/nexus-invalid-data-only.tmt",
     "syntax/nexus-invalid-declaration-bare.tmt",
     "syntax/nexus-invalid-declaration-data.tmt",
+    "syntax/nexus-invalid-declaration-dot-positional.tmt",
+    "syntax/nexus-invalid-declaration-dot.tmt",
     "syntax/nexus-invalid-declaration-id.tmt",
     "syntax/nexus-invalid-heading-connect.tmt",
     "syntax/nexus-invalid-id-only.tmt",
@@ -143,19 +136,13 @@ pub const KNOWN_TS_ERRORS: &[(&str, &[&str])] = &[
     // directly. `tomet-parser` recognizes
     // it; `grammar.js` has not been taught the combine form yet.
     ("syntax/combine.tmt", &[ANY_ERROR]),
-    // Positional arguments in a declaration's `(...)`: `grammar.js` reads one scalar or one string
-    // there, so a second positional argument (`("target", ".git")`, as `::kind(a, 2)` also fails)
-    // and an element as the positional one (`(@file(path))`) are errors. `tomet-parser` reads both.
+    // A declaration head with a dot (`::macro.copyright(...)`): `tomet-parser` refuses it (these two
+    // fixtures are in `KNOWN_UNPARSEABLE`), and the grammar refuses it too, with error nodes. That is
+    // the two agreeing, not the grammar missing syntax, so what the nodes hold is not pinned.
+    ("syntax/nexus-invalid-declaration-dot.tmt", &[ANY_ERROR]),
     (
-        "syntax/declaration-paths-positional.tmt",
-        &[
-            MISSING_NODE,
-            ", \"",
-            ")",
-            "(daily.blueprint.tmt",
-            "(deck.vocabulary.tmt",
-            "(tomet.dict.tmt",
-        ],
+        "syntax/nexus-invalid-declaration-dot-positional.tmt",
+        &[ANY_ERROR],
     ),
     // A block where a `{...}` group's value goes (`card: [ @card[ $(2) ] ]`, the body of a block
     // macro in `::macro(...)`): `grammar.js` reads a `[ ... ]` value in `(args)` but not as the

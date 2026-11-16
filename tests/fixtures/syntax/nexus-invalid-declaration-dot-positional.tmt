@@ -1,0 +1,5 @@
+// The head has no dot however many positional arguments follow it: `::workspace.ignore("target", ".git")`
+// is refused, and the entry goes inside the parentheses, as `::workspace(ignore: ...)`.
+
+::kind(fixture)
+::workspace.ignore("target", ".git")
