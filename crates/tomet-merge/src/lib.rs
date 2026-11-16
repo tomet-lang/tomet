@@ -50,11 +50,14 @@
 //! [`ConflictError`], not a marker to step over: [`has_conflicts`] says `true`
 //! for it, and nothing resolves past it.
 
+mod attrs;
 mod conflict;
 mod diff3;
 mod markers;
 mod merge;
+mod prose;
 mod resolve;
+mod trivia;
 
 pub use conflict::{ConflictError, ConflictItem, ConflictKind, find_conflicts, has_conflicts};
 pub use markers::CONFLICT_MARKER;

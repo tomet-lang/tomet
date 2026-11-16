@@ -246,10 +246,10 @@ struct MatchBlock {
     len: usize,
 }
 
-/// Maximal matching runs between `base` and `derived`, in order, via a
-/// textbook LCS dynamic-programming table. `O(n*m)`, which is fine for
-/// note-sized documents; this is not meant for diffing megabyte files.
-fn lcs_matches<T: PartialEq>(base: &[T], derived: &[T]) -> Vec<MatchBlock> {
+/// The index pairs `(base, derived)` of one longest common subsequence of `base` and `derived`, in
+/// order, via a textbook LCS dynamic-programming table. `O(n*m)`, which is fine for note-sized
+/// documents; this is not meant for diffing megabyte files.
+pub(crate) fn lcs_pairs<T: PartialEq>(base: &[T], derived: &[T]) -> Vec<(usize, usize)> {
     let (n, m) = (base.len(), derived.len());
     // Flat row-major DP table: `dp[i * stride + j]` == LCS length of
     // `base[..i]` and `derived[..j]`.
@@ -266,8 +266,7 @@ fn lcs_matches<T: PartialEq>(base: &[T], derived: &[T]) -> Vec<MatchBlock> {
         }
     }
 
-    // Backtrack from (n, m) to collect matched index pairs, then reverse
-    // and coalesce adjacent pairs into runs.
+    // Backtrack from (n, m) to collect matched index pairs, then reverse.
     let mut pairs = Vec::new();
     let (mut i, mut j) = (n, m);
     while i > 0 && j > 0 {
@@ -282,9 +281,14 @@ fn lcs_matches<T: PartialEq>(base: &[T], derived: &[T]) -> Vec<MatchBlock> {
         }
     }
     pairs.reverse();
+    pairs
+}
 
+/// Maximal matching runs between `base` and `derived`, in order: [`lcs_pairs`] with adjacent pairs
+/// coalesced.
+fn lcs_matches<T: PartialEq>(base: &[T], derived: &[T]) -> Vec<MatchBlock> {
     let mut blocks: Vec<MatchBlock> = Vec::new();
-    for (bi, di) in pairs {
+    for (bi, di) in lcs_pairs(base, derived) {
         if let Some(last) = blocks.last_mut()
             && last.base_start + last.len == bi
             && last.derived_start + last.len == di
