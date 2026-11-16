@@ -13,10 +13,9 @@ $macro.generated_by(self::path)
 
 ==[ Documentation Policy ]
 
--| All Markdown files (`README.md`, `AGENTS.md`, `CONTRIBUTING.md`, etc.) are generated artifacts.
- | Never edit `.md` files directly.
--| Always edit the source `.tmt` files under @dir(tmtroot/) (or crate-local `.tmt` files).
--| Run `tomet export` to update Markdown files, and verify with `tomet export --check`.
+- All Markdown files are generated artifacts. Never edit `.md` files directly.
+- Always edit the source `.tmt` files under @dir(tmtroot/) (or crate-local `.tmt` files).
+- Run `tomet export` to update Markdown files, and verify with `tomet export --check`.
 
 ==[ Repository Layout ]
 
@@ -64,47 +63,22 @@ $macro.generated_by(self::path)
 
 ==[ Packaging ]
 
-Nix is the packaging story. `nix/pkgs/tomet.nix` and `nix/pkgs/vscode-extension.nix` build the CLI and the VS Code extension; `nix/dev.nix` is the dev shell.
+Nix is the packaging story. 
+@file("nix/pkgs/tomet.nix") and @file("nix/pkgs/vscode-extension.nix") build the CLI and the VS Code extension; @file(nix/dev.nix) is the dev shell.
 
 ==[ Finding your way around ]
 
-- Crate layers and the dependency direction between them: the `crate-layering` entry in @file(.writ.tmt).
+- Crate layers and the dependency direction between them: the `crate-layering` entry in @file(".writ.tmt").
 - What a crate is and why it exists: that crate's `//!` module doc and @dir(tmtroot/generated/crates/).
-- What a crate depends on: its @file(Cargo.toml).
+- What a crate depends on: its @file("Cargo.toml").
 - What the CLI does: `tomet --help`.
 
 ==[ Commit Convention ]
 
-All commits must follow the Conventional Commits format: `type(scope): description`.
-
-===[ Types ]
-
--| `feat`: New feature or capability.
--| `fix`: Bug fix.
--| `docs`: Documentation changes (`.tmt` or exported docs).
--| `refactor`: Code restructuring without changing behavior.
--| `perf`: Performance improvement.
--| `test`: Adding or correcting tests.
--| `chore`: Build scripts, dependencies, tooling, repo maintenance.
-
-===[ Scopes ]
-
-Use the affected component or crate name as the scope:
-
--| **Apps**: `cli`, `lsp`
--| **Syntax & Semantics**: `parser`, `lexer`, `ast`, `syntax`, `semantics`, `validator`
--| **Converters & Format**: `markdown`, `html`, `typst`, `pandoc`, `format`
--| **Workspace & IO**: `workspace`, `load`, `vault`, `config`, `links`
--| **Bindings**: `js`, `python`, `java`
--| **Editors**: `vscode`, `zed`, `helix`, `neovim`
--| **Infra / Meta**: `nix`, `ci`, `deps`, `rules` (for `.writ.tmt`)
-
-@callout(tip)
-| If a change spans multiple components or the whole workspace,
-| omit the scope or use a broad category (e.g. `refactor(crates): ...` or `chore: update dependencies`).
+$include(tmt("tmtroot/dev/convention/commit.tmt"))
 
 ==[ Verification ]
 
 Before committing or submitting changes, ensure all checks pass:
-- `tomet export --check`: Ensure documentation artifacts are up to date.
-- `tomet api --check`: Ensure Rust API documentation matches doc-comments.
+
+$include(tmt("tmtroot/dev/howto/tools.tmt"))

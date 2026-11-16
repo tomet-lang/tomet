@@ -4,8 +4,7 @@
 
 ## Documentation Policy
 
-- All Markdown files (`README.md`, `AGENTS.md`, `CONTRIBUTING.md`, etc.) are generated artifacts.
-Never edit `.md` files directly.
+- All Markdown files are generated artifacts. Never edit `.md` files directly.
 - Always edit the source `.tmt` files under `tmtroot/` (or crate-local `.tmt` files).
 - Run `tomet export` to update Markdown files, and verify with `tomet export --check`.
 
@@ -55,7 +54,8 @@ cargo test -p tree-sitter-tomet
 
 ## Packaging
 
-Nix is the packaging story. `nix/pkgs/tomet.nix` and `nix/pkgs/vscode-extension.nix` build the CLI and the VS Code extension; `nix/dev.nix` is the dev shell.
+Nix is the packaging story. 
+`nix/pkgs/tomet.nix` and `nix/pkgs/vscode-extension.nix` build the CLI and the VS Code extension; `nix/dev.nix` is the dev shell.
 
 ## Finding your way around
 
@@ -70,13 +70,13 @@ All commits must follow the Conventional Commits format: `type(scope): descripti
 
 ### Types
 
-- `feat`: New feature or capability.
-- `fix`: Bug fix.
-- `docs`: Documentation changes (`.tmt` or exported docs).
-- `refactor`: Code restructuring without changing behavior.
-- `perf`: Performance improvement.
-- `test`: Adding or correcting tests.
-- `chore`: Build scripts, dependencies, tooling, repo maintenance.
+- **feat**: New feature or capability.
+- **fix**: Bug fix.
+- **docs**: Documentation changes (`.tmt` or exported docs).
+- **refactor**: Code restructuring without changing behavior.
+- **perf**: Performance improvement.
+- **test**: Adding or correcting tests.
+- **chore**: Build scripts, dependencies, tooling, repo maintenance.
 
 ### Scopes
 
@@ -98,6 +98,22 @@ Use the affected component or crate name as the scope:
 
 Before committing or submitting changes, ensure all checks pass:
 
-- `tomet export --check`: Ensure documentation artifacts are up to date.
-- `tomet api --check`: Ensure Rust API documentation matches doc-comments.
+Useful recipes defined in `justfile`:
+
+- **`just test`**: Runs all workspace tests (`cargo test --workspace`).
+- **`just test-suite`**: Runs the cross-crate corpus and snapshot test suite (`cargo test -p tomet-tests`).
+- **`just docs-check`**: Runs the build of `tomet-cli`, `sisho check .` (`tomet check`, `tomet format --check`, `tomet export --check`, `twrit check`, `catasto check`), and `tomet spec --all --check --out tmtroot/generated`.
+- **`just docs`**: Updates, regenerates, and formats all derived documentation.
+- **`just writ-check`**: Verifies `.writ.tmt` guard rules and language conventions.
+
+Direct checks (if running individually):
+
+- `cargo check` / `cargo build` / `cargo test`
+- `twrit check`: Reads `.writ.tmt` files.
+- `tomet export --check`: Verifies that all exported `.md` documents match their source `.tmt` files.
+- `tomet spec --all --check --out tmtroot/generated`: Verifies that generated specifications match source definitions.
+- Cross-crate tests live in the `tests/` package (`tomet-tests`), not in the individual crates;
+see `tests/README.md` for what belongs there and how the snapshot references work.
+- For editor extensions (`editors/vscode`, `editors/zed`, `editors/helix`), verify
+via reading code and running their own tests.
 

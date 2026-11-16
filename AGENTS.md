@@ -6,12 +6,14 @@
 
 ### Precedence of Instructions
 
-The rules in this document serve as the project baseline and defaults. Explicit instructions given by the user in a conversation always take precedence over these defaults.
+The rules in this document serve as the project baseline and defaults. 
+Explicit instructions given by the user in a conversation always take precedence over these defaults.
 
 ### User-First Design over Developer Convenience
 
 Always prioritize the end-user experience, syntax ergonomics, and API design.
-If there is tension between developer or implementation convenience and user simplicity, user simplicity must always win. Never compromise user experience just because an implementation is easier.
+If there is tension between developer or implementation convenience and user simplicity, user simplicity must always win. 
+Never compromise user experience just because an implementation is easier.
 
 ### Resist Path-of-Least-Resistance & Legacy Bias
 
@@ -29,7 +31,7 @@ Always state what you intend to do before doing it. Never execute non-trivial ac
 
 ### Never edit `.md` directly
 
-All Markdown files (`README.md`, `AGENTS.md`, `CLAUDE.md`, and crate `README.md` files) are generated build artifacts, not source files.
+All Markdown files are generated build artifacts, not source files.
 
 - Never edit a `.md` file directly.
 - Always edit the corresponding `.tmt` file under `tmtroot/` (or the crate's own `.tmt`).
@@ -52,7 +54,7 @@ dependencies, and placement rules, enforced automatically by `twrit`.
 
 Do not duplicate code signatures, struct layouts, or implementation prose into documentation files. Duplicate prose inevitably drifts.
 
-- Use pointers and links (`...`, `...`, or symbol references) instead of
+- Use pointers and links (`@file(...)`, `@dir(...)`, or symbol references) instead of
 copy-pasting code definitions.
 - Keep prose documentation concise and high-level, pointing directly to the code where
 the truth lives.
@@ -74,11 +76,14 @@ Before a non-trivial change:
 on each other. There is no prose overview standing between you and those -- there was,
 and it drifted.
 
-Rules this repository must obey live in `.writ.tmt` files (at the workspace root and crate level). Read the governing `.writ.tmt` for the area you are changing. They are the author's; propose an edit and stop rather than working around a rule or relaxing it.
+Rules this repository must obey live in `.writ.tmt` files (at the workspace root and crate level). 
+Read the governing `.writ.tmt` for the area you are changing. 
+They are the author's; propose an edit and stop rather than working around a rule or relaxing it.
 
 ## Environment & Tooling
 
-All commands, builds, and tests must run within the Nix development environment (via `direnv` or `nix develop`). Assume this environment is active and rely on the tools provided by the flake, rather than assuming or relying on global host toolchains.
+All commands, builds, and tests must run within the Nix development environment (via `direnv` or `nix develop`). 
+Assume this environment is active and rely on the tools provided by the flake, rather than assuming or relying on global host toolchains.
 
 ## Verifying changes
 
@@ -86,29 +91,24 @@ This is a parser/CLI/LSP/editor-extensions project with no standalone GUI app. V
 
 Useful recipes defined in `justfile`:
 
-- `just test`: Runs all workspace tests (`cargo test --workspace`).
-- `just test-suite`: Runs the cross-crate corpus and snapshot test suite (`cargo test -p tomet-tests`).
-- `just docs-check`: Runs a comprehensive check on all documents (`tomet check`, `format --check`, `export --check`, `api --check`, and `twrit check`).
-- `just docs`: Updates, regenerates, and formats all derived documentation.
-- `just writ-check`: Verifies `.writ.tmt` guard rules and language conventions.
+- **`just test`**: Runs all workspace tests (`cargo test --workspace`).
+- **`just test-suite`**: Runs the cross-crate corpus and snapshot test suite (`cargo test -p tomet-tests`).
+- **`just docs-check`**: Runs the build of `tomet-cli`, `sisho check .` (`tomet check`, `tomet format --check`, `tomet export --check`, `twrit check`, `catasto check`), and `tomet spec --all --check --out tmtroot/generated`.
+- **`just docs`**: Updates, regenerates, and formats all derived documentation.
+- **`just writ-check`**: Verifies `.writ.tmt` guard rules and language conventions.
 
 Direct checks (if running individually):
 
 - `cargo check` / `cargo build` / `cargo test`
-- `twrit check`: Verifies architectural layers and file placement rules in `.writ.tmt`.
+- `twrit check`: Reads `.writ.tmt` files.
 - `tomet export --check`: Verifies that all exported `.md` documents match their source `.tmt` files.
-- `tomet api --check`: Verifies that extracted Rust API documentation matches source code doc-comments.
-- For grammar changes specifically, also run `cargo test -p tomet-tests -p tree-sitter-tomet`.
-`tomet-parser` is the source of truth for the grammar; `tree-sitter-tomet`'s `grammar.js` is a
-separate, hand-maintained approximation used only for editor syntax highlighting, and it does
-not update itself when `tomet-parser` changes. Drift between the two is caught by `tomet-tests`'s
-`corpus` target, which runs the shared `.tmt` corpus through both implementations; the grammar's
-own structural tests stay in `tree-sitter-tomet`. Cover the new construct by adding a fixture
-under `tests/fixtures/` — that corpus is frozen.
+- `tomet spec --all --check --out tmtroot/generated`: Verifies that generated specifications match source definitions.
 - Cross-crate tests live in the `tests/` package (`tomet-tests`), not in the individual crates;
 see `tests/README.md` for what belongs there and how the snapshot references work.
 - For editor extensions (`editors/vscode`, `editors/zed`, `editors/helix`), verify
 via reading code and running their own tests.
+
+- For grammar changes specifically, see `tests/README.md`.
 
 ## Task tracking & Workspaces
 
@@ -130,11 +130,13 @@ When the task is done, fold anything worth keeping into where it belongs — a d
 The repository uses Jujutsu (`jj`) in colocated mode with Git.
 
 - Favor a branchless workflow. Do not create named Git branches for regular agent tasks.
-- All commit messages must follow the convention in `CONTRIBUTING.md`:
-`type(scope): description` (e.g. `feat(cli): add export check`, `fix(parser): handle pipe`).
 - Use `jj describe -m "..."` to set commit messages, and `jj new` to advance to subsequent revisions.
 - Always pass `--no-pager` to `jj` subcommands (e.g. `jj status --no-pager`, `jj log --no-pager`) — without it, output can hang waiting on a pager in non-interactive/agent sessions.
-- If `jj status`/`jj diff` shows changes you did not make, treat them as another person's in-progress work, not as drift to clean up. Always confirm with the user before reverting, restoring, or overwriting them.
+
+- All commit messages must follow the convention in `CONTRIBUTING.md`:
+`type(scope): description` (e.g. `feat(cli): add export check`, `fix(parser): handle pipe`).
+- If `jj status`/`jj diff` shows changes you did not make, treat them as another person's in-progress work, not as drift to clean up. 
+Always confirm with the user before reverting, restoring, or overwriting them.
 - Never commit automatically or on your own initiative. Always ask and get explicit confirmation from the user before finalizing commits or descriptions.
 - Do not put `Claude-Session:` or `Co-Authored-By: Claude` trailers in commit
 messages. The session trailer embeds a URL, and a commit message is
