@@ -17,6 +17,8 @@
 
 Tome to me!!
 
+試すには、[クイックスタート（英語）](../quick_start.md) をご覧ください。
+
 ## What is tomet?
 
 1. 人間工学的見やすさ。

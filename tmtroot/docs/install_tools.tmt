@@ -1,0 +1,234 @@
+::id(install-tools)
+::export(
+  type: commonmark,
+  path: "docs/install_tools.md"
+)
+::meta(
+  lang: "en"
+)
+
+$macro.generated_by(self::path)
+
+=[ Install Tomet and Sisho ]
+
+This page describes how to install the Tomet language tools and editor integrations.
+
+==[ What you need ]
+
+You need two command-line tools:
+
+- `tomet`: the language tool that parses, checks, formats, and exports Tomet documents.
+- `sisho`: an orchestrator that runs `tomet`, `twrit`, and `catasto` through one interface.
+
+`sisho` does not install the other tools; it finds them on your `PATH`.
+`sisho` requires `tomet` 0.5.0, `twrit` 0.2.0, and `catasto` 0.1.0.
+
+==[ Quick install ]#(quick-install)
+
+The quickest way to get `sisho` and `tomet` together is with Nix:
+
+```bash
+`` nix profile install github:tomet-lang/sisho#toolchain
+```
+
+The `toolchain` package bundles `sisho`, `tomet`, `twrit`, `catasto`, and `sisho-desk`.
+
+==[ Command-line tools ]
+
+===[ Nix ]#(nix)
+
+Nix provides reproducible packages for Linux and macOS.
+
+Install `tomet` and `sisho` from their flakes:
+
+```bash
+`` nix profile install github:tomet-lang/tomet#tomet
+`` nix profile install github:tomet-lang/sisho#sisho
+```
+
+Binary cache: `tomet.cachix.org`. Add `https://tomet.cachix.org` to `substituters` and `tomet.cachix.org-1:9c/iO8Tb6YOM+3r55t12W3fOJK+66itPEaIe8Rs9MDw=` to `trusted-public-keys`.
+
+===[ Build from source ]
+
+Building from source requires a Rust toolchain (Rust 1.85 or later and Cargo).
+
+Build the `tomet` binary from this repository:
+
+```bash
+`` cargo build --release -p tomet-cli
+```
+
+This places the executable `tomet` in `target/release/tomet`.
+
+Build `sisho` from its repository:
+
+```bash
+`` git clone https://github.com/tomet-lang/sisho.git
+`` cd sisho
+`` cargo build --release -p sisho-cli
+```
+
+This places the executable `sisho` in `target/release/sisho`. Move both executables to a directory on your `PATH`.
+
+===[ Release binaries ]
+
+@callout(warning)
+| Not available yet.
+
+Pre-built binaries for Linux, macOS, and Windows are available on GitHub Releases:
+
+- https://github.com/tomet-lang/tomet/releases
+- https://github.com/tomet-lang/sisho/releases
+
+Download the archive for your operating system and architecture, unpack it, and place the executable on your `PATH`.
+
+===[ Homebrew ]
+
+@callout(warning)
+| Not available yet.
+
+Install `tomet` and `sisho` using Homebrew:
+
+```bash
+`` brew install tomet-lang/tap/tomet tomet-lang/tap/sisho
+```
+
+This installs both tools from the `tomet-lang/homebrew-tap` tap.
+
+===[ cargo install ]
+
+@callout(warning)
+| Not available yet.
+
+Install the tools from crates.io with Cargo:
+
+```bash
+`` cargo install tomet-cli --locked
+`` cargo install sisho-cli --locked
+```
+
+The `tomet-cli` package installs the `tomet` executable. The `sisho-cli` package installs the `sisho` executable.
+
+==[ Editors ]#(editors)
+
+Install an editor extension for syntax highlighting and language server integration.
+
+===[ VS Code ]
+
+Install the official extension from the Visual Studio Marketplace:
+
+```bash
+`` code --install-extension tomet-lang.tomet
+```
+
+===[ Open VSX ]
+
+@callout(warning)
+| Not available yet.
+
+For VSCodium and other editors that use the Open VSX Registry:
+
+```bash
+`` codium --install-extension tomet-lang.tomet
+```
+
+===[ Zed ]
+
+@callout(warning)
+| Not available yet.
+
+The extension source is in the @dir(editors/zed/) directory. It is not yet available in the Zed extension registry.
+
+===[ Helix and Neovim ]
+
+Both Helix and Neovim support Tomet through Tree-sitter and the language server.
+Follow the setup instructions in @file(editors/helix/README.md) for Helix and @file(editors/neovim/README.md) for Neovim.
+
+===[ Language server ]
+
+The language server `tomet-lsp` provides diagnostics, syntax navigation, and hover documentation.
+It is packaged with Nix:
+
+```bash
+`` nix profile install github:tomet-lang/sisho#tomet-lsp
+```
+
+==[ From code (libraries) ]
+
+===[ npm ]
+
+The `@tomet/wasm` package provides WebAssembly bindings for JavaScript and TypeScript:
+
+```bash
+`` npm install @tomet/wasm
+```
+
+Initialize the WebAssembly module, then convert or format Tomet markup:
+
+```javascript
+`` import init, { toHtml } from "@tomet/wasm";
+``
+`` await init();
+`` const html = toHtml("=[ Hello ]");
+```
+
+===[ Rust ]
+
+@callout(warning)
+| Not available yet.
+
+Add `tomet` to your `Cargo.toml`:
+
+```toml
+`` [dependencies]
+`` tomet = "0.5"
+```
+
+===[ Python ]
+
+@callout(warning)
+| Not available yet.
+
+Install the Python package from PyPI:
+
+```bash
+`` pip install tomet
+```
+
+===[ Java ]
+
+@callout(warning)
+| Not started.
+
+===[ Go ]
+
+@callout(warning)
+| Not started.
+
+==[ Verify your installation ]
+
+Check that `tomet` and `sisho` are available on your `PATH`:
+
+```bash
+`` tomet --version
+```
+
+```
+`` tomet 0.5.0
+```
+
+```bash
+`` sisho --version
+```
+
+```
+`` sisho 0.1.0
+```
+
+```bash
+`` sisho -l
+```
+
+```
+`` desk      .../sisho-desk
+```

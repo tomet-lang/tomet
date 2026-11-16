@@ -7,6 +7,7 @@
 Tome to me.
 
 Tomet is a human-readable, structured markup language and Rust toolchain.
+It combines clear syntax for typed data and cross-document links with multi-format export.
 
 ## Example
 
@@ -25,60 +26,58 @@ Tomet is a human-readable, structured markup language and Rust toolchain.
 | content
 ```
 
-## Repository Layout
+## Try it
 
-<div data-tm-kind="todo"></div>
+### 1. Install
 
-```
-tomet/
-├── apps/
-│   ├── cli/              # Main CLI binary (`tomet`)
-│   └── lsp/              # Language Server Protocol implementation (`tomet-lsp`)
-├── bindings/             # Language bindings (Java, JS, Python)
-├── editors/              # Editor extensions (VS Code, Zed, Helix, Neovim)
-├── crates/
-│   ├── tomet-syntax-*    # Syntax layer: cst, lexer, parser, ast, tree
-│   ├── tomet-semantics*  # Semantics layer: semantics, validator, compute, resolver
-│   ├── tomet-transform/  # In-memory AST refactoring & macro rewrite engine
-│   ├── tomet-convert-*   # Document format converters: html, markdown, typst, pandoc
-│   ├── tomet-format-*    # Source output: formatter, printer, style, field-utils
-│   ├── tomet-workspace*  # Multi-file I/O: workspace, indexer, links, config
-│   ├── cotomet/            # cotomet data language parser and Serde adapter
-│   └── tree-sitter-tomet/# Tree-sitter grammar for editor syntax highlighting
-└── tmtroot/              # Canonical source documents and generated API docs
-    ├── generated/crates/ # Generated API docs for workspace crates
-    ├── docs/             # Specs, design notes, and guides
-    └── locales/          # Multilingual localized documentation (e.g. ja/)
-```
-
-## Building and Testing
-
-### Build workspace
+Install `sisho` and `tomet` together using the [Quick install](docs/install_tools.md#quick-install):
 
 ```bash
-cargo build
+nix profile install github:tomet-lang/sisho#toolchain
 ```
 
-### Run tests
+### 2. Write hello.tmt
+
+Create a document `hello.tmt`:
+
+```tmt
+=[ Hello, Tomet ]
+
+Tomet is a *structured* markup language.
+
+- a list item
+  -. an ordered child
+
+@callout(note)
+| A callout.
+
+@table
+|[ name  ][ kind     ]
+|[ tomet ][ language ]
+```
+
+### 3. Check it
+
+Validate and format your document:
 
 ```bash
-cargo test --workspace
+sisho check .
+sisho fix .
 ```
 
-### Run tree-sitter tests
+Continue with the [Quick Start](docs/quick_start.md).
 
-```bash
-cargo test -p tree-sitter-tomet
-```
+## Learn more
 
-## Packaging
+- [Quick Start](docs/quick_start.md): walkthrough for creating, checking, and exporting documents.
+- [Install](docs/install_tools.md): complete installation instructions for CLI tools and libraries.
+- [Why Tomet](tmtroot/docs/why/root.tmt): design motivations and comparison with other formats.
+- [Specification](tmtroot/spec/tome.tmt): the language syntax and semantics specification.
+- [Editors](docs/install_tools.md#editors): extensions and setup for VS Code, Zed, Helix, and Neovim.
+- [Contributing](CONTRIBUTING.md): guidelines for contributing to Tomet.
 
-Nix is the packaging story. `nix/pkgs/tomet.nix` and `nix/pkgs/vscode-extension.nix` build the CLI and the VS Code extension; `nix/dev.nix` is the dev shell.
+## Contributing
 
-## Finding your way around
-
-- Crate layers and the dependency direction between them: the `crate-layering` entry in `.writ.tmt`.
-- What a crate is and why it exists: that crate's `//!` module doc and `tmtroot/generated/crates/`.
-- What a crate depends on: its `Cargo.toml`.
-- What the CLI does: `tomet --help`.
+Contributions are welcome.
+Repository layout, building from source, running tests, and verification steps are documented in [CONTRIBUTING](CONTRIBUTING.md).
 

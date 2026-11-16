@@ -71,8 +71,7 @@ Do not duplicate code signatures, struct layouts, or implementation prose into d
 
 ==[ Project overview ]
 
-Read the root @file(README.md) first (what the project is, directory layout, build/run commands)
-and @file(CONTRIBUTING.md) for contribution workflow, commit conventions, and verification steps.
+Read the root @file(README.md) for what the project is, and @file(CONTRIBUTING.md) for the repository layout, building and testing, the contribution workflow, commit conventions and verification steps.
 Before a non-trivial change:
 -| Read the `//!` module doc of every crate you are touching.
 -| Read the `crate-layering` entry in the root @file(.writ.tmt) for how the layers depend

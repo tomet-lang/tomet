@@ -64,6 +64,8 @@ Tome to me!!
 `` | content
 ```
 
+请参阅 @link[快速入门指南（英文）](tmt:tmtroot/docs/quick_start.tmt) 开始使用。
+
 ==[ 已知的弱点 ]
 
 -. 视觉噪音与输入负担。符号过多（因此重视 LSP 功能）

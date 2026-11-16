@@ -66,8 +66,7 @@ corresponding doc-comments in the very same commit.
 
 ## Project overview
 
-Read the root `README.md` first (what the project is, directory layout, build/run commands)
-and `CONTRIBUTING.md` for contribution workflow, commit conventions, and verification steps.
+Read the root `README.md` for what the project is, and `CONTRIBUTING.md` for the repository layout, building and testing, the contribution workflow, commit conventions and verification steps.
 Before a non-trivial change:
 
 - Read the `//!` module doc of every crate you are touching.

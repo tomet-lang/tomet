@@ -1,0 +1,255 @@
+::id(quick-start)
+::export(
+  type: commonmark,
+  path: "docs/quick_start.md"
+)
+::meta(
+  lang: "en"
+)
+
+$macro.generated_by(self::path)
+
+=[ Quick Start ]
+
+This guide walks you through creating, checking, exporting, and serving your first Tomet document in ten minutes.
+
+==[ 1. Install ]
+
+{$ include(addr(tmt:tmtroot/docs/install_tools.tmt#quick-install), heading: false) }
+
+For other installation methods, see @link[Install Tomet and Sisho](tmt:tmtroot/docs/install_tools.tmt).
+
+==[ 2. Write your first document ]
+
+Create a file named `hello.tmt` containing headings, a list with an ordered sub-item, a callout, and a table:
+
+```tmt
+`` =[ Hello, Tomet ]
+``
+`` Tomet is a *structured* markup language.
+``
+`` - a list item
+``   -. an ordered child
+``
+`` @callout(note)
+`` | A callout.
+``
+`` @table
+`` |[ name  ][ kind     ]
+`` |[ tomet ][ language ]
+```
+
+You now have a complete Tomet document in a single file.
+
+==[ 3. Check your document ]
+
+Run `sisho check .` to validate document syntax and check formatting rules across the directory:
+
+```bash
+`` sisho check .
+```
+
+```
+`` sisho check .
+`` tomet 0.5.0, twrit 0.4.0, catasto 0.1.0
+``
+`` ✓ tomet check (0.02s)
+`` ✗ tomet format --check (0.01s): exit 1
+``     ./hello.tmt
+``     1 of 1 file(s) not formatted
+`` ✓ tomet export --check (0.02s)
+`` ✓ twrit check (0.02s)
+`` ✓ catasto check (0.03s)
+``
+`` 1 of 5 steps did not pass
+```
+
+The document parsed and validated cleanly, but failed the formatting check because hand-written spacing differed from canonical style.
+
+Run `sisho fix .` to automatically format all files in place:
+
+```bash
+`` sisho fix .
+```
+
+```
+`` sisho fix .
+`` tomet 0.5.0, twrit 0.4.0, catasto 0.1.0
+``
+`` ✓ twrit check --fix (0.00s)
+`` ✓ tomet export (0.01s)
+`` ✓ tomet format -i (0.00s)
+``
+`` all 3 steps passed
+```
+
+`sisho fix` reformatted `hello.tmt` to match canonical indentation and table alignment.
+
+Now run `sisho check .` again to confirm that everything passes:
+
+```bash
+`` sisho check .
+```
+
+```
+`` sisho check .
+`` tomet 0.5.0, twrit 0.4.0, catasto 0.1.0
+``
+`` ✓ tomet check (0.01s)
+`` ✓ tomet format --check (0.01s)
+`` ✓ tomet export --check (0.01s)
+`` ✓ twrit check (0.00s)
+`` ✓ catasto check (0.01s)
+``
+`` all 5 steps passed
+```
+
+All five verification steps now pass.
+
+==[ 4. Export to Markdown and HTML ]
+
+Add an `::export` declaration to the top of `hello.tmt` to define the target formats and output paths:
+
+```tmt
+`` ::export(
+``   type: (commonmark, html)
+``   path: ( commonmark: "hello.md", html: "hello.html" )
+`` )
+``
+`` =[ Hello, Tomet ]
+``
+`` Tomet is a *structured* markup language.
+``
+`` - a list item
+``   -. an ordered child
+``
+`` @callout(note)
+`` | A callout.
+``
+`` @table
+`` |[ name  ][ kind     ]
+`` |[ tomet ][ language ]
+```
+
+Run `tomet export hello.tmt` to generate the output files:
+
+```bash
+`` tomet export hello.tmt
+```
+
+```
+`` Exported hello.tmt -> ./hello.md
+`` Exported hello.tmt -> ./hello.html
+```
+
+The exporter generated `hello.md` in CommonMark format:
+
+```markdown
+`` # Hello, Tomet
+``
+`` Tomet is a *structured* markup language.
+``
+`` - a list item
+``   1. an ordered child
+``
+`` > [!note]
+`` > A callout.
+``
+`` | name | kind |
+`` | --- | --- |
+`` | tomet | language |
+```
+
+And `hello.html` as a standalone HTML page:
+
+```html
+`` <!DOCTYPE html>
+`` <html lang="ja">
+`` <head>
+`` <meta charset="utf-8">
+`` <title>hello</title>
+`` ...
+```
+
+==[ 5. Preview with live reload ]
+
+Run `sisho serve hello.tmt` to launch a local development server:
+
+```bash
+`` sisho serve hello.tmt
+```
+
+```
+`` Serving at http://127.0.0.1:8787 (Ctrl+C to stop)
+```
+
+The server re-renders the document on every HTTP request so edits appear on browser reload.
+
+Fetch the page with `curl` to confirm it is serving:
+
+```bash
+`` curl -s http://127.0.0.1:8787 | head -n 5
+```
+
+```html
+`` <!DOCTYPE html>
+`` <html lang="ja">
+`` <head>
+`` <meta charset="utf-8">
+`` <title>hello</title>
+```
+
+Stop the server with `Ctrl+C` when finished.
+
+==[ 6. Import an existing Markdown file ]
+
+Use `sisho convert` to migrate an existing Markdown document into Tomet:
+
+```bash
+`` sisho convert notes.md --from md -o notes.tmt
+```
+
+```
+`` Converted notes.md -> notes.tmt
+```
+
+`sisho convert` translated the Markdown headings, lists, and inline styles into Tomet markup.
+
+Run `sisho fix .` or `tomet format notes.tmt` to produce clean canonical output:
+
+```tmt
+`` =[Notes]
+``
+`` A quick note in Markdown.
+```
+
+==[ 7. Configure your editor ]
+
+Install an editor extension to get syntax highlighting, formatting, and real-time diagnostics while editing `.tmt` files.
+
+See the @link[Editors section](tmt:tmtroot/docs/install_tools.tmt#editors) of the install page for setup details covering VS Code, Zed, Helix, and Neovim.
+
+==[ 8. Manage a project with vault.config.tmt ]
+
+Add a `vault.config.tmt` file to your project root to manage multiple Tomet documents as a unified vault.
+
+A vault configuration enables shared formatting preferences, custom metadata fields, schema blueprints, and cross-document link checking with `tomet check-links`:
+
+```bash
+`` tomet check-links
+```
+
+```
+`` 3 file(s) scanned, 0 link(s) checked, 0 broken
+```
+
+For more details on vault settings and cross-document expressions, see the @link[Vault Configuration specification](tmt:tmtroot/spec/features/config.tmt).
+
+==[ Where next ]
+
+Continue exploring the Tomet ecosystem:
+
+- @link[Install Tomet and Sisho](tmt:tmtroot/docs/install_tools.tmt): complete installation options and editor setup.
+- @link[Why Tomet](tmt:tmtroot/docs/why/root.tmt): design motivations and comparison with other formats.
+- @link[Language Specification](tmt:tmtroot/spec/tome.tmt): the syntax and semantics reference.
+- @link[Contributing](tmt:tmtroot/contributing.tmt): guide to building, testing, and developing Tomet.
