@@ -52,8 +52,8 @@ mod tests {
         assert_eq!(kept, vec![3, 4, 2]);
 
         let keyed = [("a", Some(2)), ("b", None), ("c", Some(1)), ("d", None)];
-        let asc = sort_items_by_key(&keyed, false, |&(_, k)| Ok::<_, ()>(k), |a, b| a.cmp(b))
-            .unwrap();
+        let asc =
+            sort_items_by_key(&keyed, false, |&(_, k)| Ok::<_, ()>(k), |a, b| a.cmp(b)).unwrap();
         assert_eq!(
             asc,
             vec![("c", Some(1)), ("a", Some(2)), ("b", None), ("d", None)]

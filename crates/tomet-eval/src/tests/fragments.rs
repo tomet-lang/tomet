@@ -37,7 +37,10 @@ fn link_label_text(value: &EvalValue) -> Option<String> {
         panic!("expected one paragraph in content, got {content:?}");
     };
     let [tomet_ast::Inline::Text(t)] = inner_p.content.as_slice() else {
-        panic!("expected one inline text in content, got {:?}", inner_p.content);
+        panic!(
+            "expected one inline text in content, got {:?}",
+            inner_p.content
+        );
     };
     Some(t.value.clone())
 }
@@ -89,7 +92,10 @@ fn an_element_with_an_id_links_to_that_id() {
 
     let intro_lab = in_vault("#intro.link(\"Intro Section\")").unwrap();
     assert_eq!(link_target(&intro_lab), "tmt:here.tmt#intro");
-    assert_eq!(link_label_text(&intro_lab), Some("Intro Section".to_string()));
+    assert_eq!(
+        link_label_text(&intro_lab),
+        Some("Intro Section".to_string())
+    );
 }
 
 #[test]
@@ -104,7 +110,10 @@ fn link_rejects_bad_labels() {
     ));
     assert!(matches!(
         in_vault("self.link(self)"),
-        Err(EvalError::TypeMismatch { got: "document", .. })
+        Err(EvalError::TypeMismatch {
+            got: "document",
+            ..
+        })
     ));
     assert!(matches!(
         in_vault("#intro.link(none)"),
@@ -124,11 +133,17 @@ fn link_rejects_bad_labels() {
     ));
     assert!(matches!(
         in_vault("link(self, self)"),
-        Err(EvalError::TypeMismatch { got: "document", .. })
+        Err(EvalError::TypeMismatch {
+            got: "document",
+            ..
+        })
     ));
     assert!(matches!(
         in_vault("link(self, self.link())"),
-        Err(EvalError::TypeMismatch { got: "fragment", .. })
+        Err(EvalError::TypeMismatch {
+            got: "fragment",
+            ..
+        })
     ));
 }
 
@@ -171,10 +186,7 @@ fn link_wrong_argument_counts() {
 #[test]
 fn link_inside_map_lambda() {
     let resolver = MemoryResolver::new()
-        .with_source(
-            "here.tmt",
-            "::meta(lang: \"en\", lang_name: \"English\")\n",
-        )
+        .with_source("here.tmt", "::meta(lang: \"en\", lang_name: \"English\")\n")
         .unwrap()
         .with_source(
             "locales/ja/readme.tmt",
@@ -182,11 +194,7 @@ fn link_inside_map_lambda() {
         )
         .unwrap();
 
-    let links = in_resolver(
-        &resolver,
-        "vault::docs.map(d => d.link(d::meta.lang_name))",
-    )
-    .unwrap();
+    let links = in_resolver(&resolver, "vault::docs.map(d => d.link(d::meta.lang_name))").unwrap();
 
     let EvalValue::Tuple(items) = links else {
         panic!("expected a tuple");
@@ -223,7 +231,10 @@ fn join_one_paragraph_fragments() {
             assert_eq!(el.name, tomet_ast::Name::bare("link"));
             assert_eq!(
                 link_label_text(&EvalValue::Fragment(vec![tomet_ast::Block::Paragraph(
-                    tomet_ast::Paragraph::new(vec![p.content[0].clone()], tomet_span::Span::default())
+                    tomet_ast::Paragraph::new(
+                        vec![p.content[0].clone()],
+                        tomet_span::Span::default()
+                    )
                 )])),
                 Some("Here".to_string())
             );
@@ -239,7 +250,10 @@ fn join_one_paragraph_fragments() {
             assert_eq!(el.name, tomet_ast::Name::bare("link"));
             assert_eq!(
                 link_label_text(&EvalValue::Fragment(vec![tomet_ast::Block::Paragraph(
-                    tomet_ast::Paragraph::new(vec![p.content[2].clone()], tomet_span::Span::default())
+                    tomet_ast::Paragraph::new(
+                        vec![p.content[2].clone()],
+                        tomet_span::Span::default()
+                    )
                 )])),
                 Some("Intro".to_string())
             );
@@ -343,7 +357,10 @@ fn join_mismatches_with_indices() {
 #[test]
 fn target_expression_evaluates_language_bar() {
     let resolver = MemoryResolver::new()
-        .with_source("readme.tmt", "::meta(lang: \"en\", lang_name: \"English\")\n")
+        .with_source(
+            "readme.tmt",
+            "::meta(lang: \"en\", lang_name: \"English\")\n",
+        )
         .unwrap()
         .with_source(
             "locales/ja/readme.tmt",
@@ -680,6 +697,8 @@ fn raw_errors_report_expected_type_and_argument_shape() {
     // Any other named argument
     assert_eq!(
         out(r#"raw("a", other: "x")"#),
-        Err(EvalError::Message("`raw` takes `lang:`, not `other:`".to_string()))
+        Err(EvalError::Message(
+            "`raw` takes `lang:`, not `other:`".to_string()
+        ))
     );
 }

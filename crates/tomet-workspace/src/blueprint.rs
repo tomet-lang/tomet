@@ -24,9 +24,9 @@ use std::sync::Arc;
 use anyhow::{Context, Result, bail};
 use tomet_ast::Value;
 use tomet_config::PrinterConfig;
+use tomet_eval::{apply_blueprint, instantiate_blueprint};
 use tomet_expr::{DocRef, EvalContext, MemoryResolver};
 use tomet_position::{LineCol, LineIndex};
-use tomet_eval::{apply_blueprint, instantiate_blueprint};
 use tomet_transform::{SeatProblem, Source, SystemSource};
 
 /// Every blueprint `config` declares, as `(name, path)`, sorted by name.

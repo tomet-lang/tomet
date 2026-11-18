@@ -107,11 +107,10 @@ pub fn make_standalone(
     if !freeze.is_empty() {
         let mut probe = doc.clone();
         let scope = vault.scope_for_selected(&probe, path, resolver);
-        let unresolved = tomet_eval::resolve_expressions_where(
-            &mut probe,
-            &scope.context(),
-            &|span| is_among(&freeze, span),
-        );
+        let unresolved =
+            tomet_eval::resolve_expressions_where(&mut probe, &scope.context(), &|span| {
+                is_among(&freeze, span)
+            });
         for failed in unresolved {
             for (group, decision) in groups.iter().zip(decisions.iter_mut()) {
                 if matches!(decision, Decision::Freeze) && group.span.exact_eq(&failed.span) {
@@ -125,11 +124,9 @@ pub fn make_standalone(
     let freeze: Vec<Span> = places(&groups, &decisions, |d| matches!(d, Decision::Freeze));
     if !freeze.is_empty() {
         let scope = vault.scope_for_selected(&document, path, resolver);
-        tomet_eval::resolve_expressions_where(
-            &mut document,
-            &scope.context(),
-            &|span| is_among(&freeze, span),
-        );
+        tomet_eval::resolve_expressions_where(&mut document, &scope.context(), &|span| {
+            is_among(&freeze, span)
+        });
     }
 
     carry(vault, &groups, &decisions, &mut document);

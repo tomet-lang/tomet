@@ -289,12 +289,7 @@ fn format_diagnostics(
 /// evaluator also reports errors within header declarations (such as a malformed
 /// `::var` or `::macro` entry), those duplicates are dropped in favor of the
 /// declaration check's diagnostic so each problem is reported once.
-fn check_ctmt(
-    file: &Path,
-    src: &str,
-    vault: &tomet_load::Vault,
-    json: bool,
-) -> CheckFileResult {
+fn check_ctmt(file: &Path, src: &str, vault: &tomet_load::Vault, json: bool) -> CheckFileResult {
     let parsed = match cotomet::parse_file_with_expressions(src) {
         Ok(parsed) => parsed,
         Err(err) => return parse_failure(file, src, &err.into(), json),
@@ -749,7 +744,10 @@ mod tests {
         let with_use_src = "::use(deck, version: \"1.0.0\")\nfirst: deck.card(1)\n";
         let with_use_file = root.join("with_use.ctmt");
         fs::write(&with_use_file, with_use_src).unwrap();
-        assert_eq!(ctmt_messages(&with_use_file, with_use_src), Vec::<String>::new());
+        assert_eq!(
+            ctmt_messages(&with_use_file, with_use_src),
+            Vec::<String>::new()
+        );
         check(&with_use_file, false, true, false).expect("valid constructor call in .ctmt passes");
 
         let without_use_src = "first: deck.card(1)\n";
@@ -757,7 +755,9 @@ mod tests {
         fs::write(&without_use_file, without_use_src).unwrap();
         assert_eq!(
             ctmt_messages(&without_use_file, without_use_src),
-            vec!["`deck.card`: the namespace `deck` is not in scope -- declare its vocabulary in `vocabularies` and write `::use(deck)`"]
+            vec![
+                "`deck.card`: the namespace `deck` is not in scope -- declare its vocabulary in `vocabularies` and write `::use(deck)`"
+            ]
         );
 
         let no_vault_dir =
@@ -767,7 +767,9 @@ mod tests {
         fs::write(&lone_ctmt, with_use_src).unwrap();
         assert_eq!(
             ctmt_messages(&lone_ctmt, with_use_src),
-            vec!["`deck.card`: the namespace `deck` is not in scope -- declare its vocabulary in `vocabularies` and write `::use(deck)`"]
+            vec![
+                "`deck.card`: the namespace `deck` is not in scope -- declare its vocabulary in `vocabularies` and write `::use(deck)`"
+            ]
         );
         let _ = fs::remove_dir_all(&no_vault_dir);
 

@@ -114,11 +114,15 @@ fn eval_type_arg(expr: &InterpExpr, cx: &EvalContext, env: &Env) -> Result<EvalV
             InterpExprKind::Identifier(name) if is_constructor(name) => {
                 construct_with(name, args, cx, env, &mut eval_type_arg).map(EvalValue::Type)
             }
-            InterpExprKind::Identifier(name) if super::is_function(name) => Err(EvalError::message(
-                format!("a type seat holds a type, and `{expr}` is a call to `{name}`"),
-            )),
+            InterpExprKind::Identifier(name) if super::is_function(name) => {
+                Err(EvalError::message(format!(
+                    "a type seat holds a type, and `{expr}` is a call to `{name}`"
+                )))
+            }
             InterpExprKind::Identifier(name) => Err(EvalError::UnknownFunction(name.clone())),
-            _ => Err(EvalError::message("only a type constructor can be called here")),
+            _ => Err(EvalError::message(
+                "only a type constructor can be called here",
+            )),
         },
         InterpExprKind::Member { object, member } => {
             if matches!(&object.kind, InterpExprKind::Identifier(name) if name == "var")
@@ -143,7 +147,9 @@ fn eval_type_arg(expr: &InterpExpr, cx: &EvalContext, env: &Env) -> Result<EvalV
                 }),
             }
         }
-        _ => Err(EvalError::message("unsupported expression in type argument")),
+        _ => Err(EvalError::message(
+            "unsupported expression in type argument",
+        )),
     }
 }
 

@@ -14,8 +14,6 @@ use tomet_ast::{File, InterpExpr, InterpExprKind};
 use tomet_scalar::Scalar;
 use tomet_span::Span;
 
-
-
 /// Functions that answer from another document.
 const OTHER_DOCUMENT_FUNCTIONS: &[&str] = &["tmt", "ref", "include"];
 

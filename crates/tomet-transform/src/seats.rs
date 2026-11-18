@@ -635,13 +635,11 @@ mod tests {
             heading_level: 0,
             notes: Default::default(),
         };
-        let found = instantiate_blueprint_with(&mut doc, &cx, &fixed(&[UUID]), &StubEvaluator)
-            .unwrap_err();
+        let found =
+            instantiate_blueprint_with(&mut doc, &cx, &fixed(&[UUID]), &StubEvaluator).unwrap_err();
         assert_eq!(found.len(), 1);
         assert_eq!(doc, before);
     }
-
-
 
     #[test]
     fn a_seat_does_not_touch_the_expressions_around_it() {

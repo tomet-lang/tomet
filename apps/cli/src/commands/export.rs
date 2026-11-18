@@ -194,7 +194,10 @@ pub(crate) fn document_export_destinations(
                     &file_doc_ref.0[dir_doc_ref.0.len() + 1..]
                 };
                 let rel_path = Path::new(rel_str);
-                rel_path.parent().unwrap_or_else(|| Path::new("")).to_path_buf()
+                rel_path
+                    .parent()
+                    .unwrap_or_else(|| Path::new(""))
+                    .to_path_buf()
             });
             (parent, false)
         }
@@ -202,8 +205,8 @@ pub(crate) fn document_export_destinations(
             target_file,
             override_out,
         } => {
-            let is_target = override_out.is_some()
-                && file_doc_ref.0 == settings.vault.doc_ref(target_file).0;
+            let is_target =
+                override_out.is_some() && file_doc_ref.0 == settings.vault.doc_ref(target_file).0;
             (None, is_target)
         }
     };
@@ -323,10 +326,7 @@ fn export_destination_for(
     }
 }
 
-fn export_one(
-    settings: &ExportSettings,
-    file_path: &Path,
-) -> anyhow::Result<OneFileExport> {
+fn export_one(settings: &ExportSettings, file_path: &Path) -> anyhow::Result<OneFileExport> {
     let ExportSettings {
         advanced,
         check,
@@ -364,40 +364,35 @@ fn export_one(
 
         let mut render_doc = doc.clone();
         let export_dest = export_destination_for(out_path.as_deref(), &vault.root);
-        tomet_semantics::rewrite_export_links(
-            &mut render_doc,
-            export_dest,
-            |vault_path| {
-                let Ok(target_file) = vault.document_path(vault_path) else {
-                    // Not a document of this vault; left as written.
-                    return None;
-                };
-                let Ok((target_doc, _)) = vault.file(&target_file) else {
-                    // Target file does not exist on disk in the vault; left as written.
-                    return None;
-                };
-                let target_dests =
-                    document_export_destinations(&target_doc, &target_file, settings);
-                for (fmt, path) in target_dests {
-                    if let (true, Some(p)) = (fmt == target, path) {
-                        let abs_p = if p.is_absolute() { p } else { cwd.join(p) };
-                        let norm_p = tomet_indexer::normalize_join(&abs_p, Path::new(""));
-                        return Some(ExportTarget::Exported(
-                            norm_p.to_string_lossy().replace('\\', "/"),
-                        ));
-                    }
+        tomet_semantics::rewrite_export_links(&mut render_doc, export_dest, |vault_path| {
+            let Ok(target_file) = vault.document_path(vault_path) else {
+                // Not a document of this vault; left as written.
+                return None;
+            };
+            let Ok((target_doc, _)) = vault.file(&target_file) else {
+                // Target file does not exist on disk in the vault; left as written.
+                return None;
+            };
+            let target_dests = document_export_destinations(&target_doc, &target_file, settings);
+            for (fmt, path) in target_dests {
+                if let (true, Some(p)) = (fmt == target, path) {
+                    let abs_p = if p.is_absolute() { p } else { cwd.join(p) };
+                    let norm_p = tomet_indexer::normalize_join(&abs_p, Path::new(""));
+                    return Some(ExportTarget::Exported(
+                        norm_p.to_string_lossy().replace('\\', "/"),
+                    ));
                 }
-                let abs_target = if target_file.is_absolute() {
-                    target_file
-                } else {
-                    cwd.join(&target_file)
-                };
-                let norm_target = tomet_indexer::normalize_join(&abs_target, Path::new(""));
-                Some(ExportTarget::Source(
-                    norm_target.to_string_lossy().replace('\\', "/"),
-                ))
-            },
-        );
+            }
+            let abs_target = if target_file.is_absolute() {
+                target_file
+            } else {
+                cwd.join(&target_file)
+            };
+            let norm_target = tomet_indexer::normalize_join(&abs_target, Path::new(""));
+            Some(ExportTarget::Source(
+                norm_target.to_string_lossy().replace('\\', "/"),
+            ))
+        });
 
         let rendered = match target {
             ExportType::CommonMark => tomet_markdown::to_markdown(&render_doc, &bindings),
@@ -784,7 +779,8 @@ mod tests {
         // Real export run
         export_cmd(&root, None, None, false, false).expect("export succeeds");
 
-        let readme_out = fs::read_to_string(root.join("out/README.md")).expect("read out/README.md");
+        let readme_out =
+            fs::read_to_string(root.join("out/README.md")).expect("read out/README.md");
         // In English readme, bar lists all three languages including English itself
         assert!(
             readme_out.contains("[English](README.md)"),
@@ -804,7 +800,8 @@ mod tests {
             "expected [No Export Doc](../plain.tmt) in: {readme_out}"
         );
 
-        let ja_out = fs::read_to_string(root.join("out/README.ja.md")).expect("read out/README.ja.md");
+        let ja_out =
+            fs::read_to_string(root.join("out/README.ja.md")).expect("read out/README.ja.md");
         // In Japanese readme, bar lists Japanese itself with its own file name README.ja.md
         assert!(
             ja_out.contains("[English](README.md)"),
@@ -819,7 +816,8 @@ mod tests {
             "expected [Chinese](README.zh-CN.md) in: {ja_out}"
         );
 
-        let zh_out = fs::read_to_string(root.join("out/README.zh-CN.md")).expect("read out/README.zh-CN.md");
+        let zh_out =
+            fs::read_to_string(root.join("out/README.zh-CN.md")).expect("read out/README.zh-CN.md");
         // In Chinese readme, bar lists Chinese itself with its own file name README.zh-CN.md
         assert!(
             zh_out.contains("[English](README.md)"),
@@ -834,7 +832,8 @@ mod tests {
             "expected [Chinese](README.zh-CN.md) in: {zh_out}"
         );
 
-        let note_out = fs::read_to_string(root.join("out/docs/note.md")).expect("read out/docs/note.md");
+        let note_out =
+            fs::read_to_string(root.join("out/docs/note.md")).expect("read out/docs/note.md");
         // Document in subdirectory gets ../ relative link to root
         assert!(
             note_out.contains("[Root Readme](../README.md)"),
@@ -930,7 +929,8 @@ mod tests {
             "expected [Child](sub/child.md) in: {root_out}"
         );
 
-        let child_out = fs::read_to_string(dest.join("sub/child.md")).expect("read dist/sub/child.md");
+        let child_out =
+            fs::read_to_string(dest.join("sub/child.md")).expect("read dist/sub/child.md");
         assert!(
             child_out.contains("[Root](../root.md)"),
             "expected [Root](../root.md) in: {child_out}"
@@ -971,7 +971,8 @@ mod tests {
         .expect("write guide");
 
         // 1. Directory export of "docs" without --out (destination inside vault root points to target source file)
-        export_cmd(&root.join("docs"), None, None, false, false).expect("export docs without --out");
+        export_cmd(&root.join("docs"), None, None, false, false)
+            .expect("export docs without --out");
         let guide_out = fs::read_to_string(root.join("out/docs/guide.md")).expect("read guide");
         assert!(
             guide_out.contains("[Root Readme](../../readme.tmt)"),
@@ -1077,8 +1078,8 @@ mod tests {
         export_cmd(&root.join("docs/quick_start.tmt"), None, None, false, false)
             .expect("export succeeds");
 
-        let qs_out = fs::read_to_string(root.join("docs/quick_start.md"))
-            .expect("read quick_start.md");
+        let qs_out =
+            fs::read_to_string(root.join("docs/quick_start.md")).expect("read quick_start.md");
         assert!(
             qs_out.contains("[Why Tomet](../tmtroot/why/root.tmt)"),
             "expected [Why Tomet](../tmtroot/why/root.tmt) in: {qs_out}"
@@ -1115,7 +1116,8 @@ mod tests {
         )
         .expect("write config");
         fs::write(vault.join("data.txt"), "inside-txt\n").expect("write data.txt");
-        fs::write(vault.join("sub/ex.tmt"), "::kind(doc)\n#[ Sub Ex ]\n").expect("write sub/ex.tmt");
+        fs::write(vault.join("sub/ex.tmt"), "::kind(doc)\n#[ Sub Ex ]\n")
+            .expect("write sub/ex.tmt");
 
         #[cfg(unix)]
         let has_symlink = {
@@ -1160,7 +1162,8 @@ mod tests {
             "export from vault dir failed: {}",
             String::from_utf8_lossy(&out1.stderr)
         );
-        let content1 = fs::read_to_string(vault.join("out/l.md")).expect("read out/l.md after run 1");
+        let content1 =
+            fs::read_to_string(vault.join("out/l.md")).expect("read out/l.md after run 1");
 
         assert!(content1.contains("[outside-doc](../outside.tmt)"));
         assert!(content1.contains("[outside-txt](../outside-secret.txt)"));
@@ -1185,7 +1188,8 @@ mod tests {
             "export from outside dir failed: {}",
             String::from_utf8_lossy(&out2.stderr)
         );
-        let content2 = fs::read_to_string(vault.join("out/l.md")).expect("read out/l.md after run 2");
+        let content2 =
+            fs::read_to_string(vault.join("out/l.md")).expect("read out/l.md after run 2");
 
         assert_eq!(
             content1, content2,

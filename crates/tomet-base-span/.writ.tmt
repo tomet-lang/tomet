@@ -17,8 +17,7 @@
   pure: (
     forbid: ("std::fs", "std::net", "std::process", "std::env")
     allow-external: (
-      "serde", "serde_core", "serde_derive",
+      "serde", "serde_core", "serde_derive"
       "proc-macro2", "quote", "syn", "unicode-ident"
-    )
-  )
+  ))
 }

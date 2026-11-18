@@ -294,7 +294,8 @@ fn constructor_calls_in_tmt_and_ctmt_are_checked_against_the_vocabulary() {
     assert!(ctmt_errors.is_empty(), "{ctmt_errors:?}");
 
     // And a bad call in the .ctmt body has its span shifted past the header
-    let bad_ctmt_src = "::use(catasto)\n\".editorconfig\": (source: catasto.upstream(commonfiles))\n";
+    let bad_ctmt_src =
+        "::use(catasto)\n\".editorconfig\": (source: catasto.upstream(commonfiles))\n";
     let bad_ctmt = tomet_ast_parser::parse_data_file(bad_ctmt_src).expect("parses");
     let bad_bindings = Bindings::for_document(&bad_ctmt, [vocab]);
     let mut bad_errors = Vec::new();

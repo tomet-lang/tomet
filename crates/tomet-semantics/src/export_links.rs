@@ -74,11 +74,8 @@ pub enum ExportTarget<S> {
 ///
 /// Targets pointing inside the document via the empty-path form `tmt:#id`, `id:` and `ref:`
 /// targets, `file:`, `https:` and plain relative paths (`./`, `../`) are not touched.
-pub fn rewrite_export_links<F, S>(
-    doc: &mut File,
-    current_dest: ExportDestination<'_>,
-    lookup: F,
-) where
+pub fn rewrite_export_links<F, S>(doc: &mut File, current_dest: ExportDestination<'_>, lookup: F)
+where
     F: Fn(&str) -> Option<ExportTarget<S>>,
     S: AsRef<str>,
 {
@@ -133,9 +130,7 @@ pub fn rewrite_export_links<F, S>(
                 }
             }
             ExportTarget::Source(source_path) => {
-                if is_inside_vault
-                    && let Some(from) = &from_dir
-                {
+                if is_inside_vault && let Some(from) = &from_dir {
                     set_target(element, rebase(from, source_path.as_ref()));
                 }
             }
@@ -425,20 +420,11 @@ mod tests {
     fn unexported_target_with_no_destination_stdout_stays_untouched() {
         let src = "@link(tmt:tmtroot/docs/why/root.tmt)\n";
         let mut doc = tomet_ast_parser::parse_file(src).unwrap();
-        rewrite_export_links(
-            &mut doc,
-            ExportDestination::Stdout,
-            |path| match path {
-                "tmtroot/docs/why/root.tmt" => {
-                    Some(ExportTarget::Source("tmtroot/docs/why/root.tmt"))
-                }
-                _ => None,
-            },
-        );
-        assert_eq!(
-            extract_targets(&doc),
-            vec!["tmt:tmtroot/docs/why/root.tmt"]
-        );
+        rewrite_export_links(&mut doc, ExportDestination::Stdout, |path| match path {
+            "tmtroot/docs/why/root.tmt" => Some(ExportTarget::Source("tmtroot/docs/why/root.tmt")),
+            _ => None,
+        });
+        assert_eq!(extract_targets(&doc), vec!["tmt:tmtroot/docs/why/root.tmt"]);
     }
 
     #[test]
@@ -455,9 +441,6 @@ mod tests {
                 _ => None,
             },
         );
-        assert_eq!(
-            extract_targets(&doc),
-            vec!["tmt:tmtroot/docs/why/root.tmt"]
-        );
+        assert_eq!(extract_targets(&doc), vec!["tmt:tmtroot/docs/why/root.tmt"]);
     }
 }

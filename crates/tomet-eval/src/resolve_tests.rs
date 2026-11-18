@@ -824,7 +824,9 @@ fn a_seat_that_arrives_by_an_expression_is_a_stop_and_not_a_seat_in_the_document
     let resolver = MemoryResolver::new()
         .with_source("other.tmt", "=[ Top ]#(top)\n\n<$string>\n")
         .unwrap();
-    let mut doc = tomet_ast_parser::parse_file("::blueprint(note)\n\n$include(tmt(\"other.tmt\")#top)\n").unwrap();
+    let mut doc =
+        tomet_ast_parser::parse_file("::blueprint(note)\n\n$include(tmt(\"other.tmt\")#top)\n")
+            .unwrap();
     let macros = HashMap::new();
     let cx = EvalContext {
         resolver: &resolver,

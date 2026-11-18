@@ -483,10 +483,7 @@ pub(crate) fn document_method(
         "link" => {
             let mut args = args.between(".link", 0, 1)?;
             let label = args.pop();
-            super::fragments::link_fragment(
-                &EvalValue::Document(doc.clone()),
-                label.as_ref(),
-            )
+            super::fragments::link_fragment(&EvalValue::Document(doc.clone()), label.as_ref())
         }
         _ => Err(EvalError::UnknownMember {
             on: "document",

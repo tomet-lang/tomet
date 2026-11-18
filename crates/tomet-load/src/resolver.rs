@@ -257,8 +257,11 @@ mod tests {
 
         // Write secrets / non-tmt files inside the vault
         fs::write(root.join("data.txt"), "SECRET_IN_VAULT_NON_TMT\n").expect("data.txt");
-        fs::write(root.join("notes/deep/UPPER.TMT"), "::kind(upper)\n\nUpper doc\n")
-            .expect("upper.TMT");
+        fs::write(
+            root.join("notes/deep/UPPER.TMT"),
+            "::kind(upper)\n\nUpper doc\n",
+        )
+        .expect("upper.TMT");
 
         let vault = Vault::discover(&root);
         let resolver = vault.resolver();
@@ -324,9 +327,7 @@ mod tests {
             vault.document_path("data.txt").unwrap_err(),
             "`data.txt` is not a document of this vault"
         );
-        let err_doc = resolver
-            .document(&DocRef("data.txt".into()))
-            .unwrap_err();
+        let err_doc = resolver.document(&DocRef("data.txt".into())).unwrap_err();
         assert!(err_doc.contains("`data.txt` is not a document of this vault"));
         assert!(!err_doc.contains("SECRET"));
         let err_src = resolver.source(&DocRef("data.txt".into())).unwrap_err();
@@ -439,10 +440,7 @@ mod tests {
             root.join("notes/deep")
         );
         assert_eq!(vault.directory_path("").unwrap(), root);
-        assert_eq!(
-            vault.directory_path("nope").unwrap_err(),
-            "not a directory"
-        );
+        assert_eq!(vault.directory_path("nope").unwrap_err(), "not a directory");
         assert_eq!(
             vault.directory_path("data.txt").unwrap_err(),
             "not a directory"

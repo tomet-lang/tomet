@@ -694,7 +694,10 @@ fn construct(
         });
     };
     let view = crate::positional::constructor_args_view(args, decl);
-    if let Some(err) = check_call_params(head, &decl.params, Some(&view)).into_iter().next() {
+    if let Some(err) = check_call_params(head, &decl.params, Some(&view))
+        .into_iter()
+        .next()
+    {
         return Err(err);
     }
 
@@ -2634,7 +2637,10 @@ mod tests {
         let git = &v.constructors["git"];
         assert_eq!(git.positional_keys(), ["url"]);
         assert_eq!(
-            git.params.iter().map(|p| p.name.as_str()).collect::<Vec<_>>(),
+            git.params
+                .iter()
+                .map(|p| p.name.as_str())
+                .collect::<Vec<_>>(),
             ["url", "rev", "root"]
         );
         let url = git.param("url").unwrap();

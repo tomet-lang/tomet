@@ -21,20 +21,20 @@ does not relax the rule to fit the change it wanted to make.
     8: ( "crates/tomet", "apps/*", "bindings/*", "editors/*", "tests", "benches" )
     7: ( "crates/tomet-workspace*", "crates/tomet-load*", "crates/cotomet" )
     6: (
-      "crates/tomet-formatter",
-      "crates/tomet-printer",
-      "crates/tomet-convert*",
-      "crates/tomet-extract*",
-      "crates/tomet-transform",
-      "crates/tomet-query",
-      "crates/tomet-eval",
-      "crates/cotomet-eval",
-      "crates/tomet-edit",
-      "crates/tomet-merge",
-      "crates/tomet-deps",
-      "crates/tomet-stats",
-      "crates/tomet-spec",
-      "crates/tomet-vault",
+      "crates/tomet-formatter"
+      "crates/tomet-printer"
+      "crates/tomet-convert*"
+      "crates/tomet-extract*"
+      "crates/tomet-transform"
+      "crates/tomet-query"
+      "crates/tomet-eval"
+      "crates/cotomet-eval"
+      "crates/tomet-edit"
+      "crates/tomet-merge"
+      "crates/tomet-deps"
+      "crates/tomet-stats"
+      "crates/tomet-spec"
+      "crates/tomet-vault"
       "crates/tomet-tome"
       )
     5: ( "crates/tomet-config*", "crates/tomet-spec-derive" )
@@ -431,13 +431,12 @@ failing the run, so a broken file is also an unguarded one.
     names: ( "std::fs" )
     within: ( "crates/*" )
     allowed: (
-      "crates/tomet-load",
-      "crates/tomet-load-config",
-      "crates/tomet-workspace",
-      "crates/tomet-workspace-indexer",
+      "crates/tomet-load"
+      "crates/tomet-load-config"
+      "crates/tomet-workspace"
+      "crates/tomet-workspace-indexer"
       "crates/tomet-workspace-links"
-    )
-  )
+  ))
 }
 
 A library crate reads a file only if it is named above. Programs are out

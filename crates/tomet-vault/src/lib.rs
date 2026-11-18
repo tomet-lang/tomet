@@ -689,7 +689,8 @@ mod tests {
     fn vault_with_a_macro() -> Vault {
         let config = tomet_config::load_config_from_str(
             "::macro(gh: \"https://gh/$(1)\")\n::field(n: (type: uuid))\n",
-        ).unwrap();
+        )
+        .unwrap();
         Vault::from_sources(config, "/v", &[("acme.tmt", ACME)])
     }
 

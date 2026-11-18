@@ -380,7 +380,11 @@ fn raw_export_fence_selection_and_roundtrip() {
         let re_doc = crate::import::from_markdown(&md);
         match &re_doc.body[0] {
             Block::Element(el) => {
-                let roundtripped = el.content.as_deref().map(blocks_to_plain).unwrap_or_default();
+                let roundtripped = el
+                    .content
+                    .as_deref()
+                    .map(blocks_to_plain)
+                    .unwrap_or_default();
                 assert_eq!(roundtripped, code, "roundtrip mismatch for code {code:?}");
             }
             other => panic!("expected Block::Element, got {other:?}"),
@@ -785,7 +789,10 @@ fn list_marker_rule_5_multiline_item() {
 
 #[test]
 fn list_marker_rule_6_item_id_and_nested_sublist() {
-    let doc = tomet_ast_parser::parse_file("- (feat)#(item-id) feature text\n  - (x) child done\n  - () child todo\n").unwrap();
+    let doc = tomet_ast_parser::parse_file(
+        "- (feat)#(item-id) feature text\n  - (x) child done\n  - () child todo\n",
+    )
+    .unwrap();
     assert_eq!(
         to_markdown(&doc, &carried(&doc)),
         "- **feat**: feature text\n  - [x] child done\n  - [ ] child todo\n\n"

@@ -35,8 +35,14 @@ fn kind_use_and_version_accept_and_reject_the_same_values() {
     let rejected = [
         ("-1", "the integer `-1` is not a version such as `1.10.0`"),
         ("abc", "the text \"abc\" is not a version such as `1.10.0`"),
-        ("\"1.\"", "the text \"1.\" is not a version such as `1.10.0`"),
-        ("\".1\"", "the text \".1\" is not a version such as `1.10.0`"),
+        (
+            "\"1.\"",
+            "the text \"1.\" is not a version such as `1.10.0`",
+        ),
+        (
+            "\".1\"",
+            "the text \".1\" is not a version such as `1.10.0`",
+        ),
         (
             "\"1..2\"",
             "the text \"1..2\" is not a version such as `1.10.0`",
