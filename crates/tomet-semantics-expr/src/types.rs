@@ -6,13 +6,13 @@
 //! `auto` for `default` -- into the arguments `build` takes, and `build`'s
 //! refusals come out as [`EvalError::BadType`] in its own words.
 
-use tomet_ast::{InterpExpr, InterpExprKind};
+use tomet_ast::{InterpExpr, InterpExprKind, Tuple, TupleEntry};
 use tomet_semantics_core::value_to_datum;
 use tomet_type::{Arg, Datum, Kind, Type, TypeError};
 
 use super::context::EvalContext;
 use super::error::EvalError;
-use super::value::{Env, EvalValue};
+use super::value::{DirRef, Env, EvalValue, Namespace};
 
 /// The names of the types, each with a line saying what it is: what an editor
 /// offers where an expression may start.
@@ -30,32 +30,33 @@ pub fn type_names() -> Vec<(&'static str, String)> {
 }
 
 /// The type a bare name stands for: `string`, `list`, `uuid`.
-pub(crate) fn named(name: &str) -> Option<Type> {
+pub fn named(name: &str) -> Option<Type> {
     Kind::from_name(name).map(Type::bare)
 }
 
 /// Whether a call of `name` builds a type: it is the name of a kind, and no
 /// function has it (`version("1.10")` is a function, and stays one).
-pub(crate) fn is_constructor(name: &str) -> bool {
+pub fn is_constructor(name: &str) -> bool {
     Kind::from_name(name).is_some() && !super::is_function(name)
 }
 
-/// Builds the type `name(args)`.
+/// Builds the type `name(args)` using `eval_arg` to evaluate argument expressions.
 ///
 /// Arguments are evaluated: `list(string)` is given the type `string`, and `default: auto`
 /// is given the value `auto`.
-pub(crate) fn construct(
+pub fn construct_with(
     name: &str,
     args: &[InterpExpr],
     cx: &EvalContext,
     env: &Env,
+    eval_arg: &mut dyn FnMut(&InterpExpr, &EvalContext, &Env) -> Result<EvalValue, EvalError>,
 ) -> Result<Type, EvalError> {
     let mut positional: Vec<Arg> = Vec::new();
     let mut named: Vec<(&str, Arg)> = Vec::new();
     for arg in args {
         match &arg.kind {
             InterpExprKind::NamedArg { name: key, value } => {
-                let mut arg = argument(name, super::eval(value, cx, env)?)?;
+                let mut arg = argument(name, eval_arg(value, cx, env)?)?;
                 if name == "list"
                     && key == "default"
                     && matches!(&value.kind, InterpExprKind::Group(_))
@@ -66,10 +67,84 @@ pub(crate) fn construct(
                 }
                 named.push((key.as_str(), arg));
             }
-            _ => positional.push(argument(name, super::eval(arg, cx, env)?)?),
+            _ => positional.push(argument(name, eval_arg(arg, cx, env)?)?),
         }
     }
     Type::build(name, &positional, &named).map_err(EvalError::BadType)
+}
+
+fn eval_type_arg(expr: &InterpExpr, cx: &EvalContext, env: &Env) -> Result<EvalValue, EvalError> {
+    match &expr.kind {
+        InterpExprKind::Literal(literal) => Ok(EvalValue::from(literal.clone())),
+        InterpExprKind::Group(inner) => eval_type_arg(inner, cx, env),
+        InterpExprKind::Seq(items) => {
+            let mut entries = Vec::with_capacity(items.len());
+            for item in items {
+                match &item.kind {
+                    InterpExprKind::NamedArg { name, value } => {
+                        entries.push(TupleEntry::named(
+                            name.clone(),
+                            eval_type_arg(value, cx, env)?,
+                        ));
+                    }
+                    _ => {
+                        entries.push(TupleEntry::unnamed(eval_type_arg(item, cx, env)?));
+                    }
+                }
+            }
+            Tuple::try_from_entries(entries)
+                .map(EvalValue::Tuple)
+                .map_err(|e| EvalError::message(format!("duplicate key `{}` in tuple", e.key)))
+        }
+        InterpExprKind::Identifier(name) => {
+            if let Some(bound) = env.get(name) {
+                return Ok(bound.clone());
+            }
+            match name.as_str() {
+                "self" => Ok(EvalValue::Document(cx.self_doc.clone())),
+                "macro" => Ok(EvalValue::Namespace(Namespace::Macro)),
+                "vault" => Ok(EvalValue::Directory(DirRef(String::new()))),
+                "var" => Ok(cx.var.clone()),
+                _ => named(name)
+                    .map(EvalValue::Type)
+                    .ok_or_else(|| EvalError::UnknownName(name.to_string())),
+            }
+        }
+        InterpExprKind::Call { callee, args } => match &callee.kind {
+            InterpExprKind::Identifier(name) if is_constructor(name) => {
+                construct_with(name, args, cx, env, &mut eval_type_arg).map(EvalValue::Type)
+            }
+            InterpExprKind::Identifier(name) if super::is_function(name) => Err(EvalError::message(
+                format!("a type seat holds a type, and `{expr}` is a call to `{name}`"),
+            )),
+            InterpExprKind::Identifier(name) => Err(EvalError::UnknownFunction(name.clone())),
+            _ => Err(EvalError::message("only a type constructor can be called here")),
+        },
+        InterpExprKind::Member { object, member } => {
+            if matches!(&object.kind, InterpExprKind::Identifier(name) if name == "var")
+                && env.get("var").is_none()
+                && cx.var_unset.iter().any(|unset| unset == member)
+            {
+                return Err(EvalError::NoValue(member.clone()));
+            }
+            match eval_type_arg(object, cx, env)? {
+                EvalValue::Tuple(tuple) => {
+                    tuple
+                        .get(member)
+                        .cloned()
+                        .ok_or_else(|| EvalError::UnknownMember {
+                            on: "tuple",
+                            member: member.to_string(),
+                        })
+                }
+                other => Err(EvalError::UnknownMember {
+                    on: other.type_name(),
+                    member: member.to_string(),
+                }),
+            }
+        }
+        _ => Err(EvalError::message("unsupported expression in type argument")),
+    }
 }
 
 /// An evaluated value as an argument of the type `ty`: a type, or plain data.
@@ -119,12 +194,21 @@ fn unknown_type(expr: &InterpExpr, error: EvalError) -> EvalError {
 /// is not well formed -- an argument it does not take, `default: auto` for a type
 /// that makes no value up.
 pub fn evaluate_type(expr: &InterpExpr, cx: &EvalContext) -> Result<Type, EvalError> {
+    evaluate_type_with(expr, cx, &mut eval_type_arg)
+}
+
+/// [`evaluate_type`] using a caller-supplied evaluator for non-type subexpressions.
+pub fn evaluate_type_with(
+    expr: &InterpExpr,
+    cx: &EvalContext,
+    eval_arg: &mut dyn FnMut(&InterpExpr, &EvalContext, &Env) -> Result<EvalValue, EvalError>,
+) -> Result<Type, EvalError> {
     let env = Env::new();
     let written = match &expr.kind {
         InterpExprKind::Identifier(name) => named(name).map(Ok),
         InterpExprKind::Call { callee, args } => match &callee.kind {
             InterpExprKind::Identifier(name) if Kind::from_name(name).is_some() => {
-                Some(construct(name, args, cx, &env))
+                Some(construct_with(name, args, cx, &env, eval_arg))
             }
             _ => None,
         },
@@ -132,7 +216,7 @@ pub fn evaluate_type(expr: &InterpExpr, cx: &EvalContext) -> Result<Type, EvalEr
     };
     let value = match written {
         Some(ty) => EvalValue::Type(ty?),
-        None => super::eval(expr, cx, &env).map_err(|error| unknown_type(expr, error))?,
+        None => eval_arg(expr, cx, &env).map_err(|error| unknown_type(expr, error))?,
     };
     match value {
         EvalValue::Type(ty) => Ok(ty),

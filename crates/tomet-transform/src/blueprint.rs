@@ -12,7 +12,7 @@ use tomet_tree::{
 };
 use tomet_type::Type;
 
-use crate::expressions::{Unresolved, resolve_expressions};
+use crate::expressions::{Evaluator, Unresolved, resolve_expressions_with};
 use crate::seats::{SeatProblem, fill_seats, seats_left};
 use crate::source::Source;
 
@@ -98,10 +98,11 @@ pub struct Instantiated {
 ///
 /// `source` is the clock and the random source `default: auto` is made from; nothing else here reads
 /// either.
-pub fn instantiate_blueprint(
+pub fn instantiate_blueprint_with(
     doc: &mut File,
     cx: &EvalContext,
     source: &dyn Source,
+    evaluator: &dyn Evaluator,
 ) -> Result<Instantiated, Vec<SeatProblem>> {
     let filled = fill_seats(doc, cx, source)?;
     let mut changed = filled > 0;
@@ -169,7 +170,7 @@ pub fn instantiate_blueprint(
     });
 
     let promoted = doc.clone();
-    let unresolved = resolve_expressions(doc, cx);
+    let unresolved = resolve_expressions_with(doc, cx, evaluator);
     changed |= *doc != promoted;
 
     // The seats are all filled by now. One that is still here -- brought in by an expression, say
@@ -245,11 +246,12 @@ fn collect_doc_sections<'a>(blocks: &'a [Block], doc_sections: &mut Vec<&'a Sect
 ///
 /// Returns `Err(problems)` if any seat in the elements being added or overwritten cannot be filled,
 /// leaving `doc` untouched.
-pub fn apply_blueprint(
+pub fn apply_blueprint_with(
     doc: &mut File,
     blueprint: &File,
     cx: &EvalContext,
     source: &dyn Source,
+    evaluator: &dyn Evaluator,
 ) -> Result<ApplyOutcome, Vec<SeatProblem>> {
     let info = extract_blueprint_info(blueprint);
 
@@ -406,7 +408,7 @@ pub fn apply_blueprint(
     fill_seats(&mut patch, cx, source)?;
 
     // Resolve expressions on patch
-    let unresolved = resolve_expressions(&mut patch, cx);
+    let unresolved = resolve_expressions_with(&mut patch, cx, evaluator);
 
     let left = seats_left(&patch);
     if !left.is_empty() {
@@ -510,9 +512,27 @@ mod tests {
     use super::*;
     use crate::FixedSource;
     use std::collections::HashMap;
-    use tomet_ast::{Tuple, TupleEntry};
+    use tomet_ast::Tuple;
     use tomet_expr::{DocRef, EvalValue, NoResolver};
     use tomet_scalar::Scalar;
+
+    struct StubEvaluator;
+    impl Evaluator for StubEvaluator {
+        fn evaluate(
+            &self,
+            _expr: &tomet_ast::InterpExpr,
+            _cx: &EvalContext,
+        ) -> Result<EvalValue, tomet_expr::EvalError> {
+            Err(tomet_expr::EvalError::message("stub evaluator"))
+        }
+        fn evaluate_data(
+            &self,
+            _expr: &tomet_ast::InterpExpr,
+            _cx: &EvalContext,
+        ) -> Result<tomet_ast::Value, tomet_expr::EvalError> {
+            Err(tomet_expr::EvalError::message("stub evaluator"))
+        }
+    }
 
     fn instantiate(src: &str, vars: EvalValue) -> (File, Instantiated) {
         let mut doc = tomet_ast_parser::parse_file(src).unwrap();
@@ -528,8 +548,8 @@ mod tests {
             notes: Default::default(),
         };
         let source = FixedSource::at("2026-11-11T09:30:00+09:00").expect("a datetime");
-        let report =
-            instantiate_blueprint(&mut doc, &cx, &source).expect("no type seat to stop it");
+        let report = instantiate_blueprint_with(&mut doc, &cx, &source, &StubEvaluator)
+            .expect("no type seat to stop it");
         (doc, report)
     }
 
@@ -573,64 +593,6 @@ mod tests {
         assert_eq!(info.description.as_deref(), Some("Daily note"));
     }
 
-    #[test]
-    fn instantiates_blueprint_to_kind_and_resolves_expressions() {
-        let src = "::blueprint(daily-note)\n::meta(\n  file: $(self::filename)\n  title: $(var.title)\n)\n\n=[ Plan for $(var.title) ]#(plan)\n";
-        let vars = EvalValue::Tuple(
-            Tuple::try_from_entries([TupleEntry::named(
-                "title".to_string(),
-                EvalValue::Scalar(Scalar::Text("Sprint 42".into())),
-            )])
-            .unwrap(),
-        );
-        let (doc, report) = instantiate(src, vars);
-        assert!(report.changed);
-        assert!(report.unresolved.is_empty(), "{:?}", report.unresolved);
-
-        let mut top_level = Vec::new();
-        for_each_declaration(&doc, |declaration| top_level.push(declaration.clone()));
-
-        let kind = top_level
-            .iter()
-            .find(|d| classify_declaration_lenient(d) == ElementKind::Declaration(DeclKind::Kind))
-            .expect("expected a ::kind declaration");
-        assert_eq!(
-            kind.data.args,
-            Some(Tuple::from_unnamed([Value::Scalar(Scalar::Text(
-                "daily-note".into()
-            ))]))
-        );
-
-        let meta = top_level
-            .iter()
-            .find(|d| classify_declaration_lenient(d) == ElementKind::Declaration(DeclKind::Meta))
-            .expect("expected a ::meta declaration");
-        let Some(tuple) = &meta.data.args else {
-            panic!("expected meta tuple");
-        };
-        let get = |key: &str| tuple.get(key).unwrap().clone();
-        assert_eq!(get("file"), Value::Scalar(Scalar::Text("plan.tmt".into())));
-        assert_eq!(
-            get("title"),
-            Value::Scalar(Scalar::Text("Sprint 42".into()))
-        );
-    }
-
-    #[test]
-    fn an_expression_with_no_value_is_left_and_reported() {
-        let (doc, report) = instantiate(
-            "::blueprint(note)\n::meta(title: $(var.title))\n",
-            EvalValue::Tuple(Tuple::new()),
-        );
-        assert_eq!(report.unresolved.len(), 1);
-        assert!(
-            report.unresolved[0].reason.contains("title"),
-            "{:?}",
-            report.unresolved
-        );
-        assert!(format!("{doc:?}").contains("Interp"));
-    }
-
     const UUID: &str = "00000000-0000-0000-0000-000000000000";
 
     fn apply_test(
@@ -654,7 +616,7 @@ mod tests {
         let source = FixedSource::at("2026-11-11T09:30:00+09:00")
             .unwrap()
             .with_ids(ids.iter().copied());
-        let outcome = apply_blueprint(&mut doc, &bp, &cx, &source)?;
+        let outcome = apply_blueprint_with(&mut doc, &bp, &cx, &source, &StubEvaluator)?;
         Ok((doc, outcome))
     }
 
@@ -828,7 +790,7 @@ mod tests {
             notes: Default::default(),
         };
         let source = FixedSource::at("2026-11-11T09:30:00+09:00").unwrap();
-        let res = apply_blueprint(&mut doc, &bp, &cx, &source);
+        let res = apply_blueprint_with(&mut doc, &bp, &cx, &source, &StubEvaluator);
         assert!(res.is_err());
         assert_eq!(doc, before);
     }

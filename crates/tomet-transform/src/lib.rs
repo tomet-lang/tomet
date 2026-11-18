@@ -27,7 +27,9 @@ pub mod structural;
 
 pub use blueprint::*;
 pub use directive::*;
-pub use expressions::{Unresolved, UnresolvedKind, resolve_expressions, resolve_expressions_where};
+pub use expressions::{
+    Evaluator, Unresolved, UnresolvedKind, resolve_expressions_where_with, resolve_expressions_with,
+};
 pub use links::*;
 pub use macro_rewrite::*;
 pub use meta::*;

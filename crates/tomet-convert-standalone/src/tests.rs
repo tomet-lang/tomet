@@ -256,8 +256,10 @@ See $macro.gh(7) about $(var.topic) in $(self::path).
             .unwrap()
             .with_source("docs/b.tmt", "::meta(title: B)\n\nBody of B.\n")
             .unwrap();
-        let prepared = vault.prepare(&mut doc, Path::new(PATH), &resolver);
-        assert!(prepared.unresolved.is_empty(), "{:?}", prepared.unresolved);
+        let scope = vault.scope_for(&doc, Path::new(PATH), &resolver);
+        let unresolved = tomet_eval::resolve_expressions(&mut doc, &scope.context());
+        vault.fill_terms(&mut doc);
+        assert!(unresolved.is_empty(), "{:?}", unresolved);
         tomet_markdown::to_markdown(&doc)
     };
 
@@ -270,8 +272,10 @@ See $macro.gh(7) about $(var.topic) in $(self::path).
         let vault = Vault::from_sources(PrinterConfig::default(), ".", &[]);
         let mut doc = tomet_ast_parser::parse_file(&taken_out).expect("the printed file parses");
         let resolver = MemoryResolver::new();
-        let prepared = vault.prepare(&mut doc, Path::new("elsewhere/renamed.tmt"), &resolver);
-        assert!(prepared.unresolved.is_empty(), "{:?}", prepared.unresolved);
+        let scope = vault.scope_for(&doc, Path::new("elsewhere/renamed.tmt"), &resolver);
+        let unresolved = tomet_eval::resolve_expressions(&mut doc, &scope.context());
+        vault.fill_terms(&mut doc);
+        assert!(unresolved.is_empty(), "{:?}", unresolved);
         tomet_markdown::to_markdown(&doc)
     };
     assert_eq!(outside, inside);

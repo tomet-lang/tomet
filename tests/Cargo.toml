@@ -67,6 +67,10 @@ path = "src/rule.rs"
 name = "block_value_loss"
 path = "src/block_value_loss.rs"
 
+[[test]]
+name = "vault_eval"
+path = "src/vault_eval.rs"
+
 [dependencies]
 cotomet             = { workspace = true }
 tomet-ast           = { workspace = true }
@@ -75,6 +79,8 @@ tomet-config        = { workspace = true }
 tomet-cst           = { workspace = true }
 tomet-cst-parser    = { workspace = true }
 tomet-edit          = { workspace = true }
+tomet-eval          = { workspace = true }
+tomet-expr          = { workspace = true }
 tomet-formatter     = { workspace = true }
 tomet-html          = { workspace = true }
 tomet-load-config   = { workspace = true }
@@ -89,6 +95,7 @@ tomet-transform     = { workspace = true }
 tomet-tree          = { workspace = true }
 tomet-typst         = { workspace = true }
 tomet-validator     = { workspace = true }
+tomet-vault         = { workspace = true }
 tomet-workspace     = { workspace = true }
 tree-sitter-cotomet = { workspace = true }
 tree-sitter-tomet   = { workspace = true }

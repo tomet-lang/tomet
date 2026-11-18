@@ -20,11 +20,10 @@
 use tomet_ast::{Block, Element, Inline, Placement};
 use tomet_scalar::Scalar;
 
+use tomet_expr::{DocRef, EvalContext, EvalError, EvalValue, Note, Part};
+
 use super::args::Args;
-use super::context::{EvalContext, Note};
-use super::error::EvalError;
 use super::parts::load;
-use super::value::{DocRef, EvalValue, Part};
 
 /// How many files may be included inside one another.
 pub const MAX_INCLUDE_DEPTH: usize = 16;

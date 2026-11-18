@@ -20,6 +20,7 @@ tomet-ast-parser  = { workspace = true }
 tomet-cst         = { workspace = true }
 tomet-cst-parser  = { workspace = true }
 tomet-declaration = { workspace = true }
+tomet-eval        = { workspace = true }
 tomet-expr        = { workspace = true }
 tomet-formatter   = { workspace = true }
 tomet-load        = { workspace = true }

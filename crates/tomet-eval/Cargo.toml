@@ -1,0 +1,20 @@
+[package]
+name                 = "tomet-eval"
+version.workspace    = true
+edition.workspace    = true
+description          = "Expression evaluation and document-level expression resolution for Tomet."
+license.workspace    = true
+repository.workspace = true
+
+[dependencies]
+tomet-ast         = { workspace = true }
+tomet-ast-parser  = { workspace = true }
+tomet-declaration = { workspace = true }
+tomet-expr        = { workspace = true }
+tomet-query       = { workspace = true }
+tomet-scalar      = { workspace = true }
+tomet-semantics   = { workspace = true }
+tomet-span        = { workspace = true }
+tomet-transform   = { workspace = true }
+tomet-tree        = { workspace = true }
+tomet-type        = { workspace = true }

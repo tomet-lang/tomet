@@ -3,11 +3,10 @@
 use tomet_ast::{Block, Connect, File, Group, Tuple, Value};
 use tomet_scalar::Scalar;
 
+use tomet_expr::{DirRef, DocRef, EvalContext, EvalError, EvalValue, Part};
+
 use super::args::Args;
-use super::context::EvalContext;
-use super::error::EvalError;
 use super::methods::index_into;
-use super::value::{DirRef, DocRef, EvalValue, Part};
 
 /// The document behind a reference.
 pub(crate) fn load(doc: &DocRef, cx: &EvalContext) -> Result<std::sync::Arc<File>, EvalError> {
@@ -61,45 +60,10 @@ fn directory_docs(
 
 // ---- finding a part by id ----------------------------------------------------
 
-/// The part with unique id `id`: an element, a declaration, a section, a list or a list item,
-/// wherever it sits in the document, in a `::connect` too.
-pub(crate) fn find_part(doc: &File, id: &str) -> Option<Part> {
-    let found = tomet_tree::walk(doc, &mut |node, _| {
-        if node.id().is_some_and(|i| i.0 == id)
-            && let Some(found) = Part::from_tree_node(node)
-        {
-            return tomet_tree::Visit::Break(found);
-        }
-        tomet_tree::Visit::Descend
-    });
-    match found {
-        std::ops::ControlFlow::Break(part) => Some(part),
-        std::ops::ControlFlow::Continue(()) => None,
-    }
-}
-
-impl Part {
-    /// The expression language's part for a node of the tree, if it has one.
-    pub fn from_tree_node(node: tomet_tree::Node<'_>) -> Option<Part> {
-        if let Some(el) = node.element() {
-            return Some(Part::Element(Box::new(el.clone())));
-        }
-        if let Some(list) = node.list() {
-            return Some(Part::List(Box::new(list.clone())));
-        }
-        match node {
-            tomet_tree::Node::Block(Block::Section(s)) => Some(Part::Section(Box::new(s.clone()))),
-            tomet_tree::Node::Declaration(d) => Some(Part::Declaration(Box::new(d.clone()))),
-            tomet_tree::Node::Item(item) => Some(Part::Item(Box::new(item.clone()))),
-            _ => None,
-        }
-    }
-}
-
 /// `doc#id`.
 pub(crate) fn part_by_id(doc: &DocRef, id: &str, cx: &EvalContext) -> Result<EvalValue, EvalError> {
     let document = load(doc, cx)?;
-    find_part(&document, id)
+    tomet_query::find_by_id_with(&document, id, Part::from_tree_node)
         .map(|part| EvalValue::Part {
             doc: doc.clone(),
             part: Box::new(part),

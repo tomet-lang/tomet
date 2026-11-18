@@ -243,7 +243,25 @@ mod tests {
     use tomet_expr::{DocRef, EvalValue, NoResolver};
 
     use super::*;
-    use crate::{FixedSource, Instantiated, instantiate_blueprint};
+    use crate::{Evaluator, FixedSource, Instantiated, instantiate_blueprint_with};
+
+    struct StubEvaluator;
+    impl Evaluator for StubEvaluator {
+        fn evaluate(
+            &self,
+            _expr: &tomet_ast::InterpExpr,
+            _cx: &EvalContext,
+        ) -> Result<EvalValue, EvalError> {
+            Err(EvalError::message("stub evaluator"))
+        }
+        fn evaluate_data(
+            &self,
+            _expr: &tomet_ast::InterpExpr,
+            _cx: &EvalContext,
+        ) -> Result<tomet_ast::Value, EvalError> {
+            Err(EvalError::message("stub evaluator"))
+        }
+    }
 
     const NOW: &str = "2026-11-11T09:30:00+09:00";
     const UUID: &str = "00000000-0000-0000-0000-000000000000";
@@ -270,7 +288,7 @@ mod tests {
             heading_level: 0,
             notes: Default::default(),
         };
-        let report = instantiate_blueprint(&mut doc, &cx, source)?;
+        let report = instantiate_blueprint_with(&mut doc, &cx, source, &StubEvaluator)?;
         Ok((doc, report))
     }
 
@@ -617,35 +635,13 @@ mod tests {
             heading_level: 0,
             notes: Default::default(),
         };
-        let found = instantiate_blueprint(&mut doc, &cx, &fixed(&[UUID])).unwrap_err();
+        let found = instantiate_blueprint_with(&mut doc, &cx, &fixed(&[UUID]), &StubEvaluator)
+            .unwrap_err();
         assert_eq!(found.len(), 1);
         assert_eq!(doc, before);
     }
 
-    /// The filling reads the blueprint as it is written. A seat that is not in it but arrives by
-    /// an expression -- from a document it includes -- is in no document a blueprint makes.
-    #[test]
-    fn a_seat_that_arrives_by_an_expression_is_a_stop_and_not_a_seat_in_the_document() {
-        let resolver = tomet_expr::MemoryResolver::new()
-            .with_source("other.tmt", "=[ Top ]#(top)\n\n<$string>\n")
-            .unwrap();
-        let mut doc = parse("::blueprint(note)\n\n$include(tmt(\"other.tmt\")#top)\n");
-        let macros = HashMap::new();
-        let cx = EvalContext {
-            resolver: &resolver,
-            self_doc: DocRef("notes/plan.tmt".into()),
-            macros: &macros,
-            var: &EvalValue::Scalar(Scalar::None),
-            var_unset: &[],
-            includes: &[],
-            heading_level: 0,
-            notes: Default::default(),
-        };
-        let found = instantiate_blueprint(&mut doc, &cx, &fixed(&[])).unwrap_err();
-        assert_eq!(found.len(), 1, "{found:?}");
-        assert_eq!(found[0].seat, "<$string>");
-        assert_eq!(found[0].reason, SeatReason::Left);
-    }
+
 
     #[test]
     fn a_seat_does_not_touch_the_expressions_around_it() {

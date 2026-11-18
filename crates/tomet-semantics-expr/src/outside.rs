@@ -14,7 +14,7 @@ use tomet_ast::{File, InterpExpr, InterpExprKind};
 use tomet_scalar::Scalar;
 use tomet_span::Span;
 
-use crate::address;
+
 
 /// Functions that answer from another document.
 const OTHER_DOCUMENT_FUNCTIONS: &[&str] = &["tmt", "ref", "include"];
@@ -127,6 +127,13 @@ pub fn reaches_outside(expr: &InterpExpr, own: &OwnNames) -> Vec<Reaching> {
     found
 }
 
+fn outside_scheme(text: &str) -> Option<&'static str> {
+    let text = text.trim();
+    let left = text.split_once('#').map_or(text, |(left, _)| left);
+    let (scheme, _) = left.split_once(':')?;
+    ["tmt", "ref", "dir"].into_iter().find(|s| *s == scheme)
+}
+
 fn walk(expr: &InterpExpr, own: &OwnNames, out: &mut Vec<Reaching>) {
     let mut push = |reach: Reach| {
         out.push(Reaching {
@@ -155,7 +162,7 @@ fn walk(expr: &InterpExpr, own: &OwnNames, out: &mut Vec<Reaching>) {
         }
         InterpExprKind::DocId { doc, .. } => walk(doc, own, out),
         InterpExprKind::Addr { text, .. } => {
-            if let Some(scheme) = address::outside_scheme(text) {
+            if let Some(scheme) = outside_scheme(text) {
                 push(Reach::Address(scheme));
             }
         }
@@ -205,7 +212,7 @@ fn walk(expr: &InterpExpr, own: &OwnNames, out: &mut Vec<Reaching>) {
                         }
                         (_, "addr") => match &object.kind {
                             InterpExprKind::Literal(Scalar::Text(text)) => {
-                                if let Some(scheme) = address::outside_scheme(text) {
+                                if let Some(scheme) = outside_scheme(text) {
                                     push(Reach::Address(scheme));
                                 }
                             }

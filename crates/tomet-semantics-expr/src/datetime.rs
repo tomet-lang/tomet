@@ -36,7 +36,7 @@ pub fn parse_offset(text: &str) -> Option<UtcOffset> {
 /// `value.member` for a datetime, without a call: the parts of the value as
 /// it is written, in its own offset. `.year` and the rest are integers;
 /// `.offset` is text, `+09:00`, and `+00:00` for UTC.
-pub(crate) fn member(value: &OffsetDateTime, member: &str) -> Result<EvalValue, EvalError> {
+pub fn datetime_member(value: &OffsetDateTime, member: &str) -> Result<EvalValue, EvalError> {
     Ok(match member {
         "year" => EvalValue::Scalar(Scalar::Int(i64::from(value.year()))),
         "month" => EvalValue::Scalar(Scalar::Int(i64::from(u8::from(value.month())))),

@@ -46,7 +46,6 @@ members = [
   "crates/tomet-semantics-address",
   "crates/tomet-semantics-core",
   "crates/tomet-semantics-declaration",
-  "crates/tomet-semantics-eval",
 
   #= Validator -- core, rule, blueprint, facade
   "crates/tomet-validator-core",
@@ -65,7 +64,11 @@ members = [
   #= Transform -- in-memory AST transformations & macros
   "crates/tomet-transform",
 
-  #= Search -- in-memory structural search & filter queries
+  #= Eval -- expression evaluation & document-level resolution
+  "crates/tomet-eval",
+  "crates/cotomet-eval",
+
+  #= Query -- pure deterministic in-memory structural, part, and collection queries
   "crates/tomet-query",
 
   #= Edit -- backend-neutral editable model for collaborative editing
@@ -149,7 +152,8 @@ tomet-spelling   = { path = "crates/tomet-syntax-spelling", version = "0.5.0" }
 tomet-style      = { path = "crates/tomet-syntax-style", version = "0.5.0" }
 tomet-tree       = { path = "crates/tomet-syntax-tree", version = "0.5.0" }
 #--- Semantics ---
-cotomet-eval         = { path = "crates/tomet-semantics-eval", version = "0.5.0" }
+cotomet-eval         = { path = "crates/cotomet-eval", version = "0.5.0" }
+tomet-eval           = { path = "crates/tomet-eval", version = "0.5.0" }
 tomet-address        = { path = "crates/tomet-semantics-address", version = "0.5.0" }
 tomet-declaration    = { path = "crates/tomet-semantics-declaration", version = "0.5.0" }
 tomet-expr           = { path = "crates/tomet-semantics-expr", version = "0.5.0" }

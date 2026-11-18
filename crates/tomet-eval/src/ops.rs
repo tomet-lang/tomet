@@ -4,8 +4,7 @@ use std::cmp::Ordering;
 
 use tomet_scalar::Scalar;
 
-use super::error::EvalError;
-use super::value::EvalValue;
+use tomet_expr::{EvalError, EvalValue};
 
 fn number(value: &EvalValue) -> Option<f64> {
     match value {

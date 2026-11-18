@@ -2,7 +2,8 @@ use tomet_semantics::DeclKind;
 
 use lsp_types::{Hover, HoverContents, MarkupContent, MarkupKind, Position, Range, Uri};
 use tomet_ast::{Declaration, Element, File, InterpExpr, Tuple, Value};
-use tomet_expr::{DocRef, EvalContext, EvalValue, MemoryResolver, evaluate};
+use tomet_eval::evaluate;
+use tomet_expr::{DocRef, EvalContext, EvalValue, MemoryResolver};
 use tomet_scalar::Scalar;
 use tomet_semantics::{
     ElementKind, TupleView, classify_declaration_lenient, classify_std_lenient,

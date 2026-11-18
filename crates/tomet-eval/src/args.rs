@@ -1,7 +1,6 @@
 //! A call's evaluated arguments.
 
-use super::error::EvalError;
-use super::value::EvalValue;
+use tomet_expr::{EvalError, EvalValue};
 
 /// Positional arguments in order, then `name: value` arguments.
 pub(crate) struct Args {

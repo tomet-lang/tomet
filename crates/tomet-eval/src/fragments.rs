@@ -5,9 +5,9 @@ use tomet_scalar::Scalar;
 use tomet_span::Span;
 use tomet_tree::{ElementExt, element_new};
 
+use tomet_expr::{EvalError, EvalValue};
+
 use super::args::Args;
-use super::error::EvalError;
-use super::value::EvalValue;
 
 /// Extracts the label text from an evaluated argument, if one was passed.
 ///

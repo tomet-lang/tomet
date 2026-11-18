@@ -83,6 +83,22 @@ impl Part {
             Part::Item(item) => item.id.as_ref().map(|id| id.0.as_str()),
         }
     }
+
+    /// The expression language's part for a node of the tree, if it has one.
+    pub fn from_tree_node(node: tomet_tree::Node<'_>) -> Option<Part> {
+        if let Some(el) = node.element() {
+            return Some(Part::Element(Box::new(el.clone())));
+        }
+        if let Some(list) = node.list() {
+            return Some(Part::List(Box::new(list.clone())));
+        }
+        match node {
+            tomet_tree::Node::Block(Block::Section(s)) => Some(Part::Section(Box::new(s.clone()))),
+            tomet_tree::Node::Declaration(d) => Some(Part::Declaration(Box::new(d.clone()))),
+            tomet_tree::Node::Item(item) => Some(Part::Item(Box::new(item.clone()))),
+            _ => None,
+        }
+    }
 }
 
 /// A name that holds members and is not itself a value you can print.

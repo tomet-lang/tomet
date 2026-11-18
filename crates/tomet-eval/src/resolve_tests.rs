@@ -1,10 +1,11 @@
 use std::collections::HashMap;
 
-use tomet_ast::{Block, Inline, Tuple, TupleEntry, Value};
+use tomet_ast::{Block, File, Inline, Tuple, TupleEntry, Value};
 use tomet_expr::{DocRef, EvalContext, EvalValue, MemoryResolver, NoResolver, Resolver};
 use tomet_scalar::Scalar;
 
-use super::*;
+use crate::{resolve_expressions, resolve_expressions_where};
+use tomet_transform::{Unresolved, UnresolvedKind};
 
 const NOTE: &str = "::meta(
   title: Note
@@ -816,4 +817,110 @@ fn an_element_macro_in_a_paragraph_is_rejected_and_in_value_position_becomes_blo
         panic!("expected Value::Blocks, got {:?}", el.data.args);
     };
     assert!(matches!(&blocks[..], [Block::Element(c)] if c.name.to_string() == "card"));
+}
+
+#[test]
+fn a_seat_that_arrives_by_an_expression_is_a_stop_and_not_a_seat_in_the_document() {
+    let resolver = MemoryResolver::new()
+        .with_source("other.tmt", "=[ Top ]#(top)\n\n<$string>\n")
+        .unwrap();
+    let mut doc = tomet_ast_parser::parse_file("::blueprint(note)\n\n$include(tmt(\"other.tmt\")#top)\n").unwrap();
+    let macros = HashMap::new();
+    let cx = EvalContext {
+        resolver: &resolver,
+        self_doc: DocRef("notes/plan.tmt".into()),
+        macros: &macros,
+        var: &EvalValue::Scalar(Scalar::None),
+        var_unset: &[],
+        includes: &[],
+        heading_level: 0,
+        notes: Default::default(),
+    };
+    let source = tomet_transform::FixedSource::at("2026-11-11T09:30:00+09:00").unwrap();
+    let found = crate::instantiate_blueprint(&mut doc, &cx, &source).unwrap_err();
+    assert_eq!(found.len(), 1, "{found:?}");
+    assert_eq!(found[0].seat, "<$string>");
+    assert_eq!(found[0].reason, tomet_transform::SeatReason::Left);
+}
+
+fn instantiate_with_eval(src: &str, vars: EvalValue) -> (File, tomet_transform::Instantiated) {
+    let mut doc = tomet_ast_parser::parse_file(src).unwrap();
+    let macros = HashMap::new();
+    let cx = EvalContext {
+        resolver: &NoResolver,
+        self_doc: DocRef("notes/plan.tmt".into()),
+        macros: &macros,
+        var: &vars,
+        var_unset: &[],
+        includes: &[],
+        heading_level: 0,
+        notes: Default::default(),
+    };
+    let source = tomet_transform::FixedSource::at("2026-11-11T09:30:00+09:00").unwrap();
+    let report = crate::instantiate_blueprint(&mut doc, &cx, &source).unwrap();
+    (doc, report)
+}
+
+#[test]
+fn instantiates_blueprint_to_kind_and_resolves_expressions() {
+    let src = "::blueprint(daily-note)\n::meta(\n  file: $(self::filename)\n  title: $(var.title)\n)\n\n=[ Plan for $(var.title) ]#(plan)\n";
+    let vars = EvalValue::Tuple(
+        Tuple::try_from_entries([TupleEntry::named(
+            "title".to_string(),
+            EvalValue::Scalar(Scalar::Text("Sprint 42".into())),
+        )])
+        .unwrap(),
+    );
+    let (doc, report) = instantiate_with_eval(src, vars);
+    assert!(report.changed);
+    assert!(report.unresolved.is_empty(), "{:?}", report.unresolved);
+
+    let mut top_level = Vec::new();
+    tomet_tree::for_each_declaration(&doc, |declaration| top_level.push(declaration.clone()));
+
+    let kind = top_level
+        .iter()
+        .find(|d| {
+            tomet_semantics::classify_declaration_lenient(d)
+                == tomet_semantics::ElementKind::Declaration(tomet_declaration::DeclKind::Kind)
+        })
+        .expect("expected a ::kind declaration");
+    assert_eq!(
+        kind.data.args,
+        Some(Tuple::from_unnamed([Value::Scalar(Scalar::Text(
+            "daily-note".into()
+        ))]))
+    );
+
+    let meta = top_level
+        .iter()
+        .find(|d| {
+            tomet_semantics::classify_declaration_lenient(d)
+                == tomet_semantics::ElementKind::Declaration(tomet_declaration::DeclKind::Meta)
+        })
+        .expect("expected a ::meta declaration");
+    let Some(tuple) = &meta.data.args else {
+        panic!("expected meta tuple");
+    };
+    let get = |key: &str| tuple.get(key).unwrap().clone();
+    assert_eq!(get("file"), Value::Scalar(Scalar::Text("plan.tmt".into())));
+    assert_eq!(
+        get("title"),
+        Value::Scalar(Scalar::Text("Sprint 42".into()))
+    );
+}
+
+#[test]
+fn an_expression_with_no_value_is_left_and_reported() {
+    let (doc, report) = instantiate_with_eval(
+        "::blueprint(note)\n::meta(title: $(var.title))\n",
+        EvalValue::Tuple(Tuple::new()),
+    );
+    assert_eq!(report.unresolved.len(), 1);
+    assert!(
+        report.unresolved[0].reason.contains("title"),
+        "{:?}",
+        report.unresolved
+    );
+    assert!(format!("{doc:?}").contains("Interp"));
 }

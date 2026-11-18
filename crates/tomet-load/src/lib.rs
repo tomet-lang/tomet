@@ -89,7 +89,13 @@ mod vocabulary;
 
 pub use findings::{Findings, is_error};
 pub use resolver::DiskResolver;
-pub use tomet_vault::{Prepared, Unresolved, UnresolvedKind};
+pub use tomet_transform::{Unresolved, UnresolvedKind};
+
+/// What [`Vault::prepare`] could not do.
+#[derive(Debug, Default)]
+pub struct Prepared {
+    pub unresolved: Vec<Unresolved>,
+}
 
 /// A vault found on disk: `tomet_vault::Vault` plus the parts that need
 /// a filesystem.
@@ -279,20 +285,25 @@ impl Vault {
     /// `tomet_vault::Vault::prepare`'s doc; this supplies the files the
     /// expressions ask about.
     pub fn prepare(&self, doc: &mut File, path: &Path) -> Prepared {
-        self.core.prepare(doc, path, &self.resolver())
+        let resolver = self.resolver();
+        let scope = self.core.scope_for(doc, path, &resolver);
+        let unresolved = tomet_eval::resolve_expressions(doc, &scope.context());
+        self.core.fill_terms(doc);
+        Prepared { unresolved }
     }
 
     /// What `expr`, written in `doc` at `path`, comes to when the document is
-    /// rendered -- see `tomet_vault::Vault::evaluate`. This supplies the
-    /// files the expression asks about, and the editor's unsaved text for the
-    /// ones it has open.
+    /// rendered. This supplies the files the expression asks about, and the
+    /// editor's unsaved text for the ones it has open.
     pub fn evaluate(
         &self,
         doc: &File,
         path: &Path,
         expr: &tomet_ast::InterpExpr,
     ) -> Result<tomet_expr::EvalValue, tomet_expr::EvalError> {
-        self.core.evaluate(doc, path, expr, &self.resolver())
+        let resolver = self.resolver();
+        let scope = self.core.scope_for(doc, path, &resolver);
+        tomet_eval::evaluate(expr, &scope.context())
     }
 
     /// [`Vault::file`] followed by [`Vault::prepare`] -- what anything

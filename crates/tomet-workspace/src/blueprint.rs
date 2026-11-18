@@ -26,7 +26,8 @@ use tomet_ast::Value;
 use tomet_config::PrinterConfig;
 use tomet_expr::{DocRef, EvalContext, MemoryResolver};
 use tomet_position::{LineCol, LineIndex};
-use tomet_transform::{SeatProblem, Source, SystemSource, apply_blueprint, instantiate_blueprint};
+use tomet_eval::{apply_blueprint, instantiate_blueprint};
+use tomet_transform::{SeatProblem, Source, SystemSource};
 
 /// Every blueprint `config` declares, as `(name, path)`, sorted by name.
 ///

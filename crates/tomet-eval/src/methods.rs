@@ -11,11 +11,10 @@ use tomet_ast::{Tuple, TupleEntry};
 use tomet_scalar::Scalar;
 use tomet_span::Span;
 
+use tomet_expr::{Closure, EvalContext, EvalError, EvalValue};
+
 use super::args::Args;
-use super::context::EvalContext;
-use super::error::EvalError;
 use super::ops::{compare, values_equal};
-use super::value::{Closure, EvalValue};
 
 /// Calls `receiver.member(args)`.
 pub(crate) fn call_method(
@@ -27,25 +26,19 @@ pub(crate) fn call_method(
     match (receiver, member) {
         (EvalValue::Tuple(tuple), "filter") => {
             let f = function_arg(member, args)?;
-            let mut kept = Vec::new();
-            for item in tuple.unnamed() {
+            let items: Vec<EvalValue> = tuple.unnamed().cloned().collect();
+            let kept = tomet_query::filter_items(&items, |item| {
                 match super::apply(&f, vec![item.clone()], cx)? {
-                    EvalValue::Scalar(Scalar::Bool(true)) => {
-                        kept.push(TupleEntry::unnamed(item.clone()))
-                    }
-                    EvalValue::Scalar(Scalar::Bool(false)) => {}
-                    other => {
-                        return Err(EvalError::mismatch(
-                            "the function given to `.filter`",
-                            "a bool",
-                            other.type_name(),
-                        ));
-                    }
+                    EvalValue::Scalar(Scalar::Bool(true)) => Ok(true),
+                    EvalValue::Scalar(Scalar::Bool(false)) => Ok(false),
+                    other => Err(EvalError::mismatch(
+                        "the function given to `.filter`",
+                        "a bool",
+                        other.type_name(),
+                    )),
                 }
-            }
-            Tuple::try_from_entries(kept)
-                .map(EvalValue::Tuple)
-                .map_err(|e| EvalError::message(e.to_string()))
+            })?;
+            Ok(EvalValue::Tuple(Tuple::from_unnamed(kept)))
         }
         (EvalValue::Tuple(tuple), "map") => {
             let f = function_arg(member, args)?;
@@ -173,7 +166,7 @@ pub(crate) fn call_method(
                 ));
             };
             Ok(EvalValue::Scalar(Scalar::Text(
-                super::datetime::format_datetime(&value, &format),
+                tomet_expr::format_datetime(&value, &format),
             )))
         }
         (EvalValue::DateTime(value), "at") => {
@@ -185,7 +178,7 @@ pub(crate) fn call_method(
                     offset.type_name(),
                 ));
             };
-            let offset = super::datetime::parse_offset(&offset).ok_or_else(|| {
+            let offset = tomet_expr::parse_offset(&offset).ok_or_else(|| {
                 EvalError::message(format!(
                     "`.at` wants an offset such as \"+09:00\" or \"Z\", not `{offset}`"
                 ))
@@ -398,36 +391,33 @@ fn sort(items: &[EvalValue], args: Args, cx: &EvalContext) -> Result<EvalValue, 
         }
     };
 
-    // An item whose key is `None` -- a field the document does not have --
-    // goes after all the others, whichever way the rest are ordered, and
-    // keeps its place among the other `None`s. Only keys that exist have to
-    // agree on a kind.
-    let mut keyed = Vec::with_capacity(items.len());
-    let mut absent = Vec::new();
+    let mut first_class: Option<(EvalValue, u8)> = None;
+    let mut keys = Vec::with_capacity(items.len());
     for item in items {
         match super::apply(&f, vec![item.clone()], cx)? {
-            EvalValue::Scalar(Scalar::None) => absent.push(item.clone()),
-            key => keyed.push((key, item.clone())),
-        }
-    }
-    // Check every key before sorting, so the comparison below is a total
-    // order and cannot fail half way.
-    if let Some((first, _)) = keyed.first() {
-        let class = key_class(first)?;
-        for (key, _) in &keyed {
-            if key_class(key)? != class {
-                return Err(EvalError::NotComparable {
-                    left: first.type_name(),
-                    right: key.type_name(),
-                });
+            EvalValue::Scalar(Scalar::None) => keys.push(None),
+            key => {
+                let class = key_class(&key)?;
+                match &first_class {
+                    Some((first, expected)) if class != *expected => {
+                        return Err(EvalError::NotComparable {
+                            left: first.type_name(),
+                            right: key.type_name(),
+                        });
+                    }
+                    None => first_class = Some((key.clone(), class)),
+                    _ => {}
+                }
+                keys.push(Some(key));
             }
         }
     }
-    keyed.sort_by(|(a, _), (b, _)| {
-        let order = compare(a, b).unwrap_or(Ordering::Equal);
-        if descending { order.reverse() } else { order }
-    });
-    let mut sorted: Vec<EvalValue> = keyed.into_iter().map(|(_, item)| item).collect();
-    sorted.extend(absent);
+    let mut key_iter = keys.into_iter();
+    let sorted = tomet_query::sort_items_by_key(
+        items,
+        descending,
+        |_| Ok(key_iter.next().flatten()),
+        |a, b| compare(a, b).unwrap_or(Ordering::Equal),
+    )?;
     Ok(EvalValue::Tuple(Tuple::from_unnamed(sorted)))
 }

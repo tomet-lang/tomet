@@ -157,7 +157,7 @@ pub fn eval_file(file: File, src: &str, vars: &[(String, Value)]) -> Result<File
 
 fn walk_value(value: Value, lines: &LineIndex, cx: &EvalContext, errors: &mut Vec<Error>) -> Value {
     match value {
-        Value::Interp(interp) => match tomet_expr::evaluate_data(&interp.expr, cx) {
+        Value::Interp(interp) => match tomet_eval::evaluate_data(&interp.expr, cx) {
             Ok(data) => walk_value(data, lines, cx, errors),
             Err(err) => {
                 let at = lines.line_col(interp.span.start);

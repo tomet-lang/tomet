@@ -18,10 +18,13 @@ mod values;
 
 use std::collections::HashMap;
 
+use tomet_ast::{Tuple, Value};
+use tomet_expr::*;
 use tomet_scalar::Scalar;
 use tomet_type::{AutoFill, Datum, Kind, Type, TypeError};
 
 use super::*;
+use crate::evaluate_type;
 
 fn int(i: i64) -> EvalValue {
     EvalValue::Scalar(Scalar::Int(i))

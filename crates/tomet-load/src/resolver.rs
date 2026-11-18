@@ -76,7 +76,13 @@ impl Resolver for DiskResolver<'_> {
         blocks: Vec<Block>,
         includes: &[DocRef],
     ) -> Result<PreparedBlocks, String> {
-        self.vault.prepare_blocks(doc, blocks, includes, self)
+        let scope = self.vault.core.block_scope(doc, includes, self)?;
+        let mut holder = File::new(vec![], blocks, tomet_span::Span::default());
+        let unresolved = tomet_eval::resolve_expressions(&mut holder, &scope.context()).len();
+        Ok(PreparedBlocks {
+            blocks: holder.body,
+            unresolved,
+        })
     }
 
     fn rebase_links(&self, blocks: Vec<Block>, from: &DocRef, to: &DocRef) -> Vec<Block> {
@@ -196,7 +202,8 @@ mod tests {
     #[test]
     fn the_evaluator_runs_over_the_disk_through_this_resolver() {
         use std::collections::HashMap;
-        use tomet_expr::{EvalContext, evaluate};
+        use tomet_eval::evaluate;
+        use tomet_expr::EvalContext;
 
         let root = fixture("tomet_test_disk_resolver_eval");
         let vault = Vault::discover(&root);
@@ -229,7 +236,8 @@ mod tests {
     #[test]
     fn documents_and_directories_must_stay_inside_the_vault() {
         use std::collections::HashMap;
-        use tomet_expr::{EvalContext, evaluate};
+        use tomet_eval::evaluate;
+        use tomet_expr::EvalContext;
 
         let root = fixture("tomet_test_disk_resolver_security_root");
         let outside = std::env::temp_dir().join("tomet_test_disk_resolver_security_outside");

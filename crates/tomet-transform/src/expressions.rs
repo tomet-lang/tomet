@@ -34,7 +34,7 @@ use tomet_ast::{
     Block, Connect, Data, Declaration, Element, Entry, File, Group, Id, Inline, InterpExpr, List,
     ListItem, Paragraph, Text, Tuple, Value,
 };
-use tomet_expr::{EvalContext, EvalValue, Note, evaluate, evaluate_data};
+use tomet_expr::{EvalContext, EvalError, EvalValue, Note};
 use tomet_span::Span;
 use tomet_tree::list_item;
 
@@ -81,12 +81,23 @@ impl Unresolved {
     }
 }
 
-/// Replaces every `{$ ... }` in `doc` with what it stands for.
-pub fn resolve_expressions(doc: &mut File, cx: &EvalContext) -> Vec<Unresolved> {
-    resolve(doc, cx, None)
+/// Evaluates expressions on behalf of [`resolve_expressions_with`] and
+/// [`resolve_expressions_where_with`].
+pub trait Evaluator {
+    fn evaluate(&self, expr: &InterpExpr, cx: &EvalContext) -> Result<EvalValue, EvalError>;
+    fn evaluate_data(&self, expr: &InterpExpr, cx: &EvalContext) -> Result<Value, EvalError>;
 }
 
-/// [`resolve_expressions`] for the `{$ ... }` that `selected` picks, by the span of the
+/// Replaces every `{$ ... }` in `doc` with what it stands for, using `evaluator`.
+pub fn resolve_expressions_with(
+    doc: &mut File,
+    cx: &EvalContext,
+    evaluator: &dyn Evaluator,
+) -> Vec<Unresolved> {
+    resolve(doc, cx, None, evaluator)
+}
+
+/// [`resolve_expressions_with`] for the `{$ ... }` that `selected` picks, by the span of the
 /// [`Interpolation`](tomet_ast::Interpolation) in `doc` as it is passed in. The others are left
 /// as the interpolations they are, not as text, and are not reported.
 ///
@@ -94,21 +105,24 @@ pub fn resolve_expressions(doc: &mut File, cx: &EvalContext) -> Vec<Unresolved> 
 ///
 /// This is what makes a file hold its own values for only some of its expressions: the ones
 /// that depend on where it sits, and none of the ones it can still evaluate for itself.
-pub fn resolve_expressions_where(
+pub fn resolve_expressions_where_with(
     doc: &mut File,
     cx: &EvalContext,
     selected: &dyn Fn(Span) -> bool,
+    evaluator: &dyn Evaluator,
 ) -> Vec<Unresolved> {
-    resolve(doc, cx, Some(selected))
+    resolve(doc, cx, Some(selected), evaluator)
 }
 
 fn resolve(
     doc: &mut File,
     cx: &EvalContext,
     selected: Option<&dyn Fn(Span) -> bool>,
+    evaluator: &dyn Evaluator,
 ) -> Vec<Unresolved> {
     let mut pass = Pass {
         cx,
+        evaluator,
         unresolved: Vec::new(),
         level: cx.heading_level,
         selected,
@@ -133,6 +147,7 @@ fn resolve(
 
 struct Pass<'a> {
     cx: &'a EvalContext<'a>,
+    evaluator: &'a dyn Evaluator,
     unresolved: Vec<Unresolved>,
     /// The level of the heading the pass is inside: 0 at the top, and the
     /// section's own level while its blocks are being resolved. An `include`
@@ -149,7 +164,8 @@ impl Pass<'_> {
 
     /// Evaluates, or records why it could not and returns `None`.
     fn evaluate(&mut self, expr: &InterpExpr, span: Span) -> Option<EvalValue> {
-        self.eval_with(expr, span, |cx| evaluate(expr, cx))
+        let evaluator = self.evaluator;
+        self.eval_with(expr, span, |cx| evaluator.evaluate(expr, cx))
     }
 
     fn eval_with<T>(
@@ -368,7 +384,8 @@ impl Pass<'_> {
     }
 
     fn data_expression(&mut self, expr: &InterpExpr, span: Span) -> Option<Value> {
-        self.eval_with(expr, span, |cx| evaluate_data(expr, cx))
+        let evaluator = self.evaluator;
+        self.eval_with(expr, span, |cx| evaluator.evaluate_data(expr, cx))
     }
 
     // ---- lists --------------------------------------------------------------
@@ -549,5 +566,4 @@ impl Ids {
     }
 }
 
-#[cfg(test)]
-mod tests;
+

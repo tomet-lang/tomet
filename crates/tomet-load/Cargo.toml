@@ -11,13 +11,16 @@ tomet-ast         = { workspace = true }
 tomet-ast-parser  = { workspace = true }
 tomet-config      = { workspace = true }
 tomet-declaration = { workspace = true }
+tomet-eval        = { workspace = true }
 tomet-expr        = { workspace = true }
 tomet-indexer     = { workspace = true }
 tomet-links       = { workspace = true }
 tomet-load-config = { workspace = true }
 tomet-semantics   = { workspace = true }
 tomet-sort        = { workspace = true }
+tomet-span        = { workspace = true }
 tomet-tome        = { workspace = true }
+tomet-transform   = { workspace = true }
 tomet-validator   = { workspace = true }
 tomet-vault       = { workspace = true }
 tomet-workspace   = { workspace = true }

@@ -49,9 +49,9 @@
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use tomet_ast::{Block, File};
+use tomet_ast::File;
 use tomet_config::PrinterConfig;
-use tomet_expr::{DocRef, EvalContext, EvalError, EvalValue, PreparedBlocks};
+use tomet_expr::{DocRef, EvalContext, EvalValue};
 use tomet_semantics::{Bindings, LoadedDictionaries, LoadedVocabularies};
 use tomet_span::Span;
 
@@ -59,23 +59,11 @@ mod resolve;
 
 pub use resolve::{Overlay, typed_meta};
 pub use tomet_expr::{DirRef, MemoryResolver, NoResolver, Resolver};
-pub use tomet_transform::{Unresolved, UnresolvedKind};
 pub use tomet_validator::Diagnostic;
 
 /// Whether `doc` promises `::profile(standalone)`, which is a promise to be read without a vault.
 fn reads_alone<B>(doc: &File<B>) -> bool {
     tomet_declaration::document_profiles(doc).contains(&tomet_declaration::Profile::Standalone)
-}
-
-/// What [`Vault::prepare`] could not do.
-///
-/// `unresolved` is not an error: an expression with no value is left in
-/// the output as written, so a document showing `{$ ... }` as an example
-/// still renders. `tomet check` reports the list as warnings, which is
-/// what tells a typo apart from an example.
-#[derive(Debug, Default)]
-pub struct Prepared {
-    pub unresolved: Vec<Unresolved>,
 }
 
 /// Validates `source` the way a host with no disk can: what `tomet check` says
@@ -124,7 +112,7 @@ pub fn validate_sources(
 }
 
 /// What an evaluation in one document is done in. See [`Vault::scope`].
-struct Scope<'a> {
+pub struct Scope<'a> {
     overlay: Overlay<'a>,
     macros: std::collections::HashMap<String, tomet_ast::Value>,
     chain: Vec<DocRef>,
@@ -134,7 +122,7 @@ struct Scope<'a> {
 }
 
 impl Scope<'_> {
-    fn context(&self) -> EvalContext<'_> {
+    pub fn context(&self) -> EvalContext<'_> {
         EvalContext {
             resolver: &self.overlay,
             self_doc: self.self_doc.clone(),
@@ -366,50 +354,60 @@ impl Vault {
         Ok((doc, bindings))
     }
 
-    /// Resolves every `{$ ... }` in `doc`, so it is the shape a converter
-    /// should see.
-    ///
-    /// `path` is where the document sits, which is what `self` is.
-    /// References -- `#id`, `self.meta` -- are answered from the document as
-    /// it was written, not as this call rewrites it; everything else is
-    /// asked of `resolver`.
-    ///
-    /// Call this and not the underlying pass directly. A caller reaching
-    /// past it for one rewrite is how a rewrite ends up applied in three
-    /// commands and missing from the fourth.
-    pub fn prepare(&self, doc: &mut File, path: &Path, resolver: &dyn Resolver) -> Prepared {
+    /// Builds the evaluation [`Scope`] for `doc` at `path`, honoring
+    /// `::profile(standalone)` by isolating `doc` from the rest of the vault
+    /// when requested.
+    pub fn scope_for<'a>(
+        &'a self,
+        doc: &File,
+        path: &Path,
+        resolver: &'a dyn Resolver,
+    ) -> Scope<'a> {
         let (vault, resolver) = self.reading(doc, resolver);
-        let scope = vault.scope(doc, path, resolver);
-        let prepared = Prepared {
-            unresolved: tomet_transform::resolve_expressions(doc, &scope.context()),
-        };
-        self.fill_terms(doc);
-        prepared
+        self.build_scope(&vault, doc, path, resolver)
     }
 
-    /// [`Vault::prepare`] for only the `{$ ... }` that `selected` picks, by the exact position of the
-    /// [`Interpolation`](tomet_ast::Interpolation) in `doc` as it is passed in
-    /// ([`Span::exact_eq`](tomet_span::Span::exact_eq): `==` on a span is always true). The others are
-    /// left as interpolations, and `@term` mentions are left as they are: this is for changing a
-    /// document, not for rendering it. So it reads the document with the whole vault even if the
-    /// document promises `::profile(standalone)`: making that promise true is what it is for.
-    pub fn prepare_selected(
-        &self,
-        doc: &mut File,
+    /// Builds the evaluation [`Scope`] for `doc` at `path` against the full
+    /// vault, ignoring `::profile(standalone)` (used for selective freezing).
+    pub fn scope_for_selected<'a>(
+        &'a self,
+        doc: &File,
         path: &Path,
-        resolver: &dyn Resolver,
-        selected: &dyn Fn(Span) -> bool,
-    ) -> Prepared {
-        let scope = self.scope(doc, path, resolver);
-        Prepared {
-            unresolved: tomet_transform::resolve_expressions_where(doc, &scope.context(), selected),
+        resolver: &'a dyn Resolver,
+    ) -> Scope<'a> {
+        self.build_scope(self, doc, path, resolver)
+    }
+
+    fn build_scope<'a>(
+        &self,
+        vault: &Vault,
+        doc: &File,
+        path: &Path,
+        resolver: &'a dyn Resolver,
+    ) -> Scope<'a> {
+        let self_doc = self.doc_ref(path);
+        let snapshot = Arc::new(doc.clone());
+        let config = vault.evaluation_config(doc);
+        let vars = vault.vars_in_scope(&config, &self_doc);
+        Scope {
+            overlay: Overlay {
+                meta: typed_meta(&vault.config, &snapshot, &self_doc),
+                path: self_doc.clone(),
+                snapshot,
+                inner: resolver,
+            },
+            macros: config.macros,
+            chain: vec![self_doc.clone()],
+            self_doc,
+            var: vars.values,
+            var_unset: vars.unset,
         }
     }
 
     /// Gives every `@term` mention that names a term the term's own text, unless the author wrote
     /// something between the brackets, so that a converter renders a word and need not know what a
     /// dictionary is. A mention that names no term is left as it is; `tomet check` reports it.
-    fn fill_terms(&self, doc: &mut File) {
+    pub fn fill_terms(&self, doc: &mut File) {
         use tomet_ast::{Block, Inline, Paragraph, Text};
         use tomet_semantics::{Definitions, ElementKind, TermRef, ValueExt};
 
@@ -446,67 +444,13 @@ impl Vault {
         });
     }
 
-    /// What `expr`, written in `doc` (which sits at `path`), comes to when the
-    /// document is rendered: in the same scope [`Vault::prepare`] evaluates
-    /// every expression of it in, so what an editor shows for one expression
-    /// is what the output will show.
-    ///
-    /// The document is read as written (`#id`, `self.meta`), everything else
-    /// is asked of `resolver`. A variable is at its `default`: only
-    /// `tomet new` gives one a value.
-    pub fn evaluate(
-        &self,
-        doc: &File,
-        path: &Path,
-        expr: &tomet_ast::InterpExpr,
-        resolver: &dyn Resolver,
-    ) -> Result<EvalValue, EvalError> {
-        let (vault, resolver) = self.reading(doc, resolver);
-        let scope = vault.scope(doc, path, resolver);
-        tomet_expr::evaluate(expr, &scope.context())
-    }
-
-    /// Everything an evaluation of something written in `doc` needs that is
-    /// not the expression: where `self` is, what `#id` is answered from, the
-    /// macros in scope.
-    fn scope<'a>(&self, doc: &File, path: &Path, resolver: &'a dyn Resolver) -> Scope<'a> {
-        let self_doc = self.doc_ref(path);
-        let snapshot = Arc::new(doc.clone());
-        let config = self.evaluation_config(doc);
-        let vars = self.vars_in_scope(&config, &self_doc);
-        Scope {
-            overlay: Overlay {
-                meta: typed_meta(&self.config, &snapshot, &self_doc),
-                path: self_doc.clone(),
-                snapshot,
-                inner: resolver,
-            },
-            macros: config.macros,
-            // The document is the first of the chain of files being included,
-            // so a file that includes it back is a cycle at once, not one lap
-            // later.
-            chain: vec![self_doc.clone()],
-            self_doc,
-            var: vars.values,
-            var_unset: vars.unset,
-        }
-    }
-
-    /// Prepares `blocks`, which were read from the document `doc`, the way that
-    /// document is prepared on its own: its expressions in its own context, its
-    /// macros, its `self`, its settings. This is what `include` asks of the
-    /// resolver, so that an included file means what it means in its own place.
-    ///
-    /// What could not be resolved inside is left in the blocks as written. It is
-    /// reported in full only when that file is checked on its own, so here it
-    /// is counted: the including file says that it brought some in.
-    pub fn prepare_blocks(
-        &self,
+    /// Builds the evaluation [`Scope`] for an included document `doc` in its own context.
+    pub fn block_scope<'a>(
+        &'a self,
         doc: &DocRef,
-        blocks: Vec<Block>,
         includes: &[DocRef],
-        resolver: &dyn Resolver,
-    ) -> Result<PreparedBlocks, String> {
+        resolver: &'a dyn Resolver,
+    ) -> Result<Scope<'a>, String> {
         let source = resolver.document(doc)?;
         let (vault, resolver) = self.reading(&source, resolver);
         let overlay = Overlay {
@@ -517,22 +461,13 @@ impl Vault {
         };
         let config = vault.evaluation_config(&source);
         let vars = vault.vars_in_scope(&config, doc);
-        let macros = config.macros;
-        let cx = EvalContext {
-            resolver: &overlay,
+        Ok(Scope {
+            overlay,
+            macros: config.macros,
+            chain: includes.to_vec(),
             self_doc: doc.clone(),
-            macros: &macros,
-            var: &vars.values,
-            var_unset: &vars.unset,
-            includes,
-            heading_level: 0,
-            notes: Default::default(),
-        };
-        let mut holder = File::new(vec![], blocks, Span::default());
-        let unresolved = tomet_transform::resolve_expressions(&mut holder, &cx).len();
-        Ok(PreparedBlocks {
-            blocks: holder.body,
-            unresolved,
+            var: vars.values,
+            var_unset: vars.unset,
         })
     }
 
@@ -742,119 +677,6 @@ mod tests {
     }
 
     /// A resolved mention comes out as the term's own text, so a converter renders a word; what the
-    /// author wrote between the brackets stays, and one that names nothing is left alone.
-    #[test]
-    fn a_resolved_term_mention_is_given_the_terms_text() {
-        let vault = vault_with_dictionary();
-        let text_of = |src: &str| -> Vec<Option<String>> {
-            let (doc, _) = prepared(&vault, "a.tmt", src);
-            let mut found = Vec::new();
-            tomet_tree::for_each_element(&doc, |el| {
-                if tomet_semantics::classify_std_lenient(el.as_view())
-                    == tomet_semantics::ElementKind::Term
-                {
-                    found.push(el.content.as_ref().and_then(|blocks| match blocks.first() {
-                        Some(Block::Paragraph(p)) => match p.content.first() {
-                            Some(tomet_ast::Inline::Text(t)) => Some(t.value.clone()),
-                            _ => None,
-                        },
-                        _ => None,
-                    }));
-                }
-            });
-            found
-        };
-        assert_eq!(
-            text_of("a @term(tomet#vault-config) b\n"),
-            [Some("vault.config.tmt".to_string())]
-        );
-        assert_eq!(
-            text_of("a @term(tomet#vault-config)[ the config ] b\n"),
-            [Some("the config".to_string())]
-        );
-        assert_eq!(text_of("a @term(tomet#gone) b\n"), [None]);
-    }
-
-    fn prepared(vault: &Vault, path: &str, src: &str) -> (File, Prepared) {
-        let (mut doc, _) = vault.parse(src).expect("parses");
-        let prepared = vault.prepare(&mut doc, Path::new(path), &NoResolver);
-        (doc, prepared)
-    }
-
-    /// An included document's relative links are rewritten to still reach the same files: the
-    /// evaluator asks the vault's resolver, which knows what a link is.
-    #[test]
-    fn an_include_rewrites_the_relative_links_of_what_it_brings() {
-        let resolver = tomet_expr::MemoryResolver::new()
-            .with_source(
-                "docs/guide.tmt",
-                "See @link(./img/a.png) and @link(../shared/s.tmt#top) and @link(tmt:abs.tmt).\n",
-            )
-            .unwrap();
-        let vault = Vault::from_sources(PrinterConfig::default(), "/v", &[]);
-        let targets = |host: &str| {
-            let (mut doc, _) = vault
-                .parse("$include(tmt(\"docs/guide.tmt\"))\n")
-                .expect("parses");
-            vault.prepare(&mut doc, Path::new(host), &resolver);
-            let mut found = Vec::new();
-            tomet_tree::for_each_element_mut(&mut doc, |el| {
-                if let Some((_, target)) = tomet_semantics::link_target_of(el.as_view()) {
-                    found.push(target);
-                }
-            });
-            found
-        };
-        // from the vault root: `docs/guide.tmt`'s `./img/a.png` is `docs/img/a.png`
-        assert_eq!(
-            targets("/v/here.tmt"),
-            ["./docs/img/a.png", "./shared/s.tmt#top", "tmt:abs.tmt"]
-        );
-        // one level below the guide
-        assert_eq!(
-            targets("/v/docs/sub/host.tmt"),
-            ["../img/a.png", "../../shared/s.tmt#top", "tmt:abs.tmt"]
-        );
-        // beside it: nothing to rewrite
-        assert_eq!(
-            targets("/v/docs/other.tmt"),
-            ["./img/a.png", "../shared/s.tmt#top", "tmt:abs.tmt"]
-        );
-    }
-
-    /// The text of every paragraph, joined by a space. Two expressions on
-    /// one line are two blocks, so a document is read as a whole.
-    fn text_of(doc: &File) -> String {
-        doc.body
-            .iter()
-            .filter_map(|block| match block {
-                tomet_ast::Block::Paragraph(p) => Some(
-                    p.content
-                        .iter()
-                        .filter_map(|i| match i {
-                            tomet_ast::Inline::Text(t) => Some(t.value.as_str()),
-                            _ => None,
-                        })
-                        .collect::<String>(),
-                ),
-                _ => None,
-            })
-            .collect::<Vec<_>>()
-            .join(" ")
-    }
-
-    #[test]
-    fn prepare_measures_self_path_from_the_root() {
-        let vault = Vault::from_sources(PrinterConfig::default(), "/v", &[]);
-        let (doc, prepared) = prepared(
-            &vault,
-            "/v/notes/a.tmt",
-            "at $(self::path) ($(self::filename))\n",
-        );
-        assert!(prepared.unresolved.is_empty(), "{:?}", prepared.unresolved);
-        assert_eq!(text_of(&doc), "at notes/a.tmt (a.tmt)");
-    }
-
     #[test]
     fn a_vault_in_the_current_directory_names_a_document_without_a_leading_dot() {
         let vault = Vault::from_sources(PrinterConfig::default(), ".", &[]);
@@ -862,79 +684,13 @@ mod tests {
         assert_eq!(vault.doc_ref(Path::new("a.tmt")), DocRef("a.tmt".into()));
     }
 
-    #[test]
-    fn a_document_reads_its_own_meta_typed_by_the_settings() {
-        let config = tomet_config::load_config_from_str("::field(tags: (type: list))\n").unwrap();
-        let vault = Vault::from_sources(config, "/v", &[]);
-        // No `tags` written: still a list, so `.contains` answers instead of failing.
-        let (doc, prepared) = prepared(
-            &vault,
-            "/v/a.tmt",
-            "::meta(title: A)\n\nrust? {$ self::meta.tags.contains(\"rust\") }\n",
-        );
-        assert!(prepared.unresolved.is_empty(), "{:?}", prepared.unresolved);
-        assert_eq!(text_of(&doc), "rust? false");
-    }
-
-    #[test]
-    fn macros_from_the_vault_and_the_document_are_both_in_scope() {
-        let config = tomet_config::load_config_from_str(
-            "::macro(gh: \"https://gh/$(1)\", site: \"vault\")\n",
-        )
-        .unwrap();
-        let vault = Vault::from_sources(config, "/v", &[]);
-        let (doc, prepared) = prepared(
-            &vault,
-            "/v/a.tmt",
-            "::macro(site: \"doc\")\n\n$macro.gh(1) $macro.site()\n",
-        );
-        assert!(prepared.unresolved.is_empty(), "{:?}", prepared.unresolved);
-        // The document wins a collision.
-        assert_eq!(text_of(&doc), "https://gh/1 doc");
-    }
-
-    #[test]
-    fn references_are_answered_from_the_document_as_written() {
-        let vault = Vault::from_sources(PrinterConfig::default(), "/v", &[]);
-        // `n` is itself an expression. The reference sees it unresolved, so it
-        // is not the number 3 -- evaluation order cannot change an answer.
-        let (doc, prepared) = prepared(
-            &vault,
-            "/v/a.tmt",
-            "@card(n: $add(1, 2))#(c1)\n\nn is $(#c1.n)\n",
-        );
-        assert_eq!(prepared.unresolved.len(), 1, "{:?}", prepared.unresolved);
-        assert_eq!(text_of(&doc), "n is $(#c1.n)");
-    }
-    // ---- a document that declares `::profile(standalone)` is read without the vault ---------
-
     const PROMISE: &str = "::profile(standalone)\n";
 
     fn vault_with_a_macro() -> Vault {
         let config = tomet_config::load_config_from_str(
             "::macro(gh: \"https://gh/$(1)\")\n::field(n: (type: uuid))\n",
-        )
-        .unwrap();
+        ).unwrap();
         Vault::from_sources(config, "/v", &[("acme.tmt", ACME)])
-    }
-
-    #[test]
-    fn a_standalone_document_does_not_get_the_vaults_macros() {
-        let vault = vault_with_a_macro();
-        let (_, with) = prepared(&vault, "/v/a.tmt", "$macro.gh(1)\n");
-        assert!(with.unresolved.is_empty());
-
-        let (doc, alone) = prepared(&vault, "/v/a.tmt", &format!("{PROMISE}\n$macro.gh(1)\n"));
-        assert_eq!(alone.unresolved.len(), 1, "{:?}", alone.unresolved);
-        assert!(text_of(&doc).contains("$macro.gh(1)"));
-        // Its own definition is its own.
-        let (doc, own) = prepared(
-            &vault,
-            "/v/a.tmt",
-            &format!("{PROMISE}::macro(gh: \"mine/$(1)\")\n\n$macro.gh(1)\n"),
-        );
-        assert!(own.unresolved.is_empty(), "{:?}", own.unresolved);
-        assert_eq!(text_of(&doc), "mine/1");
     }
 
     #[test]
@@ -947,35 +703,15 @@ mod tests {
     }
 
     #[test]
-    fn a_standalone_document_does_not_find_other_files() {
-        let resolver = tomet_expr::MemoryResolver::new()
-            .with_source("docs/b.tmt", "Body of B.\n")
-            .unwrap();
-        let vault = Vault::from_sources(PrinterConfig::default(), "/v", &[]);
-        let run = |src: &str| {
-            let (mut doc, _) = vault.parse(src).unwrap();
-            let prepared = vault.prepare(&mut doc, Path::new("/v/a.tmt"), &resolver);
-            (text_of(&doc), prepared.unresolved.len())
-        };
-        let (text, unresolved) = run("$include(tmt(\"docs/b.tmt\"))\n");
-        assert_eq!((text.as_str(), unresolved), ("Body of B.", 0));
-        let (_, unresolved) = run(&format!("{PROMISE}\n$include(tmt(\"docs/b.tmt\"))\n"));
-        assert_eq!(unresolved, 1);
-    }
-
-    #[test]
     fn a_standalone_document_does_not_get_the_vaults_dictionaries_but_may_be_one() {
         let vault = vault_with_dictionary();
         let mention = "a @term(tomet#vault-config) b\n";
-        let (_, with) = prepared(&vault, "/v/a.tmt", mention);
-        assert!(with.unresolved.is_empty());
         assert!(
             vault
                 .diagnostics(&vault.parse(&format!("{PROMISE}{mention}")).unwrap().0, &[])
                 .iter()
                 .any(|d| matches!(d, Diagnostic::UnresolvedTerm { .. }))
         );
-        // A document that is the dictionary it mentions from is its own.
         let own = format!("{PROMISE}::dictionary(d)\n\n;@term(\"w\")[ W ]#(w)\n\n@term(d#w)\n");
         assert!(
             !vault

@@ -105,11 +105,10 @@ fn prepare_file(mut doc: tomet::ast::File, opts: &ProcessOptions) -> tomet::ast:
     // the rest. There is no disk here, so an expression that reaches for
     // another document stays as written, which is what `NoResolver` gives.
     let here = opts.current_path.as_deref().unwrap_or("document.tmt");
-    Vault::from_sources(PrinterConfig::default(), ".", &[]).prepare(
-        &mut doc,
-        std::path::Path::new(here),
-        &tomet::vault::NoResolver,
-    );
+    let vault = Vault::from_sources(PrinterConfig::default(), ".", &[]);
+    let scope = vault.scope_for(&doc, std::path::Path::new(here), &tomet::vault::NoResolver);
+    tomet_eval::resolve_expressions(&mut doc, &scope.context());
+    vault.fill_terms(&mut doc);
 
     // 3. Resolve links against cached index or vault_files option
     let lock = GLOBAL_VAULT_INDEX.lock().unwrap();
