@@ -1,0 +1,13 @@
+This is a parser/CLI/LSP/editor-extensions project with no standalone GUI app. Verify with automated checks and code reading:
+
+- (`cargo test --workspace`) Runs every test in the workspace (`just test`).
+- (`cargo test -p tomet-tests`) Runs the cross-crate corpus and snapshot suite in @dir(tests/) (`just test-suite`).
+- (`cargo test -p tomet-tests --test corpus`) Runs one target of that suite.
+- (`cargo test -p tree-sitter-tomet`) Runs the tree-sitter grammar tests.
+- (`TOMET_UPDATE_REF=1 cargo test -p tomet-tests`) Rewrites the snapshot references in `tests/ref/` with the current output.
+
+When a snapshot fails, the actual output is written to `tests/store/` at the same relative path as its reference,
+so the two can be diffed directly.
+
+Editor extensions (@dir(editors/vscode), @dir(editors/zed), @dir(editors/helix)) carry their own tests; run those
+and read the code.

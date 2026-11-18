@@ -1,6 +1,6 @@
 ::id(agents)
 ::export(
-  type: commonmark,
+  type: commonmark
   path: "AGENTS.md"
 )
 ::meta(
@@ -11,78 +11,33 @@ $macro.generated_by(self::path)
 
 =[ Tomet ]
 
+==[ Agent Behavior ]
+
+$include(tmt("tmtroot/dev/agent/behavior.tmt"))
+
 ==[ Core Philosophy & Principles ]
 
-===[ Precedence of Instructions ]
-
-The rules in this document serve as the project baseline and defaults. 
-Explicit instructions given by the user in a conversation always take precedence over these defaults.
-
-===[ User-First Design over Developer Convenience ]
-
-Always prioritize the end-user experience, syntax ergonomics, and API design.
-If there is tension between developer or implementation convenience and user simplicity, user simplicity must always win. 
-Never compromise user experience just because an implementation is easier.
-
-===[ Resist Path-of-Least-Resistance & Legacy Bias ]
-
-The existing implementation is never a justification or reason for new design choices.
-- Do not justify decisions with "it is already implemented this way, so let's stick with it."
-- Prioritize architectural beauty, elegance, and long-term correctness over the path of least resistance.
-- Understand the existing context thoroughly, but never take shortcuts or settle for lazy patches.
-
-===[ Transparent Execution ]
-
-Always state what you intend to do before doing it. Never execute non-trivial actions or commands silently.
+$include(tmt("tmtroot/dev/convention/principles.tmt"))
 
 ==[ Single Source of Truth & Documentation ]
 
-===[ Never edit `.md` directly ]
+$include(tmt("tmtroot/dev/convention/document.tmt"))
 
-All Markdown files are generated build artifacts, not source files.
-- Never edit a `.md` file directly.
-- Always edit the corresponding `.tmt` file under @dir(tmtroot/) (or the crate's own `.tmt`).
-- Run `tomet export` to regenerate the Markdown artifacts, and verify with `tomet export --check`.
-- Direct edits to generated `.md` files will be overwritten and will fail CI / lint checks.
+==[ Code Comments ]
 
-===[ Source of Truth Hierarchy (Preventing Drift) ]
-
-To prevent drift between documentation and implementation:
--.| **Behavior & API Truth**: The Rust source code and its inner doc-comments (`//!`, `///`) are the
-  | authoritative source of truth. If prose documentation contradicts the source code, the code
-  | reflects reality. Never hallucinate or enforce outdated behavior described in prose; always
-  | verify against the actual implementation.
--.| **Architecture & Invariant Truth**: Governed by `.writ.tmt` files. These define crate layering,
-  | dependencies, and placement rules, enforced automatically by `twrit`.
--. **Narrative & Overview Truth**: Lives in @dir(tmtroot/).
-
-===[ Reference over Restatement ]
-
-Do not duplicate code signatures, struct layouts, or implementation prose into documentation files. Duplicate prose inevitably drifts.
--| Use pointers and links (`@file(...)`, `@dir(...)`, or symbol references) instead of
- | copy-pasting code definitions.
--| Keep prose documentation concise and high-level, pointing directly to the code where
- | the truth lives.
-
-==[ Code Comments & Tomet ]
-
-- Doc-comments (`//!`, `///`) follow clean Tomet-compatible markup conventions.
--| When modifying function signatures, behavior, or crate responsibilities, update the
- | corresponding doc-comments in the very same commit.
--| Never leave orphaned doc-comments that describe prior, deleted behaviors.
+$include(tmt("tmtroot/dev/convention/code-comment.tmt"))
 
 ==[ Project overview ]
 
-Read the root @file(README.md) for what the project is, and @file(CONTRIBUTING.md) for the repository layout, building and testing, the contribution workflow, commit conventions and verification steps.
+Read the root @file(README.md) for what the project is, and @file(CONTRIBUTING.md) for the repository layout,
+building and testing, the contribution workflow, commit conventions and verification steps.
 Before a non-trivial change:
 - Read the `//!` module doc of every crate you are touching.
 -| Read the `crate-layering` entry in the root @file(".writ.tmt") for how the layers depend
  | on each other. There is no prose overview standing between you and those -- there was,
  | and it drifted.
 
-Rules this repository must obey live in `.writ.tmt` files (at the workspace root and crate level). 
-Read the governing `.writ.tmt` for the area you are changing. 
-They are the author's; propose an edit and stop rather than working around a rule or relaxing it.
+$include(tmt("tmtroot/dev/agent/writ.tmt"))
 
 ==[ Environment & Tooling ]
 
@@ -90,26 +45,20 @@ $include(tmt("tmtroot/dev/howto/nix.tmt"))
 
 ==[ Verifying changes ]
 
-This is a parser/CLI/LSP/editor-extensions project with no standalone GUI app. Verify with automated checks and code reading:
+$include(tmt("tmtroot/dev/howto/test.tmt"))
 
 $include(tmt("tmtroot/dev/howto/tools.tmt"))
 
-- For grammar changes specifically, see @file(tests/README.md).
+===[ Writing tests ]
+
+$include(tmt("tmtroot/dev/convention/test.tmt"))
 
 ==[ Task tracking & Workspaces ]
 
-$include(tmt("tmtroot/dev/howto/task.tmt"))
+$include(tmt("tmtroot/dev/agent/task.tmt"))
 
 ==[ Commits & Version Control (jj) ]
 
 $include(tmt("tmtroot/dev/howto/jj.tmt"))
--| All commit messages must follow the convention in @file(CONTRIBUTING.md):
- | `type(scope): description` (e.g. `feat(cli): add export check`, `fix(parser): handle pipe`).
--| If `jj status`/`jj diff` shows changes you did not make, treat them as another person's in-progress work, not as drift to clean up. 
- | Always confirm with the user before reverting, restoring, or overwriting them.
-- Never commit automatically or on your own initiative. Always ask and get explicit confirmation from the user before finalizing commits or descriptions.
--| Do not put `Claude-Session:` or `Co-Authored-By: Claude` trailers in commit
- | messages. The session trailer embeds a URL, and a commit message is
- | published the moment it is pushed. This overrides the harness default that
- | asks for them.
-- Never push to a remote without being asked.
+
+$include(tmt("tmtroot/dev/agent/commit-policy.tmt"))

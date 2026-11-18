@@ -12,15 +12,7 @@ All commits must follow the Conventional Commits format: `type(scope): descripti
 
 =[ Scopes ]
 
-Use the affected component or crate name as the scope:
-
-- (Apps) `cli`, `lsp`
-- (Syntax & Semantics) `parser`, `lexer`, `ast`, `syntax`, `semantics`, `validator`
-- (Converters & Format) `markdown`, `html`, `typst`, `pandoc`, `format`
-- (Workspace & IO) `workspace`, `load`, `vault`, `config`, `links`
-- (Bindings) `js`, `python`, `java`
-- (Editors) `vscode`, `zed`, `helix`, `neovim`
-- (Infra / Meta) `nix`, `ci`, `deps`, `rules` (for `.writ.tmt`)
+Use the affected component or crate name as the scope and `nix`, `ci`, `deps`, `rule` (for `.writ.tmt`)
 
 @callout(tip)
 | If a change spans multiple components or the whole workspace,

@@ -2,14 +2,13 @@
   "version": 1,
   "files": {
     ".editorconfig": {
-      "sha256": "2640a0cd478e15abaf9ecdabd962ac0937a3f7e1dc39900649d381f693803d94",
+      "sha256": "dd25aacb9e34b5819b0b0645843fd42f786ca0bb4f9089afa922f162e593179f",
       "source": {
         "git": "https://github.com/tomet-lang/commonfiles.git",
         "rev": "main",
         "path": "base/.editorconfig"
       },
-      "commit": "4d311d2d26068f4eb32c6e830d51fac200619bdc",
-      "mode": "executable"
+      "commit": "f5917d73c8cc20837a93d826828a9df67471ba58"
     },
     ".envrc": {
       "sha256": "3c8bdb9d52dd4e7440a504e0f43bb3a1929c06f8f4f2d4d7ef41baab974e39e2",
@@ -18,7 +17,7 @@
         "rev": "main",
         "path": "base/.envrc"
       },
-      "commit": "4d311d2d26068f4eb32c6e830d51fac200619bdc"
+      "commit": "f5917d73c8cc20837a93d826828a9df67471ba58"
     },
     ".github/workflows/nix-ci.yml": {
       "sha256": "572ebb0f03d139314ee7c638e6e6cf62b585b3bf112dd0e71dfd1905dad562bc",
@@ -27,7 +26,7 @@
         "rev": "main",
         "path": "base/.github/workflows/nix-ci.yml"
       },
-      "commit": "4d311d2d26068f4eb32c6e830d51fac200619bdc"
+      "commit": "f5917d73c8cc20837a93d826828a9df67471ba58"
     },
     ".github/workflows/pages.yml": {
       "sha256": "9bdb09c4b67311dc28ed01f7398d9988a90d4df79497e8112b949c2c31e20528",
@@ -36,7 +35,16 @@
         "rev": "main",
         "path": "base/.github/workflows/pages.yml"
       },
-      "commit": "4d311d2d26068f4eb32c6e830d51fac200619bdc"
+      "commit": "f5917d73c8cc20837a93d826828a9df67471ba58"
+    },
+    "CLAUDE.md": {
+      "sha256": "336cc4fbf19beaada7ccf9986414fa91851a8d7a07dfb3ccbe800a69eed0ab49",
+      "source": {
+        "git": "https://github.com/tomet-lang/commonfiles.git",
+        "rev": "main",
+        "path": "base/CLAUDE.md"
+      },
+      "commit": "f5917d73c8cc20837a93d826828a9df67471ba58"
     },
     "LICENSE-APACHE": {
       "sha256": "a549c19a5c34ad57b10e336bdfad9cb6040c2fc311ed217f01c7a9c4ddee6015",
@@ -45,7 +53,7 @@
         "rev": "main",
         "path": "base/LICENSE-APACHE"
       },
-      "commit": "4d311d2d26068f4eb32c6e830d51fac200619bdc"
+      "commit": "f5917d73c8cc20837a93d826828a9df67471ba58"
     },
     "LICENSE-MIT": {
       "sha256": "24d88f36f2620d2b18d70bc2136e103b1f9910a63a4614d94404577b2a41f5a0",
@@ -54,7 +62,7 @@
         "rev": "main",
         "path": "base/LICENSE-MIT"
       },
-      "commit": "4d311d2d26068f4eb32c6e830d51fac200619bdc"
+      "commit": "f5917d73c8cc20837a93d826828a9df67471ba58"
     },
     "editors/vscode/LICENSE-APACHE": {
       "sha256": "a549c19a5c34ad57b10e336bdfad9cb6040c2fc311ed217f01c7a9c4ddee6015",
@@ -63,7 +71,7 @@
         "rev": "main",
         "path": "base/LICENSE-APACHE"
       },
-      "commit": "4d311d2d26068f4eb32c6e830d51fac200619bdc"
+      "commit": "f5917d73c8cc20837a93d826828a9df67471ba58"
     },
     "editors/vscode/LICENSE-MIT": {
       "sha256": "24d88f36f2620d2b18d70bc2136e103b1f9910a63a4614d94404577b2a41f5a0",
@@ -72,7 +80,7 @@
         "rev": "main",
         "path": "base/LICENSE-MIT"
       },
-      "commit": "4d311d2d26068f4eb32c6e830d51fac200619bdc"
+      "commit": "f5917d73c8cc20837a93d826828a9df67471ba58"
     },
     "editors/zed/LICENSE-APACHE": {
       "sha256": "a549c19a5c34ad57b10e336bdfad9cb6040c2fc311ed217f01c7a9c4ddee6015",
@@ -81,7 +89,7 @@
         "rev": "main",
         "path": "base/LICENSE-APACHE"
       },
-      "commit": "4d311d2d26068f4eb32c6e830d51fac200619bdc"
+      "commit": "f5917d73c8cc20837a93d826828a9df67471ba58"
     },
     "editors/zed/LICENSE-MIT": {
       "sha256": "24d88f36f2620d2b18d70bc2136e103b1f9910a63a4614d94404577b2a41f5a0",
@@ -90,17 +98,133 @@
         "rev": "main",
         "path": "base/LICENSE-MIT"
       },
-      "commit": "4d311d2d26068f4eb32c6e830d51fac200619bdc"
+      "commit": "f5917d73c8cc20837a93d826828a9df67471ba58"
     },
     "nix/formatter.nix": {
-      "sha256": "597e3225795133fb2bf373ab5152fda14810db54fba69ce891a2ba1f26229bb1",
+      "sha256": "a8868cd1cda64877a3dc4986f5ec45fc1390aba49a6fa41846ca865438844772",
       "source": {
         "git": "https://github.com/tomet-lang/commonfiles.git",
         "rev": "main",
         "path": "base/nix/formatter.nix"
       },
-      "commit": "4d311d2d26068f4eb32c6e830d51fac200619bdc",
-      "mode": "executable"
+      "commit": "f5917d73c8cc20837a93d826828a9df67471ba58"
+    },
+    "tmtroot/dev/agent/behavior.tmt": {
+      "sha256": "bb89410e6d00c5c642d5f6536afa8e85f11902568dfce130f4d829310cadced2",
+      "source": {
+        "git": "https://github.com/tomet-lang/commonfiles.git",
+        "rev": "main",
+        "path": "base/tmtroot/dev/agent/behavior.tmt"
+      },
+      "commit": "f5917d73c8cc20837a93d826828a9df67471ba58"
+    },
+    "tmtroot/dev/agent/commit-policy.tmt": {
+      "sha256": "da42b61c851d47d391972603143d52662b8cac9f03df1f4620912f6e9fc19bec",
+      "source": {
+        "git": "https://github.com/tomet-lang/commonfiles.git",
+        "rev": "main",
+        "path": "base/tmtroot/dev/agent/commit-policy.tmt"
+      },
+      "commit": "f5917d73c8cc20837a93d826828a9df67471ba58"
+    },
+    "tmtroot/dev/agent/task.tmt": {
+      "sha256": "6baec1e1c0ec8e3684bf267defd9967a683a0111bf3d793e5628019c1792014f",
+      "source": {
+        "git": "https://github.com/tomet-lang/commonfiles.git",
+        "rev": "main",
+        "path": "base/tmtroot/dev/agent/task.tmt"
+      },
+      "commit": "f5917d73c8cc20837a93d826828a9df67471ba58"
+    },
+    "tmtroot/dev/agent/writ.tmt": {
+      "sha256": "6ba59bbc66735f5590bc1f2a871c7d614037bf20ad247c693baeb42cbbd59dc7",
+      "source": {
+        "git": "https://github.com/tomet-lang/commonfiles.git",
+        "rev": "main",
+        "path": "base/tmtroot/dev/agent/writ.tmt"
+      },
+      "commit": "f5917d73c8cc20837a93d826828a9df67471ba58"
+    },
+    "tmtroot/dev/convention/code-comment.tmt": {
+      "sha256": "e7cfe8166497384d2b96565f177a3e27cc7e2a19814cf3906769f345cb4f5ad3",
+      "source": {
+        "git": "https://github.com/tomet-lang/commonfiles.git",
+        "rev": "main",
+        "path": "base/tmtroot/dev/convention/code-comment.tmt"
+      },
+      "commit": "f5917d73c8cc20837a93d826828a9df67471ba58"
+    },
+    "tmtroot/dev/convention/commit.tmt": {
+      "sha256": "5923a3806378c6fd5a3e419fdec48801e6bb59a3b3a4ae457333015782926df7",
+      "source": {
+        "git": "https://github.com/tomet-lang/commonfiles.git",
+        "rev": "main",
+        "path": "base/tmtroot/dev/convention/commit.tmt"
+      },
+      "commit": "f5917d73c8cc20837a93d826828a9df67471ba58"
+    },
+    "tmtroot/dev/convention/document.tmt": {
+      "sha256": "2afab17533c92cec0796d61157e05ae37a710e8f8b15e486238af4adf83c9cf2",
+      "source": {
+        "git": "https://github.com/tomet-lang/commonfiles.git",
+        "rev": "main",
+        "path": "base/tmtroot/dev/convention/document.tmt"
+      },
+      "commit": "f5917d73c8cc20837a93d826828a9df67471ba58"
+    },
+    "tmtroot/dev/convention/principles.tmt": {
+      "sha256": "e8d2f9a0f9eeee44a7bfdd27d5d5dcc5c99fe9d6bcc386d3f7debfac03e16064",
+      "source": {
+        "git": "https://github.com/tomet-lang/commonfiles.git",
+        "rev": "main",
+        "path": "base/tmtroot/dev/convention/principles.tmt"
+      },
+      "commit": "f5917d73c8cc20837a93d826828a9df67471ba58"
+    },
+    "tmtroot/dev/howto/jj.tmt": {
+      "sha256": "35447fd7b97e90aff45f392752f193c8e22ef5a32c7851fbe73c04c9786f7862",
+      "source": {
+        "git": "https://github.com/tomet-lang/commonfiles.git",
+        "rev": "main",
+        "path": "base/tmtroot/dev/howto/jj.tmt"
+      },
+      "commit": "f5917d73c8cc20837a93d826828a9df67471ba58"
+    },
+    "tmtroot/dev/howto/nix.tmt": {
+      "sha256": "dcf5a4e12184f7ff1ad6873ffbc0abfd87d474562f1520cc8579697849ff03ef",
+      "source": {
+        "git": "https://github.com/tomet-lang/commonfiles.git",
+        "rev": "main",
+        "path": "base/tmtroot/dev/howto/nix.tmt"
+      },
+      "commit": "f5917d73c8cc20837a93d826828a9df67471ba58"
+    },
+    "tmtroot/schema/vocabularies/catasto@1.0.0.vocabulary.tmt": {
+      "sha256": "3259c87a389a1bf6ab279c195ef330f6600bdb551c0a768f38a338b7d9787be5",
+      "source": {
+        "git": "https://github.com/tomet-lang/fs-catasto.git",
+        "rev": "main",
+        "path": "tmtroot/schema/vocabularies/catasto@1.0.0.vocabulary.tmt"
+      },
+      "commit": "59222fbbc0d12fddfaeacce19b51130d67515361"
+    },
+    "tmtroot/schema/vocabularies/rust@1.0.0.vocabulary.tmt": {
+      "sha256": "41b022ca9a034d7894d041039fc85fb793a4e5149da52ccc3191e88056430209",
+      "source": {
+        "git": "https://github.com/tomet-lang/vocabularies.git",
+        "rev": "main",
+        "path": "vocabularies/rust/rust@1.0.0.vocabulary.tmt"
+      },
+      "commit": "7c8a43e240bfb5680d24e9711c4a42f09df4e75f"
+    },
+    "tmtroot/schema/vocabularies/writ@1.0.0.vocabulary.tmt": {
+      "sha256": "2662a7f93d70d90f0e6de79a333036a01e89875b6ceeb11f5a7207e263ef4677",
+      "source": {
+        "git": "https://github.com/tomet-lang/vocabularies.git",
+        "rev": "main",
+        "path": "vocabularies/writ/writ@1.0.0.vocabulary.tmt"
+      },
+      "commit": "7c8a43e240bfb5680d24e9711c4a42f09df4e75f"
     }
   }
 }

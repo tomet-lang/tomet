@@ -1,0 +1,12 @@
+-| Layer-local tests stay in their own crate. Only tests that need the shared `.tmt` corpus, or that cross a
+ | crate boundary, live in the @dir(tests/) package (`tomet-tests`).
+-| A failing snapshot means "this changed", not "this broke": the references pin the output at the time they were
+ | written, bugs included. Read the diff, decide whether the new output is better, and only then accept it with
+ | `TOMET_UPDATE_REF=1`.
+-| `tests/fixtures/` is frozen. A fixture changes only when a test needs it to. When a grammar change lands, add a
+ | fixture covering the new construct instead of expecting an existing file to pick it up. A fixture that still
+ | exercises retired syntax is regression coverage, not a bug.
+-| `tests/SYNTAX.md` says what the parser accepts; @dir(tmtroot/spec/) says what it should accept. Where they
+ | disagree, the disagreement is the finding: do not silently edit one to match the other.
+-| The known-exception lists (`KNOWN_UNPARSEABLE`, `KNOWN_FORMAT_CHANGES_DOCUMENT`) are asserted to match reality
+ | exactly, and each entry carries its reason. They are defect records, not permanent carve-outs.

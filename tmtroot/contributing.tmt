@@ -1,6 +1,6 @@
 ::id(contributing)
 ::export(
-  type: commonmark,
+  type: commonmark
   path: "CONTRIBUTING.md"
 )
 ::meta(
@@ -51,19 +51,15 @@ $macro.generated_by(self::path)
 
 ===[ Run tests ]
 
-```bash
-`` cargo test --workspace
-```
+$include(tmt("tmtroot/dev/howto/test.tmt"))
 
-===[ Run tree-sitter tests ]
+===[ Write tests ]
 
-```bash
-`` cargo test -p tree-sitter-tomet
-```
+$include(tmt("tmtroot/dev/convention/test.tmt"))
 
 ==[ Packaging ]
 
-Nix is the packaging story. 
+Nix is the packaging story.
 @file("nix/pkgs/tomet.nix") and @file("nix/pkgs/vscode-extension.nix") build the CLI and the VS Code extension; @file(nix/dev.nix) is the dev shell.
 
 ==[ Finding your way around ]

@@ -42,19 +42,38 @@ cargo build
 
 ### Run tests
 
-```bash
-cargo test --workspace
-```
+This is a parser/CLI/LSP/editor-extensions project with no standalone GUI app. Verify with automated checks and code reading:
 
-### Run tree-sitter tests
+- **`cargo test --workspace`**: Runs every test in the workspace (`just test`).
+- **`cargo test -p tomet-tests`**: Runs the cross-crate corpus and snapshot suite in `tests/` (`just test-suite`).
+- **`cargo test -p tomet-tests --test corpus`**: Runs one target of that suite.
+- **`cargo test -p tree-sitter-tomet`**: Runs the tree-sitter grammar tests.
+- **`TOMET_UPDATE_REF=1 cargo test -p tomet-tests`**: Rewrites the snapshot references in `tests/ref/` with the current output.
 
-```bash
-cargo test -p tree-sitter-tomet
-```
+When a snapshot fails, the actual output is written to `tests/store/` at the same relative path as its reference,
+so the two can be diffed directly.
+
+Editor extensions (`editors/vscode`, `editors/zed`, `editors/helix`) carry their own tests; run those
+and read the code.
+
+### Write tests
+
+- Layer-local tests stay in their own crate. Only tests that need the shared `.tmt` corpus, or that cross a
+crate boundary, live in the `tests/` package (`tomet-tests`).
+- A failing snapshot means "this changed", not "this broke": the references pin the output at the time they were
+written, bugs included. Read the diff, decide whether the new output is better, and only then accept it with
+`TOMET_UPDATE_REF=1`.
+- `tests/fixtures/` is frozen. A fixture changes only when a test needs it to. When a grammar change lands, add a
+fixture covering the new construct instead of expecting an existing file to pick it up. A fixture that still
+exercises retired syntax is regression coverage, not a bug.
+- `tests/SYNTAX.md` says what the parser accepts; `tmtroot/spec/` says what it should accept. Where they
+disagree, the disagreement is the finding: do not silently edit one to match the other.
+- The known-exception lists (`KNOWN_UNPARSEABLE`, `KNOWN_FORMAT_CHANGES_DOCUMENT`) are asserted to match reality
+exactly, and each entry carries its reason. They are defect records, not permanent carve-outs.
 
 ## Packaging
 
-Nix is the packaging story. 
+Nix is the packaging story.
 `nix/pkgs/tomet.nix` and `nix/pkgs/vscode-extension.nix` build the CLI and the VS Code extension; `nix/dev.nix` is the dev shell.
 
 ## Finding your way around
@@ -80,15 +99,7 @@ All commits must follow the Conventional Commits format: `type(scope): descripti
 
 ### Scopes
 
-Use the affected component or crate name as the scope:
-
-- **Apps**: `cli`, `lsp`
-- **Syntax & Semantics**: `parser`, `lexer`, `ast`, `syntax`, `semantics`, `validator`
-- **Converters & Format**: `markdown`, `html`, `typst`, `pandoc`, `format`
-- **Workspace & IO**: `workspace`, `load`, `vault`, `config`, `links`
-- **Bindings**: `js`, `python`, `java`
-- **Editors**: `vscode`, `zed`, `helix`, `neovim`
-- **Infra / Meta**: `nix`, `ci`, `deps`, `rules` (for `.writ.tmt`)
+Use the affected component or crate name as the scope and `nix`, `ci`, `deps`, `rule` (for `.writ.tmt`)
 
 > [!tip]
 > If a change spans multiple components or the whole workspace,
@@ -112,8 +123,4 @@ Direct checks (if running individually):
 - `twrit check`: Reads `.writ.tmt` files.
 - `tomet export --check`: Verifies that all exported `.md` documents match their source `.tmt` files.
 - `tomet spec --all --check --out tmtroot/generated`: Verifies that generated specifications match source definitions.
-- Cross-crate tests live in the `tests/` package (`tomet-tests`), not in the individual crates;
-see `tests/README.md` for what belongs there and how the snapshot references work.
-- For editor extensions (`editors/vscode`, `editors/zed`, `editors/helix`), verify
-via reading code and running their own tests.
 

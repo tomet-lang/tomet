@@ -2,17 +2,23 @@
 
 # Tomet
 
-## Core Philosophy & Principles
+## Agent Behavior
 
 ### Precedence of Instructions
 
-The rules in this document serve as the project baseline and defaults. 
+The rules in this document serve as the project baseline and defaults.
 Explicit instructions given by the user in a conversation always take precedence over these defaults.
+
+### Transparent Execution
+
+Always state what you intend to do before doing it. Never execute non-trivial actions or commands silently.
+
+## Core Philosophy & Principles
 
 ### User-First Design over Developer Convenience
 
 Always prioritize the end-user experience, syntax ergonomics, and API design.
-If there is tension between developer or implementation convenience and user simplicity, user simplicity must always win. 
+If there is tension between developer or implementation convenience and user simplicity, user simplicity must always win.
 Never compromise user experience just because an implementation is easier.
 
 ### Resist Path-of-Least-Resistance & Legacy Bias
@@ -22,10 +28,6 @@ The existing implementation is never a justification or reason for new design ch
 - Do not justify decisions with "it is already implemented this way, so let's stick with it."
 - Prioritize architectural beauty, elegance, and long-term correctness over the path of least resistance.
 - Understand the existing context thoroughly, but never take shortcuts or settle for lazy patches.
-
-### Transparent Execution
-
-Always state what you intend to do before doing it. Never execute non-trivial actions or commands silently.
 
 ## Single Source of Truth & Documentation
 
@@ -37,6 +39,15 @@ All Markdown files are generated build artifacts, not source files.
 - Always edit the corresponding `.tmt` file under `tmtroot/` (or the crate's own `.tmt`).
 - Run `tomet export` to regenerate the Markdown artifacts, and verify with `tomet export --check`.
 - Direct edits to generated `.md` files will be overwritten and will fail CI / lint checks.
+
+### Reference over Restatement
+
+Do not duplicate code signatures, struct layouts, or implementation prose into documentation files. Duplicate prose inevitably drifts.
+
+- Use pointers and links (`@file(...)`, `@dir(...)`, or symbol references) instead of
+copy-pasting code definitions.
+- Keep prose documentation concise and high-level, pointing directly to the code where
+the truth lives.
 
 ### Source of Truth Hierarchy (Preventing Drift)
 
@@ -50,17 +61,9 @@ verify against the actual implementation.
 dependencies, and placement rules, enforced automatically by `twrit`.
 3. **Narrative & Overview Truth**: Lives in `tmtroot/`.
 
-### Reference over Restatement
+## Code Comments
 
-Do not duplicate code signatures, struct layouts, or implementation prose into documentation files. Duplicate prose inevitably drifts.
-
-- Use pointers and links (`@file(...)`, `@dir(...)`, or symbol references) instead of
-copy-pasting code definitions.
-- Keep prose documentation concise and high-level, pointing directly to the code where
-the truth lives.
-
-## Code Comments & Tomet
-
+- Write code and code comments in English.
 - Doc-comments (`//!`, `///`) follow clean Tomet-compatible markup conventions.
 - When modifying function signatures, behavior, or crate responsibilities, update the
 corresponding doc-comments in the very same commit.
@@ -68,7 +71,8 @@ corresponding doc-comments in the very same commit.
 
 ## Project overview
 
-Read the root `README.md` for what the project is, and `CONTRIBUTING.md` for the repository layout, building and testing, the contribution workflow, commit conventions and verification steps.
+Read the root `README.md` for what the project is, and `CONTRIBUTING.md` for the repository layout,
+building and testing, the contribution workflow, commit conventions and verification steps.
 Before a non-trivial change:
 
 - Read the `//!` module doc of every crate you are touching.
@@ -76,8 +80,8 @@ Before a non-trivial change:
 on each other. There is no prose overview standing between you and those -- there was,
 and it drifted.
 
-Rules this repository must obey live in `.writ.tmt` files (at the workspace root and crate level). 
-Read the governing `.writ.tmt` for the area you are changing. 
+Rules this repository must obey live in `.writ.tmt` files (at the workspace root and crate level).
+Read the governing `.writ.tmt` for the area you are changing.
 They are the author's; propose an edit and stop rather than working around a rule or relaxing it.
 
 ## Environment & Tooling
@@ -88,6 +92,18 @@ Assume this environment is active and rely on the tools provided by the flake, r
 ## Verifying changes
 
 This is a parser/CLI/LSP/editor-extensions project with no standalone GUI app. Verify with automated checks and code reading:
+
+- **`cargo test --workspace`**: Runs every test in the workspace (`just test`).
+- **`cargo test -p tomet-tests`**: Runs the cross-crate corpus and snapshot suite in `tests/` (`just test-suite`).
+- **`cargo test -p tomet-tests --test corpus`**: Runs one target of that suite.
+- **`cargo test -p tree-sitter-tomet`**: Runs the tree-sitter grammar tests.
+- **`TOMET_UPDATE_REF=1 cargo test -p tomet-tests`**: Rewrites the snapshot references in `tests/ref/` with the current output.
+
+When a snapshot fails, the actual output is written to `tests/store/` at the same relative path as its reference,
+so the two can be diffed directly.
+
+Editor extensions (`editors/vscode`, `editors/zed`, `editors/helix`) carry their own tests; run those
+and read the code.
 
 Useful recipes defined in `justfile`:
 
@@ -103,12 +119,21 @@ Direct checks (if running individually):
 - `twrit check`: Reads `.writ.tmt` files.
 - `tomet export --check`: Verifies that all exported `.md` documents match their source `.tmt` files.
 - `tomet spec --all --check --out tmtroot/generated`: Verifies that generated specifications match source definitions.
-- Cross-crate tests live in the `tests/` package (`tomet-tests`), not in the individual crates;
-see `tests/README.md` for what belongs there and how the snapshot references work.
-- For editor extensions (`editors/vscode`, `editors/zed`, `editors/helix`), verify
-via reading code and running their own tests.
 
-- For grammar changes specifically, see `tests/README.md`.
+### Writing tests
+
+- Layer-local tests stay in their own crate. Only tests that need the shared `.tmt` corpus, or that cross a
+crate boundary, live in the `tests/` package (`tomet-tests`).
+- A failing snapshot means "this changed", not "this broke": the references pin the output at the time they were
+written, bugs included. Read the diff, decide whether the new output is better, and only then accept it with
+`TOMET_UPDATE_REF=1`.
+- `tests/fixtures/` is frozen. A fixture changes only when a test needs it to. When a grammar change lands, add a
+fixture covering the new construct instead of expecting an existing file to pick it up. A fixture that still
+exercises retired syntax is regression coverage, not a bug.
+- `tests/SYNTAX.md` says what the parser accepts; `tmtroot/spec/` says what it should accept. Where they
+disagree, the disagreement is the finding: do not silently edit one to match the other.
+- The known-exception lists (`KNOWN_UNPARSEABLE`, `KNOWN_FORMAT_CHANGES_DOCUMENT`) are asserted to match reality
+exactly, and each entry carries its reason. They are defect records, not permanent carve-outs.
 
 ## Task tracking & Workspaces
 
@@ -135,7 +160,7 @@ The repository uses Jujutsu (`jj`) in colocated mode with Git.
 
 - All commit messages must follow the convention in `CONTRIBUTING.md`:
 `type(scope): description` (e.g. `feat(cli): add export check`, `fix(parser): handle pipe`).
-- If `jj status`/`jj diff` shows changes you did not make, treat them as another person's in-progress work, not as drift to clean up. 
+- If `jj status`/`jj diff` shows changes you did not make, treat them as another person's in-progress work, not as drift to clean up.
 Always confirm with the user before reverting, restoring, or overwriting them.
 - Never commit automatically or on your own initiative. Always ask and get explicit confirmation from the user before finalizing commits or descriptions.
 - Do not put `Claude-Session:` or `Co-Authored-By: Claude` trailers in commit
