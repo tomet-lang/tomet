@@ -1,0 +1,82 @@
+::kind(element)
+::id(std.attribute)
+
+=[ 全容 ]
+
+```tm
+`` ::kind(vocabulary)
+`` ::vocabulary(deck, version: "1.0.0")
+`` ::attribute(
+``   theme: (
+``     about: | 全体の配色。
+``     singleton: true
+``     args: (
+``       name: (
+``         type: string
+``         positional: true
+``         required: true
+``         about: | 配色の名前。
+``       )
+``     )
+``   )
+``   upstream: (
+``     about: | 取り込み元。
+``     host: ctmt
+``   )
+`` )
+```
+
+語彙文書（`::vocabulary`）の中で、その名前空間が提供する属性を宣言する（@file(tmtroot/spec/features/vocabulary.tmt)）。属性は、文書の先頭に `::name(...)` と書いて、文書が自分について言うもの。本文に置く `@name` は要素（`::element`）、値の位置に書く `ns.name(...)` はコンストラクタ（@file(tmtroot/spec/declarations/std.constructor.declaration.tmt)）で、三つは別の表に並ぶ。どの表を引くかは書かれた記号が決めるので、同じ名前が属性と要素の両方にあってもよい。
+
+一回の `::attribute` にいくつ並べてもよく、語彙文書に複数書いてもよい。`::kind` や `::meta`、`::use` のような標準の宣言は、`std` が持つ属性にあたる。
+
+=[ フィールド ]
+
+各エントリは属性の名前をキーにしたタプル。
+
+|[ フィールド  ][ 既定   ][ 意味 ]
+|[ `about`     ][ なし   ][ 属性の散文。検査は読まない ]
+|[ `args`      ][ なし   ][ 引数のタプル。フィールドは要素の `args` と同じ。無ければ、引数は検査されない ]
+|[ `singleton` ][ false  ][ 一つの文書に一つまで ]
+|[ `host`      ][ `both` ][ 書けるファイル。`tmt`（`.tmt` 文書だけ）、`ctmt`（`.ctmt` ファイルだけ）、`both`（両方） ]
+
+`display`、`region`、`content` は無い。属性は文書の先頭に書くもので、本文の形も中身も持たない。知らないフィールドと、三つのどれでもない `host:` は、語彙を読むときに `tomet check` が報告する。
+
+=[ 文書での書き方 ]
+
+文書自身の `::kind` の語彙の属性は、裸で書く。
+
+```tm
+`` ::kind(deck)
+`` ::theme(dark)
+```
+
+`::use` でスコープに入れた語彙の属性は、名前空間をつけて `::ns.name` と書く。ヘッドの `.` は、`@ns.name` や `ns.name(...)` と同じく、名前空間と名前の区切り。
+
+```tm
+`` ::kind(note)
+`` ::use(deck)
+`` ::deck.theme(dark)
+```
+
+`::use(ns, as: alias)` で入れた語彙は、その文書では別名で書く。別名が名前空間の代わりになるので、ここで `::deck.theme` とは書けない（@file(tmtroot/spec/declarations/std.use.declaration.tmt)）。
+
+```tm
+`` ::kind(note)
+`` ::use(deck, as: d)
+`` ::d.theme(dark)
+```
+
+どう書いても、解決される名前は語彙自身の名前空間のもの（ここでは三つとも `deck.theme`）。一つまでかどうかも、解決された名前で数える。
+
+標準の宣言は `std` の名前空間にあり、`::std.kind(note)` のように書き出してもよい。`::kind(note)` と同じもの。
+
+=[ 検査 ]
+
+`tomet check` は、文書の先頭の `::name` を、標準の宣言と、スコープにある語彙の `::attribute` に照らす。`.tmt` 文書でも `.ctmt` ファイルでも同じ。報告するのは次のもの。
+
+- どちらにも無い名前（unknown attribute）。裸で書けるのは `std` と文書自身の `::kind` だけなので、`::use` で入れた語彙の属性を裸で書いても、これになる。
+- 記号の違い。要素の名前を `::` で書いた（`::slide`）、または属性の名前を `@` で書いた（`@theme`）。書くべき記号を添えて報告する。
+- `host:` が許さないファイルに書いた属性。
+- `singleton: true` の属性の二つ目。
+- 引数。`args:` に無い引数、`required: true` なのに無い引数、`type:` に合わない値。`args:` を宣言していない属性の引数は検査しない。

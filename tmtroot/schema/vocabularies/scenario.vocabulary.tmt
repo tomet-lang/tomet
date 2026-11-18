@@ -11,7 +11,4 @@
         positional: true
         required: true
         about: | 話者。
-      )
-    )
-  )
-)
+))))

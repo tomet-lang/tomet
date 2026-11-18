@@ -1,6 +1,6 @@
 ::id(readme)
 ::export(
-  type: commonmark,
+  type: commonmark
   path: "README.md"
 )
 ::meta(
@@ -14,10 +14,10 @@ $macro.generated_by(self::path)
 
 // @fixme| ファイルパスでのフィルタが望ましい。
 {$ vault::docs
-    .filter(d => d::filename == "readme.tmt" && exists(d::meta.lang))
-    .sort(d => d::meta.lang)
-    .map(d => d.link(d::meta.lang_name))
-    .join(" | ")
+  .filter(d => d::filename == "readme.tmt" && exists(d::meta.lang))
+  .sort(d => d::meta.lang)
+  .map(d => d.link(d::meta.lang_name))
+  .join(" | ")
 }
 
 Tome to me.
@@ -29,6 +29,7 @@ It combines clear syntax for typed data and cross-document links with multi-form
 
 $raw(tmt("tmtroot/examples/overview.tmt")::source, lang: "tmt")
 
+// @draft| See Also
 ==[ Try it ]
 
 ===[ 1. Install ]

@@ -1,9 +1,23 @@
-vocabulary は、ある kind の文書が使える要素の名前と、その要素が取るものを宣言する
-文書。`::vocabulary.ns()` で名前空間を名乗り、`::element` に要素を並べる。
+vocabulary は、文書やデータが使える名前と、それぞれが取る引数を宣言する文書。`::vocabulary(ns)` で
+名前空間を名乗り、名前を三つの表に並べる。
+
+|[ 表             ][ 文書での書き方 ][ 何か ]
+|[ `::element`     ][ `@name`         ][ 要素。文書の本文に置く ]
+|[ `::attribute`   ][ `::name`        ][ 属性。文書の先頭に書き、文書が自分について言う ]
+|[ `::constructor` ][ `ns.name(...)`  ][ コンストラクタ。値の位置に書き、データの値を組み立てる ]
+
+どの表を引くかは書かれた記号が決めるので、同じ名前が二つの表にあってもよい。
 
 ```tm
 `` ::kind(vocabulary)
-`` ::vocabulary.deck(version: "1.0.0")
+`` ::vocabulary(deck, version: "1.0.0")
+`` 
+`` ::attribute(
+``   theme: (
+``     singleton: true
+``     about: | 全体の配色。
+``   )
+`` )
 `` 
 `` ::element(
 ``   card: (
@@ -26,8 +40,8 @@ vocabulary は、ある kind の文書が使える要素の名前と、その要
 
 #[ 名前はキー ]
 
-`::element` の中身は、要素の名前をキーにしたタプル。`args` の中身は、引数の名前を
-キーにしたタプル。どの段も「キー: フィールドのタプル」という同じ形で、要素と引数で
+三つの表の中身は、名前をキーにしたタプル。`args` の中身は、引数の名前を
+キーにしたタプル。どの段も「キー: フィールドのタプル」という同じ形で、表と引数で
 別の記法を覚える必要がない。名前を `@element(card)` のように括弧の引数へ入れる綴りは
 無い。
 
@@ -38,7 +52,6 @@ vocabulary は、ある kind の文書が使える要素の名前と、その要
 
 |[ フィールド  ][ 既定  ][ 意味 ]
 |[ `display`   ][ 両方  ][ `block` か `inline`。置かれた形がこれと違えば報告される ]
-|[ `region`    ][ body  ][ `preamble` なら文書の頭にだけ置ける ]
 |[ `singleton` ][ false ][ 一つの文書に一つまで ]
 |[ `args`      ][ なし  ][ 引数のタプル。無いのは「何も言わない」で、「取らない」ではない ]
 |[ `content`   ][ なし  ][ `( allow: )`。`[content]` に何を許すか ]
@@ -46,6 +59,42 @@ vocabulary は、ある kind の文書が使える要素の名前と、その要
 
 `content` の `allow:` は、`(a, b)`（この名前だけ）、`inline`（段落一つだけ）、
 `any` のいずれか。詳細は @link[`content-shape.tmt`](file:spec/features/content-shape.tmt)。
+
+要素は本文に置くもので、置き場所を選ぶフィールドは無い。文書の先頭に書くものは属性として宣言する。
+知らないフィールド（`region` もその一つ）は、語彙を読むときに `tomet check` が報告する。
+
+#[ 属性のフィールド ]
+
+`::attribute` は、文書の先頭に `::name(...)` と書く属性を宣言する。フィールドは `about`、`args`、
+`singleton`、`host`（書けるファイル。`tmt`、`ctmt`、`both`）。詳細と検査は
+@file(tmtroot/spec/declarations/std.attribute.declaration.tmt)。
+
+#[ コンストラクタのフィールド ]
+
+`::constructor` は、値の位置に `ns.name(...)` と書くコンストラクタ（データの値を組み立てるもの。計算の `$f()` ではない）を宣言する（@file(tmtroot/spec/declarations/std.constructor.declaration.tmt)）。
+
+|[ フィールド ][ 既定 ][ 意味 ]
+|[ `args`     ][ なし ][ 引数のタプル。フィールドは要素の `args` と同じ ]
+|[ `about`    ][ なし ][ コンストラクタの散文。検査は読まない ]
+
+コンストラクタには `display`、`singleton`、`content` は無い。書けば `tomet check` が報告する。
+呼び出す側（`.tmt` または `.ctmt`）では `::use(ns)` で名前空間をスコープに入れ、`ns.name(...)` と書く。
+
+#[ 名前空間 ]
+
+`std` と文書自身の `::kind` の語彙は、名前を裸で書く。`::use` で入れた語彙の名前は、どの表のものも
+名前空間をつけて書く。`.` が名前空間と名前の区切りで、三つの記号で同じ。
+
+```tm
+`` ::kind(note)
+`` ::use(deck)
+`` ::deck.theme(dark)
+`` 
+`` @deck.card(1)[ 一枚目 ]
+```
+
+`::use(deck, as: d)` と別名をつけた文書では、`::d.theme`、`@d.card` と書く。どう書いても、名前は
+語彙自身の名前空間のもの（`deck.theme`）に解決される（@file(tmtroot/spec/declarations/std.use.declaration.tmt)）。
 
 #[ 引数のフィールド ]
 
@@ -85,5 +134,3 @@ vocabulary は、ある kind の文書が使える要素の名前と、その要
 #[ 未実装 ]
 
 - `data` の `open:`。
-- 知らないキーの報告。`display` の綴り間違いや、`args` の外に置かれた `positional` は、
-  今は黙って読み捨てられる。

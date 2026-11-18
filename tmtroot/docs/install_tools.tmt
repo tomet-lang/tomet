@@ -1,6 +1,6 @@
 ::id(install-tools)
 ::export(
-  type: commonmark,
+  type: commonmark
   path: "docs/install_tools.md"
 )
 ::meta(

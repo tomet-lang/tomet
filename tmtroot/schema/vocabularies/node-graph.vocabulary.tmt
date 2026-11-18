@@ -10,7 +10,4 @@
         type: string
         required: true
         about: | ノードの種類。`textarea` / `number` / `export`。
-      )
-    )
-  )
-)
+))))

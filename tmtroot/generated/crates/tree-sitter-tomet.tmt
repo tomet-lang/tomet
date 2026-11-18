@@ -62,7 +62,7 @@ a group's body derails the rest of that group into an `ERROR`. Not
 investigated further here -- a real fix means teaching `map`'s
 entry-separator logic about comments specifically, not just the
 `map`/`children` vs. their own trailing gap ambiguity below.
-- @strong[Stray/unmatched `]`] (e.g. literal `[content]` written as prose,
+- @strong[Stray/unmatched `]`] (e.g. literal `[content]` written as prose
 not as a real `content_group`) has no fallback token and produces a
 small `ERROR` -- unlike `(`/`[`/`{`/`-`, which all fall back to a
 `punctuation` node when nothing opens with them.

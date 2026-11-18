@@ -10,10 +10,7 @@
         type: string
         positional: true
         about: | 指す先。文書のパス(`elements.roots.tmt`)か、名前(`std.meta`)。
-      )
-    )
-  )
-)
+))))
 
 @dir(tmtroot/index/) の索引のための語彙。`::kind(roots)` の文書は、`root` で
 文書の根を並べる。`.roots.tmt` が各 `*.roots.tmt` を指し、そこから索引をたどる。

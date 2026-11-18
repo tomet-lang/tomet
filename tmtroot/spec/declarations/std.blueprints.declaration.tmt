@@ -4,8 +4,10 @@
 =[ 全容 ]
 
 ```tm
-`` ::blueprint.writ(@file(tmtroot/schema/blueprints/writ.blueprint.tmt))
-`` ::blueprint.crate(@file(tmtroot/schema/blueprints/crate.blueprint.tmt))
+`` ::blueprint(
+``   writ:  @file(tmtroot/schema/blueprints/writ.blueprint.tmt)
+``   crate: @file(tmtroot/schema/blueprints/crate.blueprint.tmt)
+`` )
 ```
 
 この vault が使うブループリントのファイルを、名前をつけて登録する。ブループリントとは何かは @file(tmtroot/spec/features/blueprint.tmt)。
@@ -14,7 +16,7 @@
 
 `::blueprint`、`::vocabulary`、`::dictionary` は同じ形で、同じ決まりに従う。
 
-- ヘッドの名前（`::blueprint.writ` の `writ`）が、登録する名前。1つだけの位置引数が、その値になる（`X.X` は `X`）。名前をキーにした表を `::blueprint(writ: @file(...))` と渡す形も、同じ意味。
+- 名前をキーにした表を渡す。キー（`writ: @file(...)` の `writ`）が、登録する名前。
 - 登録する名前はファイルが自分で名乗る名前（`::blueprint(writ)` の `writ`）と同じでなければならない。食い違えば `tomet check` が報告する。
 - 値は `@file(パス)`。パスは vault のルートからの相対。`@file` でない値は、何も登録しない。
 - 層ごとに重なり、同じ名前は内側の層のものに置き換わる。違う名前は、足し合わさる。

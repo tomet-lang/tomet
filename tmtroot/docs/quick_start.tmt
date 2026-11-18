@@ -1,6 +1,6 @@
 ::id(quick-start)
 ::export(
-  type: commonmark,
+  type: commonmark
   path: "docs/quick_start.md"
 )
 ::meta(
@@ -15,7 +15,7 @@ This guide walks you through creating, checking, exporting, and serving your fir
 
 ==[ 1. Install ]
 
-{$ include(addr(tmt:tmtroot/docs/install_tools.tmt#quick-install), heading: false) }
+$include(addr(tmt:tmtroot/docs/install_tools.tmt#quick-install), heading: false)
 
 For other installation methods, see @link[Install Tomet and Sisho](tmt:tmtroot/docs/install_tools.tmt).
 

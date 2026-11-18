@@ -11,7 +11,4 @@
         positional: true
         required: true
         about: | The crate name (e.g. "tomet-span", "tomet-parser").
-      )
-    )
-  )
-)
+))))

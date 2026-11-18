@@ -11,7 +11,4 @@
         positional: true
         required: true
         about: | 動画内の時刻。`"02:59"` のように quote する。
-      )
-    )
-  )
-)
+))))

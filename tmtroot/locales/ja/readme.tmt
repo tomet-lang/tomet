@@ -1,8 +1,8 @@
+::id(doc-ja-readme)
 ::export(
-  type: commonmark,
+  type: commonmark
   path: "docs/readmes/README.ja.md"
 )
-::id(doc-gCzNE6yl)
 ::meta(
   lang:      ja
   lang_name: "日本語"
@@ -20,7 +20,8 @@ $macro.generated_by(self::path)
     .filter(d => d::filename == "readme.tmt" && exists(d::meta.lang))
     .sort(d => d::meta.lang)
     .map(d => d.link(d::meta.lang_name))
-    .join(" | ") }
+    .join(" | ")
+}
 
 @embed(url:"https://img.shields.io/github/license/tomet-lang/tomet?style=flat-square&color=brightgreen")[license]
 @embed(url:"https://img.shields.io/github/downloads/tomet-lang/tomet/total?style=flat-square&color=orange")[release]

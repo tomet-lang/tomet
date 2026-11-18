@@ -1,0 +1,37 @@
+::kind(element)
+::id(std.constructor)
+
+=[ 全容 ]
+
+```tm
+`` ::kind(vocabulary)
+`` ::vocabulary(deck, version: "1.0.0")
+`` ::constructor(
+``   source: (
+``     about: | 参照先。
+``     args: (
+``       name: (
+``         type: string
+``         positional: true
+``         required: true
+``         about: | 名前。
+``       )
+``       path: (
+``         type: string
+``         required: true
+``         about: | パス。
+``       )
+``     )
+``   )
+`` )
+```
+
+語彙文書（`::vocabulary`）の中で、その名前空間が提供するコンストラクタを宣言する（@file(tmtroot/spec/features/vocabulary.tmt)）。コンストラクタは値の位置に `ns.name(...)` と書いてデータの値を組み立てるもので、計算の `$f()` とは別。一回の `::constructor` にいくつ並べてもよく、語彙文書に複数書いてもよい。
+
+呼び出す側では、`ns` は `::use` で入れた名前空間。`::use(deck, as: d)` と別名をつけた文書では `d.source(...)` と書き、`deck.source(...)` とは書けない。引数は `deck` の `::constructor` に照らして検査される（@file(tmtroot/spec/declarations/std.use.declaration.tmt)）。
+
+=[ フィールド ]
+
+各エントリはコンストラクタ名をキーにしたタプルで、`about:`（散文）と `args:`（引数のタプル）だけを持つ。`display`、`singleton`、`content` は無く、書けば `tomet check` が報告する。
+
+`args:` の各引数は `::element` の引数と同じフィールド（`type`、`positional`、`required`、`default`、`about`）を持ち、`positional: true` の並び順が位置引数の順序になる。

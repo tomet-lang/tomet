@@ -1,8 +1,8 @@
+::id(doc-zh-hans-readme)
 ::export(
-  type: commonmark,
+  type: commonmark
   path: "docs/readmes/README.zh-CN.md"
 )
-::id(doc-XPCA2A8F)
 ::meta(
   lang:      "zh-Hans"
   lang_name: "简体中文"
@@ -23,7 +23,8 @@ $macro.generated_by(self::path)
     .filter(d => d::filename == "readme.tmt" && exists(d::meta.lang))
     .sort(d => d::meta.lang)
     .map(d => d.link(d::meta.lang_name))
-    .join(" | ") }
+    .join(" | ")
+}
 
 Tome to me!!
 
