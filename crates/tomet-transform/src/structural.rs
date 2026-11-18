@@ -1,6 +1,6 @@
 //! Structural in-place AST transformations.
 
-pub use tomet_search::structural::{
+pub use tomet_query::structural::{
     StructuralMatch, StructuralQuery, count_structural_matches, matches_query,
 };
 

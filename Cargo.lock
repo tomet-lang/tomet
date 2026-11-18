@@ -2238,14 +2238,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "tomet-scalar"
-version = "0.5.0"
-dependencies = [
- "serde",
-]
-
-[[package]]
-name = "tomet-search"
+name = "tomet-query"
 version = "0.5.0"
 dependencies = [
  "tomet-ast",
@@ -2254,6 +2247,13 @@ dependencies = [
  "tomet-semantics",
  "tomet-span",
  "tomet-tree",
+]
+
+[[package]]
+name = "tomet-scalar"
+version = "0.5.0"
+dependencies = [
+ "serde",
 ]
 
 [[package]]
@@ -2402,8 +2402,8 @@ dependencies = [
  "tomet-ast-parser",
  "tomet-expr",
  "tomet-id",
+ "tomet-query",
  "tomet-scalar",
- "tomet-search",
  "tomet-semantics",
  "tomet-semantics-core",
  "tomet-span",
@@ -2557,8 +2557,8 @@ dependencies = [
  "tomet-load-config",
  "tomet-position",
  "tomet-printer",
+ "tomet-query",
  "tomet-scalar",
- "tomet-search",
  "tomet-semantics",
  "tomet-span",
  "tomet-transform",

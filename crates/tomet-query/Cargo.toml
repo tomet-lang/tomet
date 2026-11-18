@@ -1,8 +1,8 @@
 [package]
-name                 = "tomet-search"
+name                 = "tomet-query"
 version.workspace    = true
 edition.workspace    = true
-description          = "Pure, in-memory search and query engine for Tomet documents."
+description          = "Pure, in-memory deterministic query engine for Tomet documents."
 license.workspace    = true
 repository.workspace = true
 

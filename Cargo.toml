@@ -66,7 +66,7 @@ members = [
   "crates/tomet-transform",
 
   #= Search -- in-memory structural search & filter queries
-  "crates/tomet-search",
+  "crates/tomet-query",
 
   #= Edit -- backend-neutral editable model for collaborative editing
   "crates/tomet-edit",
@@ -177,7 +177,7 @@ tomet-printer   = { path = "crates/tomet-printer", version = "0.5.0" }
 tomet-edit      = { path = "crates/tomet-edit", version = "0.5.0" }
 tomet-extract   = { path = "crates/tomet-extract", version = "0.5.0" }
 tomet-merge     = { path = "crates/tomet-merge", version = "0.5.0" }
-tomet-search    = { path = "crates/tomet-search", version = "0.5.0" }
+tomet-query     = { path = "crates/tomet-query", version = "0.5.0" }
 tomet-stats     = { path = "crates/tomet-stats", version = "0.5.0" }
 tomet-tome      = { path = "crates/tomet-tome", version = "0.5.0" }
 tomet-transform = { path = "crates/tomet-transform", version = "0.5.0" }

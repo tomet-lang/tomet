@@ -16,7 +16,7 @@ tomet-indexer     = { workspace = true }
 tomet-load-config = { workspace = true }
 tomet-position    = { workspace = true }
 tomet-printer     = { workspace = true }
-tomet-search      = { workspace = true }
+tomet-query       = { workspace = true }
 tomet-semantics   = { workspace = true }
 tomet-transform   = { workspace = true }
 #--- Crates.io ---
