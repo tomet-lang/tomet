@@ -54,15 +54,17 @@ flake-parts.lib.mkFlake { inherit inputs; } {
         tools =
           let
             system = pkgs.stdenv.hostPlatform.system;
-            sisho = inputs.sisho.packages.${system};
           in
-          inputs.sisho.legacyPackages.${system}.combine [
-            sisho.sisho
-            sisho.twrit
-            sisho.tomet-shelf
-            # `sisho check` runs `catasto check` beside `tomet` and `twrit`.
-            sisho.catasto
-          ];
+          pkgs.symlinkJoin {
+            name = "tomet-toolchain";
+            paths = [
+              inputs.sisho.packages.${system}.sisho
+              inputs.twrit.packages.${system}.twrit
+              inputs.tomet-shelf.packages.${system}.tomet-shelf
+              # `sisho check` runs `catasto check` beside `tomet` and `twrit`.
+              inputs.catasto.packages.${system}.catasto
+            ];
+          };
       };
 
       treefmt = import ./formatter.nix {

@@ -1,5 +1,5 @@
 {
-  description = "Tomet - A structured markup language for thought and document graphs";
+  description = "Tomet";
 
   nixConfig = {
     extra-substituters = [ "https://tomet.cachix.org" ];
@@ -14,7 +14,7 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
-    #= Rust
+    # --- Rust ---
     fenix = {
       url = "github:nix-community/fenix";
       inputs.nixpkgs.follows = "nixpkgs";
@@ -23,10 +23,36 @@
       url = "github:ipetkov/crane";
     };
 
-    #= Tool
-    # sisho brings twrit and tomet-shelf for the dev shell. It pins tomet too, but its
-    # `tomet` input cuts this one (`inputs.sisho.follows = ""`), so the loop is not in the lock.
-    sisho.url = "github:tomet-lang/sisho";
+    # --- Tools ---
+    twrit = {
+      url = "github:tomet-lang/twrit";
+      inputs.tomet.follows = "";
+      inputs.tomet-shelf.follows = "";
+      inputs.catasto.follows = "";
+      inputs.sisho.follows = "";
+    };
+    tomet-shelf = {
+      url = "github:tomet-lang/tomet-shelf";
+      inputs.tomet.follows = "";
+      inputs.twrit.follows = "";
+      inputs.catasto.follows = "";
+      inputs.sisho.follows = "";
+    };
+    catasto = {
+      url = "github:tomet-lang/fs-catasto";
+      inputs.tomet.follows = "";
+      inputs.twrit.follows = "";
+      inputs.tomet-shelf.follows = "";
+      inputs.sisho.follows = "";
+    };
+    sisho = {
+      url = "github:tomet-lang/sisho";
+      inputs.tomet.follows = "";
+      inputs.twrit.follows = "";
+      inputs.tomet-shelf.follows = "";
+      inputs.sisho-desk.follows = "";
+      inputs.catasto.follows = "";
+    };
   };
 
   outputs = inputs: import ./nix inputs;

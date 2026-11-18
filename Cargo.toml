@@ -153,9 +153,9 @@ tomet-style      = { path = "crates/tomet-syntax-style", version = "0.5.0" }
 tomet-tree       = { path = "crates/tomet-syntax-tree", version = "0.5.0" }
 #--- Semantics ---
 cotomet-eval         = { path = "crates/cotomet-eval", version = "0.5.0" }
-tomet-eval           = { path = "crates/tomet-eval", version = "0.5.0" }
 tomet-address        = { path = "crates/tomet-semantics-address", version = "0.5.0" }
 tomet-declaration    = { path = "crates/tomet-semantics-declaration", version = "0.5.0" }
+tomet-eval           = { path = "crates/tomet-eval", version = "0.5.0" }
 tomet-expr           = { path = "crates/tomet-semantics-expr", version = "0.5.0" }
 tomet-semantics      = { path = "crates/tomet-semantics", version = "0.5.0" }
 tomet-semantics-core = { path = "crates/tomet-semantics-core", version = "0.5.0" }
