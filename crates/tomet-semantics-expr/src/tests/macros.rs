@@ -1,4 +1,5 @@
-//! Macros: text macros and block macros `::macro(name: [ ... ])`.
+//! Macros: text macros, block macros `::macro(name: [ ... ])`, and element macros
+//! `::macro(name: @el[ ... ])`.
 
 use super::*;
 
@@ -193,11 +194,117 @@ fn a_block_macro_checks_its_arguments_as_a_text_macro_does() {
 }
 
 #[test]
-fn a_template_that_is_neither_a_string_nor_blocks_cannot_be_called() {
+fn a_template_that_is_neither_a_string_blocks_nor_element_cannot_be_called() {
     let macros = macros_of(&[("three", Value::Scalar(Scalar::Int(3)))]);
     let run = |src: &str| run_with(src, &EvalValue::Scalar(Scalar::None), &macros);
     let Err(error) = run("macro.three()") else {
         panic!("a number is not a template");
     };
     assert!(error.to_string().contains("macro.three"), "{error}");
+}
+
+#[test]
+fn an_element_macro_fills_args_and_content_into_a_block_element_fragment() {
+    let macros = macros_of(&[
+        (
+            "generated_by",
+            block_macro(
+                "::macro(generated_by: @comment[ Generated from $(1). Edit that, then `tomet export .`. ])\n",
+            ),
+        ),
+        (
+            "card",
+            block_macro("::macro(card: @card(title: $(1), count: $(n))[ $(2) ])\n"),
+        ),
+    ]);
+    let run = |src: &str| run_with(src, &EvalValue::Scalar(Scalar::None), &macros);
+
+    let EvalValue::Fragment(blocks) = run("macro.generated_by(\"tmtroot/agents.tmt\")").unwrap()
+    else {
+        panic!("an element macro is a fragment");
+    };
+    let [tomet_ast::Block::Element(comment)] = &blocks[..] else {
+        panic!("expected the comment element, got {blocks:?}");
+    };
+    assert_eq!(comment.name.to_string(), "comment");
+    assert_eq!(comment.placement, tomet_ast::Placement::Block);
+    let Some([tomet_ast::Block::Paragraph(p)]) = comment.content.as_deref() else {
+        panic!("expected one paragraph, got {:?}", comment.content);
+    };
+    assert!(
+        matches!(
+            &p.content[..],
+            [
+                tomet_ast::Inline::Text(a),
+                tomet_ast::Inline::Text(b),
+                tomet_ast::Inline::Text(c),
+                tomet_ast::Inline::Element(code),
+                tomet_ast::Inline::Text(d),
+            ] if a.value.contains("Generated from ")
+                && b.value == "tmtroot/agents.tmt"
+                && c.value.contains("Edit that, then ")
+                && code.name.to_string() == "raw"
+                && d.value == "."
+        ),
+        "{:?}",
+        p.content
+    );
+
+    let EvalValue::Fragment(blocks) = run("macro.card(\"Welcome\", \"Hello\", n: 7)").unwrap()
+    else {
+        panic!("an element macro is a fragment");
+    };
+    let [tomet_ast::Block::Element(card)] = &blocks[..] else {
+        panic!("expected the card element, got {blocks:?}");
+    };
+    assert_eq!(card.placement, tomet_ast::Placement::Block);
+    assert_eq!(
+        card.data.args,
+        Some(tomet_ast::Tuple::from_named([
+            (
+                "title".to_string(),
+                Value::Scalar(Scalar::Text("Welcome".to_string()))
+            ),
+            ("count".to_string(), Value::Scalar(Scalar::Int(7)))
+        ]))
+    );
+    let Some([tomet_ast::Block::Paragraph(p)]) = card.content.as_deref() else {
+        panic!("expected one paragraph, got {:?}", card.content);
+    };
+    assert!(matches!(&p.content[..], [tomet_ast::Inline::Text(t)] if t.value == "Hello"));
+}
+
+#[test]
+fn an_element_macro_checks_its_arguments() {
+    let macros = macros_of(&[
+        (
+            "card",
+            block_macro("::macro(card: @card(title: $(1))[ $(who) ])\n"),
+        ),
+        ("plain", block_macro("::macro(plain: @comment[ ok ])\n")),
+    ]);
+    let run = |src: &str| run_with(src, &EvalValue::Scalar(Scalar::None), &macros);
+    assert_eq!(
+        run("macro.card(who: \"ann\")"),
+        Err(EvalError::WrongArgCount {
+            function: "macro.card".to_string(),
+            expected: "1".to_string(),
+            got: 0
+        })
+    );
+    assert_eq!(
+        run("macro.card(\"Title\")"),
+        Err(EvalError::message(
+            "macro.card expects named argument `who`"
+        ))
+    );
+    assert_eq!(
+        run("macro.plain(1)"),
+        Err(EvalError::WrongArgCount {
+            function: "macro.plain".to_string(),
+            expected: "0".to_string(),
+            got: 1
+        })
+    );
+    assert!(matches!(run("macro.plain()"), Ok(EvalValue::Fragment(_))));
 }

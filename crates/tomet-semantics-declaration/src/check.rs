@@ -394,27 +394,27 @@ fn check_macros(
 }
 
 /// Why `template` cannot be a macro's, or `None` if it can. A string is a text macro. A `[ ... ]`
-/// is a block macro, whose only interpolations are the places arguments go.
+/// or an `@element[...]` is a block/element macro, whose only interpolations are the places
+/// arguments go.
 fn macro_problem(template: &Value) -> Option<String> {
     match template {
         Value::Scalar(Scalar::Text(_)) => None,
-        Value::Blocks(_) => {
+        Value::Blocks(_) | Value::Element(_) => {
             let expressions = crate::expressions_in_body(template);
             if expressions.is_empty() {
                 None
             } else {
-                let written: Vec<String> =
-                    expressions.iter().map(|e| format!("`{e}`")).collect();
+                let written: Vec<String> = expressions.iter().map(|e| format!("`{e}`")).collect();
                 Some(format!(
-                    "in a block macro `$(...)` is where an argument goes (`$(1)`, `$(name)`), not an \
-                     expression; found {}",
+                    "in a block or element macro `$(...)` is where an argument goes (`$(1)`, \
+                     `$(name)`), not an expression; found {}",
                     written.join(", ")
                 ))
             }
         }
         _ => Some(
-            "a macro is a string template, such as `\"https://x/$(1)\"`, or block content, such as \
-             `[ @card[ $(1) ] ]`"
+            "a macro is a string template, such as `\"https://x/$(1)\"`, block content, such as \
+             `[ @card[ $(1) ] ]`, or an element, such as `@comment[ $(1) ]`"
                 .to_string(),
         ),
     }
@@ -630,15 +630,25 @@ mod tests {
                 format!("::use(ns, version: {ver})\n"),
                 format!("::version({ver})\n"),
             ] {
-                assert!(problems_of(&src).is_empty(), "{src}: {:?}", problems_of(&src));
+                assert!(
+                    problems_of(&src).is_empty(),
+                    "{src}: {:?}",
+                    problems_of(&src)
+                );
             }
         }
 
         let rejected = [
             ("-1", "the integer `-1` is not a version such as `1.10.0`"),
             ("abc", "the text \"abc\" is not a version such as `1.10.0`"),
-            ("\"1.\"", "the text \"1.\" is not a version such as `1.10.0`"),
-            ("\".1\"", "the text \".1\" is not a version such as `1.10.0`"),
+            (
+                "\"1.\"",
+                "the text \"1.\" is not a version such as `1.10.0`",
+            ),
+            (
+                "\".1\"",
+                "the text \".1\" is not a version such as `1.10.0`",
+            ),
             (
                 "\"1..2\"",
                 "the text \"1..2\" is not a version such as `1.10.0`",
@@ -773,6 +783,44 @@ mod tests {
     }
 
     #[test]
+    fn an_element_macro_is_accepted_and_may_hold_only_places_for_arguments() {
+        let doc = parse(
+            "::macro(\n  \
+             generated_by: @comment[ Generated from $(1). Edit that, then `tomet export .`. ]\n  \
+             card: @card(title: $(1), kind: $(kind))[ $(who) ]\n  \
+             bad_arg: @card(title: $(a.b))[ $(1) ]\n  \
+             bad_body: @card(title: $(1)){ k: $(x.y) }[ $f(1) $(2) ]\n\
+             )\n",
+        );
+        let decls: Vec<_> = declarations(&doc)
+            .into_iter()
+            .map(|f| f.declaration)
+            .collect();
+        let problems = check_declarations(&decls, Host::Tmt);
+        assert_eq!(problems.len(), 2, "{problems:?}");
+        let Problem::InvalidDefinition {
+            name: n0,
+            reason: r0,
+            ..
+        } = &problems[0].1
+        else {
+            panic!("expected an invalid definition, got {:?}", problems[0].1);
+        };
+        assert_eq!(n0, "bad_arg");
+        assert_eq!(r0.split("found ").nth(1), Some("`$(a.b)`"));
+        let Problem::InvalidDefinition {
+            name: n1,
+            reason: r1,
+            ..
+        } = &problems[1].1
+        else {
+            panic!("expected an invalid definition, got {:?}", problems[1].1);
+        };
+        assert_eq!(n1, "bad_body");
+        assert_eq!(r1.split("found ").nth(1), Some("`$(x.y)`, `$f(1)`"));
+    }
+
+    #[test]
     fn macros_and_vars_checks() {
         let bad_macro = Declaration::new(
             "macro",
@@ -789,8 +837,9 @@ mod tests {
             Problem::InvalidDefinition {
                 declaration: "macro",
                 name: "gh".into(),
-                reason: "a macro is a string template, such as `\"https://x/$(1)\"`, or block \
-                         content, such as `[ @card[ $(1) ] ]`"
+                reason: "a macro is a string template, such as `\"https://x/$(1)\"`, block \
+                         content, such as `[ @card[ $(1) ] ]`, or an element, such as \
+                         `@comment[ $(1) ]`"
                     .into(),
             }
         );

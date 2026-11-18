@@ -3,10 +3,10 @@
 //! What a macro's template is made of: the places a call fills in.
 //!
 //! A template is a [`Value`]. A string is a text macro, and its places are written `$(1)` and
-//! `$(name)` in the text. A `[ ... ]` is a block macro, and its places are the `$(1)` and
-//! `$(name)` interpolations written in the blocks. Either way a place is not an expression: it is
-//! where an argument goes, and the definition (`check_declarations`) and the call (the evaluator)
-//! both ask this module what one is, so they cannot disagree.
+//! `$(name)` in the text. A `[ ... ]` or an `@element[...]` is a block/element macro, and its
+//! places are the `$(1)` and `$(name)` interpolations written in its tree. Either way a place is
+//! not an expression: it is where an argument goes, and the definition (`check_declarations`) and
+//! the call (the evaluator) both ask this module what one is, so they cannot disagree.
 
 use tomet_ast::{InterpExprKind, Interpolation, Value};
 use tomet_scalar::Scalar;
@@ -20,7 +20,8 @@ pub enum Placeholder {
     Named(String),
 }
 
-/// The placeholder an interpolation of a block macro's body is, or `None` if it is an expression.
+/// The placeholder an interpolation of a block or element macro's body is, or `None` if it is an
+/// expression.
 pub fn placeholder_of(interp: &Interpolation) -> Option<Placeholder> {
     match &interp.expr.kind {
         InterpExprKind::Literal(Scalar::Int(n)) if *n >= 1 => {
@@ -75,8 +76,8 @@ impl Arity {
         arity
     }
 
-    /// The arity of a block macro: the placeholders among the interpolations written anywhere in
-    /// `body`, arguments of its elements included.
+    /// The arity of a block or element macro: the placeholders among the interpolations written
+    /// anywhere in `body`, arguments of its elements included.
     pub fn of_body(body: &Value) -> Self {
         let mut arity = Arity::default();
         for_each_interpolation_in_value(body, |interp| {
@@ -104,8 +105,8 @@ impl Arity {
     }
 }
 
-/// The interpolations written in a block macro's `body` that are not placeholders, each in its
-/// canonical spelling. A block macro has none: `$(1)` and `$(name)` are where
+/// The interpolations written in a block or element macro's `body` that are not placeholders, each
+/// in its canonical spelling. A block or element macro has none: `$(1)` and `$(name)` are where
 /// arguments go, and anything else would have nothing to be evaluated against at the definition.
 pub fn expressions_in_body(body: &Value) -> Vec<String> {
     let mut found = Vec::new();
@@ -154,5 +155,19 @@ mod tests {
             ["$(0)", "$(a.b)", "$f(1)", "{$ \"s\" }"]
         );
         assert_eq!(Arity::of_body(&value).positional, 1);
+    }
+
+    #[test]
+    fn an_element_body_takes_placeholders_from_args_value_and_content() {
+        let value =
+            body("::macro(m: @card(title: $(1), count: $(2)){ note: $(kind) }[ hi $(name) ])\n");
+        assert!(expressions_in_body(&value).is_empty());
+        let arity = Arity::of_body(&value);
+        assert_eq!(arity.positional, 2);
+        assert_eq!(arity.named, ["kind", "name"]);
+
+        let bad = body("::macro(m: @card(title: $(a.b))[ $f(1) $(1) ])\n");
+        assert_eq!(expressions_in_body(&bad), ["$(a.b)", "$f(1)"]);
+        assert_eq!(Arity::of_body(&bad).positional, 1);
     }
 }

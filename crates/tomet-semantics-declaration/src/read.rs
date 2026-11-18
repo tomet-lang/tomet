@@ -89,9 +89,10 @@ pub fn meta(declaration: &Declaration) -> Option<Value> {
 
 /// The macros a `::macro` defines, in the order written: each entry is a name and its template.
 ///
-/// A template is a [`Value`]: a string is a text macro, and `[ ... ]` is a block macro (see
-/// [`crate::Arity`]). An entry of any other kind is returned too, because refusing it is
-/// `tomet check`'s business and not a reader's; whoever calls the macro finds out it cannot.
+/// A template is a [`Value`]: a string is a text macro, and `[ ... ]` or `@element[...]` is a
+/// block/element macro (see [`crate::Arity`]). An entry of any other kind is returned too, because
+/// refusing it is `tomet check`'s business and not a reader's; whoever calls the macro finds out
+/// it cannot.
 /// `::macro(gh: "...")` defines one and `::macro(gh: "...", n: "...")` defines several (see
 /// [`Declaration::entries`]).
 pub fn macros(declaration: &Declaration) -> Vec<(String, Value)> {
@@ -426,18 +427,20 @@ mod tests {
 
     #[test]
     fn macros_are_the_entries_of_every_macros_declaration() {
-        let doc =
-            parse("::macro(gh: \"https://x/$(1)\", n: 3, wiki: \"w/$(1)\", blk: [ hello ])\n");
+        let doc = parse(
+            "::macro(gh: \"https://x/$(1)\", n: 3, wiki: \"w/$(1)\", blk: [ hello ], el: @comment[ $(1) ])\n",
+        );
         let read = document_macros(&doc);
         let names: Vec<&str> = read.iter().map(|(name, _)| name.as_str()).collect();
         // A template of any kind is read; refusing a kind is `check`'s.
-        assert_eq!(names, ["gh", "n", "wiki", "blk"]);
+        assert_eq!(names, ["gh", "n", "wiki", "blk", "el"]);
         assert_eq!(
             read[0].1,
             Value::Scalar(Scalar::Text("https://x/$(1)".to_string()))
         );
         assert_eq!(read[1].1, Value::Scalar(Scalar::Int(3)));
         assert!(matches!(read[3].1, Value::Blocks(_)));
+        assert!(matches!(read[4].1, Value::Element(_)));
         // no entries, no macros
         assert!(document_macros(&parse("::macro()\n")).is_empty());
     }

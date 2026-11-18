@@ -62,7 +62,7 @@
 
 use std::collections::HashMap;
 
-use tomet_ast::{BinaryOp, InterpExpr, InterpExprKind, Tuple, TupleEntry, Value};
+use tomet_ast::{BinaryOp, Block, InterpExpr, InterpExprKind, Placement, Tuple, TupleEntry, Value};
 use tomet_declaration::{Arity, Placeholder, is_ident_placeholder, placeholder_of};
 use tomet_scalar::Scalar;
 use tomet_tree::fill_interpolations;
@@ -349,9 +349,10 @@ fn call(
 ///
 /// A template is a [`Value`] ([`tomet_declaration::Arity`] says what its places are). A string is
 /// a text macro: `$(1)`, `$(2)`, ... take positional arguments, `$(ident)` takes a named one, any
-/// other `{$ ... }` in it is plain text, and the call is a string. A `[ ... ]` is a block macro: the
-/// same places, written as the interpolations `$(1)` and `$(name)` in its blocks, are filled in on
-/// the tree, and the call is a fragment ([`EvalValue::Fragment`]) of those blocks.
+/// other `{$ ... }` in it is plain text, and the call is a string. A `[ ... ]` or `@element[...]`
+/// is a block/element macro: the same places, written as the interpolations `$(1)` and `$(name)`
+/// in its tree, are filled in on the tree, and the call is a fragment ([`EvalValue::Fragment`]) of
+/// those blocks (or that element as a block).
 ///
 /// Arguments are ordinary expressions. Missing or excess arguments report arity
 /// errors, missing named arguments report the missing name, and an unknown
@@ -376,48 +377,58 @@ fn macro_call(name: &str, args: Args, cx: &EvalContext) -> Result<EvalValue, Eva
             }
             Ok(EvalValue::Scalar(Scalar::Text(text)))
         }
-        Value::Blocks(_) => {
+        Value::Blocks(_) | Value::Element(_) => {
             macro_args_fit(name, &Arity::of_body(template), &args)?;
-            let mut fills: HashMap<Placeholder, Value> = HashMap::new();
-            let named = args
-                .named
-                .iter()
-                .filter(|(key, _)| is_ident_placeholder(key))
-                .map(|(key, value)| (Placeholder::Named(key.clone()), value));
-            let positional = args
-                .positional
-                .iter()
-                .enumerate()
-                .map(|(i, value)| (Placeholder::Positional(i + 1), value));
-            for (place, value) in named.chain(positional) {
-                let filled = value.to_ast().ok_or_else(|| {
-                    EvalError::mismatch(
-                        format!("an argument of macro.{name}"),
-                        "a value that can be written in a document",
-                        value.type_name(),
-                    )
-                })?;
-                fills.insert(place, filled);
-            }
+            let fills = macro_fills(name, &args)?;
             let mut body = template.clone();
             fill_interpolations(&mut body, |interp| {
                 placeholder_of(interp).and_then(|place| fills.get(&place).cloned())
             });
             match body {
                 Value::Blocks(blocks) => Ok(EvalValue::Fragment(blocks)),
-                other => unreachable!("filling a block macro left {other:?}"),
+                Value::Element(mut el) => {
+                    el.placement = Placement::Block;
+                    Ok(EvalValue::Fragment(vec![Block::Element(*el)]))
+                }
+                other => unreachable!("filling a block or element macro left {other:?}"),
             }
         }
         _ => Err(EvalError::message(format!(
-            "macro.{name} is not a string or block content, so it cannot be called"
+            "macro.{name} is not a string, block content, or element, so it cannot be called"
         ))),
     }
 }
 
+/// Converts the evaluated arguments of a block or element macro call into AST values keyed by placeholder.
+fn macro_fills(name: &str, args: &Args) -> Result<HashMap<Placeholder, Value>, EvalError> {
+    let mut fills = HashMap::new();
+    let named = args
+        .named
+        .iter()
+        .filter(|(key, _)| is_ident_placeholder(key))
+        .map(|(key, value)| (Placeholder::Named(key.clone()), value));
+    let positional = args
+        .positional
+        .iter()
+        .enumerate()
+        .map(|(i, value)| (Placeholder::Positional(i + 1), value));
+    for (place, value) in named.chain(positional) {
+        let filled = value.to_ast().ok_or_else(|| {
+            EvalError::mismatch(
+                format!("an argument of macro.{name}"),
+                "a value that can be written in a document",
+                value.type_name(),
+            )
+        })?;
+        fills.insert(place, filled);
+    }
+    Ok(fills)
+}
+
 /// Whether the arguments of a call to macro `name` are the ones its template takes.
 ///
-/// One check for a text macro and a block macro, because what a template takes is
-/// [`Arity`]'s answer for both.
+/// One check for text, block, and element macros, because what a template takes is
+/// [`Arity`]'s answer for all of them.
 fn macro_args_fit(name: &str, arity: &Arity, args: &Args) -> Result<(), EvalError> {
     if arity.positional > 0 && args.positional.len() != arity.positional {
         return Err(EvalError::WrongArgCount {

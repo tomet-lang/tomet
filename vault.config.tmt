@@ -1,7 +1,7 @@
 ::kind(config)
 ::id(config-vault)
 ::macro(copyright: ("(C) 2026 Tomet Projects"))
-::macro(generated_by: [@comment[ Generated from $(1). Edit that, then `tomet export .`. ]])
+::macro(generated_by: @comment[ Generated from $(1). Edit that, then `tomet export .`. ])
 ::format(
   meta: (always_newline: true)
   section: (
@@ -49,6 +49,6 @@
   demo:    @file(tmtroot/schema/blueprints/demo.blueprint.tmt)
 )
 ::workspace(
-  ignore: ("00-09 System/01 Apps/obsidian")
+  ignore:  ("00-09 System/01 Apps/obsidian")
   unswept: ("tests/fixtures", "tests/ref", "tests/store")
 )

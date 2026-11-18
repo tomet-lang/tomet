@@ -28,14 +28,23 @@ fn vault() -> MemoryResolver {
         .unwrap()
 }
 
-/// The block macro `name` whose body is `body`, as `::macro(name: [ body ])` defines it.
-fn block_macro(name: &str, body: &str) -> Value {
-    let src = format!("::macro({name}: [{body}])\n");
+/// The macro `name` defined by `entry`, e.g. `card: [ ... ]` or `generated_by: @comment[ ... ]`.
+fn macro_entry(entry: &str) -> (String, Value) {
+    let src = format!("::macro({entry})\n");
     let file = tomet_ast_parser::parse_file(&src).expect("the macro parses");
     let Some(tuple) = &file.header[0].data.args else {
         panic!("expected `(name: template)` entries");
     };
-    tuple.get(name).cloned().expect("macro entry")
+    let item = tuple.nth(0).expect("macro entry");
+    (
+        item.name().expect("named entry").to_string(),
+        item.value().clone(),
+    )
+}
+
+/// The block macro `name` whose body is `body`, as `::macro(name: [ body ])` defines it.
+fn block_macro(name: &str, body: &str) -> Value {
+    macro_entry(&format!("{name}: [{body}]")).1
 }
 
 /// Resolves `src` as the document `here.tmt` of the small vault above.
@@ -59,6 +68,12 @@ fn run_in(src: &str, resolver: &dyn Resolver, vars: &EvalValue) -> (File, Vec<Un
         "pair".to_string(),
         block_macro("pair", "\none $(1)\n\ntwo $(1)\n"),
     );
+    let (name, tmpl) = macro_entry(
+        "generated_by: @comment[ Generated from $(1). Edit that, then `tomet export .`. ]",
+    );
+    macros.insert(name, tmpl);
+    let (name, tmpl) = macro_entry("el_card: @card(title: $(1))[ $(2) ]");
+    macros.insert(name, tmpl);
     let cx = EvalContext {
         resolver,
         self_doc: DocRef("here.tmt".to_string()),
@@ -276,7 +291,10 @@ fn raw_placement_alone_on_line_gives_block_and_inline_is_type_mismatch() {
         reason.contains("cannot go inside a paragraph"),
         "expected mismatch reason, got: {reason}"
     );
-    assert_eq!(text_of(&doc), "Look: $raw(\"fn main() {}\", lang: \"rust\")");
+    assert_eq!(
+        text_of(&doc),
+        "Look: $raw(\"fn main() {}\", lang: \"rust\")"
+    );
 }
 
 #[test]
@@ -749,4 +767,53 @@ fn a_block_macro_called_wrongly_is_reported_and_kept() {
     let (doc, unresolved) = run("$macro.card(\"only one\")\n");
     assert_eq!(unresolved.len(), 1, "{unresolved:?}");
     assert_eq!(text_of(&doc), "$macro.card(\"only one\")");
+}
+
+// ---- element macros ----
+
+#[test]
+fn an_element_macro_on_its_own_line_expands_to_a_block_element() {
+    let (doc, unresolved) = run("$macro.generated_by(self::path)\n");
+    assert!(unresolved.is_empty(), "{unresolved:?}");
+    assert_eq!(text_of(&doc), "<comment>");
+    let Block::Element(comment) = &doc.body[0] else {
+        panic!("expected comment element, got {:?}", doc.body[0]);
+    };
+    assert_eq!(comment.name.to_string(), "comment");
+    assert_eq!(comment.placement, tomet_ast::Placement::Block);
+
+    let (doc, unresolved) = run("$macro.el_card(\"Title\", \"words\")\n");
+    assert!(unresolved.is_empty(), "{unresolved:?}");
+    assert_eq!(text_of(&doc), "<card>");
+    let Block::Element(card) = &doc.body[0] else {
+        panic!("expected card element, got {:?}", doc.body[0]);
+    };
+    assert_eq!(card.placement, tomet_ast::Placement::Block);
+    assert_eq!(
+        card.data.args,
+        Some(Tuple::from_named([(
+            "title".to_string(),
+            Value::Scalar(Scalar::Text("Title".to_string()))
+        )]))
+    );
+}
+
+#[test]
+fn an_element_macro_in_a_paragraph_is_rejected_and_in_value_position_becomes_blocks() {
+    let (doc, unresolved) = run("before $macro.generated_by(self::path) after\n");
+    assert_eq!(unresolved.len(), 1, "{unresolved:?}");
+    assert_eq!(
+        text_of(&doc),
+        "before $macro.generated_by(self::path) after"
+    );
+
+    let (doc, unresolved) = run("@box(item: $macro.el_card(\"T\", \"B\"))\n");
+    assert!(unresolved.is_empty(), "{unresolved:?}");
+    let Block::Element(el) = &doc.body[0] else {
+        panic!("expected box element");
+    };
+    let Some(Value::Blocks(blocks)) = el.data.args.as_ref().and_then(|a| a.get("item")) else {
+        panic!("expected Value::Blocks, got {:?}", el.data.args);
+    };
+    assert!(matches!(&blocks[..], [Block::Element(c)] if c.name.to_string() == "card"));
 }
