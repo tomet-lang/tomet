@@ -173,6 +173,49 @@ fn aligning_values_does_not_change_the_parsed_document() {
 }
 
 #[test]
+fn collapsing_closing_parens_does_not_change_the_parsed_document() {
+    use tomet_config::{FormatConfig, PrinterConfig};
+
+    let config = PrinterConfig {
+        format: FormatConfig {
+            map_collapse_closing_parens: true,
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+    let mut changed = 0;
+    for (rel, src) in parseable_corpus() {
+        let before = tomet_ast_parser::parse_file(&src)
+            .unwrap_or_else(|e| panic!("{} failed to parse: {e}", rel.display()));
+        let once = tomet_formatter::format_source_with_config(&src, &config);
+        let after = tomet_ast_parser::parse_file(&once).unwrap_or_else(|e| {
+            panic!(
+                "{} failed to parse after collapsing closing parens: {e}",
+                rel.display()
+            )
+        });
+        assert!(
+            before == after,
+            "collapsing closing parens changed the parsed document for {}",
+            rel.display()
+        );
+        assert_eq!(
+            tomet_formatter::format_source_with_config(&once, &config),
+            once,
+            "collapsing closing parens is not idempotent for {}",
+            rel.display()
+        );
+        if once != tomet_formatter::format_source_with_config(&src, &PrinterConfig::default()) {
+            changed += 1;
+        }
+    }
+    assert!(
+        changed > 0,
+        "no fixture has consecutive closing paren lines to collapse"
+    );
+}
+
+#[test]
 fn section_blank_lines_do_not_change_the_parsed_document() {
     use tomet_config::{FormatConfig, PrinterConfig};
 

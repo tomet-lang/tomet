@@ -128,6 +128,12 @@ fn test_all_config_specs_coverage() {
             .iter()
             .any(|e| e.key == "element.table.adjust_width")
     );
+    assert!(
+        format_group
+            .entries
+            .iter()
+            .any(|e| e.key == "map.collapse_closing_parens")
+    );
 
     let meta_group = specs.iter().find(|g| g.name == "meta").unwrap();
     assert!(

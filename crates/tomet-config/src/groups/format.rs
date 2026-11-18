@@ -173,6 +173,12 @@ pub struct FormatConfig {
     #[config(key = "map.max_key_width", default = 20)]
     pub map_max_key_width: Option<usize>,
 
+    /// Collapse consecutive standalone closing `)` lines of nested `(...)` groups onto a single
+    /// standalone line (`))))`), aligned to the indentation of the outermost closing `)` line. Off,
+    /// each closing `)` stays on its own line.
+    #[config(key = "map.collapse_closing_parens", default = false)]
+    pub map_collapse_closing_parens: bool,
+
     /// How the title of a section is written: `bracketed` (`===[ title ]`) or `bare` (`=== title`) ([`SectionTitleStyle`]).
     /// Unset, the formatter leaves each section as written, and the printer writes `bracketed`.
     #[config(

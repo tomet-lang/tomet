@@ -772,3 +772,53 @@ fn declaration_blank_lines_format_source_with_config() {
     let expected = "::kind(fixture)\n::meta(x: 1)\n\nSome paragraph text.\n";
     assert_eq!(formatted, expected);
 }
+
+#[test]
+fn collapse_closing_parens_format_source_with_config() {
+    let src = "\
+::format(
+  meta: (always_newline: true)
+  heading: (space_inside_brackets: true)
+  element: (
+    table: (adjust_width: auto)
+    callout: (
+      style: (
+        content: block
+      )
+    )
+  )
+)
+";
+    // Off by default.
+    assert_eq!(
+        format_source_with_config(src, &PrinterConfig::default()),
+        src
+    );
+
+    let config = PrinterConfig {
+        format: FormatConfig {
+            map_align_values: true,
+            map_collapse_closing_parens: true,
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+    let formatted = format_source_with_config(src, &config);
+    let expected = "\
+::format(
+  meta:    (always_newline: true)
+  heading: (space_inside_brackets: true)
+  element: (
+    table: (adjust_width: auto)
+    callout: (
+      style: (
+        content: block
+))))
+";
+    assert_eq!(formatted, expected);
+    assert_eq!(
+        tomet_ast_parser::parse_file(&formatted).unwrap(),
+        tomet_ast_parser::parse_file(src).unwrap()
+    );
+    assert_eq!(format_source_with_config(&formatted, &config), formatted);
+}
