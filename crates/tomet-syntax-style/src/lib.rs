@@ -13,10 +13,12 @@
 //! - [`BracketSpacing`] and [`ColonSpacing`]: the spaces inside a section heading's brackets and after the
 //!   colon of an element's lone `target` argument.
 //! - [`GroupLayout`]: how the entries of a `(...)` group are laid out over lines.
+//! - [`MultilineComma`]: how commas are written on the entries of a multi-line `(...)` group.
 //! - [`ContentLayout`]: how content that runs over several lines is laid out between its brackets.
 //! - [`FenceLines`]: how the body lines of a fenced code block are written (`Marked` or `Bare`).
 
 mod align;
+mod comma;
 mod content;
 mod fence;
 mod group;
@@ -26,6 +28,7 @@ mod separator;
 mod spacing;
 
 pub use align::ValueAlignment;
+pub use comma::MultilineComma;
 pub use content::ContentLayout;
 pub use fence::FenceLines;
 pub use group::GroupLayout;

@@ -23,8 +23,10 @@
 //! (e.g. `element.table.adjust_width`, `element.table.max_col_width`, `element.table.align`), sets paragraphs
 //! off by a blank line or a `;` (`paragraph.separator`, [`format_paragraph_separators`]),
 //! aligns the values of a multi-line `(...)` group (`map.align_values`,
-//! [`format_map_alignment`]), collapses consecutive standalone closing `)` lines of nested `(...)`
-//! groups (`map.collapse_closing_parens`, [`format_closing_parens`]), lays out the content of a
+//! [`format_map_alignment`]), formats optional commas in multi-line `(...)` groups
+//! (`map.multiline_comma`, [`format_multiline_commas`]), collapses consecutive standalone closing
+//! `)` lines of nested `(...)` groups (`map.collapse_closing_parens`, [`format_closing_parens`]),
+//! lays out the content of a
 //! callout or a list item that runs over several
 //! lines (`element.callout.style.content`, `list.multiline.style.content`, [`format_content_layouts`]), formats
 //! section titles and bracket spacing (`section.title`, `section.space_inside_brackets`, [`format_section_titles`],
@@ -38,6 +40,7 @@
 
 pub mod align;
 pub mod clean;
+pub mod comma;
 pub mod data;
 pub mod declaration;
 mod edit;
@@ -57,6 +60,7 @@ mod tests;
 
 pub use align::format_map_alignment;
 pub use clean::clean_whitespace;
+pub use comma::format_multiline_commas;
 pub use data::format_data_source;
 pub use declaration::format_declaration_blank_lines;
 pub use fence::format_fence_lines;
@@ -93,7 +97,8 @@ pub fn format_source_with_config(src: &str, config: &PrinterConfig) -> String {
     let laid_out = layout::format_content_layouts(&formatted_elements, config);
     let fenced = fence::format_fence_lines(&laid_out, config);
     let metad = meta::format_meta_layout(&fenced, config);
-    let separated = paragraph::format_paragraph_separators(&metad, config);
+    let commad = comma::format_multiline_commas(&metad, config);
+    let separated = paragraph::format_paragraph_separators(&commad, config);
     let aligned = align::format_map_alignment(&separated, config);
     let collapsed = parens::format_closing_parens(&aligned, config);
     let titled = section::format_section_titles(&collapsed, config);

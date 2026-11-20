@@ -65,6 +65,50 @@ pub(crate) fn is_declaration_named(form: &SyntaxNode, name: &str) -> bool {
             .is_some_and(|n| n.text() == name)
 }
 
+/// Whether `args` (`K::ARGS`) is a `(...)` group that layout formatters (`map.*`) may rewrite.
+///
+/// Allows groups belonging to forms, connects, list items, holes, map entries, and sequence items,
+/// while excluding anything inside error recovery, depth-exceeded nodes, fenced code blocks,
+/// interpolation expressions, `$name(...)` interpolations, or `<$type(...)>` type seats.
+pub(crate) fn is_formattable_args_group(args: &SyntaxNode) -> bool {
+    let Some(parent) = args.parent() else {
+        return false;
+    };
+    if !matches!(
+        parent.kind(),
+        K::BLOCK_FORM
+            | K::INLINE_FORM
+            | K::CONNECT
+            | K::LIST_ITEM
+            | K::SLOT
+            | K::MAP_ENTRY
+            | K::SEQ_ITEM
+    ) {
+        return false;
+    }
+
+    for ancestor in args.ancestors().skip(1) {
+        match ancestor.kind() {
+            K::ERROR | K::CODE_BLOCK | K::INTERP_EXPR | K::TOO_DEEP => return false,
+            K::BLOCK_FORM | K::INLINE_FORM if has_dollar_sigil(&ancestor) => return false,
+            K::SLOT if has_dollar_mark(&ancestor) => return false,
+            _ => {}
+        }
+    }
+    true
+}
+
+fn has_dollar_sigil(form: &SyntaxNode) -> bool {
+    form.children()
+        .find(|child| child.kind() == K::SIGIL)
+        .and_then(|sigil| sigil.first_token())
+        .is_some_and(|tok| tok.kind() == K::DOLLAR)
+}
+
+fn has_dollar_mark(slot: &SyntaxNode) -> bool {
+    slot.children_with_tokens().any(|el| el.kind() == K::DOLLAR)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -123,9 +123,12 @@ impl Scan {
         self.depth == 0 && self.quote.is_none()
     }
 
-    /// Takes in `line`; whether a `,` stood at the top level of it.
+    /// Takes in `line`; whether a `,` stood at the top level followed by more code on the same
+    /// line (e.g. `a: 1, b: 2`). A trailing comma at the end of a single-entry line (`a: 1,` or
+    /// `a: 1, // note`) does not end the run.
     fn take(&mut self, line: &str) -> bool {
-        let mut comma = false;
+        let mut saw_comma = false;
+        let mut extra_on_line = false;
         let mut prev: Option<char> = None;
         let mut chars = line.chars().peekable();
         while let Some(c) = chars.next() {
@@ -137,24 +140,52 @@ impl Scan {
                 }
             } else {
                 match c {
-                    '"' => self.quote = Some('"'),
+                    '"' => {
+                        if saw_comma && self.depth == 0 {
+                            extra_on_line = true;
+                        }
+                        self.quote = Some('"');
+                    }
                     // An apostrophe inside a word (`don't`) is text, not a quote.
-                    '\'' if !prev.is_some_and(char::is_alphanumeric) => self.quote = Some('\''),
-                    '(' | '[' | '{' => self.depth += 1,
-                    ')' | ']' | '}' => match self.depth.checked_sub(1) {
-                        Some(depth) => self.depth = depth,
-                        None => self.broken = true,
-                    },
-                    ',' if self.depth == 0 => comma = true,
+                    '\'' if !prev.is_some_and(char::is_alphanumeric) => {
+                        if saw_comma && self.depth == 0 {
+                            extra_on_line = true;
+                        }
+                        self.quote = Some('\'');
+                    }
+                    '(' | '[' | '{' => {
+                        if saw_comma && self.depth == 0 {
+                            extra_on_line = true;
+                        }
+                        self.depth += 1;
+                    }
+                    ')' | ']' | '}' => {
+                        if saw_comma && self.depth == 0 {
+                            extra_on_line = true;
+                        }
+                        match self.depth.checked_sub(1) {
+                            Some(depth) => self.depth = depth,
+                            None => self.broken = true,
+                        }
+                    }
+                    ',' if self.depth == 0 => {
+                        if saw_comma {
+                            extra_on_line = true;
+                        }
+                        saw_comma = true;
+                    }
                     '/' if chars.peek() == Some(&'/') && prev.is_none_or(char::is_whitespace) => {
                         break;
+                    }
+                    c if saw_comma && self.depth == 0 && !c.is_whitespace() => {
+                        extra_on_line = true;
                     }
                     _ => {}
                 }
             }
             prev = Some(c);
         }
-        comma
+        extra_on_line
     }
 }
 

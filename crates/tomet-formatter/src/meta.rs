@@ -3,7 +3,7 @@
 use tomet_config::PrinterConfig;
 use tomet_cst::{SyntaxElement, SyntaxKind as K, SyntaxNode};
 use tomet_cst_parser::parse_cst;
-use tomet_style::GroupLayout;
+use tomet_style::{GroupLayout, MultilineComma};
 
 use crate::edit::{Edit, apply_keeping_the_document, is_declaration_named, leading_indent};
 
@@ -18,11 +18,15 @@ pub fn format_meta_layout(src: &str, config: &PrinterConfig) -> String {
     let Some(layout) = config.meta.field_layout else {
         return src.to_string();
     };
+    let comma = config
+        .format
+        .map_multiline_comma
+        .unwrap_or(MultilineComma::Never);
     let root = parse_cst(src);
     let edits: Vec<Edit> = root
         .descendants()
         .filter(|node| node.kind() == K::BLOCK_FORM && is_declaration_named(node, "meta"))
-        .filter_map(|meta| edit(src, &meta, layout))
+        .filter_map(|meta| edit(src, &meta, layout, comma))
         .collect();
     if edits.is_empty() {
         return src.to_string();
@@ -46,7 +50,7 @@ fn field_text(entry: &SyntaxNode) -> Option<String> {
 }
 
 /// The change that lays the form's args out as `layout` says, if it is not already.
-fn edit(src: &str, form: &SyntaxNode, layout: GroupLayout) -> Option<Edit> {
+fn edit(src: &str, form: &SyntaxNode, layout: GroupLayout, comma: MultilineComma) -> Option<Edit> {
     let mut args = form.children().filter(|child| child.kind() == K::ARGS);
     let (args, None) = (args.next()?, args.next()) else {
         return None;
@@ -76,7 +80,7 @@ fn edit(src: &str, form: &SyntaxNode, layout: GroupLayout) -> Option<Edit> {
 
     let start = usize::from(form.text_range().start());
     let indent = leading_indent(src, start);
-    let text = layout.render(&fields, indent);
+    let text = layout.render_with_comma(&fields, indent, comma);
     let range = args.text_range();
     (src[usize::from(range.start())..usize::from(range.end())] != text)
         .then(|| (usize::from(range.start()), usize::from(range.end()), text))

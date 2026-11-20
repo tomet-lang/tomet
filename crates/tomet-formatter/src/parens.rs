@@ -5,11 +5,11 @@ use std::collections::HashSet;
 
 use tomet_ast_parser::parse_file;
 use tomet_config::PrinterConfig;
-use tomet_cst::{SyntaxKind as K, SyntaxNode};
+use tomet_cst::SyntaxKind as K;
 use tomet_cst_parser::parse_cst;
 
 use crate::clean::collect_raw_spans;
-use crate::edit::{Edit, apply_keeping_the_document};
+use crate::edit::{Edit, apply_keeping_the_document, is_formattable_args_group};
 
 /// Collapses consecutive standalone closing `)` lines of nested `(...)` groups onto a single
 /// standalone line (`))))`), aligned to the leading whitespace of the outermost closing `)` line,
@@ -50,7 +50,7 @@ fn collect_closing_paren_offsets(src: &str, raw_spans: &[(usize, usize)]) -> Has
     let root = parse_cst(src);
     let mut offsets = HashSet::new();
     for node in root.descendants() {
-        if node.kind() != K::ARGS || !is_collapsible_args_group(&node) {
+        if node.kind() != K::ARGS || !is_formattable_args_group(&node) {
             continue;
         }
         let Some(open) = node.first_token().filter(|tok| tok.kind() == K::L_PAREN) else {
@@ -69,47 +69,6 @@ fn collect_closing_paren_offsets(src: &str, raw_spans: &[(usize, usize)]) -> Has
         }
     }
     offsets
-}
-
-fn is_collapsible_args_group(args: &SyntaxNode) -> bool {
-    let Some(parent) = args.parent() else {
-        return false;
-    };
-    if !matches!(
-        parent.kind(),
-        K::BLOCK_FORM
-            | K::INLINE_FORM
-            | K::CONNECT
-            | K::LIST_ITEM
-            | K::SLOT
-            | K::MAP_ENTRY
-            | K::SEQ_ITEM
-    ) {
-        return false;
-    }
-
-    // Never touch anything inside error recovery, fenced code blocks, interpolation expressions,
-    // `$name(...)` interpolations, or `<$type(...)>` type seats.
-    for ancestor in args.ancestors().skip(1) {
-        match ancestor.kind() {
-            K::ERROR | K::CODE_BLOCK | K::INTERP_EXPR => return false,
-            K::BLOCK_FORM | K::INLINE_FORM if has_dollar_sigil(&ancestor) => return false,
-            K::SLOT if has_dollar_mark(&ancestor) => return false,
-            _ => {}
-        }
-    }
-    true
-}
-
-fn has_dollar_sigil(form: &SyntaxNode) -> bool {
-    form.children()
-        .find(|child| child.kind() == K::SIGIL)
-        .and_then(|sigil| sigil.first_token())
-        .is_some_and(|tok| tok.kind() == K::DOLLAR)
-}
-
-fn has_dollar_mark(slot: &SyntaxNode) -> bool {
-    slot.children_with_tokens().any(|el| el.kind() == K::DOLLAR)
 }
 
 struct ClosingLine<'a> {

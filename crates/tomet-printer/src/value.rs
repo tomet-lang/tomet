@@ -10,7 +10,7 @@ use crate::inline::render_content_blocks;
 use tomet_ast::{Block, Declaration, Entry, Group, Tuple, Value};
 use tomet_config::{FieldConfig, PrinterConfig};
 use tomet_spelling::{key_text, scalar_spelling};
-use tomet_style::{ColonSpacing, GroupLayout, ValueAlignment};
+use tomet_style::{ColonSpacing, GroupLayout, MultilineComma, ValueAlignment};
 use tomet_tree::ValueExt;
 
 /// What stands between the colon of a link's `target` and its value: a space unless asked not to.
@@ -240,6 +240,11 @@ pub(crate) fn render_meta_declaration(declaration: &Declaration, config: &Printe
         let alignment = config.format.map_align_values.then(|| ValueAlignment {
             widest_key: config.format.max_key_width(),
         });
+        let comma = config
+            .format
+            .map_multiline_comma
+            .unwrap_or(MultilineComma::Never);
+        let has_block_list_row = rows.iter().any(|(_, value)| value.starts_with('\n'));
         let entries: Vec<String> = rows
             .iter()
             .enumerate()
@@ -259,10 +264,23 @@ pub(crate) fn render_meta_declaration(declaration: &Declaration, config: &Printe
                     None if on_the_line(value) => 1,
                     _ => 0,
                 };
-                format!("{key}:{}{value}", " ".repeat(pad))
+                let suffix = if has_block_list_row
+                    && !value.starts_with('\n')
+                    && comma.trailing_for(i, rows.len())
+                {
+                    ","
+                } else {
+                    ""
+                };
+                format!("{key}:{}{value}{suffix}", " ".repeat(pad))
             })
             .collect();
-        return format!("{head}{}", GroupLayout::OnePerLine.render(&entries, ""));
+        let rendered = if has_block_list_row {
+            GroupLayout::OnePerLine.render(&entries, "")
+        } else {
+            GroupLayout::OnePerLine.render_with_comma(&entries, "", comma)
+        };
+        return format!("{head}{rendered}");
     }
 
     let mut out = String::from(head);
@@ -563,6 +581,60 @@ mod tests {
         assert_eq!(
             render_meta_declaration(&el, &cfg),
             "::meta(\n  plain.key: 1\n  \"tmtroot/a b.tmt\": 2\n)"
+        );
+    }
+
+    #[test]
+    fn render_meta_declaration_honors_multiline_comma_and_guards_block_lists() {
+        let text = |s: &str| Value::Scalar(Scalar::Text(s.to_string()));
+        let mut el = tomet_tree::declaration_new("meta");
+        el.data.args = Some(Tuple::from_named([
+            ("id".to_string(), text("x")),
+            ("title".to_string(), text("T")),
+        ]));
+
+        let mut cfg = PrinterConfig::default();
+        cfg.meta.field_layout = Some(tomet_style::GroupLayout::OnePerLine);
+        cfg.format.map_align_values = true;
+
+        cfg.format.map_multiline_comma = Some(tomet_style::MultilineComma::Never);
+        assert_eq!(
+            render_meta_declaration(&el, &cfg),
+            "::meta(\n  id:    x\n  title: T\n)"
+        );
+
+        cfg.format.map_multiline_comma = Some(tomet_style::MultilineComma::Between);
+        assert_eq!(
+            render_meta_declaration(&el, &cfg),
+            "::meta(\n  id:    x,\n  title: T\n)"
+        );
+
+        cfg.format.map_multiline_comma = Some(tomet_style::MultilineComma::Always);
+        assert_eq!(
+            render_meta_declaration(&el, &cfg),
+            "::meta(\n  id:    x,\n  title: T,\n)"
+        );
+
+        // With an `always_newline` block list field (`- item`), commas are added only to normal
+        // lines and never appended onto `- item` lines.
+        el.data.args = Some(Tuple::from_named([
+            ("id".to_string(), text("x")),
+            (
+                "tags".to_string(),
+                Value::Tuple(Tuple::from_unnamed(vec![text("a"), text("b")])),
+            ),
+            ("kind".to_string(), text("k")),
+        ]));
+        cfg.meta.fields.insert(
+            "tags".to_string(),
+            tomet_config::FieldConfig {
+                always_newline: true,
+                ..Default::default()
+            },
+        );
+        assert_eq!(
+            render_meta_declaration(&el, &cfg),
+            "::meta(\n  id: x,\n  tags:\n    - a\n    - b\n  kind: k,\n)"
         );
     }
 }

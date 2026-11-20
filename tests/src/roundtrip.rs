@@ -216,6 +216,52 @@ fn collapsing_closing_parens_does_not_change_the_parsed_document() {
 }
 
 #[test]
+fn multiline_commas_do_not_change_the_parsed_document() {
+    use tomet_config::{FormatConfig, PrinterConfig};
+    use tomet_style::MultilineComma;
+
+    for style in MultilineComma::ALL {
+        let config = PrinterConfig {
+            format: FormatConfig {
+                map_multiline_comma: Some(style),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        let mut changed = 0;
+        for (rel, src) in parseable_corpus() {
+            let before = tomet_ast_parser::parse_file(&src)
+                .unwrap_or_else(|e| panic!("{} failed to parse: {e}", rel.display()));
+            let once = tomet_formatter::format_source_with_config(&src, &config);
+            let after = tomet_ast_parser::parse_file(&once).unwrap_or_else(|e| {
+                panic!(
+                    "{} failed to parse after multiline comma formatting ({style:?}): {e}",
+                    rel.display()
+                )
+            });
+            assert!(
+                before == after,
+                "multiline comma formatting ({style:?}) changed the parsed document for {}",
+                rel.display()
+            );
+            assert_eq!(
+                tomet_formatter::format_source_with_config(&once, &config),
+                once,
+                "multiline comma formatting ({style:?}) is not idempotent for {}",
+                rel.display()
+            );
+            if once != tomet_formatter::format_source_with_config(&src, &PrinterConfig::default()) {
+                changed += 1;
+            }
+        }
+        assert!(
+            changed > 0,
+            "no fixture was rewritten by multiline comma formatting ({style:?})"
+        );
+    }
+}
+
+#[test]
 fn section_blank_lines_do_not_change_the_parsed_document() {
     use tomet_config::{FormatConfig, PrinterConfig};
 

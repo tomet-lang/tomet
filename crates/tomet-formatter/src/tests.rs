@@ -822,3 +822,112 @@ fn collapse_closing_parens_format_source_with_config() {
     );
     assert_eq!(format_source_with_config(&formatted, &config), formatted);
 }
+
+#[test]
+fn multiline_comma_integrates_with_meta_align_and_collapse_parens() {
+    use tomet_style::MultilineComma;
+
+    let src = "\
+::meta(id: doc-1, title: Hello)
+
+::format(
+  meta: (always_newline: true),
+  heading: (space_inside_brackets: true),
+  element: (
+    table: (adjust_width: auto)
+    callout: (
+      style: (
+        content: block
+      )
+    )
+  )
+)
+";
+
+    let check = |config: &PrinterConfig, want: &str| {
+        let out = format_source_with_config(src, config);
+        assert_eq!(out, want);
+        assert_eq!(
+            tomet_ast_parser::parse_file(&out).unwrap(),
+            tomet_ast_parser::parse_file(src).unwrap()
+        );
+        assert_eq!(format_source_with_config(&out, config), out);
+    };
+
+    // Never + align + collapse_closing_parens + meta.always_newline:
+    let mut cfg_never = PrinterConfig::default();
+    cfg_never.meta.field_layout = Some(tomet_style::GroupLayout::OnePerLine);
+    cfg_never.format.map_align_values = true;
+    cfg_never.format.map_collapse_closing_parens = true;
+    cfg_never.format.map_multiline_comma = Some(MultilineComma::Never);
+    check(
+        &cfg_never,
+        "\
+::meta(
+  id:    doc-1
+  title: Hello
+)
+
+::format(
+  meta:    (always_newline: true)
+  heading: (space_inside_brackets: true)
+  element: (
+    table: (adjust_width: auto)
+    callout: (
+      style: (
+        content: block
+))))
+",
+    );
+
+    // Between + align + collapse_closing_parens + meta.always_newline:
+    // Trailing entries omit `,` so their closing `)` lines still collapse cleanly.
+    let mut cfg_between = cfg_never.clone();
+    cfg_between.format.map_multiline_comma = Some(MultilineComma::Between);
+    check(
+        &cfg_between,
+        "\
+::meta(
+  id:    doc-1,
+  title: Hello
+)
+
+::format(
+  meta:    (always_newline: true),
+  heading: (space_inside_brackets: true),
+  element: (
+    table: (adjust_width: auto),
+    callout: (
+      style: (
+        content: block
+))))
+",
+    );
+
+    // Always + align + collapse_closing_parens + meta.always_newline:
+    // Every closing `)` line carries `,`, so collapse_closing_parens leaves them separate.
+    let mut cfg_always = cfg_never.clone();
+    cfg_always.format.map_multiline_comma = Some(MultilineComma::Always);
+    check(
+        &cfg_always,
+        "\
+::meta(
+  id:    doc-1,
+  title: Hello,
+)
+
+::format(
+  meta:    (always_newline: true),
+  heading: (space_inside_brackets: true),
+  element: (
+    table: (adjust_width: auto),
+    callout: (
+      style: (
+        content: block,
+      ),
+    ),
+  ),
+)
+",
+    );
+}

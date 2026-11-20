@@ -6,8 +6,8 @@ use tomet_ast::Value;
 use tomet_scalar::Scalar;
 use tomet_spec_derive::Config;
 use tomet_style::{
-    BracketSpacing, ColonSpacing, ContentLayout, FenceLines, GroupOrder, ParagraphSeparator,
-    SectionTitleStyle,
+    BracketSpacing, ColonSpacing, ContentLayout, FenceLines, GroupOrder, MultilineComma,
+    ParagraphSeparator, SectionTitleStyle,
 };
 use tomet_tree::ValueExt;
 
@@ -57,6 +57,10 @@ fn parse_content_layout(value: &Value) -> Option<ContentLayout> {
 
 fn parse_fence_lines(value: &Value) -> Option<FenceLines> {
     FenceLines::from_name(value.as_str()?)
+}
+
+fn parse_multiline_comma(value: &Value) -> Option<MultilineComma> {
+    MultilineComma::from_name(value.as_str()?)
 }
 
 /// Configuration for a specific element type (e.g. `element.link.*`, `element.table.*`, or custom `element.<name>.*`).
@@ -178,6 +182,18 @@ pub struct FormatConfig {
     /// each closing `)` stays on its own line.
     #[config(key = "map.collapse_closing_parens", default = false)]
     pub map_collapse_closing_parens: bool,
+
+    /// How commas are written on the entries of a multi-line `(...)` group: `never`, `between`, or
+    /// `always` ([`MultilineComma`]). `never` omits optional line-ending and trailing commas;
+    /// `between` places commas between entries with no trailing comma; `always` places commas on
+    /// every entry including the last. Unset, the formatter leaves commas as written and the
+    /// printer omits line-ending commas.
+    #[config(
+        key = "map.multiline_comma",
+        type = "string",
+        parse_with = "parse_multiline_comma"
+    )]
+    pub map_multiline_comma: Option<MultilineComma>,
 
     /// How the title of a section is written: `bracketed` (`===[ title ]`) or `bare` (`=== title`) ([`SectionTitleStyle`]).
     /// Unset, the formatter leaves each section as written, and the printer writes `bracketed`.

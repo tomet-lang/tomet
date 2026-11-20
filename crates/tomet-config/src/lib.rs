@@ -507,4 +507,28 @@ mod tests {
         let cfg = load_config_from_str("::workspace(ignore: (\"target\",))\n").expect("parses");
         assert_eq!(cfg.workspace.ignore, vec!["target"]);
     }
+
+    #[test]
+    fn multiline_comma_is_unset_never_between_or_always() {
+        let load = |src: &str| {
+            load_config_from_str(src)
+                .expect("failed to parse format")
+                .format
+                .map_multiline_comma
+        };
+        assert_eq!(load("::format()\n"), None);
+        assert_eq!(
+            load("::format(map: (multiline_comma: never))\n"),
+            Some(tomet_style::MultilineComma::Never)
+        );
+        assert_eq!(
+            load("::format(map: (multiline_comma: \"between\"))\n"),
+            Some(tomet_style::MultilineComma::Between)
+        );
+        assert_eq!(
+            load("::format(map.multiline_comma: always)\n"),
+            Some(tomet_style::MultilineComma::Always)
+        );
+        assert_eq!(load("::format(map: (multiline_comma: unknown))\n"), None);
+    }
 }

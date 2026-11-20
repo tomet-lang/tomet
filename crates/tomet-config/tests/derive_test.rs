@@ -134,6 +134,12 @@ fn test_all_config_specs_coverage() {
             .iter()
             .any(|e| e.key == "map.collapse_closing_parens")
     );
+    assert!(
+        format_group
+            .entries
+            .iter()
+            .any(|e| e.key == "map.multiline_comma")
+    );
 
     let meta_group = specs.iter().find(|g| g.name == "meta").unwrap();
     assert!(
