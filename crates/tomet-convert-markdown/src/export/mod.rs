@@ -21,14 +21,16 @@ use tomet_ast::{
 };
 use tomet_scalar::Scalar;
 use tomet_semantics::{
-    FootnoteRegistry, LIST_MARKER_POSITIONAL_KEY, TargetScheme, classify_std_lenient, comment_text,
-    element_args_view, extract_tags, heading_level, is_attribute_key, is_directive, link_target,
-    list_marker_view, path_target, target_scheme,
+    Bindings, ElementKind, FootnoteRegistry, LIST_MARKER_POSITIONAL_KEY, TargetScheme,
+    comment_text, element_args_view, extract_tags, heading_level, is_attribute_key, is_directive,
+    link_target, list_marker_view, path_target, target_scheme,
 };
 use tomet_tree::ValueExt;
 
 struct MarkdownCtx<'a> {
     footnotes: &'a FootnoteRegistry,
+    /// The names the document has in scope, as its caller bound them.
+    bindings: &'a Bindings,
 }
 
 /// Renders `doc` as CommonMark.
@@ -38,10 +40,16 @@ struct MarkdownCtx<'a> {
 /// `tomet-transform`'s `resolve_expressions` (reached through
 /// `tomet_load::Vault::prepare`), because converters deciding it
 /// independently would produce different answers for the same document.
-pub fn to_markdown(doc: &File) -> String {
+///
+/// `bindings` are the names `doc` has in scope (`Bindings` in `tomet-semantics`): an element is
+/// what its name resolves to there, so an aliased `@ng.node` is written as the `node-graph.node`
+/// it is. Whoever loaded the document builds them (a vault's `bindings`); a caller with no vault
+/// binds the vocabularies tomet carries (`LoadedVocabularies::default().bindings_for(doc)`).
+pub fn to_markdown(doc: &File, bindings: &Bindings) -> String {
     let footnotes = FootnoteRegistry::from_file(doc);
     let cx = MarkdownCtx {
         footnotes: &footnotes,
+        bindings,
     };
     let mut out = String::new();
     for block in &doc.body {
@@ -243,7 +251,7 @@ fn inline_to_md(cx: &MarkdownCtx, inlines: &[Inline]) -> String {
 }
 
 fn element_to_md(cx: &MarkdownCtx, el: ElementView<'_>, inline: bool) -> String {
-    let kind = classify_std_lenient(el);
+    let kind = cx.bindings.classify_lenient(el.name);
     match kind.as_str() {
         // Directives configure or annotate the document and have no
         // rendering of their own. The list lives in `tomet-semantics` so
@@ -267,9 +275,9 @@ fn element_to_md(cx: &MarkdownCtx, el: ElementView<'_>, inline: bool) -> String 
         "callout" => render_callout(cx, el),
         "conflict" => render_conflict(cx, el, inline),
         "table" => render_table(cx, el),
-        "link" => render_link(cx, el),
-        "file" | "dir" => render_path(cx, el, inline),
-        "embed" => render_embed(el),
+        "link" => render_link(cx, el, &kind),
+        "file" | "dir" => render_path(cx, el, &kind, inline),
+        "embed" => render_embed(el, &kind),
         "ftn" => {
             if inline || el.placement == Placement::Inline {
                 if let Some((idx, _)) = cx.footnotes.get_ref(&el.span) {
@@ -501,8 +509,8 @@ fn render_callout(cx: &MarkdownCtx, el: ElementView<'_>) -> String {
 /// exported Markdown byte-identical. The import direction cannot recover
 /// it -- a code span in Markdown is a code span, and nothing in it says
 /// whether the author meant a path.
-fn render_path(cx: &MarkdownCtx, el: ElementView<'_>, inline: bool) -> String {
-    let path = path_target(el, &classify_std_lenient(el)).unwrap_or_default();
+fn render_path(cx: &MarkdownCtx, el: ElementView<'_>, kind: &ElementKind, inline: bool) -> String {
+    let path = path_target(el, kind).unwrap_or_default();
     let content = match el.content {
         Some(content) if !content.is_empty() => Some(blocks_to_md(cx, content)),
         _ => None,
@@ -519,8 +527,8 @@ fn render_path(cx: &MarkdownCtx, el: ElementView<'_>, inline: bool) -> String {
     }
 }
 
-fn render_link(cx: &MarkdownCtx, el: ElementView<'_>) -> String {
-    let raw_target = link_target(el, &classify_std_lenient(el)).unwrap_or_default();
+fn render_link(cx: &MarkdownCtx, el: ElementView<'_>, kind: &ElementKind) -> String {
+    let raw_target = link_target(el, kind).unwrap_or_default();
     let (scheme, target) = target_scheme(&raw_target);
     let text = match el.content {
         Some(content) if !content.is_empty() => blocks_to_md(cx, content),
@@ -561,8 +569,8 @@ fn render_link(cx: &MarkdownCtx, el: ElementView<'_>) -> String {
 /// Strips `target`'s scheme prefix the same way `render_link` does -- see
 /// `tomet-html`'s `render_embed_element` for why `<embed>`
 /// needs this too, not just a raw passthrough.
-fn render_embed(el: ElementView<'_>) -> String {
-    let raw_target = link_target(el, &classify_std_lenient(el)).unwrap_or_default();
+fn render_embed(el: ElementView<'_>, kind: &ElementKind) -> String {
+    let raw_target = link_target(el, kind).unwrap_or_default();
     let (_, src) = target_scheme(&raw_target);
     let alt = el.content.map(blocks_to_plain).unwrap_or_default();
     format!("![{alt}]({src})")

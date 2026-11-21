@@ -80,9 +80,9 @@ pub use flatten::{
 };
 pub use kind::{
     ContentShape, ElementKind, Shape, UnknownName, builtin_content_shape, builtin_kinds,
-    builtin_region, classify_declaration, classify_declaration_lenient, classify_std,
-    classify_std_lenient, classify_std_name, is_directive, refuse_declaration_as_element,
-    required_shape, shape_mismatch,
+    classify_declaration, classify_declaration_lenient, classify_std, classify_std_attribute_name,
+    classify_std_lenient, classify_std_name, is_directive, is_written_in_std, required_shape,
+    shape_mismatch,
 };
 pub use positional::{
     LIST_MARKER_POSITIONAL_KEY, builtin_positional_arg_keys, constructor_args_view,
@@ -95,8 +95,9 @@ pub use tomet_declaration::DeclKind;
 pub use tomet_semantics_core::TupleView;
 pub use tomet_tree::{ElementExt, ValueExt};
 pub use vocabulary::{
-    Bindings, CONSTRUCTOR_KEYS, CallError, Constructed, ConstructorDecl, ConstructorProblem,
-    ContentAllow, ElementDecl, LoadedVocabularies, PARAM_KEYS, ParamDecl, RESERVED_ELEMENT_NAMES,
-    RESERVED_NAMESPACES, Region, Vocabulary, builtin_doc_vocabularies, check_call_params,
-    constructor_problems_in, is_reserved_element_name, read_call,
+    ATTRIBUTE_KEYS, AttributeDecl, Bindings, CONSTRUCTOR_KEYS, CallError, Constructed,
+    ConstructorDecl, ContentAllow, ELEMENT_KEYS, ElementDecl, EntryProblem, HOST_VALUES,
+    LoadedVocabularies, PARAM_KEYS, ParamDecl, RESERVED_ELEMENT_NAMES, RESERVED_NAMESPACES, TABLES,
+    USE_ARGS, Use, UseProblem, Vocabulary, builtin_doc_vocabularies, check_call_params,
+    entry_problems_in, is_alias, is_reserved_element_name, read_call, use_problems, uses,
 };

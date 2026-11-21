@@ -413,10 +413,7 @@ fn check_ctmt_declarations_reports_expected_diagnostics() {
     assert_eq!(errors.len(), 4);
     assert!(errors.iter().any(|e| matches!(
         e,
-        Diagnostic::NotForThisHost {
-            declaration: "export",
-            ..
-        }
+        Diagnostic::NotForThisHost { declaration, .. } if declaration == "export"
     )));
     assert!(errors.iter().any(
         |e| matches!(e, Diagnostic::DuplicateSingleton { name, first, duplicate } if name == "meta" && *first == spans[4] && *duplicate == spans[5])

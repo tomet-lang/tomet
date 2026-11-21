@@ -6,8 +6,8 @@ use tomet_eval::evaluate;
 use tomet_expr::{DocRef, EvalContext, EvalValue, MemoryResolver};
 use tomet_scalar::Scalar;
 use tomet_semantics::{
-    ElementKind, TupleView, classify_declaration_lenient, classify_std_lenient,
-    declaration_args_view, element_args_view, heading_level,
+    Bindings, ElementKind, LoadedVocabularies, TupleView, declaration_args_view_in,
+    element_args_view, element_args_view_in, heading_level,
 };
 use tomet_span::Span;
 use tomet_spelling::scalar_spelling;
@@ -28,24 +28,34 @@ pub type Evaluate<'a> =
 /// alone.
 ///
 /// An expression is evaluated against this one document and its settings, so
-/// what reaches for another file fails and says so. A document that has a
-/// vault is better served by [`hover_in`], with the vault's evaluation.
+/// what reaches for another file fails and says so, and its names are bound
+/// against the vocabularies tomet carries alone. A document that has a vault is
+/// better served by [`hover_in`], with the vault's bindings and evaluation.
 pub fn hover_for(text: &str, pos: Position, uri: Option<&Uri>) -> Option<Hover> {
     let doc = tomet_ast_parser::parse_file(text).ok()?;
     let config = resolve_effective_config(&doc, uri);
-    hover_in(text, pos, &|doc, expr| {
+    let bindings = LoadedVocabularies::default().bindings_for(&doc);
+    hover_in(text, &doc, &bindings, pos, &|doc, expr| {
         evaluate_for_hover(doc, expr, &config)
     })
 }
 
-/// [`hover_for`], with `evaluate` deciding what an expression comes to.
-pub fn hover_in(text: &str, pos: Position, evaluate: Evaluate<'_>) -> Option<Hover> {
-    let doc = tomet_ast_parser::parse_file(text).ok()?;
+/// [`hover_for`] over `doc`, parsed from `text`, with `bindings` saying what its names are (an
+/// element or declaration is shown as what it resolves to there: `@ng.node` under
+/// `::use(node-graph, as: ng)` is `node-graph.node`) and `evaluate` what an expression comes to.
+pub fn hover_in(
+    text: &str,
+    doc: &File,
+    bindings: &Bindings,
+    pos: Position,
+    evaluate: Evaluate<'_>,
+) -> Option<Hover> {
     let positions = TextPositions::new(text);
     let offset = positions.offset(pos);
 
     struct HoverFinder<'a> {
         doc: &'a File,
+        bindings: &'a Bindings,
         evaluate: Evaluate<'a>,
         text: &'a str,
         positions: &'a TextPositions<'a>,
@@ -73,7 +83,7 @@ pub fn hover_in(text: &str, pos: Position, evaluate: Evaluate<'_>) -> Option<Hov
             let span = el.span;
             if span_contains(&span, self.offset) {
                 let view = el.as_view();
-                let kind = classify_std_lenient(view);
+                let kind = self.bindings.classify_lenient(&el.name);
                 let hover = if kind == ElementKind::Table {
                     table_hover(self.positions, self.text, self.pos, el)
                 } else if let Some(h) = macro_hover(self.positions, self.doc, self.evaluate, el) {
@@ -92,7 +102,7 @@ pub fn hover_in(text: &str, pos: Position, evaluate: Evaluate<'_>) -> Option<Hov
                 } else {
                     let mut desc = format!("**Element**: `{}`\n", format!("@{}", el.name));
                     desc.push_str(&format!("- **Classification**: `{}`\n", kind.as_str()));
-                    if let Some(norm_args) = element_args_view(view) {
+                    if let Some(norm_args) = element_args_view_in(view, self.bindings) {
                         desc.push_str(&format!(
                             "- **Normalized Args**: `{:?}`\n",
                             norm_args.tuple()
@@ -114,7 +124,8 @@ pub fn hover_in(text: &str, pos: Position, evaluate: Evaluate<'_>) -> Option<Hov
     }
 
     let mut finder = HoverFinder {
-        doc: &doc,
+        doc,
+        bindings,
         evaluate,
         text,
         positions: &positions,
@@ -124,7 +135,7 @@ pub fn hover_in(text: &str, pos: Position, evaluate: Evaluate<'_>) -> Option<Hov
         best_width: usize::MAX,
     };
     // A list item is not an element, so the walk below never meets it.
-    for_each_list_item(&doc, |item| {
+    for_each_list_item(doc, |item| {
         if span_contains(&item.span, offset) && item.name.is_none() {
             finder.offer(
                 Hover {
@@ -138,15 +149,15 @@ pub fn hover_in(text: &str, pos: Position, evaluate: Evaluate<'_>) -> Option<Hov
             );
         }
     });
-    for_each_element(&doc, |el| finder.visit(el));
+    for_each_element(doc, |el| finder.visit(el));
 
     // An interpolation is not an element, so the walk above never meets it.
     // It is a leaf, hence the innermost thing under the cursor.
-    for_each_interpolation(&doc, |interp| {
+    for_each_interpolation(doc, |interp| {
         if span_contains(&interp.span, offset) {
             finder.best_match = Some(macro_result_hover(
                 &positions,
-                &doc,
+                doc,
                 evaluate,
                 &interp.expr,
                 interp.span,
@@ -155,9 +166,9 @@ pub fn hover_in(text: &str, pos: Position, evaluate: Evaluate<'_>) -> Option<Hov
     });
 
     // A declaration is not an element either; it is a block of its own.
-    for_each_declaration(&doc, |declaration| {
+    for_each_declaration(doc, |declaration| {
         if span_contains(&declaration.span, offset) {
-            finder.best_match = Some(declaration_hover(&positions, declaration));
+            finder.best_match = Some(declaration_hover(&positions, bindings, declaration));
         }
     });
 
@@ -165,11 +176,15 @@ pub fn hover_in(text: &str, pos: Position, evaluate: Evaluate<'_>) -> Option<Hov
 }
 
 /// The hover for a `::name` declaration: what the standard ones declare, and
-/// what any other is.
-fn declaration_hover(positions: &TextPositions<'_>, declaration: &Declaration) -> Hover {
+/// what any other resolves to in `bindings`.
+fn declaration_hover(
+    positions: &TextPositions<'_>,
+    bindings: &Bindings,
+    declaration: &Declaration,
+) -> Hover {
     let span = declaration.span;
-    let kind = classify_declaration_lenient(declaration);
-    let args = declaration_args_view(declaration);
+    let kind = bindings.classify_attribute_lenient(&declaration.name);
+    let args = declaration_args_view_in(declaration, bindings);
     let text_of = |keys: &[&str]| {
         args.as_ref()
             .and_then(|v| keys.iter().find_map(|key| v.get(key)))

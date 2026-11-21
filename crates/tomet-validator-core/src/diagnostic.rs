@@ -75,6 +75,16 @@ pub enum Diagnostic {
         unbound_namespace: Option<String>,
         span: Span,
     },
+    /// A `::name` that is no attribute in scope: not a standard declaration, and not in the
+    /// `::attribute` table of the document's `::kind` or of a namespace it brought in.
+    UnknownAttribute {
+        name: String,
+        /// Set when the name is namespaced and that namespace is not in
+        /// scope -- a missing `::use` rather than a misspelled attribute.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        unbound_namespace: Option<String>,
+        span: Span,
+    },
     /// A second copy of an element that may appear at most once.
     ///
     /// `singleton` was declared in `docs/spec/builtin-settings.tmt` for
@@ -86,12 +96,13 @@ pub enum Diagnostic {
         first: Span,
         duplicate: Span,
     },
-    /// An element written with the sigil of the other kind: a declaration
-    /// about the document written `@name` (it is `::name`), or content written
+    /// A name written with the sigil of the other table: an attribute about the
+    /// document written `@name` (it is `::name`), or an element of its content written
     /// `::name` (it is `@name`).
     ///
-    /// The sigil says whether something describes the document, and which an
-    /// element is follows from the `Region` its vocabulary declares.
+    /// The sigil says which table a name is looked up in, so which one a name takes
+    /// follows from the table it is in: `std`'s declarations and a vocabulary's
+    /// `::attribute` are `::`, `std`'s body elements and a vocabulary's `::element` are `@`.
     WrongSigil {
         name: String,
         written: &'static str,
@@ -281,9 +292,21 @@ pub enum Diagnostic {
         value: String,
         span: Span,
     },
-    /// A declaration written in a host where it is not permitted.
+    /// A declaration written in a file it may not be written in; `only_in` names the files it
+    /// may be (`tomet_declaration::Scope::files`).
     NotForThisHost {
-        declaration: &'static str,
+        declaration: String,
+        only_in: &'static str,
+        span: Span,
+    },
+    /// A `::use` that does not bring a vocabulary in as written: an argument it does not take,
+    /// an alias that is no bare name or names something else already, or a vocabulary brought in
+    /// twice. `reason` is `tomet_semantics::UseProblem`'s wording; `first` is the earlier
+    /// `::use` of the same vocabulary.
+    InvalidUse {
+        reason: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        first: Option<Span>,
         span: Span,
     },
     /// A `{...}` written on a declaration that takes none: `::meta(){ a: 1 }`. Only the header of
@@ -297,11 +320,6 @@ pub enum Diagnostic {
     /// The `(...)` of a declaration of `name: value` entries holds something else, such as
     /// `::macro(gh)`. `span` is the whole declaration.
     ExpectedEntries {
-        declaration: &'static str,
-        span: Span,
-    },
-    /// A path after the name of a declaration that takes none: `::kind.version(2)`.
-    UnexpectedDeclarationPath {
         declaration: &'static str,
         span: Span,
     },
@@ -341,6 +359,7 @@ impl Diagnostic {
             Diagnostic::MissingRequiredMetaKey { span, .. } => *span,
             Diagnostic::MissingRequiredSection { span, .. } => *span,
             Diagnostic::UnknownElement { span, .. } => *span,
+            Diagnostic::UnknownAttribute { span, .. } => *span,
             Diagnostic::UnknownConnect { span, .. } => *span,
             Diagnostic::DisallowedByRule { span, .. } => *span,
             Diagnostic::ShapeMismatch { span, .. } => *span,
@@ -366,9 +385,9 @@ impl Diagnostic {
             Diagnostic::ContentNotInline { span, .. } => *span,
             Diagnostic::DisallowedInContent { span, .. } => *span,
             Diagnostic::NotForThisHost { span, .. } => *span,
+            Diagnostic::InvalidUse { span, .. } => *span,
             Diagnostic::UnexpectedDeclarationData { span, .. } => *span,
             Diagnostic::ExpectedEntries { span, .. } => *span,
-            Diagnostic::UnexpectedDeclarationPath { span, .. } => *span,
             Diagnostic::UnexpectedDeclarationProse { span, .. } => *span,
             Diagnostic::RetiredDeclaration { span, .. } => *span,
             Diagnostic::TypeSeatOutsideBlueprint { span, .. } => *span,
@@ -466,10 +485,25 @@ impl Diagnostic {
                     tomet_semantics::UnknownName {
                         name: name.clone(),
                         unbound_namespace: unbound_namespace.clone(),
-                        declaration: false,
+                        attribute: false,
+                        wrong_sigil: false,
                     }
                 )
             }
+            Diagnostic::UnknownAttribute {
+                name,
+                unbound_namespace,
+                ..
+            } => write!(
+                f,
+                "{}",
+                tomet_semantics::UnknownName {
+                    name: name.clone(),
+                    unbound_namespace: unbound_namespace.clone(),
+                    attribute: true,
+                    wrong_sigil: false,
+                }
+            ),
             Diagnostic::UnknownConnect { name, .. } => {
                 // One wording, in `tomet_semantics::UnknownConnectMember`,
                 // for the same reason `UnknownElement` above delegates to
@@ -500,18 +534,17 @@ impl Diagnostic {
                     None => Ok(()),
                 }
             }
-            Diagnostic::WrongSigil {
-                name,
-                written,
-                expected,
-                ..
-            } => {
-                write!(
-                    f,
-                    "`{name}` is written `{written}{name}`, but it is content, not a \
-                     declaration about the document: write `{expected}{name}`"
-                )
-            }
+            // One wording, in `tomet_semantics::UnknownName`, as for an unknown name.
+            Diagnostic::WrongSigil { name, written, .. } => write!(
+                f,
+                "{}",
+                tomet_semantics::UnknownName {
+                    name: name.clone(),
+                    unbound_namespace: None,
+                    attribute: *written == "::",
+                    wrong_sigil: true,
+                }
+            ),
             Diagnostic::ShapeMismatch {
                 name,
                 found,
@@ -718,8 +751,17 @@ impl Diagnostic {
                      but `{value}` is not a valid {field_type}"
                 )
             }
-            Diagnostic::NotForThisHost { declaration, .. } => {
-                write!(f, "`::{declaration}` is not permitted in this host")
+            Diagnostic::NotForThisHost {
+                declaration,
+                only_in,
+                ..
+            } => write!(f, "`::{declaration}` may only be written in {only_in}"),
+            Diagnostic::InvalidUse { reason, first, .. } => {
+                write!(f, "{reason}")?;
+                match first.as_ref().and_then(at) {
+                    Some(loc) => write!(f, " (at {loc})"),
+                    None => Ok(()),
+                }
             }
             // One wording, in `tomet_declaration::Problem`, for the problems of a declaration.
             Diagnostic::UnexpectedDeclarationData { declaration, .. } => {
@@ -727,9 +769,6 @@ impl Diagnostic {
             }
             Diagnostic::ExpectedEntries { declaration, .. } => {
                 write!(f, "{}", Problem::ExpectedEntries { declaration })
-            }
-            Diagnostic::UnexpectedDeclarationPath { declaration, .. } => {
-                write!(f, "{}", Problem::UnexpectedPath { declaration })
             }
             Diagnostic::UnexpectedDeclarationProse {
                 declaration,

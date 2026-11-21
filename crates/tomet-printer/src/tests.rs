@@ -52,6 +52,19 @@ fn nested_inline_heading_does_not_reserialize_as_hash_sugar() {
 }
 
 #[test]
+fn a_namespaced_declaration_round_trips_as_written() {
+    for src in [
+        "::catasto.upstream(commonfiles)\n",
+        "::ng.direction(down)\n",
+        "::std.kind(note)\n",
+        "::std.meta(title: T)\n",
+    ] {
+        let doc = tomet_ast_parser::parse_file(src).unwrap();
+        assert_eq!(document_to_tm(&doc), src);
+    }
+}
+
+#[test]
 fn a_named_connect_round_trips_on_a_plain_element() {
     let doc = tomet_ast_parser::parse_file("@section[ x ]::rule(allow: (card))\n").unwrap();
     let printed = document_to_tm(&doc);

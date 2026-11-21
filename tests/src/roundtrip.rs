@@ -692,7 +692,8 @@ fn the_printer_writes_text_the_formatter_leaves_as_it_is() {
     for (rel, src) in parseable_corpus() {
         let doc = tomet_ast_parser::parse_file(&src)
             .unwrap_or_else(|e| panic!("{} failed to parse: {e}", rel.display()));
-        let from_pandoc = tomet_pandoc::from_pandoc(&tomet_pandoc::to_pandoc(&doc));
+        let from_pandoc =
+            tomet_pandoc::from_pandoc(&tomet_pandoc::to_pandoc(&doc, &tomet_tests::carried(&doc)));
         for (what, doc) in [
             ("the document", &doc),
             ("its Pandoc round trip", &from_pandoc),

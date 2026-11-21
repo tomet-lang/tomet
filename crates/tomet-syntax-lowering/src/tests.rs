@@ -468,31 +468,20 @@ fn value_starting_brace_is_error_and_middle_brace_is_scalar() {
 }
 
 #[test]
-fn dotted_declaration_heads_are_refused_with_advice() {
-    for (src, want) in [
-        (
-            "::field.author(type: string)\n",
-            "a declaration head has no dot: write `::field(author: (...))`",
-        ),
-        (
-            "::macro.copyright(\"copy\")\n",
-            "a declaration head has no dot: write `::macro(copyright: (...))`",
-        ),
-        (
-            "::blueprint.x(a: 1)\n",
-            "a declaration head has no dot: write `::blueprint(x: (...))`",
-        ),
-        (
-            "::vocabulary.x(version: \"1.0.0\")\n",
-            "a declaration head has no dot: write `::vocabulary(x: (...))`",
-        ),
-        (
-            "::field.url.wiki(type: list)\n",
-            "a declaration head has no dot: write `::field(url.wiki: (...))`",
-        ),
+fn a_dotted_declaration_head_is_namespaced() {
+    for (src, namespace, name) in [
+        ("::catasto.upstream(a: 1)\n", Some("catasto"), "upstream"),
+        ("::std.kind(config)\n", Some("std"), "kind"),
+        ("::a.b.c(x)\n", Some("a.b"), "c"),
+        ("::kind(config)\n", None, "kind"),
     ] {
-        let err = file(src).unwrap_err();
-        assert_eq!(err.message, want, "{src}");
+        let doc = file(src).expect(src);
+        let head = &doc.header[0].name;
+        assert_eq!(
+            (head.namespace.as_deref(), head.name.as_str()),
+            (namespace, name),
+            "{src}"
+        );
     }
 }
 

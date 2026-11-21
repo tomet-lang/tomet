@@ -60,7 +60,10 @@ mod tests {
             1,
         )];
 
+        let vault =
+            tomet_vault::Vault::from_sources(tomet_config::PrinterConfig::default(), ".", &[]);
         StructuralEngine::apply_action(
+            &vault,
             &mut matches,
             &tomet_transform::StructuralAction::RenameKey {
                 old_key: "author".into(),

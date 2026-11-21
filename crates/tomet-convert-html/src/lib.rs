@@ -32,7 +32,7 @@ use crate::block::render_block;
 use crate::elements::{HeadingState, render_footnotes};
 use crate::util::{escape_attr, escape_html};
 use tomet_ast::{Block, File};
-use tomet_semantics::{Bindings, FootnoteRegistry, TupleView, builtin_doc_vocabularies};
+use tomet_semantics::{Bindings, FootnoteRegistry, TupleView};
 
 const DEFAULT_STYLE: &str = "\
 body { font-family: sans-serif; line-height: 1.6; max-width: 48rem; margin: 2rem auto; padding: 0 1rem; }
@@ -108,8 +108,9 @@ pub struct RenderOptions {
 /// and elements it declines should never pay for normalizing args they
 /// were never going to use.
 pub struct CustomElementCtx<'a> {
-    /// The dotted or bare name [`classify_std_lenient`] fell back to
-    /// (`"doc.icon"`, `"my-widget"`, ...).
+    /// The dotted or bare name the element resolved to (`"doc.icon"`, `"my-widget"`, ...), in its
+    /// vocabulary's own namespace: under `::use(node-graph, as: ng)`, `@ng.node` is
+    /// `"node-graph.node"`.
     pub kind: &'a str,
     /// The element's bracketed `[content]`, as parsed blocks (`Vec<Block>`).
     /// Ordinary
@@ -139,9 +140,9 @@ impl<'a> CustomElementCtx<'a> {
         }
     }
 
-    /// `args`, viewed against the same vocabularies this crate binds
-    /// for rendering (`builtin_doc_vocabularies`), so a positional first
-    /// argument -- `doc.icon`'s `name` -- is reached by its alias name.
+    /// `args`, viewed against the bindings the document is rendered with, so a positional
+    /// argument -- `doc.icon`'s `name`, or one a vault vocabulary declares -- is reached by
+    /// its name.
     pub fn args_view(&self) -> Option<TupleView<'a, 'static>> {
         (self.args_view)()
     }
@@ -168,21 +169,32 @@ impl fmt::Debug for CustomElementRenderer {
 
 /// Render a full standalone HTML document with the plain (unnumbered)
 /// heading style. See [`render_page_with`] for the numbered variant.
-pub fn render_page(doc: &File, title: &str) -> String {
-    render_page_with(doc, title, &RenderOptions::default())
+///
+/// `bindings` are the names `doc` has in scope (`Bindings` in `tomet-semantics`): what an element
+/// name means is what it resolves to there, so an aliased `@ng.node` renders as the
+/// `node-graph.node` it is. Whoever loaded the document knows its vocabularies and builds them
+/// (a vault's `bindings`); a caller with no vault binds the vocabularies tomet carries
+/// (`LoadedVocabularies::default().bindings_for(doc)`). This crate never builds its own.
+pub fn render_page(doc: &File, bindings: &Bindings, title: &str) -> String {
+    render_page_with(doc, bindings, title, &RenderOptions::default())
 }
 
 /// Render a full standalone HTML document, applying `options` (e.g.
 /// `RenderOptions { number_headings: true }` for the "advanced",
-/// sequentially-numbered heading style).
-pub fn render_page_with(doc: &File, title: &str, options: &RenderOptions) -> String {
+/// sequentially-numbered heading style). `bindings` as in [`render_page`].
+pub fn render_page_with(
+    doc: &File,
+    bindings: &Bindings,
+    title: &str,
+    options: &RenderOptions,
+) -> String {
     let lang = options.lang.as_deref().unwrap_or("ja");
     format!(
         "<!DOCTYPE html>\n<html lang=\"{lang}\">\n<head>\n<meta charset=\"utf-8\">\n<title>{title}</title>\n<style>{style}</style>\n</head>\n<body>\n{body}</body>\n</html>\n",
         lang = escape_attr(lang),
         title = escape_html(title),
         style = DEFAULT_STYLE,
-        body = render_body_with(doc, options),
+        body = render_body_with(doc, bindings, options),
     )
 }
 
@@ -208,33 +220,32 @@ pub struct HeadingInfo {
 }
 
 /// Render just the body content, without the surrounding `<html>` shell,
-/// with the plain (unnumbered) heading style.
-pub fn render_body(doc: &File) -> String {
-    render_body_with(doc, &RenderOptions::default())
+/// with the plain (unnumbered) heading style. `bindings` as in [`render_page`].
+pub fn render_body(doc: &File, bindings: &Bindings) -> String {
+    render_body_with(doc, bindings, &RenderOptions::default())
 }
 
-/// Render just the body content, applying `options`.
-pub fn render_body_with(doc: &File, options: &RenderOptions) -> String {
-    render_body_with_outline(doc, options).0
+/// Render just the body content, applying `options`. `bindings` as in [`render_page`].
+pub fn render_body_with(doc: &File, bindings: &Bindings, options: &RenderOptions) -> String {
+    render_body_with_outline(doc, bindings, options).0
 }
 
 /// Render the body and report its headings, in a single pass.
 ///
 /// The HTML is byte-for-byte what [`render_body_with`] produces; the outline
-/// lists every heading the renderer emitted, in document order.
-pub fn render_body_with_outline(doc: &File, options: &RenderOptions) -> (String, Vec<HeadingInfo>) {
+/// lists every heading the renderer emitted, in document order. `bindings` as in
+/// [`render_page`].
+pub fn render_body_with_outline(
+    doc: &File,
+    bindings: &Bindings,
+    options: &RenderOptions,
+) -> (String, Vec<HeadingInfo>) {
     let mut out = String::new();
     let mut state = HeadingState::default();
-    // Only `doc.*` needs binding here -- a document's own `::vocabulary`
-    // declarations have no bearing on this crate's syntactic, semantics-free
-    // rendering, but `doc.icon`'s positional `name` still has to resolve to
-    // that key (not the parser's positional sentinel) for `custom_element`
-    // hooks to read it by name.
-    let bindings = Bindings::for_document(doc, builtin_doc_vocabularies());
     let footnotes = FootnoteRegistry::from_file(doc);
     let cx = RenderCtx {
         options,
-        bindings: &bindings,
+        bindings,
         footnotes: &footnotes,
     };
     for block in &doc.body {

@@ -174,22 +174,14 @@ pub fn is_declaration(node: &SyntaxNode) -> bool {
             .is_some_and(|t| t.kind() == K::COLON)
 }
 
-/// `::name(args){value}[content]#(id)`.
+/// `::name(args){value}[content]#(id)`. A dotted name is namespaced, as an element's is:
+/// `::catasto.upstream(...)` is the attribute `upstream` of the namespace `catasto`.
 pub fn lower_declaration(node: &SyntaxNode) -> Result<Declaration> {
     let sigil = node
         .children()
         .find(|n| n.kind() == K::SIGIL)
         .ok_or_else(|| unsupported("a declaration without a sigil"))?;
     let (start, _) = range_of(&sigil);
-    if let Some(name_node) = sigil.children().find(|n| n.kind() == K::NAME) {
-        let name_text = name_node.text().to_string();
-        if let Some((decl, sub)) = name_text.trim().split_once('.') {
-            return Err(err(
-                start,
-                format!("a declaration head has no dot: write `::{decl}({sub}: (...))`"),
-            ));
-        }
-    }
     let name = name_of(&sigil)?;
     // Before any group is read: a nameless `::(...)` would otherwise merge into the args.
     if node.children().any(|n| n.kind() == K::CONNECT) {

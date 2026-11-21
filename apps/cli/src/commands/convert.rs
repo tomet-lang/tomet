@@ -325,21 +325,26 @@ fn convert_text(vault: &Vault, src: &str, path: &Path, direction: &Direction) ->
 }
 
 fn to_text(vault: &Vault, src: &str, path: &Path, target: &Target) -> Result<String> {
-    let (mut doc, _bindings) = vault
+    let (mut doc, bindings) = vault
         .parse(src)
         .map_err(|e| anyhow!("{}", format_parse_error(path, src, &e)))?;
     // The vault settles what a `{$ macro.… }` or a `{$ self.… }` means, so this and
     // `export` cannot disagree about it.
     vault.prepare(&mut doc, path);
     Ok(match target {
-        Target::CommonMark => tomet_markdown::to_markdown(&doc),
-        Target::Typst => tomet_typst::to_typst(&doc),
-        Target::Pandoc => serde_json::to_string(&tomet_pandoc::to_pandoc(&doc))?,
-        Target::Html(options) => html(&doc, path, options),
+        Target::CommonMark => tomet_markdown::to_markdown(&doc, &bindings),
+        Target::Typst => tomet_typst::to_typst(&doc, &bindings),
+        Target::Pandoc => serde_json::to_string(&tomet_pandoc::to_pandoc(&doc, &bindings))?,
+        Target::Html(options) => html(&doc, &bindings, path, options),
     })
 }
 
-fn html(doc: &tomet_ast::File, path: &Path, options: &HtmlOptions) -> String {
+fn html(
+    doc: &tomet_ast::File,
+    bindings: &tomet_semantics::Bindings,
+    path: &Path,
+    options: &HtmlOptions,
+) -> String {
     let render = tomet_html::RenderOptions {
         number_headings: options.advanced,
         auto_slug_headings: options.advanced,
@@ -347,7 +352,7 @@ fn html(doc: &tomet_ast::File, path: &Path, options: &HtmlOptions) -> String {
         ..Default::default()
     };
     if options.body {
-        return tomet_html::render_body_with(doc, &render);
+        return tomet_html::render_body_with(doc, bindings, &render);
     }
     // The shell carries the title: the document's own, else its file's name.
     let fallback = path
@@ -356,7 +361,7 @@ fn html(doc: &tomet_ast::File, path: &Path, options: &HtmlOptions) -> String {
         .filter(|_| !is_stdin(path))
         .unwrap_or("Tomet");
     let title = meta_title(doc).unwrap_or_else(|| fallback.to_string());
-    tomet_html::render_page_with(doc, &title, &render)
+    tomet_html::render_page_with(doc, bindings, &title, &render)
 }
 
 /// Markdown to Tomet, laid out as the vault's config says (table widths).

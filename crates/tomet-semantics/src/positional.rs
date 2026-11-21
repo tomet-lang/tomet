@@ -3,25 +3,17 @@ use tomet_scalar::Scalar;
 use tomet_semantics_core::{Slots, TupleView};
 use tomet_tree::ValueExt;
 
-use crate::vocabulary::{Bindings, ConstructorDecl, ElementDecl};
+use crate::vocabulary::{AttributeDecl, Bindings, ConstructorDecl, ElementDecl};
 
-/// One table, keyed on the bare name alone.
+/// The positional slots of a `std` body element (`@name`), keyed on the bare name alone.
 ///
-/// `@name` is the only sigil, and shape comes from position, so keying on
-/// anything but the name would let two spellings of one element disagree
-/// about whether `x` means `target`. `callout` is kept even though it is not in `BUILTIN_KINDS`;
-/// it is a widely used custom element in the docs and dropping its
-/// positional key would silently change how `(warning)` reads.
-///
-/// Asked of an element or a declaration alike: the name is all it reads.
+/// Shape comes from position, so keying on anything but the name would let two spellings of one
+/// element disagree about whether `x` means `target`. A standard declaration's slots are the
+/// declaration's own ([`tomet_declaration::DeclKind::positional_keys`]), the same ones for every
+/// host that reads it, and are not here: `::kind` and `@kind` are looked up in different tables.
 pub fn builtin_positional_arg_keys(name: &Name) -> &'static [&'static str] {
     if !name.is_bare() {
         return &[];
-    }
-    // A declaration's slots are the declaration's own (`tomet-declaration`): the same ones for every
-    // host that reads it. The table below is the body elements'.
-    if let Some(declaration) = tomet_declaration::DeclKind::from_name(&name.name) {
-        return declaration.positional_keys();
     }
     match name.name.as_str() {
         "ftn" => &["id"],
@@ -105,11 +97,9 @@ fn recover_target_scheme_entry(first_positional_key: Option<&str>, tuple: &Tuple
     Some(tuple)
 }
 
-/// The ordered positional-key slots for `name`.
-fn positional_slots(name: Option<&Name>, bindings: &Bindings) -> Slots<'static> {
-    let Some(name) = name else {
-        return Slots::Borrowed(&[]);
-    };
+/// The ordered positional-key slots of the element `name`: a `std` body element's, or what the
+/// `::element` entry in scope declares.
+fn element_slots(name: &Name, bindings: &Bindings) -> Slots<'static> {
     let builtin = builtin_positional_arg_keys(name);
     if !builtin.is_empty() {
         return Slots::Borrowed(builtin);
@@ -121,18 +111,33 @@ fn positional_slots(name: Option<&Name>, bindings: &Bindings) -> Slots<'static> 
     Slots::Owned(keys)
 }
 
+/// The ordered positional-key slots of the attribute `name`: a standard declaration's, or what
+/// the `::attribute` entry in scope declares.
+fn attribute_slots(name: &Name, bindings: &Bindings) -> Slots<'static> {
+    if crate::kind::is_written_in_std(name)
+        && let Some(declaration) = tomet_declaration::DeclKind::from_name(&name.name)
+    {
+        return Slots::Borrowed(declaration.positional_keys());
+    }
+    let keys = bindings
+        .attribute(name)
+        .map(AttributeDecl::positional_keys)
+        .unwrap_or_default();
+    Slots::Owned(keys)
+}
+
 /// Returns the arguments view for an [`Element`]. Knows only `std`.
 pub fn element_args_view(el: ElementView<'_>) -> Option<TupleView<'_, 'static>> {
     element_args_view_in(el, &Bindings::default())
 }
 
-/// [`element_args_view`], plus the positional slots a vocabulary in
-/// scope declares with `@param(name){ positional: true }`.
+/// [`element_args_view`], plus the positional slots the `::element` entry in scope declares
+/// (`args: ( name: (positional: true) )`).
 pub fn element_args_view_in<'a>(
     el: ElementView<'a>,
     bindings: &Bindings,
 ) -> Option<TupleView<'a, 'static>> {
-    args_view_in(Some(el.name), el.data, bindings)
+    args_view_in(element_slots(el.name, bindings), el.data)
 }
 
 /// Arguments view for a declaration: `::kind(config, 2)` views `kind` and `version`.
@@ -140,12 +145,16 @@ pub fn declaration_args_view(declaration: &Declaration) -> Option<TupleView<'_, 
     declaration_args_view_in(declaration, &Bindings::default())
 }
 
-/// [`declaration_args_view`], plus the positional slots a vocabulary in scope declares.
+/// [`declaration_args_view`], plus the positional slots the `::attribute` entry in scope
+/// declares.
 pub fn declaration_args_view_in<'a>(
     declaration: &'a Declaration,
     bindings: &Bindings,
 ) -> Option<TupleView<'a, 'static>> {
-    args_view_in(Some(&declaration.name), &declaration.data, bindings)
+    args_view_in(
+        attribute_slots(&declaration.name, bindings),
+        &declaration.data,
+    )
 }
 
 /// Views a constructor call's `args` through the positional slots `constructor` declares.
@@ -156,14 +165,9 @@ pub fn constructor_args_view<'a>(
     TupleView::with_owned_slots(args, constructor.positional_keys())
 }
 
-/// Views `args` through the signature slots that `name` has.
-fn args_view_in<'a>(
-    name: Option<&Name>,
-    data: &'a Data,
-    bindings: &Bindings,
-) -> Option<TupleView<'a, 'static>> {
+/// Views `args` through `slots`.
+fn args_view_in<'a>(slots: Slots<'static>, data: &'a Data) -> Option<TupleView<'a, 'static>> {
     let args = data.args.as_ref()?;
-    let slots = positional_slots(name, bindings);
     let first_key = slots.get(0);
     let recovered = if !slots.is_empty() {
         recover_target_scheme_entry(first_key, args)
@@ -219,20 +223,25 @@ mod tests {
     #[test]
     fn kind_and_use_take_an_optional_version_after_the_name() {
         // `::kind(name, 2)` is two bare entries; `::kind(name)` is one scalar.
-        for (sigil, name_key) in [("kind", "kind"), ("use", "target")] {
-            let mut el = element_new(Name::bare(sigil));
-            el.data.args = Some(Tuple::from_unnamed([s("deck"), i(2)]));
-            let view = element_args_view(el.as_view()).unwrap();
-            assert_eq!(view.get(name_key), Some(&s("deck")), "@{sigil}(deck, 2)");
+        for (name, name_key) in [("kind", "kind"), ("use", "target")] {
+            let mut decl = tomet_tree::declaration_new(name);
+            decl.data.args = Some(Tuple::from_unnamed([s("deck"), i(2)]));
+            let view = declaration_args_view(&decl).unwrap();
+            assert_eq!(view.get(name_key), Some(&s("deck")), "::{name}(deck, 2)");
             assert_eq!(view.get("version"), Some(&i(2)));
-            assert_eq!(view.tuple(), el.data.args.as_ref().unwrap());
+            assert_eq!(view.tuple(), decl.data.args.as_ref().unwrap());
 
             // the version may be left out
-            el.data.args = Some(Tuple::from_unnamed([s("deck")]));
-            let view = element_args_view(el.as_view()).unwrap();
-            assert_eq!(view.get(name_key), Some(&s("deck")), "@{sigil}(deck)");
+            decl.data.args = Some(Tuple::from_unnamed([s("deck")]));
+            let view = declaration_args_view(&decl).unwrap();
+            assert_eq!(view.get(name_key), Some(&s("deck")), "::{name}(deck)");
             assert_eq!(view.get("version"), None);
-            assert_eq!(view.tuple(), el.data.args.as_ref().unwrap());
+            assert_eq!(view.tuple(), decl.data.args.as_ref().unwrap());
+
+            // `@kind` is no element, and has no slots
+            let mut el = element_new(Name::bare(name));
+            el.data.args = Some(Tuple::from_unnamed([s("deck")]));
+            assert_eq!(element_args_view(el.as_view()).unwrap().get(name_key), None);
         }
     }
 

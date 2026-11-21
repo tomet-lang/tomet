@@ -6,7 +6,7 @@ pub use tomet_query::structural::{
 
 use tomet_ast::{Data, File, Name, Value};
 use tomet_scalar::Scalar;
-use tomet_semantics::{classify_declaration_lenient, classify_std_lenient};
+use tomet_semantics::Bindings;
 use tomet_tree::{DataExt, for_each_declaration_mut, for_each_element_mut};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -18,14 +18,22 @@ pub enum StructuralAction {
 
 /// Applies a structural refactoring action to all matching elements in `doc`.
 /// Returns the number of transformations applied.
-pub fn apply_structural_action(doc: &mut File, action: &StructuralAction) -> usize {
+///
+/// A kind is what a name resolves to against `bindings` (the names `doc` has in scope, as whoever
+/// loaded it bound them): `RenameTag { from: "node-graph.node", .. }` renames `@ng.node` under
+/// `::use(node-graph, as: ng)`, and leaves the alias the document writes in place.
+pub fn apply_structural_action(
+    doc: &mut File,
+    bindings: &Bindings,
+    action: &StructuralAction,
+) -> usize {
     let mut count = 0;
     for_each_element_mut(doc, |el| {
-        let kind = classify_std_lenient(el.as_view());
+        let kind = bindings.classify_lenient(&el.name);
         count += apply_to(action, kind.as_str(), Some(&mut el.name), &mut el.data);
     });
     for_each_declaration_mut(doc, |declaration| {
-        let kind = classify_declaration_lenient(declaration);
+        let kind = bindings.classify_attribute_lenient(&declaration.name);
         count += apply_to(
             action,
             kind.as_str(),

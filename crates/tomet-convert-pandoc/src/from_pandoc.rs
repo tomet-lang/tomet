@@ -725,9 +725,16 @@ fn assert_json_round_trip(v: &Value) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::to_pandoc;
     use tomet_ast_parser::parse_file;
     use tomet_printer::document_to_tm;
+
+    /// [`crate::to_pandoc`] with what a vault-less caller binds: the vocabularies tomet carries.
+    fn to_pandoc(doc: &tomet_ast::File) -> crate::PandocDoc {
+        crate::to_pandoc(
+            doc,
+            &tomet_semantics::LoadedVocabularies::default().bindings_for(doc),
+        )
+    }
 
     /// Tomet source -> Pandoc -> Tomet source.
     fn round_trip(src: &str) -> String {

@@ -175,7 +175,8 @@ pub fn render_hole(hole: &Hole, config: &PrinterConfig) -> String {
 /// Render a [`Declaration`] AST node into Tomet syntax:
 /// `::name(args)[content]{value}#(id)`.
 pub fn render_declaration(declaration: &Declaration, config: &PrinterConfig) -> String {
-    if declaration.name.is_bare_named("meta") {
+    let in_std = matches!(declaration.name.namespace.as_deref(), None | Some("std"));
+    if in_std && declaration.name.name == "meta" {
         let mut out = render_meta_declaration(declaration, config);
         out.push_str(&render_id(declaration.id.as_ref()));
         return out;

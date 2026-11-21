@@ -762,6 +762,13 @@ fn section_title_format_source_with_config() {
 }
 
 #[test]
+fn a_namespaced_declaration_keeps_its_spelling() {
+    let src = "::use(node-graph, as: ng)\n::ng.direction(down)\n::std.meta(x: 1)\n\n@ng.node(a)\n";
+    let formatted = format_source_with_config(src, &PrinterConfig::default());
+    assert_eq!(formatted, src);
+}
+
+#[test]
 fn declaration_blank_lines_format_source_with_config() {
     let mut config = PrinterConfig::default();
     config.format.declaration_blank_between = Some(false);

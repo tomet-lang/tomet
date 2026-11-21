@@ -194,7 +194,42 @@ mod tests {
             from: "note".into(),
             to: "warning".into(),
         };
-        let count = apply_structural_action(&mut doc, &action);
+        let bindings = tomet_semantics::LoadedVocabularies::default().bindings_for(&doc);
+        let count = apply_structural_action(&mut doc, &bindings, &action);
         assert_eq!(count, 1);
+    }
+
+    /// A rename and a meta edit find a vocabulary's names in their own namespace, whatever alias
+    /// the document writes them under, and leave that alias as written.
+    #[test]
+    fn an_aliased_name_is_found_in_its_real_namespace() {
+        const NODE_GRAPH: &str = "::kind(vocabulary)\n::vocabulary(node-graph, version: \"1.0.0\")\n::element(\n  node: ()\n)\n::attribute(\n  layout: ()\n)\n";
+        let mut loaded = tomet_semantics::LoadedVocabularies::default();
+        loaded.add("node-graph", &parse_doc(NODE_GRAPH));
+        assert!(loaded.errors.is_empty(), "{:?}", loaded.errors);
+
+        let mut doc =
+            parse_doc("::use(node-graph, as: ng)\n::ng.layout(dir: tree)\n\n@ng.node(a)\n");
+        let bindings = loaded.bindings_for(&doc);
+        let action = StructuralAction::RenameTag {
+            from: "node-graph.node".into(),
+            to: "card".into(),
+        };
+        assert_eq!(apply_structural_action(&mut doc, &bindings, &action), 1);
+        assert!(set_meta_in_doc(
+            &mut doc,
+            &bindings,
+            "node-graph.layout",
+            "dir",
+            "radial"
+        ));
+        let mut names = Vec::new();
+        tomet_tree::for_each_element(&doc, |el| names.push(el.name.to_string()));
+        assert_eq!(names, ["ng.card"]);
+        assert_eq!(doc.header.len(), 2, "no declaration was added");
+        let layout = &doc.header[1];
+        assert_eq!(layout.name.to_string(), "ng.layout");
+        let dir = layout.data.args.as_ref().and_then(|args| args.get("dir"));
+        assert_eq!(dir.and_then(tomet_tree::ValueExt::as_str), Some("radial"));
     }
 }

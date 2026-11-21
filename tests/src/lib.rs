@@ -19,6 +19,12 @@
 
 use std::path::{Path, PathBuf};
 
+/// What a document read with no vault has in scope: the vocabularies tomet carries. What a
+/// converter is handed for a corpus file, which belongs to no vault.
+pub fn carried(doc: &tomet_ast::File) -> tomet_semantics::Bindings {
+    tomet_semantics::LoadedVocabularies::default().bindings_for(doc)
+}
+
 /// Root of this package (`<repo>/tests`).
 pub fn package_dir() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -81,9 +87,11 @@ pub fn read_fixture(rel: &Path) -> String {
 /// a failure rather than silently changing which files get covered.
 ///
 /// Every entry is a `syntax/nexus-invalid-*` fixture: one form the nexus rule
-/// refuses (a `@name` or `::name` with no primary group, or a `::name.path` head
-/// with a dot), kept apart because the parser stops at the first error. A nexus
-/// test holds each to the place and reason it is refused for.
+/// refuses (a `@name` or `::name` with no primary group, or a group that cannot
+/// stand without one), kept apart because the parser stops at the first error. A
+/// nexus test holds each to the place and reason it is refused for. The two
+/// `nexus-invalid-declaration-dot*` fixtures are not here: a dotted declaration
+/// head is namespaced and parses (the nexus test's `NO_LONGER_REFUSED`).
 pub const KNOWN_UNPARSEABLE: &[&str] = &[
     "syntax/nexus-invalid-bare-block.tmt",
     "syntax/nexus-invalid-bare-hr.tmt",
@@ -97,8 +105,6 @@ pub const KNOWN_UNPARSEABLE: &[&str] = &[
     "syntax/nexus-invalid-data-only.tmt",
     "syntax/nexus-invalid-declaration-bare.tmt",
     "syntax/nexus-invalid-declaration-data.tmt",
-    "syntax/nexus-invalid-declaration-dot-positional.tmt",
-    "syntax/nexus-invalid-declaration-dot.tmt",
     "syntax/nexus-invalid-declaration-id.tmt",
     "syntax/nexus-invalid-heading-connect.tmt",
     "syntax/nexus-invalid-id-only.tmt",
@@ -136,14 +142,6 @@ pub const KNOWN_TS_ERRORS: &[(&str, &[&str])] = &[
     // directly. `tomet-parser` recognizes
     // it; `grammar.js` has not been taught the combine form yet.
     ("syntax/combine.tmt", &[ANY_ERROR]),
-    // A declaration head with a dot (`::macro.copyright(...)`): `tomet-parser` refuses it (these two
-    // fixtures are in `KNOWN_UNPARSEABLE`), and the grammar refuses it too, with error nodes. That is
-    // the two agreeing, not the grammar missing syntax, so what the nodes hold is not pinned.
-    ("syntax/nexus-invalid-declaration-dot.tmt", &[ANY_ERROR]),
-    (
-        "syntax/nexus-invalid-declaration-dot-positional.tmt",
-        &[ANY_ERROR],
-    ),
     // A block where a `{...}` group's value goes (`card: [ @card[ $(2) ] ]`, the body of a block
     // macro in `::macro(...)`): `grammar.js` reads a `[ ... ]` value in `(args)` but not as the
     // value of a pair in `{...}`, even when it holds a single paragraph. `tomet-parser` reads it
@@ -279,6 +277,10 @@ pub const KNOWN_TS_ERRORS: &[(&str, &[&str])] = &[
     // cases, and splitting the file to isolate exactly which lines
     // already pass is not worth it for a fixture this size.
     ("syntax/connect.tmt", &[ANY_ERROR]),
+    // Dotted `::ns.x` heads: grammar.js not yet regenerated.
+    ("syntax/declaration-namespaced.tmt", &[ANY_ERROR]),
+    ("syntax/nexus-invalid-declaration-dot-positional.tmt", &[ANY_ERROR]),
+    ("syntax/nexus-invalid-declaration-dot.tmt", &[ANY_ERROR]),
     // ---- the nexus rule, refused on purpose --------------------------
     //
     // `syntax/nexus-invalid-*.tmt` are forms `tomet-parser` refuses: a nexus

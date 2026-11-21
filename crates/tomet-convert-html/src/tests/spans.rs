@@ -21,7 +21,7 @@ fn extract_spans(html: &str) -> Vec<(usize, usize)> {
 #[test]
 fn spans_are_absent_unless_opted_in() {
     let doc = parse_file("hello world\n").unwrap();
-    let html = render_body(&doc);
+    let html = render_body(&doc, &carried(&doc));
     assert!(!html.contains("data-tmt-start"));
 }
 
@@ -33,7 +33,7 @@ fn a_paragraph_is_tagged_with_its_own_span() {
         emit_source_spans: true,
         ..RenderOptions::default()
     };
-    let html = render_body_with(&doc, &options);
+    let html = render_body_with(&doc, &carried(&doc), &options);
     let spans = extract_spans(&html);
     assert_eq!(spans.len(), 1);
     assert_eq!(&src[spans[0].0..spans[0].1], "hello world");
@@ -47,7 +47,7 @@ fn a_heading_and_the_paragraph_after_it_each_get_their_own_span() {
         emit_source_spans: true,
         ..RenderOptions::default()
     };
-    let html = render_body_with(&doc, &options);
+    let html = render_body_with(&doc, &carried(&doc), &options);
     let spans = extract_spans(&html);
     assert_eq!(
         spans.len(),
@@ -70,7 +70,7 @@ fn list_items_are_tagged_individually_and_the_list_itself_is_not() {
         emit_source_spans: true,
         ..RenderOptions::default()
     };
-    let html = render_body_with(&doc, &options);
+    let html = render_body_with(&doc, &carried(&doc), &options);
     assert!(
         !html.starts_with("<ul data-tmt-start"),
         "the list wrapper itself must not carry a span: {html:?}"
@@ -91,7 +91,7 @@ fn a_non_list_non_heading_block_is_tagged_as_one_opaque_leaf() {
         emit_source_spans: true,
         ..RenderOptions::default()
     };
-    let html = render_body_with(&doc, &options);
+    let html = render_body_with(&doc, &carried(&doc), &options);
     let spans = extract_spans(&html);
     assert_eq!(spans.len(), 1);
     assert_eq!(&src[spans[0].0..spans[0].1], src.trim_end());

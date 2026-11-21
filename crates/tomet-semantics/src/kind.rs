@@ -275,18 +275,16 @@ pub fn builtin_kinds() -> impl Iterator<Item = (&'static str, ElementKind)> + Cl
         .chain(BODY_KINDS.iter().cloned())
 }
 
-fn builtin_kind(name: &str) -> Option<ElementKind> {
-    DeclKind::from_name(name)
-        .map(ElementKind::Declaration)
-        .or_else(|| {
-            BODY_KINDS
-                .iter()
-                .find(|(builtin, _)| *builtin == name)
-                .map(|(_, kind)| kind.clone())
-        })
+/// The `std` body element a bare name stands for: `link` is [`ElementKind::Link`]. A standard
+/// declaration's name is not one ([`DeclKind::from_name`] is that table).
+pub(crate) fn body_kind(name: &str) -> Option<ElementKind> {
+    BODY_KINDS
+        .iter()
+        .find(|(builtin, _)| *builtin == name)
+        .map(|(_, kind)| kind.clone())
 }
 
-/// Classifies a [`Name`] against the `std` vocabulary alone.
+/// Classifies an element name (`@name`) against the `std` vocabulary alone: its body elements.
 ///
 /// `std` alone is the whole of what this sees. A document may also write
 /// its own `::kind`'s namespace bare, and names it brought in with `::use`
@@ -297,10 +295,12 @@ fn builtin_kind(name: &str) -> Option<ElementKind> {
 /// A name in any namespace but `std` is `Custom` -- namespaces are exactly
 /// how a user-defined element declares it is not part of the built-in
 /// vocabulary. A bare name, or one written in `std` (`@std.link` is `@link`),
-/// must be in [`builtin_kinds`]; anything else is [`UnknownName`], not a
-/// silent `Custom`. `Bindings::classify` reads `std.` the same way.
+/// must be one of the body elements; anything else is [`UnknownName`], not a
+/// silent `Custom`. `Bindings::classify` reads `std.` the same way. A standard declaration's
+/// name (`@kind`) is no element: it is unknown here, written with the wrong sigil
+/// ([`UnknownName::wrong_sigil`]), and nothing reads it as the declaration.
 ///
-/// That silent fallback -- `builtin_kind(name).unwrap_or_else(|| Custom(name))`
+/// That silent fallback -- `body_kind(name).unwrap_or_else(|| Custom(name))`
 /// -- is where a sigil ambiguity would live: a sigil meant to separate
 /// official from user-defined elements would still classify through this
 /// one arm, so the distinction would never reach the tree. Namespaces
@@ -309,39 +309,37 @@ pub fn classify_std_name(name: &Name) -> Result<ElementKind, UnknownName> {
     if !is_written_in_std(name) {
         return Ok(ElementKind::Custom(name.to_string()));
     }
-    builtin_kind(&name.name).ok_or_else(|| UnknownName {
-        name: name.to_string(),
-        unbound_namespace: None,
-        declaration: false,
+    body_kind(&name.name).ok_or_else(|| UnknownName {
+        wrong_sigil: DeclKind::from_name(&name.name).is_some(),
+        ..UnknownName::element(name)
     })
 }
 
-/// A declaration about the document is written `::name`. Written `@name` it
-/// is refused -- the element sigil is for content -- and means nothing: it is
-/// not classified as the declaration, so nothing reads it as one.
-///
-/// `kind` is what the bare name resolved to; `name` is as written.
-pub fn refuse_declaration_as_element(
-    name: &Name,
-    kind: ElementKind,
-) -> Result<ElementKind, UnknownName> {
-    if is_written_in_std(name) && builtin_region(&kind) == crate::vocabulary::Region::Preamble {
-        return Err(UnknownName {
-            name: name.to_string(),
-            unbound_namespace: None,
-            declaration: true,
-        });
+/// Classifies an attribute name (`::name`) against the `std` vocabulary alone: its standard
+/// declarations ([`DeclKind`]). The counterpart of [`classify_std_name`], with the same reading
+/// of a namespaced name; a body element's name (`::callout`) is unknown here, written with the
+/// wrong sigil.
+pub fn classify_std_attribute_name(name: &Name) -> Result<ElementKind, UnknownName> {
+    if !is_written_in_std(name) {
+        return Ok(ElementKind::Custom(name.to_string()));
     }
-    Ok(kind)
+    DeclKind::from_name(&name.name)
+        .map(ElementKind::Declaration)
+        .ok_or_else(|| UnknownName {
+            wrong_sigil: body_kind(&name.name).is_some(),
+            ..UnknownName::attribute(name)
+        })
 }
 
 /// Whether `name` is one of `std`'s: bare, or spelled with the `std` namespace. They are one
-/// vocabulary written two ways, so every rule about `std`'s names holds for both.
-fn is_written_in_std(name: &Name) -> bool {
+/// vocabulary written two ways, so every rule about `std`'s names holds for both: `::std.kind` is
+/// `::kind`, `@std.link` is `@link`.
+pub fn is_written_in_std(name: &Name) -> bool {
     matches!(name.namespace.as_deref(), None | Some("std"))
 }
 
-/// An unrecognized bare element name.
+/// A name that resolves to nothing in the table its sigil looks it up in: an element (`@name`)
+/// or an attribute (`::name`).
 ///
 /// A bare name resolves only in `std` or the document's own `::kind`
 /// namespace, so this is what a `#tag` alone on a line reports --
@@ -359,21 +357,64 @@ pub struct UnknownName {
     /// scope at all. The distinction matters to whoever has to fix it:
     /// a missing `::use` is a different edit from a typo in the element.
     pub unbound_namespace: Option<String>,
-    /// Set when the name is one of the declarations about the document
-    /// (`kind`, `meta`, ...) written as an element, `::kind`. It is not unknown
-    /// -- it is spelled for something else: a declaration is `::kind`.
-    pub declaration: bool,
+    /// Whether it was looked up as an attribute (`::name`) rather than as an element (`@name`).
+    pub attribute: bool,
+    /// Set when the name is not unknown but is in the other table: an attribute written `@name`
+    /// (it is `::name`), or an element written `::name` (it is `@name`). Which table a name is
+    /// in is what decides its sigil.
+    pub wrong_sigil: bool,
+}
+
+impl UnknownName {
+    /// `name`, looked up as an element and not found.
+    pub fn element(name: &Name) -> Self {
+        UnknownName {
+            name: name.to_string(),
+            ..UnknownName::default()
+        }
+    }
+
+    /// `name`, looked up as an attribute and not found.
+    pub fn attribute(name: &Name) -> Self {
+        UnknownName {
+            name: name.to_string(),
+            attribute: true,
+            ..UnknownName::default()
+        }
+    }
+
+    /// The sigil the name was written with.
+    pub fn written(&self) -> &'static str {
+        if self.attribute { "::" } else { "@" }
+    }
+
+    /// The sigil the name takes when it is written with the wrong one.
+    pub fn expected(&self) -> &'static str {
+        if self.attribute { "@" } else { "::" }
+    }
 }
 
 impl std::fmt::Display for UnknownName {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        if self.declaration {
+        if self.wrong_sigil {
+            let what = if self.attribute {
+                "an element, content of the document"
+            } else {
+                "an attribute, about the document"
+            };
             return write!(
                 f,
-                "`{0}` is a declaration about the document: write `::{0}`, not `@{0}`",
-                self.name
+                "`{0}` is {what}: write `{1}{0}`, not `{2}{0}`",
+                self.name,
+                self.expected(),
+                self.written()
             );
         }
+        let table = if self.attribute {
+            "attribute"
+        } else {
+            "element"
+        };
         if let Some(namespace) = &self.unbound_namespace {
             return write!(
                 f,
@@ -385,16 +426,18 @@ impl std::fmt::Display for UnknownName {
         if let Some((namespace, local)) = self.name.split_once('.') {
             return write!(
                 f,
-                "`{}`: the namespace `{namespace}` declares no `{local}`",
+                "`{}`: the namespace `{namespace}` declares no {table} `{local}`",
                 self.name
             );
         }
         write!(
             f,
-            "unknown element `{}`: only `std` and this document's own `::kind` may be \
-             written bare; namespace it (`ns.{}`), or declare the vocabulary that has it \
+            "unknown {table} `{}`: only `std` and this document's own `::kind` may be \
+             written bare; namespace it (`{}ns.{}`), or declare the vocabulary that has it \
              and bind it with `::use`",
-            self.name, self.name
+            self.name,
+            self.written(),
+            self.name
         )
     }
 }
@@ -419,9 +462,7 @@ impl std::error::Error for UnknownName {}
 /// guessing does not exist; the only way to get `ElementKind::Link` is to
 /// write `@link` explicitly.
 pub fn classify_std(el: ElementView<'_>) -> Result<ElementKind, UnknownName> {
-    // A name that is a declaration's is refused when written `@name`:
-    // see [`refuse_declaration_as_element`].
-    refuse_declaration_as_element(el.name, classify_std_name(el.name)?)
+    classify_std_name(el.name)
 }
 
 /// [`classify_std`], falling back to `Custom` for an unknown bare name.
@@ -429,24 +470,22 @@ pub fn classify_std(el: ElementView<'_>) -> Result<ElementKind, UnknownName> {
 /// Same `std`-only scope, and the same caveat: a user vocabulary's
 /// elements come back as `Custom` here rather than as themselves.
 ///
-/// For consumers that render whatever they are given and have no way to
-/// report a diagnostic -- an HTML writer mid-document, say. Validation
-/// belongs to [`classify_std`]; this is the lenient read of the same thing.
+/// Exact for comparing against a `std` kind (`std` can be neither aliased nor shadowed), wrong
+/// for anything that keys on a vocabulary's name: a reader that has the document's bindings, such
+/// as a converter, uses `Bindings::classify_lenient`. Validation belongs to [`classify_std`]; this
+/// is the lenient read of the same thing.
 pub fn classify_std_lenient(el: ElementView<'_>) -> ElementKind {
     classify_std(el).unwrap_or_else(|e| ElementKind::Custom(e.name))
 }
 
 /// What a written `::name` declaration is by name, for `std` only: the
 /// counterpart of [`classify_std`], with the same caveat that a user
-/// vocabulary's elements are unknown here.
-///
-/// Unlike an `@name` element a declaration is not refused for being one: the
-/// `::` is what makes it a declaration. Whether this name may be written
-/// there is the `Region` check's business.
+/// vocabulary's attributes are unknown here (`Bindings::classify_attribute` knows them).
+/// See [`classify_std_attribute_name`].
 pub fn classify_declaration(
     declaration: &tomet_ast::Declaration,
 ) -> Result<ElementKind, UnknownName> {
-    classify_std_name(&declaration.name)
+    classify_std_attribute_name(&declaration.name)
 }
 
 /// [`classify_declaration`], falling back to `Custom` for an unknown name:
@@ -589,19 +628,6 @@ pub fn builtin_content_shape(kind: &ElementKind) -> Option<ContentShape> {
     }
 }
 
-/// Where in a document `kind` may appear.
-///
-/// Every standard declaration is in the preamble, and nothing else the language names is: a body
-/// element goes anywhere. What the spec spelled `placement: head` -- a name that also carried the
-/// block/inline rule, which is why the key is being retired in favour of these two plus `display`.
-pub fn builtin_region(kind: &ElementKind) -> crate::vocabulary::Region {
-    use crate::vocabulary::Region;
-    match kind {
-        ElementKind::Declaration(_) => Region::Preamble,
-        _ => Region::Body,
-    }
-}
-
 /// Reports an element put where its kind cannot go -- a `meta` in the
 /// middle of a paragraph, or a `heading` standing as a block inside one.
 ///
@@ -642,11 +668,11 @@ mod tests {
     fn builtin_kind_round_trips_through_as_str() {
         for (name, kind) in builtin_kinds() {
             assert_eq!(kind.as_str(), name, "as_str() mismatch for {name:?}");
-            assert_eq!(
-                classify_std_name(&Name::bare(name)),
-                Ok(kind.clone()),
-                "classify_std_name() mismatch for {name:?}"
-            );
+            let classified = match kind {
+                ElementKind::Declaration(_) => classify_std_attribute_name(&Name::bare(name)),
+                _ => classify_std_name(&Name::bare(name)),
+            };
+            assert_eq!(classified, Ok(kind.clone()), "mismatch for {name:?}");
         }
     }
 
@@ -660,7 +686,8 @@ mod tests {
             Err(UnknownName {
                 name: "caution".to_string(),
                 unbound_namespace: None,
-                declaration: false,
+                attribute: false,
+                wrong_sigil: false,
             })
         );
     }
@@ -678,6 +705,7 @@ mod tests {
             "macro",
             "var",
             "element",
+            "attribute",
             "constructor",
             "use",
             "blueprint",
@@ -689,7 +717,7 @@ mod tests {
                 "::{name}"
             );
             let err = classify_std(element_new(Name::bare(name)).as_view()).unwrap_err();
-            assert!(err.declaration, "@{name}");
+            assert!(err.wrong_sigil && !err.attribute, "@{name}");
             assert!(
                 err.to_string().contains(&format!("write `::{name}`")),
                 "{err}"
@@ -700,8 +728,21 @@ mod tests {
                 ElementKind::Custom(name.to_string())
             );
         }
-        // content keeps its sigil
+        // content keeps its sigil, and is refused the other one
         assert!(classify_std(element_new(Name::bare("callout")).as_view()).is_ok());
+        let err = classify_declaration(&declaration_new("callout")).unwrap_err();
+        assert!(err.wrong_sigil && err.attribute);
+        assert!(err.to_string().contains("write `@callout`"), "{err}");
+    }
+
+    #[test]
+    fn an_unknown_double_colon_name_is_an_unknown_attribute() {
+        let err = classify_declaration(&declaration_new("upstream")).unwrap_err();
+        assert!(!err.wrong_sigil);
+        assert!(
+            err.to_string().starts_with("unknown attribute `upstream`"),
+            "{err}"
+        );
     }
 
     #[test]
@@ -793,11 +834,12 @@ mod tests {
     fn a_name_written_in_std_is_the_bare_name() {
         // `@std.link` is `@link`: every built-in reads the same either way.
         for (name, kind) in builtin_kinds() {
-            assert_eq!(
-                classify_std_name(&Name::namespaced("std", name)),
-                Ok(kind),
-                "for {name:?}"
-            );
+            let name = Name::namespaced("std", name);
+            let classified = match kind {
+                ElementKind::Declaration(_) => classify_std_attribute_name(&name),
+                _ => classify_std_name(&name),
+            };
+            assert_eq!(classified, Ok(kind), "for {name}");
         }
         let el = element_new(Name::namespaced("std", "comment"));
         assert_eq!(classify_std_lenient(el.as_view()), ElementKind::Comment);
@@ -812,11 +854,8 @@ mod tests {
     #[test]
     fn a_declaration_written_as_an_element_in_std_is_refused_like_the_bare_one() {
         for name in [Name::bare("kind"), Name::namespaced("std", "kind")] {
-            let kind = classify_std_name(&name).unwrap();
-            assert!(
-                refuse_declaration_as_element(&name, kind).is_err(),
-                "for {name}"
-            );
+            let err = classify_std_name(&name).unwrap_err();
+            assert!(err.wrong_sigil, "for {name}");
         }
     }
 

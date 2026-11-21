@@ -260,7 +260,7 @@ See $macro.gh(7) about $(var.topic) in $(self::path).
         let unresolved = tomet_eval::resolve_expressions(&mut doc, &scope.context());
         vault.fill_terms(&mut doc);
         assert!(unresolved.is_empty(), "{:?}", unresolved);
-        tomet_markdown::to_markdown(&doc)
+        tomet_markdown::to_markdown(&doc, &vault.bindings(&doc))
     };
 
     let converted = convert(source, Options::default());
@@ -276,7 +276,7 @@ See $macro.gh(7) about $(var.topic) in $(self::path).
         let unresolved = tomet_eval::resolve_expressions(&mut doc, &scope.context());
         vault.fill_terms(&mut doc);
         assert!(unresolved.is_empty(), "{:?}", unresolved);
-        tomet_markdown::to_markdown(&doc)
+        tomet_markdown::to_markdown(&doc, &vault.bindings(&doc))
     };
     assert_eq!(outside, inside);
 }

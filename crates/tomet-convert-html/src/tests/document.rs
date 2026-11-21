@@ -4,7 +4,7 @@ use super::*;
 fn a_nested_map_survives_as_an_exact_copy() {
     // It does not render as `data-m=""` -- key kept, contents gone.
     let doc = parse_file("@deck.x(a: 1, m: (k: v))[ 本文 ]\n").unwrap();
-    let html = render_body(&doc);
+    let html = render_body(&doc, &carried(&doc));
     assert!(html.contains(r#"data-a="1""#), "got {html}");
     assert!(
         !html.contains(r#"data-m="""#),
@@ -17,7 +17,7 @@ fn a_nested_map_survives_as_an_exact_copy() {
 #[test]
 fn flat_args_need_no_exact_copy() {
     let doc = parse_file("@deck.x(a: 1, tags: (p, q))[ 本文 ]\n").unwrap();
-    let html = render_body(&doc);
+    let html = render_body(&doc, &carried(&doc));
     assert!(html.contains(r#"data-tags="p, q""#), "got {html}");
     assert!(!html.contains("data-tomet-data="), "got {html}");
 }
@@ -25,7 +25,7 @@ fn flat_args_need_no_exact_copy() {
 #[test]
 fn render_page_defaults_to_japanese_lang() {
     let doc = parse_file("=[ One ]\n").unwrap();
-    let page = render_page(&doc, "Title");
+    let page = render_page(&doc, &carried(&doc), "Title");
     assert!(
         page.contains("<html lang=\"ja\">"),
         "expected default lang=\"ja\", got: {page}"
@@ -37,6 +37,7 @@ fn render_page_with_honors_lang_override() {
     let doc = parse_file("=[ One ]\n").unwrap();
     let page = render_page_with(
         &doc,
+        &carried(&doc),
         "Title",
         &RenderOptions {
             lang: Some("en".to_string()),

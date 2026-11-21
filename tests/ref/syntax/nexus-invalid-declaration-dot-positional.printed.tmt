@@ -1,0 +1,3 @@
+::kind(fixture)
+
+::workspace.ignore(target, .git)

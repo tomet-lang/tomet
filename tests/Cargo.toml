@@ -48,6 +48,10 @@ name = "vocabulary"
 path = "src/vocabulary.rs"
 
 [[test]]
+name = "aliased_export"
+path = "src/aliased_export.rs"
+
+[[test]]
 name = "pipe"
 path = "src/pipe.rs"
 

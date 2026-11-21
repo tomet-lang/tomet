@@ -8,7 +8,7 @@ use crate::util::{
 };
 use crate::{HeadingInfo, RenderCtx};
 use tomet_ast::{Block, ElementView, Inline, List, Paragraph, Section, Value};
-use tomet_semantics::{ElementKind, classify_std_lenient, heading_level};
+use tomet_semantics::{ElementKind, heading_level};
 use tomet_span::Span;
 use tomet_tree::ValueExt;
 
@@ -50,7 +50,7 @@ pub(crate) fn render_block(
                 out.push_str("</p>\n");
             }
         }
-        Block::Element(el) if classify_std_lenient(el.as_view()) == ElementKind::Heading => {
+        Block::Element(el) if cx.bindings.classify_lenient(&el.name) == ElementKind::Heading => {
             render_heading_element(cx, el.as_view(), out, state)
         }
         Block::Element(el) => {

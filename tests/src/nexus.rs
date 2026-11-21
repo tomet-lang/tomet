@@ -2,14 +2,15 @@
 //!
 //! A nexus -- `@name`, a `::name` declaration or connect -- needs a primary group: `(args)`,
 //! `[content]`, or a `|` run. `{value}`, `#(id)` and a `::connect` only add to
-//! one and cannot stand alone. A declaration's head is its name and nothing
-//! more: `::macro.copyright(...)` has a dot in it and is refused, the entry
-//! goes inside, as `::macro(copyright: ...)`. The grammar lives in `tomet-cst-parser` and
+//! one and cannot stand alone. A dotted declaration head is namespaced, as an
+//! element's name is: `::catasto.upstream(...)` is the attribute `upstream` of
+//! the vocabulary `catasto`. The grammar lives in `tomet-cst-parser` and
 //! `tomet-ast-parser`; this target pins it from the outside, with the corpus:
 //!
 //! - `syntax/nexus-invalid-*.tmt` are the forms that are refused, one to a
 //!   file because the parser stops at the first error. `KNOWN_UNPARSEABLE`
-//!   lists them, and [`REJECTED`] says where each is refused and why.
+//!   lists them, and [`REJECTED`] says where each is refused and why. The ones
+//!   no longer refused are [`NO_LONGER_REFUSED`], kept as regression coverage.
 //! - `syntax/nexus.tmt` and `syntax/nexus-declarations*.tmt` are the forms
 //!   that stay valid, among them the twelve declarations whose primary
 //!   group is `(...)`.
@@ -105,16 +106,6 @@ const REJECTED: &[(&str, &str, &str)] = &[
         "`::meta` needs a primary group",
     ),
     (
-        "syntax/nexus-invalid-declaration-dot-positional.tmt",
-        "5:1",
-        "a declaration head has no dot: write `::workspace(ignore: (...))`",
-    ),
-    (
-        "syntax/nexus-invalid-declaration-dot.tmt",
-        "5:1",
-        "a declaration head has no dot: write `::macro(copyright: (...))`",
-    ),
-    (
         "syntax/nexus-invalid-declaration-id.tmt",
         "4:1",
         "`#(id)` cannot stand without one",
@@ -145,6 +136,38 @@ const REJECTED: &[(&str, &str, &str)] = &[
         "`::rule` needs a primary group",
     ),
 ];
+
+/// `(fixture, the namespace and name its dotted head reads as)`: `syntax/nexus-invalid-*` fixtures
+/// of a form that was refused and is now read. `::macro.copyright(...)` was refused while a dot in
+/// a declaration head was read as diving into a key (`::macro(copyright: ...)`); since a dotted
+/// head is namespaced, it is the attribute `copyright` of the namespace `macro`, which validation
+/// reports as out of scope. The fixtures are frozen, so they keep their names.
+const NO_LONGER_REFUSED: &[(&str, &str, &str)] = &[
+    (
+        "syntax/nexus-invalid-declaration-dot-positional.tmt",
+        "workspace",
+        "ignore",
+    ),
+    (
+        "syntax/nexus-invalid-declaration-dot.tmt",
+        "macro",
+        "copyright",
+    ),
+];
+
+#[test]
+fn a_form_no_longer_refused_reads_as_a_namespaced_attribute() {
+    for (rel, namespace, name) in NO_LONGER_REFUSED {
+        let doc = parse_file(&read_fixture(Path::new(rel)))
+            .unwrap_or_else(|e| panic!("{rel} should parse: {e}"));
+        let head = &doc.header.last().expect("a declaration").name;
+        assert_eq!(
+            (head.namespace.as_deref(), head.name.as_str()),
+            (Some(*namespace), *name),
+            "{rel}"
+        );
+    }
+}
 
 fn element_names(doc: &tomet_ast::File) -> Vec<String> {
     let mut names = Vec::new();
@@ -196,9 +219,11 @@ fn the_invalid_fixtures_are_listed_and_explained_once() {
         .collect();
     let mut on_disk: Vec<&str> = on_disk.iter().map(String::as_str).collect();
     on_disk.sort_unstable();
+    explained.extend(NO_LONGER_REFUSED.iter().map(|(name, _, _)| *name));
+    explained.sort_unstable();
     assert_eq!(
         on_disk, explained,
-        "a `{INVALID}*` fixture on disk is not in REJECTED, or the reverse"
+        "a `{INVALID}*` fixture on disk is not in REJECTED or NO_LONGER_REFUSED, or the reverse"
     );
 }
 

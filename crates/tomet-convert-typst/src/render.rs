@@ -6,7 +6,7 @@ use std::collections::HashSet;
 use tomet_ast::{Block, ElementView, File, Inline, Interpolation, List, Placement, Section, Value};
 use tomet_scalar::Scalar;
 use tomet_semantics::{
-    FootnoteRegistry, TargetScheme, classify_std_lenient, comment_text, element_args_view,
+    Bindings, ElementKind, FootnoteRegistry, TargetScheme, comment_text, element_args_view,
     extract_tags, heading_level, is_directive, link_target, parse_table_rows, path_target,
     target_scheme,
 };
@@ -14,13 +14,22 @@ use tomet_tree::ValueExt;
 
 pub(crate) struct TypstCtx<'a> {
     pub(crate) footnotes: &'a FootnoteRegistry,
+    /// The names the document has in scope, as its caller bound them.
+    pub(crate) bindings: &'a Bindings,
     pub(crate) rendered_footnotes: RefCell<HashSet<usize>>,
 }
 
-pub fn to_typst(doc: &File) -> String {
+/// Renders `doc` as Typst markup.
+///
+/// `bindings` are the names `doc` has in scope (`Bindings` in `tomet-semantics`): an element is
+/// what its name resolves to there, so an aliased `@ng.node` is written as the `node-graph.node`
+/// it is. Whoever loaded the document builds them (a vault's `bindings`); a caller with no vault
+/// binds the vocabularies tomet carries (`LoadedVocabularies::default().bindings_for(doc)`).
+pub fn to_typst(doc: &File, bindings: &Bindings) -> String {
     let footnotes = FootnoteRegistry::from_file(doc);
     let cx = TypstCtx {
         footnotes: &footnotes,
+        bindings,
         rendered_footnotes: RefCell::new(HashSet::new()),
     };
     let mut out = String::new();
@@ -172,7 +181,7 @@ fn inline_to_typst(cx: &TypstCtx, inlines: &[Inline]) -> String {
 }
 
 fn element_to_typst(cx: &TypstCtx, el: ElementView<'_>, inline: bool) -> String {
-    let kind = classify_std_lenient(el);
+    let kind = cx.bindings.classify_lenient(el.name);
     match kind.as_str() {
         // Directives -- see `tomet_semantics::is_directive`.
         _ if is_directive(&kind) => String::new(),
@@ -193,9 +202,9 @@ fn element_to_typst(cx: &TypstCtx, el: ElementView<'_>, inline: bool) -> String 
         "callout" => render_callout(cx, el),
         "conflict" => render_conflict(cx, el),
         "table" => render_table(cx, el),
-        "link" => render_link(cx, el),
-        "file" | "dir" => render_path(cx, el, inline),
-        "embed" => render_embed(el),
+        "link" => render_link(cx, el, &kind),
+        "file" | "dir" => render_path(cx, el, &kind, inline),
+        "embed" => render_embed(el, &kind),
         "ftn" => {
             if inline || el.placement == Placement::Inline {
                 if let Some((idx, _)) = cx.footnotes.get_ref(&el.span) {
@@ -512,8 +521,8 @@ fn render_table(cx: &TypstCtx, el: ElementView<'_>) -> String {
 /// the visible target.
 /// `@file(x)`/`@dir(x)` -> Typst raw text, the same shape CommonMark
 /// gets. A path is named, not navigated to, so there is no `#link` here.
-fn render_path(cx: &TypstCtx, el: ElementView<'_>, inline: bool) -> String {
-    let path = path_target(el, &classify_std_lenient(el)).unwrap_or_default();
+fn render_path(cx: &TypstCtx, el: ElementView<'_>, kind: &ElementKind, inline: bool) -> String {
+    let path = path_target(el, kind).unwrap_or_default();
     let content = match el.content {
         Some(content) if !content.is_empty() => Some(blocks_to_typst(cx, content)),
         _ => None,
@@ -527,8 +536,8 @@ fn render_path(cx: &TypstCtx, el: ElementView<'_>, inline: bool) -> String {
     }
 }
 
-fn render_link(cx: &TypstCtx, el: ElementView<'_>) -> String {
-    let raw_target = link_target(el, &classify_std_lenient(el)).unwrap_or_default();
+fn render_link(cx: &TypstCtx, el: ElementView<'_>, kind: &ElementKind) -> String {
+    let raw_target = link_target(el, kind).unwrap_or_default();
     let (scheme, target) = target_scheme(&raw_target);
     let text = match el.content {
         Some(content) if !content.is_empty() => blocks_to_typst(cx, content),
@@ -564,8 +573,8 @@ fn render_link(cx: &TypstCtx, el: ElementView<'_>) -> String {
 /// Strips `target`'s scheme prefix the same way `render_link` does -- see
 /// `tomet-convert-html`'s `render_embed_element` for why `<embed>` needs
 /// this too, not just a raw passthrough.
-fn render_embed(el: ElementView<'_>) -> String {
-    let raw_target = link_target(el, &classify_std_lenient(el)).unwrap_or_default();
+fn render_embed(el: ElementView<'_>, kind: &ElementKind) -> String {
+    let raw_target = link_target(el, kind).unwrap_or_default();
     let (_, src) = target_scheme(&raw_target);
     let alt = el.content.map(blocks_to_plain).unwrap_or_default();
     if alt.is_empty() {

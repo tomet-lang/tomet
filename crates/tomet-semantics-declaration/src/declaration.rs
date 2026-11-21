@@ -13,7 +13,8 @@ use crate::kind::DeclKind;
 /// `::blueprint` alone (see [`Shape`](crate::Shape)).
 #[derive(Debug, Clone, PartialEq)]
 pub struct Declaration {
-    /// The name of the declaration, after `::`.
+    /// The name of the declaration, after `::`, namespace included as written
+    /// (`catasto.upstream`).
     pub name: String,
     /// `(args)` as written: a positional argument is still unnamed
     /// ([`args_view`](Declaration::args_view) views it with its aliases).
@@ -74,9 +75,17 @@ impl Declaration {
         ))
     }
 
-    /// The standard declaration this is, when its name is one.
+    /// The standard declaration this is, when its name is one: written bare, or in `std`
+    /// (`::std.kind` is `::kind`). A name in any other namespace (`::catasto.upstream`) is a
+    /// vocabulary's attribute and no standard declaration.
     pub fn kind(&self) -> Option<DeclKind> {
-        DeclKind::from_name(&self.name)
+        DeclKind::from_name(self.std_name()?)
+    }
+
+    /// The name as `std` has it, when it is written in `std`: bare, or after `std.`.
+    pub(crate) fn std_name(&self) -> Option<&str> {
+        let name = self.name.strip_prefix("std.").unwrap_or(&self.name);
+        (!name.contains('.')).then_some(name)
     }
 
     /// Whether this is the header a document names itself with, as against an entry of a registry:
@@ -228,10 +237,14 @@ mod tests {
     }
 
     #[test]
-    fn a_dotted_head_in_source_is_an_error() {
-        assert!(tomet_ast_parser::parse_file("::field.url.wiki(type: list)\n").is_err());
-        assert!(tomet_ast_parser::parse_file("::macro.copyright(\"(C)\")\n").is_err());
-        assert!(tomet_ast_parser::parse_file("::workspace.ignore(\"target\")\n").is_err());
+    fn a_dotted_head_is_namespaced() {
+        let doc = parse("::field.author(type: string)\n::std.kind(config)\n");
+        let found = declarations(&doc);
+        assert_eq!(
+            found.iter().map(|f| f.kind).collect::<Vec<_>>(),
+            [DeclKind::Kind]
+        );
+        assert_eq!(found[0].declaration.name, "std.kind");
     }
 
     #[test]

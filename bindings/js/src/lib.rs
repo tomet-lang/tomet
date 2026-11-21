@@ -2,13 +2,23 @@ use tomet::config::PrinterConfig;
 use tomet::vault::Vault;
 use wasm_bindgen::prelude::*;
 
-/// Parses `source` against a vault with no vocabularies of its own.
+/// A vault with no vocabularies of its own: what this module reads every document in.
 ///
 /// The facade has no bare parse on purpose (see `tomet`'s crate doc), and
 /// nothing here but `validateWith` needs one: reading a document as `std`
 /// alone is exactly what an empty vault does.
-fn parse_plain(source: &str) -> Result<tomet::File, String> {
+fn empty_vault() -> Vault {
     Vault::from_sources(PrinterConfig::default(), ".", &[])
+}
+
+/// The names `doc` has in scope in the [`empty_vault`], which is what a converter is handed.
+fn bindings_of(doc: &tomet::File) -> tomet::semantics::Bindings {
+    empty_vault().bindings(doc)
+}
+
+/// Parses `source` in the [`empty_vault`].
+fn parse_plain(source: &str) -> Result<tomet::File, String> {
+    empty_vault()
         .parse(source)
         .map(|(doc, _bindings)| doc)
         .map_err(|e| e.to_string())
@@ -105,7 +115,7 @@ fn prepare_file(mut doc: tomet::ast::File, opts: &ProcessOptions) -> tomet::ast:
     // the rest. There is no disk here, so an expression that reaches for
     // another document stays as written, which is what `NoResolver` gives.
     let here = opts.current_path.as_deref().unwrap_or("document.tmt");
-    let vault = Vault::from_sources(PrinterConfig::default(), ".", &[]);
+    let vault = empty_vault();
     let scope = vault.scope_for(&doc, std::path::Path::new(here), &tomet::vault::NoResolver);
     tomet_eval::resolve_expressions(&mut doc, &scope.context());
     vault.fill_terms(&mut doc);
@@ -160,7 +170,7 @@ pub struct ProcessedFile {
 pub fn process_file_internal(mut doc: tomet::ast::File, opts: &ProcessOptions) -> ProcessedFile {
     doc = prepare_file(doc, opts);
     let render_opts = opts.to_render_options();
-    let html = tomet::html::render_body_with(&doc, &render_opts);
+    let html = tomet::html::render_body_with(&doc, &bindings_of(&doc), &render_opts);
     let is_data_only = html.trim().is_empty();
 
     // 1. Meta & Title from ::meta(title: ...)
@@ -242,7 +252,11 @@ pub fn to_html(source_or_file: &JsValue, options: Option<JsValue>) -> Result<Str
         doc
     };
     doc = prepare_file(doc, &opts);
-    Ok(tomet::html::render_body_with(&doc, &render_opts))
+    Ok(tomet::html::render_body_with(
+        &doc,
+        &bindings_of(&doc),
+        &render_opts,
+    ))
 }
 
 /// Process `.tmt` markup source text or a `File` AST object into HTML, metadata, title, and TOC.
@@ -274,11 +288,11 @@ pub fn process_file(
 pub fn to_markdown(source_or_file: &JsValue) -> Result<String, JsValue> {
     if let Some(src) = source_or_file.as_string() {
         let doc = parse_plain(&src).map_err(|e| JsValue::from_str(&e.to_string()))?;
-        Ok(tomet::markdown::to_markdown(&doc))
+        Ok(tomet::markdown::to_markdown(&doc, &bindings_of(&doc)))
     } else {
         let doc: tomet::ast::File = serde_wasm_bindgen::from_value(source_or_file.clone())
             .map_err(|e| JsValue::from_str(&e.to_string()))?;
-        Ok(tomet::markdown::to_markdown(&doc))
+        Ok(tomet::markdown::to_markdown(&doc, &bindings_of(&doc)))
     }
 }
 
@@ -287,11 +301,11 @@ pub fn to_markdown(source_or_file: &JsValue) -> Result<String, JsValue> {
 pub fn to_typst(source_or_file: &JsValue) -> Result<String, JsValue> {
     if let Some(src) = source_or_file.as_string() {
         let doc = parse_plain(&src).map_err(|e| JsValue::from_str(&e.to_string()))?;
-        Ok(tomet::typst::to_typst(&doc))
+        Ok(tomet::typst::to_typst(&doc, &bindings_of(&doc)))
     } else {
         let doc: tomet::ast::File = serde_wasm_bindgen::from_value(source_or_file.clone())
             .map_err(|e| JsValue::from_str(&e.to_string()))?;
-        Ok(tomet::typst::to_typst(&doc))
+        Ok(tomet::typst::to_typst(&doc, &bindings_of(&doc)))
     }
 }
 
@@ -393,7 +407,7 @@ mod tests {
     fn test_parse_and_html_roundtrip() {
         let src = "#[ Hello World ]\n\n<task>(done: true)[Buy milk]\n";
         let doc = parse_plain(src).unwrap();
-        let html = tomet::html::render_body(&doc);
+        let html = tomet::html::render_body(&doc, &bindings_of(&doc));
         assert!(html.contains("Hello World"));
         assert!(html.contains("Buy milk"));
     }

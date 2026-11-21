@@ -337,7 +337,7 @@ fn export_one(
     let src = fs::read_to_string(file_path)?;
     // `vault.parse` and not `vault.document`, so the source text is still
     // in hand for `format_parse_error`'s pointer-at-the-column report.
-    let (mut doc, _bindings) = vault
+    let (mut doc, bindings) = vault
         .parse(&src)
         .map_err(|e| anyhow::anyhow!("{}", format_parse_error(file_path, &src, &e)))?;
 
@@ -400,10 +400,12 @@ fn export_one(
         );
 
         let rendered = match target {
-            ExportType::CommonMark => tomet_markdown::to_markdown(&render_doc),
+            ExportType::CommonMark => tomet_markdown::to_markdown(&render_doc, &bindings),
             // Pandoc's AST, not a rendering -- `pandoc -f json` turns it
             // into whatever format is actually wanted.
-            ExportType::Pandoc => serde_json::to_string(&tomet_pandoc::to_pandoc(&render_doc))?,
+            ExportType::Pandoc => {
+                serde_json::to_string(&tomet_pandoc::to_pandoc(&render_doc, &bindings))?
+            }
             ExportType::Html => {
                 let filename_title = file_path
                     .file_stem()
@@ -416,9 +418,9 @@ fn export_one(
                     lang: None,
                     ..Default::default()
                 };
-                tomet_html::render_page_with(&render_doc, &title, &options)
+                tomet_html::render_page_with(&render_doc, &bindings, &title, &options)
             }
-            ExportType::Typst => tomet_typst::to_typst(&render_doc),
+            ExportType::Typst => tomet_typst::to_typst(&render_doc, &bindings),
             ExportType::Custom(fmt) => {
                 return Err(anyhow::anyhow!("unsupported export type: {fmt}"));
             }

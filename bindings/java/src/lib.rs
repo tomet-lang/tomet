@@ -11,15 +11,15 @@ fn throw_err(env: &mut JNIEnv, msg: impl std::fmt::Display) -> jstring {
     std::ptr::null_mut()
 }
 
-/// Parses `source` against a vault with no vocabularies of its own.
+/// Parses `source` against a vault with no vocabularies of its own: the document, and the names
+/// it has in scope there, which is what a converter is handed.
 ///
 /// The facade has no bare parse on purpose (see `tomet`'s crate doc), and
 /// nothing here but `validateJsonWith` needs one: reading a document as
 /// `std` alone is exactly what an empty vault does.
-fn parse(source: &str) -> Result<tomet::File, String> {
+fn parse(source: &str) -> Result<(tomet::File, tomet::semantics::Bindings), String> {
     Vault::from_sources(PrinterConfig::default(), ".", &[])
         .parse(source)
-        .map(|(doc, _bindings)| doc)
         .map_err(|e| e.to_string())
 }
 
@@ -40,7 +40,7 @@ pub extern "system" fn Java_org_tomet_tomet_Tomet_parseFileJson(
         Ok(s) => s,
         Err(e) => return throw_err(&mut env, e),
     };
-    let doc = match parse(&src) {
+    let (doc, _bindings) = match parse(&src) {
         Ok(d) => d,
         Err(e) => return throw_err(&mut env, e),
     };
@@ -88,11 +88,11 @@ pub extern "system" fn Java_org_tomet_tomet_Tomet_toHtml(
         Ok(s) => s,
         Err(e) => return throw_err(&mut env, e),
     };
-    let doc = match parse(&src) {
+    let (doc, bindings) = match parse(&src) {
         Ok(d) => d,
         Err(e) => return throw_err(&mut env, e),
     };
-    let html = tomet::html::render_body(&doc);
+    let html = tomet::html::render_body(&doc, &bindings);
     env.new_string(html)
         .map(|s| s.into_raw())
         .unwrap_or(std::ptr::null_mut())
@@ -109,11 +109,11 @@ pub extern "system" fn Java_org_tomet_tomet_Tomet_toMarkdown(
         Ok(s) => s,
         Err(e) => return throw_err(&mut env, e),
     };
-    let doc = match parse(&src) {
+    let (doc, bindings) = match parse(&src) {
         Ok(d) => d,
         Err(e) => return throw_err(&mut env, e),
     };
-    let md = tomet::markdown::to_markdown(&doc);
+    let md = tomet::markdown::to_markdown(&doc, &bindings);
     env.new_string(md)
         .map(|s| s.into_raw())
         .unwrap_or(std::ptr::null_mut())
@@ -130,11 +130,11 @@ pub extern "system" fn Java_org_tomet_tomet_Tomet_toTypst(
         Ok(s) => s,
         Err(e) => return throw_err(&mut env, e),
     };
-    let doc = match parse(&src) {
+    let (doc, bindings) = match parse(&src) {
         Ok(d) => d,
         Err(e) => return throw_err(&mut env, e),
     };
-    let typ = tomet::typst::to_typst(&doc);
+    let typ = tomet::typst::to_typst(&doc, &bindings);
     env.new_string(typ)
         .map(|s| s.into_raw())
         .unwrap_or(std::ptr::null_mut())
@@ -310,7 +310,7 @@ mod tests {
     #[test]
     fn test_core_functionality() {
         let src = "#[ Hello Java ]\n\n<task>(done: true)[Test task]\n";
-        let doc = parse(src).unwrap();
+        let (doc, bindings) = parse(src).unwrap();
         let json = serde_json::to_string(&doc).unwrap();
         assert!(json.contains("Hello Java"));
         assert!(json.contains("Test task"));
@@ -320,13 +320,13 @@ mod tests {
         let val_json = serde_json::to_string(&val).unwrap();
         assert_eq!(val_json, r#"{"name":"Tomet","count":42}"#);
 
-        let html = tomet::html::render_body(&doc);
+        let html = tomet::html::render_body(&doc, &bindings);
         assert!(html.contains("Hello Java"));
 
-        let md = tomet::markdown::to_markdown(&doc);
+        let md = tomet::markdown::to_markdown(&doc, &bindings);
         assert!(md.contains("Hello Java"));
 
-        let typ = tomet::typst::to_typst(&doc);
+        let typ = tomet::typst::to_typst(&doc, &bindings);
         assert!(typ.contains("Hello Java"));
 
         let formatted = tomet::format::format_source("#[  Hello  ]\n");

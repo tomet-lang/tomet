@@ -24,7 +24,10 @@ fn html_output_matches_reference() {
         // `render_body` rather than `render_page`: the page wrapper is
         // boilerplate, and pinning it would make every fixture's
         // reference churn on an unrelated template tweak.
-        assert_snapshot(&snapshot_name(&rel, "html"), &tomet_html::render_body(&doc));
+        assert_snapshot(
+            &snapshot_name(&rel, "html"),
+            &tomet_html::render_body(&doc, &tomet_tests::carried(&doc)),
+        );
     }
 }
 
@@ -35,7 +38,7 @@ fn markdown_output_matches_reference() {
             .unwrap_or_else(|e| panic!("{} failed to parse: {e}", rel.display()));
         assert_snapshot(
             &snapshot_name(&rel, "md"),
-            &tomet_markdown::to_markdown(&doc),
+            &tomet_markdown::to_markdown(&doc, &tomet_tests::carried(&doc)),
         );
     }
 }
@@ -45,7 +48,10 @@ fn typst_output_matches_reference() {
     for (rel, src) in parseable_corpus() {
         let doc = tomet_ast_parser::parse_file(&src)
             .unwrap_or_else(|e| panic!("{} failed to parse: {e}", rel.display()));
-        assert_snapshot(&snapshot_name(&rel, "typ"), &tomet_typst::to_typst(&doc));
+        assert_snapshot(
+            &snapshot_name(&rel, "typ"),
+            &tomet_typst::to_typst(&doc, &tomet_tests::carried(&doc)),
+        );
     }
 }
 
@@ -72,11 +78,11 @@ fn markdown_import_export_is_stable() {
     for (rel, src) in parseable_corpus() {
         let doc = tomet_ast_parser::parse_file(&src)
             .unwrap_or_else(|e| panic!("{} failed to parse: {e}", rel.display()));
-        let exported = tomet_markdown::to_markdown(&doc);
+        let exported = tomet_markdown::to_markdown(&doc, &tomet_tests::carried(&doc));
         let reimported = tomet_markdown::from_markdown(&exported);
         assert_snapshot(
             &snapshot_name(&rel, "md.reimported.md"),
-            &tomet_markdown::to_markdown(&reimported),
+            &tomet_markdown::to_markdown(&reimported, &tomet_tests::carried(&reimported)),
         );
     }
 }
@@ -89,8 +95,11 @@ fn pandoc_output_matches_reference() {
     for (rel, src) in parseable_corpus() {
         let doc = tomet_ast_parser::parse_file(&src)
             .unwrap_or_else(|e| panic!("{} failed to parse: {e}", rel.display()));
-        let json = serde_json::to_string_pretty(&tomet_pandoc::to_pandoc(&doc))
-            .expect("the Pandoc AST serializes");
+        let json = serde_json::to_string_pretty(&tomet_pandoc::to_pandoc(
+            &doc,
+            &tomet_tests::carried(&doc),
+        ))
+        .expect("the Pandoc AST serializes");
         assert_snapshot(&snapshot_name(&rel, "pandoc.json"), &json);
     }
 }
@@ -106,7 +115,8 @@ fn pandoc_round_trip_is_stable() {
     for (rel, src) in parseable_corpus() {
         let doc = tomet_ast_parser::parse_file(&src)
             .unwrap_or_else(|e| panic!("{} failed to parse: {e}", rel.display()));
-        let back = tomet_pandoc::from_pandoc(&tomet_pandoc::to_pandoc(&doc));
+        let back =
+            tomet_pandoc::from_pandoc(&tomet_pandoc::to_pandoc(&doc, &tomet_tests::carried(&doc)));
         assert_snapshot(
             &snapshot_name(&rel, "pandoc.roundtrip.tmt"),
             &tomet_printer::document_to_tm(&back),

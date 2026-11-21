@@ -51,7 +51,8 @@ pub(crate) fn is_element(form: &SyntaxNode) -> bool {
         .is_some_and(|tok| tok.kind() == K::AT)
 }
 
-/// Whether `form` is a declaration form (with `::`) named `name`.
+/// Whether `form` is a declaration form (with `::`) of the standard declaration `name`, written
+/// bare or in `std` (`::std.meta` is `::meta`).
 pub(crate) fn is_declaration_named(form: &SyntaxNode, name: &str) -> bool {
     let Some(sigil) = form.children().find(|child| child.kind() == K::SIGIL) else {
         return false;
@@ -62,7 +63,10 @@ pub(crate) fn is_declaration_named(form: &SyntaxNode, name: &str) -> bool {
         && sigil
             .children()
             .find(|child| child.kind() == K::NAME)
-            .is_some_and(|n| n.text() == name)
+            .is_some_and(|n| {
+                let text = n.text().to_string();
+                text.strip_prefix("std.").unwrap_or(&text) == name
+            })
 }
 
 /// Whether `args` (`K::ARGS`) is a `(...)` group that layout formatters (`map.*`) may rewrite.

@@ -24,6 +24,8 @@ use crate::position::get_line_prefix;
 ///   ids of this document, or of the one named on the left of the `#`
 ///   (`tmt("p")#`, `tmt:p#`);
 /// - after `@`, the built-in elements and those of the vocabularies in scope;
+/// - after a `::` that opens a line, the standard declarations and the attributes of the
+///   vocabularies in scope;
 /// - anything else is the text alone's to say.
 ///
 /// A `#` that starts a declaration (`#(id)`, `#[`) is not a reference, and gets
@@ -45,7 +47,9 @@ pub(crate) fn completions(
 
     let mut items = completions_for_with_uri(text, pos, uri);
     if prefix.ends_with('@') {
-        items.extend(vocabulary_elements(vault, text, pos));
+        items.extend(vocabulary_names(vault, text, pos, Table::Element));
+    } else if prefix.trim_start() == "::" {
+        items.extend(vocabulary_names(vault, text, pos, Table::Attribute));
     }
     items
 }
@@ -177,26 +181,57 @@ fn ids(vault: &Vault, text: &str, pos: Position, other: Option<&str>) -> Vec<Com
         .collect()
 }
 
-/// The elements of the vocabularies `text` has in scope: the bare names of the
-/// vocabulary its `::kind` binds, and `ns.name` for each one it `::use`s.
-fn vocabulary_elements(vault: &Vault, text: &str, pos: Position) -> Vec<CompletionItem> {
+/// Which of a vocabulary's tables a completion offers names from: the one its sigil looks names
+/// up in.
+#[derive(Clone, Copy)]
+enum Table {
+    /// `@name`, `::element`.
+    Element,
+    /// `::name`, `::attribute`.
+    Attribute,
+}
+
+/// The names in `table` of the vocabularies `text` has in scope: bare for the vocabulary its
+/// `::kind` binds, and `ns.name` for each one it `::use`s, in the namespace it is brought in
+/// under -- the alias, when the `::use` gives one.
+fn vocabulary_names(vault: &Vault, text: &str, pos: Position, table: Table) -> Vec<CompletionItem> {
     let Some(doc) = parse_while_typing(vault, text, pos) else {
         return Vec::new();
     };
     let bindings = vault.bindings(&doc);
     let mut items = Vec::new();
-    let mut add = |vocabulary: &tomet_semantics::vocabulary::Vocabulary, qualified: bool| {
-        for (name, decl) in &vocabulary.elements {
-            let label = if qualified {
-                format!("{}.{name}", vocabulary.namespace)
-            } else {
-                name.clone()
+    let mut add = |vocabulary: &tomet_semantics::vocabulary::Vocabulary, written: Option<&str>| {
+        let (names, what): (Vec<(&String, Vec<&str>)>, &str) = match table {
+            Table::Element => (
+                vocabulary
+                    .elements
+                    .iter()
+                    .map(|(name, decl)| {
+                        (name, decl.params.iter().map(|p| p.name.as_str()).collect())
+                    })
+                    .collect(),
+                "element",
+            ),
+            Table::Attribute => (
+                vocabulary
+                    .attributes
+                    .iter()
+                    .map(|(name, decl)| {
+                        (name, decl.params.iter().map(|p| p.name.as_str()).collect())
+                    })
+                    .collect(),
+                "attribute",
+            ),
+        };
+        for (name, params) in names {
+            let label = match written {
+                Some(namespace) => format!("{namespace}.{name}"),
+                None => name.clone(),
             };
-            let params: Vec<&str> = decl.params.iter().map(|p| p.name.as_str()).collect();
             let detail = if params.is_empty() {
-                format!("{} element", vocabulary.namespace)
+                format!("{} {what}", vocabulary.namespace)
             } else {
-                format!("{} element ({})", vocabulary.namespace, params.join(", "))
+                format!("{} {what} ({})", vocabulary.namespace, params.join(", "))
             };
             items.push(CompletionItem {
                 label: label.clone(),
@@ -208,10 +243,10 @@ fn vocabulary_elements(vault: &Vault, text: &str, pos: Position) -> Vec<Completi
         }
     };
     if let Some(kind) = &bindings.kind {
-        add(kind, false);
+        add(kind, None);
     }
-    for vocabulary in bindings.used.values() {
-        add(vocabulary, true);
+    for (written, vocabulary) in &bindings.used {
+        add(vocabulary, Some(written));
     }
     items
 }

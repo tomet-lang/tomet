@@ -415,12 +415,20 @@ mod tests {
     }
 
     #[test]
-    fn a_dotted_head_is_an_error() {
-        assert!(load_config_from_str("::macro.copyright(\"(C) 2026\")\n").is_err());
-        assert!(load_config_from_str("::format.meta(always_newline: true)\n").is_err());
-        assert!(load_config_from_str("::field.author(type: string)\n").is_err());
-        assert!(load_config_from_str("::blueprint.x(a: 1)\n").is_err());
-        assert!(load_config_from_str("::vocabulary.x(version: \"1.0.0\")\n").is_err());
+    fn a_dotted_head_is_a_namespaced_attribute_and_sets_nothing() {
+        for src in [
+            "::macro.copyright(\"(C) 2026\")\n",
+            "::format.meta(always_newline: true)\n",
+            "::field.author(type: string)\n",
+        ] {
+            assert_eq!(
+                load_config_from_str(src).unwrap(),
+                Config::default(),
+                "{src}"
+            );
+        }
+        let written_out = load_config_from_str("::std.macro(copyright: \"(C) 2026\")\n").unwrap();
+        assert!(written_out.macros.contains_key("copyright"));
     }
 
     #[test]

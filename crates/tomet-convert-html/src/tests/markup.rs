@@ -3,21 +3,21 @@ use super::*;
 #[test]
 fn escapes_paragraph_text() {
     let doc = parse_file("a < b & c\n").unwrap();
-    let body = render_body(&doc);
+    let body = render_body(&doc, &carried(&doc));
     assert_eq!(body, "<p>a &lt; b &amp; c</p>\n");
 }
 
 #[test]
 fn renders_thematic_break_as_hr() {
     let doc = parse_file("---\n").unwrap();
-    let body = render_body(&doc);
+    let body = render_body(&doc, &carried(&doc));
     assert_eq!(body, "<hr>\n");
 }
 
 #[test]
 fn renders_titled_thematic_break() {
     let doc = parse_file("---[ Title ]---\n").unwrap();
-    let body = render_body(&doc);
+    let body = render_body(&doc, &carried(&doc));
     assert_eq!(
         body,
         "<div class=\"tm-hr-titled\"><hr><span>Title</span><hr></div>\n"
@@ -27,7 +27,7 @@ fn renders_titled_thematic_break() {
 #[test]
 fn renders_emphasis_strong_and_mark() {
     let doc = parse_file("a *em* b **strong** c @mark[mark]\n").unwrap();
-    let body = render_body(&doc);
+    let body = render_body(&doc, &carried(&doc));
     assert_eq!(
         body,
         "<p>a <em>em</em> b <strong>strong</strong> c <mark>mark</mark></p>\n"
@@ -37,7 +37,7 @@ fn renders_emphasis_strong_and_mark() {
 #[test]
 fn renders_ruby() {
     let doc = parse_file("a @ruby[漢字](rt:\"かんじ\") b\n").unwrap();
-    let body = render_body(&doc);
+    let body = render_body(&doc, &carried(&doc));
     assert_eq!(body, "<p>a <ruby>漢字<rt>かんじ</rt></ruby> b</p>\n");
 }
 
@@ -45,7 +45,7 @@ fn renders_ruby() {
 fn renders_table_element_to_html() {
     let src = "@table()[\n[ title ][  sdfasdf   ][    fasdf    ][ sdffdsf ]\n[ title ][ sdfddfasdf ][ fasddfdfdff ][ sdffdsf ]\n[ title ][  sdfasdf   ][   fasdf     ][ sdffdsf ]\n]{}\n";
     let doc = parse_file(src).unwrap();
-    let body = render_body(&doc);
+    let body = render_body(&doc, &carried(&doc));
     assert_eq!(
         body,
         "<table class=\"tm-element tm-table\">\n\
@@ -79,7 +79,7 @@ fn renders_table_element_to_html() {
 fn test_renders_inline_footnote() {
     let src = "Prose with @ftn[a short note] here.\n";
     let doc = parse_file(src).unwrap();
-    let html = render_body(&doc);
+    let html = render_body(&doc, &carried(&doc));
 
     assert!(
         html.contains(
@@ -102,7 +102,7 @@ fn test_renders_separated_footnote_with_multiple_references() {
     let src =
         "Prose A@ftn(note1) and Prose B@ftn(note1).\n\n@ftn(note1)[Shared footnote explanation.]\n";
     let doc = parse_file(src).unwrap();
-    let html = render_body(&doc);
+    let html = render_body(&doc, &carried(&doc));
 
     assert!(
         html.contains(
@@ -126,7 +126,7 @@ fn test_renders_separated_footnote_with_multiple_references() {
 fn a_type_seat_is_shown_as_written() {
     let doc = parse_file("<$list(string, length: 6)>\n\nid <$uuid> end\n").unwrap();
     assert_eq!(
-        render_body(&doc),
+        render_body(&doc, &carried(&doc)),
         "<p>&lt;$list(string, length: 6)&gt;</p>\n<p>id &lt;$uuid&gt; end</p>\n"
     );
 }

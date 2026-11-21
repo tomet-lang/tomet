@@ -5,14 +5,16 @@
 
 use tomet_ast::{Data, Declaration, Element, File, Tuple, Value};
 use tomet_scalar::Scalar;
-use tomet_semantics::{classify_declaration_lenient, classify_std_lenient};
+use tomet_semantics::Bindings;
 use tomet_span::Span;
 use tomet_tree::{DataExt, for_each_declaration, for_each_element};
 
 /// Criteria for matching AST elements.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct StructuralQuery {
-    /// Tag (kind) name to match (case-insensitive, e.g. "meta", "link", "heading").
+    /// Tag (kind) name to match (case-insensitive, e.g. "meta", "link", "heading"). A name a
+    /// vocabulary declares is matched in that vocabulary's own namespace (`node-graph.node`),
+    /// whatever alias a document writes it under.
     pub tag: Option<String>,
     /// Attribute or property key that must exist on the element.
     pub key: Option<String>,
@@ -20,22 +22,33 @@ pub struct StructuralQuery {
     pub value_contains: Option<String>,
 }
 
-/// A matched AST element occurrence with its span and tag name.
+/// A matched AST element occurrence with its span and tag name (the kind it resolved to).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct StructuralMatch {
     pub span: Span,
     pub tag: String,
 }
 
-/// Checks if a single element matches `query`.
-pub fn matches_query(el: &Element, query: &StructuralQuery) -> bool {
-    matches_parts(classify_std_lenient(el.as_view()).as_str(), &el.data, query)
+/// Checks if a single element matches `query`, its name resolved against `bindings` (the names
+/// the element's document has in scope).
+pub fn matches_query(el: &Element, bindings: &Bindings, query: &StructuralQuery) -> bool {
+    matches_parts(
+        bindings.classify_lenient(&el.name).as_str(),
+        &el.data,
+        query,
+    )
 }
 
-/// Checks if a single declaration matches `query`.
-pub fn matches_declaration_query(declaration: &Declaration, query: &StructuralQuery) -> bool {
+/// Checks if a single declaration matches `query`, its name resolved against `bindings`.
+pub fn matches_declaration_query(
+    declaration: &Declaration,
+    bindings: &Bindings,
+    query: &StructuralQuery,
+) -> bool {
     matches_parts(
-        classify_declaration_lenient(declaration).as_str(),
+        bindings
+            .classify_attribute_lenient(&declaration.name)
+            .as_str(),
         &declaration.data,
         query,
     )
@@ -75,29 +88,34 @@ fn matches_parts(tag: &str, data: &Data, query: &StructuralQuery) -> bool {
     true
 }
 
-/// Counts matching elements and declarations in `doc` for `query`.
-pub fn count_structural_matches(doc: &File, query: &StructuralQuery) -> usize {
-    find_structural_matches(doc, query).len()
+/// Counts matching elements and declarations in `doc` for `query`. `bindings` are the names
+/// `doc` has in scope, as whoever loaded it bound them.
+pub fn count_structural_matches(doc: &File, bindings: &Bindings, query: &StructuralQuery) -> usize {
+    find_structural_matches(doc, bindings, query).len()
 }
 
 /// Finds all matching element and declaration occurrences in `doc` for
-/// `query`, in document order.
-pub fn find_structural_matches(doc: &File, query: &StructuralQuery) -> Vec<StructuralMatch> {
+/// `query`, in document order. `bindings` as in [`count_structural_matches`].
+pub fn find_structural_matches(
+    doc: &File,
+    bindings: &Bindings,
+    query: &StructuralQuery,
+) -> Vec<StructuralMatch> {
     let mut matches = Vec::new();
     for_each_element(doc, |el| {
-        if matches_query(el, query) {
-            let kind = classify_std_lenient(el.as_view());
+        if matches_query(el, bindings, query) {
             matches.push(StructuralMatch {
                 span: el.span,
-                tag: kind.as_str().to_string(),
+                tag: bindings.classify_lenient(&el.name).as_str().to_string(),
             });
         }
     });
     for_each_declaration(doc, |declaration| {
-        if matches_declaration_query(declaration, query) {
+        if matches_declaration_query(declaration, bindings, query) {
             matches.push(StructuralMatch {
                 span: declaration.span,
-                tag: classify_declaration_lenient(declaration)
+                tag: bindings
+                    .classify_attribute_lenient(&declaration.name)
                     .as_str()
                     .to_string(),
             });
@@ -135,6 +153,11 @@ mod tests {
     use super::*;
     use tomet_ast_parser::parse_file;
 
+    /// What a document read with no vault has in scope: the vocabularies tomet carries.
+    fn carried(doc: &File) -> Bindings {
+        tomet_semantics::LoadedVocabularies::default().bindings_for(doc)
+    }
+
     #[test]
     fn matches_query_by_tag() {
         let doc = parse_file("::meta(author: \"Alice\")\n#[ Title ]\n").unwrap();
@@ -142,8 +165,8 @@ mod tests {
             tag: Some("meta".to_string()),
             ..Default::default()
         };
-        assert_eq!(count_structural_matches(&doc, &query), 1);
-        let matches = find_structural_matches(&doc, &query);
+        assert_eq!(count_structural_matches(&doc, &carried(&doc), &query), 1);
+        let matches = find_structural_matches(&doc, &carried(&doc), &query);
         assert_eq!(matches.len(), 1);
         assert_eq!(matches[0].tag, "meta");
     }
@@ -155,13 +178,16 @@ mod tests {
             key: Some("author".to_string()),
             ..Default::default()
         };
-        assert_eq!(count_structural_matches(&doc, &q_author), 1);
+        assert_eq!(count_structural_matches(&doc, &carried(&doc), &q_author), 1);
 
         let q_missing = StructuralQuery {
             key: Some("nonexistent".to_string()),
             ..Default::default()
         };
-        assert_eq!(count_structural_matches(&doc, &q_missing), 0);
+        assert_eq!(
+            count_structural_matches(&doc, &carried(&doc), &q_missing),
+            0
+        );
     }
 
     #[test]
@@ -171,13 +197,16 @@ mod tests {
             value_contains: Some("Wonder".to_string()),
             ..Default::default()
         };
-        assert_eq!(count_structural_matches(&doc, &q_val), 1);
+        assert_eq!(count_structural_matches(&doc, &carried(&doc), &q_val), 1);
 
         let q_nomatch = StructuralQuery {
             value_contains: Some("Bob".to_string()),
             ..Default::default()
         };
-        assert_eq!(count_structural_matches(&doc, &q_nomatch), 0);
+        assert_eq!(
+            count_structural_matches(&doc, &carried(&doc), &q_nomatch),
+            0
+        );
     }
 
     #[test]
@@ -188,12 +217,50 @@ mod tests {
             value_contains: Some("special".to_string()),
             ..Default::default()
         };
-        assert_eq!(count_structural_matches(&doc, &q_call), 1);
+        assert_eq!(count_structural_matches(&doc, &carried(&doc), &q_call), 1);
 
         let q_interp = StructuralQuery {
             value_contains: Some("vault".to_string()),
             ..Default::default()
         };
-        assert_eq!(count_structural_matches(&doc, &q_interp), 1);
+        assert_eq!(count_structural_matches(&doc, &carried(&doc), &q_interp), 1);
+    }
+
+    /// The names `doc` has in scope in a vault holding a `node-graph` vocabulary.
+    fn with_node_graph(doc: &File) -> Bindings {
+        let mut loaded = tomet_semantics::LoadedVocabularies::default();
+        loaded.add("node-graph", &parse_file(NODE_GRAPH).unwrap());
+        assert!(loaded.errors.is_empty(), "{:?}", loaded.errors);
+        loaded.bindings_for(doc)
+    }
+
+    const NODE_GRAPH: &str = "::kind(vocabulary)\n::vocabulary(node-graph, version: \"1.0.0\")\n::element(\n  node: ()\n)\n::attribute(\n  layout: ()\n)\n";
+
+    /// A name written under a `::use` alias is matched, and reported, in its vocabulary's own
+    /// namespace, exactly as one written out, or bare under the document's kind, is.
+    #[test]
+    fn an_aliased_name_matches_in_its_real_namespace() {
+        let query = |tag: &str| StructuralQuery {
+            tag: Some(tag.to_string()),
+            ..Default::default()
+        };
+        for src in [
+            "::use(node-graph, as: ng)\n::ng.layout(tree)\n\n@ng.node(a)\n",
+            "::use(node-graph)\n::node-graph.layout(tree)\n\n@node-graph.node(a)\n",
+            // bare under the document's own kind: resolves only with the vocabulary in hand
+            "::kind(node-graph)\n::layout(tree)\n\n@node(a)\n",
+        ] {
+            let doc = parse_file(src).unwrap();
+            let bindings = with_node_graph(&doc);
+            let found = find_structural_matches(&doc, &bindings, &query("node-graph.node"));
+            assert_eq!(found.len(), 1, "{src}");
+            assert_eq!(found[0].tag, "node-graph.node");
+            let found = find_structural_matches(&doc, &bindings, &query("node-graph.layout"));
+            assert_eq!(found.len(), 1, "{src}");
+            assert_eq!(
+                count_structural_matches(&doc, &bindings, &query("ng.node")),
+                0
+            );
+        }
     }
 }

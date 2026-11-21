@@ -21,13 +21,13 @@ use crate::block::push_span_attrs;
 use crate::util::{escape_attr, escape_html, id_attr, push_data_attrs, push_value_data_attrs};
 use crate::{CustomElementCtx, RenderCtx};
 use tomet_ast::{BodyView, ElementView, Entry, Group, Interpolation};
-use tomet_semantics::{
-    classify_std_lenient, comment_text, element_args_view_in, extract_tags, is_directive,
-};
+use tomet_semantics::{comment_text, element_args_view_in, extract_tags, is_directive};
 use tomet_tree::ValueExt;
 
 pub(crate) fn render_element(cx: &RenderCtx, el: ElementView<'_>, out: &mut String, inline: bool) {
-    let kind = classify_std_lenient(el);
+    // Through the document's bindings, so a name written under a `::use` alias is passed on in
+    // its vocabulary's own namespace.
+    let kind = cx.bindings.classify_lenient(el.name);
     match kind.as_str() {
         // Directives -- see `tomet_semantics::is_directive`.
         _ if is_directive(&kind) => {}
@@ -41,9 +41,9 @@ pub(crate) fn render_element(cx: &RenderCtx, el: ElementView<'_>, out: &mut Stri
                 ));
             }
         }
-        "link" => render_link_element(cx, el, out, inline),
-        "file" | "dir" => render_path_element(cx, el, out, inline),
-        "embed" => render_embed_element(el, out),
+        "link" => render_link_element(cx, el, &kind, out, inline),
+        "file" | "dir" => render_path_element(cx, el, &kind, out, inline),
+        "embed" => render_embed_element(el, &kind, out),
         "hr" => render_hr_element(cx, el, out),
         "em" | "strong" | "mark" => render_wrapped_inline(cx, el, kind.as_str(), out),
         // `<del>` rather than a `strikeout` tag: the element's name is

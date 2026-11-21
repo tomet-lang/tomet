@@ -2,7 +2,8 @@ use super::*;
 use tomet_ast_parser::parse_file;
 
 fn typst(src: &str) -> String {
-    to_typst(&parse_file(src).unwrap())
+    let doc = parse_file(src).unwrap();
+    to_typst(&doc, &carried(&doc))
 }
 
 #[test]
@@ -201,7 +202,7 @@ fn a_comment_can_neither_end_early_nor_stay_open() {
             text,
             tomet_ast::Placement::Block,
         ))];
-        to_typst(&doc)
+        to_typst(&doc, &carried(&doc))
     };
     assert_eq!(comment("a */ b"), "/* a * / b */\n\n");
     assert_eq!(comment("a /* b"), "/* a / * b */\n\n");
@@ -217,4 +218,9 @@ fn a_comment_with_no_text_is_the_empty_comment() {
 fn a_type_seat_is_shown_as_written() {
     assert_eq!(typst("<$uuid>\n"), "\\<\\$uuid\\>\n\n");
     assert_eq!(typst("id <$date> end\n"), "id \\<\\$date\\> end\n\n");
+}
+
+/// What a document read with no vault has in scope: the vocabularies tomet carries.
+fn carried(doc: &tomet_ast::File) -> tomet_semantics::Bindings {
+    tomet_semantics::LoadedVocabularies::default().bindings_for(doc)
 }

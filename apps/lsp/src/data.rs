@@ -136,7 +136,7 @@ mod tests {
         assert!(
             diags[0]
                 .message
-                .contains("`::export` is not permitted in this host")
+                .contains("`::export` may only be written in a `.tmt` document")
         );
         assert_eq!(diags[0].severity, Some(DiagnosticSeverity::ERROR));
     }

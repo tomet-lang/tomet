@@ -5,14 +5,14 @@ use tomet_tree::ValueExt;
 #[test]
 fn meta_element_has_no_visible_output() {
     let doc = parse_file("::meta(key: value)\n").unwrap();
-    let body = render_body(&doc);
+    let body = render_body(&doc, &carried(&doc));
     assert_eq!(body, "");
 }
 
 #[test]
 fn config_element_has_no_visible_output() {
     let doc = parse_file("::export(type:commonmark)\n").unwrap();
-    let body = render_body(&doc);
+    let body = render_body(&doc, &carried(&doc));
     assert_eq!(body, "");
 }
 
@@ -31,14 +31,14 @@ fn adjacent_meta_blocks_have_no_visible_output() {
     let doc =
         parse_file("::meta(key: value)\n::meta(key: value)\n::meta(key: value)\n\n=[ next ]\n")
             .unwrap();
-    let body = render_body(&doc);
+    let body = render_body(&doc, &carried(&doc));
     assert_eq!(body, "<h1>next</h1>\n");
 }
 
 #[test]
 fn renders_typed_element_generically() {
     let doc = parse_file("@caution[ be careful ]\n").unwrap();
-    let body = render_body(&doc);
+    let body = render_body(&doc, &carried(&doc));
     assert_eq!(
         body,
         "<div class=\"tm-element tm-caution\">be careful</div>\n"
@@ -73,11 +73,39 @@ fn custom_element_hook_renders_doc_icon() {
         })),
         ..RenderOptions::default()
     };
-    let body = render_body_with(&doc, &options);
+    let body = render_body_with(&doc, &carried(&doc), &options);
     assert_eq!(
         body,
         "<p>a <i data-icon=\"star\" data-pkg=\"lucide\"></i> b</p>\n"
     );
+}
+
+/// A name written under a `::use` alias reaches the hook in its vocabulary's own namespace, with
+/// its arguments named by that vocabulary, exactly as one written out does: what a name is, is
+/// what the document's bindings resolve it to.
+#[test]
+fn custom_element_hook_sees_the_real_namespace_of_an_aliased_name() {
+    let seen = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+    let record = seen.clone();
+    let options = RenderOptions {
+        custom_element: Some(CustomElementRenderer::new(move |ctx| {
+            let label = ctx.args_view().and_then(|args| {
+                args.get("label")
+                    .and_then(|v| v.as_str())
+                    .map(str::to_string)
+            });
+            record.lock().unwrap().push((ctx.kind.to_string(), label));
+            None
+        })),
+        ..RenderOptions::default()
+    };
+    let aliased = parse_file("::use(node-graph, as: ng)\n\n@ng.node(a)\n").unwrap();
+    let written_out = parse_file("::use(node-graph)\n\n@node-graph.node(a)\n").unwrap();
+    let aliased_html = render_body_with(&aliased, &with_node_graph(&aliased), &options);
+    let written_out_html = render_body_with(&written_out, &with_node_graph(&written_out), &options);
+    assert_eq!(aliased_html, written_out_html);
+    let expected = ("node-graph.node".to_string(), Some("a".to_string()));
+    assert_eq!(*seen.lock().unwrap(), [expected.clone(), expected]);
 }
 
 /// A hook that declines an element (returns `None`) falls back to the
@@ -85,12 +113,12 @@ fn custom_element_hook_renders_doc_icon() {
 #[test]
 fn custom_element_hook_falling_through_matches_generic_rendering() {
     let doc = parse_file("@doc.icon(\"star\", pkg:\"lucide\")\n").unwrap();
-    let without_hook = render_body(&doc);
+    let without_hook = render_body(&doc, &carried(&doc));
     let options = RenderOptions {
         custom_element: Some(CustomElementRenderer::new(|_ctx| None)),
         ..RenderOptions::default()
     };
-    let with_declining_hook = render_body_with(&doc, &options);
+    let with_declining_hook = render_body_with(&doc, &carried(&doc), &options);
     assert_eq!(with_declining_hook, without_hook);
 }
 
@@ -110,7 +138,7 @@ fn custom_element_hook_falling_through_matches_generic_rendering() {
 fn an_unprepared_interpolation_renders_as_its_own_source() {
     let doc = parse_file("Issue: $gh(42)\nFooter: $(copyright)\nMath: $add(10, 5)\n").unwrap();
     assert_eq!(
-        render_body(&doc),
+        render_body(&doc, &carried(&doc)),
         "<p>Issue: $gh(42) Footer: $(copyright) Math: $add(10, 5)</p>\n"
     );
 }
@@ -123,7 +151,7 @@ fn test_renders_wrap_sections() {
         wrap_sections: true,
         ..RenderOptions::default()
     };
-    let html = render_body_with(&doc, &options);
+    let html = render_body_with(&doc, &carried(&doc), &options);
 
     assert!(html.contains("<section class=\"tmt-section level-1\">\n<h1>Chapter 1</h1>\n<p>Paragraph in chapter.</p>\n<section class=\"tmt-section level-2\">\n<h2>Section 1.1</h2>\n<p>Nested paragraph.</p>\n</section>\n</section>\n"), "got {html}");
 }
@@ -132,7 +160,7 @@ fn test_renders_wrap_sections() {
 fn test_renders_tag_element() {
     let src = "Prose with @tag(rust, tomet) tags.\n";
     let doc = parse_file(src).unwrap();
-    let html = render_body(&doc);
+    let html = render_body(&doc, &carried(&doc));
 
     assert!(html.contains("<span class=\"tmt-tag-list\"><span class=\"tmt-tag\">#rust</span> <span class=\"tmt-tag\">#tomet</span></span>"), "got {html}");
 }
@@ -141,7 +169,7 @@ fn test_renders_tag_element() {
 fn test_renders_task_element() {
     let src = "@task(done)[ Finished work ]\n\n@task(todo)[ Pending work ]\n";
     let doc = parse_file(src).unwrap();
-    let html = render_body(&doc);
+    let html = render_body(&doc, &carried(&doc));
 
     assert!(html.contains("<div class=\"tm-element tm-task\" data-status=\"done\"><input type=\"checkbox\" class=\"tm-task-checkbox\" disabled checked> Finished work</div>\n"), "got {html}");
     assert!(html.contains("<div class=\"tm-element tm-task\" data-status=\"todo\"><input type=\"checkbox\" class=\"tm-task-checkbox\" disabled> Pending work</div>\n"), "got {html}");
@@ -153,7 +181,7 @@ fn test_renders_task_element() {
 #[test]
 fn a_key_that_is_not_an_attribute_name_cannot_add_attributes() {
     let doc = parse_file("@x(\"a onclick=alert(1)\": 1, plain: 2)\n").unwrap();
-    let body = render_body(&doc);
+    let body = render_body(&doc, &carried(&doc));
     // The key appears only inside the quoted value of `data-tomet-data`.
     assert_eq!(
         body.trim(),
@@ -165,7 +193,7 @@ fn a_key_that_is_not_an_attribute_name_cannot_add_attributes() {
 #[test]
 fn a_path_key_stays_out_of_data_attributes_and_in_the_exact_copy() {
     let doc = parse_file("@x(\"tmtroot/a.tmt\": 1)\n").unwrap();
-    let body = render_body(&doc);
+    let body = render_body(&doc, &carried(&doc));
     assert!(!body.contains("data-tmtroot"), "{body}");
     assert!(body.contains("tmtroot/a.tmt"), "exact copy: {body}");
 }
@@ -173,28 +201,37 @@ fn a_path_key_stays_out_of_data_attributes_and_in_the_exact_copy() {
 #[test]
 fn a_comment_renders_as_an_html_comment() {
     let doc = parse_file("@comment[ A block comment ]\n").unwrap();
-    assert_eq!(render_body(&doc), "<!-- A block comment -->\n");
+    assert_eq!(
+        render_body(&doc, &carried(&doc)),
+        "<!-- A block comment -->\n"
+    );
 
     let doc = parse_file("before @comment[ inline ] after\n").unwrap();
-    assert_eq!(render_body(&doc), "<p>before <!-- inline --> after</p>\n");
+    assert_eq!(
+        render_body(&doc, &carried(&doc)),
+        "<p>before <!-- inline --> after</p>\n"
+    );
 }
 
 #[test]
 fn a_comment_written_in_std_is_the_same_comment() {
     let doc = parse_file("@std.comment[ Generated from file.tmt. ]\n").unwrap();
-    assert_eq!(render_body(&doc), "<!-- Generated from file.tmt. -->\n");
+    assert_eq!(
+        render_body(&doc, &carried(&doc)),
+        "<!-- Generated from file.tmt. -->\n"
+    );
 }
 
 #[test]
 fn a_comment_cannot_end_early() {
     let doc = parse_file("@comment[ a --> b ]\n").unwrap();
-    assert_eq!(render_body(&doc), "<!-- a -- > b -->\n");
+    assert_eq!(render_body(&doc, &carried(&doc)), "<!-- a -- > b -->\n");
 }
 
 #[test]
 fn a_comment_with_no_text_is_the_empty_comment() {
     let doc = parse_file("@comment[]\n").unwrap();
-    assert_eq!(render_body(&doc), "<!---->\n");
+    assert_eq!(render_body(&doc, &carried(&doc)), "<!---->\n");
 }
 
 #[test]
@@ -205,7 +242,7 @@ fn a_comment_has_no_source_span_attributes_to_carry() {
         ..RenderOptions::default()
     };
     let doc = parse_file("@comment[ note ]\n\nwords\n").unwrap();
-    let body = render_body_with(&doc, &options);
+    let body = render_body_with(&doc, &carried(&doc), &options);
     assert!(body.starts_with("<!-- note -->\n"), "{body}");
     assert!(body.contains("<p data-tmt-start="), "{body}");
 }

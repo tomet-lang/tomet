@@ -6,20 +6,30 @@
 //! `tomet-load` finds `.tomet/vocabularies/<ns>.vocabulary.tmt`
 //! and reads it, because this layer may not do I/O.
 //!
-//! See `docs/spec/vocabulary.tmt` for the normative description. Three
-//! rules from it are enforced here:
+//! See `docs/spec/vocabulary.tmt` for the normative description. These
+//! rules are enforced here:
 //!
 //! - Exactly two namespaces may be written bare -- `std`, because the
 //!   language carries it, and the document's own `::kind`, because it is
 //!   declared on the first line. Anything brought in with `::use` is
-//!   always written out.
+//!   always written out, in the namespace the document brings it in under:
+//!   its own (`::use(node-graph)`, `@node-graph.node`), or the alias `as:`
+//!   gives it (`::use(node-graph, as: ng)`, `@ng.node`). An alias replaces
+//!   the namespace in that document. What a name resolves to is always in
+//!   the vocabulary's own namespace, never in the alias, so `@ng.node` here
+//!   and `@node-graph.node` elsewhere are one element. The rules for a
+//!   `::use` are [`use_problems`].
+//! - A vocabulary declares its names in three tables: `::element` (the
+//!   `@name`s), `::attribute` (the `::name`s) and `::constructor` (the
+//!   `ns.name(...)` values). The sigil says which table a name is looked up
+//!   in, so the same name may be in more than one.
 //! - `std` wins every collision, and cannot be shadowed: a vocabulary
-//!   that declares a name already in [`builtin_kinds`] is rejected at the
-//!   declaration rather than at each use site, which is one error instead
-//!   of many.
+//!   that declares an element `std` has as a body element, or an attribute
+//!   `std` has as a standard declaration, is rejected at the declaration
+//!   rather than at each use site, which is one error instead of many.
 //! - `doc` (`RESERVED_NAMESPACES`) is a second namespace tomet carries
 //!   itself, resolved the same unconditional way `std` is in
-//!   [`Bindings::classify`]/[`Bindings::declaration`] -- but, unlike
+//!   [`Bindings::classify`]/[`Bindings::classify_attribute`] -- but, unlike
 //!   `std`, never written bare: `@doc.icon(...)` needs its full name, just
 //!   never an `::use(doc)` in front of it.
 
@@ -32,25 +42,10 @@ use tomet_type::{Type, TypeError};
 
 use tomet_semantics_core::{TupleView, admits, is_placeholder, parse_type_spec};
 
-use tomet_declaration::DeclKind;
+use tomet_declaration::{DeclKind, Scope};
 
-use crate::kind::{ElementKind, Shape, UnknownName, builtin_kinds, classify_declaration_lenient};
+use crate::kind::{ElementKind, Shape, UnknownName, body_kind, classify_declaration_lenient};
 use crate::positional::declaration_args_view;
-
-/// Where an element is allowed to sit in a document.
-///
-/// Distinct from an element's *shape*, which is whether it stands as a
-/// block or belongs to running text. `::use` has `Region::Preamble` and is
-/// not a singleton -- you bring in several vocabularies -- which is the
-/// proof the two axes are independent.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub enum Region {
-    /// Only before any body content.
-    Preamble,
-    /// Anywhere.
-    #[default]
-    Body,
-}
 
 /// One parameter, as an entry of an element's `args:` map declares it.
 ///
@@ -77,15 +72,15 @@ pub struct ParamDecl {
     pub default: Option<Value>,
 }
 
-/// One element, as a vocabulary declares it.
+/// One element, as a vocabulary declares it with `::element`: an `@name` of the document body.
 ///
 /// `args:` and `content:` are read; `@data` is not yet. `about:`, the
-/// element's prose, is not read either.
+/// element's prose, is not read either. Its fields are [`ELEMENT_KEYS`].
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct ElementDecl {
     /// The shape this element may take, or `None` for either.
     pub display: Option<Shape>,
-    pub region: Region,
+    /// `singleton: true`: at most one in a document.
     pub singleton: bool,
     /// `(args)`, in declaration order.
     pub params: Vec<ParamDecl>,
@@ -96,15 +91,48 @@ pub struct ElementDecl {
     pub content_allow: Option<ContentAllow>,
 }
 
+/// One attribute, as a vocabulary declares it with `::attribute`: a `::name` a document writes
+/// about itself in the vocabulary's terms (`::upstream(commonfiles)`).
+///
+/// An attribute and an element are different things, kept in different tables: the sigil a
+/// document writes says which table a name is looked up in, so a vocabulary may have an
+/// attribute and an element of the same name. `about:`, the attribute's prose, is not read. Its
+/// fields are [`ATTRIBUTE_KEYS`].
+#[derive(Debug, Clone, PartialEq)]
+pub struct AttributeDecl {
+    /// `singleton: true`: at most one in a document.
+    pub singleton: bool,
+    /// `host:`: which files may write it -- `tmt`, `ctmt`, or `both`, the default.
+    pub host: Scope,
+    /// `(args)`, in declaration order.
+    pub params: Vec<ParamDecl>,
+}
+
+impl Default for AttributeDecl {
+    fn default() -> Self {
+        AttributeDecl {
+            singleton: false,
+            host: Scope::Both,
+            params: Vec::new(),
+        }
+    }
+}
+
 /// One constructor, as a vocabulary declares it with `::constructor`.
 ///
-/// A constructor builds a data value (`ns.name(...)`) from a tuple of arguments;
-/// unlike [`ElementDecl`], it has no `display`, `region`, `singleton`, or `content`.
+/// A constructor builds a data value (`ns.name(...)`) from a tuple of arguments. Its fields are
+/// [`CONSTRUCTOR_KEYS`].
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct ConstructorDecl {
     /// `(args)`, in declaration order.
     pub params: Vec<ParamDecl>,
 }
+
+/// The keys an `::element` entry may have.
+pub const ELEMENT_KEYS: [&str; 5] = ["about", "display", "singleton", "args", "content"];
+
+/// The keys an `::attribute` entry may have.
+pub const ATTRIBUTE_KEYS: [&str; 4] = ["about", "args", "singleton", "host"];
 
 /// The keys a `::constructor` entry may have.
 pub const CONSTRUCTOR_KEYS: [&str; 2] = ["about", "args"];
@@ -112,11 +140,39 @@ pub const CONSTRUCTOR_KEYS: [&str; 2] = ["about", "args"];
 /// The keys an entry of `args:` may have.
 pub const PARAM_KEYS: [&str; 5] = ["type", "positional", "required", "default", "about"];
 
-/// Something wrong with how a `::constructor` entry is declared.
+/// The values `host:` of an `::attribute` entry may take.
+pub const HOST_VALUES: [&str; 3] = ["tmt", "ctmt", "both"];
+
+/// The tables a vocabulary declares its names in: [`DeclKind::Element`], [`DeclKind::Attribute`]
+/// and [`DeclKind::Constructor`].
+pub const TABLES: [DeclKind; 3] = [
+    DeclKind::Element,
+    DeclKind::Attribute,
+    DeclKind::Constructor,
+];
+
+/// Something wrong with how an entry of one of a vocabulary's [`TABLES`] is declared: a field the
+/// table does not have, a value a field cannot take, or a parameter declared in a way that cannot
+/// be held to (a `type:` that names no type, a `default:` that is not of its `type:`).
+///
+/// Not an invalid vocabulary: the entry is read as far as it can be. Reported once, where the
+/// vocabulary is read and where its file is checked.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ConstructorProblem {
+pub struct EntryProblem {
+    /// The table the entry is in.
+    pub table: DeclKind,
+    /// The entry, or `entry.param` for one of its parameters.
     pub name: String,
     pub reason: String,
+}
+
+/// The keys an entry of `table` may have.
+fn table_keys(table: DeclKind) -> &'static [&'static str] {
+    match table {
+        DeclKind::Element => &ELEMENT_KEYS,
+        DeclKind::Attribute => &ATTRIBUTE_KEYS,
+        _ => &CONSTRUCTOR_KEYS,
+    }
 }
 
 /// A constructor call (`namespace.name(...)`) read against its vocabulary definition.
@@ -147,6 +203,8 @@ pub enum CallError {
         expected: String,
         found: String,
     },
+    /// The call's namespace is not in scope in the document ([`Bindings::read_call`]).
+    UnboundNamespace { call: String, namespace: String },
     /// The vocabulary declares no constructor of this name.
     UnknownConstructor {
         call: String,
@@ -186,6 +244,10 @@ impl std::fmt::Display for CallError {
             } => write!(
                 f,
                 "`{call}` is in the namespace `{found}`, not `{expected}`"
+            ),
+            CallError::UnboundNamespace { call, namespace } => write!(
+                f,
+                "`{call}`: the namespace `{namespace}` is not in scope -- write `::use({namespace})`"
             ),
             CallError::UnknownConstructor {
                 call,
@@ -267,15 +329,6 @@ pub enum ContentAllow {
     Any,
 }
 
-/// Something wrong with how a parameter is declared, found where the
-/// vocabulary is read rather than at every use.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ParamProblem {
-    pub element: String,
-    pub param: String,
-    pub reason: String,
-}
-
 impl ParamDecl {
     /// The declared type, when `type:` names one.
     pub fn declared_type(&self) -> Option<Type> {
@@ -284,6 +337,17 @@ impl ParamDecl {
 }
 
 impl ElementDecl {
+    /// The positional slots, in declaration order.
+    pub fn positional_keys(&self) -> Vec<String> {
+        positional_keys_of(&self.params)
+    }
+
+    pub fn param(&self, name: &str) -> Option<&ParamDecl> {
+        param_of(&self.params, name)
+    }
+}
+
+impl AttributeDecl {
     /// The positional slots, in declaration order.
     pub fn positional_keys(&self) -> Vec<String> {
         positional_keys_of(&self.params)
@@ -317,14 +381,18 @@ fn param_of<'a>(params: &'a [ParamDecl], name: &str) -> Option<&'a ParamDecl> {
     params.iter().find(|p| p.name == name)
 }
 
-/// The elements and constructors one namespace declares.
+/// The elements, attributes and constructors one namespace declares, each in a table of its own.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct Vocabulary {
     pub namespace: String,
+    /// `::element`: the `@name`s.
     pub elements: BTreeMap<String, ElementDecl>,
+    /// `::attribute`: the `::name`s.
+    pub attributes: BTreeMap<String, AttributeDecl>,
+    /// `::constructor`: the `ns.name(...)` values.
     pub constructors: BTreeMap<String, ConstructorDecl>,
     /// `::vocabulary(ns, open: true)` -- any name resolves in this
-    /// namespace, declared or not.
+    /// namespace, declared or not, as an element and as an attribute.
     ///
     /// For a sketchpad. `docs/design/ideas/` writes elements that do not
     /// exist yet, which is what a sketch is for, so asking it to obey a
@@ -388,6 +456,7 @@ pub fn builtin_doc_vocabularies() -> Vec<Vocabulary> {
         Vocabulary {
             namespace: "doc.index".to_string(),
             elements: BTreeMap::new(),
+            attributes: BTreeMap::new(),
             constructors: BTreeMap::new(),
             open: false,
         },
@@ -397,7 +466,6 @@ pub fn builtin_doc_vocabularies() -> Vec<Vocabulary> {
                 "icon".to_string(),
                 ElementDecl {
                     display: Some(Shape::Inline),
-                    region: Region::Body,
                     singleton: false,
                     content_allow: None,
                     params: vec![
@@ -418,6 +486,7 @@ pub fn builtin_doc_vocabularies() -> Vec<Vocabulary> {
                     ],
                 },
             )]),
+            attributes: BTreeMap::new(),
             constructors: BTreeMap::new(),
             open: false,
         },
@@ -452,6 +521,7 @@ impl Vocabulary {
         let mut vocab = Vocabulary {
             namespace,
             elements: BTreeMap::new(),
+            attributes: BTreeMap::new(),
             constructors: BTreeMap::new(),
             open,
         };
@@ -467,6 +537,18 @@ impl Vocabulary {
                             vocab
                                 .elements
                                 .insert(name.to_string(), decl_from_value(decl));
+                        }
+                    }
+                }
+                ElementKind::Declaration(DeclKind::Attribute) => {
+                    let Some(entries) = crate::data::declaration_entries(declaration) else {
+                        continue;
+                    };
+                    if let Some(tuple) = entries.as_tuple() {
+                        for (name, decl) in tuple.named() {
+                            vocab
+                                .attributes
+                                .insert(name.to_string(), attribute_from_value(decl));
                         }
                     }
                 }
@@ -489,7 +571,7 @@ impl Vocabulary {
         Some(vocab)
     }
 
-    /// Whether this vocabulary answers for `name` -- because it declares
+    /// Whether this vocabulary answers for the element `name` (`@name`) -- because it declares
     /// it, or because it is open.
     ///
     /// Reserved element names like `item` are never claimed by any vocabulary,
@@ -501,52 +583,31 @@ impl Vocabulary {
         self.open || self.elements.contains_key(name)
     }
 
-    /// Names this vocabulary declares that `std` already has, or that tomet
-    /// reserves as structural names, in declaration order.
-    ///
-    /// Non-empty means the vocabulary is invalid. Reported here, once,
-    /// rather than at every use site: `std` winning is what keeps a bare
-    /// name unambiguous, so the shadowing itself is the error.
-    pub fn shadowed_builtins(&self) -> Vec<&str> {
-        self.elements
-            .keys()
-            .filter(|name| {
-                builtin_kinds().any(|(builtin, _)| builtin == *name)
-                    || is_reserved_element_name(name)
-            })
-            .map(String::as_str)
-            .collect()
+    /// Whether this vocabulary answers for the attribute `name` (`::name`) -- because it
+    /// declares it, or because it is open.
+    pub fn has_attribute(&self, name: &str) -> bool {
+        self.open || self.attributes.contains_key(name)
     }
 
-    /// Parameters declared in a way that cannot be held to: a `type:` that
-    /// names no type, and a `default:` that is not of its `type:`. In
-    /// declaration order.
+    /// Names this vocabulary declares that `std` already has in the same table, or that tomet
+    /// reserves as structural names, with the table each is in.
     ///
-    /// Not an invalid vocabulary: such a parameter is accepted and simply not
-    /// checked. Reported once, where the vocabulary is read.
-    pub fn param_problems(&self) -> Vec<ParamProblem> {
-        let mut problems = Vec::new();
-        for (element, decl) in &self.elements {
-            for param in &decl.params {
-                let reason = match &param.ty {
-                    Some(Err(err)) => Some(err.to_string()),
-                    Some(Ok(ty)) => param
-                        .default
-                        .as_ref()
-                        .and_then(|default| admits(ty, default).err())
-                        .map(|mismatch| format!("`default` is not of `type: {ty}`: {mismatch}")),
-                    None => None,
-                };
-                if let Some(reason) = reason {
-                    problems.push(ParamProblem {
-                        element: element.clone(),
-                        param: param.name.clone(),
-                        reason,
-                    });
-                }
-            }
-        }
-        problems
+    /// The rule is per table: an element may not take the name of a `std` body element (`@link`),
+    /// and an attribute may not take the name of a standard declaration (`::kind`). Non-empty
+    /// means the vocabulary is invalid. Reported here, once, rather than at every use site: `std`
+    /// winning is what keeps a bare name unambiguous, so the shadowing itself is the error.
+    pub fn shadowed_builtins(&self) -> Vec<(DeclKind, &str)> {
+        let elements = self
+            .elements
+            .keys()
+            .filter(|name| is_body_kind_name(name) || is_reserved_element_name(name))
+            .map(|name| (DeclKind::Element, name.as_str()));
+        let attributes = self
+            .attributes
+            .keys()
+            .filter(|name| DeclKind::from_name(name).is_some())
+            .map(|name| (DeclKind::Attribute, name.as_str()));
+        elements.chain(attributes).collect()
     }
 
     /// Reads a constructor call (`Value::Call` with head `namespace.name`) against this
@@ -611,10 +672,22 @@ pub fn read_call(value: &Value, vocabulary: &Vocabulary) -> Result<Constructed, 
             found: namespace.to_string(),
         });
     }
+    construct(head, namespace, constructor, args, vocabulary)
+}
+
+/// The call `head` (written `namespace.constructor(args)`) read as the constructor `constructor`
+/// of `vocabulary`, whatever namespace it was written in.
+fn construct(
+    head: &str,
+    namespace: &str,
+    constructor: &str,
+    args: &tomet_ast::Tuple,
+    vocabulary: &Vocabulary,
+) -> Result<Constructed, CallError> {
     let Some(decl) = vocabulary.constructors.get(constructor) else {
         let known = vocabulary.constructors.keys().cloned().collect();
         return Err(CallError::UnknownConstructor {
-            call: head.clone(),
+            call: head.to_string(),
             namespace: namespace.to_string(),
             constructor: constructor.to_string(),
             known,
@@ -637,7 +710,7 @@ pub fn read_call(value: &Value, vocabulary: &Vocabulary) -> Result<Constructed, 
                 && let Err(mismatch) = admits(&ty, &val)
             {
                 return Err(CallError::InvalidArgument {
-                    call: head.clone(),
+                    call: head.to_string(),
                     argument: param.name.clone(),
                     ty: ty.to_string(),
                     reason: mismatch.to_string(),
@@ -814,7 +887,7 @@ impl LoadedVocabularies {
 
         // Reported here, once, rather than at every document that writes
         // the shadowed name.
-        for shadowed in vocab.shadowed_builtins() {
+        for (table, shadowed) in vocab.shadowed_builtins() {
             self.errors.push(if is_reserved_element_name(shadowed) {
                 format!(
                     "{label} declares `{shadowed}`, which is a reserved element name; \
@@ -822,21 +895,15 @@ impl LoadedVocabularies {
                 )
             } else {
                 format!(
-                    "{label} declares `{shadowed}`, which is already a built-in name; \
-                     std wins, so a vocabulary may not take one"
+                    "{label} declares the {table} `{shadowed}`, which is already a built-in \
+                     {table}; std wins, so a vocabulary may not take one"
                 )
             });
         }
-        for problem in vocab.param_problems() {
+        for (_, problem) in entry_problems_in(doc) {
             self.errors.push(format!(
-                "{label}: `{}`'s parameter `{}`: {}",
-                problem.element, problem.param, problem.reason
-            ));
-        }
-        for (_, problem) in constructor_problems_in(doc) {
-            self.errors.push(format!(
-                "{label}: `{}` in `::constructor`: {}",
-                problem.name, problem.reason
+                "{label}: `{}` in `::{}`: {}",
+                problem.name, problem.table, problem.reason
             ));
         }
 
@@ -858,15 +925,27 @@ impl LoadedVocabularies {
     }
 }
 
+/// What counts as a vocabulary having a name: whatever it answers for, an open vocabulary
+/// answering for every name, or only what it declares.
+#[derive(Debug, Clone, Copy)]
+enum Claim {
+    Open,
+    Declared,
+}
+
 /// The namespaces in scope for one document.
 #[derive(Debug, Clone, Default)]
 pub struct Bindings {
     /// The vocabulary named by the document's `::kind(X)`. Its names may
     /// be written bare.
     pub kind: Option<Vocabulary>,
-    /// Vocabularies brought in with `::use`, by the name each one calls
-    /// itself. Never written bare.
+    /// Vocabularies brought in with `::use`, by the namespace this document writes each one
+    /// in: its `as:` alias, or the namespace it calls itself. Never written bare.
     pub used: BTreeMap<String, Vocabulary>,
+    /// The aliases the document gives with `::use(ns, as: alias)`, alias to the namespace it
+    /// stands for. Read from the document alone, so it holds whether or not the vocabulary is at
+    /// hand ([`classify_lenient`](Bindings::classify_lenient)).
+    pub aliases: BTreeMap<String, String>,
 }
 
 impl Bindings {
@@ -881,7 +960,9 @@ impl Bindings {
     /// can pass them straight in.
     ///
     /// A document's `::kind(X)` binds the vocabulary calling itself `X`.
-    /// Everything else has to be asked for with `::use`.
+    /// Everything else has to be asked for with `::use`, and is bound under the namespace the
+    /// `::use` gives it ([`Use::local`]). When two `::use` give one namespace, the first holds it
+    /// ([`use_problems`] reports the second).
     pub fn for_document<I, B>(doc: &File<B>, available: I) -> Self
     where
         I: IntoIterator<Item = Vocabulary>,
@@ -896,42 +977,109 @@ impl Bindings {
             .cloned();
 
         let mut used = BTreeMap::new();
-        for namespace in used_namespaces(doc) {
-            if let Some(vocab) = by_namespace.get(&namespace) {
-                used.insert(namespace, vocab.clone());
+        let mut aliases = BTreeMap::new();
+        for found in uses(doc) {
+            if let Some(alias) = &found.alias {
+                aliases
+                    .entry(alias.clone())
+                    .or_insert_with(|| found.namespace.clone());
+            }
+            if let Some(vocab) = by_namespace.get(&found.namespace) {
+                used.entry(found.local().to_string())
+                    .or_insert_with(|| vocab.clone());
             }
         }
 
-        Bindings { kind, used }
+        Bindings {
+            kind,
+            used,
+            aliases,
+        }
     }
 
-    /// Resolves an element name against `std` and everything in scope.
+    /// [`classify`](Bindings::classify), falling back to `Custom` for a name it does not resolve:
+    /// the counterpart of [`classify_std_lenient`](crate::classify_std_lenient) for a reader that
+    /// renders whatever it is given, such as a converter.
+    ///
+    /// The fallback is named in the vocabulary's own namespace, as a resolved name is: under
+    /// `::use(node-graph, as: ng)`, `@ng.node` is `Custom("node-graph.node")` even with no
+    /// vocabulary at hand, because the alias is the document's ([`aliases`](Bindings::aliases)).
+    pub fn classify_lenient(&self, name: &Name) -> ElementKind {
+        self.classify(name)
+            .unwrap_or_else(|_| self.unresolved(name))
+    }
+
+    /// [`classify_attribute`](Bindings::classify_attribute), falling back to `Custom` for a name
+    /// it does not resolve, named in the vocabulary's own namespace: the counterpart of
+    /// [`classify_lenient`](Bindings::classify_lenient) for a `::name`.
+    pub fn classify_attribute_lenient(&self, name: &Name) -> ElementKind {
+        self.classify_attribute(name)
+            .unwrap_or_else(|_| self.unresolved(name))
+    }
+
+    /// What a name no table resolves stands for: itself, with an alias the document gives
+    /// replaced by the namespace it stands for.
+    fn unresolved(&self, name: &Name) -> ElementKind {
+        ElementKind::Custom(match name.namespace.as_deref() {
+            Some(written) => {
+                let namespace = self.aliases.get(written).map_or(written, String::as_str);
+                format!("{namespace}.{}", name.name)
+            }
+            None => name.name.clone(),
+        })
+    }
+
+    /// Resolves an element name (`@name`) against `std`'s body elements and the `::element`
+    /// tables in scope.
     ///
     /// A bare name goes to `std` first and to the document's kind second.
     /// The order cannot matter, because a vocabulary shadowing a builtin
     /// is rejected when it is read -- but it is written this way round so
     /// that the code says which one wins.
+    ///
+    /// A name that is no element but is an attribute in scope is not unknown: it is written with
+    /// the wrong sigil, and the [`UnknownName`] says so ([`UnknownName::wrong_sigil`]). Only a
+    /// name the other table has decides that: an open vocabulary claims every name in both
+    /// tables, which says nothing about which one a name belongs to.
     pub fn classify(&self, name: &Name) -> Result<ElementKind, UnknownName> {
-        let unknown = || UnknownName {
-            name: name.to_string(),
-            unbound_namespace: None,
-            declaration: false,
+        self.resolve_element(name, Claim::Open)
+            .map_err(|mut unknown| {
+                unknown.wrong_sigil = self.resolve_attribute(name, Claim::Declared).is_ok();
+                unknown
+            })
+    }
+
+    /// Resolves an attribute name (`::name`) against `std`'s declarations and the `::attribute`
+    /// tables in scope: the counterpart of [`classify`](Bindings::classify).
+    ///
+    /// Bare names follow the same rule as elements: only `std` and the document's own `::kind`
+    /// may be written bare. A name that is no attribute but is an element in scope is written
+    /// with the wrong sigil, and the [`UnknownName`] says so.
+    pub fn classify_attribute(&self, name: &Name) -> Result<ElementKind, UnknownName> {
+        self.resolve_attribute(name, Claim::Open)
+            .map_err(|mut unknown| {
+                unknown.wrong_sigil = self.resolve_element(name, Claim::Declared).is_ok();
+                unknown
+            })
+    }
+
+    fn resolve_attribute(&self, name: &Name, claim: Claim) -> Result<ElementKind, UnknownName> {
+        let has = |vocab: &Vocabulary| match claim {
+            Claim::Open => vocab.has_attribute(&name.name),
+            Claim::Declared => vocab.attributes.contains_key(&name.name),
         };
+        let unknown = || UnknownName::attribute(name);
         let unbound = |namespace: &str| UnknownName {
-            name: name.to_string(),
             unbound_namespace: Some(namespace.to_string()),
-            declaration: false,
+            ..UnknownName::attribute(name)
         };
 
         let Some(namespace) = name.namespace.as_deref() else {
-            if let Some(kind) = builtin(&name.name) {
-                return Ok(kind);
-            }
-            if is_reserved_element_name(&name.name) {
-                return Err(unknown());
+            if let Some(kind) = DeclKind::from_name(&name.name) {
+                return Ok(ElementKind::Declaration(kind));
             }
             return match self.kind.as_ref() {
-                Some(vocab) if vocab.has(&name.name) => Ok(ElementKind::Custom(format!(
+                Some(vocab) if has(vocab) => Ok(ElementKind::Custom(format!(
                     "{}.{}",
                     vocab.namespace, name.name
                 ))),
@@ -940,7 +1088,58 @@ impl Bindings {
         };
 
         if namespace == "std" {
-            return builtin(&name.name).ok_or_else(unknown);
+            return DeclKind::from_name(&name.name)
+                .map(ElementKind::Declaration)
+                .ok_or_else(unknown);
+        }
+        if namespace == "doc" {
+            return if has(&DOC_VOCAB) {
+                Ok(ElementKind::Custom(name.to_string()))
+            } else {
+                Err(unknown())
+            };
+        }
+        match self.vocabulary_in_scope(namespace) {
+            Some(vocab) if has(vocab) => Ok(ElementKind::Custom(format!(
+                "{}.{}",
+                vocab.namespace, name.name
+            ))),
+            Some(_) => Err(unknown()),
+            None => Err(unbound(namespace)),
+        }
+    }
+
+    fn resolve_element(&self, name: &Name, claim: Claim) -> Result<ElementKind, UnknownName> {
+        let has = |vocab: &Vocabulary| match claim {
+            Claim::Open => vocab.has(&name.name),
+            Claim::Declared => {
+                !is_reserved_element_name(&name.name) && vocab.elements.contains_key(&name.name)
+            }
+        };
+        let unknown = || UnknownName::element(name);
+        let unbound = |namespace: &str| UnknownName {
+            unbound_namespace: Some(namespace.to_string()),
+            ..UnknownName::element(name)
+        };
+
+        let Some(namespace) = name.namespace.as_deref() else {
+            if let Some(kind) = body_kind(&name.name) {
+                return Ok(kind);
+            }
+            if is_reserved_element_name(&name.name) {
+                return Err(unknown());
+            }
+            return match self.kind.as_ref() {
+                Some(vocab) if has(vocab) => Ok(ElementKind::Custom(format!(
+                    "{}.{}",
+                    vocab.namespace, name.name
+                ))),
+                _ => Err(unknown()),
+            };
+        };
+
+        if namespace == "std" {
+            return body_kind(&name.name).ok_or_else(unknown);
         }
 
         // `doc` is tomet's own second reserved namespace, resolved the
@@ -949,45 +1148,75 @@ impl Bindings {
         // Still a real, closed vocabulary: `doc.glyph` (undeclared) is
         // `unknown()`, not silently accepted.
         if namespace == "doc" {
-            return if DOC_VOCAB.has(&name.name) {
+            return if has(&DOC_VOCAB) {
                 Ok(ElementKind::Custom(name.to_string()))
             } else {
                 Err(unknown())
             };
         }
 
-        let vocab = match self.kind.as_ref() {
-            Some(kind) if kind.namespace == namespace => Some(kind),
-            _ => self.used.get(namespace),
-        };
-
-        match vocab {
-            Some(vocab) if vocab.has(&name.name) => Ok(ElementKind::Custom(name.to_string())),
+        match self.vocabulary_in_scope(namespace) {
+            Some(vocab) if has(vocab) => Ok(ElementKind::Custom(format!(
+                "{}.{}",
+                vocab.namespace, name.name
+            ))),
             Some(_) => Err(unknown()),
             None => Err(unbound(namespace)),
         }
     }
 
-    /// The declaration behind a name, when one is in scope.
+    /// The vocabulary a name written in `namespace` (or bare, for `None`) is looked up in:
+    /// the document's own kind for a bare name, `doc` always, and otherwise what is in scope.
+    fn vocabulary_for(&self, namespace: Option<&str>) -> Option<&Vocabulary> {
+        match namespace {
+            None | Some("std") => self.kind.as_ref(),
+            // Unconditional, like `classify`'s `"doc"` branch -- `doc.icon`
+            // has a real declaration (`name`/`pkg`) regardless of what, if
+            // anything, `self.kind`/`self.used` hold.
+            Some("doc") => Some(&DOC_VOCAB),
+            Some(namespace) => self.vocabulary_in_scope(namespace),
+        }
+    }
+
+    /// The `::element` entry behind an element name (`@name`), when one is in scope.
     pub fn declaration(&self, name: &Name) -> Option<&ElementDecl> {
         if is_reserved_element_name(&name.name) {
             return None;
         }
-        let vocab = match name.namespace.as_deref() {
-            None | Some("std") => self.kind.as_ref()?,
-            // Unconditional, like `classify`'s `"doc"` branch -- `doc.icon`
-            // has a real declaration (`name`/`pkg`) regardless of what, if
-            // anything, `self.kind`/`self.used` hold.
-            Some("doc") => &DOC_VOCAB,
-            Some(namespace) => match self.kind.as_ref() {
-                Some(kind) if kind.namespace == namespace => kind,
-                _ => self.used.get(namespace)?,
-            },
-        };
-        vocab.elements.get(&name.name)
+        self.vocabulary_for(name.namespace.as_deref())?
+            .elements
+            .get(&name.name)
     }
 
-    /// The vocabulary in scope for `namespace`, if any.
+    /// The `::attribute` entry behind an attribute name (`::name`), when one is in scope.
+    pub fn attribute(&self, name: &Name) -> Option<&AttributeDecl> {
+        self.vocabulary_for(name.namespace.as_deref())?
+            .attributes
+            .get(&name.name)
+    }
+
+    /// Reads a constructor call (`ns.name(...)`) against the vocabulary in scope for the namespace
+    /// it is written in: under `::use(catasto, as: c)`, `c.git(...)` is `catasto.git(...)`. The
+    /// counterpart of [`read_call`] for a call written in a document.
+    pub fn read_call(&self, value: &Value) -> Result<Constructed, CallError> {
+        let Value::Call(head, args) = value else {
+            return Err(CallError::NotACall);
+        };
+        let Some((namespace, constructor)) = head.split_once('.') else {
+            return Err(CallError::NotACall);
+        };
+        let Some(vocabulary) = self.vocabulary_in_scope(namespace) else {
+            return Err(CallError::UnboundNamespace {
+                call: head.clone(),
+                namespace: namespace.to_string(),
+            });
+        };
+        construct(head, namespace, constructor, args, vocabulary)
+    }
+
+    /// The vocabulary in scope for `namespace` as this document writes it: the namespace of its
+    /// own `::kind`, or the one a `::use` brings a vocabulary in under (an alias, when it gives
+    /// one). A vocabulary brought in under an alias is not in scope under its own namespace.
     pub fn vocabulary_in_scope(&self, namespace: &str) -> Option<&Vocabulary> {
         match self.kind.as_ref() {
             Some(kind) if kind.namespace == namespace => Some(kind),
@@ -996,7 +1225,12 @@ impl Bindings {
     }
 }
 
-/// The namespaces a document asks for with `::use`.
+/// The arguments `::use` takes: the namespace (`target`, its first slot), the `version` wanted
+/// (its second slot), and `as`, the alias it is written under.
+pub const USE_ARGS: [&str; 3] = ["target", "version", "as"];
+
+/// What one `::use(ns, version, as: alias)` brings in: the vocabulary calling itself `ns`, and the
+/// alias this document writes its names under, if it gives one.
 ///
 /// The argument is the namespace, not a path. The vault already says
 /// where each vocabulary lives, so naming the file here would write the
@@ -1008,31 +1242,201 @@ impl Bindings {
 /// a step between them (path -> file -> namespace) that nothing could
 /// take without carrying paths through this layer, which would mean
 /// trimming a filename stem and hoping.
-fn used_namespaces<B>(doc: &File<B>) -> Vec<String> {
-    let mut names = Vec::new();
-    for declaration in &doc.header {
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Use {
+    /// The namespace the vocabulary calls itself.
+    pub namespace: String,
+    /// `as:`, when it is written and is a bare name ([`is_alias`]).
+    pub alias: Option<String>,
+}
+
+impl Use {
+    /// The namespace this document writes the vocabulary's names in: `ng` for
+    /// `::use(node-graph, as: ng)`, `node-graph` for `::use(node-graph)`.
+    pub fn local(&self) -> &str {
+        self.alias.as_deref().unwrap_or(&self.namespace)
+    }
+}
+
+/// Whether `text` may be an alias: one bare name part, an ASCII letter or `_` then ASCII letters,
+/// digits, `_` and `-`, as a namespace is written. A dotted name is not one: the dot separates the
+/// namespace from the name.
+pub fn is_alias(text: &str) -> bool {
+    let mut chars = text.chars();
+    chars
+        .next()
+        .is_some_and(|c| c.is_ascii_alphabetic() || c == '_')
+        && chars.all(|c| c.is_ascii_alphanumeric() || matches!(c, '_' | '-'))
+}
+
+/// What a declaration brings in when it is a `::use` naming a namespace. An `as:` that is no
+/// bare name is no alias: the vocabulary is brought in under its own namespace, and
+/// [`use_problems`] reports the `as:`.
+fn use_of(declaration: &tomet_ast::Declaration) -> Option<Use> {
+    if classify_declaration_lenient(declaration) != ElementKind::Declaration(DeclKind::Use) {
+        return None;
+    }
+    let args = declaration_args_view(declaration)?;
+    let namespace = args.get("target").and_then(|v| v.as_str())?.to_string();
+    let alias = args
+        .get("as")
+        .and_then(|v| v.as_str())
+        .filter(|text| is_alias(text))
+        .map(str::to_string);
+    Some(Use { namespace, alias })
+}
+
+/// Every `::use` a document writes, in order.
+pub fn uses<B>(doc: &File<B>) -> Vec<Use> {
+    doc.header.iter().filter_map(use_of).collect()
+}
+
+/// Something wrong with a `::use`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum UseProblem {
+    /// An argument `::use` does not take ([`USE_ARGS`]): `::use(catasto, from: x)`.
+    UnknownArgument(String),
+    /// An `as:` that is not a bare name: `as: "a b"`, `as: ng.x`, `as: 3`.
+    NotAnAlias,
+    /// An alias that is a namespace tomet carries itself, `std` or `doc`.
+    ReservedAlias(String),
+    /// An alias that is the namespace of the document's own `::kind`.
+    KindAlias(String),
+    /// An alias that is already the namespace another `::use` brings a vocabulary in under.
+    AliasTaken { alias: String, by: String },
+    /// The vocabulary is brought in by an earlier `::use` already; `first` is the index of that
+    /// one in the header.
+    UsedTwice { namespace: String, first: usize },
+    /// The vocabulary is the document's own `::kind`, which brings it in already.
+    UsedKind(String),
+}
+
+impl std::fmt::Display for UseProblem {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            UseProblem::UnknownArgument(argument) => write!(
+                f,
+                "`::use` has no argument `{argument}`; it takes the namespace, the version and \
+                 `as:`, as in `::use(node-graph, \"1.0.0\", as: ng)`"
+            ),
+            UseProblem::NotAnAlias => write!(
+                f,
+                "`as:` of `::use` takes a bare name, the namespace to write the vocabulary in: \
+                 `::use(node-graph, as: ng)`"
+            ),
+            UseProblem::ReservedAlias(alias) => write!(
+                f,
+                "`as: {alias}`: `{alias}` is a namespace tomet carries itself, and names no \
+                 other vocabulary"
+            ),
+            UseProblem::KindAlias(alias) => write!(
+                f,
+                "`as: {alias}`: `{alias}` is this document's own `::kind`, and names no other \
+                 vocabulary"
+            ),
+            UseProblem::AliasTaken { alias, by } => write!(
+                f,
+                "`as: {alias}`: `{alias}` already names the vocabulary `{by}` in this document"
+            ),
+            UseProblem::UsedTwice { namespace, .. } => write!(
+                f,
+                "`{namespace}` is brought in by an earlier `::use` already"
+            ),
+            UseProblem::UsedKind(namespace) => write!(
+                f,
+                "`{namespace}` is this document's own `::kind`, which brings it in already"
+            ),
+        }
+    }
+}
+
+/// The problems of the `::use` declarations in `header`, each with the index of the declaration
+/// it is about.
+///
+/// A `::use` takes [`USE_ARGS`] and nothing else. Its alias is a bare name ([`is_alias`]), and a
+/// namespace the document does not write anything else in: not `std` or `doc`, which tomet
+/// carries itself, not the document's own `::kind`, and not one another `::use` brings a
+/// vocabulary in under. A vocabulary is brought in once: by one `::use`, or by the `::kind`. Too many positional arguments, and a
+/// `version` that is not a version, are reported with the other standard declarations.
+pub fn use_problems(header: &[tomet_ast::Declaration]) -> Vec<(usize, UseProblem)> {
+    let kind = tomet_declaration::declarations_from_header(header)
+        .into_iter()
+        .find(|found| found.kind == DeclKind::Kind)
+        .and_then(|found| tomet_declaration::kind_name(&found.declaration));
+    let written: Vec<(usize, Use)> = header
+        .iter()
+        .enumerate()
+        .filter_map(|(idx, declaration)| use_of(declaration).map(|found| (idx, found)))
+        .collect();
+
+    let mut problems = Vec::new();
+    for (idx, declaration) in header.iter().enumerate() {
         if classify_declaration_lenient(declaration) != ElementKind::Declaration(DeclKind::Use) {
             continue;
         }
-        let Some(args) = declaration_args_view(declaration) else {
+        let Some(args) = declaration.data.args.as_ref() else {
             continue;
         };
-        let namespace = args
-            .get("target")
-            .and_then(|v| v.as_str())
-            .or_else(|| args.nth_unnamed(0).and_then(|v| v.as_str()))
-            .map(str::to_string);
-        if let Some(namespace) = namespace {
-            names.push(namespace);
+        for (name, value) in args.named() {
+            if !USE_ARGS.contains(&name) {
+                problems.push((idx, UseProblem::UnknownArgument(name.to_string())));
+            } else if name == "as" && !value.as_str().is_some_and(is_alias) {
+                problems.push((idx, UseProblem::NotAnAlias));
+            }
         }
     }
-    names
+    for (at, (idx, found)) in written.iter().enumerate() {
+        if let Some((first, _)) = written[..at]
+            .iter()
+            .find(|(_, earlier)| earlier.namespace == found.namespace)
+        {
+            problems.push((
+                *idx,
+                UseProblem::UsedTwice {
+                    namespace: found.namespace.clone(),
+                    first: *first,
+                },
+            ));
+            continue;
+        }
+        if kind.as_deref() == Some(found.namespace.as_str()) {
+            problems.push((*idx, UseProblem::UsedKind(found.namespace.clone())));
+            continue;
+        }
+        let Some(alias) = &found.alias else {
+            continue;
+        };
+        let taken_by = written
+            .iter()
+            .enumerate()
+            .find_map(|(other_at, (_, other))| {
+                let clash = other_at != at
+                    && other.namespace != found.namespace
+                    && other.local() == alias
+                    // Two aliases that clash are reported once, at the later one.
+                    && (other.alias.is_none() || other_at < at);
+                clash.then(|| other.namespace.clone())
+            });
+        let problem = if alias == "std" || RESERVED_NAMESPACES.contains(&alias.as_str()) {
+            UseProblem::ReservedAlias(alias.clone())
+        } else if kind.as_deref() == Some(alias.as_str()) {
+            UseProblem::KindAlias(alias.clone())
+        } else if let Some(by) = taken_by {
+            UseProblem::AliasTaken {
+                alias: alias.clone(),
+                by,
+            }
+        } else {
+            continue;
+        };
+        problems.push((*idx, problem));
+    }
+    problems.sort_by_key(|(idx, _)| *idx);
+    problems
 }
 
-fn builtin(name: &str) -> Option<ElementKind> {
-    builtin_kinds()
-        .find(|(builtin, _)| *builtin == name)
-        .map(|(_, kind)| kind)
+fn is_body_kind_name(name: &str) -> bool {
+    body_kind(name).is_some()
 }
 
 /// The namespace a vocabulary's own header names, and whether it is open: `::vocabulary(ns, version: "1.0.0")`
@@ -1071,16 +1475,31 @@ fn decl_from_value(decl: &Value) -> ElementDecl {
             Some("inline") => Some(Shape::Inline),
             _ => None,
         },
-        region: match decl.get("region").and_then(|v| v.as_str()) {
-            Some("preamble") => Region::Preamble,
-            _ => Region::Body,
-        },
         singleton: decl
             .get("singleton")
             .and_then(|v| v.as_bool())
             .unwrap_or(false),
         params: decl.get("args").map(params_from_value).unwrap_or_default(),
         content_allow: decl.get("content").and_then(content_allow_from_value),
+    }
+}
+
+/// One entry of `::attribute()`: the map of fields an attribute declares.
+///
+/// A `host:` that is none of [`HOST_VALUES`] is read as the default, `both`;
+/// [`entry_problems_in`] reports it.
+fn attribute_from_value(decl: &Value) -> AttributeDecl {
+    AttributeDecl {
+        singleton: decl
+            .get("singleton")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false),
+        host: match decl.get("host").and_then(|v| v.as_str()) {
+            Some("tmt") => Scope::Tmt,
+            Some("ctmt") => Scope::Ctmt,
+            _ => Scope::Both,
+        },
+        params: decl.get("args").map(params_from_value).unwrap_or_default(),
     }
 }
 
@@ -1091,16 +1510,24 @@ fn constructor_from_value(decl: &Value) -> ConstructorDecl {
     }
 }
 
-/// Validates every `::constructor` declaration in `doc`, returning each problem paired with the
-/// span of the `::constructor` declaration where it was found.
-pub fn constructor_problems_in<B>(doc: &File<B>) -> Vec<(tomet_span::Span, ConstructorProblem)> {
+/// Validates every entry of the vocabulary [`TABLES`] (`::element`, `::attribute`,
+/// `::constructor`) in `doc`, returning each problem paired with the span of the declaration
+/// where it was found.
+///
+/// An entry is a map of the fields its table has ([`ELEMENT_KEYS`], [`ATTRIBUTE_KEYS`],
+/// [`CONSTRUCTOR_KEYS`]); any other field is reported, and so is an entry declared twice in one
+/// table. `args:` is a map of parameters of [`PARAM_KEYS`], each with a `type:` that names a
+/// type and a `default:` of that type; `singleton:` is a bool and `host:` one of
+/// [`HOST_VALUES`].
+pub fn entry_problems_in<B>(doc: &File<B>) -> Vec<(tomet_span::Span, EntryProblem)> {
     let mut problems = Vec::new();
-    let mut seen_constructors = std::collections::HashSet::new();
+    let mut seen = std::collections::HashSet::new();
 
     for declaration in &doc.header {
-        if classify_declaration_lenient(declaration)
-            != ElementKind::Declaration(DeclKind::Constructor)
-        {
+        let ElementKind::Declaration(table) = classify_declaration_lenient(declaration) else {
+            continue;
+        };
+        if !TABLES.contains(&table) {
             continue;
         }
         let span = declaration.span;
@@ -1113,137 +1540,135 @@ pub fn constructor_problems_in<B>(doc: &File<B>) -> Vec<(tomet_span::Span, Const
         if !tuple.has_no_unnamed() {
             continue;
         }
-        for (ctor_name, decl) in tuple.named() {
-            if !seen_constructors.insert(ctor_name.to_string()) {
-                problems.push((
-                    span,
-                    ConstructorProblem {
-                        name: ctor_name.to_string(),
-                        reason: format!("duplicate constructor `{ctor_name}`"),
-                    },
-                ));
+        let mut report = |name: String, reason: String| {
+            problems.push((
+                span,
+                EntryProblem {
+                    table,
+                    name,
+                    reason,
+                },
+            ));
+        };
+        for (entry, decl) in tuple.named() {
+            if !seen.insert((table, entry.to_string())) {
+                report(entry.to_string(), format!("duplicate {table} `{entry}`"));
             }
             let Some(fields) = decl.as_tuple().filter(|t| t.has_no_unnamed()) else {
-                problems.push((
-                    span,
-                    ConstructorProblem {
-                        name: ctor_name.to_string(),
-                        reason: "a constructor is declared as a map: `(about: ..., args: ...)`"
-                            .to_string(),
-                    },
-                ));
+                report(
+                    entry.to_string(),
+                    format!(
+                        "{} is declared as a map: `(about: ..., args: ...)`",
+                        article(table)
+                    ),
+                );
                 continue;
             };
-            for (field_key, field_val) in fields.named() {
-                match field_key {
-                    "about" => {}
-                    "args" => {
-                        let Some(args_tuple) = field_val.as_tuple().filter(|t| t.has_no_unnamed())
-                        else {
-                            problems.push((
-                                span,
-                                ConstructorProblem {
-                                    name: format!("{ctor_name}.args"),
-                                    reason: "`args` is declared as a map: `(name: (type: ..., ...))`"
-                                        .to_string(),
-                                },
-                            ));
-                            continue;
-                        };
-                        for (param_name, param_val) in args_tuple.named() {
-                            let target_name = format!("{ctor_name}.{param_name}");
-                            let Some(param_fields) =
-                                param_val.as_tuple().filter(|t| t.has_no_unnamed())
-                            else {
-                                problems.push((
-                                    span,
-                                    ConstructorProblem {
-                                        name: target_name,
-                                        reason: "an argument is declared as a map: `(type: ..., positional: ..., required: ..., default: ..., about: ...)`".to_string(),
-                                    },
-                                ));
-                                continue;
-                            };
-                            let mut parsed_ty: Option<Result<Type, TypeError>> = None;
-                            for (pkey, pval) in param_fields.named() {
-                                match pkey {
-                                    "type" => {
-                                        let res = parse_type_spec(pval);
-                                        if let Err(err) = &res {
-                                            problems.push((
-                                                span,
-                                                ConstructorProblem {
-                                                    name: target_name.clone(),
-                                                    reason: err.to_string(),
-                                                },
-                                            ));
-                                        }
-                                        parsed_ty = Some(res);
-                                    }
-                                    "positional" | "required" => {
-                                        if let Err(mismatch) =
-                                            admits(&Type::bare(tomet_type::Kind::Bool), pval)
-                                        {
-                                            problems.push((
-                                                span,
-                                                ConstructorProblem {
-                                                    name: target_name.clone(),
-                                                    reason: format!("`{pkey}`: {mismatch}"),
-                                                },
-                                            ));
-                                        }
-                                    }
-                                    "default" | "about" => {}
-                                    other => {
-                                        problems.push((
-                                            span,
-                                            ConstructorProblem {
-                                                name: target_name.clone(),
-                                                reason: format!(
-                                                    "unknown field `{other}`; an argument has {}",
-                                                    PARAM_KEYS
-                                                        .map(|k| format!("`{k}`"))
-                                                        .join(", ")
-                                                ),
-                                            },
-                                        ));
-                                    }
-                                }
-                            }
-                            if let (Some(Ok(ty)), Some(default)) =
-                                (parsed_ty.as_ref(), param_fields.get("default"))
-                                && let Err(mismatch) = admits(ty, default)
-                            {
-                                problems.push((
-                                    span,
-                                    ConstructorProblem {
-                                        name: target_name,
-                                        reason: format!(
-                                            "`default` is not of `type: {ty}`: {mismatch}"
-                                        ),
-                                    },
-                                ));
-                            }
+            for (field, value) in fields.named() {
+                if !table_keys(table).contains(&field) {
+                    report(
+                        entry.to_string(),
+                        format!(
+                            "unknown field `{field}`; {} has {}",
+                            article(table),
+                            table_keys(table)
+                                .iter()
+                                .map(|k| format!("`{k}`"))
+                                .collect::<Vec<_>>()
+                                .join(", ")
+                        ),
+                    );
+                    continue;
+                }
+                match field {
+                    "args" => param_problems(entry, value, &mut report),
+                    "singleton" => {
+                        if let Err(mismatch) = admits(&Type::bare(tomet_type::Kind::Bool), value) {
+                            report(entry.to_string(), format!("`singleton`: {mismatch}"));
                         }
                     }
-                    other => {
-                        problems.push((
-                            span,
-                            ConstructorProblem {
-                                name: ctor_name.to_string(),
-                                reason: format!(
-                                    "unknown field `{other}`; a constructor has {}",
-                                    CONSTRUCTOR_KEYS.map(|k| format!("`{k}`")).join(", ")
-                                ),
-                            },
-                        ));
+                    "host" if !value.as_str().is_some_and(|v| HOST_VALUES.contains(&v)) => {
+                        report(
+                            entry.to_string(),
+                            format!(
+                                "`host` is one of {}",
+                                HOST_VALUES.map(|k| format!("`{k}`")).join(", ")
+                            ),
+                        );
                     }
+                    _ => {}
                 }
             }
         }
     }
 
     problems
+}
+
+/// `an element`, `an attribute`, `a constructor`: how a problem names an entry of `table`.
+fn article(table: DeclKind) -> String {
+    match table {
+        DeclKind::Constructor => format!("a {table}"),
+        _ => format!("an {table}"),
+    }
+}
+
+/// The problems in an entry's `args:` map, reported as `entry.param`.
+fn param_problems(entry: &str, args: &Value, report: &mut impl FnMut(String, String)) {
+    let Some(args) = args.as_tuple().filter(|t| t.has_no_unnamed()) else {
+        report(
+            format!("{entry}.args"),
+            "`args` is declared as a map: `(name: (type: ..., ...))`".to_string(),
+        );
+        return;
+    };
+    for (param, spec) in args.named() {
+        let target = format!("{entry}.{param}");
+        let Some(fields) = spec.as_tuple().filter(|t| t.has_no_unnamed()) else {
+            report(
+                target,
+                "an argument is declared as a map: `(type: ..., positional: ..., required: ..., \
+                 default: ..., about: ...)`"
+                    .to_string(),
+            );
+            continue;
+        };
+        let mut parsed_ty: Option<Result<Type, TypeError>> = None;
+        for (key, value) in fields.named() {
+            match key {
+                "type" => {
+                    let res = parse_type_spec(value);
+                    if let Err(err) = &res {
+                        report(target.clone(), err.to_string());
+                    }
+                    parsed_ty = Some(res);
+                }
+                "positional" | "required" => {
+                    if let Err(mismatch) = admits(&Type::bare(tomet_type::Kind::Bool), value) {
+                        report(target.clone(), format!("`{key}`: {mismatch}"));
+                    }
+                }
+                "default" | "about" => {}
+                other => {
+                    report(
+                        target.clone(),
+                        format!(
+                            "unknown field `{other}`; an argument has {}",
+                            PARAM_KEYS.map(|k| format!("`{k}`")).join(", ")
+                        ),
+                    );
+                }
+            }
+        }
+        if let (Some(Ok(ty)), Some(default)) = (parsed_ty.as_ref(), fields.get("default"))
+            && let Err(mismatch) = admits(ty, default)
+        {
+            report(
+                target,
+                format!("`default` is not of `type: {ty}`: {mismatch}"),
+            );
+        }
+    }
 }
 
 /// The `content: ( allow: )` an element declares, if any.
@@ -1351,7 +1776,6 @@ mod tests {
         let layers = &v.elements["layers"];
         assert_eq!(layers.display, Some(Shape::Block));
         assert!(layers.singleton);
-        assert_eq!(layers.region, Region::Body);
         assert!(!v.elements["pure"].singleton);
     }
 
@@ -1495,9 +1919,293 @@ mod tests {
 
     #[test]
     fn shadowing_a_builtin_is_reported_at_the_declaration() {
-        let v = vocab("::vocabulary(deck)\n\n::element(link: (), ref: (), item: ())\n");
-        assert_eq!(v.shadowed_builtins(), ["item", "link"]);
+        let v = vocab(
+            "::vocabulary(deck)\n\n::element(link: (), ref: (), item: (), kind: ())\n\
+             ::attribute(meta: (), link: (), upstream: ())\n",
+        );
+        // per table: `@kind` and `::link` take no std name of their own table
+        assert_eq!(
+            v.shadowed_builtins(),
+            [
+                (DeclKind::Element, "item"),
+                (DeclKind::Element, "link"),
+                (DeclKind::Attribute, "meta")
+            ]
+        );
         assert!(vocab(WRIT).shadowed_builtins().is_empty());
+    }
+
+    const CATASTO: &str = r#"::kind(vocabulary)
+::vocabulary(catasto, version: "1.0.0")
+::attribute(
+  upstream: (
+    about: | The upstream repositories.
+    host: ctmt
+    singleton: true
+    args: ( name: (type: string, positional: true, required: true) )
+  )
+  note: ()
+)
+::element(
+  upstream: (display: block)
+)
+"#;
+
+    #[test]
+    fn reads_the_attributes_a_vocabulary_declares() {
+        let v = vocab(CATASTO);
+        let upstream = &v.attributes["upstream"];
+        assert!(upstream.singleton);
+        assert_eq!(upstream.host, Scope::Ctmt);
+        assert_eq!(upstream.positional_keys(), ["name"]);
+        let note = &v.attributes["note"];
+        assert!(!note.singleton);
+        assert_eq!(note.host, Scope::Both);
+        // the same name in the other table is another thing
+        assert_eq!(v.elements["upstream"].display, Some(Shape::Block));
+    }
+
+    #[test]
+    fn the_sigil_says_which_table_a_name_is_looked_up_in() {
+        let b = Bindings {
+            kind: Some(vocab(CATASTO)),
+            ..Default::default()
+        };
+        // both tables have `upstream`
+        assert!(b.classify(&name("upstream")).is_ok());
+        assert!(b.classify_attribute(&name("upstream")).is_ok());
+        // `note` is an attribute only: `@note` is written with the wrong sigil
+        assert!(b.classify_attribute(&name("note")).is_ok());
+        let err = b.classify(&name("note")).unwrap_err();
+        assert!(err.wrong_sigil && !err.attribute, "{err:?}");
+        assert!(err.to_string().contains("write `::note`"), "{err}");
+        // std's own tables hold the same way
+        assert!(b.classify_attribute(&name("kind")).is_ok());
+        let err = b.classify_attribute(&name("link")).unwrap_err();
+        assert!(err.wrong_sigil && err.attribute, "{err:?}");
+        // nothing in either table is unknown as what it was written as
+        let err = b.classify_attribute(&name("nonesuch")).unwrap_err();
+        assert!(!err.wrong_sigil);
+        assert!(
+            err.to_string().starts_with("unknown attribute `nonesuch`"),
+            "{err}"
+        );
+        assert!(b.attribute(&name("upstream")).is_some());
+        assert!(b.attribute(&name("catasto.upstream")).is_some());
+        assert!(b.attribute(&name("kind")).is_none());
+    }
+
+    #[test]
+    fn an_attribute_of_a_used_vocabulary_is_written_out_and_its_namespace_must_be_in_scope() {
+        let mut b = Bindings::default();
+        let err = b.classify_attribute(&name("catasto.upstream")).unwrap_err();
+        assert_eq!(err.unbound_namespace.as_deref(), Some("catasto"));
+        b.used.insert("catasto".to_string(), vocab(CATASTO));
+        assert!(b.classify_attribute(&name("catasto.upstream")).is_ok());
+        // a used vocabulary is never bare
+        assert!(b.classify_attribute(&name("upstream")).is_err());
+    }
+
+    fn doc(src: &str) -> File {
+        tomet_ast_parser::parse_file(src).expect("document parses")
+    }
+
+    #[test]
+    fn an_alias_replaces_the_namespace_and_names_resolve_in_the_real_one() {
+        let b = Bindings::for_document(&doc("::use(catasto, as: c)\n\nBody.\n"), [vocab(CATASTO)]);
+        let real = Ok(ElementKind::Custom("catasto.upstream".to_string()));
+        assert_eq!(b.classify_attribute(&name("c.upstream")), real);
+        assert_eq!(b.classify(&name("c.upstream")), real);
+        assert!(
+            b.attribute(&name("c.upstream"))
+                .is_some_and(|a| a.singleton)
+        );
+        // the alias replaces the namespace: written out, it is not in scope
+        let err = b.classify_attribute(&name("catasto.upstream")).unwrap_err();
+        assert_eq!(err.unbound_namespace.as_deref(), Some("catasto"));
+        assert_eq!(err.name, "catasto.upstream");
+        // a message about a written name shows it as written
+        let err = b.classify_attribute(&name("c.nonesuch")).unwrap_err();
+        assert_eq!(err.name, "c.nonesuch");
+        // unaliased, the same name resolves to the same thing
+        let plain = Bindings::for_document(&doc("::use(catasto)\n\nBody.\n"), [vocab(CATASTO)]);
+        assert_eq!(plain.classify_attribute(&name("catasto.upstream")), real);
+    }
+
+    #[test]
+    fn an_alias_holds_with_no_vocabulary_at_hand() {
+        let b = Bindings::for_document(
+            &doc("::use(node-graph, as: ng)\n\nBody.\n"),
+            std::iter::empty(),
+        );
+        let real = ElementKind::Custom("node-graph.node".to_string());
+        assert_eq!(b.classify_lenient(&name("ng.node")), real);
+        assert_eq!(b.classify_lenient(&name("node-graph.node")), real);
+        assert_eq!(b.classify_lenient(&name("link")), ElementKind::Link);
+        assert_eq!(
+            b.classify_lenient(&name("nonesuch")),
+            ElementKind::Custom("nonesuch".to_string())
+        );
+        let attribute = ElementKind::Custom("node-graph.port".to_string());
+        assert_eq!(b.classify_attribute_lenient(&name("ng.port")), attribute);
+        assert_eq!(
+            b.classify_attribute_lenient(&name("kind")),
+            ElementKind::Declaration(DeclKind::Kind)
+        );
+    }
+
+    #[test]
+    fn an_aliased_attribute_resolves_leniently_in_the_real_namespace() {
+        let b = Bindings::for_document(&doc("::use(catasto, as: c)\n\nBody.\n"), [vocab(CATASTO)]);
+        assert_eq!(
+            b.classify_attribute_lenient(&name("c.upstream")),
+            ElementKind::Custom("catasto.upstream".to_string())
+        );
+    }
+
+    #[test]
+    fn std_written_out_is_std() {
+        let b = Bindings::default();
+        assert_eq!(
+            b.classify_attribute(&name("std.kind")),
+            Ok(ElementKind::Declaration(DeclKind::Kind))
+        );
+        let written = doc("::std.kind(config, 2)\n");
+        let view = declaration_args_view(&written.header[0]).unwrap();
+        assert_eq!(view.get("kind").and_then(|v| v.as_str()), Some("config"));
+    }
+
+    #[test]
+    fn a_constructor_call_resolves_through_the_alias() {
+        let b = Bindings::for_document(
+            &doc("::use(catasto, as: c)\n\nBody.\n"),
+            [vocab(CATASTO_VOCAB)],
+        );
+        let call = tomet_ast_parser::parse_value(r#"c.git("https://x/y.git")"#).unwrap();
+        let read = b.read_call(&call).unwrap();
+        assert_eq!(read.name, "git");
+        assert_eq!(read.get("rev").and_then(|v| v.as_str()), Some("main"));
+        let unaliased = tomet_ast_parser::parse_value(r#"catasto.git("https://x/y.git")"#).unwrap();
+        assert_eq!(
+            b.read_call(&unaliased).unwrap_err(),
+            CallError::UnboundNamespace {
+                call: "catasto.git".to_string(),
+                namespace: "catasto".to_string(),
+            }
+        );
+    }
+
+    #[test]
+    fn the_use_declarations_are_held_to_their_rules() {
+        let problems = |src: &str| -> Vec<(usize, UseProblem)> { use_problems(&doc(src).header) };
+        assert_eq!(
+            problems("::use(catasto, \"1.0.0\", as: c)\n::use(deck)\n"),
+            []
+        );
+        assert_eq!(
+            problems("::use(catasto, from: x)\n"),
+            [(0, UseProblem::UnknownArgument("from".to_string()))]
+        );
+        for alias in ["\"a b\"", "ng.x", "3", "(a)"] {
+            assert_eq!(
+                problems(&format!("::use(catasto, as: {alias})\n")),
+                [(0, UseProblem::NotAnAlias)],
+                "{alias}"
+            );
+        }
+        for alias in ["std", "doc"] {
+            assert_eq!(
+                problems(&format!("::use(catasto, as: {alias})\n")),
+                [(0, UseProblem::ReservedAlias(alias.to_string()))]
+            );
+        }
+        assert_eq!(
+            problems("::kind(writ)\n::use(catasto, as: writ)\n"),
+            [(1, UseProblem::KindAlias("writ".to_string()))]
+        );
+        assert_eq!(
+            problems("::kind(writ)\n::use(writ, as: w)\n"),
+            [(1, UseProblem::UsedKind("writ".to_string()))]
+        );
+        let taken = |by: &str| UseProblem::AliasTaken {
+            alias: "deck".to_string(),
+            by: by.to_string(),
+        };
+        // the namespace of another `::use`, before or after it
+        assert_eq!(
+            problems("::use(catasto, as: deck)\n::use(deck)\n"),
+            [(0, taken("deck"))]
+        );
+        // two aliases that clash: reported at the later one
+        assert_eq!(
+            problems("::use(writ, as: deck)\n::use(catasto, as: deck)\n"),
+            [(1, taken("writ"))]
+        );
+        let twice = UseProblem::UsedTwice {
+            namespace: "catasto".to_string(),
+            first: 0,
+        };
+        assert_eq!(
+            problems("::use(catasto)\n::use(catasto, as: c)\n"),
+            [(1, twice)]
+        );
+        assert!(
+            UseProblem::NotAnAlias
+                .to_string()
+                .contains("`::use(node-graph, as: ng)`")
+        );
+    }
+
+    #[test]
+    fn an_unknown_name_is_advised_with_its_own_sigil() {
+        let attribute = UnknownName::attribute(&name("upstrem")).to_string();
+        assert!(attribute.contains("(`::ns.upstrem`)"), "{attribute}");
+        let element = UnknownName::element(&name("bookmrk")).to_string();
+        assert!(element.contains("(`@ns.bookmrk`)"), "{element}");
+    }
+
+    #[test]
+    fn an_entry_with_a_field_its_table_does_not_have_is_a_problem() {
+        let doc = tomet_ast_parser::parse_file(
+            "::kind(vocabulary)\n::vocabulary(deck)\n\
+             ::element(card: (region: preamble, display: block))\n\
+             ::attribute(character: (display: block, host: page, singleton: yes))\n\
+             ::constructor(git: (singleton: true))\n",
+        )
+        .unwrap();
+        let problems: Vec<_> = entry_problems_in(&doc)
+            .into_iter()
+            .map(|(_, p)| (p.table, p.name, p.reason))
+            .collect();
+        assert_eq!(problems.len(), 5, "{problems:?}");
+        assert!(
+            problems[0].0 == DeclKind::Element
+                && problems[0]
+                    .2
+                    .starts_with("unknown field `region`; an element has `about`"),
+            "{problems:?}"
+        );
+        assert!(
+            problems[1].0 == DeclKind::Attribute
+                && problems[1].2.starts_with(
+                    "unknown field `display`; an attribute has `about`, `args`, `singleton`, `host`"
+                ),
+            "{problems:?}"
+        );
+        assert!(
+            problems[2]
+                .2
+                .starts_with("`host` is one of `tmt`, `ctmt`, `both`"),
+            "{problems:?}"
+        );
+        assert!(problems[3].2.starts_with("`singleton`:"), "{problems:?}");
+        assert!(
+            problems[4].0 == DeclKind::Constructor
+                && problems[4]
+                    .2
+                    .starts_with("unknown field `singleton`; a constructor has"),
+            "{problems:?}"
+        );
     }
 
     #[test]
@@ -1549,11 +2257,15 @@ mod tests {
 
     #[test]
     fn a_type_that_names_no_type_or_a_default_that_does_not_fit_is_a_problem() {
-        let problems = vocab(DECK).param_problems();
+        let doc = tomet_ast_parser::parse_file(DECK).unwrap();
+        let problems: Vec<EntryProblem> = entry_problems_in(&doc)
+            .into_iter()
+            .map(|(_, p)| p)
+            .collect();
         let by_param = |p: &str| {
             problems
                 .iter()
-                .find(|x| x.param == p)
+                .find(|x| x.name == format!("entry.{p}"))
                 .map(|x| x.reason.as_str())
         };
         // `set(string)` and `person` are no types
@@ -1589,7 +2301,7 @@ mod tests {
         loaded.add("deck.vocabulary.tmt", &doc);
         assert_eq!(loaded.errors.len(), 3, "{:?}", loaded.errors);
         assert!(
-            loaded.errors[0].starts_with("deck.vocabulary.tmt: `entry`'s parameter `"),
+            loaded.errors[0].starts_with("deck.vocabulary.tmt: `entry."),
             "{:?}",
             loaded.errors
         );
@@ -1623,6 +2335,7 @@ mod tests {
         let b = Bindings {
             kind: Some(vocab(WRIT)),
             used: [("deck".to_string(), deck)].into_iter().collect(),
+            ..Default::default()
         };
 
         assert_eq!(b.classify(&name("link")), Ok(ElementKind::Link));
@@ -1727,9 +2440,10 @@ mod tests {
     fn empty_bindings_resolve_std_and_nothing_else() {
         let b = Bindings::default();
         assert_eq!(
-            b.classify(&name("meta")),
+            b.classify_attribute(&name("meta")),
             Ok(ElementKind::Declaration(DeclKind::Meta))
         );
+        assert_eq!(b.classify(&name("link")), Ok(ElementKind::Link));
         assert!(b.classify(&name("layers")).is_err());
         assert!(b.classify(&name("writ.layers")).is_err());
     }

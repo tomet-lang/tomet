@@ -11,7 +11,7 @@ use tomet_semantics_core::{admits, is_placeholder};
 use tomet_type::{Kind, Type};
 
 use crate::declaration::{Declaration, EntriesError};
-use crate::kind::{Cardinality, DeclKind, Host, Shape};
+use crate::kind::{Cardinality, DeclKind, Host, Scope, Shape};
 use crate::profile::Profile;
 use crate::read::profile_names;
 use crate::vars::{VarDecl, read_var_decls};
@@ -33,8 +33,11 @@ pub enum Problem {
         name: String,
         reason: String,
     },
-    /// A declaration written in a host that does not permit it.
-    NotForThisHost { declaration: &'static str },
+    /// A declaration written in a host that does not permit it; `scope` is where it may be written.
+    NotForThisHost {
+        declaration: &'static str,
+        scope: Scope,
+    },
     /// A declaration that may appear at most once was written more than once.
     ///
     /// The shared check is the one place standard declarations are counted for both
@@ -55,9 +58,6 @@ pub enum Problem {
     /// among the entries, as in `::meta(2, a: 1)`. An entry needs a name:
     /// `::macro(gh: "...")`.
     ExpectedEntries { declaration: &'static str },
-    /// A path written after the name of a declaration that has none: `::kind.version(2)`. Its
-    /// arguments are in the parentheses, `::kind(config, 2)`.
-    UnexpectedPath { declaration: &'static str },
     /// A `[...]` that has nothing to be the prose of, or that clashes with the value.
     UnexpectedProse {
         declaration: &'static str,
@@ -84,8 +84,12 @@ impl std::fmt::Display for Problem {
                 name,
                 reason,
             } => write!(f, "`{name}` in `::{declaration}`: {reason}"),
-            Problem::NotForThisHost { declaration } => {
-                write!(f, "`::{declaration}` is not permitted in this host")
+            Problem::NotForThisHost { declaration, scope } => {
+                write!(
+                    f,
+                    "`::{declaration}` may only be written in {}",
+                    scope.files()
+                )
             }
             Problem::Repeated { declaration, .. } => {
                 write!(f, "`{declaration}` may appear once in a document")
@@ -117,12 +121,6 @@ impl std::fmt::Display for Problem {
                      write `::{declaration}(name: value)`"
                 )
             }
-            Problem::UnexpectedPath { declaration } => {
-                write!(
-                    f,
-                    "`::{declaration}` takes its arguments in the parentheses and has no path after its name"
-                )
-            }
             Problem::UnexpectedProse {
                 declaration,
                 reason,
@@ -147,7 +145,7 @@ pub fn check_declarations(declarations: &[Declaration], host: Host) -> Vec<(usiz
 
     for (idx, decl) in declarations.iter().enumerate() {
         let Some(kind) = decl.kind() else {
-            if let Some(instead) = DeclKind::retired(&decl.name) {
+            if let Some(instead) = decl.std_name().and_then(DeclKind::retired) {
                 problems.push((
                     idx,
                     Problem::Retired {
@@ -165,6 +163,7 @@ pub fn check_declarations(declarations: &[Declaration], host: Host) -> Vec<(usiz
                 idx,
                 Problem::NotForThisHost {
                     declaration: spec.name,
+                    scope: spec.scope,
                 },
             ));
             continue;
@@ -545,7 +544,8 @@ mod tests {
                 .map(|(_, problem)| problem)
                 .collect::<Vec<_>>(),
             [Problem::NotForThisHost {
-                declaration: "profile"
+                declaration: "profile",
+                scope: Scope::Tmt,
             }]
         );
     }
@@ -927,7 +927,8 @@ mod tests {
         assert_eq!(
             problems[0].1,
             Problem::NotForThisHost {
-                declaration: "export"
+                declaration: "export",
+                scope: Scope::Tmt,
             }
         );
     }

@@ -8,9 +8,9 @@ pub fn completions_for(text: &str, pos: Position) -> Vec<CompletionItem> {
     completions_for_with_uri(text, pos, None)
 }
 
-/// Whether a built-in is a declaration about the document (`::name`).
+/// Whether a built-in is a declaration about the document (`::name`): which table it is in.
 fn is_declaration(kind: &ElementKind) -> bool {
-    tomet_semantics::builtin_region(kind) == tomet_semantics::Region::Preamble
+    matches!(kind, ElementKind::Declaration(_))
 }
 
 /// Provides autocompletion items with document URI awareness for path completions.
@@ -34,9 +34,8 @@ pub fn completions_for_with_uri(
     // Bare names are reserved for exactly this set, so offering a
     // non-builtin one would suggest something that fails to validate.
     //
-    // The spelling follows the element's `Region`, not its shape: a
-    // declaration about the document (the ones that belong in the
-    // preamble) is `::name`, anything else is `@name`. Where in a body an
+    // The spelling follows the table the name is in, not its shape: a
+    // declaration about the document is `::name`, a body element is `@name`. Where in a body an
     // element may be *placed* is reported in the completion detail instead.
     //
     // `::` opening a line starts a declaration: only the built-ins that are

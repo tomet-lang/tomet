@@ -110,12 +110,16 @@ impl Workspace {
     ///
     /// An expression comes to what it comes to when the document is rendered,
     /// in its vault: it can ask about other documents (`tmt(...)`, `ref(...)`,
-    /// `vault.docs`), and about an open buffer as the editor has it. Nothing
+    /// `vault.docs`), and about an open buffer as the editor has it. A name is shown as what it
+    /// resolves to in the vault (an aliased `@ng.node` is `node-graph.node`). Nothing
     /// open at `path` gives nothing.
     pub fn hover(&mut self, path: &Path, pos: lsp_types::Position) -> Option<lsp_types::Hover> {
         let text = self.buffers.get(path)?.clone();
         let vault = self.vault_for(path);
-        crate::hover_in(&text, pos, &|doc, expr| vault.evaluate(doc, path, expr))
+        let (doc, bindings) = vault.parse(&text).ok()?;
+        crate::hover_in(&text, &doc, &bindings, pos, &|doc, expr| {
+            vault.evaluate(doc, path, expr)
+        })
     }
 
     /// Where the reference at `pos` in the document open at `path` is defined.
@@ -516,6 +520,52 @@ mod tests {
         let _ = fs::remove_dir_all(&root);
     }
 
+    /// A name written under a `::use` alias is shown as what it resolves to in the vault, exactly
+    /// as the name written out is.
+    #[test]
+    fn hover_shows_an_aliased_name_in_its_real_namespace() {
+        let root = vault(
+            "hover_alias",
+            "::kind(config)\n::vocabulary(node-graph: @file(.tomet/vocabularies/node-graph.vocabulary.tmt))\n",
+            &[(
+                ".tomet/vocabularies/node-graph.vocabulary.tmt",
+                "::kind(vocabulary)\n::vocabulary(node-graph)\n\n\
+                 ::element(node: (args: (label: (type: string, positional: true))))\n\
+                 ::attribute(layout: ())\n",
+            )],
+        );
+        let a = root.join("a.tmt");
+        let mut ws = Workspace::new();
+        let mut shown = Vec::new();
+        // The last is bare under the document's own kind: it resolves only with the vocabulary in
+        // hand, which says the vault's bindings reached the hover.
+        for (prefix, written) in [
+            ("ng.", "::use(node-graph, as: ng)"),
+            ("node-graph.", "::use(node-graph)"),
+            ("", "::kind(node-graph)"),
+        ] {
+            ws.set_buffer(
+                a.clone(),
+                format!("{written}\n::{prefix}layout(tree)\n\n@{prefix}node(a)\n"),
+            );
+            let element = hover_text(ws.hover(&a, lsp_types::Position::new(3, 2)));
+            let notices = ws.take_notices();
+            assert!(notices.is_empty(), "{notices:?}");
+            assert!(
+                element.contains("**Classification**: `node-graph.node`"),
+                "{element}"
+            );
+            let declaration = hover_text(ws.hover(&a, lsp_types::Position::new(1, 3)));
+            assert!(
+                declaration.contains("**Classification**: `node-graph.layout`"),
+                "{declaration}"
+            );
+            shown.push(element.replace(&format!("@{prefix}node"), "@x.node"));
+        }
+        assert!(shown.iter().all(|s| *s == shown[0]), "{shown:?}");
+        let _ = fs::remove_dir_all(&root);
+    }
+
     /// An expression that has no value is an error on hover, as it is when rendered.
     #[test]
     fn hover_on_an_expression_with_no_value_is_an_error() {
@@ -580,6 +630,37 @@ mod tests {
         // A document that does not bind the vocabulary does not get it.
         let elsewhere = completions_at_the_end(&root, "::kind(other)\n\n@");
         assert!(!labels(&elsewhere).contains(&"tile"));
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    /// After a `::` opening a line, the attributes of the vocabularies in scope, and a used
+    /// vocabulary's names are offered in the namespace the document writes it in: its alias.
+    #[test]
+    fn a_used_vocabulary_is_offered_under_its_alias() {
+        const CARDS: &str = "::kind(vocabulary)\n::vocabulary(cards)\n\n::element(tile: ())\n::attribute(theme: (args: (name: (type: string, positional: true))))\n";
+        let root = vault(
+            "alias",
+            "::kind(config)\n::vocabulary(cards: @file(.tomet/vocabularies/cards.vocabulary.tmt))\n",
+            &[(".tomet/vocabularies/cards.vocabulary.tmt", CARDS)],
+        );
+        let aliased = "::use(cards, as: c)\n";
+        let names = labels(&completions_at_the_end(&root, &format!("{aliased}\n@")))
+            .into_iter()
+            .map(str::to_string)
+            .collect::<Vec<_>>();
+        assert!(names.contains(&"c.tile".to_string()), "{names:?}");
+        assert!(!names.iter().any(|n| n.starts_with("cards.")), "{names:?}");
+        let attributes = completions_at_the_end(&root, &format!("{aliased}::"));
+        let theme = attributes.iter().find(|i| i.label == "c.theme");
+        assert!(
+            theme.is_some_and(|i| i.detail.as_deref() == Some("cards attribute (name)")),
+            "{:?}",
+            labels(&attributes)
+        );
+        assert!(
+            labels(&attributes).contains(&"kind"),
+            "a standard declaration is still offered"
+        );
         let _ = fs::remove_dir_all(&root);
     }
 

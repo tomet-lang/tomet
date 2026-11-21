@@ -284,7 +284,8 @@ fn format_diagnostics(
 
 /// Check a standalone cotomet file (`.ctmt`).
 ///
-/// Declarations at the top are validated by `check_ctmt_declarations`. If the
+/// Declarations at the top are validated by `check_ctmt_declarations` (the standard ones) and
+/// `check_header` (every name is an attribute in scope, held to its vocabulary entry). If the
 /// evaluator also reports errors within header declarations (such as a malformed
 /// `::var` or `::macro` entry), those duplicates are dropped in favor of the
 /// declaration check's diagnostic so each problem is reported once.
@@ -312,6 +313,12 @@ fn check_ctmt(
     let mut diagnostics = Vec::new();
     tomet_validator::check_ctmt_declarations(&declared, &mut diagnostics);
     let bindings = vault.bindings(&parsed);
+    tomet_validator::check_header(
+        &parsed.header,
+        &bindings,
+        tomet_declaration::Host::Ctmt,
+        &mut diagnostics,
+    );
     tomet_validator::check_ctmt_calls(&parsed, &bindings, &mut diagnostics);
 
     let eval_res = cotomet_eval::eval_file(parsed, src, &[]);
@@ -677,18 +684,20 @@ mod tests {
         assert_eq!(ctmt_messages(&good_file, good_src), Vec::<String>::new());
         check(&good_file, false, true, false).expect("valid ctmt passes");
 
-        // 2. A file that opens with non-standard ::upstreams(){ ... } checks clean
-        let upstreams_src = "::upstreams(){\n  vocabularies: (git: \"https://github.com/tomet-lang/vocabularies.git\", rev: main, root: vocabularies)\n  commonfiles: (git: \"https://github.com/tomet-lang/commonfiles.git\", rev: main, root: base)\n}\n\"tmtroot/schema/vocabularies/rust@1.0.0.vocabulary.tmt\": (source: (upstream: vocabularies, path: \"...\"))\n";
+        // 2. A `::name` that no vocabulary in scope declares is an unknown attribute, as in a `.tmt`
+        let upstreams_src = "::upstreams(\n  vocabularies: (git: \"https://github.com/tomet-lang/vocabularies.git\", rev: main, root: vocabularies)\n)\n\"tmtroot/schema/vocabularies/rust@1.0.0.vocabulary.tmt\": (source: (upstream: vocabularies, path: \"...\"))\n";
         let upstreams_file = root.join("upstreams.ctmt");
         fs::write(&upstreams_file, upstreams_src).unwrap();
-        assert_eq!(
-            ctmt_messages(&upstreams_file, upstreams_src),
-            Vec::<String>::new()
+        let msgs = ctmt_messages(&upstreams_file, upstreams_src);
+        assert_eq!(msgs.len(), 1, "{msgs:?}");
+        assert!(
+            msgs[0].starts_with("unknown attribute `upstreams`"),
+            "{msgs:?}"
         );
-        check(&upstreams_file, false, true, false).expect("::upstreams checks clean");
+        check(&upstreams_file, false, true, false).expect_err("an undeclared ::upstreams fails");
 
-        // 3. The same file with ::kind(catalog, abc) added reports version problem only
-        let bad_kind_src = "::kind(catalog, abc)\n::upstreams(){\n  vocabularies: (git: \"https://github.com/tomet-lang/vocabularies.git\", rev: main, root: vocabularies)\n}\nkey: 1\n";
+        // 3. A malformed ::kind version is reported
+        let bad_kind_src = "::kind(catalog, abc)\nkey: 1\n";
         let bad_kind_file = root.join("upstreams_bad_kind.ctmt");
         fs::write(&bad_kind_file, bad_kind_src).unwrap();
         let msgs = ctmt_messages(&bad_kind_file, bad_kind_src);
@@ -697,7 +706,6 @@ mod tests {
             msgs[0],
             "`version` in `::kind`: the text \"abc\" is not a version such as `1.10.0`"
         );
-        assert!(!msgs[0].contains("upstreams"));
         let err = check(&bad_kind_file, false, true, false).expect_err("bad ::kind version fails");
         assert!(err.to_string().contains("1 of 1 file(s) failed"));
 
@@ -712,7 +720,10 @@ mod tests {
         let not_for_host_file = root.join("not_for_host.ctmt");
         fs::write(&not_for_host_file, not_for_host_src).unwrap();
         let msgs = ctmt_messages(&not_for_host_file, not_for_host_src);
-        assert_eq!(msgs, vec!["`::export` is not permitted in this host"]);
+        assert_eq!(
+            msgs,
+            vec!["`::export` may only be written in a `.tmt` document"]
+        );
         let err =
             check(&not_for_host_file, false, true, false).expect_err("::export in .ctmt fails");
         assert!(err.to_string().contains("1 of 1 file(s) failed"));
@@ -759,6 +770,100 @@ mod tests {
             vec!["`deck.card`: the namespace `deck` is not in scope -- declare its vocabulary in `vocabularies` and write `::use(deck)`"]
         );
         let _ = fs::remove_dir_all(&no_vault_dir);
+
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    /// The attributes a `::kind` vocabulary declares are held to their entries in a `.ctmt`:
+    /// arguments, `singleton`, `host`, and the sigil.
+    #[test]
+    fn vocabulary_attributes_are_checked_in_a_cotomet_file() {
+        let root = vault("ctmt_attributes");
+        fs::write(
+            root.join(".tomet/vocabularies/deck.vocabulary.tmt"),
+            "::kind(vocabulary)\n::vocabulary(deck)\n::attribute(\n  upstream: (\n    host: ctmt\n    singleton: true\n    args: ( name: (type: string, positional: true, required: true) )\n  )\n  page: (host: tmt)\n)\n::element(card: ())\n",
+        )
+        .unwrap();
+        let messages = |name: &str, src: &str| -> Vec<String> {
+            let file = root.join(name);
+            fs::write(&file, src).unwrap();
+            let vault = tomet_load::Vault::discover(&file);
+            match check_ctmt(&file, src, &vault, false) {
+                CheckFileResult::Checked { stderr_lines, .. } => stderr_lines
+                    .into_iter()
+                    .map(|l| {
+                        let prefix = format!("{}: ", file.display());
+                        l.strip_prefix(&prefix).unwrap_or(&l).to_string()
+                    })
+                    .collect(),
+                _ => panic!("expected CheckFileResult::Checked"),
+            }
+        };
+
+        assert_eq!(
+            messages("ok.ctmt", "::kind(deck)\n::upstream(base)\nkey: 1\n"),
+            Vec::<String>::new()
+        );
+        let msgs = messages(
+            "arg.ctmt",
+            "::kind(deck)\n::upstream(base, nme: x)\nkey: 1\n",
+        );
+        assert_eq!(msgs.len(), 1, "{msgs:?}");
+        assert!(msgs[0].contains("has no argument `nme`"), "{msgs:?}");
+        let msgs = messages(
+            "twice.ctmt",
+            "::kind(deck)\n::upstream(a)\n::upstream(b)\nkey: 1\n",
+        );
+        assert_eq!(
+            msgs,
+            vec!["`upstream` may appear once in a document; the first is at 2:1"]
+        );
+        let msgs = messages("host.ctmt", "::kind(deck)\n::page()\nkey: 1\n");
+        assert_eq!(
+            msgs,
+            vec!["`::page` may only be written in a `.tmt` document"]
+        );
+        // written out in its namespace, and under an alias, it is the same attribute
+        assert_eq!(
+            messages(
+                "qualified.ctmt",
+                "::kind(deck)\n::deck.upstream(base)\nkey: 1\n"
+            ),
+            Vec::<String>::new()
+        );
+        assert_eq!(
+            messages(
+                "aliased.ctmt",
+                "::kind(other)\n::use(deck, as: d)\n::d.upstream(base)\nkey: 1\n"
+            ),
+            Vec::<String>::new()
+        );
+        let msgs = messages(
+            "unaliased.ctmt",
+            "::kind(other)\n::use(deck, as: d)\n::deck.upstream(base)\nkey: 1\n",
+        );
+        assert_eq!(msgs.len(), 1, "{msgs:?}");
+        assert!(
+            msgs[0].contains("the namespace `deck` is not in scope"),
+            "{msgs:?}"
+        );
+        let msgs = messages(
+            "host-tmt.ctmt",
+            "::kind(other)\n::use(deck)\n::deck.page()\nkey: 1\n",
+        );
+        assert_eq!(
+            msgs,
+            vec!["`::deck.page` may only be written in a `.tmt` document"]
+        );
+        let msgs = messages("sigil.ctmt", "::kind(deck)\n::card()\nkey: 1\n");
+        assert_eq!(msgs.len(), 1, "{msgs:?}");
+        assert!(msgs[0].contains("write `@card`"), "{msgs:?}");
+        let msgs = messages("unknown.ctmt", "::kind(deck)\n::upstreem(a)\nkey: 1\n");
+        assert_eq!(msgs.len(), 1, "{msgs:?}");
+        assert!(
+            msgs[0].starts_with("unknown attribute `upstreem`"),
+            "{msgs:?}"
+        );
 
         let _ = fs::remove_dir_all(&root);
     }

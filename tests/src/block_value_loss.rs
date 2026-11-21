@@ -17,10 +17,11 @@ const BLOCK_BEARING_KINDS: &[&str] = &["conflict"];
 const LOSSY_PLACEHOLDER_SUBSTRING: &str = "block(s)>";
 
 fn convert_all(doc: &File) -> [(&'static str, String); 4] {
-    let html = tomet_html::render_body(doc);
-    let md = tomet_markdown::to_markdown(doc);
-    let typ = tomet_typst::to_typst(doc);
-    let pandoc = serde_json::to_string(&tomet_pandoc::to_pandoc(doc))
+    let bindings = tomet_tests::carried(doc);
+    let html = tomet_html::render_body(doc, &bindings);
+    let md = tomet_markdown::to_markdown(doc, &bindings);
+    let typ = tomet_typst::to_typst(doc, &bindings);
+    let pandoc = serde_json::to_string(&tomet_pandoc::to_pandoc(doc, &bindings))
         .expect("pandoc serialization must succeed");
 
     [

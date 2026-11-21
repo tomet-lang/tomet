@@ -779,7 +779,7 @@ fn test_callout_with_empty_leading_line_import() {
 fn test_bare_url_with_query_param_no_backticks() {
     let md = "- http://127.0.0.1:8888/search?lang=ja&q=@query\n- https://example.com:1011/search?lang=ja&q=@query\n";
     let doc = from_markdown(md);
-    let exported = crate::export::to_markdown(&doc);
+    let exported = crate::export::to_markdown(&doc, &carried(&doc));
     assert_eq!(exported.trim(), md.trim());
 }
 
@@ -787,7 +787,7 @@ fn test_bare_url_with_query_param_no_backticks() {
 fn test_bare_angle_brackets_not_escaped() {
     let md = "asdfasdfdsf>\n#foo\n";
     let doc = from_markdown(md);
-    let exported = crate::export::to_markdown(&doc);
+    let exported = crate::export::to_markdown(&doc, &carried(&doc));
     assert!(
         !exported.contains("`>`"),
         "should never wrap > in backticks: {exported}"
@@ -850,7 +850,13 @@ fn other_html_is_still_dropped_as_a_block() {
 #[test]
 fn a_comment_survives_a_round_trip_through_markdown() {
     for md in ["<!-- A block comment -->\n", "before <!-- note --> after\n"] {
-        let exported = crate::export::to_markdown(&from_markdown(md));
+        let imported = from_markdown(md);
+        let exported = crate::export::to_markdown(&imported, &carried(&imported));
         assert_eq!(exported.trim(), md.trim());
     }
+}
+
+/// What a document read with no vault has in scope: the vocabularies tomet carries.
+fn carried(doc: &tomet_ast::File) -> tomet_semantics::Bindings {
+    tomet_semantics::LoadedVocabularies::default().bindings_for(doc)
 }

@@ -30,17 +30,22 @@ mod roundtrip_tests {
     use super::*;
     use tomet_html::render_body;
 
+    /// What a document read with no vault has in scope: the vocabularies tomet carries.
+    fn carried(doc: &tomet_ast::File) -> tomet_semantics::Bindings {
+        tomet_semantics::LoadedVocabularies::default().bindings_for(doc)
+    }
+
     /// Round-trip through both directions and assert the *rendered HTML*
     /// is equivalent, which is the fidelity bar this crate targets -- the
     /// intermediate `.tmt` shape doesn't have to be identical, just render
     /// the same.
     fn assert_html_round_trips(markdown: &str) {
         let doc = from_markdown(markdown);
-        let re_markdown = to_markdown(&doc);
+        let re_markdown = to_markdown(&doc, &carried(&doc));
         let doc2 = from_markdown(&re_markdown);
         assert_eq!(
-            render_body(&doc),
-            render_body(&doc2),
+            render_body(&doc, &carried(&doc)),
+            render_body(&doc2, &carried(&doc2)),
             "markdown was:\n{markdown}\nre-emitted as:\n{re_markdown}"
         );
     }

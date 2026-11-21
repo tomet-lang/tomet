@@ -6,7 +6,7 @@ use crate::block::render_content_blocks;
 use crate::util::{blocks_to_plain, escape_attr, escape_html, push_data_attrs};
 use tomet_ast::ElementView;
 use tomet_semantics::{
-    TargetScheme, classify_std_lenient, element_args_view, link_target, path_target, target_scheme,
+    ElementKind, TargetScheme, element_args_view, link_target, path_target, target_scheme,
 };
 
 /// Strips `target`'s scheme prefix the same way `render_link_element`
@@ -15,9 +15,9 @@ use tomet_semantics::{
 /// `src="name"`, not the literal `"ref:name"`. Both `@link` and `<embed>`
 /// share one `target` key with the scheme embedded in the string, so
 /// `<embed>` needs the same treatment `@link` gets, not just a raw
-/// passthrough.
-pub(crate) fn render_embed_element(el: ElementView<'_>, out: &mut String) {
-    let raw_target = link_target(el, &classify_std_lenient(el)).unwrap_or_default();
+/// passthrough. `kind` is what the element resolved to.
+pub(crate) fn render_embed_element(el: ElementView<'_>, kind: &ElementKind, out: &mut String) {
+    let raw_target = link_target(el, kind).unwrap_or_default();
     let (scheme, src) = target_scheme(&raw_target);
     let alt = el.content.map(blocks_to_plain).unwrap_or_default();
     if scheme == TargetScheme::Unresolved {
@@ -42,15 +42,15 @@ pub(crate) fn render_embed_element(el: ElementView<'_>, out: &mut String) {
 /// offering to take the reader there, and before these elements existed
 /// it was written in backticks -- which is exactly what this renders back
 /// to, so moving a mention onto `@file` changes what a checker can see
-/// and nothing a reader can.
+/// and nothing a reader can. `kind` is what the element resolved to.
 pub(crate) fn render_path_element(
     cx: &RenderCtx,
     el: ElementView<'_>,
+    kind: &ElementKind,
     out: &mut String,
     inline: bool,
 ) {
-    let kind = classify_std_lenient(el);
-    let path = path_target(el, &kind).unwrap_or_default();
+    let path = path_target(el, kind).unwrap_or_default();
     let class = format!("tm-{}", kind.as_str());
     let content = el.content.filter(|c| !c.is_empty()).map(|c| {
         let mut s = String::new();
@@ -87,15 +87,17 @@ pub(crate) fn render_path_element(
 /// `tomet_semantics::target_scheme`) decides whether this is a
 /// same-document anchor reference (`id:`) or a real `href` (everything
 /// else: url/file/tm/ref). The scheme prefix itself is stripped before
-/// rendering -- it's addressing metadata, not part of the visible target.
+/// rendering -- it's addressing metadata, not part of the visible target. `kind` is what the
+/// element resolved to.
 pub(crate) fn render_link_element(
     cx: &RenderCtx,
     el: ElementView<'_>,
+    kind: &ElementKind,
     out: &mut String,
     inline: bool,
 ) {
     let args_view = element_args_view(el);
-    let raw_target = link_target(el, &classify_std_lenient(el)).unwrap_or_default();
+    let raw_target = link_target(el, kind).unwrap_or_default();
     let (scheme, target) = target_scheme(&raw_target);
     let target = target.to_string();
 

@@ -20,6 +20,7 @@ tomet-printer     = { workspace = true }
 tomet-query       = { workspace = true }
 tomet-semantics   = { workspace = true }
 tomet-transform   = { workspace = true }
+tomet-vault       = { workspace = true }
 #--- Crates.io ---
 anyhow = { workspace = true }
 

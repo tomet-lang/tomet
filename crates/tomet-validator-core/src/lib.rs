@@ -1,8 +1,11 @@
 //! Core document structure and semantic validation.
 //!
-//! Validates standard and custom elements, duplicate IDs, singleton directives,
-//! regions (preamble vs body), argument declarations, dangling intra-document anchors, and type
-//! seats (`<$...>`): one outside a blueprint, or one that is not a type, is an error.
+//! Validates standard and custom elements and attributes (an `@name` is looked up in the
+//! element tables, a `::name` in the attribute tables, and a name found only in the other is
+//! written with the wrong sigil), duplicate IDs, singletons, argument declarations, dangling
+//! intra-document anchors, and type seats (`<$...>`): one outside a blueprint, or one that is not
+//! a type, is an error. The header of a `.ctmt` file is held to the same attribute checks
+//! ([`check_header`]).
 
 pub mod diagnostic;
 pub mod id;
@@ -14,6 +17,7 @@ pub use seats::check_type_seats;
 
 use tomet_ast::{Block, ElementView, File, Inline};
 use tomet_cst::{SyntaxNode, TextRange};
+use tomet_declaration::Host;
 use tomet_semantics::DeclKind;
 use tomet_semantics::{Bindings, Shape};
 use tomet_semantics_core::is_placeholder;
@@ -33,12 +37,12 @@ fn for_each_element_and_item(doc: &File, mut f: impl FnMut(ElementView<'_>)) {
     });
 }
 
-/// Classifies `el` against `std` and the namespaces in scope.
+/// Classifies `el` against `std` and the element tables in scope.
 pub fn classify_in(
     el: ElementView<'_>,
     bindings: &Bindings,
 ) -> Result<tomet_semantics::ElementKind, tomet_semantics::UnknownName> {
-    tomet_semantics::refuse_declaration_as_element(el.name, bindings.classify(el.name)?)
+    bindings.classify(el.name)
 }
 
 /// What a `::rule(allow: (...))` calls a plain `- item`, which has no name
@@ -65,15 +69,15 @@ pub fn shape_str(shape: Shape) -> &'static str {
     }
 }
 
-/// Runs core element, ID, region, argument, and type seat validations on `doc`.
+/// Runs core element, attribute, ID, argument, and type seat validations on `doc`.
 pub fn validate_core(doc: &File, bindings: &Bindings, errors: &mut Vec<Diagnostic>) {
     let mut seen: Vec<(String, Span)> = Vec::new();
 
     for_each_element_and_item(doc, |el| {
         if let Err(unknown) = classify_in(el, bindings) {
-            // a declaration written as an element is not unknown, it is
+            // an attribute written as an element is not unknown, it is
             // spelled wrongly: say which spelling it takes
-            errors.push(if unknown.declaration {
+            errors.push(if unknown.wrong_sigil {
                 Diagnostic::WrongSigil {
                     name: unknown.name,
                     written: "@",
@@ -99,26 +103,8 @@ pub fn validate_core(doc: &File, bindings: &Bindings, errors: &mut Vec<Diagnosti
         }
     });
 
-    tomet_tree::for_each_declaration(doc, |declaration| {
-        // A declaration is held to `std` alone: it is spelled `::`, so it is not
-        // looked up in the vocabularies in scope. A retired plural (`::fields`) is not unknown: it
-        // is reported as retired, with the name to write instead, by `check_document_declarations`.
-        let head = declaration.name.to_string();
-        if tomet_declaration::DeclKind::retired(head.split('.').next().unwrap_or_default())
-            .is_some()
-        {
-            return;
-        }
-        if let Err(unknown) = tomet_semantics::classify_declaration(declaration) {
-            errors.push(Diagnostic::UnknownElement {
-                name: unknown.name,
-                unbound_namespace: unknown.unbound_namespace,
-                span: declaration.span,
-            });
-        }
-    });
-
-    check_singletons_and_regions(doc, bindings, errors);
+    check_header(&doc.header, bindings, Host::Tmt, errors);
+    check_singletons(doc, bindings, errors);
     check_document_declarations(doc, errors);
     check_vocabulary_params(doc, errors);
     check_type_seats(doc, errors);
@@ -140,92 +126,129 @@ pub fn validate_core(doc: &File, bindings: &Bindings, errors: &mut Vec<Diagnosti
     }
 }
 
-/// Enforces the `singleton` and `region` axes.
-pub fn check_singletons_and_regions(doc: &File, bindings: &Bindings, errors: &mut Vec<Diagnostic>) {
-    use tomet_ast::{Block, Inline};
-    use tomet_semantics::Region;
-
-    /// What the validator holds an element to.
-    struct Held {
-        name: String,
-        singleton: bool,
-        declared: Option<Region>,
-        document: bool,
+/// Holds the attributes a header writes (`::name(...)`, in a `.tmt` document or a `.ctmt` file
+/// alike) to the attribute tables in scope.
+///
+/// A name is looked up as an attribute: a standard declaration, or an entry of the `::attribute`
+/// table of the document's `::kind` (bare) or of a namespace in scope. A name found nowhere is an
+/// [`Diagnostic::UnknownAttribute`]; one that is an element is a [`Diagnostic::WrongSigil`]. A
+/// vocabulary's attribute is then held to what its entry declares: `host:` (where it may be
+/// written), `singleton:` and `args:`. The standard declarations are checked, and counted, by
+/// [`check_document_declarations`] and [`check_ctmt_declarations`].
+///
+/// A retired plural (`::fields`) is not unknown: it is reported as retired, with the name to
+/// write instead, by those two.
+///
+/// A dotted name is namespaced, as an element's is: `::catasto.upstream` is the attribute
+/// `upstream` of the vocabulary the document writes `catasto` for, and `::std.kind` is `::kind`.
+/// A singleton is counted by what it resolves to, not by how it is written. The `::use`
+/// declarations are held to [`tomet_semantics::use_problems`].
+pub fn check_header(
+    header: &[tomet_ast::Declaration],
+    bindings: &Bindings,
+    host: Host,
+    errors: &mut Vec<Diagnostic>,
+) {
+    for (idx, problem) in tomet_semantics::use_problems(header) {
+        let first = match &problem {
+            tomet_semantics::UseProblem::UsedTwice { first, .. } => Some(header[*first].span),
+            _ => None,
+        };
+        errors.push(Diagnostic::InvalidUse {
+            reason: problem.to_string(),
+            first,
+            span: header[idx].span,
+        });
     }
-
-    let constraints = |node: Node<'_>| -> Option<Held> {
-        let (name, document, classified) = match node {
-            Node::Declaration(d) => (&d.name, true, tomet_semantics::classify_declaration(d)),
-            other => {
-                let view = other.element_view()?;
-                (view.name, false, classify_in(view, bindings))
+    let mut seen: Vec<(String, Span)> = Vec::new();
+    for declaration in header {
+        let name = &declaration.name;
+        let span = declaration.span;
+        let head = name.to_string();
+        if tomet_semantics::is_written_in_std(name) && DeclKind::retired(&name.name).is_some() {
+            continue;
+        }
+        let resolved = match bindings.classify_attribute(name) {
+            Ok(kind) => kind,
+            Err(unknown) => {
+                errors.push(if unknown.wrong_sigil {
+                    Diagnostic::WrongSigil {
+                        name: unknown.name,
+                        written: "::",
+                        expected: "@",
+                        span,
+                    }
+                } else {
+                    Diagnostic::UnknownAttribute {
+                        name: unknown.name,
+                        unbound_namespace: unknown.unbound_namespace,
+                        span,
+                    }
+                });
+                continue;
             }
         };
-        let (singleton, declared) = match classified {
-            Ok(kind) => match bindings.declaration(name) {
-                Some(decl) => (decl.singleton, Some(decl.region)),
-                None => (
-                    false, // Standard declarations are counted in one place by `check_declarations`
-                    Some(tomet_semantics::builtin_region(&kind)),
-                ),
-            },
-            // a name nothing declares: reported as unknown elsewhere
-            Err(_) if document => (false, None),
-            Err(_) => return None,
+        let Some(attribute) = bindings.attribute(name) else {
+            continue;
         };
-        Some(Held {
-            name: name.to_string(),
-            singleton,
-            declared,
-            document,
-        })
-    };
+        if !attribute.host.allows(host) {
+            errors.push(Diagnostic::NotForThisHost {
+                declaration: head,
+                only_in: attribute.host.files(),
+                span,
+            });
+            continue;
+        }
+        if attribute.singleton {
+            let identity = resolved.as_str().to_string();
+            if let Some((_, first)) = seen.iter().find(|(seen, _)| *seen == identity) {
+                errors.push(Diagnostic::DuplicateSingleton {
+                    name: head.clone(),
+                    first: *first,
+                    duplicate: span,
+                });
+            } else {
+                seen.push((identity, span));
+            }
+        }
+        if !attribute.params.is_empty() {
+            let args = tomet_semantics::declaration_args_view_in(declaration, bindings);
+            check_params_of(&head, &attribute.params, args.as_ref(), span, errors);
+        }
+    }
+}
+
+/// Enforces `singleton` on the elements of the body: a vocabulary's element declared
+/// `singleton: true` may be written once. The attributes of the header are counted by
+/// [`check_header`].
+pub fn check_singletons(doc: &File, bindings: &Bindings, errors: &mut Vec<Diagnostic>) {
+    use tomet_ast::{Block, Inline};
 
     let mut seen: Vec<(String, Span)> = Vec::new();
 
     let mut visit = |node: Node<'_>| {
         let span = node.span().unwrap_or_default();
-        let Some(Held {
-            name,
-            singleton,
-            declared,
-            document,
-        }) = constraints(node)
-        else {
+        let Some(view) = node.element_view() else {
             return;
         };
-        if document && declared == Some(Region::Body) {
-            errors.push(Diagnostic::WrongSigil {
-                name: name.clone(),
-                written: "::",
-                expected: "@",
-                span,
-            });
+        if classify_in(view, bindings).is_err() {
+            // a name nothing declares: reported as unknown elsewhere
+            return;
         }
-        if !document && declared == Some(Region::Preamble) {
-            errors.push(Diagnostic::WrongSigil {
-                name: name.clone(),
-                written: "@",
-                expected: "::",
-                span,
-            });
+        if !bindings.declaration(view.name).is_some_and(|d| d.singleton) {
+            return;
         }
-        if singleton {
-            if let Some((_, first)) = seen.iter().find(|(seen_name, _)| *seen_name == name) {
-                errors.push(Diagnostic::DuplicateSingleton {
-                    name: name.clone(),
-                    first: *first,
-                    duplicate: span,
-                });
-            } else {
-                seen.push((name.clone(), span));
-            }
+        let name = view.name.to_string();
+        if let Some((_, first)) = seen.iter().find(|(seen_name, _)| *seen_name == name) {
+            errors.push(Diagnostic::DuplicateSingleton {
+                name,
+                first: *first,
+                duplicate: span,
+            });
+        } else {
+            seen.push((name, span));
         }
     };
-
-    for decl in &doc.header {
-        visit(Node::Declaration(decl));
-    }
 
     for block in &doc.body {
         match block {
@@ -317,22 +340,13 @@ pub fn check_arguments(doc: &File, bindings: &Bindings, errors: &mut Vec<Diagnos
             errors,
         );
     });
-    for declaration in &doc.header {
-        check_arguments_of(
-            &declaration.name,
-            tomet_semantics::declaration_args_view_in(declaration, bindings),
-            declaration.span,
-            bindings,
-            errors,
-        );
-    }
     tomet_tree::for_each_call(doc, |head, args, span| {
         check_call(head, args, span, bindings, errors);
     });
 }
 
-/// The arguments written for `name` (viewed through the slots it has),
-/// held to the parameters a vocabulary in scope declares for it.
+/// The arguments written for the element `name` (viewed through the slots it has),
+/// held to the parameters the `::element` entry in scope declares for it.
 fn check_arguments_of(
     name: &tomet_ast::Name,
     args: Option<tomet_semantics::TupleView<'_, '_>>,
@@ -458,6 +472,7 @@ fn check_params_of(
             }
             CallError::NotACall
             | CallError::WrongNamespace { .. }
+            | CallError::UnboundNamespace { .. }
             | CallError::UnknownConstructor { .. } => {}
         }
     }
@@ -466,7 +481,7 @@ fn check_params_of(
 /// Runs checks on the standard declarations in `doc`, mapping each [`tomet_declaration::Problem`]
 /// back to a [`Diagnostic`] with the declaration element's span.
 pub fn check_document_declarations(doc: &File, errors: &mut Vec<Diagnostic>) {
-    use tomet_declaration::{Declaration, Host, Problem, check_declarations};
+    use tomet_declaration::{Declaration, Problem, check_declarations};
 
     // Every declaration written, not only the standard ones: a retired spelling is reported by
     // what it was, and the check skips a name that is nobody's.
@@ -497,8 +512,12 @@ pub fn check_document_declarations(doc: &File, errors: &mut Vec<Diagnostic>) {
                     span,
                 });
             }
-            Problem::NotForThisHost { declaration } => {
-                errors.push(Diagnostic::NotForThisHost { declaration, span });
+            Problem::NotForThisHost { declaration, scope } => {
+                errors.push(Diagnostic::NotForThisHost {
+                    declaration: declaration.to_string(),
+                    only_in: scope.files(),
+                    span,
+                });
             }
             Problem::Repeated { declaration, first } => {
                 errors.push(Diagnostic::DuplicateSingleton {
@@ -515,9 +534,6 @@ pub fn check_document_declarations(doc: &File, errors: &mut Vec<Diagnostic>) {
             }
             Problem::ExpectedEntries { declaration } => {
                 errors.push(Diagnostic::ExpectedEntries { declaration, span });
-            }
-            Problem::UnexpectedPath { declaration } => {
-                errors.push(Diagnostic::UnexpectedDeclarationPath { declaration, span });
             }
             Problem::UnexpectedProse {
                 declaration,
@@ -553,21 +569,25 @@ impl Declared {
     }
 }
 
-/// Validates declarations from a `.ctmt` file header against [`tomet_declaration::Host::Ctmt`].
+/// Validates the standard declarations of a `.ctmt` file header against
+/// [`tomet_declaration::Host::Ctmt`].
 ///
 /// Reports host restrictions, duplicate singletons, version format errors,
-/// too many arguments, and invalid macro/var definitions. Declarations whose
-/// names are not standard are ignored (their meaning belongs to the tool that
-/// reads the file).
+/// too many arguments, and invalid macro/var definitions. Names that are not standard are
+/// [`check_header`]'s: a vocabulary's attribute, or unknown.
 pub fn check_ctmt_declarations(declarations: &[Declared], errors: &mut Vec<Diagnostic>) {
-    use tomet_declaration::{Host, Problem, check_declarations};
+    use tomet_declaration::{Problem, check_declarations};
 
     let decls: Vec<_> = declarations.iter().map(|d| d.declaration.clone()).collect();
     for (idx, problem) in check_declarations(&decls, Host::Ctmt) {
         let span = declarations[idx].span;
         match problem {
-            Problem::NotForThisHost { declaration } => {
-                errors.push(Diagnostic::NotForThisHost { declaration, span });
+            Problem::NotForThisHost { declaration, scope } => {
+                errors.push(Diagnostic::NotForThisHost {
+                    declaration: declaration.to_string(),
+                    only_in: scope.files(),
+                    span,
+                });
             }
             Problem::Repeated { declaration, first } => {
                 errors.push(Diagnostic::DuplicateSingleton {
@@ -584,9 +604,6 @@ pub fn check_ctmt_declarations(declarations: &[Declared], errors: &mut Vec<Diagn
             }
             Problem::ExpectedEntries { declaration } => {
                 errors.push(Diagnostic::ExpectedEntries { declaration, span });
-            }
-            Problem::UnexpectedPath { declaration } => {
-                errors.push(Diagnostic::UnexpectedDeclarationPath { declaration, span });
             }
             Problem::UnexpectedProse {
                 declaration,
@@ -701,41 +718,17 @@ fn for_each_direct_content_item<'a>(content: &'a [Block], mut f: impl FnMut(Elem
     }
 }
 
-/// Checks how a vocabulary document declares its parameters and constructors: a `type:` that names
-/// no type, a `default:` that is not of its `type:`, and invalid `::constructor` fields. The same
-/// findings are reported where a vault reads the vocabulary ([`tomet_semantics::LoadedVocabularies`]);
-/// this is for checking the vocabulary file itself.
+/// Checks how a vocabulary document declares the entries of its `::element`, `::attribute` and
+/// `::constructor` tables: a field the table does not have, a value a field cannot take, a
+/// `type:` that names no type, a `default:` that is not of its `type:`
+/// ([`tomet_semantics::entry_problems_in`]). The same findings are reported where a vault reads
+/// the vocabulary ([`tomet_semantics::LoadedVocabularies`]); this is for checking the vocabulary
+/// file itself.
 pub fn check_vocabulary_params(doc: &File, errors: &mut Vec<Diagnostic>) {
-    use tomet_semantics::{
-        ElementKind, Vocabulary, classify_declaration_lenient, constructor_problems_in,
-    };
-
-    for (span, problem) in constructor_problems_in(doc) {
+    for (span, problem) in tomet_semantics::entry_problems_in(doc) {
         errors.push(Diagnostic::InvalidDefinition {
-            declaration: "constructor",
+            declaration: problem.table.name(),
             name: problem.name,
-            reason: problem.reason,
-            span,
-        });
-    }
-
-    let Some(vocab) = Vocabulary::from_file(doc) else {
-        return;
-    };
-    let mut elements_span = None;
-    for declaration in &doc.header {
-        if elements_span.is_none()
-            && classify_declaration_lenient(declaration)
-                == ElementKind::Declaration(DeclKind::Element)
-        {
-            elements_span = Some(declaration.span);
-        }
-    }
-    let Some(span) = elements_span else { return };
-    for problem in vocab.param_problems() {
-        errors.push(Diagnostic::InvalidDefinition {
-            declaration: "element",
-            name: format!("{}.{}", problem.element, problem.param),
             reason: problem.reason,
             span,
         });

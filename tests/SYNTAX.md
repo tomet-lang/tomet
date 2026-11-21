@@ -96,7 +96,7 @@ Block  @memo
 検証:
 
 ```
-unknown element `memo`: only `std` and this document's own `::kind` may be written bare; namespace it (`ns.memo`), or declare the vocabulary that has it and bind it with `::use`
+unknown element `memo`: only `std` and this document's own `::kind` may be written bare; namespace it (`@ns.memo`), or declare the vocabulary that has it and bind it with `::use`
 ```
 
 ### `(args)` `[content]` `{value}` は各1個まで、順不同。ただし `(args)` か `[content]` のどちらかは要る（下の「ネクサスと主グループ」）
@@ -118,7 +118,7 @@ Block  @memo
 検証:
 
 ```
-unknown element `memo`: only `std` and this document's own `::kind` may be written bare; namespace it (`ns.memo`), or declare the vocabulary that has it and bind it with `::use`
+unknown element `memo`: only `std` and this document's own `::kind` may be written bare; namespace it (`@ns.memo`), or declare the vocabulary that has it and bind it with `::use`
 ```
 
 ### 順序を入れ替えても同じ木になる
@@ -138,7 +138,7 @@ Block  @memo
 検証:
 
 ```
-unknown element `memo`: only `std` and this document's own `::kind` may be written bare; namespace it (`ns.memo`), or declare the vocabulary that has it and bind it with `::use`
+unknown element `memo`: only `std` and this document's own `::kind` may be written bare; namespace it (`@ns.memo`), or declare the vocabulary that has it and bind it with `::use`
 ```
 
 ### `.` 区切りの名前空間
@@ -347,7 +347,7 @@ Block  @memo
 検証:
 
 ```
-unknown element `memo`: only `std` and this document's own `::kind` may be written bare; namespace it (`ns.memo`), or declare the vocabulary that has it and bind it with `::use`
+unknown element `memo`: only `std` and this document's own `::kind` may be written bare; namespace it (`@ns.memo`), or declare the vocabulary that has it and bind it with `::use`
 ```
 
 ### 本文に backtick の行があるときは長い走りで囲む
@@ -373,7 +373,7 @@ Block  @memo
 検証:
 
 ```
-unknown element `memo`: only `std` and this document's own `::kind` may be written bare; namespace it (`ns.memo`), or declare the vocabulary that has it and bind it with `::use`
+unknown element `memo`: only `std` and this document's own `::kind` may be written bare; namespace it (`@ns.memo`), or declare the vocabulary that has it and bind it with `::use`
 ```
 
 ### `{$ ... }` は展開されず逐語で残る
@@ -398,7 +398,7 @@ Declaration ::config
 検証:
 
 ```
-unknown element `config`: only `std` and this document's own `::kind` may be written bare; namespace it (`ns.config`), or declare the vocabulary that has it and bind it with `::use`
+unknown attribute `config`: only `std` and this document's own `::kind` may be written bare; namespace it (`::ns.config`), or declare the vocabulary that has it and bind it with `::use`
 ```
 
 ## ネクサスと主グループ
@@ -417,7 +417,7 @@ Block  @memo
 検証:
 
 ```
-unknown element `memo`: only `std` and this document's own `::kind` may be written bare; namespace it (`ns.memo`), or declare the vocabulary that has it and bind it with `::use`
+unknown element `memo`: only `std` and this document's own `::kind` may be written bare; namespace it (`@ns.memo`), or declare the vocabulary that has it and bind it with `::use`
 ```
 
 ### `[content]` だけでもよい
@@ -436,7 +436,7 @@ Block  @memo
 検証:
 
 ```
-unknown element `memo`: only `std` and this document's own `::kind` may be written bare; namespace it (`ns.memo`), or declare the vocabulary that has it and bind it with `::use`
+unknown element `memo`: only `std` and this document's own `::kind` may be written bare; namespace it (`@ns.memo`), or declare the vocabulary that has it and bind it with `::use`
 ```
 
 ### 付加のグループは主グループのあとに付く
@@ -456,7 +456,7 @@ Block  @memo
 検証:
 
 ```
-unknown element `memo`: only `std` and this document's own `::kind` may be written bare; namespace it (`ns.memo`), or declare the vocabulary that has it and bind it with `::use`
+unknown element `memo`: only `std` and this document's own `::kind` may be written bare; namespace it (`@ns.memo`), or declare the vocabulary that has it and bind it with `::use`
 ```
 
 ### 主グループは付加のグループのあとでもよい。要るのは、どこかに一つあること
@@ -475,7 +475,7 @@ Block  @memo
 検証:
 
 ```
-unknown element `memo`: only `std` and this document's own `::kind` may be written bare; namespace it (`ns.memo`), or declare the vocabulary that has it and bind it with `::use`
+unknown element `memo`: only `std` and this document's own `::kind` may be written bare; namespace it (`@ns.memo`), or declare the vocabulary that has it and bind it with `::use`
 ```
 
 ### `|` の連なりも主グループ。`@table` だけの行でも、次の行の `|` が主グループになる。`()` `[]` の無い、唯一の要素の書き方
@@ -517,8 +517,8 @@ List ordered=false
 検証:
 
 ```
-unknown element `memo`: only `std` and this document's own `::kind` may be written bare; namespace it (`ns.memo`), or declare the vocabulary that has it and bind it with `::use`
-unknown element `memo`: only `std` and this document's own `::kind` may be written bare; namespace it (`ns.memo`), or declare the vocabulary that has it and bind it with `::use`
+unknown element `memo`: only `std` and this document's own `::kind` may be written bare; namespace it (`@ns.memo`), or declare the vocabulary that has it and bind it with `::use`
+unknown element `memo`: only `std` and this document's own `::kind` may be written bare; namespace it (`@ns.memo`), or declare the vocabulary that has it and bind it with `::use`
 ```
 
 ### 名前のないコネクト `::{...}` `::(...)` は、付いた先（項目・見出し・要素）のデータに入る。`{...}` が単独で置ける唯一の場所
@@ -591,7 +591,7 @@ Block  @memo
 検証:
 
 ```
-unknown element `memo`: only `std` and this document's own `::kind` may be written bare; namespace it (`ns.memo`), or declare the vocabulary that has it and bind it with `::use`
+unknown element `memo`: only `std` and this document's own `::kind` may be written bare; namespace it (`@ns.memo`), or declare the vocabulary that has it and bind it with `::use`
 ```
 
 ### 空のグループ
@@ -609,7 +609,7 @@ Block  @memo
 検証:
 
 ```
-unknown element `memo`: only `std` and this document's own `::kind` may be written bare; namespace it (`ns.memo`), or declare the vocabulary that has it and bind it with `::use`
+unknown element `memo`: only `std` and this document's own `::kind` may be written bare; namespace it (`@ns.memo`), or declare the vocabulary that has it and bind it with `::use`
 ```
 
 ### 引用符つきのキー。パスや空白を含むキーはこう書く。引用符つきの文字列は、直後に `:` があるときだけキーになる
@@ -629,7 +629,7 @@ Block  @memo
 検証:
 
 ```
-unknown element `memo`: only `std` and this document's own `::kind` may be written bare; namespace it (`ns.memo`), or declare the vocabulary that has it and bind it with `::use`
+unknown element `memo`: only `std` and this document's own `::kind` may be written bare; namespace it (`@ns.memo`), or declare the vocabulary that has it and bind it with `::use`
 ```
 
 ## `(args)` と値の文法
@@ -648,7 +648,7 @@ Block  @memo
 検証:
 
 ```
-unknown element `memo`: only `std` and this document's own `::kind` may be written bare; namespace it (`ns.memo`), or declare the vocabulary that has it and bind it with `::use`
+unknown element `memo`: only `std` and this document's own `::kind` may be written bare; namespace it (`@ns.memo`), or declare the vocabulary that has it and bind it with `::use`
 ```
 
 ### 位置引数（キーなし）
@@ -676,7 +676,7 @@ Block  @memo
 検証:
 
 ```
-unknown element `memo`: only `std` and this document's own `::kind` may be written bare; namespace it (`ns.memo`), or declare the vocabulary that has it and bind it with `::use`
+unknown element `memo`: only `std` and this document's own `::kind` may be written bare; namespace it (`@ns.memo`), or declare the vocabulary that has it and bind it with `::use`
 ```
 
 ### 空の列と一要素の列。値に中置演算はないので、括弧は何もまとめない。`(x)` はカンマがなくても一要素の列
@@ -693,7 +693,7 @@ Block  @memo
 検証:
 
 ```
-unknown element `memo`: only `std` and this document's own `::kind` may be written bare; namespace it (`ns.memo`), or declare the vocabulary that has it and bind it with `::use`
+unknown element `memo`: only `std` and this document's own `::kind` may be written bare; namespace it (`@ns.memo`), or declare the vocabulary that has it and bind it with `::use`
 ```
 
 ### 入れ子の列
@@ -710,7 +710,7 @@ Block  @memo
 検証:
 
 ```
-unknown element `memo`: only `std` and this document's own `::kind` may be written bare; namespace it (`ns.memo`), or declare the vocabulary that has it and bind it with `::use`
+unknown element `memo`: only `std` and this document's own `::kind` may be written bare; namespace it (`@ns.memo`), or declare the vocabulary that has it and bind it with `::use`
 ```
 
 ### 型の `list(string)` は列ではなく呼び出しのまま残る
@@ -738,7 +738,7 @@ Block  @memo
 検証:
 
 ```
-unknown element `memo`: only `std` and this document's own `::kind` may be written bare; namespace it (`ns.memo`), or declare the vocabulary that has it and bind it with `::use`
+unknown element `memo`: only `std` and this document's own `::kind` may be written bare; namespace it (`@ns.memo`), or declare the vocabulary that has it and bind it with `::use`
 ```
 
 ### 値位置の `{...}` はエラー。`(k: v)` を書く
@@ -772,7 +772,7 @@ Block  @memo
 検証:
 
 ```
-unknown element `memo`: only `std` and this document's own `::kind` may be written bare; namespace it (`ns.memo`), or declare the vocabulary that has it and bind it with `::use`
+unknown element `memo`: only `std` and this document's own `::kind` may be written bare; namespace it (`@ns.memo`), or declare the vocabulary that has it and bind it with `::use`
 ```
 
 ### 引用符つき文字列
@@ -789,7 +789,7 @@ Block  @memo
 検証:
 
 ```
-unknown element `memo`: only `std` and this document's own `::kind` may be written bare; namespace it (`ns.memo`), or declare the vocabulary that has it and bind it with `::use`
+unknown element `memo`: only `std` and this document's own `::kind` may be written bare; namespace it (`@ns.memo`), or declare the vocabulary that has it and bind it with `::use`
 ```
 
 ### 引用符つきのキー
@@ -806,7 +806,7 @@ Block  @memo
 検証:
 
 ```
-unknown element `memo`: only `std` and this document's own `::kind` may be written bare; namespace it (`ns.memo`), or declare the vocabulary that has it and bind it with `::use`
+unknown element `memo`: only `std` and this document's own `::kind` may be written bare; namespace it (`@ns.memo`), or declare the vocabulary that has it and bind it with `::use`
 ```
 
 ### スカラーは型が推論される
@@ -823,7 +823,7 @@ Block  @memo
 検証:
 
 ```
-unknown element `memo`: only `std` and this document's own `::kind` may be written bare; namespace it (`ns.memo`), or declare the vocabulary that has it and bind it with `::use`
+unknown element `memo`: only `std` and this document's own `::kind` may be written bare; namespace it (`@ns.memo`), or declare the vocabulary that has it and bind it with `::use`
 ```
 
 ### 同じ種類のグループを続けて書くとエラー。`:` を前に置けば、既にあるほうへマージされる
@@ -852,7 +852,7 @@ Paragraph
 検証:
 
 ```
-unknown element `memo`: only `std` and this document's own `::kind` may be written bare; namespace it (`ns.memo`), or declare the vocabulary that has it and bind it with `::use`
+unknown element `memo`: only `std` and this document's own `::kind` may be written bare; namespace it (`@ns.memo`), or declare the vocabulary that has it and bind it with `::use`
 ```
 
 ## `|` で開く内容
@@ -1709,7 +1709,7 @@ Block  @memo
 検証:
 
 ```
-unknown element `memo`: only `std` and this document's own `::kind` may be written bare; namespace it (`ns.memo`), or declare the vocabulary that has it and bind it with `::use`
+unknown element `memo`: only `std` and this document's own `::kind` may be written bare; namespace it (`@ns.memo`), or declare the vocabulary that has it and bind it with `::use`
 `<$int>` is a type seat, and type seats belong in a blueprint (`::blueprint(...)`): a document made from one has none
 ```
 
@@ -1727,7 +1727,7 @@ Block  @memo
 検証:
 
 ```
-unknown element `memo`: only `std` and this document's own `::kind` may be written bare; namespace it (`ns.memo`), or declare the vocabulary that has it and bind it with `::use`
+unknown element `memo`: only `std` and this document's own `::kind` may be written bare; namespace it (`@ns.memo`), or declare the vocabulary that has it and bind it with `::use`
 `<$uuid(default: auto)>` is a type seat, and type seats belong in a blueprint (`::blueprint(...)`): a document made from one has none
 ```
 
@@ -1748,7 +1748,7 @@ Block  @memo
 検証:
 
 ```
-unknown element `memo`: only `std` and this document's own `::kind` may be written bare; namespace it (`ns.memo`), or declare the vocabulary that has it and bind it with `::use`
+unknown element `memo`: only `std` and this document's own `::kind` may be written bare; namespace it (`@ns.memo`), or declare the vocabulary that has it and bind it with `::use`
 `<$string>` is a type seat, and type seats belong in a blueprint (`::blueprint(...)`): a document made from one has none
 `<$string>` is a type seat, and type seats belong in a blueprint (`::blueprint(...)`): a document made from one has none
 `<$int>` is a type seat, and type seats belong in a blueprint (`::blueprint(...)`): a document made from one has none
@@ -1981,7 +1981,7 @@ Block  @section
 検証:
 
 ```
-unknown element `section`: only `std` and this document's own `::kind` may be written bare; namespace it (`ns.section`), or declare the vocabulary that has it and bind it with `::use`
+unknown element `section`: only `std` and this document's own `::kind` may be written bare; namespace it (`@ns.section`), or declare the vocabulary that has it and bind it with `::use`
 ```
 
 ### `::id(x)` は所有者の `#(x)`、`::meta(a: 1)` は `{a: 1}` を、そのまま書き下した形。どちらも `connects` には積まれず、所有者のidと値になる
@@ -2001,7 +2001,7 @@ Block  @x
 検証:
 
 ```
-unknown element `x`: only `std` and this document's own `::kind` may be written bare; namespace it (`ns.x`), or declare the vocabulary that has it and bind it with `::use`
+unknown element `x`: only `std` and this document's own `::kind` may be written bare; namespace it (`@ns.x`), or declare the vocabulary that has it and bind it with `::use`
 ```
 
 ### 複数のコネクトを重ねられる。それぞれ独立した `connects` の要素になる
@@ -2024,7 +2024,7 @@ Block  @x
 検証:
 
 ```
-unknown element `x`: only `std` and this document's own `::kind` may be written bare; namespace it (`ns.x`), or declare the vocabulary that has it and bind it with `::use`
+unknown element `x`: only `std` and this document's own `::kind` may be written bare; namespace it (`@ns.x`), or declare the vocabulary that has it and bind it with `::use`
 unknown connect `:as`; only a closed set may follow `:` (currently: rule)
 ```
 
@@ -2042,7 +2042,7 @@ Block  @x
 検証:
 
 ```
-unknown element `x`: only `std` and this document's own `::kind` may be written bare; namespace it (`ns.x`), or declare the vocabulary that has it and bind it with `::use`
+unknown element `x`: only `std` and this document's own `::kind` may be written bare; namespace it (`@ns.x`), or declare the vocabulary that has it and bind it with `::use`
 ```
 
 ### リスト項目・見出しの糖衣形でも bare connect が使える。`::()`/`::{}`はどちらが先でもよく、両方書いても一つの `:` で足りる
@@ -2323,7 +2323,7 @@ Declaration ::x
 検証:
 
 ```
-unknown element `x`: only `std` and this document's own `::kind` may be written bare; namespace it (`ns.x`), or declare the vocabulary that has it and bind it with `::use`
+unknown attribute `x`: only `std` and this document's own `::kind` may be written bare; namespace it (`::ns.x`), or declare the vocabulary that has it and bind it with `::use`
 ```
 
 ### `{...}` だけを取っていた12個の宣言は `(...)` を取る: `meta` `macros` `format` `fields` `workspace` `export` `blueprints` `vocabularies` `dictionaries` `migration` `vars` `elements`。`::meta{ ... }` はもう書けない（下の「主グループの無いネクサス」）
@@ -2736,7 +2736,7 @@ Block  @memo
 検証:
 
 ```
-unknown element `memo`: only `std` and this document's own `::kind` may be written bare; namespace it (`ns.memo`), or declare the vocabulary that has it and bind it with `::use`
+unknown element `memo`: only `std` and this document's own `::kind` may be written bare; namespace it (`@ns.memo`), or declare the vocabulary that has it and bind it with `::use`
 ```
 
 > **パースは通る。** 上が実際の結果。
@@ -2788,7 +2788,7 @@ Block  @memo
 検証:
 
 ```
-unknown element `memo`: only `std` and this document's own `::kind` may be written bare; namespace it (`ns.memo`), or declare the vocabulary that has it and bind it with `::use`
+unknown element `memo`: only `std` and this document's own `::kind` may be written bare; namespace it (`@ns.memo`), or declare the vocabulary that has it and bind it with `::use`
 ```
 
 > **パースは通る。** 上が実際の結果。
@@ -2850,7 +2850,7 @@ Block  @id
 検証:
 
 ```
-`id` is written `@id`, but it is content, not a declaration about the document: write `::id`
+`id` is an attribute, about the document: write `::id`, not `@id`
 ```
 
 > **パースは通る。** 上が実際の結果。
@@ -2879,7 +2879,7 @@ Block  @memo
 検証:
 
 ```
-unknown element `memo`: only `std` and this document's own `::kind` may be written bare; namespace it (`ns.memo`), or declare the vocabulary that has it and bind it with `::use`
+unknown element `memo`: only `std` and this document's own `::kind` may be written bare; namespace it (`@ns.memo`), or declare the vocabulary that has it and bind it with `::use`
 ```
 
 > **パースは通る。** 上が実際の結果。

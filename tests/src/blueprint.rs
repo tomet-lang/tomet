@@ -150,11 +150,11 @@ Reviewed on <$date(default: auto)>.
     );
 
     // 6. Test converters (HTML, Markdown, Typst ignore ::blueprint)
-    let html_out = tomet_html::render_body(&blueprint_ast);
+    let html_out = tomet_html::render_body(&blueprint_ast, &tomet_tests::carried(&blueprint_ast));
     assert!(!html_out.contains("blueprint"));
-    let md_out = tomet_markdown::to_markdown(&blueprint_ast);
+    let md_out = tomet_markdown::to_markdown(&blueprint_ast, &tomet_tests::carried(&blueprint_ast));
     assert!(!md_out.contains("blueprint"));
-    let typst_out = tomet_typst::to_typst(&blueprint_ast);
+    let typst_out = tomet_typst::to_typst(&blueprint_ast, &tomet_tests::carried(&blueprint_ast));
     assert!(!typst_out.contains("blueprint"));
 }
 

@@ -5,7 +5,7 @@
 ///
 /// Closed on purpose. The standard declarations are the language's own, and a host matches on
 /// this to do what only it knows (a `.tmt` binds a vocabulary for `Use`, a vault reads `Workspace`);
-/// a user's own preamble element is a vocabulary's, and is not here.
+/// a vocabulary's own `::name` is an entry of its `::attribute` table, and is not here.
 ///
 /// Every name is singular. A declaration is a node of the document's tree: `::field` is the
 /// `field` node, and the fields it holds are its children, written grouped under the parent
@@ -60,8 +60,12 @@ pub enum DeclKind {
     Var,
     /// `::use(ns, 3)`: brings a vocabulary into scope.
     Use,
-    /// `::element(name: (display: block, about: "about"))`: an element a vocabulary declares.
+    /// `::element(name: (display: block, about: "about"))`: the `@name` elements a vocabulary
+    /// declares.
     Element,
+    /// `::attribute(name: (singleton: true, about: "about"))`: the `::name` attributes a vocabulary
+    /// declares -- what a document says about itself in the vocabulary's terms.
+    Attribute,
     /// `::constructor(name: (about: "about", args: (...)))`: a constructor a vocabulary declares.
     Constructor,
 }
@@ -87,6 +91,9 @@ pub enum Scope {
     /// This is data, not structure. Opening a declaration to `.ctmt` is a change of this value
     /// and of nothing else.
     Tmt,
+    /// In a `.ctmt` file only. No standard declaration has it; a vocabulary's attribute does when
+    /// it declares `host: ctmt`.
+    Ctmt,
 }
 
 /// A document the declarations are written in.
@@ -104,6 +111,17 @@ impl Scope {
         match self {
             Scope::Both => true,
             Scope::Tmt => host == Host::Tmt,
+            Scope::Ctmt => host == Host::Ctmt,
+        }
+    }
+
+    /// The files a declaration of this scope may be written in, as a message names them:
+    /// "a `.ctmt` file".
+    pub fn files(self) -> &'static str {
+        match self {
+            Scope::Both => "a `.tmt` document or a `.ctmt` file",
+            Scope::Tmt => "a `.tmt` document",
+            Scope::Ctmt => "a `.ctmt` file",
         }
     }
 }
@@ -177,7 +195,7 @@ const fn spec(
 }
 
 /// Every standard declaration, in the order they are listed to people.
-const SPECS: [Spec; 18] = [
+const SPECS: [Spec; 19] = [
     Spec {
         // The second slot is the version of that kind's definition, a `version`, and may be
         // left out. The validator checks the value; nothing reads it yet.
@@ -342,6 +360,13 @@ const SPECS: [Spec; 18] = [
         Shape::Entries,
     ),
     spec(
+        DeclKind::Attribute,
+        "attribute",
+        Cardinality::Many,
+        Scope::Tmt,
+        Shape::Entries,
+    ),
+    spec(
         DeclKind::Constructor,
         "constructor",
         Cardinality::Many,
@@ -363,7 +388,7 @@ const RETIRED: [(&str, DeclKind); 7] = [
 
 impl DeclKind {
     /// Every standard declaration.
-    pub const ALL: [DeclKind; 18] = [
+    pub const ALL: [DeclKind; 19] = [
         DeclKind::Kind,
         DeclKind::Id,
         DeclKind::Version,
@@ -381,6 +406,7 @@ impl DeclKind {
         DeclKind::Var,
         DeclKind::Use,
         DeclKind::Element,
+        DeclKind::Attribute,
         DeclKind::Constructor,
     ];
 
@@ -434,9 +460,11 @@ impl DeclKind {
     /// What a trailing `[...]` on this declaration, written with a path, becomes.
     pub fn prose(self) -> Prose {
         match self {
-            DeclKind::Field | DeclKind::Var | DeclKind::Element | DeclKind::Constructor => {
-                Prose::About
-            }
+            DeclKind::Field
+            | DeclKind::Var
+            | DeclKind::Element
+            | DeclKind::Attribute
+            | DeclKind::Constructor => Prose::About,
             DeclKind::Macro => Prose::Value,
             _ => Prose::None,
         }
@@ -567,6 +595,7 @@ mod tests {
         assert_eq!(DeclKind::Field.prose(), Prose::About);
         assert_eq!(DeclKind::Var.prose(), Prose::About);
         assert_eq!(DeclKind::Element.prose(), Prose::About);
+        assert_eq!(DeclKind::Attribute.prose(), Prose::About);
         assert_eq!(DeclKind::Constructor.prose(), Prose::About);
         assert_eq!(DeclKind::Macro.prose(), Prose::Value);
         assert_eq!(DeclKind::Meta.prose(), Prose::None);

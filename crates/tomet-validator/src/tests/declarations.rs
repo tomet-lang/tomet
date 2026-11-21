@@ -71,7 +71,7 @@ fn the_dissolved_config_and_settings_are_unknown_declarations() {
         assert!(
             errors.iter().any(|e| matches!(
                 e,
-                Diagnostic::UnknownElement { name: found, .. } if found == name
+                Diagnostic::UnknownAttribute { name: found, .. } if found == name
             )),
             "{name}: {errors:?}"
         );

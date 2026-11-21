@@ -6,7 +6,7 @@ use tomet_ast::{
 };
 use tomet_scalar::Scalar;
 use tomet_semantics::{
-    ElementKind, TableRow, classify_std_lenient, comment_text, element_args_view, flatten_data,
+    Bindings, ElementKind, TableRow, comment_text, element_args_view, flatten_data,
     flatten_element_data, heading_level, is_directive, link_target, parse_table_rows, path_target,
 };
 use tomet_tree::ValueExt;
@@ -16,6 +16,12 @@ use crate::ast::{
     PandocDoc, QuoteType, Row, RowHeadColumns, TableBody, TableFoot, TableHead, TableParts, Target,
 };
 
+/// What every writer below reads besides the node in front of it.
+struct PandocCtx<'a> {
+    /// The names the document has in scope, as its caller bound them.
+    bindings: &'a Bindings,
+}
+
 /// Converts a Tomet document to Pandoc's AST.
 ///
 /// `::meta` feeds Pandoc's document-level `meta` map rather than being
@@ -24,10 +30,17 @@ use crate::ast::{
 /// `::meta(title: x)` survives into every output format. The sibling
 /// writers have nowhere to put `::meta` and drop it; this is deliberately
 /// not symmetric with them.
-pub fn to_pandoc(doc: &File) -> PandocDoc {
+///
+/// `bindings` are the names `doc` has in scope (`Bindings` in `tomet-semantics`): an element is
+/// what its name resolves to there, so an aliased `@ng.node` gets the `tomet-node-graph.node`
+/// class an unaliased `@node-graph.node` gets. Whoever loaded the document builds them (a vault's
+/// `bindings`); a caller with no vault binds the vocabularies tomet carries
+/// (`LoadedVocabularies::default().bindings_for(doc)`).
+pub fn to_pandoc(doc: &File, bindings: &Bindings) -> PandocDoc {
+    let cx = &PandocCtx { bindings };
     let mut blocks = Vec::new();
     for block in &doc.body {
-        blocks.extend(block_to_pandoc(block));
+        blocks.extend(block_to_pandoc(cx, block));
     }
     let mut out = PandocDoc::new(blocks);
     if let Some(Value::Tuple(entries)) = tomet_declaration::document_meta(doc) {
@@ -106,10 +119,10 @@ fn meta_value(v: &Value) -> MetaValue {
 /// `::meta` line would leave an empty `Para` behind, the same trap the
 /// Markdown and HTML writers guard against.
 #[deny(clippy::wildcard_enum_match_arm)]
-fn block_to_pandoc(block: &TmBlock) -> Vec<Block> {
+fn block_to_pandoc(cx: &PandocCtx, block: &TmBlock) -> Vec<Block> {
     match block {
-        TmBlock::Paragraph(p) => content_to_blocks(&p.content),
-        TmBlock::Element(el) => element_to_blocks(el.as_view()),
+        TmBlock::Paragraph(p) => content_to_blocks(cx, &p.content),
+        TmBlock::Element(el) => element_to_blocks(cx, el.as_view()),
         TmBlock::Interp(interp) => vec![Block::Para(vec![interp_inline(interp)])],
         TmBlock::Hole(hole) => vec![Block::Para(vec![hole_inline(hole)])],
         TmBlock::TypeSeat(seat) => vec![Block::Para(vec![type_seat_inline(seat)])],
@@ -118,23 +131,23 @@ fn block_to_pandoc(block: &TmBlock) -> Vec<Block> {
                 vec![Block::Header(
                     sec.level.max(1) as i64,
                     section_attr(sec),
-                    inlines_to_pandoc(&sec.title),
+                    inlines_to_pandoc(cx, &sec.title),
                 )]
             } else {
                 Vec::new()
             };
             for child in &sec.blocks {
-                blocks.extend(block_to_pandoc(child));
+                blocks.extend(block_to_pandoc(cx, child));
             }
             blocks
         }
-        TmBlock::List(list) => vec![list_to_pandoc(list)],
+        TmBlock::List(list) => vec![list_to_pandoc(cx, list)],
     }
 }
 
 /// An element in block position.
-fn element_to_blocks(el: ElementView<'_>) -> Vec<Block> {
-    let kind = classify_std_lenient(el);
+fn element_to_blocks(cx: &PandocCtx, el: ElementView<'_>) -> Vec<Block> {
+    let kind = cx.bindings.classify_lenient(el.name);
     if is_directive(&kind) {
         return Vec::new();
     }
@@ -145,12 +158,15 @@ fn element_to_blocks(el: ElementView<'_>) -> Vec<Block> {
             // field -- emitting it again as an attribute would put a
             // `tomet-data` copy on every heading.
             attr_from_value(el, &[]),
-            content_to_inlines(el),
+            content_to_inlines(cx, el),
         )],
         "hr" => vec![Block::HorizontalRule],
         "raw" => vec![Block::CodeBlock(code_attr(el), content_to_plain_text(el))],
-        "quote" => vec![Block::BlockQuote(element_content_to_blocks(content_of(el)))],
-        "table" => table_to_pandoc(el),
+        "quote" => vec![Block::BlockQuote(element_content_to_blocks(
+            cx,
+            content_of(el),
+        ))],
+        "table" => table_to_pandoc(cx, el),
         // A path standing as a block is a listing row, so the
         // description goes beside the path rather than instead of it --
         // the same split the HTML/Markdown/Typst writers make. One
@@ -161,7 +177,7 @@ fn element_to_blocks(el: ElementView<'_>) -> Vec<Block> {
                 attr_from_value(el, &[]),
                 path_target(el, &kind).unwrap_or_default(),
             )];
-            let content = content_to_inlines(el);
+            let content = content_to_inlines(cx, el);
             if !content.is_empty() {
                 inlines.push(Inline::Space);
                 inlines.extend(content);
@@ -187,11 +203,11 @@ fn element_to_blocks(el: ElementView<'_>) -> Vec<Block> {
                 vec![
                     Block::Div(
                         Attr::with_class("tm-conflict-a"),
-                        element_content_to_blocks(&a),
+                        element_content_to_blocks(cx, &a),
                     ),
                     Block::Div(
                         Attr::with_class("tm-conflict-b"),
-                        element_content_to_blocks(&b),
+                        element_content_to_blocks(cx, &b),
                     ),
                 ],
             )]
@@ -201,31 +217,34 @@ fn element_to_blocks(el: ElementView<'_>) -> Vec<Block> {
         // It keeps its own mapping and gets wrapped, rather than falling
         // through to the generic `Div` and losing its link-ness.
         "em" | "strong" | "mark" | "link" | "embed" => {
-            vec![Block::Para(element_to_inlines(el))]
+            vec![Block::Para(element_to_inlines(cx, el))]
         }
         // Everything else -- including an inline-only kind that somehow
         // stands as a block -- becomes a `Div` carrying its data. The
         // class is what lets `from_pandoc` recognise it again.
-        _ => vec![Block::Div(generic_attr(el, &kind), element_body_blocks(el))],
+        _ => vec![Block::Div(
+            generic_attr(el, &kind),
+            element_body_blocks(cx, el),
+        )],
     }
 }
 
 /// An element in inline position.
-fn element_to_inlines(el: ElementView<'_>) -> Vec<Inline> {
-    let kind = classify_std_lenient(el);
+fn element_to_inlines(cx: &PandocCtx, el: ElementView<'_>) -> Vec<Inline> {
+    let kind = cx.bindings.classify_lenient(el.name);
     if is_directive(&kind) {
         return Vec::new();
     }
     match kind.as_str() {
-        "em" => vec![Inline::Emph(content_to_inlines(el))],
-        "strong" => vec![Inline::Strong(content_to_inlines(el))],
-        "strikeout" => vec![Inline::Strikeout(content_to_inlines(el))],
+        "em" => vec![Inline::Emph(content_to_inlines(cx, el))],
+        "strong" => vec![Inline::Strong(content_to_inlines(cx, el))],
+        "strikeout" => vec![Inline::Strikeout(content_to_inlines(cx, el))],
         // Pandoc has no mark node. A `Span` with the class keeps it
         // recognisable in both directions, and writers that understand
         // classes (HTML, docx) can style it.
         "mark" => vec![Inline::Span(
             Attr::with_class("mark"),
-            content_to_inlines(el),
+            content_to_inlines(cx, el),
         )],
         // Pandoc draws the same distinction Tomet draws by position:
         // `BlockQuote` above for one standing alone, `Quoted` here for
@@ -233,11 +252,11 @@ fn element_to_inlines(el: ElementView<'_>) -> Vec<Inline> {
         // quotation without a stated style is.
         "quote" => vec![Inline::Quoted(
             QuoteType::DoubleQuote,
-            content_to_inlines(el),
+            content_to_inlines(cx, el),
         )],
         "link" => vec![Inline::Link(
             attr_from_value(el, &[]),
-            content_to_inlines(el),
+            content_to_inlines(cx, el),
             Target::url(link_target(el, &kind).unwrap_or_default()),
         )],
         // A path is named, not navigated to: `Code`, not `Link`. Pandoc's
@@ -249,7 +268,7 @@ fn element_to_inlines(el: ElementView<'_>) -> Vec<Inline> {
         )],
         "embed" => vec![Inline::Image(
             attr_from_value(el, &[]),
-            content_to_inlines(el),
+            content_to_inlines(cx, el),
             Target::url(link_target(el, &kind).unwrap_or_default()),
         )],
         "raw" => vec![Inline::Code(code_attr(el), content_to_plain_text(el))],
@@ -268,18 +287,18 @@ fn element_to_inlines(el: ElementView<'_>) -> Vec<Inline> {
                 vec![
                     Inline::Span(
                         Attr::with_class("tm-conflict-a"),
-                        blocks_to_inlines_lossy(&a),
+                        blocks_to_inlines_lossy(cx, &a),
                     ),
                     Inline::Span(
                         Attr::with_class("tm-conflict-b"),
-                        blocks_to_inlines_lossy(&b),
+                        blocks_to_inlines_lossy(cx, &b),
                     ),
                 ],
             )]
         }
         _ => vec![Inline::Span(
             generic_attr(el, &kind),
-            content_to_inlines(el),
+            content_to_inlines(cx, el),
         )],
     }
 }
@@ -316,22 +335,22 @@ fn conflict_sides(el: ElementView<'_>) -> (Vec<TmBlock>, Vec<TmBlock>) {
 /// inlines join directly; anything else (a nested element, a section
 /// title) contributes what its own inline form would.
 #[deny(clippy::wildcard_enum_match_arm)]
-fn blocks_to_inlines_lossy(blocks: &[TmBlock]) -> Vec<Inline> {
+fn blocks_to_inlines_lossy(cx: &PandocCtx, blocks: &[TmBlock]) -> Vec<Inline> {
     let mut out = Vec::new();
     for (i, block) in blocks.iter().enumerate() {
         if i > 0 {
             out.push(Inline::LineBreak);
         }
         match block {
-            TmBlock::Paragraph(p) => out.extend(inlines_to_pandoc(&p.content)),
-            TmBlock::Element(el) => out.extend(element_to_inlines(el.as_view())),
+            TmBlock::Paragraph(p) => out.extend(inlines_to_pandoc(cx, &p.content)),
+            TmBlock::Element(el) => out.extend(element_to_inlines(cx, el.as_view())),
             TmBlock::Interp(interp) => out.push(interp_inline(interp)),
             TmBlock::Hole(hole) => out.push(hole_inline(hole)),
             TmBlock::TypeSeat(seat) => out.push(type_seat_inline(seat)),
-            TmBlock::Section(sec) => out.extend(inlines_to_pandoc(&sec.title)),
+            TmBlock::Section(sec) => out.extend(inlines_to_pandoc(cx, &sec.title)),
             TmBlock::List(list) => {
                 for item in &list.items {
-                    out.extend(blocks_to_inlines_lossy(&item.content));
+                    out.extend(blocks_to_inlines_lossy(cx, &item.content));
                 }
             }
         }
@@ -353,7 +372,7 @@ fn content_of(el: ElementView<'_>) -> &[TmBlock] {
 /// becomes its own Pandoc block, and the true inlines around it are
 /// gathered into `Para`.
 #[deny(clippy::wildcard_enum_match_arm)]
-fn content_to_blocks(inlines: &[TmInline]) -> Vec<Block> {
+fn content_to_blocks(cx: &PandocCtx, inlines: &[TmInline]) -> Vec<Block> {
     let mut blocks = Vec::new();
     let mut run: Vec<Inline> = Vec::new();
 
@@ -361,9 +380,9 @@ fn content_to_blocks(inlines: &[TmInline]) -> Vec<Block> {
         match item {
             TmInline::Element(el) if el.placement == Placement::Block => {
                 flush_run(&mut run, &mut blocks);
-                blocks.extend(element_to_blocks(el.as_view()));
+                blocks.extend(element_to_blocks(cx, el.as_view()));
             }
-            TmInline::Element(el) => run.extend(element_to_inlines(el.as_view())),
+            TmInline::Element(el) => run.extend(element_to_inlines(cx, el.as_view())),
             TmInline::Interp(interp) => run.push(interp_inline(interp)),
             TmInline::Text(t) => run.extend(text_to_inlines(&t.value)),
             TmInline::Raw(t) => run.extend(text_to_inlines(&t.value)),
@@ -396,12 +415,12 @@ fn flush_run(run: &mut Vec<Inline>, blocks: &mut Vec<Block>) {
 /// stayed `Vec<Inline>` -- see `tmtroot/docs/spec/feature/
 /// content-shape.tmt`).
 #[deny(clippy::wildcard_enum_match_arm)]
-fn element_content_to_blocks(blocks: &[TmBlock]) -> Vec<Block> {
+fn element_content_to_blocks(cx: &PandocCtx, blocks: &[TmBlock]) -> Vec<Block> {
     let mut out = Vec::new();
     for block in blocks {
         match block {
             TmBlock::Paragraph(p) => {
-                let inlines = inlines_to_pandoc(&p.content);
+                let inlines = inlines_to_pandoc(cx, &p.content);
                 if inlines
                     .iter()
                     .any(|i| !matches!(i, Inline::Space | Inline::SoftBreak))
@@ -409,7 +428,7 @@ fn element_content_to_blocks(blocks: &[TmBlock]) -> Vec<Block> {
                     out.push(Block::Para(inlines));
                 }
             }
-            TmBlock::Element(el) => out.extend(element_to_blocks(el.as_view())),
+            TmBlock::Element(el) => out.extend(element_to_blocks(cx, el.as_view())),
             TmBlock::Interp(interp) => out.push(Block::Para(vec![interp_inline(interp)])),
             TmBlock::Hole(hole) => out.push(Block::Para(vec![hole_inline(hole)])),
             TmBlock::TypeSeat(seat) => out.push(Block::Para(vec![type_seat_inline(seat)])),
@@ -419,11 +438,11 @@ fn element_content_to_blocks(blocks: &[TmBlock]) -> Vec<Block> {
                 out.push(Block::Header(
                     sec.level.max(1) as i64,
                     Attr::empty(),
-                    inlines_to_pandoc(&sec.title),
+                    inlines_to_pandoc(cx, &sec.title),
                 ));
-                out.extend(element_content_to_blocks(&sec.blocks));
+                out.extend(element_content_to_blocks(cx, &sec.blocks));
             }
-            TmBlock::List(list) => out.push(list_to_pandoc(list)),
+            TmBlock::List(list) => out.push(list_to_pandoc(cx, list)),
         }
     }
     out
@@ -435,27 +454,27 @@ fn element_content_to_blocks(blocks: &[TmBlock]) -> Vec<Block> {
 /// blocks, or a block-placed element put where a heading/link expects
 /// plain text -- which the validator already reports as a shape mismatch)
 /// flattens every paragraph's inlines together rather than losing it.
-fn content_to_inlines(el: ElementView<'_>) -> Vec<Inline> {
-    blocks_to_pandoc_inlines(content_of(el))
+fn content_to_inlines(cx: &PandocCtx, el: ElementView<'_>) -> Vec<Inline> {
+    blocks_to_pandoc_inlines(cx, content_of(el))
 }
 
 #[deny(clippy::wildcard_enum_match_arm)]
-fn blocks_to_pandoc_inlines(blocks: &[TmBlock]) -> Vec<Inline> {
+fn blocks_to_pandoc_inlines(cx: &PandocCtx, blocks: &[TmBlock]) -> Vec<Inline> {
     if let [TmBlock::Paragraph(p)] = blocks {
-        return inlines_to_pandoc(&p.content);
+        return inlines_to_pandoc(cx, &p.content);
     }
     let mut out = Vec::new();
     for block in blocks {
         match block {
-            TmBlock::Paragraph(p) => out.extend(inlines_to_pandoc(&p.content)),
-            TmBlock::Element(el) => out.extend(element_to_inlines(el.as_view())),
+            TmBlock::Paragraph(p) => out.extend(inlines_to_pandoc(cx, &p.content)),
+            TmBlock::Element(el) => out.extend(element_to_inlines(cx, el.as_view())),
             TmBlock::Interp(interp) => out.push(interp_inline(interp)),
             TmBlock::Hole(hole) => out.push(hole_inline(hole)),
             TmBlock::TypeSeat(seat) => out.push(type_seat_inline(seat)),
-            TmBlock::Section(sec) => out.extend(inlines_to_pandoc(&sec.title)),
+            TmBlock::Section(sec) => out.extend(inlines_to_pandoc(cx, &sec.title)),
             TmBlock::List(list) => {
                 for item in &list.items {
-                    out.extend(blocks_to_pandoc_inlines(&item.content));
+                    out.extend(blocks_to_pandoc_inlines(cx, &item.content));
                 }
             }
         }
@@ -464,7 +483,7 @@ fn blocks_to_pandoc_inlines(blocks: &[TmBlock]) -> Vec<Inline> {
 }
 
 #[deny(clippy::wildcard_enum_match_arm)]
-fn inlines_to_pandoc(inlines: &[TmInline]) -> Vec<Inline> {
+fn inlines_to_pandoc(cx: &PandocCtx, inlines: &[TmInline]) -> Vec<Inline> {
     let mut out = Vec::new();
     for item in inlines {
         match item {
@@ -472,7 +491,7 @@ fn inlines_to_pandoc(inlines: &[TmInline]) -> Vec<Inline> {
             TmInline::Raw(t) => out.extend(text_to_inlines(&t.value)),
             TmInline::SoftBreak(_) => out.push(Inline::SoftBreak),
             TmInline::LineBreak(_) => out.push(Inline::LineBreak),
-            TmInline::Element(el) => out.extend(element_to_inlines(el.as_view())),
+            TmInline::Element(el) => out.extend(element_to_inlines(cx, el.as_view())),
             TmInline::Interp(interp) => out.push(interp_inline(interp)),
             TmInline::Hole(hole) => out.push(hole_inline(hole)),
             TmInline::TypeSeat(seat) => out.push(type_seat_inline(seat)),
@@ -562,18 +581,18 @@ fn push_word(word: &mut String, out: &mut Vec<Inline>) {
 
 /// An element's own body as blocks: its `[content]`, then any elements
 /// its `{...}` group holds as children.
-fn element_body_blocks(el: ElementView<'_>) -> Vec<Block> {
-    body_blocks(el.body())
+fn element_body_blocks(cx: &PandocCtx, el: ElementView<'_>) -> Vec<Block> {
+    body_blocks(cx, el.body())
 }
 
 /// [`element_body_blocks`] for a body view.
 #[deny(clippy::wildcard_enum_match_arm)]
-fn body_blocks(body: BodyView<'_>) -> Vec<Block> {
-    let mut blocks = element_content_to_blocks(body.content.unwrap_or(&[]));
+fn body_blocks(cx: &PandocCtx, body: BodyView<'_>) -> Vec<Block> {
+    let mut blocks = element_content_to_blocks(cx, body.content.unwrap_or(&[]));
     if let Some(Group(entries)) = body.data.value.as_ref() {
         for entry in entries {
             match entry {
-                Entry::Element(child) => blocks.extend(element_to_blocks(child.as_view())),
+                Entry::Element(child) => blocks.extend(element_to_blocks(cx, child.as_view())),
                 Entry::Pair(..) | Entry::Hole(_) => {}
             }
         }
@@ -650,7 +669,7 @@ fn interp_inline(interp: &Interpolation) -> Inline {
 
 // ---- lists ---------------------------------------------------------
 
-fn list_to_pandoc(list: &List) -> Block {
+fn list_to_pandoc(cx: &PandocCtx, list: &List) -> Block {
     let items: Vec<Vec<Block>> = list
         .items
         .iter()
@@ -659,9 +678,9 @@ fn list_to_pandoc(list: &List) -> Block {
                 // The combine notation (`-@name(...)`): rendered exactly
                 // like a standalone `@name(...)` would be, through the
                 // same generic element-to-blocks dispatch.
-                element_to_blocks(element)
+                element_to_blocks(cx, element)
             } else {
-                element_content_to_blocks(&item.content)
+                element_content_to_blocks(cx, &item.content)
             };
             // A list item's own content is a single logical line, so
             // Pandoc's `Plain` is a better fit than `Para` -- it is what
@@ -672,7 +691,7 @@ fn list_to_pandoc(list: &List) -> Block {
                 }
             }
             if let Some(sub) = &item.sublist {
-                blocks.push(list_to_pandoc(sub));
+                blocks.push(list_to_pandoc(cx, sub));
             }
             blocks
         })
@@ -698,7 +717,7 @@ fn list_to_pandoc(list: &List) -> Block {
 /// becomes a real `ColSpec` alignment. The Markdown and Typst writers
 /// both ignore that argument today, because neither target has a good
 /// place to put it.
-fn table_to_pandoc(el: ElementView<'_>) -> Vec<Block> {
+fn table_to_pandoc(cx: &PandocCtx, el: ElementView<'_>) -> Vec<Block> {
     let rows = parse_table_rows(content_of(el));
     let col_count = rows.iter().map(|r| r.cells.len()).max().unwrap_or(0);
     if col_count == 0 {
@@ -728,7 +747,7 @@ fn table_to_pandoc(el: ElementView<'_>) -> Vec<Block> {
                         // differently.
                         let blocks = match content {
                             Some(inlines) if !inlines.is_empty() => {
-                                vec![Block::Plain(inlines_to_pandoc(inlines))]
+                                vec![Block::Plain(inlines_to_pandoc(cx, inlines))]
                             }
                             _ => Vec::new(),
                         };
@@ -853,7 +872,13 @@ mod tests {
     use tomet_semantics::EXACT_DATA_KEY;
 
     fn convert(src: &str) -> Vec<Block> {
-        to_pandoc(&parse_file(src).unwrap()).blocks
+        let doc = parse_file(src).unwrap();
+        to_pandoc(&doc, &carried(&doc)).blocks
+    }
+
+    /// What a document read with no vault has in scope: the vocabularies tomet carries.
+    fn carried(doc: &File) -> Bindings {
+        tomet_semantics::LoadedVocabularies::default().bindings_for(doc)
     }
 
     #[test]
@@ -958,7 +983,7 @@ mod tests {
     #[test]
     fn the_id_declaration_feeds_the_metadata_id() {
         let doc = parse_file("::id(doc-1)\n::meta(title: Hello)\n\n本文\n").unwrap();
-        let pandoc = to_pandoc(&doc);
+        let pandoc = to_pandoc(&doc, &carried(&doc));
         assert_eq!(
             pandoc.meta.get("id"),
             Some(&MetaValue::MetaInlines(vec![Inline::Str("doc-1".into())]))
@@ -969,7 +994,7 @@ mod tests {
     #[test]
     fn meta_feeds_the_document_metadata_map() {
         let doc = parse_file("::meta(title: Hello, draft: true, tags: (a, b))\n\n本文\n").unwrap();
-        let pandoc = to_pandoc(&doc);
+        let pandoc = to_pandoc(&doc, &carried(&doc));
         assert_eq!(
             pandoc.meta.get("title"),
             Some(&MetaValue::MetaInlines(vec![Inline::Str("Hello".into())]))
@@ -988,7 +1013,7 @@ mod tests {
         // a sequence `(a, b)` converts to a meta list
         let doc_call =
             parse_file("::meta(title: Hello, draft: true, tags: (a, b))\n\n本文\n").unwrap();
-        let pandoc_call = to_pandoc(&doc_call);
+        let pandoc_call = to_pandoc(&doc_call, &carried(&doc_call));
         assert_eq!(
             pandoc_call.meta.get("tags"),
             Some(&MetaValue::MetaList(vec![
@@ -1004,7 +1029,7 @@ mod tests {
         // hidden: this is the one lossy edge of the meta mapping.
         let doc = parse_file("::meta(year: 2026)\n").unwrap();
         assert_eq!(
-            to_pandoc(&doc).meta.get("year"),
+            to_pandoc(&doc, &carried(&doc)).meta.get("year"),
             Some(&MetaValue::MetaString("2026".into()))
         );
     }
@@ -1187,7 +1212,7 @@ mod tests {
     #[test]
     fn the_whole_document_serializes_to_pandoc_json() {
         let doc = parse_file("#[ T ]\n\n本文です。\n").unwrap();
-        let json = serde_json::to_string(&to_pandoc(&doc)).unwrap();
+        let json = serde_json::to_string(&to_pandoc(&doc, &carried(&doc))).unwrap();
         assert!(json.starts_with(r#"{"pandoc-api-version":[1,23,1],"meta":{},"blocks":["#));
     }
 }

@@ -21,18 +21,39 @@
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use tomet_crate::config::PrinterConfig;
+use tomet_crate::semantics::Bindings;
 use tomet_crate::vault::Vault;
 
-/// Parses `source` against a vault with no vocabularies of its own.
+/// A vault with no vocabularies of its own: what this module reads every document in.
 ///
 /// The facade has no bare parse on purpose (see `tomet`'s crate doc), and
 /// nothing here needs one: everything except `validate_with` reads a
 /// document as `std` alone, which is exactly what an empty vault is.
-fn parse(source: &str) -> PyResult<tomet_crate::File> {
+fn empty_vault() -> Vault {
     Vault::from_sources(PrinterConfig::default(), ".", &[])
+}
+
+/// Parses `source` in the [`empty_vault`].
+fn parse(source: &str) -> PyResult<tomet_crate::File> {
+    empty_vault()
         .parse(source)
         .map(|(doc, _bindings)| doc)
         .map_err(|e| PyValueError::new_err(e.to_string()))
+}
+
+/// `.tmt` source text, or a `File` AST dict, as a document and the names it has in scope in the
+/// [`empty_vault`], which is what a converter is handed.
+fn document(source_or_doc: &Bound<'_, PyAny>) -> PyResult<(tomet_crate::File, Bindings)> {
+    let vault = empty_vault();
+    if let Ok(src) = source_or_doc.extract::<String>() {
+        return vault
+            .parse(&src)
+            .map_err(|e| PyValueError::new_err(e.to_string()));
+    }
+    let doc: tomet_crate::File =
+        pythonize::depythonize(source_or_doc).map_err(|e| PyValueError::new_err(e.to_string()))?;
+    let bindings = vault.bindings(&doc);
+    Ok((doc, bindings))
 }
 
 /// Parse a data-only `.tmt` document into native Python objects (dict, list, str, int, float, bool, None).
@@ -52,40 +73,22 @@ fn parse_file<'py>(py: Python<'py>, source: &str) -> PyResult<Bound<'py, PyAny>>
 /// Convert `.tmt` source text or a `File` AST dict into an HTML body string.
 #[pyfunction]
 fn to_html(_py: Python<'_>, source_or_doc: &Bound<'_, PyAny>) -> PyResult<String> {
-    if let Ok(src) = source_or_doc.extract::<String>() {
-        let doc = parse(&src)?;
-        Ok(tomet_crate::html::render_body(&doc))
-    } else {
-        let doc: tomet_crate::File = pythonize::depythonize(source_or_doc)
-            .map_err(|e| PyValueError::new_err(e.to_string()))?;
-        Ok(tomet_crate::html::render_body(&doc))
-    }
+    let (doc, bindings) = document(source_or_doc)?;
+    Ok(tomet_crate::html::render_body(&doc, &bindings))
 }
 
 /// Convert `.tmt` source text or a `File` AST dict into a CommonMark Markdown string.
 #[pyfunction]
 fn to_markdown(_py: Python<'_>, source_or_doc: &Bound<'_, PyAny>) -> PyResult<String> {
-    if let Ok(src) = source_or_doc.extract::<String>() {
-        let doc = parse(&src)?;
-        Ok(tomet_crate::markdown::to_markdown(&doc))
-    } else {
-        let doc: tomet_crate::File = pythonize::depythonize(source_or_doc)
-            .map_err(|e| PyValueError::new_err(e.to_string()))?;
-        Ok(tomet_crate::markdown::to_markdown(&doc))
-    }
+    let (doc, bindings) = document(source_or_doc)?;
+    Ok(tomet_crate::markdown::to_markdown(&doc, &bindings))
 }
 
 /// Convert `.tmt` source text or a `File` AST dict into a Typst markup string.
 #[pyfunction]
 fn to_typst(_py: Python<'_>, source_or_doc: &Bound<'_, PyAny>) -> PyResult<String> {
-    if let Ok(src) = source_or_doc.extract::<String>() {
-        let doc = parse(&src)?;
-        Ok(tomet_crate::typst::to_typst(&doc))
-    } else {
-        let doc: tomet_crate::File = pythonize::depythonize(source_or_doc)
-            .map_err(|e| PyValueError::new_err(e.to_string()))?;
-        Ok(tomet_crate::typst::to_typst(&doc))
-    }
+    let (doc, bindings) = document(source_or_doc)?;
+    Ok(tomet_crate::typst::to_typst(&doc, &bindings))
 }
 
 /// Parse CommonMark Markdown text into a `File` AST dict.

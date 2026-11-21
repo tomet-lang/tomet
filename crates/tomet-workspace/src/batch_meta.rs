@@ -4,10 +4,10 @@ use std::collections::BTreeMap;
 use std::fs;
 use std::path::PathBuf;
 
-use tomet_ast_parser::parse_file;
 use tomet_indexer::extract_metadata;
 use tomet_printer::document_to_tm;
 use tomet_transform::set_meta_in_doc;
+use tomet_vault::Vault;
 
 /// Represents a workspace file with its metadata.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -68,7 +68,11 @@ impl BatchMetaEngine {
     }
 
     /// Updates or inserts a key-value pair in a metadata element across files.
+    ///
+    /// Each file's names are read in `vault` (its kind and what it brings in with `::use`), so
+    /// `target_element` names a vocabulary's attribute in that vocabulary's own namespace.
     pub fn update_meta_key(
+        vault: &Vault,
         files: &mut [MetaFile],
         target_element: &str,
         key: &str,
@@ -76,8 +80,8 @@ impl BatchMetaEngine {
     ) {
         for file in files.iter_mut() {
             file.ensure_loaded();
-            if let Ok(mut doc) = parse_file(&file.original_src)
-                && set_meta_in_doc(&mut doc, target_element, key, new_value)
+            if let Ok((mut doc, bindings)) = vault.parse(&file.original_src)
+                && set_meta_in_doc(&mut doc, &bindings, target_element, key, new_value)
             {
                 file.modified_src = document_to_tm(&doc);
                 file.metadata = extract_metadata(&file.modified_src);

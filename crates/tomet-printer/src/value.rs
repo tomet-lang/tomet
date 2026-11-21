@@ -222,7 +222,8 @@ fn render_meta_field_value(
 /// are the declaration's `(args)`; `{...}` is no part of `::meta`, but a declaration that has one
 /// (`tomet check` reports it) is printed with it rather than losing it.
 pub(crate) fn render_meta_declaration(declaration: &Declaration, config: &PrinterConfig) -> String {
-    let head = "::meta";
+    // As written: `::meta`, or `::std.meta`.
+    let head = &format!("::{}", declaration.name);
     if config.meta.field_layout == Some(GroupLayout::OnePerLine)
         && declaration.data.value.is_none()
         && let Some(Value::Tuple(tuple)) = tomet_semantics::data::declaration_entries(declaration)

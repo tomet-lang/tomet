@@ -1,0 +1,9 @@
+::std.kind(fixture)
+
+::use(catasto, as: c)
+
+::c.upstream(commonfiles)
+
+::std.meta(title: "Namespaced declarations")
+
+A body, so the header is a header.
