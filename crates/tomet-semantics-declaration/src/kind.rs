@@ -288,7 +288,7 @@ const SPECS: [Spec; 19] = [
             DeclKind::Blueprint,
             "blueprint",
             Cardinality::Many,
-            Scope::Tmt,
+            Scope::Both,
             Shape::ArgsAndData,
         )
     },
@@ -614,6 +614,7 @@ mod tests {
                 DeclKind::Id,
                 DeclKind::Version,
                 DeclKind::Meta,
+                DeclKind::Blueprint,
                 DeclKind::Macro,
                 DeclKind::Var,
                 DeclKind::Use,

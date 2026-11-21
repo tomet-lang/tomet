@@ -61,7 +61,6 @@ fn a_type_seat_that_does_not_fit_is_text() {
         "<$5>",
         "<$x >",
         "<$x",
-        "<$x.y>",
         "<$x{a: 1}>",
         "<$x[t]>",
         "<$x(a)(b)>",

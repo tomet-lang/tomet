@@ -13,7 +13,7 @@ pub mod seats;
 
 pub use diagnostic::{CstValidationError, Diagnostic, Severity};
 pub use id::{collect_ids, collect_ids_cst};
-pub use seats::check_type_seats;
+pub use seats::{check_ctmt_type_seats, check_type_seats};
 
 use tomet_ast::{Block, ElementView, File, Inline};
 use tomet_cst::{SyntaxNode, TextRange};

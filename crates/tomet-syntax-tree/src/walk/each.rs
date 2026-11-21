@@ -312,3 +312,20 @@ pub fn for_each_call_in_declaration(
         },
     );
 }
+
+/// Visits every [`TypeSeat`] under `declaration`, in document order, wherever it sits.
+pub fn for_each_type_seat_in_declaration(
+    declaration: &Declaration,
+    mut f: impl FnMut(&TypeSeat),
+) {
+    let _ = walk_node(
+        Node::Declaration(declaration),
+        Place::Header,
+        &mut |node, _| {
+            if let Some(seat) = node.type_seat() {
+                f(seat);
+            }
+            Visit::<()>::Descend
+        },
+    );
+}

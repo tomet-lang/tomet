@@ -14,6 +14,7 @@ tomet-scalar         = { workspace = true }
 tomet-semantics      = { workspace = true }
 tomet-semantics-core = { workspace = true }
 tomet-span           = { workspace = true }
+tomet-spelling       = { workspace = true }
 tomet-tree           = { workspace = true }
 tomet-type           = { workspace = true }
 tomet-validator-core = { workspace = true }

@@ -290,11 +290,12 @@ fn entry_at(writer: &SyntaxNode, path: &[String]) -> Option<SyntaxNode> {
             let entry_key = match entry.kind() {
                 K::MAP_ENTRY => crate::element::lower_map_entry(entry, false)
                     .ok()
-                    .and_then(|(name, _, _)| name),
+                    .and_then(|(key, _, _)| key),
                 _ => None,
             };
             let entry_key = match entry_key {
-                Some(name) => name,
+                Some(tomet_ast::EntryKey::Name(name)) => name,
+                Some(tomet_ast::EntryKey::TypeSeat(seat)) => seat.to_string(),
                 None => {
                     let k = unnamed_count.to_string();
                     unnamed_count += 1;

@@ -348,6 +348,31 @@ pub enum Diagnostic {
         reason: String,
         span: Span,
     },
+    /// A required key defined in a `.blueprint.ctmt` schema is missing from the target `.ctmt` map.
+    MissingRequiredKey {
+        key: String,
+        kind: String,
+        span: Span,
+    },
+    /// A key in a `.ctmt` map is not declared in the closed `.blueprint.ctmt` map schema.
+    UnknownKey {
+        key: String,
+        kind: String,
+        span: Span,
+    },
+    /// A required header attribute (`::name(...)`) defined in a `.blueprint.ctmt` schema is missing.
+    MissingRequiredHeaderAttr {
+        name: String,
+        kind: String,
+        span: Span,
+    },
+    /// A value in a `.ctmt` document does not conform to the `.blueprint.ctmt` schema at `path`.
+    InvalidBlueprintValue {
+        path: String,
+        expected: String,
+        value: String,
+        span: Span,
+    },
 }
 
 impl Diagnostic {
@@ -392,6 +417,10 @@ impl Diagnostic {
             Diagnostic::RetiredDeclaration { span, .. } => *span,
             Diagnostic::TypeSeatOutsideBlueprint { span, .. } => *span,
             Diagnostic::InvalidTypeSeat { span, .. } => *span,
+            Diagnostic::MissingRequiredKey { span, .. } => *span,
+            Diagnostic::UnknownKey { span, .. } => *span,
+            Diagnostic::MissingRequiredHeaderAttr { span, .. } => *span,
+            Diagnostic::InvalidBlueprintValue { span, .. } => *span,
         }
     }
 
@@ -799,6 +828,26 @@ impl Diagnostic {
             ),
             Diagnostic::InvalidTypeSeat { seat, reason, .. } => {
                 write!(f, "type seat `{seat}`: {reason}")
+            }
+            Diagnostic::MissingRequiredKey { key, kind, .. } => {
+                write!(f, "missing required key `{key}` for `{kind}` blueprint")
+            }
+            Diagnostic::UnknownKey { key, kind, .. } => {
+                write!(f, "unknown key `{key}` for `{kind}` blueprint")
+            }
+            Diagnostic::MissingRequiredHeaderAttr { name, kind, .. } => {
+                write!(
+                    f,
+                    "missing required header attribute `::{name}` for `{kind}` blueprint"
+                )
+            }
+            Diagnostic::InvalidBlueprintValue {
+                path,
+                expected,
+                value,
+                ..
+            } => {
+                write!(f, "`{path}` expects {expected}, but got `{value}`")
             }
         }
     }

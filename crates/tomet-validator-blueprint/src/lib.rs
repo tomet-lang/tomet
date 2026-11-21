@@ -1,8 +1,20 @@
 //! Blueprint structural validation against a target document.
 //!
 //! Extracts structural schemas (required meta keys, required sections, and section-level
-//! `::rule` constraints) from blueprint documents (`::kind(blueprint)`), and validates
-//! target documents for conformance.
+//! `::rule` constraints) from `.tmt` blueprint documents (`::kind(blueprint)`), as well as
+//! [`CtmtBlueprintSchema`] schemas (header attributes, fixed/dynamic map keys, [`SeatSpec`]
+//! type constraints, constructors, and `enum(...)` unions) from `.blueprint.ctmt` documents,
+//! and validates target documents for conformance.
+
+pub mod ctmt;
+pub mod seat;
+
+pub use ctmt::{
+    CtmtBlueprintSchema, HeaderAttrSchema, MapEntrySchema, MapSchema, ValueSchema,
+    extract_ctmt_blueprint_schema, validate_ctmt_against_blueprint, validate_ctmt_against_schema,
+    validate_ctmt_blueprint,
+};
+pub use seat::{EnumVariant, SeatSpec, SeatType};
 
 use std::collections::HashMap;
 

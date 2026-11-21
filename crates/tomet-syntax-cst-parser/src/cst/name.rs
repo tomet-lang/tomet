@@ -66,7 +66,7 @@ impl<'a, 't> CstParser<'a, 't> {
     /// [`CstParser::name_tokens_at`] for the name of the box with `mark`, whose shape is the
     /// mark's: a name tag's is a label for the reader, not a name, so it starts with any letter
     /// and may hold any letters; a hole's matcher and a type seat's type are ASCII names like any
-    /// other, and the type is one word, with no `.` in it.
+    /// other, and may be dotted (`ns.name`).
     pub(super) fn slot_name_tokens_at(&self, i: usize, mark: SlotMark) -> usize {
         let Some(first_kind) = self.raw_kind_at(i) else {
             return 0;
@@ -85,7 +85,7 @@ impl<'a, 't> CstParser<'a, 't> {
             _ => false,
         };
         if valid_start {
-            self.name_run_len(i, ascii, mark != SlotMark::TypeSeat)
+            self.name_run_len(i, ascii, true)
         } else {
             0
         }

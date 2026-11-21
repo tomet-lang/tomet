@@ -46,6 +46,12 @@ fn a_type_seat_is_the_mark_a_name_and_optional_arguments() {
         ),
         // A name has digits, `_` and `-`, and starts with a letter or `_`.
         ("<$_a-b_2>", vec![K::LT, K::DOLLAR, K::NAME, K::GT]),
+        // A dotted name (`ns.name`) is a namespaced type or constructor.
+        ("<$catasto.git>", vec![K::LT, K::DOLLAR, K::NAME, K::GT]),
+        (
+            "<$catasto.git(optional: true)>",
+            vec![K::LT, K::DOLLAR, K::NAME, K::ARGS, K::GT],
+        ),
     ];
     for (src, expected) in cases {
         let found = slots(src);
@@ -138,7 +144,6 @@ fn what_is_not_a_type_seat_is_no_box() {
         "<$-x>",
         "<$(x)>",
         "<$é>",
-        "<$x.y>",
         "<$x::y>",
         // Not tight, or not closed.
         "<$x >",
@@ -217,4 +222,31 @@ fn the_arguments_of_a_type_seat_are_structured_entries() {
         .map(|n| n.text().to_string())
         .collect();
     assert_eq!(entries, ["length: 8", "prefix: \"note-\""]);
+}
+
+#[test]
+fn type_seat_in_map_key_position_is_parsed_as_map_entry() {
+    let root = crate::parse_cst_value("<$string>: <$int>\n");
+    let entries: Vec<_> = root.children().filter(|n| n.kind() == K::MAP_ENTRY).collect();
+    assert_eq!(entries.len(), 1);
+    let key_slot = entries[0].children().next().unwrap();
+    assert_eq!(key_slot.kind(), K::SLOT);
+    assert_eq!(key_slot.text().to_string(), "<$string>");
+
+    // A type seat in value position (no colon) stays a SEQ_ITEM, not a MAP_ENTRY.
+    let seq_root = crate::parse_cst_value("<$string>\n");
+    assert_eq!(
+        seq_root
+            .children()
+            .filter(|n| n.kind() == K::MAP_ENTRY)
+            .count(),
+        0
+    );
+    assert_eq!(
+        seq_root
+            .children()
+            .filter(|n| n.kind() == K::SEQ_ITEM)
+            .count(),
+        1
+    );
 }

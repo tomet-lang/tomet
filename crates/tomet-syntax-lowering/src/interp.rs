@@ -94,10 +94,8 @@ pub(crate) fn lower_type_seat(slot: &SyntaxNode) -> Result<TypeSeat> {
         ));
     }
     let is_type = match &expr.kind {
-        InterpExprKind::Identifier(_) => true,
-        InterpExprKind::Call { callee, .. } => {
-            matches!(callee.kind, InterpExprKind::Identifier(_))
-        }
+        InterpExprKind::Identifier(_) | InterpExprKind::Member { .. } => expr.is_name_chain(),
+        InterpExprKind::Call { callee, .. } => callee.is_name_chain(),
         _ => false,
     };
     if !is_type {

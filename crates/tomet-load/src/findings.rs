@@ -151,17 +151,26 @@ impl Vault {
                 _ => continue,
             };
             for (name, path) in tomet_config::registered_by(&found.declaration) {
-                let Some(registered) = std::fs::read_to_string(self.root.join(&path))
-                    .ok()
-                    .and_then(|src| tomet_ast_parser::parse_file(&src).ok())
-                else {
+                let full_path = self.root.join(&path);
+                let Some(src) = std::fs::read_to_string(&full_path).ok() else {
                     continue;
                 };
-                let declared = match found.kind {
-                    DeclKind::Blueprint => tomet_declaration::document_blueprint(&registered),
-                    DeclKind::Dictionary => tomet_declaration::document_dictionary(&registered),
-                    _ => tomet_semantics::Vocabulary::from_file(&registered)
-                        .map(|vocabulary| vocabulary.namespace),
+                let declared = if found.kind == DeclKind::Blueprint
+                    && full_path.extension().and_then(|ext| ext.to_str()) == Some("ctmt")
+                {
+                    tomet_ast_parser::parse_data_file(&src)
+                        .ok()
+                        .and_then(|registered| tomet_declaration::document_blueprint(&registered))
+                } else {
+                    let Some(registered) = tomet_ast_parser::parse_file(&src).ok() else {
+                        continue;
+                    };
+                    match found.kind {
+                        DeclKind::Blueprint => tomet_declaration::document_blueprint(&registered),
+                        DeclKind::Dictionary => tomet_declaration::document_dictionary(&registered),
+                        _ => tomet_semantics::Vocabulary::from_file(&registered)
+                            .map(|vocabulary| vocabulary.namespace),
+                    }
                 };
                 if declared.as_deref() != Some(name.as_str()) {
                     out.push(tomet_validator::Diagnostic::RegistryNameMismatch {

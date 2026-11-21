@@ -62,7 +62,12 @@ fn block_runs<'a>(node: Node<'a>) -> Vec<&'a [Block]> {
         Node::Declaration(declaration) => runs.extend(declaration.content.as_deref()),
         Node::Connect(connect) => runs.extend(connect.content.as_deref()),
         Node::Value(Value::Blocks(blocks)) => runs.push(blocks),
-        Node::Block(_) | Node::Inline(_) | Node::Value(_) | Node::Entry(_) | Node::List(_) => {}
+        Node::Block(_)
+        | Node::Inline(_)
+        | Node::Value(_)
+        | Node::Entry(_)
+        | Node::List(_)
+        | Node::TypeSeat(_) => {}
     }
     if let Some(element) = node.element_view() {
         runs.extend(element.content);

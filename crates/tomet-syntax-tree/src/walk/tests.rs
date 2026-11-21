@@ -427,3 +427,9 @@ fn filling_type_seats_leaves_interpolations_and_the_reverse() {
     fill_interpolations(body, |_| Some(Value::Scalar(Scalar::Int(3))));
     assert!(interpolations(body).is_empty());
 }
+
+#[test]
+fn type_seat_in_tuple_key_position_is_visited_in_order() {
+    let val = tomet_ast_parser::parse_value("(<$string>: <$int>)").unwrap();
+    assert_eq!(seats(&val), ["string", "int"]);
+}

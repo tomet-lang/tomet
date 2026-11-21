@@ -94,23 +94,39 @@ fn write_args(tuple: &Tuple, out: &mut String) {
         if i > 0 {
             out.push_str(", ");
         }
-        if let Some(name) = entry.name() {
-            write_key(name, out);
-            out.push_str(": ");
+        match entry.key() {
+            Some(tomet_ast::EntryKey::Name(name)) => {
+                write_key(name, out);
+                out.push_str(": ");
+            }
+            Some(tomet_ast::EntryKey::TypeSeat(seat)) => {
+                out.push_str(&seat.to_string());
+                out.push_str(": ");
+            }
+            None => {}
         }
         write_value(entry.value(), out, false);
     }
 }
 
-/// The top level of a document whose entries all have names is written as bare
+/// The top level of a document whose entries all have keys is written as bare
 /// `key: value` lines, with no enclosing `( )`.
 fn write_top_level_lines(tuple: &Tuple, out: &mut String) {
-    for (i, (key, value)) in tuple.named().enumerate() {
+    for (i, entry) in tuple.entries().enumerate() {
         if i > 0 {
             out.push('\n');
         }
-        write_key(key, out);
-        out.push_str(": ");
-        write_value(value, out, false);
+        match entry.key() {
+            Some(tomet_ast::EntryKey::Name(name)) => {
+                write_key(name, out);
+                out.push_str(": ");
+            }
+            Some(tomet_ast::EntryKey::TypeSeat(seat)) => {
+                out.push_str(&seat.to_string());
+                out.push_str(": ");
+            }
+            None => {}
+        }
+        write_value(entry.value(), out, false);
     }
 }

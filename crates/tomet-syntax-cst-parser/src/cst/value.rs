@@ -9,6 +9,7 @@ enum MapKey {
     String,
     Name,
     Simple,
+    TypeSeat,
 }
 
 impl<'a, 't> CstParser<'a, 't> {
@@ -68,6 +69,18 @@ impl<'a, 't> CstParser<'a, 't> {
                     }
                 }
             }
+            K::LT => {
+                if let Some((tomet_cst::CstSlotMark::TypeSeat, close)) = self.slot_at(from) {
+                    let colon_tok = self.skip_ws_from(close + 1);
+                    if self.kind_at(colon_tok) == Some(K::COLON) {
+                        Some(MapKey::TypeSeat)
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                }
+            }
             _ => {
                 let n = self.name_tokens_at(from);
                 if n > 0 {
@@ -121,6 +134,7 @@ impl<'a, 't> CstParser<'a, 't> {
                 MapKey::String => self.bump_string_literal(),
                 MapKey::Name => self.bump_name(),
                 MapKey::Simple => self.bump(),
+                MapKey::TypeSeat => self.parse_slot(),
             }
             self.bump_while(K::WHITESPACE);
             self.bump(); // ':'

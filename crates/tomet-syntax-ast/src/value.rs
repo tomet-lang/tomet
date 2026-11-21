@@ -72,32 +72,70 @@ pub enum Value {
     Blocks(Vec<Block>),
 }
 
-/// One entry of a [`Tuple`]: a value, with a name or without one.
+/// The key of a [`TupleEntry`] when one was written: a plain/quoted name, or a type seat (`<$type>`).
+#[derive(Debug, Clone, PartialEq)]
+pub enum EntryKey {
+    Name(String),
+    TypeSeat(crate::TypeSeat),
+}
+
+/// One entry of a [`Tuple`]: a value, with a key or without one.
 ///
-/// An entry with no name is an entry whose key was not written; its key is its position among
+/// An entry with no key is an entry whose key was not written; its key is its position among
 /// the unnamed entries of its tuple. An entry does not know that position: ask the tuple
 /// ([`Tuple::keyed`], [`Tuple::get`]).
 #[derive(Debug, Clone, PartialEq)]
 pub struct TupleEntry<V = Value> {
-    name: Option<String>,
+    key: Option<EntryKey>,
     value: V,
 }
 
 impl<V> TupleEntry<V> {
     pub fn unnamed(value: V) -> Self {
-        Self { name: None, value }
+        Self { key: None, value }
     }
 
     pub fn named(name: impl Into<String>, value: V) -> Self {
         Self {
-            name: Some(name.into()),
+            key: Some(EntryKey::Name(name.into())),
             value,
         }
     }
 
-    /// The name this entry is written with, or `None` for an unnamed entry.
+    pub fn type_seat(seat: crate::TypeSeat, value: V) -> Self {
+        Self {
+            key: Some(EntryKey::TypeSeat(seat)),
+            value,
+        }
+    }
+
+    /// The key this entry is written with, or `None` for an unnamed entry.
+    pub fn key(&self) -> Option<&EntryKey> {
+        self.key.as_ref()
+    }
+
+    /// The name this entry is written with, or `None` for an unnamed or type-seat-keyed entry.
     pub fn name(&self) -> Option<&str> {
-        self.name.as_deref()
+        match &self.key {
+            Some(EntryKey::Name(name)) => Some(name.as_str()),
+            _ => None,
+        }
+    }
+
+    /// The type seat key this entry is written with, or `None` otherwise.
+    pub fn type_seat_key(&self) -> Option<&crate::TypeSeat> {
+        match &self.key {
+            Some(EntryKey::TypeSeat(seat)) => Some(seat),
+            _ => None,
+        }
+    }
+
+    /// Mutable access to the type seat key, if this entry is keyed by a type seat.
+    pub fn type_seat_key_mut(&mut self) -> Option<&mut crate::TypeSeat> {
+        match &mut self.key {
+            Some(EntryKey::TypeSeat(seat)) => Some(seat),
+            _ => None,
+        }
     }
 
     pub fn value(&self) -> &V {
@@ -112,13 +150,13 @@ impl<V> TupleEntry<V> {
         self.value
     }
 
-    pub fn into_parts(self) -> (Option<String>, V) {
-        (self.name, self.value)
+    pub fn into_parts(self) -> (Option<EntryKey>, V) {
+        (self.key, self.value)
     }
 
     pub fn map_value<U>(self, f: impl FnOnce(V) -> U) -> TupleEntry<U> {
         TupleEntry {
-            name: self.name,
+            key: self.key,
             value: f(self.value),
         }
     }
@@ -215,19 +253,27 @@ impl<V> Tuple<V> {
             key,
             index: self.entries.len(),
         };
-        let entry = match entry.name.as_deref().map(|name| (name, as_position(name))) {
-            // Named with the position it would have unnamed: the same entry, unnamed.
-            Some((_, Some(position))) if position == next => TupleEntry::unnamed(entry.value),
-            Some((name, Some(position))) if position < next => {
-                return Err(duplicate(name.to_string()));
+        let entry = match &entry.key {
+            Some(EntryKey::Name(name)) => match as_position(name) {
+                // Named with the position it would have unnamed: the same entry, unnamed.
+                Some(position) if position == next => TupleEntry::unnamed(entry.value),
+                Some(position) if position < next => {
+                    return Err(duplicate(name.clone()));
+                }
+                _ if self.entries.iter().any(|e| e.name() == Some(name.as_str())) => {
+                    return Err(duplicate(name.clone()));
+                }
+                _ => entry,
+            },
+            Some(EntryKey::TypeSeat(seat)) => {
+                if self.entries.iter().any(|e| e.type_seat_key() == Some(seat)) {
+                    return Err(duplicate(seat.to_string()));
+                }
+                entry
             }
-            Some((name, _)) if self.entries.iter().any(|e| e.name() == Some(name)) => {
-                return Err(duplicate(name.to_string()));
-            }
-            Some(_) => entry,
             None => entry,
         };
-        if entry.name.is_none() {
+        if entry.key.is_none() {
             let key = next.to_string();
             if self.entries.iter().any(|e| e.name() == Some(key.as_str())) {
                 return Err(duplicate(key));
@@ -293,25 +339,26 @@ impl<V> Tuple<V> {
     }
 
     fn unnamed_len(&self) -> usize {
-        self.entries.iter().filter(|e| e.name.is_none()).count()
+        self.entries.iter().filter(|e| e.key.is_none()).count()
     }
 
-    /// Whether no entry has a name. True for an empty tuple.
+    /// Whether no entry has a key. True for an empty tuple.
     pub fn has_no_named(&self) -> bool {
-        self.entries.iter().all(|e| e.name.is_none())
+        self.entries.iter().all(|e| e.key.is_none())
     }
 
-    /// Whether every entry has a name. True for an empty tuple.
+    /// Whether every entry has a key. True for an empty tuple.
     pub fn has_no_unnamed(&self) -> bool {
-        self.entries.iter().all(|e| e.name.is_some())
+        self.entries.iter().all(|e| e.key.is_some())
     }
 
     /// The index, among the entries as written, of the entry whose key is `key`.
     pub fn index_of(&self, key: &str) -> Option<usize> {
         let position = as_position(key);
         let mut seen = 0;
-        self.entries.iter().position(|entry| match &entry.name {
-            Some(name) => name == key,
+        self.entries.iter().position(|entry| match &entry.key {
+            Some(EntryKey::Name(name)) => name == key,
+            Some(EntryKey::TypeSeat(_)) => false,
             None => {
                 seen += 1;
                 position == Some(seen - 1)
@@ -354,7 +401,7 @@ impl<V> Tuple<V> {
     pub fn nth_unnamed_mut(&mut self, n: usize) -> Option<&mut V> {
         self.entries
             .iter_mut()
-            .filter(|e| e.name.is_none())
+            .filter(|e| e.key.is_none())
             .nth(n)
             .map(|e| &mut e.value)
     }
@@ -369,13 +416,14 @@ impl<V> Tuple<V> {
         self.entries.into_iter()
     }
 
-    /// Every entry with its key, in written order: the name of a named entry, the position of an
-    /// unnamed one.
+    /// Every entry with its key, in written order: the name of a named entry, the `<$type>`
+    /// spelling of a type-seat key, or the position of an unnamed one.
     pub fn keyed(&self) -> impl Iterator<Item = (std::borrow::Cow<'_, str>, &V)> {
         let mut position = 0;
         self.entries.iter().map(move |entry| {
-            let key = match &entry.name {
-                Some(name) => std::borrow::Cow::Borrowed(name.as_str()),
+            let key = match &entry.key {
+                Some(EntryKey::Name(name)) => std::borrow::Cow::Borrowed(name.as_str()),
+                Some(EntryKey::TypeSeat(seat)) => std::borrow::Cow::Owned(seat.to_string()),
                 None => {
                     position += 1;
                     std::borrow::Cow::Owned((position - 1).to_string())
@@ -402,7 +450,7 @@ impl<V> Tuple<V> {
                 .entries
                 .into_iter()
                 .map(|e| TupleEntry {
-                    name: e.name,
+                    key: e.key,
                     value: f(e.value),
                 })
                 .collect(),
@@ -415,7 +463,7 @@ impl<V> Tuple<V> {
         let mut entries = Vec::with_capacity(self.entries.len());
         for e in self.entries {
             entries.push(TupleEntry {
-                name: e.name,
+                key: e.key,
                 value: f(e.value)?,
             });
         }
@@ -429,35 +477,37 @@ impl<V> Tuple<V> {
     pub fn named(&self) -> impl Iterator<Item = (&str, &V)> {
         self.entries
             .iter()
-            .filter_map(|e| Some((e.name.as_deref()?, &e.value)))
+            .filter_map(|e| Some((e.name()?, &e.value)))
     }
 
     /// Mutable counterpart of [`Tuple::named`].
     pub fn named_mut(&mut self) -> impl Iterator<Item = (&str, &mut V)> {
-        self.entries
-            .iter_mut()
-            .filter_map(|e| Some((e.name.as_deref()?, &mut e.value)))
+        self.entries.iter_mut().filter_map(|e| match &e.key {
+            Some(EntryKey::Name(name)) => Some((name.as_str(), &mut e.value)),
+            _ => None,
+        })
     }
 
     /// Owning counterpart of [`Tuple::named`].
     pub fn into_named(self) -> impl Iterator<Item = (String, V)> {
-        self.entries
-            .into_iter()
-            .filter_map(|e| Some((e.name?, e.value)))
+        self.entries.into_iter().filter_map(|e| match e.key {
+            Some(EntryKey::Name(name)) => Some((name, e.value)),
+            _ => None,
+        })
     }
 
     /// The unnamed entries' values, in written order: the `n`-th has the key `n`.
     pub fn unnamed(&self) -> impl Iterator<Item = &V> {
         self.entries
             .iter()
-            .filter_map(|e| e.name.is_none().then_some(&e.value))
+            .filter_map(|e| e.key.is_none().then_some(&e.value))
     }
 
     /// Owning counterpart of [`Tuple::unnamed`].
     pub fn into_unnamed(self) -> impl Iterator<Item = V> {
         self.entries
             .into_iter()
-            .filter_map(|e| e.name.is_none().then_some(e.value))
+            .filter_map(|e| e.key.is_none().then_some(e.value))
     }
 
     /// Adds an unnamed entry at the end, unless an entry is named with its position.
@@ -496,7 +546,7 @@ impl<V> Tuple<V> {
             return Ok(false);
         };
         let mut entries = self.entries.clone();
-        entries[index].name = Some(name.into());
+        entries[index].key = Some(EntryKey::Name(name.into()));
         *self = Self::try_from_entries(entries)?;
         Ok(true)
     }
@@ -975,5 +1025,29 @@ mod tests {
         let mapped = unnamed.map_values(|n| n * 2);
         assert_eq!(mapped.get("0"), Some(&20));
         assert_eq!(mapped.get("1"), Some(&40));
+    }
+
+    #[test]
+    fn type_seat_entry_key_preserves_key_and_rejects_duplicates() {
+        let seat = crate::TypeSeat {
+            expr: crate::InterpExpr {
+                kind: crate::InterpExprKind::Identifier("string".into()),
+                span: tomet_span::Span::dummy(),
+            },
+            span: tomet_span::Span::dummy(),
+        };
+        let entry = TupleEntry::type_seat(seat.clone(), 42);
+        assert_eq!(entry.name(), None);
+        assert_eq!(entry.type_seat_key(), Some(&seat));
+        assert!(matches!(entry.key(), Some(EntryKey::TypeSeat(_))));
+
+        let tuple = Tuple::try_from_entries([entry.clone()]).unwrap();
+        assert!(!tuple.has_no_named());
+        assert!(tuple.has_no_unnamed());
+        let keys: Vec<String> = tuple.keyed().map(|(k, _)| k.into_owned()).collect();
+        assert_eq!(keys, ["<$string>"]);
+
+        let dup = Tuple::try_from_entries([entry.clone(), entry]);
+        assert!(dup.is_err());
     }
 }

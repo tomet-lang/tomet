@@ -1879,8 +1879,14 @@ Paragraph
 ```
 
 ```
-Paragraph
-  Text "<$x.y>"
+TypeSeat <$
+  type    x.y
+```
+
+検証:
+
+```
+`<$x.y>` is a type seat, and type seats belong in a blueprint (`::blueprint(...)`): a document made from one has none
 ```
 
 ### `>` の前に空白があれば座ではなく文字。`(args)` の後なら、`$x(a)` が補間として読まれる

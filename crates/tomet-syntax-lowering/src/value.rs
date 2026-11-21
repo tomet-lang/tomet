@@ -37,8 +37,14 @@ pub fn shift_spans(value: &mut Value, delta: usize) {
                 let s = tuple.span();
                 tuple.set_span(tomet_span::Span::new(s.start + delta, s.end + delta));
             }
-            for v in tuple.values_mut() {
-                shift_spans(v, delta);
+            for i in 0..tuple.len() {
+                if let Some(entry) = tuple.nth_mut(i) {
+                    if let Some(seat) = entry.type_seat_key_mut() {
+                        seat.span.start += delta;
+                        seat.span.end += delta;
+                    }
+                    shift_spans(entry.value_mut(), delta);
+                }
             }
         }
         _ => {}

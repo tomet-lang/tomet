@@ -39,6 +39,11 @@ fn a_seat_holds_the_type_as_the_expression_it_is_written() {
     for (src, expected) in [
         ("<$uuid>", "Identifier(uuid)"),
         ("<$date>", "Identifier(date)"),
+        ("<$catasto.git>", "Member(Identifier(catasto), git)"),
+        (
+            "<$catasto.git(optional: true)>",
+            "Call(Member(Identifier(catasto), git), [NamedArg(optional, Bool(true))])",
+        ),
         (
             "<$date(default: auto)>",
             "Call(Identifier(date), [NamedArg(default, Auto)])",
@@ -330,7 +335,6 @@ fn what_is_not_a_seat_is_text() {
         "<$x",
         "<$>",
         "a <$ b",
-        "<$x.y>",
         "<$x{a: 1}>",
         "<$x[t]>",
         "<$x#(id)>",
@@ -464,4 +468,28 @@ fn unclosed_type_seat_paren_is_refused() {
     for src in ["<$x(a>", "<$x(", "<$x(\"a>"] {
         assert!(parse_file(src).is_err(), "{src:?} must be refused");
     }
+}
+
+#[test]
+fn type_seat_as_tuple_entry_key_lowers_and_rejects_duplicates() {
+    let val = crate::parse_value("(<$string>: <$int>)").unwrap();
+    let Value::Tuple(tuple) = val else {
+        panic!("expected tuple, got {val:?}");
+    };
+    assert_eq!(tuple.len(), 1);
+    let entry = tuple.nth(0).unwrap();
+    assert_eq!(
+        entry.type_seat_key().map(|s| s.to_string()).as_deref(),
+        Some("<$string>")
+    );
+    assert!(matches!(
+        entry.value(),
+        Value::TypeSeat(seat) if seat.to_string() == "<$int>"
+    ));
+
+    // Duplicate type seat key is rejected.
+    assert!(crate::parse_value("(<$string>: 1, <$string>: 2)").is_err());
+
+    // Type seat key in a `{...}` group is rejected.
+    assert!(parse_file("@card{ <$string>: 1 }\n").is_err());
 }

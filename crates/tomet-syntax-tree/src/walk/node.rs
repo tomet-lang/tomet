@@ -60,6 +60,8 @@ pub enum Node<'a> {
     Item(&'a ListItem),
     /// A list nested in a list item.
     List(&'a List),
+    /// A type seat in key position of a tuple entry (`<$type>: value`).
+    TypeSeat(&'a TypeSeat),
 }
 
 impl<'a> Node<'a> {
@@ -104,6 +106,7 @@ impl<'a> Node<'a> {
             Node::Value(Value::TypeSeat(t)) => Some(t.span),
             Node::Value(Value::Call(_, args)) => (!args.span().is_dummy()).then_some(args.span()),
             Node::Value(_) => None,
+            Node::TypeSeat(t) => Some(t.span),
         }
     }
 
@@ -174,7 +177,8 @@ impl<'a> Node<'a> {
         match self {
             Node::Block(Block::TypeSeat(t))
             | Node::Inline(Inline::TypeSeat(t))
-            | Node::Value(Value::TypeSeat(t)) => Some(t),
+            | Node::Value(Value::TypeSeat(t))
+            | Node::TypeSeat(t) => Some(t),
             _ => None,
         }
     }
@@ -230,8 +234,11 @@ pub fn children<'a>(node: Node<'a>, f: &mut dyn FnMut(Node<'a>, Place)) {
             Value::Element(el) => element(el, f),
             Value::Hole(h) => groups(&h.data, h.content.as_deref(), f),
             Value::Tuple(tuple) | Value::Call(_, tuple) => {
-                for v in tuple.values() {
-                    f(Node::Value(v), Place::Part);
+                for entry in tuple.entries() {
+                    if let Some(seat) = entry.type_seat_key() {
+                        f(Node::TypeSeat(seat), Place::Part);
+                    }
+                    f(Node::Value(entry.value()), Place::Part);
                 }
             }
             Value::Blocks(blocks) => {
@@ -255,6 +262,7 @@ pub fn children<'a>(node: Node<'a>, f: &mut dyn FnMut(Node<'a>, Place)) {
             connects(&item.connects, f);
         }
         Node::List(l) => list(l, f),
+        Node::TypeSeat(_) => {}
     }
 }
 

@@ -45,6 +45,7 @@
   video:      @file(tmtroot/schema/vocabularies/video.vocabulary.tmt)
   idea:       @file(tmtroot/schema/vocabularies/idea.vocabulary.tmt)
   roots:      @file(tmtroot/schema/vocabularies/roots.vocabulary.tmt)
+  catasto:    @file(tmtroot/schema/vocabularies/catasto@1.0.0.vocabulary.tmt)
   tomet:      @file(tmtroot/dict/tomet.dict.tmt)
 )
 ::blueprint(
@@ -52,6 +53,7 @@
   element: @file(tmtroot/schema/blueprints/element.blueprint.tmt)
   crate:   @file(tmtroot/schema/blueprints/crate.blueprint.tmt)
   demo:    @file(tmtroot/schema/blueprints/demo.blueprint.tmt)
+  catasto: @file(tmtroot/schema/blueprints/catasto.blueprint.ctmt)
 )
 ::workspace(
   ignore:  ("00-09 System/01 Apps/obsidian")

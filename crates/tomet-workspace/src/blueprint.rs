@@ -93,8 +93,13 @@ pub fn find_blueprint(root: &Path, name: &str, config: &PrinterConfig) -> Option
 /// `::blueprint(X)`.
 fn blueprint_name(path: &Path) -> Option<String> {
     let src = fs::read_to_string(path).ok()?;
-    let doc = tomet_ast_parser::parse_file(&src).ok()?;
-    tomet_declaration::document_blueprint(&doc)
+    if path.extension().and_then(|ext| ext.to_str()) == Some("ctmt") {
+        let doc = tomet_ast_parser::parse_data_file(&src).ok()?;
+        tomet_declaration::document_blueprint(&doc)
+    } else {
+        let doc = tomet_ast_parser::parse_file(&src).ok()?;
+        tomet_declaration::document_blueprint(&doc)
+    }
 }
 
 /// An expression in a blueprint that had no value, and so stands in the new

@@ -2498,6 +2498,7 @@ dependencies = [
  "tomet-semantics",
  "tomet-semantics-core",
  "tomet-span",
+ "tomet-spelling",
  "tomet-tree",
  "tomet-type",
  "tomet-validator-core",

@@ -243,7 +243,7 @@ impl InterpExpr {
     }
 
     /// A name, or `.member`s of one: what `$name(...)` can take as its callee.
-    fn is_name_chain(&self) -> bool {
+    pub fn is_name_chain(&self) -> bool {
         match &self.kind {
             InterpExprKind::Identifier(_) => true,
             InterpExprKind::Member { object, .. } => object.is_name_chain(),

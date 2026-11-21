@@ -60,7 +60,15 @@ fn find_not_data(v: &Value) -> Option<(Span, &'static str)> {
             seat.span,
             "a type seat (`<$type>`) is not read: this reader reads data only",
         )),
-        Value::Tuple(tuple) | Value::Call(_, tuple) => tuple.values().find_map(find_not_data),
+        Value::Tuple(tuple) | Value::Call(_, tuple) => tuple.entries().find_map(|entry| {
+            if let Some(seat) = entry.type_seat_key() {
+                return Some((
+                    seat.span,
+                    "a type seat (`<$type>`) is not read: this reader reads data only",
+                ));
+            }
+            find_not_data(entry.value())
+        }),
         _ => None,
     }
 }
@@ -303,5 +311,25 @@ mod tests {
             Value::Tuple(Tuple::new())
         );
         assert!(parse_file("a: 1\n").unwrap().header.is_empty());
+    }
+
+    #[test]
+    fn type_seat_in_key_position_is_rejected_in_data_mode_and_allowed_with_expressions() {
+        let src = "<$string>: <$int>\n";
+        let err = parse_file(src).unwrap_err();
+        assert!(err.message.contains("type seat"), "{}", err.message);
+
+        let file = parse_file_with_expressions(src).unwrap();
+        let Value::Tuple(tuple) = &file.body else {
+            panic!("expected tuple body");
+        };
+        assert_eq!(
+            tuple
+                .nth(0)
+                .and_then(|e| e.type_seat_key())
+                .map(|s| s.to_string())
+                .as_deref(),
+            Some("<$string>")
+        );
     }
 }

@@ -976,7 +976,16 @@ impl Bindings {
             .collect();
 
         let kind = tomet_declaration::document_kind(doc)
-            .and_then(|kind| by_namespace.get(&kind))
+            .and_then(|kind| {
+                by_namespace.get(&kind).or_else(|| {
+                    if kind == "blueprint" {
+                        tomet_declaration::document_blueprint(doc)
+                            .and_then(|target| by_namespace.get(&target))
+                    } else {
+                        None
+                    }
+                })
+            })
             .cloned();
 
         let mut used = BTreeMap::new();

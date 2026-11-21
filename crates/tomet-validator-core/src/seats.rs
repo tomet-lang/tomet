@@ -40,6 +40,20 @@ pub fn check_type_seats(doc: &File, errors: &mut Vec<Diagnostic>) {
     });
 }
 
+/// Reports every type seat in a non-blueprint `.ctmt` file as [`Diagnostic::TypeSeatOutsideBlueprint`].
+pub fn check_ctmt_type_seats(doc: &File<tomet_ast::Value>, errors: &mut Vec<Diagnostic>) {
+    let mut report = |seat: &TypeSeat| {
+        errors.push(Diagnostic::TypeSeatOutsideBlueprint {
+            seat: seat.to_string(),
+            span: seat.span,
+        });
+    };
+    for decl in &doc.header {
+        tomet_tree::for_each_type_seat_in_declaration(decl, &mut report);
+    }
+    tomet_tree::for_each_type_seat_in_value(&doc.body, &mut report);
+}
+
 /// What is wrong with the type `seat` is written as, or `None` when nothing is, or when it cannot
 /// be told from the text alone.
 fn problem_with(seat: &TypeSeat) -> Option<String> {

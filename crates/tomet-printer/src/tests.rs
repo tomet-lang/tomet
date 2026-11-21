@@ -1114,3 +1114,11 @@ fn a_paragraph_that_starts_with_a_semicolon_is_still_escaped_after_one() {
     let printed = printed_with_separator("a\n\n\\;b\n", Some(ParagraphSeparator::Semicolon));
     assert_eq!(printed, "a\n;\\;b\n");
 }
+
+#[test]
+fn type_seat_entry_key_roundtrips_through_printer() {
+    let src = "::macro(m: (<$string>: <$int>))\n";
+    let doc = tomet_ast_parser::parse_file(src).unwrap();
+    let printed = crate::document_to_tm(&doc);
+    assert_eq!(printed, src);
+}

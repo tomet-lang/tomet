@@ -67,4 +67,4 @@ pub use nexus::{
     BodyView, Connect, Data, Declaration, Element, ElementView, Entry, Group, Hole, Id, Name,
     Placement,
 };
-pub use value::{DuplicateKey, Tuple, TupleEntry, Value};
+pub use value::{DuplicateKey, EntryKey, Tuple, TupleEntry, Value};

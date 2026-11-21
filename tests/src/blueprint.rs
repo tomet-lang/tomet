@@ -225,3 +225,66 @@ fn a_type_seat_in_an_ordinary_document_is_an_error() {
         "{found:?}"
     );
 }
+
+#[test]
+fn cotomet_blueprint_discovery_and_validation() {
+    let temp_dir = std::env::temp_dir().join(format!(
+        "tm_test_cross_ctmt_blueprint_{}",
+        std::process::id()
+    ));
+    let _ = fs::remove_dir_all(&temp_dir);
+    fs::create_dir_all(temp_dir.join("blueprints")).unwrap();
+
+    let bp_src = "::kind(blueprint)\n::blueprint(manifest)\n::upstream(<$string>: <$manifest.git>)\n\n<$string>: <$enum(manifest.git, manifest.local)>\n";
+    fs::write(temp_dir.join("blueprints/manifest.blueprint.ctmt"), bp_src).unwrap();
+
+    let config = PrinterConfig {
+        registry: RegistryConfig {
+            blueprints: vec!["blueprints/manifest.blueprint.ctmt".to_string()],
+            ..Default::default()
+        },
+        ..PrinterConfig::default()
+    };
+
+    assert!(tomet_workspace::declaration_errors(&temp_dir, &config).is_empty());
+    let found_bp = tomet_workspace::find_blueprint(&temp_dir, "manifest", &config)
+        .expect("blueprint should be discovered");
+    assert_eq!(
+        found_bp,
+        temp_dir.join("blueprints/manifest.blueprint.ctmt")
+    );
+
+    let vocab = tomet_semantics::Vocabulary::from_file(
+        &tomet_ast_parser::parse_file(
+            "::kind(vocabulary)\n::vocabulary(manifest, version: \"1.0.0\")\n::attribute(\n  upstream: (host: ctmt)\n)\n::constructor(\n  git: (args: (url: (type: string, positional: true, required: true)))\n  local: (args: (path: (type: string, positional: true, required: true)))\n)\n",
+        )
+        .unwrap(),
+    )
+    .unwrap();
+
+    let bp_doc = tomet_ast_parser::parse_data_file(bp_src).unwrap();
+    let bp_bindings = tomet_semantics::Bindings::for_document(&bp_doc, [vocab.clone()]);
+    assert!(
+        tomet_validator::validate_ctmt_blueprint(&bp_doc, &bp_bindings).is_empty(),
+        "self-validation of .blueprint.ctmt should pass"
+    );
+
+    let valid_doc = tomet_ast_parser::parse_data_file(
+        "::kind(manifest)\n::upstream(base: manifest.git(\"https://example.com/base.git\"))\n\n\"a.tmt\": manifest.local(\"src/a.tmt\")\n",
+    )
+    .unwrap();
+    let valid_bindings = tomet_semantics::Bindings::for_document(&valid_doc, [vocab.clone()]);
+    assert!(
+        tomet_validator::validate_ctmt_against_blueprint(&valid_doc, &bp_doc, &valid_bindings)
+            .is_empty()
+    );
+
+    let invalid_doc =
+        tomet_ast_parser::parse_data_file("::kind(manifest)\n\n\"a.tmt\": 42\n").unwrap();
+    let invalid_bindings = tomet_semantics::Bindings::for_document(&invalid_doc, [vocab]);
+    let errs =
+        tomet_validator::validate_ctmt_against_blueprint(&invalid_doc, &bp_doc, &invalid_bindings);
+    assert_eq!(errs.len(), 2, "{errs:?}");
+
+    let _ = fs::remove_dir_all(&temp_dir);
+}

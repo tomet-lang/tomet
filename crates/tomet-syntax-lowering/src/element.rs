@@ -9,8 +9,12 @@ use crate::interp::unescape;
 use crate::lower::error_node::lower_error;
 use crate::lower::form::{LoweredSlot, lower_element, lower_slot, slot_of};
 use crate::lower::groups::{lower_content, lower_embedded};
-use tomet_ast::{Block, Connect, Data, Entry, Group, Id, Placement, Tuple, TupleEntry, Value};
-use tomet_cst::{SyntaxElement, SyntaxKind as K, SyntaxNode, SyntaxToken};
+use tomet_ast::{
+    Block, Connect, Data, Entry, EntryKey, Group, Id, Placement, Tuple, TupleEntry, Value,
+};
+use tomet_cst::{
+    AstNode, CstSlot, CstSlotMark, SyntaxElement, SyntaxKind as K, SyntaxNode, SyntaxToken,
+};
 use tomet_tree::ElementExt;
 
 pub(crate) fn duplicate_key_error(pos: usize, key: &str) -> Error {
@@ -196,12 +200,22 @@ pub(crate) fn lower_value_group(node: &SyntaxNode) -> Result<Group> {
             K::ERROR => return Err(lower_error(child)),
             K::MAP_ENTRY => {
                 let (key, value, offset) = lower_map_entry(child, false)?;
-                let Some(key) = key else {
-                    return Err(err(
-                        offset,
-                        "a '{...}' group holds 'key: value' entries or elements; \
-                         write a bare value in '(args)' instead",
-                    ));
+                let key = match key {
+                    Some(EntryKey::Name(key)) => key,
+                    Some(EntryKey::TypeSeat(_)) => {
+                        return Err(err(
+                            offset,
+                            "a type seat cannot be a key in a '{...}' group; \
+                             write it in '(args)' instead",
+                        ));
+                    }
+                    None => {
+                        return Err(err(
+                            offset,
+                            "a '{...}' group holds 'key: value' entries or elements; \
+                             write a bare value in '(args)' instead",
+                        ));
+                    }
                 };
                 if entries
                     .iter()
@@ -329,13 +343,13 @@ pub(crate) fn lower_tuple_entries(
     // Every entry with the key it is written with and where it stands. An entry written without
     // a key has the key of its position among the entries written without one; that is decided
     // here, on the text, because a tuple does not know how its entries were spelled.
-    let mut written: Vec<(String, Value, usize)> = Vec::new();
+    let mut written: Vec<(EntryKey, Value, usize)> = Vec::new();
     let mut unnamed_count = 0usize;
     let mut seen_named = false;
-    // The one place that admits an entry. `key` is `None` for an entry written without a name:
-    // such an entry is refused where only named ones are allowed, and everywhere it must stand
-    // to the left of the named ones.
-    let mut write = |key: Option<String>, value: Value, offset: usize| -> Result<()> {
+    // The one place that admits an entry. `key` is `None` for an entry written without a key:
+    // such an entry is refused where only keyed ones are allowed, and everywhere it must stand
+    // to the left of the keyed ones.
+    let mut write = |key: Option<EntryKey>, value: Value, offset: usize| -> Result<()> {
         let key = match key {
             Some(key) => {
                 seen_named = true;
@@ -352,11 +366,15 @@ pub(crate) fn lower_tuple_entries(
                     ));
                 }
                 unnamed_count += 1;
-                (unnamed_count - 1).to_string()
+                EntryKey::Name((unnamed_count - 1).to_string())
             }
         };
         if written.iter().any(|(held, _, _)| *held == key) {
-            return Err(duplicate_key_error(offset, &key));
+            let display = match &key {
+                EntryKey::Name(name) => name.clone(),
+                EntryKey::TypeSeat(seat) => seat.to_string(),
+            };
+            return Err(duplicate_key_error(offset, &display));
         }
         written.push((key, value, offset));
         Ok(())
@@ -412,11 +430,10 @@ pub(crate) fn lower_tuple_entries(
         }
     }
     let offsets: Vec<usize> = written.iter().map(|(_, _, offset)| *offset).collect();
-    Tuple::try_from_entries(
-        written
-            .into_iter()
-            .map(|(key, value, _)| TupleEntry::named(key, value)),
-    )
+    Tuple::try_from_entries(written.into_iter().map(|(key, value, _)| match key {
+        EntryKey::Name(name) => TupleEntry::named(name, value),
+        EntryKey::TypeSeat(seat) => TupleEntry::type_seat(seat, value),
+    }))
     .map_err(|duplicate| duplicate_key_error(offsets[duplicate.index], &duplicate.key))
 }
 
@@ -424,7 +441,7 @@ pub(crate) fn lower_tuple_entries(
 pub(crate) fn lower_map_entry(
     node: &SyntaxNode,
     raw_scalars: bool,
-) -> Result<(Option<String>, Value, usize)> {
+) -> Result<(Option<EntryKey>, Value, usize)> {
     let start = usize::from(node.text_range().start());
     let colon = node.children_with_tokens().find(|e| e.kind() == K::COLON);
     let Some(colon) = colon else {
@@ -477,27 +494,40 @@ pub(crate) fn lower_map_entry(
         ));
     }
 
-    if key_tokens.iter().any(|t| t.kind() == K::DOLLAR) {
-        return Err(err(start, "an expression cannot be a key"));
-    }
+    let slot_before_colon = node
+        .children_with_tokens()
+        .take_while(|e| e.kind() != K::COLON)
+        .find_map(|e| e.into_node().filter(|n| n.kind() == K::SLOT));
 
-    let key = if key_tokens.is_empty() {
-        None
-    } else if key_tokens[0].kind() == K::STRING_LITERAL {
-        let token = &key_tokens[0];
-        let offset = usize::from(token.text_range().start());
-        let unescaped = unescape_quoted_string(token.text(), offset)?;
-        if unescaped.is_empty() {
-            return Err(err(offset, "a quoted key must not be empty"));
-        }
-        Some(unescaped)
+    let key = if let Some(slot_node) = slot_before_colon
+        && CstSlot::cast(slot_node.clone()).is_some_and(|s| s.mark() == CstSlotMark::TypeSeat)
+    {
+        Some(EntryKey::TypeSeat(crate::interp::lower_type_seat(
+            &slot_node,
+        )?))
     } else {
-        let mut k = String::new();
-        for t in &key_tokens {
-            k.push_str(t.text());
+        if key_tokens.iter().any(|t| t.kind() == K::DOLLAR) {
+            return Err(err(start, "an expression cannot be a key"));
         }
-        let trimmed = k.trim();
-        (!trimmed.is_empty()).then(|| trimmed.to_string())
+
+        if key_tokens.is_empty() {
+            None
+        } else if key_tokens[0].kind() == K::STRING_LITERAL {
+            let token = &key_tokens[0];
+            let offset = usize::from(token.text_range().start());
+            let unescaped = unescape_quoted_string(token.text(), offset)?;
+            if unescaped.is_empty() {
+                return Err(err(offset, "a quoted key must not be empty"));
+            }
+            Some(EntryKey::Name(unescaped))
+        } else {
+            let mut k = String::new();
+            for t in &key_tokens {
+                k.push_str(t.text());
+            }
+            let trimmed = k.trim();
+            (!trimmed.is_empty()).then(|| EntryKey::Name(trimmed.to_string()))
+        }
     };
 
     let elements_after_colon: Vec<SyntaxElement> = node

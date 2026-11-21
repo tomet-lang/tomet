@@ -57,7 +57,11 @@ pub fn comment_text(el: ElementView<'_>) -> String {
             Node::Inline(Inline::SoftBreak(_) | Inline::LineBreak(_)) => state.push("\n"),
             Node::Inline(Inline::Interp(interp)) => state.push(&interp.to_string()),
             Node::Inline(Inline::Element(_)) => state.inline_elements += 1,
-            Node::Declaration(_) | Node::Value(_) | Node::Entry(_) | Node::Connect(_) => {}
+            Node::Declaration(_)
+            | Node::Value(_)
+            | Node::Entry(_)
+            | Node::Connect(_)
+            | Node::TypeSeat(_) => {}
         }
         Visit::<()>::Descend
     };

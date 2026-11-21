@@ -158,12 +158,13 @@ pub(crate) fn render_args(tuple: &Tuple, config: &PrinterConfig) -> String {
     parts.join(", ")
 }
 
-/// One entry of a tuple as it is written: `value`, or `name: value`.
+/// One entry of a tuple as it is written: `value`, `name: value`, or `<$type>: value`.
 fn render_entry(entry: &tomet_ast::TupleEntry, config: &PrinterConfig) -> String {
     let value = render_nested(entry.value(), config);
-    match entry.name() {
+    match entry.key() {
         None => value,
-        Some(name) => format!("{}: {value}", key_text(name)),
+        Some(tomet_ast::EntryKey::Name(name)) => format!("{}: {value}", key_text(name)),
+        Some(tomet_ast::EntryKey::TypeSeat(seat)) => format!("{seat}: {value}"),
     }
 }
 

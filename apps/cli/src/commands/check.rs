@@ -314,15 +314,36 @@ fn check_ctmt(file: &Path, src: &str, vault: &tomet_load::Vault, json: bool) -> 
         tomet_declaration::Host::Ctmt,
         &mut diagnostics,
     );
-    tomet_validator::check_ctmt_calls(&parsed, &bindings, &mut diagnostics);
 
-    let eval_res = cotomet_eval::eval_file(parsed, src, &[]);
-    let eval_errors: Vec<_> = match eval_res {
-        Ok(_) => Vec::new(),
-        Err(errors) => errors
-            .into_iter()
-            .filter(|e| !header_spans.iter().any(|s| s.contains_offset(e.span.start)))
-            .collect(),
+    let is_blueprint = tomet_declaration::document_kind(&parsed).as_deref() == Some("blueprint");
+    let eval_errors: Vec<_> = if is_blueprint {
+        diagnostics.extend(tomet_validator::validate_ctmt_blueprint(
+            &parsed, &bindings,
+        ));
+        Vec::new()
+    } else {
+        tomet_validator::check_ctmt_type_seats(&parsed, &mut diagnostics);
+        tomet_validator::check_ctmt_calls(&parsed, &bindings, &mut diagnostics);
+
+        if let Some(kind) = tomet_declaration::document_kind(&parsed)
+            && let Some(bp_path) =
+                tomet_workspace::blueprint::find_blueprint(&vault.root, &kind, &vault.config)
+            && tomet_indexer::is_ctmt_file(&bp_path)
+            && let Ok(bp_src) = std::fs::read_to_string(&bp_path)
+            && let Ok(bp_doc) = tomet_ast_parser::parse_data_file(&bp_src)
+        {
+            diagnostics.extend(tomet_validator::validate_ctmt_against_blueprint(
+                &parsed, &bp_doc, &bindings,
+            ));
+        }
+
+        match cotomet_eval::eval_file(parsed, src, &[]) {
+            Ok(_) => Vec::new(),
+            Err(errors) => errors
+                .into_iter()
+                .filter(|e| !header_spans.iter().any(|s| s.contains_offset(e.span.start)))
+                .collect(),
+        }
     };
 
     let index = LineIndex::new(src);
@@ -940,6 +961,76 @@ mod tests {
         assert_eq!(errs.len(), 1, "expected 1 error, got {:?}", errs);
         let err = check(&bad_var_file, false, true, false).expect_err("bad vars fails");
         assert!(err.to_string().contains("1 of 1 file(s) failed"));
+
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn cotomet_blueprint_and_target_check() {
+        let root = vault("ctmt_blueprint_check");
+        fs::write(
+            root.join(".tomet/vocabularies/catasto.vocabulary.tmt"),
+            "::kind(vocabulary)\n::vocabulary(catasto, version: \"1.0.0\")\n::attribute(\n  upstream: (host: ctmt)\n)\n::constructor(\n  git: (\n    args: (\n      url: (type: string, positional: true, required: true)\n    )\n  )\n  local: (\n    args: (\n      path: (type: string, positional: true, required: true)\n    )\n  )\n)\n",
+        )
+        .unwrap();
+        fs::write(
+            root.join(tomet_load_config::VAULT_CONFIG_FILE),
+            "::kind(config)\n::vocabulary(catasto: @file(.tomet/vocabularies/catasto.vocabulary.tmt))\n::blueprint(catasto: @file(catasto.blueprint.ctmt))\n",
+        )
+        .unwrap();
+
+        let bp_file = root.join("catasto.blueprint.ctmt");
+        fs::write(
+            &bp_file,
+            "::kind(blueprint)\n::blueprint(catasto)\n::upstream(<$string>: <$catasto.git>)\n\n<$string>: <$enum(catasto.git, catasto.local)>\n",
+        )
+        .unwrap();
+        check(&bp_file, false, true, false).expect("valid .blueprint.ctmt passes");
+
+        let bad_bp = root.join("bad.blueprint.ctmt");
+        fs::write(
+            &bad_bp,
+            "::kind(blueprint)\n::blueprint(catasto)\n\n<$string>: <$catasto.missing>\n",
+        )
+        .unwrap();
+        check(&bad_bp, false, true, false).expect_err("unknown constructor in blueprint fails");
+
+        let good_ctmt = root.join("good.ctmt");
+        fs::write(
+            &good_ctmt,
+            "::kind(catasto)\n::upstream(common: catasto.git(\"https://example.com/a.git\"))\n\n\"a.txt\": catasto.local(\"b.txt\")\n",
+        )
+        .unwrap();
+        check(&good_ctmt, false, true, false).expect("conforming .ctmt passes");
+
+        let bad_ctmt = root.join("bad.ctmt");
+        fs::write(
+            &bad_ctmt,
+            "::kind(catasto)\n\n\"a.txt\": \"not a constructor\"\n",
+        )
+        .unwrap();
+        check(&bad_ctmt, false, true, false).expect_err("non-conforming .ctmt fails");
+
+        let seat_in_ctmt = root.join("seat.ctmt");
+        fs::write(&seat_in_ctmt, "key: <$string>\n").unwrap();
+        let vault = tomet_load::Vault::discover(&seat_in_ctmt);
+        let res = check_ctmt(&seat_in_ctmt, "key: <$string>\n", &vault, false);
+        match res {
+            CheckFileResult::Checked {
+                has_errors,
+                stderr_lines,
+                ..
+            } => {
+                assert!(has_errors);
+                assert!(
+                    stderr_lines
+                        .iter()
+                        .any(|l| l.contains("is a type seat, and type seats belong in a blueprint")),
+                    "{stderr_lines:?}"
+                );
+            }
+            _ => panic!("expected CheckFileResult::Checked"),
+        }
 
         let _ = fs::remove_dir_all(&root);
     }
