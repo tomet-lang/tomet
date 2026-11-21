@@ -277,10 +277,6 @@ pub const KNOWN_TS_ERRORS: &[(&str, &[&str])] = &[
     // cases, and splitting the file to isolate exactly which lines
     // already pass is not worth it for a fixture this size.
     ("syntax/connect.tmt", &[ANY_ERROR]),
-    // Dotted `::ns.x` heads: grammar.js not yet regenerated.
-    ("syntax/declaration-namespaced.tmt", &[ANY_ERROR]),
-    ("syntax/nexus-invalid-declaration-dot-positional.tmt", &[ANY_ERROR]),
-    ("syntax/nexus-invalid-declaration-dot.tmt", &[ANY_ERROR]),
     // ---- the nexus rule, refused on purpose --------------------------
     //
     // `syntax/nexus-invalid-*.tmt` are forms `tomet-parser` refuses: a nexus

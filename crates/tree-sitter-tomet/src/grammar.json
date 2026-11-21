@@ -2579,7 +2579,7 @@
             "name": "name",
             "content": {
               "type": "SYMBOL",
-              "name": "_declaration_name"
+              "name": "_element_name"
             }
           },
           {
@@ -3098,22 +3098,6 @@
     "identifier": {
       "type": "PATTERN",
       "value": "[A-Za-z_][A-Za-z0-9_.-]*"
-    },
-    "_declaration_name": {
-      "type": "ALIAS",
-      "content": {
-        "type": "TOKEN",
-        "content": {
-          "type": "PREC",
-          "value": 1,
-          "content": {
-            "type": "PATTERN",
-            "value": "[A-Za-z_][A-Za-z0-9_-]*"
-          }
-        }
-      },
-      "named": true,
-      "value": "identifier"
     },
     "_element_name": {
       "type": "ALIAS",

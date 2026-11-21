@@ -772,7 +772,7 @@ module.exports = grammar({
         3,
         seq(
           token(prec(2, "::")),
-          field("name", $._declaration_name),
+          field("name", $._element_name),
           $._nexus_groups,
         ),
       ),
@@ -1012,15 +1012,8 @@ module.exports = grammar({
     // `_entry_value`/`scalar`'s comment). Aliased back to `identifier`
     // (referencing the rule, not a bare string) so it still shows up as
     // a normal, visible `identifier` node in the tree.
-    // A declaration name is an ASCII identifier with no `.` (a declaration head has no dot).
-    _declaration_name: ($) =>
-      alias(
-        token(prec(1, /[A-Za-z_][A-Za-z0-9_-]*/)),
-        $.identifier,
-      ),
-
-    // An element name is an ASCII identifier, optionally `.`-separated
-    // into `namespace.name`. The old permissive charset existed to let
+    // An element or declaration name is an ASCII identifier, optionally `.`-separated
+    // into `namespace.name`: `@ns.x` and `::ns.x` are namespaced the same way. The old permissive charset existed to let
     // `<id:taskA>` smuggle a target through the name; that is
     // `#id(taskA)` now, so the name can be a real identifier.
     _element_name: ($) =>
