@@ -10,7 +10,7 @@ pub mod ctmt;
 pub mod seat;
 
 pub use ctmt::{
-    CtmtBlueprintSchema, HeaderAttrSchema, MapEntrySchema, MapSchema, ValueSchema,
+    CtmtBlueprintSchema, HeaderAttrSchema, MapEntrySchema, MapSchema, TupleSchema, ValueSchema,
     extract_ctmt_blueprint_schema, validate_ctmt_against_blueprint, validate_ctmt_against_schema,
     validate_ctmt_blueprint,
 };

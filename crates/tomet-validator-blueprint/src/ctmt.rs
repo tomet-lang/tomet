@@ -12,6 +12,8 @@
 //!   (`<$type>: <schema>`) accept any key matching `<$type>` that is not already a fixed key.
 //!   Maps without a dynamic key are closed: unrecognized keys produce [`Diagnostic::UnknownKey`].
 
+use std::fmt;
+
 use tomet_ast::{EntryKey, File, Tuple, Value};
 use tomet_scalar::Scalar;
 use tomet_semantics::{Bindings, DeclKind, ElementKind, classify_declaration_lenient};
@@ -41,7 +43,7 @@ pub struct HeaderAttrSchema {
     pub span: Span,
 }
 
-/// Schema for a cotomet map (`(...)` or top-level `.ctmt` body).
+/// Schema for the keyed entries of a cotomet map or tuple.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct MapSchema {
     pub fixed: Vec<(String, MapEntrySchema)>,
@@ -49,6 +51,11 @@ pub struct MapSchema {
 }
 
 impl MapSchema {
+    /// Returns `true` when there are neither fixed nor dynamic keyed entries.
+    pub fn is_empty(&self) -> bool {
+        self.fixed.is_empty() && self.dynamic.is_none()
+    }
+
     /// Returns `true` when every fixed entry is optional and any dynamic key is also optional
     /// (or there are no entries at all).
     pub fn is_all_optional(&self) -> bool {
@@ -68,22 +75,125 @@ pub struct MapEntrySchema {
     pub span: Span,
 }
 
+/// Schema for a cotomet tuple `(...)`, covering empty tuples, homogeneous lists,
+/// positional tuples, keyed maps, and mixed positional + named tuples:
+///
+/// - empty `()` (`positional.is_empty() && named.is_empty()`) matches `()`
+/// - single positional item with no named entries (`positional.len() == 1 && named.is_empty()`)
+///   matches a homogeneous 0+ list
+/// - pure keyed map (`positional.is_empty() && !named.is_empty()`) matches keyed entries only
+/// - fixed/bounded positional or mixed tuple (`!positional.is_empty()` with either
+///   `positional.len() >= 2` or `!named.is_empty()`) validates positional slots and named keys.
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct TupleSchema {
+    pub positional: Vec<ValueSchema>,
+    pub named: MapSchema,
+}
+
+impl TupleSchema {
+    /// Returns `true` for the empty tuple schema `()`.
+    pub fn is_empty(&self) -> bool {
+        self.positional.is_empty() && self.named.is_empty()
+    }
+
+    /// Returns `true` when this tuple schema describes a keyed-only map.
+    pub fn is_pure_map(&self) -> bool {
+        self.positional.is_empty() && !self.named.is_empty()
+    }
+
+    /// Returns `true` when this tuple schema describes a 0+ homogeneous list `(S)`.
+    pub fn is_list(&self) -> bool {
+        self.positional.len() == 1 && self.named.is_empty()
+    }
+
+    /// Returns `true` when every positional item and every named entry is optional
+    /// (or the tuple is empty).
+    pub fn is_all_optional(&self) -> bool {
+        self.positional.iter().all(value_schema_is_optional) && self.named.is_all_optional()
+    }
+
+    /// Returns `(min_positional, max_positional)` for fixed/mixed tuples.
+    ///
+    /// Trailing positional items marked optional (or carrying a `default`) may be omitted.
+    pub fn positional_arity(&self) -> (usize, usize) {
+        let max = self.positional.len();
+        let min = self
+            .positional
+            .iter()
+            .rposition(|item| !value_schema_is_optional(item))
+            .map_or(0, |idx| idx + 1);
+        (min, max)
+    }
+}
+
 /// Recursive schema for any cotomet value in a `.blueprint.ctmt` document.
 #[derive(Debug, Clone, PartialEq)]
 pub enum ValueSchema {
     /// A `<$...>` type seat constraint.
     Seat(SeatSpec),
-    /// A map with fixed and/or dynamic keys.
-    Map(Box<MapSchema>),
-    /// A positional tuple or homogeneous list:
-    /// - empty `()` matches `()`
-    /// - 1 element `(S)` matches a list of 0+ elements each matching `S`
-    /// - N elements `(S1, S2, ...)` matches an N-tuple positionally
-    List(Vec<ValueSchema>),
+    /// A tuple, list, or map schema.
+    Tuple(Box<TupleSchema>),
     /// A literal scalar constant.
     Literal(Scalar),
     /// A literal constructor call written directly outside a `<$...>` seat.
     LiteralCall { head: String, args: Tuple },
+}
+
+pub(crate) fn value_schema_is_optional(schema: &ValueSchema) -> bool {
+    matches!(
+        schema,
+        ValueSchema::Seat(spec) if spec.optional || spec.default.is_some()
+    )
+}
+
+impl fmt::Display for ValueSchema {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ValueSchema::Seat(spec) => {
+                if spec.optional {
+                    write!(f, "{} (optional)", spec.ty)
+                } else {
+                    write!(f, "{}", spec.ty)
+                }
+            }
+            ValueSchema::Tuple(tuple) => write!(f, "{tuple}"),
+            ValueSchema::Literal(s) => write!(f, "`{}`", scalar_spelling(s)),
+            ValueSchema::LiteralCall { head, .. } => write!(f, "`{head}(...)`"),
+        }
+    }
+}
+
+impl fmt::Display for TupleSchema {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "(")?;
+        let mut first = true;
+        let mut sep = |f: &mut fmt::Formatter<'_>| -> fmt::Result {
+            if !first {
+                write!(f, ", ")?;
+            }
+            first = false;
+            Ok(())
+        };
+        for item in &self.positional {
+            sep(f)?;
+            write!(f, "{item}")?;
+        }
+        for (name, entry) in &self.named.fixed {
+            sep(f)?;
+            let already_annotated =
+                matches!(&entry.schema, ValueSchema::Seat(spec) if spec.optional);
+            if entry.optional && !already_annotated {
+                write!(f, "{name}: {} (optional)", entry.schema)?;
+            } else {
+                write!(f, "{name}: {}", entry.schema)?;
+            }
+        }
+        if let Some((key_spec, val_schema)) = &self.named.dynamic {
+            sep(f)?;
+            write!(f, "<${}>: {val_schema}", key_spec.ty)?;
+        }
+        write!(f, ")")
+    }
 }
 
 /// Extracts a [`CtmtBlueprintSchema`] from a `.blueprint.ctmt` [`File<Value>`].
@@ -230,7 +340,7 @@ fn extract_ctmt_schema_with_errors(
                 let schema = extract_value_schema(&raw_val, decl.span, errors);
                 let optional = match &schema {
                     ValueSchema::Seat(spec) => spec.optional || spec.default.is_some(),
-                    ValueSchema::Map(map) => map.is_all_optional(),
+                    ValueSchema::Tuple(tuple) => tuple.is_all_optional(),
                     _ => false,
                 };
                 header_attrs.push(HeaderAttrSchema {
@@ -276,20 +386,11 @@ fn extract_value_schema(val: &Value, span: Span, errors: &mut Vec<Diagnostic>) -
                     reason,
                     span: seat.span,
                 });
-                ValueSchema::List(Vec::new())
+                ValueSchema::Tuple(Box::default())
             }
         },
         Value::Tuple(tuple) => {
-            let has_keyed = tuple.entries().any(|e| e.key().is_some());
-            if has_keyed {
-                ValueSchema::Map(Box::new(extract_map_schema(tuple, span, errors)))
-            } else {
-                let items = tuple
-                    .values()
-                    .map(|item| extract_value_schema(item, span, errors))
-                    .collect();
-                ValueSchema::List(items)
-            }
+            ValueSchema::Tuple(Box::new(extract_tuple_schema(tuple, span, errors)))
         }
         Value::Scalar(s) => ValueSchema::Literal(s.clone()),
         Value::Call(head, args) => ValueSchema::LiteralCall {
@@ -302,12 +403,13 @@ fn extract_value_schema(val: &Value, span: Span, errors: &mut Vec<Diagnostic>) -
                 reason: "unsupported value in blueprint schema".to_string(),
                 span,
             });
-            ValueSchema::List(Vec::new())
+            ValueSchema::Tuple(Box::default())
         }
     }
 }
 
-fn extract_map_schema(tuple: &Tuple, span: Span, errors: &mut Vec<Diagnostic>) -> MapSchema {
+fn extract_tuple_schema(tuple: &Tuple, span: Span, errors: &mut Vec<Diagnostic>) -> TupleSchema {
+    let mut positional = Vec::new();
     let mut fixed = Vec::new();
     let mut dynamic: Option<(SeatSpec, ValueSchema)> = None;
 
@@ -315,10 +417,7 @@ fn extract_map_schema(tuple: &Tuple, span: Span, errors: &mut Vec<Diagnostic>) -
         match entry.key() {
             Some(EntryKey::Name(name)) => {
                 let val_schema = extract_value_schema(entry.value(), span, errors);
-                let optional = matches!(
-                    &val_schema,
-                    ValueSchema::Seat(spec) if spec.optional || spec.default.is_some()
-                );
+                let optional = value_schema_is_optional(&val_schema);
                 fixed.push((
                     name.clone(),
                     MapEntrySchema {
@@ -353,16 +452,29 @@ fn extract_map_schema(tuple: &Tuple, span: Span, errors: &mut Vec<Diagnostic>) -
                 }
             }
             None => {
-                errors.push(Diagnostic::InvalidTypeSeat {
-                    seat: written_value(entry.value()),
-                    reason: "map schema cannot mix positional and keyed entries".to_string(),
-                    span,
-                });
+                positional.push(extract_value_schema(entry.value(), span, errors));
             }
         }
     }
 
-    MapSchema { fixed, dynamic }
+    TupleSchema {
+        positional,
+        named: MapSchema { fixed, dynamic },
+    }
+}
+
+fn extract_map_schema(tuple: &Tuple, span: Span, errors: &mut Vec<Diagnostic>) -> MapSchema {
+    let tuple_schema = extract_tuple_schema(tuple, span, errors);
+    if !tuple_schema.positional.is_empty() {
+        for item in tuple.unnamed() {
+            errors.push(Diagnostic::InvalidTypeSeat {
+                seat: written_value(item),
+                reason: "map schema cannot contain positional entries".to_string(),
+                span,
+            });
+        }
+    }
+    tuple_schema.named
 }
 
 fn check_map_schema_bindings(
@@ -379,6 +491,17 @@ fn check_map_schema_bindings(
     }
 }
 
+fn check_tuple_schema_bindings(
+    tuple: &TupleSchema,
+    bindings: &Bindings,
+    errors: &mut Vec<Diagnostic>,
+) {
+    for item in &tuple.positional {
+        check_value_schema_bindings(item, bindings, errors);
+    }
+    check_map_schema_bindings(&tuple.named, bindings, errors);
+}
+
 fn check_value_schema_bindings(
     schema: &ValueSchema,
     bindings: &Bindings,
@@ -386,12 +509,7 @@ fn check_value_schema_bindings(
 ) {
     match schema {
         ValueSchema::Seat(spec) => check_seat_bindings(spec, bindings, errors),
-        ValueSchema::Map(map) => check_map_schema_bindings(map, bindings, errors),
-        ValueSchema::List(items) => {
-            for item in items {
-                check_value_schema_bindings(item, bindings, errors);
-            }
-        }
+        ValueSchema::Tuple(tuple) => check_tuple_schema_bindings(tuple, bindings, errors),
         ValueSchema::Literal(_) | ValueSchema::LiteralCall { .. } => {}
     }
 }
@@ -403,10 +521,29 @@ fn check_seat_bindings(spec: &SeatSpec, bindings: &Bindings, errors: &mut Vec<Di
             check_constructor_exists(namespace, name, spec.span, bindings, errors);
         }
         SeatType::Enum(variants) => {
-            for variant in variants {
-                if let EnumVariant::Constructor { namespace, name } = variant {
-                    check_constructor_exists(namespace, name, spec.span, bindings, errors);
-                }
+            check_enum_variants_bindings(variants, spec.span, bindings, errors);
+        }
+        SeatType::Tuple(tuple) => check_tuple_schema_bindings(tuple, bindings, errors),
+    }
+}
+
+fn check_enum_variants_bindings(
+    variants: &[EnumVariant],
+    span: Span,
+    bindings: &Bindings,
+    errors: &mut Vec<Diagnostic>,
+) {
+    for variant in variants {
+        match variant {
+            EnumVariant::Literal(_) | EnumVariant::Type(_) => {}
+            EnumVariant::Constructor { namespace, name } => {
+                check_constructor_exists(namespace, name, span, bindings, errors);
+            }
+            EnumVariant::Enum(nested) => {
+                check_enum_variants_bindings(nested, span, bindings, errors);
+            }
+            EnumVariant::Tuple(tuple) => {
+                check_tuple_schema_bindings(tuple, bindings, errors);
             }
         }
     }
@@ -449,21 +586,28 @@ fn validate_map(
     errors: &mut Vec<Diagnostic>,
 ) {
     // Reject unexpected positional items when the schema is a map.
-    if !schema.fixed.is_empty() || schema.dynamic.is_some() {
+    if !schema.is_empty() {
         for item in tuple.unnamed() {
             errors.push(Diagnostic::InvalidBlueprintValue {
-                path: if path.is_empty() {
-                    "body".to_string()
-                } else {
-                    path.to_string()
-                },
+                path: display_path(path),
                 expected: "keyed entries".to_string(),
                 value: written_value(item),
                 span,
             });
         }
     }
+    validate_map_entries(tuple, schema, path, kind, span, bindings, errors);
+}
 
+fn validate_map_entries(
+    tuple: &Tuple,
+    schema: &MapSchema,
+    path: &str,
+    kind: &str,
+    span: Span,
+    bindings: &Bindings,
+    errors: &mut Vec<Diagnostic>,
+) {
     // Check required fixed keys.
     for (req_key, entry_schema) in &schema.fixed {
         let child_path = join_path(path, req_key);
@@ -504,6 +648,7 @@ fn validate_map(
                 &key_val,
                 key_spec,
                 &format!("{child_path} (key)"),
+                kind,
                 span,
                 bindings,
                 errors,
@@ -519,6 +664,135 @@ fn validate_map(
     }
 }
 
+fn validate_tuple_value(
+    val: &Value,
+    schema: &TupleSchema,
+    path: &str,
+    kind: &str,
+    span: Span,
+    bindings: &Bindings,
+    errors: &mut Vec<Diagnostic>,
+) {
+    let Value::Tuple(tuple) = val else {
+        let expected = if schema.is_empty() {
+            "an empty tuple `()`"
+        } else if schema.is_pure_map() {
+            "a map"
+        } else if schema.is_list() {
+            "a list"
+        } else {
+            "a tuple"
+        };
+        errors.push(Diagnostic::InvalidBlueprintValue {
+            path: display_path(path),
+            expected: expected.to_string(),
+            value: written_value(val),
+            span,
+        });
+        return;
+    };
+
+    if schema.is_empty() {
+        if !tuple.is_empty() {
+            errors.push(Diagnostic::InvalidBlueprintValue {
+                path: display_path(path),
+                expected: "an empty tuple `()`".to_string(),
+                value: written_value(val),
+                span,
+            });
+        }
+        return;
+    }
+
+    if schema.is_pure_map() {
+        validate_map(tuple, &schema.named, path, kind, span, bindings, errors);
+        return;
+    }
+
+    if schema.is_list() {
+        if !tuple.has_no_named() {
+            errors.push(Diagnostic::InvalidBlueprintValue {
+                path: display_path(path),
+                expected: "a list".to_string(),
+                value: written_value(val),
+                span,
+            });
+            return;
+        }
+        for (i, item) in tuple.values().enumerate() {
+            let item_path = format!("{}[{i}]", display_path(path));
+            validate_value(
+                item,
+                &schema.positional[0],
+                &item_path,
+                kind,
+                span,
+                bindings,
+                errors,
+            );
+        }
+        return;
+    }
+
+    let (min_pos, max_pos) = schema.positional_arity();
+    if schema.named.is_empty() && !tuple.has_no_named() {
+        errors.push(Diagnostic::InvalidBlueprintValue {
+            path: display_path(path),
+            expected: positional_arity_expected(min_pos, max_pos, false),
+            value: written_value(val),
+            span,
+        });
+        return;
+    }
+
+    let unnamed: Vec<&Value> = tuple.unnamed().collect();
+    if unnamed.len() < min_pos || unnamed.len() > max_pos {
+        errors.push(Diagnostic::InvalidBlueprintValue {
+            path: display_path(path),
+            expected: positional_arity_expected(min_pos, max_pos, !schema.named.is_empty()),
+            value: written_value(val),
+            span,
+        });
+    } else {
+        for (i, (item, item_schema)) in unnamed.iter().zip(schema.positional.iter()).enumerate() {
+            let item_path = format!("{}[{i}]", display_path(path));
+            validate_value(item, item_schema, &item_path, kind, span, bindings, errors);
+        }
+    }
+
+    if !schema.named.is_empty() {
+        validate_map_entries(tuple, &schema.named, path, kind, span, bindings, errors);
+    }
+}
+
+fn positional_arity_expected(min: usize, max: usize, has_named: bool) -> String {
+    if min == max {
+        if has_named {
+            let noun = if max == 1 { "item" } else { "items" };
+            format!("{max} positional {noun}")
+        } else {
+            format!("a tuple of {max} items")
+        }
+    } else if has_named {
+        format!("{min}..={max} positional items")
+    } else {
+        format!("a tuple of {min}..={max} items")
+    }
+}
+
+pub(crate) fn value_matches_tuple(
+    val: &Value,
+    schema: &TupleSchema,
+    path: &str,
+    kind: &str,
+    span: Span,
+    bindings: &Bindings,
+) -> bool {
+    let mut scratch = Vec::new();
+    validate_tuple_value(val, schema, path, kind, span, bindings, &mut scratch);
+    scratch.is_empty()
+}
+
 fn validate_value(
     val: &Value,
     schema: &ValueSchema,
@@ -532,69 +806,10 @@ fn validate_value(
         return;
     }
     match schema {
-        ValueSchema::Seat(spec) => validate_seat(val, spec, path, span, bindings, errors),
-        ValueSchema::Map(map_schema) => match val {
-            Value::Tuple(tuple) => {
-                validate_map(tuple, map_schema, path, kind, span, bindings, errors);
-            }
-            other => {
-                errors.push(Diagnostic::InvalidBlueprintValue {
-                    path: display_path(path),
-                    expected: "a map".to_string(),
-                    value: written_value(other),
-                    span,
-                });
-            }
-        },
-        ValueSchema::List(elem_schemas) => match val {
-            Value::Tuple(tuple) if tuple.has_no_named() => {
-                if elem_schemas.is_empty() {
-                    if !tuple.is_empty() {
-                        errors.push(Diagnostic::InvalidBlueprintValue {
-                            path: display_path(path),
-                            expected: "an empty tuple `()`".to_string(),
-                            value: written_value(val),
-                            span,
-                        });
-                    }
-                } else if elem_schemas.len() == 1 {
-                    for (i, item) in tuple.values().enumerate() {
-                        let item_path = format!("{}[{i}]", display_path(path));
-                        validate_value(
-                            item,
-                            &elem_schemas[0],
-                            &item_path,
-                            kind,
-                            span,
-                            bindings,
-                            errors,
-                        );
-                    }
-                } else if tuple.len() != elem_schemas.len() {
-                    errors.push(Diagnostic::InvalidBlueprintValue {
-                        path: display_path(path),
-                        expected: format!("a tuple of {} items", elem_schemas.len()),
-                        value: written_value(val),
-                        span,
-                    });
-                } else {
-                    for (i, (item, item_schema)) in
-                        tuple.values().zip(elem_schemas.iter()).enumerate()
-                    {
-                        let item_path = format!("{}[{i}]", display_path(path));
-                        validate_value(item, item_schema, &item_path, kind, span, bindings, errors);
-                    }
-                }
-            }
-            other => {
-                errors.push(Diagnostic::InvalidBlueprintValue {
-                    path: display_path(path),
-                    expected: "a list".to_string(),
-                    value: written_value(other),
-                    span,
-                });
-            }
-        },
+        ValueSchema::Seat(spec) => validate_seat(val, spec, path, kind, span, bindings, errors),
+        ValueSchema::Tuple(tuple_schema) => {
+            validate_tuple_value(val, tuple_schema, path, kind, span, bindings, errors);
+        }
         ValueSchema::Literal(expected) => {
             if !matches!(val, Value::Scalar(s) if s == expected) {
                 errors.push(Diagnostic::InvalidBlueprintValue {
@@ -622,6 +837,7 @@ fn validate_seat(
     val: &Value,
     spec: &SeatSpec,
     path: &str,
+    kind: &str,
     span: Span,
     bindings: &Bindings,
     errors: &mut Vec<Diagnostic>,
@@ -635,14 +851,13 @@ fn validate_seat(
             val,
             Value::Call(head, _) if matches_constructor(head, namespace, name, bindings)
         ),
-        SeatType::Enum(variants) => variants.iter().any(|variant| match variant {
-            EnumVariant::Literal(expected) => matches!(val, Value::Scalar(s) if s == expected),
-            EnumVariant::Constructor { namespace, name } => matches!(
-                val,
-                Value::Call(head, _) if matches_constructor(head, namespace, name, bindings)
-            ),
-            EnumVariant::Type(ty) => matches_builtin_type(ty, val),
-        }),
+        SeatType::Enum(variants) => variants
+            .iter()
+            .any(|variant| matches_enum_variant(val, variant, path, kind, span, bindings)),
+        SeatType::Tuple(tuple_schema) => {
+            validate_tuple_value(val, tuple_schema, path, kind, span, bindings, errors);
+            return;
+        }
     };
     if !conforms {
         errors.push(Diagnostic::InvalidBlueprintValue {
@@ -651,6 +866,30 @@ fn validate_seat(
             value: written_value(val),
             span,
         });
+    }
+}
+
+fn matches_enum_variant(
+    val: &Value,
+    variant: &EnumVariant,
+    path: &str,
+    kind: &str,
+    span: Span,
+    bindings: &Bindings,
+) -> bool {
+    match variant {
+        EnumVariant::Literal(expected) => matches!(val, Value::Scalar(s) if s == expected),
+        EnumVariant::Constructor { namespace, name } => matches!(
+            val,
+            Value::Call(head, _) if matches_constructor(head, namespace, name, bindings)
+        ),
+        EnumVariant::Type(ty) => matches_builtin_type(ty, val),
+        EnumVariant::Enum(nested) => nested
+            .iter()
+            .any(|v| matches_enum_variant(val, v, path, kind, span, bindings)),
+        EnumVariant::Tuple(tuple_schema) => {
+            value_matches_tuple(val, tuple_schema, path, kind, span, bindings)
+        }
     }
 }
 
@@ -1042,6 +1281,304 @@ ports: (
         assert!(matches!(
             &errs[3],
             Diagnostic::InvalidBlueprintValue { path, .. } if path == "ports.not_an_int (key)"
+        ));
+    }
+
+    fn catasto_extended_vocab() -> Vocabulary {
+        let doc = tomet_ast_parser::parse_file(
+            r#"::kind(vocabulary)
+::vocabulary(catasto)
+
+::constructor(
+  git: (
+    args: (
+      url: (type: string, required: true, positional: 0)
+      rev: (type: string)
+    )
+  )
+  upstream: (
+    args: (
+      name: (type: string, required: true, positional: 0)
+      path: (type: string, required: true)
+    )
+  )
+  local: (
+    args: (
+      path: (type: string, required: true, positional: 0)
+    )
+  )
+  repo: (
+    args: (
+      path: (type: string, required: true, positional: 0)
+    )
+  )
+)
+"#,
+        )
+        .expect("valid vocabulary");
+        Vocabulary::from_file(&doc).expect("vocabulary")
+    }
+
+    #[test]
+    fn validates_mixed_positional_and_named_tuple_in_value_position() {
+        let vocab = catasto_extended_vocab();
+        let bp = parse_ctmt(
+            r#"::kind(blueprint)
+::blueprint(catasto)
+::use(catasto)
+
+opt_exec: (<$catasto.git>, executable: <$bool(optional: true)>)
+req_exec: (<$catasto.git>, executable: <$bool>)
+tags: (<$string>)
+empty: ()
+"#,
+        );
+
+        let ok = parse_ctmt(
+            r#"::kind(catasto)
+::use(catasto)
+
+opt_exec: (catasto.git("https://example.com/a.git"), executable: true)
+req_exec: (catasto.git("https://example.com/b.git"), executable: false)
+tags: ("a", "b")
+empty: ()
+"#,
+        );
+        let bindings = Bindings::for_document(&ok, [vocab.clone()]);
+        let errs = validate_ctmt_against_blueprint(&ok, &bp, &bindings);
+        assert!(errs.is_empty(), "{errs:?}");
+
+        // Optional named key omitted on mixed tuple.
+        let ok_omitted = parse_ctmt(
+            r#"::kind(catasto)
+::use(catasto)
+
+opt_exec: (catasto.git("https://example.com/a.git"),)
+req_exec: (catasto.git("https://example.com/b.git"), executable: true)
+tags: ()
+empty: ()
+"#,
+        );
+        let errs = validate_ctmt_against_blueprint(&ok_omitted, &bp, &bindings);
+        assert!(errs.is_empty(), "{errs:?}");
+
+        // Errors: missing required key, unknown key, wrong positional type, wrong element in list, non-empty for empty tuple.
+        let bad = parse_ctmt(
+            r#"::kind(catasto)
+::use(catasto)
+
+opt_exec: ("not-git", extra: true)
+req_exec: (catasto.git("https://example.com/b.git"),)
+tags: (none)
+empty: ("non-empty")
+"#,
+        );
+        let errs = validate_ctmt_against_blueprint(&bad, &bp, &bindings);
+        assert_eq!(errs.len(), 5, "{errs:?}");
+        assert!(matches!(
+            &errs[0],
+            Diagnostic::InvalidBlueprintValue { path, .. } if path == "opt_exec[0]"
+        ));
+        assert!(matches!(
+            &errs[1],
+            Diagnostic::UnknownKey { key, .. } if key == "opt_exec.extra"
+        ));
+        assert!(matches!(
+            &errs[2],
+            Diagnostic::MissingRequiredKey { key, .. } if key == "req_exec.executable"
+        ));
+        assert!(matches!(
+            &errs[3],
+            Diagnostic::InvalidBlueprintValue { path, .. } if path == "tags[0]"
+        ));
+        assert!(matches!(
+            &errs[4],
+            Diagnostic::InvalidBlueprintValue { path, .. } if path == "empty"
+        ));
+
+        let bad_count_and_named_type = parse_ctmt(
+            r#"::kind(catasto)
+::use(catasto)
+
+opt_exec: (catasto.git("https://example.com/a.git"), "extra-pos", executable: "yes")
+req_exec: (catasto.git("https://example.com/b.git"), executable: true)
+tags: ("a")
+empty: ()
+"#,
+        );
+        let errs = validate_ctmt_against_blueprint(&bad_count_and_named_type, &bp, &bindings);
+        assert_eq!(errs.len(), 2, "{errs:?}");
+        assert!(matches!(
+            &errs[0],
+            Diagnostic::InvalidBlueprintValue { path, .. } if path == "opt_exec"
+        ));
+        assert!(matches!(
+            &errs[1],
+            Diagnostic::InvalidBlueprintValue { path, .. } if path == "opt_exec.executable"
+        ));
+    }
+
+    #[test]
+    fn validates_nested_enum_and_seq_tuple_inside_enum() {
+        let vocab = catasto_extended_vocab();
+        let bp = parse_ctmt(
+            r#"::kind(blueprint)
+::blueprint(catasto)
+::use(catasto)
+
+<$string>: <$enum(
+  catasto.repo,
+  enum(catasto.git, catasto.upstream, catasto.local),
+  (enum(catasto.git, catasto.upstream, catasto.local), executable: bool(optional: true))
+)>
+"#,
+        );
+        let bp_bindings = Bindings::for_document(&bp, [vocab.clone()]);
+        let bp_errs = validate_ctmt_blueprint(&bp, &bp_bindings);
+        assert!(bp_errs.is_empty(), "blueprint errors: {bp_errs:?}");
+
+        let ok = parse_ctmt(
+            r#"::kind(catasto)
+::use(catasto)
+
+repo_entry: catasto.repo("vendor/foo")
+upstream_entry: catasto.upstream(commonfiles, path: ".editorconfig")
+local_entry: catasto.local("shared/base")
+tuple_with_exec: (catasto.upstream(commonfiles, path: "bin/run"), executable: true)
+tuple_without_exec: (catasto.local("bin/tool"),)
+"#,
+        );
+        let doc_bindings = Bindings::for_document(&ok, [vocab]);
+        let errs = validate_ctmt_against_blueprint(&ok, &bp, &doc_bindings);
+        assert!(errs.is_empty(), "expected no errors, got: {errs:?}");
+
+        let bad = parse_ctmt(
+            r#"::kind(catasto)
+::use(catasto)
+
+bad_first_slot: (catasto.repo("vendor/foo"), executable: true)
+bad_unknown_key: (catasto.upstream(commonfiles, path: "a"), unknown: true)
+bad_exec_type: (catasto.upstream(commonfiles, path: "a"), executable: "yes")
+"#,
+        );
+        let errs = validate_ctmt_against_blueprint(&bad, &bp, &doc_bindings);
+        assert_eq!(errs.len(), 3, "{errs:?}");
+        assert!(matches!(
+            &errs[0],
+            Diagnostic::InvalidBlueprintValue { path, .. } if path == "bad_first_slot"
+        ));
+        assert!(matches!(
+            &errs[1],
+            Diagnostic::InvalidBlueprintValue { path, .. } if path == "bad_unknown_key"
+        ));
+        assert!(matches!(
+            &errs[2],
+            Diagnostic::InvalidBlueprintValue { path, .. } if path == "bad_exec_type"
+        ));
+    }
+
+    #[test]
+    fn validates_required_named_key_inside_enum_seq_tuple() {
+        let vocab = catasto_extended_vocab();
+        let bp = parse_ctmt(
+            r#"::kind(blueprint)
+::blueprint(catasto)
+::use(catasto)
+
+entry: <$enum(catasto.repo, (catasto.upstream, executable: bool))>
+"#,
+        );
+
+        let ok = parse_ctmt(
+            r#"::kind(catasto)
+::use(catasto)
+
+entry: (catasto.upstream(commonfiles, path: "bin/run"), executable: true)
+"#,
+        );
+        let bindings = Bindings::for_document(&ok, [vocab]);
+        assert!(validate_ctmt_against_blueprint(&ok, &bp, &bindings).is_empty());
+
+        let missing_req = parse_ctmt(
+            r#"::kind(catasto)
+::use(catasto)
+
+entry: (catasto.upstream(commonfiles, path: "bin/run"),)
+"#,
+        );
+        let errs = validate_ctmt_against_blueprint(&missing_req, &bp, &bindings);
+        assert!(
+            matches!(
+                errs.as_slice(),
+                [Diagnostic::InvalidBlueprintValue { path, .. }] if path == "entry"
+            ),
+            "{errs:?}"
+        );
+    }
+
+    #[test]
+    fn validates_zone_style_optional_enum_of_string_or_list_of_string() {
+        let bp = parse_ctmt(
+            r#"::kind(blueprint)
+::blueprint(zone)
+
+zones: <$enum(string, list(string), optional: true)>
+"#,
+        );
+        let bindings = Bindings::default();
+
+        let omitted = parse_ctmt("::kind(zone)\n\n");
+        assert!(validate_ctmt_against_blueprint(&omitted, &bp, &bindings).is_empty());
+
+        let as_str = parse_ctmt("::kind(zone)\n\nzones: \"work\"\n");
+        assert!(validate_ctmt_against_blueprint(&as_str, &bp, &bindings).is_empty());
+
+        let as_list = parse_ctmt("::kind(zone)\n\nzones: (\"work\", \"home\")\n");
+        assert!(validate_ctmt_against_blueprint(&as_list, &bp, &bindings).is_empty());
+
+        let invalid = parse_ctmt("::kind(zone)\n\nzones: (\"work\", none)\n");
+        let errs = validate_ctmt_against_blueprint(&invalid, &bp, &bindings);
+        assert!(
+            matches!(
+                errs.as_slice(),
+                [Diagnostic::InvalidBlueprintValue { path, .. }] if path == "zones"
+            ),
+            "{errs:?}"
+        );
+    }
+
+    #[test]
+    fn blueprint_self_check_catches_unknown_constructors_inside_nested_enum_and_seq() {
+        let vocab = catasto_extended_vocab();
+        let bp = parse_ctmt(
+            r#"::kind(blueprint)
+::blueprint(catasto)
+::use(catasto)
+
+entry: <$enum(
+  catasto.repo,
+  enum(catasto.git, catasto.missing_nested),
+  (enum(catasto.upstream, missing_ns.ctor), flag: catasto.missing_named(optional: true))
+)>
+"#,
+        );
+        let bindings = Bindings::for_document(&bp, [vocab]);
+        let errs = validate_ctmt_blueprint(&bp, &bindings);
+        assert_eq!(errs.len(), 3, "{errs:?}");
+        assert!(matches!(
+            &errs[0],
+            Diagnostic::UnknownConstructor { name, unbound_namespace: None, .. }
+            if name == "catasto.missing_nested"
+        ));
+        assert!(matches!(
+            &errs[1],
+            Diagnostic::UnknownConstructor { name, unbound_namespace: Some(ns), .. }
+            if name == "missing_ns.ctor" && ns == "missing_ns"
+        ));
+        assert!(matches!(
+            &errs[2],
+            Diagnostic::UnknownConstructor { name, unbound_namespace: None, .. }
+            if name == "catasto.missing_named"
         ));
     }
 }
