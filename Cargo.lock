@@ -2328,9 +2328,12 @@ dependencies = [
  "tomet-formatter",
  "tomet-printer",
  "tomet-scalar",
+ "tomet-semantics",
  "tomet-span",
  "tomet-spec-derive",
+ "tomet-spelling",
  "tomet-tree",
+ "tomet-validator-blueprint",
 ]
 
 [[package]]

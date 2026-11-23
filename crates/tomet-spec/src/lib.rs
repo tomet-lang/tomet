@@ -1,7 +1,7 @@
 //! =[ tomet-spec ]
 //!
-//! Automated `.tmt` specification and reference generation for CLI commands (`clap`)
-//! and configuration schemas (`#[derive(Config)]`).
+//! Automated `.tmt` and `.blueprint.ctmt` specification and reference generation for
+//! CLI commands (`clap`), configuration schemas (`#[derive(Config)]`), and cotomet blueprints.
 //!
 //! =[ Architecture & Responsibilities ]
 //!
@@ -10,13 +10,15 @@
 //!   | [`ConfigGroupSpec`], and [`ConfigEntrySpec`] so external repositories
 //!   | can define configuration schemas and render `.tmt` specifications by
 //!   | depending only on `tomet-spec`.
-//! - (Pure In-Memory AST & `.tmt` Generators)
+//! - (Pure In-Memory AST, `.tmt`, and `.blueprint.ctmt` Generators)
+//!   - ([`blueprint`]) Converts [`CtmtBlueprintSpec`](blueprint::CtmtBlueprintSpec) schemas into `.blueprint.ctmt` [`File`](tomet_ast::File) ASTs and formatted strings.
 //!   - ([`cli`]) Converts `clap::Command` introspection trees into `.tmt` [`File`](tomet_ast::File) ASTs and formatted strings.
 //!   - ([`config`]) Converts [`ConfigGroupSpec`] slices into `.tmt` [`File`](tomet_ast::File) ASTs and formatted strings.
 //!   - ([`util`]) Shared inline code escaping and AST construction utilities.
 
 extern crate self as tomet_spec;
 
+pub mod blueprint;
 pub mod cli;
 pub mod config;
 pub mod util;
