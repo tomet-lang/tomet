@@ -5,8 +5,8 @@
 
 ```tm
 `` ::blueprint(
-``   writ:  @file(tmtroot/schema/blueprints/writ.blueprint.tmt)
-``   crate: @file(tmtroot/schema/blueprints/crate.blueprint.tmt)
+``   writ:  @file(tmtroot/schema/writ.blueprint.tmt)
+``   crate: @file(tmtroot/schema/crate.blueprint.tmt)
 `` )
 ```
 
