@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/tomet-lang/tomet/schemas/0.5.0/plain.schema.json",
+  "title": "Tomet plain data",
+  "description": "Plain data: what a `Value` says when it is only data, as the JSON every language has. It is\nwhat `parseValue`, `loads`, and the `meta` of a processed file hand out.\n\n**Rules**\n\nThe projection is explicitly lossy, and it does not round-trip: a `PlainValue` is not a\n`Value`, and nothing reads one back into one (it is written, never read).\n\n- `none` is `null`, a boolean is a boolean, an integer is an integer and a text is a string.\n- A float, and a number kept as written, is a float: `1.10` is `1.1`, `1e3` is `1000.0` and an\n  integer beyond an `i64` is the nearest `f64`. One with no finite `f64` (`1e999`, `NaN`) has no\n  plain form and is an error: a string that stood for it would be indistinguishable from a text.\n- A tuple with at least one entry, and no entry with a key, is an array. Any other tuple is an\n  object, in written order: an entry's key is its name, or its position in decimal if it has\n  none, so `(a, k: b)` is `{\"0\": a, \"k\": b}`. An empty tuple is an empty object, not an empty\n  array: it has no entry to say it is a list, and an object is the container that can hold what\n  a tuple can. A reader that must tell `(a, b)` from `(\"0\": a, \"1\": b)` cannot: they are one tuple.\n- Everything else has no plain form and is refused (`NotPlain`), never lowered to a stand-in. `auto` is\n  not `null` (that is `none`) and not the text `\"auto\"`; a `Value::Call`, `Value::Interp`,\n  `Value::Hole`, `Value::TypeSeat`, `Value::Element`, `Value::Blocks` and a type-seat key\n  are nodes, and an object that stood for one would be exactly the ambiguity the wire exists\n  to remove. A reader that wants those reads the AST wire.\n\nAn object keeps its entries in order and holds no key twice. Serialized, it is the natural JSON\nof its shape (`null`, a boolean, a number, a string, an array, an object) with no tag of its own.",
+  "anyOf": [
+    {
+      "type": "null",
+      "description": "`none`."
+    },
+    {
+      "type": "boolean",
+      "description": "A boolean."
+    },
+    {
+      "type": "integer",
+      "format": "int64",
+      "description": "An integer."
+    },
+    {
+      "type": "number",
+      "format": "double",
+      "description": "A float, or a number kept as written."
+    },
+    {
+      "type": "string",
+      "description": "A text."
+    },
+    {
+      "type": "array",
+      "items": {
+        "$ref": "#"
+      },
+      "description": "A tuple with entries, none of them keyed."
+    },
+    {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#"
+      },
+      "description": "Any other tuple, in written order: an entry's key is its name, or its position among the\nunnamed entries if it has none. An empty tuple is the empty object."
+    }
+  ]
+}

@@ -18,6 +18,7 @@ use serde::{Deserialize, Serialize};
 
 /// The scalar values a document can hold.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum Scalar {
     /// `none`: the value is nothing, and says so. It is not an absent key, which says nothing, and not
     /// `auto`, which leaves the value to the system. Plain JSON data writes it as `null`; serialized as a scalar it is `"None"`.

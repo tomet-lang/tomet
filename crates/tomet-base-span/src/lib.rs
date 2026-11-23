@@ -21,6 +21,8 @@ use serde::{Deserialize, Serialize};
 /// every node cost a rescan of everything before it. Resolve them on demand
 /// with `tomet_position::LineIndex`.
 ///
+/// =[ In Rust ]
+///
 /// Note: [`PartialEq`] is implemented to always return `true` so that AST
 /// structural equality checks (e.g. `assert_eq!(doc1, doc2)`) compare node
 /// content and semantics without failing on source location differences.
@@ -33,6 +35,7 @@ use serde::{Deserialize, Serialize};
 /// violation that breaks `HashMap`/`HashSet` lookups. Don't re-add it
 /// without also reconciling it with the custom equality above.
 #[derive(Debug, Clone, Copy, Eq, Default, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct Span {
     /// Byte offset of the first byte.
     pub start: usize,

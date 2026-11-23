@@ -8,8 +8,8 @@ use tomet_span::Span;
 
 /// An element's name, split into its optional namespace and its own name.
 ///
-/// The separator is `.`: `deck.bookmark` is `Name { namespace:
-/// Some("deck"), name: "bookmark" }`. Exactly two namespaces may be
+/// The separator is `.`: `deck.bookmark` is the namespace `deck` and the name
+/// `bookmark`. Exactly two namespaces may be
 /// written bare: `std`, which the language carries, and the document's
 /// own `::kind`, declared on its first line. A name from any other
 /// namespace -- anything brought in with `::use` -- is always written
@@ -22,6 +22,7 @@ use tomet_span::Span;
 /// the separator, so it is deliberately *not* an identifier character
 /// here -- unlike in entry names, where `url.wiki` is one flat name.
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct Name {
     pub namespace: Option<String>,
     pub name: String,
@@ -77,6 +78,7 @@ impl fmt::Display for Name {
 /// free as any other string value (e.g. `@line(天音かなた)` elsewhere in
 /// this codebase already allows non-ASCII value text).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct Id(pub String);
 
 /// Where an element sits: on its own as a block, or inside running text.
@@ -88,7 +90,7 @@ pub struct Id(pub String);
 /// else is [`Placement::Inline`].
 ///
 /// It is recorded rather than implied by the tree because [`Element`]'s
-/// `content` is a `Vec<Inline>`: an element written at a line start inside
+/// `content` is a list of blocks: an element written at a line start inside
 /// another element's `[content]` is a block, and this field is the only
 /// place that survives.
 ///
@@ -96,6 +98,7 @@ pub struct Id(pub String);
 /// take is a vocabulary question, answered by `tomet-semantics`'
 /// `required_shape` and checked against this field by `shape_mismatch`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum Placement {
     Block,
     #[default]
@@ -116,6 +119,7 @@ pub enum Placement {
 /// and so has no [`Placement`]. And it is attached to nothing, so unlike an
 /// [`Element`] it takes no `::connect`.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct Declaration {
     pub name: Name,
     pub data: Data,
@@ -152,6 +156,7 @@ impl Declaration {
 /// means, and what a hole matches, is the host's (tandr's), not tomet's. See
 /// `tmtroot/spec/syntax/hole.tmt`.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct Hole {
     pub matcher: Option<Name>,
     pub placement: Placement,
@@ -177,6 +182,7 @@ impl Hole {
 /// and nothing else: no `#(id)` (an id belongs to the owner, written before the
 /// first connect), no connects of its own, and no placement.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct Connect {
     pub name: Name,
     pub data: Data,
@@ -203,6 +209,7 @@ impl Connect {
 /// them. `[content]` and `#(id)` are not in here on purpose: they differ in
 /// kind (child blocks, an address) and not every node takes them.
 #[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct Data {
     pub args: Option<Tuple>,
     pub value: Option<Group>,
@@ -231,6 +238,7 @@ pub struct Data {
 /// stacked after them (`@x(...)::as(y)::rule(...)`), zero or more, each a
 /// [`Connect`]. Order-preserving, empty when nothing follows.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct Element {
     /// The name after `@`. It is mandatory: a nameless `@(url:...)` is not an element,
     /// because a kind is not inferred from a key in the args.
@@ -365,6 +373,7 @@ impl<'a> BodyView<'a> {
 /// `Pair` is a named entry (`key: value`), which lets the data view be
 /// rebuilt as a [`Tuple`] from a group without copying any other structure.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum Entry {
     Pair(String, Value),
     /// A named entry, `@name(...)`.
@@ -381,11 +390,12 @@ pub enum Entry {
 /// computed downstream in `tomet-semantics`, which is what lets the parser
 /// build the tree without consulting any element vocabulary.
 ///
-/// `Group` holds a source-order sequence of entries (`Group(pub Vec<Entry>)`)
+/// A group holds a source-order sequence of entries
 /// and provides named-entry operations exclusively for [`Entry::Pair`] entries.
 /// Non-pair entries ([`Entry::Element`], [`Entry::Hole`]) are
 /// handled directly by callers through exhaustive pattern matching.
 #[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct Group(pub Vec<Entry>);
 
 impl Group {

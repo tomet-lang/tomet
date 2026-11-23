@@ -21,6 +21,7 @@ use std::fmt;
 /// A data consumer that wants `null`, numbers, strings, arrays and objects, and accepts losing
 /// what those cannot say, reads the plain-data projection instead: [`Value::to_plain`].
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum Value {
     /// A scalar value: `none`, `auto`, a boolean, an integer, a float,
     /// a number kept as written, or text. See [`tomet_scalar::Scalar`].
@@ -74,7 +75,7 @@ pub enum Value {
     /// and a connect changes what the *enclosing* element means, which
     /// has no sense for an element that is itself sitting inside a value.
     Element(Box<Element>),
-    /// `key: [ ... ]` -- block content (the same `Vec<Block>` grammar as
+    /// `key: [ ... ]` -- block content (the same grammar as
     /// an element's own `[content]`/`|content` slot, see
     /// `tmtroot/docs/spec/feature/content-shape.tmt`) sitting as a named
     /// value inside `(args)`/`{data}`, e.g. `@conflict(a: [ ... ], b: [
@@ -88,6 +89,7 @@ pub enum Value {
 ///
 /// On the wire the two kinds stay apart: `{"Name":"a"}` and `{"TypeSeat":{...}}`.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum EntryKey {
     Name(String),
     TypeSeat(crate::TypeSeat),
@@ -101,6 +103,8 @@ pub enum EntryKey {
 ///
 /// On the wire an entry is `{"key": null | EntryKey, "value": V}`; `null` is a key that was not written.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+#[cfg_attr(feature = "schema", schemars(rename = "TupleEntry"))]
 pub struct TupleEntry<V = Value> {
     key: Option<EntryKey>,
     value: V,
@@ -206,7 +210,10 @@ impl std::error::Error for DuplicateKey {}
 /// A key is text, and there is one key space: a key is not a value and has no type. Quoting a key
 /// is spelling (`"a": 1` is `a: 1`), and so is leaving it out: an unnamed entry's key is its
 /// position among the unnamed entries, in decimal (`0`, `1`, `12`). So `(a, b)` and
-/// `("0": a, "1": b)` are the same tuple, and `("0": a, b)` writes the key `0` twice.
+/// `("0": a, "1": b)` are the same tuple, and `("0": a, b)` writes the key `0` twice, which is
+/// an error: a key is held once.
+///
+/// =[ In Rust ]
 ///
 /// A tuple keeps that true by how it is built, not by asking its callers to:
 ///
@@ -227,7 +234,9 @@ impl std::error::Error for DuplicateKey {}
 /// position the entry would have unnamed is the unnamed entry, and a key written twice is an error,
 /// not a tuple.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[serde(try_from = "TupleWire<V>", bound(deserialize = "V: Deserialize<'de>"))]
+#[cfg_attr(feature = "schema", schemars(rename = "Tuple"))]
 pub struct Tuple<V = Value> {
     entries: Vec<TupleEntry<V>>,
     span: Option<tomet_span::Span>,
@@ -236,6 +245,7 @@ pub struct Tuple<V = Value> {
 /// What a [`Tuple`] is read from: its fields as written, before the rules of its keys apply.
 #[derive(Deserialize)]
 #[serde(bound(deserialize = "V: Deserialize<'de>"))]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 struct TupleWire<V> {
     entries: Vec<TupleEntry<V>>,
     span: Option<tomet_span::Span>,

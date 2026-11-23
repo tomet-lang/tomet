@@ -1,49 +1,67 @@
 //! The plain-data projection of a [`Value`]: [`PlainValue`], and what refuses to become one, [`NotPlain`].
 //!
 //! A [`Value`] has two serde forms, for two readers. Its derived form (see [`Value`]) is the AST
-//! wire: lossless, tagged, and read back as the same value. This module is the other one, for a
+//! wire: lossless, tagged, and read back as the same value. [`PlainValue`] is the other one, for a
 //! reader who wants *data* -- `null`, booleans, numbers, strings, arrays and objects, what every
 //! language already has -- and does not want to learn the AST to get it: a document's `::meta`, a
-//! `.ctmt` value, the value a script parses out of a string.
-//!
-//! =[ Rules ]
-//!
-//! The projection is explicitly lossy, and it does not round-trip: [`PlainValue`] is not a
-//! [`Value`], and nothing reads one back into one (it is written, never read).
-//!
-//! - `none` is `null`, a boolean is a boolean, an integer is an integer and a text is a string.
-//! - A float, and a number kept as written, is a float: `1.10` is `1.1`, `1e3` is `1000.0` and an
-//!   integer beyond an `i64` is the nearest `f64`. One with no finite `f64` (`1e999`, `NaN`) has no
-//!   plain form and is an error: a string that stood for it would be indistinguishable from a text.
-//! - A tuple with at least one entry, and no entry with a key, is an array. Any other tuple is an
-//!   object, in written order: an entry's key is its name, or its position in decimal if it has
-//!   none, so `(a, k: b)` is `{"0": a, "k": b}`. An empty tuple is an empty object, not an empty
-//!   array: it has no entry to say it is a list, and an object is the container that can hold what
-//!   a tuple can. A reader that must tell `(a, b)` from `("0": a, "1": b)` cannot: they are one tuple.
-//! - Everything else has no plain form and is a [`NotPlain`], never a lowered stand-in. `auto` is
-//!   not `null` (that is `none`) and not the text `"auto"`; a [`Value::Call`], [`Value::Interp`],
-//!   [`Value::Hole`], [`Value::TypeSeat`], [`Value::Element`], [`Value::Blocks`] and a type-seat key
-//!   are nodes, and an object that stood for one would be exactly the ambiguity the wire exists
-//!   to remove. A reader that wants those reads the AST wire.
+//! `.ctmt` value, the value a script parses out of a string. The rules of the projection are
+//! those of [`PlainValue`].
 
 use crate::{EntryKey, Tuple, Value};
 use serde::{Serialize, ser};
 use std::fmt;
 use tomet_scalar::Scalar;
 
-/// Plain data: the value a [`Value`] says when it is only data. See the [module](self) for the rules.
+/// Plain data: what a [`Value`] says when it is only data, as the JSON every language has. It is
+/// what `parseValue`, `loads`, and the `meta` of a processed file hand out.
+///
+/// =[ Rules ]
+///
+/// The projection is explicitly lossy, and it does not round-trip: a [`PlainValue`] is not a
+/// [`Value`], and nothing reads one back into one (it is written, never read).
+///
+/// - `none` is `null`, a boolean is a boolean, an integer is an integer and a text is a string.
+/// - A float, and a number kept as written, is a float: `1.10` is `1.1`, `1e3` is `1000.0` and an
+///   integer beyond an `i64` is the nearest `f64`. One with no finite `f64` (`1e999`, `NaN`) has no
+///   plain form and is an error: a string that stood for it would be indistinguishable from a text.
+/// - A tuple with at least one entry, and no entry with a key, is an array. Any other tuple is an
+///   object, in written order: an entry's key is its name, or its position in decimal if it has
+///   none, so `(a, k: b)` is `{"0": a, "k": b}`. An empty tuple is an empty object, not an empty
+///   array: it has no entry to say it is a list, and an object is the container that can hold what
+///   a tuple can. A reader that must tell `(a, b)` from `("0": a, "1": b)` cannot: they are one tuple.
+/// - Everything else has no plain form and is refused ([`NotPlain`]), never lowered to a stand-in. `auto` is
+///   not `null` (that is `none`) and not the text `"auto"`; a [`Value::Call`], [`Value::Interp`],
+///   [`Value::Hole`], [`Value::TypeSeat`], [`Value::Element`], [`Value::Blocks`] and a type-seat key
+///   are nodes, and an object that stood for one would be exactly the ambiguity the wire exists
+///   to remove. A reader that wants those reads the AST wire.
 ///
 /// An object keeps its entries in order and holds no key twice. Serialized, it is the natural JSON
 /// of its shape (`null`, a boolean, a number, a string, an array, an object) with no tag of its own.
 #[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+#[cfg_attr(feature = "schema", schemars(untagged))]
 pub enum PlainValue {
+    /// `none`.
     Null,
+    /// A boolean.
     Bool(bool),
+    /// An integer.
     Int(i64),
+    /// A float, or a number kept as written.
     Float(f64),
+    /// A text.
     Text(String),
+    /// A tuple with entries, none of them keyed.
     Array(Vec<PlainValue>),
-    Object(Vec<(String, PlainValue)>),
+    /// Any other tuple, in written order: an entry's key is its name, or its position among the
+    /// unnamed entries if it has none. An empty tuple is the empty object.
+    Object(
+        #[cfg_attr(
+            feature = "schema",
+            schemars(with = "std::collections::BTreeMap<String, PlainValue>")
+        )]
+        Vec<(String, PlainValue)>,
+    ),
 }
 
 /// What a [`Value`] holds that is not plain data, and where.

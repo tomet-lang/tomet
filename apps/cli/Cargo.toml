@@ -14,7 +14,7 @@ path = "src/main.rs"
 [dependencies]
 cotomet                  = { workspace = true }
 cotomet-eval             = { workspace = true }
-tomet-ast                = { workspace = true }
+tomet-ast                = { workspace = true, features = ["schema"] }
 tomet-ast-parser         = { workspace = true }
 tomet-config             = { workspace = true }
 tomet-convert-standalone = { workspace = true }
@@ -42,6 +42,7 @@ clap           = { workspace = true }
 jobserver-gate = { workspace = true }
 mimalloc       = { workspace = true }
 rayon          = { workspace = true }
+schemars       = { workspace = true }
 serde_json     = { workspace = true }
 
 [dev-dependencies]

@@ -220,16 +220,19 @@ pub enum Command {
         force: bool,
     },
 
-    /// Generate automated reference specifications (`cli` or `config`) in `.tmt` format.
+    /// Generate automated reference specifications: `cli` and `config` in `.tmt` format, and `ast-schema`,
+    /// the JSON Schemas of the AST.
     ///
     /// The target defaults to `cli` when omitted. With `--all`, writes both `cli.tmt`
-    /// and `config.tmt` into the directory specified by `--out`. With `--check`, exits
-    /// non-zero if target files on disk disagree with newly generated output.
+    /// and `config.tmt` into the directory specified by `--out`; `ast-schema` is not part of
+    /// `--all`, it writes `ast.schema.json` and `plain.schema.json` into the directory given
+    /// to `--out`. With `--check`, exits non-zero if target files on disk disagree with
+    /// newly generated output.
     Spec {
-        /// Documentation target to generate (`cli` | `config`).
+        /// Specification target to generate (`cli` | `config` | `ast-schema`).
         #[arg(value_name = "TARGET")]
         target: Option<crate::commands::spec::SpecTarget>,
-        /// Generate all declared specification targets. Requires `--out <DIR>`.
+        /// Generate every `.tmt` specification target (`cli`, `config`). Requires `--out <DIR>`.
         #[arg(long, conflicts_with = "target", requires = "out")]
         all: bool,
         /// Write to this file or directory instead of stdout.

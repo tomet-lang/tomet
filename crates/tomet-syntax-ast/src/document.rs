@@ -8,6 +8,7 @@ use serde::{Deserialize, Serialize};
 use tomet_span::Span;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum Block {
     Paragraph(Paragraph),
     Element(Element),
@@ -46,6 +47,7 @@ impl Block {
 /// connects (`::as(...)`), and child blocks (paragraphs, lists, sub-sections)
 /// scoped to this section.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct Section {
     pub level: usize,
     pub title: Vec<Inline>,
@@ -82,6 +84,7 @@ impl Section {
 /// what a `::rule(allow:(...))` attached to the list itself (restricting
 /// what its own items may be) needs to live on.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct List {
     pub ordered: bool,
     pub items: Vec<ListItem>,
@@ -112,11 +115,12 @@ impl List {
 /// name for the combine notation.
 ///
 /// `sublist` is the one genuinely new thing: an indented list directly
-/// below this item. Typed as `Option<List>`, not `Option<Vec<Block>>`,
+/// below this item. Typed as a list, not as blocks,
 /// because the parser only ever produces one specific shape here (another
 /// list) -- giving it its own field makes that a compiler-checked fact
 /// instead of a convention.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct ListItem {
     pub name: Option<Name>,
     pub data: Data,
@@ -154,6 +158,7 @@ impl ListItem {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct Paragraph {
     pub content: Vec<Inline>,
     pub span: Span,
@@ -166,6 +171,7 @@ impl Paragraph {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum Inline {
     Text(Text),
     Element(Element),
@@ -230,6 +236,7 @@ impl Inline {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct SoftBreak {
     pub span: Span,
 }
@@ -260,6 +267,7 @@ pub fn softbreak_join(before: Option<char>, after: Option<char>) -> &'static str
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct LineBreak {
     pub span: Span,
 }
@@ -267,6 +275,7 @@ pub struct LineBreak {
 /// Verbatim text, captured byte-for-byte from source. See
 /// [`Inline::Raw`] for why this is a separate type from [`Text`].
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct RawText {
     pub value: String,
     pub span: Span,
@@ -305,6 +314,7 @@ impl From<&str> for RawText {
 /// instead of a character here. Verbatim text that may contain real newlines
 /// (code block bodies) is [`RawText`], not this.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct Text {
     pub value: String,
     pub span: Span,
@@ -352,9 +362,19 @@ impl std::ops::DerefMut for Text {
 
 /// A Tomet file: its `::name(...)` declarations in the preamble header, followed by its body.
 ///
-/// For prose documents (`.tmt`), `body` defaults to `Vec<Block>`.
-/// For structured data files (`.ctmt`), `body` is [`Value`](crate::Value).
+/// For prose documents (`.tmt`), `body` is a list of [`Block`]s; for structured data files
+/// (`.ctmt`), it is a [`Value`](crate::Value).
+///
+/// =[ Wire ]
+///
+/// The serialized form of a file is its AST, losslessly: a file written and read back is the same
+/// file, spans included. Every field is always present, an absent one as `null`. An enum is an
+/// object with one key, the variant's name, holding its payload (`{"Paragraph": {...}}`), or just
+/// the name as a string for a variant that has none (`"Block"`). A reader also accepts a missing
+/// optional field as `null`.
 #[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+#[cfg_attr(feature = "schema", schemars(rename = "File"))]
 pub struct File<B = Vec<Block>> {
     /// The `::name(...)` declarations at the top of the file, in source order.
     pub header: Vec<Declaration>,

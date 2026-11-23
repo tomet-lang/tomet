@@ -8,3 +8,8 @@ repository.workspace = true
 
 [dependencies]
 serde = { workspace = true }
+schemars = { workspace = true, optional = true }
+
+[features]
+# `JsonSchema` for the wire shape of a scalar, for the generated schema of the AST (`tomet spec ast-schema`).
+schema = ["dep:schemars"]

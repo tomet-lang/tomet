@@ -22,6 +22,7 @@ use tomet_span::Span;
 /// [`Inline`](crate::Inline) and [`Value`](crate::Value), and not of [`Entry`](crate::Entry): a `{...}` group holds `key: value` entries
 /// and elements, and a seat is neither.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct TypeSeat {
     pub expr: InterpExpr,
     pub span: Span,
@@ -44,6 +45,7 @@ impl fmt::Display for TypeSeat {
 /// span of the whole `$`-form, and nothing else. It sits in three places, as
 /// [`Block::Interp`](crate::Block::Interp), [`Inline::Interp`](crate::Inline::Interp) and [`Value::Interp`](crate::Value::Interp).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct Interpolation {
     pub expr: InterpExpr,
     pub span: Span,
@@ -73,12 +75,14 @@ pub enum InterpSpelling {
 
 /// One node of an interpolation's parsed expression tree.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct InterpExpr {
     pub kind: InterpExprKind,
     pub span: Span,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum InterpExprKind {
     Identifier(String),
     Id(String),
@@ -149,6 +153,7 @@ pub enum InterpExprKind {
 ///
 /// Precedence, tightest first: the postfix forms, additive, comparison, `&&`, `||`, then `=>`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum BinaryOp {
     Add,
     Sub,

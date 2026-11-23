@@ -79,6 +79,10 @@ path = "src/vault_eval.rs"
 name = "wire"
 path = "src/wire.rs"
 
+[[test]]
+name = "schema"
+path = "src/schema.rs"
+
 [dependencies]
 cotomet             = { workspace = true }
 tomet-ast           = { workspace = true }

@@ -9,7 +9,7 @@
 //!
 //! - (Pure Data Models & Structural Accessors Only)
 //!   | `tomet-ast` is the foundational AST crate referenced across the workspace,
-//!   | depending only on `tomet-scalar`, `tomet-span`, `tomet-spelling`, `serde`, and `unicode-width`.
+//!   | depending only on `tomet-scalar`, `tomet-span`, `tomet-spelling`, `serde`, and `unicode-width` (and `schemars`, if asked).
 //!   | It contains only struct/enum definitions and pure inherent methods for construction
 //!   | (`new`, `with_*`) and structural inspection (`as_str()`, `get()`, `is_none()`).
 //! - (Two Serde Forms, For Two Readers)
@@ -23,6 +23,12 @@
 //!   | [`Value::to_plain`] gives a [`PlainValue`] (`null`, booleans, numbers, strings, arrays, objects),
 //!   | which is lossy on purpose, does not read back into a [`Value`], and refuses (as [`NotPlain`])
 //!   | the nodes that are not data. Which form a consumer wants is its choice, never a flag.
+//! - (The Schema Is Derived, Behind A Feature)
+//!   | With the `schema` feature every node (and [`PlainValue`]) also derives `schemars::JsonSchema`, so the JSON Schema
+//!   | of the wire is the shape serde writes and not a second description of it; `tomet spec ast-schema` generates it.
+//!   | The feature is off by default, so nothing that parses or prints compiles `schemars`. A doc comment on a type is
+//!   | that type's description in the schema: write it for a reader of JSON, and put what only a Rust reader needs
+//!   | under a `=[ In Rust ]` heading, which the schema leaves out.
 //! - (A Node's Role Is Its Type)
 //!   | A `{$ ... }`, `$(...)` or `$name(...)` is an [`Interpolation`] (an expression and a span), not an [`Element`]:
 //!   | it has no name, no groups and no connects, so it is a variant of [`Block`],
