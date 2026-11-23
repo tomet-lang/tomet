@@ -6,9 +6,12 @@
  *
  * A loader that skips what it cannot publish publishes a broken site, so `tometLoader` does not skip.
  * Anything wrong with a document -- it does not parse, it is empty, a link goes nowhere, an element is
- * unknown, it still says `@draft` -- is a *problem*. In a build every problem is collected, with the
- * file, line and column, and the build fails with all of them at once. In the dev server the same
- * problems are logged and the pages are still served, so a typo does not take the server down.
+ * unknown, it still says `@draft` -- is a *problem*, and so is a collection or vault that cannot be
+ * built (a missing base, no documents, a missing or unreadable vault config or part, an invalid vault).
+ * In a build every problem is collected, with the file, line and column, and the build fails with all
+ * of them at once; when the vault itself cannot be built, the build stops there instead of reading
+ * documents against an incomplete vault. In the dev server problems are logged without taking the
+ * server down.
  */
 import type { AstroIntegration } from "astro";
 import type { Loader } from "astro/loaders";
@@ -165,8 +168,10 @@ export declare function resolveAssetUrl(raw: unknown, fileRelDir: string, assetM
  * Every problem is found before any is reported: a build fails once, with all of them
  * (`TometLoaderError`), each with its file, line and column. That includes a document that does not
  * parse, an empty one, an `@draft`, a link that goes nowhere, and an unknown element, and also a
- * `base` that is not there and a `filter` that matches nothing. What a site does not want to publish is
- * left out with `filter`; nothing is skipped silently.
+ * `base` that is not there, a `filter` that matches nothing, or a vault config that is missing,
+ * unreadable, or invalid. When the collection or vault itself cannot be built, the loader stops at
+ * those problems rather than parsing documents against an incomplete vault. What a site does not want
+ * to publish is left out with `filter`; nothing is skipped silently.
  */
 export declare function tometLoader(options: TometLoaderOptions): Loader;
 /** Options accepted by the Astro integration. */

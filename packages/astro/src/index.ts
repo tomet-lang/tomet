@@ -6,9 +6,12 @@
  *
  * A loader that skips what it cannot publish publishes a broken site, so `tometLoader` does not skip.
  * Anything wrong with a document -- it does not parse, it is empty, a link goes nowhere, an element is
- * unknown, it still says `@draft` -- is a *problem*. In a build every problem is collected, with the
- * file, line and column, and the build fails with all of them at once. In the dev server the same
- * problems are logged and the pages are still served, so a typo does not take the server down.
+ * unknown, it still says `@draft` -- is a *problem*, and so is a collection or vault that cannot be
+ * built (a missing base, no documents, a missing or unreadable vault config or part, an invalid vault).
+ * In a build every problem is collected, with the file, line and column, and the build fails with all
+ * of them at once; when the vault itself cannot be built, the build stops there instead of reading
+ * documents against an incomplete vault. In the dev server problems are logged without taking the
+ * server down.
  */
 import type { AstroIntegration } from "astro";
 import type { Loader, LoaderContext } from "astro/loaders";
@@ -407,8 +410,10 @@ function problemsOf(path: string, diagnostics: Diagnostic[]): Problem[] {
  * Every problem is found before any is reported: a build fails once, with all of them
  * (`TometLoaderError`), each with its file, line and column. That includes a document that does not
  * parse, an empty one, an `@draft`, a link that goes nowhere, and an unknown element, and also a
- * `base` that is not there and a `filter` that matches nothing. What a site does not want to publish is
- * left out with `filter`; nothing is skipped silently.
+ * `base` that is not there, a `filter` that matches nothing, or a vault config that is missing,
+ * unreadable, or invalid. When the collection or vault itself cannot be built, the loader stops at
+ * those problems rather than parsing documents against an incomplete vault. What a site does not want
+ * to publish is left out with `filter`; nothing is skipped silently.
  */
 export function tometLoader(options: TometLoaderOptions): Loader {
   const {
@@ -448,7 +453,8 @@ export function tometLoader(options: TometLoaderOptions): Loader {
       };
 
       /** Everything a load is made from: made again whenever the files of the vault change. */
-      interface State {
+      type ReadyState = {
+        ok: true;
         vault: Vault;
         vaultKey: string;
         files: Set<string>;
@@ -456,9 +462,18 @@ export function tometLoader(options: TometLoaderOptions): Loader {
         assetMap: Map<string, string>;
         /** The files whose change changes the vault itself: its config and what it registers. */
         parts: string[];
+      };
+
+      type FailedState = {
+        ok: false;
+        files: Set<string>;
+        /** The files whose change changes the vault itself: its config and what it registers. */
+        parts: string[];
         /** Problems of the collection as a whole, not of a document. */
         problems: Problem[];
-      }
+      };
+
+      type State = ReadyState | FailedState;
 
       const configPath = vaultConfig
         ? isAbsolute(vaultConfig)
@@ -478,7 +493,8 @@ export function tometLoader(options: TometLoaderOptions): Loader {
             message,
           });
 
-        if (!existsSync(baseDir)) {
+        const baseExists = existsSync(baseDir);
+        if (!baseExists) {
           collectionProblem(
             display(baseDir),
             "missing-base",
@@ -489,7 +505,7 @@ export function tometLoader(options: TometLoaderOptions): Loader {
         const docs = filter
           ? scanned.docFiles.filter((f) => filter(f.relPath))
           : scanned.docFiles;
-        if (docs.length === 0 && existsSync(baseDir)) {
+        if (docs.length === 0 && baseExists) {
           collectionProblem(
             display(baseDir),
             "no-documents",
@@ -509,52 +525,76 @@ export function tometLoader(options: TometLoaderOptions): Loader {
         const partsText: string[] = [];
         if (existsSync(configPath)) {
           parts.push(configPath);
-          const text = await fs.readFile(configPath, "utf8");
-          sources.config = text;
-          partsText.push(text);
-          const configDir = dirname(configPath);
+          let text: string | undefined;
           try {
-            const registry = vaultRegistry(text);
-            const read = async (path: string): Promise<string> => {
-              const file = resolve(configDir, path);
-              parts.push(file);
-              try {
-                const body = await fs.readFile(file, "utf8");
-                partsText.push(body);
-                return body;
-              } catch (err) {
-                collectionProblem(
-                  display(file),
-                  "unreadable",
-                  `registered by ${display(configPath)} but cannot be read: ${(err as Error).message}`,
-                );
-                return "";
-              }
-            };
-            sources.vocabularies = {};
-            for (const path of registry.vocabularies)
-              sources.vocabularies[path] = await read(path);
-            sources.dictionaries = {};
-            for (const path of registry.dictionaries)
-              sources.dictionaries[path] = await read(path);
-            // A `.ctmt` blueprint is the schema of a data document, not of a `.tmt`.
-            sources.blueprints = [];
-            for (const path of registry.blueprints)
-              if (!path.endsWith(".ctmt"))
-                sources.blueprints.push(await read(path));
+            text = await fs.readFile(configPath, "utf8");
           } catch (err) {
             collectionProblem(
               display(configPath),
-              "invalid-vault",
-              (err as Error).message ?? String(err),
+              "unreadable",
+              `cannot be read: ${(err as Error).message}`,
             );
           }
+          if (text !== undefined) {
+            sources.config = text;
+            partsText.push(text);
+            const configDir = dirname(configPath);
+            try {
+              const registry = vaultRegistry(text);
+              const read = async (path: string): Promise<string | undefined> => {
+                const file = resolve(configDir, path);
+                parts.push(file);
+                try {
+                  const body = await fs.readFile(file, "utf8");
+                  partsText.push(body);
+                  return body;
+                } catch (err) {
+                  collectionProblem(
+                    display(file),
+                    "unreadable",
+                    `registered by ${display(configPath)} but cannot be read: ${(err as Error).message}`,
+                  );
+                  return undefined;
+                }
+              };
+              sources.vocabularies = {};
+              for (const path of registry.vocabularies) {
+                const body = await read(path);
+                if (body !== undefined) sources.vocabularies[path] = body;
+              }
+              sources.dictionaries = {};
+              for (const path of registry.dictionaries) {
+                const body = await read(path);
+                if (body !== undefined) sources.dictionaries[path] = body;
+              }
+              // A `.ctmt` blueprint is the schema of a data document, not of a `.tmt`.
+              sources.blueprints = [];
+              for (const path of registry.blueprints) {
+                if (!path.endsWith(".ctmt")) {
+                  const body = await read(path);
+                  if (body !== undefined) sources.blueprints.push(body);
+                }
+              }
+            } catch (err) {
+              collectionProblem(
+                display(configPath),
+                "invalid-vault",
+                (err as Error).message ?? String(err),
+              );
+            }
+          }
         } else if (vaultConfig) {
+          parts.push(configPath);
           collectionProblem(
             display(configPath),
             "missing-vault-config",
             "the vault config does not exist",
           );
+        }
+
+        const files = new Set(scanned.allFiles);
+        if (problems.length > 0) {
+          return { ok: false, files, parts, problems };
         }
 
         let vault: Vault;
@@ -566,15 +606,7 @@ export function tometLoader(options: TometLoaderOptions): Loader {
             "invalid-vault",
             (err as Error).message ?? String(err),
           );
-          // The problem is reported; the documents are still read, in the vault as far as it is usable.
-          vault = new Vault({
-            files: scanned.allFiles,
-            documents: sources.documents,
-            urlPrefix,
-            assetPrefix,
-            basePath,
-            sourceUrl,
-          });
+          return { ok: false, files, parts, problems };
         }
 
         const assetMap = new Map<string, string>();
@@ -604,13 +636,13 @@ export function tometLoader(options: TometLoaderOptions): Loader {
           .digest("hex");
 
         return {
+          ok: true,
           vault,
           vaultKey,
-          files: new Set(scanned.allFiles),
+          files,
           docs,
           assetMap,
           parts,
-          problems,
         };
       }
 
@@ -619,7 +651,7 @@ export function tometLoader(options: TometLoaderOptions): Loader {
       /** Reads one document into the store and says what is wrong with it. */
       async function loadEntry(
         file: { absPath: string; relPath: string },
-        current: State,
+        current: ReadyState,
       ): Promise<Problem[]> {
         const id = file.relPath.replace(/\.(tmt|tm)$/, "");
         const path = display(file.absPath);
@@ -797,6 +829,12 @@ export function tometLoader(options: TometLoaderOptions): Loader {
       };
 
       async function loadAll(current: State): Promise<void> {
+        if (!current.ok) {
+          if (strict) throw new TometLoaderError(collection, current.problems);
+          log(current.problems);
+          return;
+        }
+
         logger.info(`Reading Tomet documents in ${baseDir}...`);
         const untouched = new Set(store.keys());
         for (const file of current.docs) {
@@ -808,16 +846,12 @@ export function tometLoader(options: TometLoaderOptions): Loader {
         // Entries of documents that are gone, or no longer published.
         for (const gone of untouched) store.delete(gone);
 
-        // The collection's own problems first, then the documents', in a fixed order.
-        const problems = [
-          ...current.problems,
-          ...found.flat().sort(
-            (a, b) =>
-              a.path.localeCompare(b.path) ||
-              (a.line ?? 0) - (b.line ?? 0) ||
-              (a.column ?? 0) - (b.column ?? 0),
-          ),
-        ];
+        const problems = found.flat().sort(
+          (a, b) =>
+            a.path.localeCompare(b.path) ||
+            (a.line ?? 0) - (b.line ?? 0) ||
+            (a.column ?? 0) - (b.column ?? 0),
+        );
         logger.info(
           `Loaded ${store.keys().length} Tomet documents` +
             (problems.length > 0 ? ` with ${problems.length} problem(s).` : "."),
@@ -833,13 +867,28 @@ export function tometLoader(options: TometLoaderOptions): Loader {
       // Watcher for dev mode
       if (watcher) {
         watcher.add(baseDir);
-        for (const part of state.parts) watcher.add(part);
+        const watchedParts = new Set<string>();
+        const syncWatchedParts = (parts: readonly string[]) => {
+          for (const part of parts) {
+            const abs = resolve(part);
+            if (!watchedParts.has(abs)) {
+              watchedParts.add(abs);
+              watcher.add(part);
+            }
+          }
+        };
+        syncWatchedParts(state.parts);
 
+        const isPart = (filePath: string) => {
+          const abs = resolve(filePath);
+          return state.parts.some((p) => resolve(p) === abs);
+        };
         const isDoc = (path: string) =>
           path.endsWith(".tmt") || path.endsWith(".tm");
         const reload = async () => {
           try {
             state = await build();
+            syncWatchedParts(state.parts);
             await loadAll(state);
           } catch (err) {
             logger.error(`Failed to reload Tomet documents: ${err}`);
@@ -847,7 +896,7 @@ export function tometLoader(options: TometLoaderOptions): Loader {
         };
 
         const handleChange = async (changedPath: string) => {
-          if (state.parts.some((p) => resolve(p) === resolve(changedPath))) {
+          if (isPart(changedPath)) {
             logger.info(
               "The vault config or a file it registers changed, reloading...",
             );
@@ -857,6 +906,10 @@ export function tometLoader(options: TometLoaderOptions): Loader {
           const relPath = relative(baseDir, changedPath).split("\\").join("/");
           // A file that was not there changes what links can reach: the vault is made again.
           if (!state.files.has(relPath)) return reload();
+          if (!state.ok) {
+            log(state.problems);
+            return;
+          }
           if (!isDoc(changedPath)) return;
           const file = state.docs.find((d) => d.relPath === relPath);
           if (!file) return;
@@ -864,7 +917,9 @@ export function tometLoader(options: TometLoaderOptions): Loader {
         };
 
         const handleUnlink = async (deletedPath: string) => {
-          if (deletedPath.startsWith(baseDir)) await reload();
+          if (isPart(deletedPath) || deletedPath.startsWith(baseDir)) {
+            await reload();
+          }
         };
 
         watcher.on("add", handleChange);

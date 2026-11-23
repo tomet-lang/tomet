@@ -187,9 +187,12 @@ function context(root: string, store = new Map<string, Entry>(), dev = false) {
   const logged: { level: string; message: string }[] = [];
   const log = (level: string) => (message: string) => logged.push({ level, message });
   const handlers: Record<string, ((path: string) => unknown)[]> = {};
+  const watched: string[] = [];
   const watcher = dev
     ? {
-        add() {},
+        add(path: string) {
+          watched.push(path);
+        },
         on(event: string, handler: (path: string) => unknown) {
           (handlers[event] ??= []).push(handler);
         },
@@ -199,6 +202,7 @@ function context(root: string, store = new Map<string, Entry>(), dev = false) {
     store,
     logged,
     handlers,
+    watched,
     context: {
       collection: "docs",
       config: { root: pathToFileURL(`${root}/`) },
@@ -412,6 +416,141 @@ describe("tometLoader on a directory", () => {
     rmSync(join(root, "docs", "dict.tmt"));
     const error = await failure(loader().load(context(root).context));
     assert.match(error.message, /unresolved-term/);
+    rmSync(root, { recursive: true });
+  });
+
+  test("a broken vault config stops the build without per-document errors", async () => {
+    const root = site({
+      "a.tmt": "=[ A ]\n\n@term(tomet#config)\n\n@custom.widget[ hi ]\n",
+      "vault.config.tmt": "@broken(\n",
+    });
+    const store = new Map<string, Entry>();
+    const error = await failure(
+      tometLoader({ base: "docs", filter: (p) => p === "a.tmt" }).load(
+        context(root, store).context,
+      ),
+    );
+    assert.equal(error.problems.length, 1);
+    assert.equal(error.problems[0].code, "invalid-vault");
+    assert.doesNotMatch(error.message, /unresolved-term|unknown-element/);
+    assert.equal(store.size, 0);
+    rmSync(root, { recursive: true });
+  });
+
+  test("an invalid registered dictionary stops the build without per-document errors", async () => {
+    const root = site({
+      "a.tmt": "=[ A ]\n\n@term(tomet#config)\n",
+      "vault.config.tmt": "::dictionary(tomet: @file(dict.tmt))\n",
+      "dict.tmt": "=[ Not a dictionary ]\n\n@broken(\n",
+    });
+    const store = new Map<string, Entry>();
+    const error = await failure(
+      tometLoader({ base: "docs", filter: (p) => p === "a.tmt" }).load(
+        context(root, store).context,
+      ),
+    );
+    assert.equal(error.problems.length, 1);
+    assert.equal(error.problems[0].code, "invalid-vault");
+    assert.doesNotMatch(error.message, /unresolved-term/);
+    assert.equal(store.size, 0);
+    rmSync(root, { recursive: true });
+  });
+
+  test("a missing registered vocabulary or dictionary stops the build with unreadable only", async () => {
+    const root = site({
+      "a.tmt": "=[ A ]\n\n@term(tomet#config)\n",
+      "vault.config.tmt": "::dictionary(tomet: @file(missing-dict.tmt))\n",
+    });
+    const store = new Map<string, Entry>();
+    const error = await failure(
+      tometLoader({ base: "docs", filter: (p) => p === "a.tmt" }).load(
+        context(root, store).context,
+      ),
+    );
+    assert.equal(error.problems.length, 1);
+    assert.equal(error.problems[0].code, "unreadable");
+    assert.doesNotMatch(error.message, /invalid-vault|unresolved-term/);
+    assert.equal(store.size, 0);
+    rmSync(root, { recursive: true });
+  });
+
+  test("a missing explicit vault config stops the build without per-document errors", async () => {
+    const root = site({
+      "a.tmt": "=[ A ]\n\n@term(tomet#config)\n",
+    });
+    const store = new Map<string, Entry>();
+    const error = await failure(
+      tometLoader({ base: "docs", vault: "missing-vault.config.tmt" }).load(
+        context(root, store).context,
+      ),
+    );
+    assert.equal(error.problems.length, 1);
+    assert.equal(error.problems[0].code, "missing-vault-config");
+    assert.doesNotMatch(error.message, /unresolved-term/);
+    assert.equal(store.size, 0);
+    rmSync(root, { recursive: true });
+  });
+
+  test("dev mode logs vault problems without crashing and recovers on reload when fixed", async () => {
+    const root = site({
+      "a.tmt": "=[ A ]\n\n@term(tomet#config)\n",
+    });
+    const sharedDir = join(root, "shared");
+    const configPath = join(sharedDir, "vault.config.tmt");
+    const dictPath = join(sharedDir, "dict.tmt");
+    mkdirSync(sharedDir, { recursive: true });
+    writeFileSync(configPath, "@broken(\n");
+    writeFileSync(
+      dictPath,
+      '::dictionary(tomet)\n\n;@term("config")[ the settings ]#(config)\n',
+    );
+
+    const { context: ctx, logged, store, handlers, watched } = context(
+      root,
+      new Map(),
+      true,
+    );
+    await tometLoader({
+      base: "docs",
+      vault: "shared/vault.config.tmt",
+    }).load(ctx);
+
+    const initialProblems = logged.filter(
+      (l) => l.level === "error" || l.level === "warn",
+    );
+    assert.equal(initialProblems.length, 1);
+    assert.match(initialProblems[0].message, /invalid-vault/);
+    assert.equal(store.size, 0);
+    assert.ok(watched.includes(configPath));
+
+    // Fixing the vault config triggers reload() and registers the newly discovered dictionary part.
+    logged.length = 0;
+    writeFileSync(configPath, "::dictionary(tomet: @file(dict.tmt))\n");
+    for (const handler of handlers.change ?? []) {
+      await handler(configPath);
+    }
+
+    const afterFixProblems = logged.filter(
+      (l) => l.level === "error" || l.level === "warn",
+    );
+    assert.equal(afterFixProblems.length, 0);
+    assert.deepEqual([...store.keys()], ["a"]);
+    assert.ok(watched.includes(dictPath));
+
+    // Breaking the config later logs only invalid-vault and keeps the previously served entries.
+    logged.length = 0;
+    writeFileSync(configPath, "@broken(\n");
+    for (const handler of handlers.change ?? []) {
+      await handler(configPath);
+    }
+
+    const afterBreakProblems = logged.filter(
+      (l) => l.level === "error" || l.level === "warn",
+    );
+    assert.equal(afterBreakProblems.length, 1);
+    assert.match(afterBreakProblems[0].message, /invalid-vault/);
+    assert.deepEqual([...store.keys()], ["a"]);
+
     rmSync(root, { recursive: true });
   });
 });
