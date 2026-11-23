@@ -26,7 +26,7 @@ use serde_json::{Map, Value};
 
 /// The schema documents of the AST: file name, and the schema.
 ///
-/// `tomet spec ast-types` reads these same documents, so the types and the schemas have one source.
+/// `tomet spec typescript` reads these same documents, so the types and the schemas have one source.
 pub fn documents() -> Vec<(&'static str, Value)> {
     vec![
         (
@@ -43,7 +43,7 @@ pub fn documents() -> Vec<(&'static str, Value)> {
 /// The file of what the bindings hand out.
 pub const BINDING_FILE: &str = "binding.schema.json";
 
-/// The schema documents `tomet spec ast-schema` writes, rendered: file name, and the text of the file.
+/// The schema documents `tomet spec schema` writes, rendered: file name, and the text of the file.
 pub fn render() -> Vec<(&'static str, String)> {
     documents()
         .into_iter()
@@ -304,7 +304,7 @@ mod tests {
                 .unwrap_or_else(|e| panic!("cannot read {}: {e}", path.display()));
             assert!(
                 committed == rendered,
-                "{} is out of date; regenerate it with `tomet spec ast-schema --out bindings/schema`",
+                "{} is out of date; regenerate it with `tomet spec schema --out bindings/schema`",
                 path.display()
             );
         }

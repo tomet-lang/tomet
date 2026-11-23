@@ -11,5 +11,5 @@ serde = { workspace = true }
 schemars = { workspace = true, optional = true }
 
 [features]
-# `JsonSchema` for the wire shape of a scalar, for the generated schema of the AST (`tomet spec ast-schema`).
+# `JsonSchema` for the wire shape of a scalar, for the generated schema of the AST (`tomet spec schema`).
 schema = ["dep:schemars"]

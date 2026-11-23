@@ -25,7 +25,7 @@
 //!   | the nodes that are not data. Which form a consumer wants is its choice, never a flag.
 //! - (The Schema Is Derived, Behind A Feature)
 //!   | With the `schema` feature every node (and [`PlainValue`]) also derives `schemars::JsonSchema`, so the JSON Schema
-//!   | of the wire is the shape serde writes and not a second description of it; `tomet spec ast-schema` generates it.
+//!   | of the wire is the shape serde writes and not a second description of it; `tomet spec schema` generates it.
 //!   | The feature is off by default, so nothing that parses or prints compiles `schemars`. A doc comment on a type is
 //!   | that type's description in the schema: write it for a reader of JSON, and put what only a Rust reader needs
 //!   | under a `=[ In Rust ]` heading, which the schema leaves out.

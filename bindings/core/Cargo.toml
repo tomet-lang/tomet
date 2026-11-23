@@ -8,7 +8,7 @@ repository.workspace = true
 publish              = false
 
 [features]
-# `JsonSchema` for the types that cross the boundary: what `tomet spec ast-schema` writes the
+# `JsonSchema` for the types that cross the boundary: what `tomet spec schema` writes the
 # binding schema from.
 schema = ["dep:schemars", "tomet-ast/schema", "tomet-span/schema"]
 

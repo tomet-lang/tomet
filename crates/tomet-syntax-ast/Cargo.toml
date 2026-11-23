@@ -20,5 +20,5 @@ serde_json = { workspace = true }
 
 [features]
 # `JsonSchema` for every type of the AST wire (and the plain-data form), for the schema generated
-# by `tomet spec ast-schema`. Off by default: nothing that parses or prints needs it.
+# by `tomet spec schema`. Off by default: nothing that parses or prints needs it.
 schema = ["dep:schemars", "tomet-scalar/schema", "tomet-span/schema"]

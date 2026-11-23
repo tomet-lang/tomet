@@ -63,8 +63,8 @@ format-check:
 docs:
     cargo build -p tomet-cli
     ./target/debug/tomet spec --all --out tmtroot/generated
-    ./target/debug/tomet spec ast-schema --out bindings/schema
-    ./target/debug/tomet spec ast-types --out bindings/js
+    ./target/debug/tomet spec schema --out bindings/schema
+    ./target/debug/tomet spec typescript --out bindings/js
     PATH="{{ justfile_directory() }}/target/debug:$PATH" sisho fix .
 
 # The placement check stays here because it is this repository's docs
@@ -74,8 +74,8 @@ docs-check:
     cargo build -p tomet-cli
     PATH="{{ justfile_directory() }}/target/debug:$PATH" sisho check .
     ./target/debug/tomet spec --all --check --out tmtroot/generated
-    ./target/debug/tomet spec ast-schema --check --out bindings/schema
-    ./target/debug/tomet spec ast-types --check --out bindings/js
+    ./target/debug/tomet spec schema --check --out bindings/schema
+    ./target/debug/tomet spec typescript --check --out bindings/js
 
 # Run the two guards that `.writ.tmt` entries name but nothing executed.
 #

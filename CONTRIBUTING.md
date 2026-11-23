@@ -113,7 +113,7 @@ Useful recipes defined in `justfile`:
 
 - **`just test`**: Runs all workspace tests (`cargo test --workspace`).
 - **`just test-suite`**: Runs the cross-crate corpus and snapshot test suite (`cargo test -p tomet-tests`).
-- **`just docs-check`**: Runs the build of `tomet-cli`, `sisho check .` (`tomet check`, `tomet format --check`, `tomet export --check`, `twrit check`, `catasto check`), `tomet spec --all --check --out tmtroot/generated`, `tomet spec ast-schema --check --out bindings/schema`, and `tomet spec ast-types --check --out bindings/js`.
+- **`just docs-check`**: Runs the build of `tomet-cli`, `sisho check .` (`tomet check`, `tomet format --check`, `tomet export --check`, `twrit check`, `catasto check`), `tomet spec --all --check --out tmtroot/generated`, `tomet spec schema --check --out bindings/schema`, and `tomet spec typescript --check --out bindings/js`.
 - **`just docs`**: Updates, regenerates, and formats all derived documentation.
 - **`just writ-check`**: Verifies `.writ.tmt` guard rules and language conventions.
 
@@ -123,6 +123,6 @@ Direct checks (if running individually):
 - `twrit check`: Reads `.writ.tmt` files.
 - `tomet export --check`: Verifies that all exported `.md` documents match their source `.tmt` files.
 - `tomet spec --all --check --out tmtroot/generated`: Verifies that generated specifications match source definitions.
-- `tomet spec ast-schema --check --out bindings/schema`: Verifies that the JSON Schemas of the AST wire and of the bindings (`bindings/schema/`) match the Rust types they are generated from.
-- `tomet spec ast-types --check --out bindings/js`: Verifies that the TypeScript declarations of the AST wire and of the bindings (`bindings/js/ast.d.ts`, `bindings/js/binding.d.ts`) match the JSON Schemas they are generated from.
+- `tomet spec schema --check --out bindings/schema`: Verifies that the JSON Schemas of the AST wire and of the bindings (`bindings/schema/`) match the Rust types they are generated from.
+- `tomet spec typescript --check --out bindings/js`: Verifies that the TypeScript declarations of the AST wire and of the bindings (`bindings/js/ast.d.ts`, `bindings/js/binding.d.ts`) match the JSON Schemas they are generated from.
 

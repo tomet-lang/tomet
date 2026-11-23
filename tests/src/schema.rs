@@ -2,7 +2,7 @@
 //! JSON Schema validator holds them to it: every document of the corpus, serialized, is valid
 //! against `ast.schema.json`, and every plain value against `plain.schema.json`.
 //!
-//! The schemas are generated from the Rust types (`tomet spec ast-schema`), and a test of the CLI holds
+//! The schemas are generated from the Rust types (`tomet spec schema`), and a test of the CLI holds
 //! the committed files to what the types generate. This one holds what is generated to what serde
 //! writes, which the derive cannot promise where a type is serialized by hand (`PlainValue`) or
 //! through an attribute (`Tuple`). That a document serialized and read back is the same document is

@@ -5,8 +5,8 @@ use std::path::{Path, PathBuf};
 
 use clap::ValueEnum;
 
-pub mod ast_schema;
-pub mod ast_types;
+pub mod schema;
+pub mod typescript;
 pub mod cli;
 pub mod config;
 pub mod util;
@@ -23,11 +23,11 @@ pub enum SpecTarget {
     /// JSON Schemas of the AST wire format, of plain data and of what the bindings hand out
     /// (`ast.schema.json`, `plain.schema.json`, `binding.schema.json`), derived from the Rust types.
     /// `--out` is the directory to write them to; not part of `--all`.
-    AstSchema,
+    Schema,
     /// TypeScript declarations of the AST wire format and of plain data (`ast.d.ts`) and of what the
     /// bindings hand out (`binding.d.ts`), generated from the JSON Schemas. `--out` is the directory to
     /// write them to; not part of `--all`.
-    AstTypes,
+    Typescript,
 }
 
 pub fn spec_cmd(
@@ -50,8 +50,8 @@ pub fn spec_cmd(
             "config.tmt",
             "config",
         ),
-        SpecTarget::AstSchema => return ast_schema_cmd(out, check),
-        SpecTarget::AstTypes => return ast_types_cmd(out, check),
+        SpecTarget::Schema => return schema_cmd(out, check),
+        SpecTarget::Typescript => return typescript_cmd(out, check),
     };
 
     let Some(out) = out else {
@@ -65,30 +65,30 @@ pub fn spec_cmd(
 }
 
 /// Writes (or checks) the schema documents of the AST and of the bindings into the directory `out`.
-fn ast_schema_cmd(out: Option<&Path>, check: bool) -> anyhow::Result<()> {
+fn schema_cmd(out: Option<&Path>, check: bool) -> anyhow::Result<()> {
     let Some(out) = out else {
         anyhow::bail!(
-            "`ast-schema` writes one file per schema: give the directory with --out <DIR>"
+            "`schema` writes one file per schema: give the directory with --out <DIR>"
         );
     };
-    let regenerate = format!("tomet spec ast-schema --out {}", out.display());
-    for (file, content) in ast_schema::render() {
+    let regenerate = format!("tomet spec schema --out {}", out.display());
+    for (file, content) in schema::render() {
         write_or_check(&out.join(file), &content, check, &regenerate)?;
     }
     Ok(())
 }
 
 /// Writes (or checks) the TypeScript declarations of the AST and of the bindings into the directory `out`.
-fn ast_types_cmd(out: Option<&Path>, check: bool) -> anyhow::Result<()> {
+fn typescript_cmd(out: Option<&Path>, check: bool) -> anyhow::Result<()> {
     let Some(out) = out else {
         anyhow::bail!(
-            "`ast-types` writes a file next to the bindings: give the directory with --out <DIR>"
+            "`typescript` writes a file next to the bindings: give the directory with --out <DIR>"
         );
     };
-    let regenerate = format!("tomet spec ast-types --out {}", out.display());
+    let regenerate = format!("tomet spec typescript --out {}", out.display());
     for (file, rendered) in [
-        (ast_types::FILE, ast_types::render()),
-        (ast_types::BINDING_FILE, ast_types::render_binding()),
+        (typescript::FILE, typescript::render()),
+        (typescript::BINDING_FILE, typescript::render_binding()),
     ] {
         let text = rendered.map_err(|e| anyhow::anyhow!("cannot generate {file}: {e}"))?;
         write_or_check(&out.join(file), &text, check, &regenerate)?;
