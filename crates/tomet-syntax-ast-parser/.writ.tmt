@@ -25,6 +25,11 @@ does not relax the rule to fit the change it wanted to make.
       "serde", "serde_core", "serde_derive",
       "proc-macro2", "quote", "syn", "unicode-ident", "unicode-width",
       "ahash", "cfg-if", "once_cell", "zerocopy", "zerocopy-derive"
+      // The `schema` feature of tomet-span, tomet-scalar and tomet-ast, which the
+      // workspace build unifies in: JSON Schema of the AST wire, never in wasm.
+      "schemars", "schemars_derive", "serde_derive_internals", "dyn-clone",
+      "ref-cast", "ref-cast-impl", "serde_json", "itoa", "memchr", "zmij",
+      "indexmap", "equivalent"
     ]
   )
 }

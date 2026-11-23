@@ -3,7 +3,8 @@
 
 @rule(tomet-span-dependencies){
   why: | `tomet-span` is a base-layer crate representing byte ranges and offsets.
-       | It holds zero dependencies on other workspace members.
+       | It performs no I/O, and depends externally only on `serde` (and its derive closure),
+       | plus `schemars` (and its closure) behind the `schema` feature.| It holds zero dependencies on other workspace members.
   guard: ( twrit: dependencies )
   crate: @crate(tomet-span)
   dependencies: ()
@@ -11,7 +12,8 @@
 
 @rule(tomet-span-purity){
   why: | `tomet-span` is pure and side-effect-free.
-       | It performs no I/O, and depends externally only on `serde` (and its derive closure).
+       | It performs no I/O, and depends externally only on `serde` (and its derive closure),
+       | plus `schemars` (and its closure) behind the `schema` feature.
   guard: ( twrit: pure )
   crate: @crate(tomet-span)
   pure: (
@@ -19,5 +21,9 @@
     allow-external: (
       "serde", "serde_core", "serde_derive"
       "proc-macro2", "quote", "syn", "unicode-ident"
+      // The `schema` feature: JSON Schema of the AST wire, never in wasm.
+      "schemars", "schemars_derive", "serde_derive_internals", "dyn-clone",
+      "ref-cast", "ref-cast-impl", "serde_json", "itoa", "memchr", "zmij",
+      "indexmap", "equivalent", "hashbrown"
   ))
 }
