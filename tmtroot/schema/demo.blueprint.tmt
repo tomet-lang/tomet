@@ -4,8 +4,8 @@
   description: "Demo blueprint showcasing type seats, expressions, and apply"
 }
 ::var(
-  title:      { default: "Untitled Demo" }
-  base_score: { type: int, default: 10 }
+  title:      (default: "Untitled Demo")
+  base_score: (type: int, default: 10)
 )
 ::id(<$nanoid(length: 8, prefix: "demo-", default: auto, overwrite: true)>)
 ::meta(

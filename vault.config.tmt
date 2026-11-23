@@ -46,7 +46,9 @@
   idea:       @file(tmtroot/schema/idea.vocabulary.tmt)
   roots:      @file(tmtroot/schema/roots.vocabulary.tmt)
   catasto:    @file(tmtroot/schema/catasto@1.0.0.vocabulary.tmt)
-  tomet:      @file(tmtroot/dict/tomet.dict.tmt)
+)
+::dictionary(
+  tomet: @file(tmtroot/dict/tomet.dict.tmt)
 )
 ::blueprint(
   writ:    @file(tmtroot/schema/writ.blueprint.tmt)
