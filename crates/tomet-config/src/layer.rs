@@ -3,12 +3,12 @@
 //! A vault's configuration is a stack of files -- the vault config, then each folder config on the
 //! way down to a document, then the document's own declarations -- and the nearer layer wins, key
 //! by key. Each concern is a declaration of its own (`::format`, `::field`, `::workspace`,
-//! `::blueprint`, `::vocabulary`, `::dictionary`, `::macro`, `::var`), and a layer keeps what
+//! `::cache`, `::blueprint`, `::vocabulary`, `::dictionary`, `::macro`, `::var`), and a layer keeps what
 //! each one said.
 //! They are of three kinds, and the kind decides how they are read: tables from a name to a
 //! definition (`::macro`, `::var`, `::field`, `::blueprint`,
 //! `::dictionary`: merged by name), file lists (`::vocabulary`: stacked in registration order),
-//! knobs of a tool (`::format`, `::workspace`, `::export`:
+//! knobs of a tool (`::format`, `::workspace`, `::cache`, `::export`:
 //! merged key by key), and pointers to other files (`::import`, not implemented yet).
 //! Merging happens on those values, before they become a [`Config`](crate::Config): a typed group
 //! cannot tell a key that was never written from one written with its default, so two typed groups
@@ -27,6 +27,7 @@ pub struct ConfigLayer {
     format: Vec<(String, Value)>,
     fields: Vec<(String, Value)>,
     workspace: Vec<(String, Value)>,
+    cache: Vec<(String, Value)>,
     blueprints: Vec<(String, Value)>,
     vocabularies: Vec<Value>,
     dictionaries: Vec<(String, Value)>,
@@ -41,6 +42,7 @@ impl ConfigLayer {
             format: document_entries(doc, DeclKind::Format),
             fields: document_entries(doc, DeclKind::Field),
             workspace: document_entries(doc, DeclKind::Workspace),
+            cache: document_entries(doc, DeclKind::Cache),
             blueprints: document_entries(doc, DeclKind::Blueprint),
             vocabularies: document_vocabulary_entries(doc),
             dictionaries: document_entries(doc, DeclKind::Dictionary),
@@ -58,6 +60,7 @@ impl ConfigLayer {
             DeclKind::Format => Some(&mut self.format),
             DeclKind::Field => Some(&mut self.fields),
             DeclKind::Workspace => Some(&mut self.workspace),
+            DeclKind::Cache => Some(&mut self.cache),
             DeclKind::Blueprint => Some(&mut self.blueprints),
             DeclKind::Dictionary => Some(&mut self.dictionaries),
             _ => None,
@@ -87,6 +90,7 @@ impl ConfigLayer {
         self.format.extend(inner.format.iter().cloned());
         self.fields.extend(inner.fields.iter().cloned());
         self.workspace.extend(inner.workspace.iter().cloned());
+        self.cache.extend(inner.cache.iter().cloned());
         self.blueprints.extend(inner.blueprints.iter().cloned());
         self.vocabularies.extend(inner.vocabularies.iter().cloned());
         self.dictionaries.extend(inner.dictionaries.iter().cloned());
@@ -109,6 +113,10 @@ impl ConfigLayer {
 
     pub(crate) fn workspace(&self) -> &[(String, Value)] {
         &self.workspace
+    }
+
+    pub(crate) fn cache(&self) -> &[(String, Value)] {
+        &self.cache
     }
 
     pub(crate) fn macros(&self) -> &HashMap<String, Value> {
@@ -305,6 +313,23 @@ mod tests {
         assert!(l.strip_vault_only().is_empty());
         let cfg = Config::from_layers([&l]);
         assert!(cfg.workspace.ignore.is_empty());
+        assert_eq!(
+            cfg.format.link_target_colon,
+            Some(tomet_style::ColonSpacing::Tight),
+            "the rest of the layer still applies"
+        );
+    }
+
+    #[test]
+    fn the_cache_is_dropped_from_a_layer_that_may_not_declare_it() {
+        let mut l = layer(
+            "::cache(dir: \".tomet/cache\", local: true)\n::format(element: (link: (no_space: true)))\n",
+        );
+        assert_eq!(l.strip_vault_only(), vec![DeclKind::Cache]);
+        assert!(l.strip_vault_only().is_empty());
+        let cfg = Config::from_layers([&l]);
+        assert_eq!(cfg.cache.dir, None);
+        assert!(!cfg.cache.local);
         assert_eq!(
             cfg.format.link_target_colon,
             Some(tomet_style::ColonSpacing::Tight),

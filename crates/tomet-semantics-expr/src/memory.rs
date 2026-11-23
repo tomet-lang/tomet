@@ -1,14 +1,15 @@
 //! A resolver over documents held in memory.
 
 use std::collections::BTreeMap;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use tomet_ast::{Block, File, Tuple};
 
-use super::context::{PreparedBlocks, Resolver};
+use super::context::{CacheRequest, PreparedBlocks, Resolver};
+use super::error::EvalError;
 use super::value::{DirRef, DocRef, EvalValue};
 
-/// Documents by vault-relative path.
+/// Documents and cache entries held in memory.
 ///
 /// `meta` is the document's `::meta` as written, with no settings applied: a
 /// `list` field that the document lacks is simply absent here. The vault's
@@ -17,6 +18,8 @@ use super::value::{DirRef, DocRef, EvalValue};
 pub struct MemoryResolver {
     docs: BTreeMap<String, Arc<File>>,
     sources: BTreeMap<String, String>,
+    cache: BTreeMap<(String, String, bool), EvalValue>,
+    cache_requests: Mutex<Vec<CacheRequest>>,
 }
 
 impl MemoryResolver {
@@ -40,6 +43,36 @@ impl MemoryResolver {
         self.docs.insert(path.to_string(), Arc::new(doc));
         self.sources.insert(path.to_string(), source.to_string());
         Ok(self)
+    }
+
+    /// Registers a non-local (`local: false`) cache entry for `(kind, key)`.
+    pub fn with_cache(
+        mut self,
+        kind: impl Into<String>,
+        key: impl Into<String>,
+        value: EvalValue,
+    ) -> Self {
+        self.cache.insert((kind.into(), key.into(), false), value);
+        self
+    }
+
+    /// Registers a user-local (`local: true`) cache entry for `(kind, key)`.
+    pub fn with_local_cache(
+        mut self,
+        kind: impl Into<String>,
+        key: impl Into<String>,
+        value: EvalValue,
+    ) -> Self {
+        self.cache.insert((kind.into(), key.into(), true), value);
+        self
+    }
+
+    /// Returns all [`CacheRequest`]s observed by [`Resolver::cache`] in call order.
+    pub fn cache_requests(&self) -> Vec<CacheRequest> {
+        self.cache_requests
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .clone()
     }
 }
 
@@ -103,5 +136,28 @@ impl Resolver for MemoryResolver {
     ) -> Result<PreparedBlocks, String> {
         // Nothing here evaluates; the blocks come back as they are.
         Ok(PreparedBlocks::clean(blocks))
+    }
+
+    fn cache(&self, req: &CacheRequest) -> Result<EvalValue, EvalError> {
+        self.cache_requests
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .push(req.clone());
+        self.cache
+            .get(&(req.kind.clone(), req.key.clone(), req.local))
+            .cloned()
+            .ok_or_else(|| {
+                if req.local {
+                    EvalError::Unresolved(format!(
+                        "local cache miss for `cache.{}({:?})`",
+                        req.kind, req.key
+                    ))
+                } else {
+                    EvalError::Unresolved(format!(
+                        "cache miss for `cache.{}({:?})`",
+                        req.kind, req.key
+                    ))
+                }
+            })
     }
 }

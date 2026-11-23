@@ -382,6 +382,9 @@ pub enum Diagnostic {
         value: String,
         span: Span,
     },
+    /// A `$cache.<kind>(...)` expression failed to resolve (undeclared `::cache`,
+    /// disallowed `local: true`, cache miss, or unreadable/corrupt `.cache.ctmt`).
+    CacheError { reason: String, span: Span },
 }
 
 impl Diagnostic {
@@ -431,6 +434,7 @@ impl Diagnostic {
             Diagnostic::UnknownKey { span, .. } => *span,
             Diagnostic::MissingRequiredHeaderAttr { span, .. } => *span,
             Diagnostic::InvalidBlueprintValue { span, .. } => *span,
+            Diagnostic::CacheError { span, .. } => *span,
         }
     }
 
@@ -491,6 +495,7 @@ impl Diagnostic {
             Diagnostic::UnknownKey { .. } => "unknown-key",
             Diagnostic::MissingRequiredHeaderAttr { .. } => "missing-required-header-attr",
             Diagnostic::InvalidBlueprintValue { .. } => "invalid-blueprint-value",
+            Diagnostic::CacheError { .. } => "cache-error",
         }
     }
 }
@@ -939,6 +944,7 @@ impl Diagnostic {
             } => {
                 write!(f, "`{path}` expects {expected}, but got `{value}`")
             }
+            Diagnostic::CacheError { reason, .. } => f.write_str(reason),
         }
     }
 }

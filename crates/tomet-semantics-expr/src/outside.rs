@@ -48,6 +48,8 @@ pub enum Reach {
     Address(&'static str),
     /// `.addr()` on a string that is not written out, so where it points cannot be told.
     UnknownAddress,
+    /// `cache.<kind>(...)` or `cache`, which reads cached values from outside the document.
+    Cache,
 }
 
 impl std::fmt::Display for Reach {
@@ -80,6 +82,7 @@ impl std::fmt::Display for Reach {
                 f,
                 "an address built at run time, which cannot be shown to stay inside the file"
             ),
+            Reach::Cache => write!(f, "external cached data (`cache`)"),
         }
     }
 }
@@ -144,6 +147,8 @@ fn walk(expr: &InterpExpr, own: &OwnNames, out: &mut Vec<Reaching>) {
         InterpExprKind::Identifier(name) => {
             if name == "vault" {
                 push(Reach::Vault);
+            } else if name == "cache" {
+                push(Reach::Cache);
             }
         }
         InterpExprKind::Group(inner) => walk(inner, own, out),
@@ -335,6 +340,12 @@ mod tests {
         assert_eq!(reaches("link(#intro)"), vec![Reach::Placement("link")]);
         assert_eq!(reaches("self.link()"), vec![Reach::Placement("link")]);
         assert_eq!(reaches("#intro.link()"), vec![Reach::Placement("link")]);
+        assert_eq!(reaches("cache"), vec![Reach::Cache]);
+        assert_eq!(reaches("cache.command(\"whoami\")"), vec![Reach::Cache]);
+        assert_eq!(
+            reaches("raw(cache.command(\"tomet --help\"), lang: \"text\")"),
+            vec![Reach::Cache]
+        );
     }
 
     #[test]

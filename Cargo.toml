@@ -69,6 +69,9 @@ members = [
   "crates/tomet-eval",
   "crates/cotomet-eval",
 
+  #= Cache -- pure cache protocol, hashing, layout, .cache.ctmt format, AST extraction
+  "crates/tomet-cache",
+
   #= Query -- pure deterministic in-memory structural, part, and collection queries
   "crates/tomet-query",
 
@@ -134,6 +137,10 @@ repository   = "https://github.com/tomet-lang/tomet"
 #--- Facade ---
 cotomet = { path = "crates/cotomet", version = "0.5.0" }
 tomet   = { path = "crates/tomet", version = "0.5.0" }
+#---
+serde_cotomet       = { path = "crates/serde_cotomet", version = "0.5.0" }
+tree-sitter-cotomet = { path = "crates/tree-sitter-cotomet", version = "0.5.0" }
+tree-sitter-tomet   = { path = "crates/tree-sitter-tomet", version = "0.5.0" }
 #--- Base ---
 tomet-id       = { path = "crates/tomet-base-id", version = "0.5.0" }
 tomet-position = { path = "crates/tomet-base-position", version = "0.5.0" }
@@ -175,21 +182,22 @@ tomet-html               = { path = "crates/tomet-convert-html", version = "0.5.
 tomet-markdown           = { path = "crates/tomet-convert-markdown", version = "0.5.0" }
 tomet-pandoc             = { path = "crates/tomet-convert-pandoc", version = "0.5.0" }
 tomet-typst              = { path = "crates/tomet-convert-typst", version = "0.5.0" }
-#--- Format ---
-tomet-formatter = { path = "crates/tomet-formatter", version = "0.5.0" }
-tomet-printer   = { path = "crates/tomet-printer", version = "0.5.0" }
+#--- Config ---
+tomet-config = { path = "crates/tomet-config", version = "0.5.0" }
 #---
+tomet-deps      = { path = "crates/tomet-deps", version = "0.5.0" }
+tomet-cache     = { path = "crates/tomet-cache", version = "0.5.0" }
 tomet-edit      = { path = "crates/tomet-edit", version = "0.5.0" }
 tomet-extract   = { path = "crates/tomet-extract", version = "0.5.0" }
+tomet-formatter = { path = "crates/tomet-formatter", version = "0.5.0" }
 tomet-merge     = { path = "crates/tomet-merge", version = "0.5.0" }
+tomet-printer   = { path = "crates/tomet-printer", version = "0.5.0" }
 tomet-query     = { path = "crates/tomet-query", version = "0.5.0" }
 tomet-stats     = { path = "crates/tomet-stats", version = "0.5.0" }
 tomet-tome      = { path = "crates/tomet-tome", version = "0.5.0" }
 tomet-transform = { path = "crates/tomet-transform", version = "0.5.0" }
 tomet-vault     = { path = "crates/tomet-vault", version = "0.5.0" }
 #--- Workspace ---
-tomet-config      = { path = "crates/tomet-config", version = "0.5.0" }
-tomet-deps        = { path = "crates/tomet-deps", version = "0.5.0" }
 tomet-indexer     = { path = "crates/tomet-workspace-indexer", version = "0.5.0" }
 tomet-links       = { path = "crates/tomet-workspace-links", version = "0.5.0", default-features = false }
 tomet-load        = { path = "crates/tomet-load", version = "0.5.0" }
@@ -198,15 +206,15 @@ tomet-workspace   = { path = "crates/tomet-workspace", version = "0.5.0" }
 #--- Bindings ---
 tomet-binding = { path = "bindings/core", version = "0.5.0" }
 #---
-serde_cotomet       = { path = "crates/serde_cotomet", version = "0.5.0" }
-tree-sitter-cotomet = { path = "crates/tree-sitter-cotomet", version = "0.5.0" }
-tree-sitter-tomet   = { path = "crates/tree-sitter-tomet", version = "0.5.0" }
-#---
 jobserver-gate = { git = "https://github.com/tomet-lang/jobserver-gate.git" }
 tomet-synth    = { git = "https://github.com/tomet-lang/tomet-corpus.git" }
 # No plotters/rayon: the benches are for numbers and CI baselines, not HTML reports.
 criterion = { version = "0.8", default-features = false, features = [
   "cargo_bench_support",
+] }
+schemars = { version = "1", default-features = false, features = [
+  "derive",
+  "std",
 ] }
 #--- Crates.io ---
 anyhow               = "1"
@@ -231,11 +239,11 @@ rayon                = "1"
 regex                = "1.12"
 rowan                = "0.16"
 rusqlite             = { version = "0.31", features = ["bundled"] }
-schemars             = { version = "1", default-features = false, features = ["derive", "std"] }
 serde                = { version = "1", features = ["derive"] }
 serde-wasm-bindgen   = "0.6"
 serde_json           = { version = "1", features = ["preserve_order"] }
 serde_yaml           = "0.9"
+sha2                 = "0.10"
 syn                  = { version = "2.0", features = ["full", "extra-traits"] }
 time                 = "0.3"
 tree-sitter          = "0.26"

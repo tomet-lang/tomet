@@ -1,0 +1,20 @@
+[package]
+name                 = "tomet-cache"
+version.workspace    = true
+edition.workspace    = true
+description          = "Pure cache protocol for Tomet: SHA-256 keys, path layout, .cache.ctmt format, and AST extraction."
+license.workspace    = true
+repository.workspace = true
+
+[dependencies]
+serde_cotomet     = { workspace = true }
+tomet-ast         = { workspace = true }
+tomet-ast-parser  = { workspace = true }
+tomet-declaration = { workspace = true }
+tomet-scalar      = { workspace = true }
+tomet-span        = { workspace = true }
+tomet-tree        = { workspace = true }
+tomet-expr        = { workspace = true }
+tomet-position    = { workspace = true }
+# --- Crates.io ---
+sha2              = { workspace = true }

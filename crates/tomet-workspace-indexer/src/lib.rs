@@ -120,10 +120,41 @@ pub fn is_path_ignored(path: &Path, root: Option<&Path>, ignore_patterns: &[Stri
     false
 }
 
-/// Whether the sweep skips `p`: not part of the vault, or in it and
-/// left alone.
+/// Whether `path` sits inside the configured `::cache(dir: ...)` directory.
 ///
-/// The two lists answer different questions and only this one takes
+/// `cache.dir` is declared relative to the vault root (`root`), so only paths inside
+/// `<root>/<dir>` (or `<dir>` when `root` is `None` or `path` is relative against an absolute
+/// `root`) match — unlike `workspace.ignore`, a segment match deeper in the tree such as
+/// `docs/<dir>` is not excluded.
+fn is_in_cache_dir(path: &Path, root: Option<&Path>, config: &PrinterConfig) -> bool {
+    let Some(dir) = config.cache.dir.as_deref() else {
+        return false;
+    };
+    let dir_normalized = dir.trim().replace('\\', "/");
+    let dir_path = normalize_join(Path::new(""), Path::new(&dir_normalized));
+    if dir_path.as_os_str().is_empty() {
+        return false;
+    }
+    let path_clean = normalize_join(Path::new(""), path);
+    if let Some(r) = root {
+        let root_clean = normalize_join(Path::new(""), r);
+        let cache_root = normalize_join(&root_clean, &dir_path);
+        if path_clean.starts_with(&cache_root) {
+            return true;
+        }
+        if path_clean.is_relative() && root_clean.is_absolute() {
+            return path_clean.starts_with(&dir_path);
+        }
+        false
+    } else {
+        path_clean.starts_with(&dir_path)
+    }
+}
+
+/// Whether the sweep skips `p`: not part of the vault, in it and left alone, or inside the
+/// configured `::cache(dir: ...)` directory.
+///
+/// The two workspace lists answer different questions and only this one takes
 /// both. `ignore` says a path is not the vault's; `unswept` says it is,
 /// and is not processed -- the frozen corpus is skipped because a stale
 /// export there is the coverage, not because the repository lacks it.
@@ -132,6 +163,7 @@ pub fn is_path_ignored(path: &Path, root: Option<&Path>, ignore_patterns: &[Stri
 pub fn is_path_unswept(p: &Path, config_root: Option<&Path>, config: &PrinterConfig) -> bool {
     is_path_ignored(p, config_root, &config.workspace.ignore)
         || is_path_ignored(p, config_root, &config.workspace.unswept)
+        || is_in_cache_dir(p, config_root, config)
 }
 
 /// Whether the sweep would leave `path` alone under `config`, judged the
@@ -187,6 +219,7 @@ pub fn collect_vault_tm_files_with_config(
 ) -> Vec<PathBuf> {
     collect_files(path, is_tm_file, |p| {
         is_path_ignored(p, Some(config_root), &config.workspace.ignore)
+            || is_in_cache_dir(p, Some(config_root), config)
     })
 }
 
@@ -624,6 +657,37 @@ mod unswept_tests {
             is_path_ignored(foreign, Some(root), &cfg.workspace.ignore),
             "foreign is not referable"
         );
+    }
+
+    #[test]
+    fn files_under_cache_dir_are_excluded_from_scanning() {
+        let dir = std::env::temp_dir().join(format!("tm_indexer_cache_{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(dir.join(".tomet/cache/command")).unwrap();
+        std::fs::create_dir_all(dir.join("notes")).unwrap();
+
+        let cached_ctmt = dir.join(".tomet/cache/command/abc123.cache.ctmt");
+        let cached_tmt = dir.join(".tomet/cache/stray.tmt");
+        let outside_tmt = dir.join("notes/doc.tmt");
+        let outside_ctmt = dir.join("notes/data.ctmt");
+
+        std::fs::write(&cached_ctmt, "::kind(cache)\nkey: \"k\"\nvalue: \"v\"\n").unwrap();
+        std::fs::write(&cached_tmt, "#[Stray]\n").unwrap();
+        std::fs::write(&outside_tmt, "#[Doc]\n").unwrap();
+        std::fs::write(&outside_ctmt, "k: v\n").unwrap();
+
+        let mut cfg = PrinterConfig::default();
+        cfg.cache.dir = Some(".tomet/cache".to_string());
+
+        assert!(is_path_unswept(&cached_ctmt, Some(&dir), &cfg));
+        assert!(is_path_unswept(&cached_tmt, Some(&dir), &cfg));
+        assert!(!is_path_unswept(&outside_tmt, Some(&dir), &cfg));
+        assert!(!is_path_unswept(&outside_ctmt, Some(&dir), &cfg));
+
+        let collected = collect_tm_and_ctmt_files_with_config(&dir, &cfg, &dir);
+        assert_eq!(collected, vec![outside_ctmt.clone(), outside_tmt.clone()]);
+
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }
 

@@ -55,6 +55,11 @@ pub struct Unresolved {
     /// new --var` does). A blueprint is written to be filled in, so there that is as it
     /// should be, and `tomet check` leaves it out.
     pub awaits_input: bool,
+    /// Whether the expression failed due to a `$cache.<kind>(...)` lookup or
+    /// entry validation failure (`::cache` undeclared, `local: true` disallowed,
+    /// cache miss, or unreadable/corrupt `.cache.ctmt`). Reported as an error by
+    /// `tomet check` rather than a warning.
+    pub cache_error: bool,
 }
 
 /// What an [`Unresolved`] is about.
@@ -193,6 +198,7 @@ impl Pass<'_> {
                         from.0
                     ),
                     awaits_input: false,
+                    cache_error: false,
                 }),
             }
         }
@@ -202,6 +208,7 @@ impl Pass<'_> {
                 self.fail(expr, span, reason.to_string());
                 if let Some(last) = self.unresolved.last_mut() {
                     last.awaits_input = matches!(reason, tomet_expr::EvalError::NoValue(_));
+                    last.cache_error = matches!(reason, tomet_expr::EvalError::Cache(_));
                 }
                 None
             }
@@ -215,6 +222,7 @@ impl Pass<'_> {
             span,
             reason,
             awaits_input: false,
+            cache_error: false,
         });
     }
 
@@ -562,6 +570,7 @@ impl Ids {
                 "the id `{taken}` is already used earlier in the document; this one was dropped"
             ),
             awaits_input: false,
+            cache_error: false,
         });
     }
 }

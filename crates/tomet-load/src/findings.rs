@@ -95,9 +95,24 @@ impl Vault {
             unresolved.retain(|u| !u.awaits_input);
         }
 
+        // Cache lookup and entry validation failures (undeclared `::cache`,
+        // disallowed `local: true`, cache miss, unreadable/corrupt `.cache.ctmt`)
+        // are errors in `tomet check`, not warnings.
+        let mut kept_unresolved = Vec::with_capacity(unresolved.len());
+        for item in unresolved {
+            if item.cache_error {
+                diagnostics.push(tomet_validator::Diagnostic::CacheError {
+                    reason: item.reason,
+                    span: item.span,
+                });
+            } else {
+                kept_unresolved.push(item);
+            }
+        }
+
         Findings {
             diagnostics,
-            unresolved,
+            unresolved: kept_unresolved,
         }
     }
 }

@@ -26,6 +26,7 @@
 |[ `macro`    ][ 名前空間     ][ vault と文書の `::macro` で定義したマクロ（@file(tmtroot/spec/expressions/macro.expr.tmt)） ]
 |[ `var`      ][ Map          ][ vault と文書の `::var` で宣言した変数。値は `default`、作成時は `--var` が上書きする（@file(tmtroot/spec/elements/std.vars.element.tmt)） ]
 |[ `vault`    ][ ディレクトリ ][ vault のルート ]
+|[ `cache`    ][ 名前空間     ][ 外部キャッシュ（@file(tmtroot/spec/features/cache.tmt)） ]
 |[ `generate` ][ 名前空間     ][ 作成時だけ。生成関数（@file(tmtroot/spec/expressions/func.expr.tmt)） ]
 
 作成時だけの名前を出力時に書くと、未知の名前ではなく「作成時専用」という専用のエラーになる。`var` は作成時専用ではない。文書の値なので、出力時にも使える。

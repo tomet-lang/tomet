@@ -47,6 +47,7 @@ schemars       = { workspace = true }
 serde_json     = { workspace = true }
 
 [dev-dependencies]
-jobserver = { workspace = true }
-nanoid    = { workspace = true }
-uuid      = { workspace = true }
+jobserver   = { workspace = true }
+nanoid      = { workspace = true }
+tomet-cache = { workspace = true }
+uuid        = { workspace = true }

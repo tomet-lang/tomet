@@ -1,6 +1,6 @@
 //! Runtime configuration schema models and trait definitions.
 
-use crate::groups::{FormatConfig, MetaConfig, RegistryConfig, WorkspaceConfig};
+use crate::groups::{CacheConfig, FormatConfig, MetaConfig, RegistryConfig, WorkspaceConfig};
 
 /// Specification of a single configuration key/entry.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -42,5 +42,6 @@ pub fn all_config_specs() -> Vec<ConfigGroupSpec> {
         MetaConfig::spec(),
         WorkspaceConfig::spec(),
         RegistryConfig::spec(),
+        CacheConfig::spec(),
     ]
 }

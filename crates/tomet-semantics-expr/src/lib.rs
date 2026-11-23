@@ -15,7 +15,7 @@ mod types;
 mod value;
 mod vars;
 
-pub use context::{EvalContext, NoResolver, Note, Notes, PreparedBlocks, Resolver};
+pub use context::{CacheRequest, EvalContext, NoResolver, Note, Notes, PreparedBlocks, Resolver};
 pub use datetime::{datetime_member, format_datetime, parse_datetime, parse_offset};
 pub use error::EvalError;
 pub use memory::MemoryResolver;
@@ -28,7 +28,7 @@ pub use value::{Closure, DirRef, DocRef, Env, EvalValue, Namespace, Part};
 pub use vars::{VarError, VarScope, shaped, typed_value, var_scope};
 
 /// The names that stand for a value and that no lambda parameter may take.
-pub const RESERVED_VALUES: [&str; 4] = ["self", "macro", "var", "vault"];
+pub const RESERVED_VALUES: [&str; 5] = ["self", "macro", "var", "vault", "cache"];
 
 /// The functions an expression can call by a bare name, each with a line
 /// saying what it does -- what an editor offers when `{$` is typed.
@@ -82,6 +82,10 @@ pub const RESERVED_NAMES: &[(&str, &str)] = &[
         "The variables declared by `::var`: `var.name` (`tomet new --var` fills them in)",
     ),
     ("vault", "The vault's root directory: `vault::docs`"),
+    (
+        "cache",
+        "External cached values declared outside tomet: `cache.kind(\"key\")`",
+    ),
 ];
 
 /// Whether `name` is a function called by a bare name, as [`FUNCTIONS`] lists them.

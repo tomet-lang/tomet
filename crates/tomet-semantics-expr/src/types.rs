@@ -103,6 +103,7 @@ fn eval_type_arg(expr: &InterpExpr, cx: &EvalContext, env: &Env) -> Result<EvalV
             match name.as_str() {
                 "self" => Ok(EvalValue::Document(cx.self_doc.clone())),
                 "macro" => Ok(EvalValue::Namespace(Namespace::Macro)),
+                "cache" => Ok(EvalValue::Namespace(Namespace::Cache)),
                 "vault" => Ok(EvalValue::Directory(DirRef(String::new()))),
                 "var" => Ok(cx.var.clone()),
                 _ => named(name)

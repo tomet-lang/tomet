@@ -6,7 +6,9 @@ use std::sync::Arc;
 
 use tomet_ast::{Block, File, Tuple, TupleEntry, Value};
 use tomet_config::{FieldConfig, PrinterConfig};
-use tomet_expr::{DirRef, DocRef, EvalValue, PreparedBlocks, Resolver, typed_value};
+use tomet_expr::{
+    CacheRequest, DirRef, DocRef, EvalError, EvalValue, PreparedBlocks, Resolver, typed_value,
+};
 use tomet_scalar::Scalar;
 use tomet_type::{Kind, Type};
 
@@ -116,6 +118,10 @@ impl Resolver for Overlay<'_> {
 
     fn rebase_links(&self, blocks: Vec<Block>, from: &DocRef, to: &DocRef) -> Vec<Block> {
         tomet_semantics::rebase_relative_links(blocks, &from.0, &to.0)
+    }
+
+    fn cache(&self, req: &CacheRequest) -> Result<EvalValue, EvalError> {
+        self.inner.cache(req)
     }
 }
 
@@ -283,6 +289,32 @@ mod tests {
         assert_ne!(
             overlay.meta(&DocRef("b.tmt".into())),
             Ok(EvalValue::Scalar(Scalar::Text("overlaid".into())))
+        );
+    }
+
+    #[test]
+    fn the_overlay_forwards_cache_requests_to_inner() {
+        let inner = MemoryResolver::new().with_cache(
+            "command",
+            "whoami",
+            EvalValue::Scalar(Scalar::Text("alice".into())),
+        );
+        let snapshot = Arc::new(tomet_ast_parser::parse_file("hello\n").unwrap());
+        let overlay = Overlay {
+            path: DocRef("a.tmt".into()),
+            snapshot,
+            meta: EvalValue::Tuple(Tuple::new()),
+            inner: &inner,
+        };
+        let req = CacheRequest {
+            kind: "command".into(),
+            key: "whoami".into(),
+            local: false,
+            inputs: vec![],
+        };
+        assert_eq!(
+            overlay.cache(&req),
+            Ok(EvalValue::Scalar(Scalar::Text("alice".into())))
         );
     }
 }

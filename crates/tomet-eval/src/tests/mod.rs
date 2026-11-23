@@ -1,5 +1,6 @@
 //! The evaluator's unit tests, by topic.
 
+mod cache;
 mod datetimes;
 mod documents;
 mod editor_names;

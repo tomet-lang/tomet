@@ -7,8 +7,10 @@ license.workspace    = true
 repository.workspace = true
 
 [dependencies]
+directories       = { workspace = true }
 tomet-ast         = { workspace = true }
 tomet-ast-parser  = { workspace = true }
+tomet-cache       = { workspace = true }
 tomet-config      = { workspace = true }
 tomet-declaration = { workspace = true }
 tomet-eval        = { workspace = true }

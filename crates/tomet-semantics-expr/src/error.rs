@@ -45,6 +45,9 @@ pub enum EvalError {
     NoValue(String),
     /// A document, a note, a directory or an id that could not be found.
     Unresolved(String),
+    /// A `$cache.<kind>(...)` lookup or entry validation failure (undeclared
+    /// `::cache`, disallowed `local: true`, cache miss, or corrupt `.cache.ctmt`).
+    Cache(String),
     /// Text that is not an address.
     BadAddress(String),
     /// A value that has no data representation where data was required.
@@ -116,6 +119,7 @@ impl fmt::Display for EvalError {
                  or pass `--var {name}=...` when creating the document"
             ),
             EvalError::Unresolved(what) => write!(f, "{what}"),
+            EvalError::Cache(what) => f.write_str(what),
             EvalError::BadAddress(text) => write!(f, "`{text}` is not an address"),
             EvalError::NotData { type_name, .. } => {
                 write!(f, "a {type_name} cannot be stored as data")

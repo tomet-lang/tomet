@@ -88,7 +88,7 @@ mod resolver;
 mod vocabulary;
 
 pub use findings::{Findings, is_error};
-pub use resolver::DiskResolver;
+pub use resolver::{DiskResolver, resolve_cache_dir, resolve_cache_entry_path};
 pub use tomet_transform::{Unresolved, UnresolvedKind};
 
 /// What [`Vault::prepare`] could not do.

@@ -1,0 +1,87 @@
+::kind(guide)
+::id(feature.cache)
+::meta(
+  title: "キャッシュ"
+)
+
+外部コマンドの実行や外部取得のような不純（impure）な処理を `tomet` から隔離しつつ、その結果を文書の中で純粋に参照するための仕組み。
+
+状態: 設計確定（未実装）。
+
+=[ 責務の境界 ]
+
+- `tomet` はキャッシュを **読むだけ** で、外部コマンドの実行やネットワーク取得は一切行わない。
+- `tomet` はキャッシュの生産者（`tetch` など）を知らない。知っているのは「種別とキー文字列から参照先のキャッシュファイルを引き、その `value` を返す」という純粋な仕組みだけ。
+- 生産者は `tomet` の構文木からキャッシュ参照の構造体を取得し、自分が担う種別（例: `command`）を処理して、対応するキャッシュファイルへ結果を書き込む。
+
+=[ 式の書き方 ]
+
+予約された名前空間 `cache` の下に種別を書き、第1引数にキー文字列を渡す。
+
+```tm
+`` $cache.command("git rev-parse --short HEAD")
+`` $cache.command("wc -l < scripts/deploy.sh", inputs: ("scripts/deploy.sh"))
+`` $cache.command("whoami", local: true)
+`` $raw(cache.command("tomet --help"), lang: "text")
+```
+
+- **種別（`<kind>`）**: `command`、`http`、`ai` など、役割を表す名前。ツール名（`tetch` 等）は書かない。`tomet` は種別の中身を解釈しない。
+- **第1引数（必須）**: キー文字列。vault 内で一意（呼び出し元文書のパスやフォルダには依存しない）。
+- **`local`（任意・既定 `false`）**: `true` のとき、リポジトリ内ではなくローカル限定キャッシュを参照する。
+- **`inputs`（任意）**: 生産者が無効化（stale 判定）に使う入力の宣言。`tomet` 自体はこれを解釈せず、ファイルシステムにも触れず、構造体として保持して生産者へ渡すだけ。
+
+=[ 宣言（既定パスなし） ]
+
+キャッシュの置き場所に既定パスは設けない。@term(tomet#vault-config) で `::cache(...)` が宣言されていない vault では、`$cache.*` は使用不可になる（@file(tmtroot/spec/declarations/std.cache.declaration.tmt)）。
+
+- `local: false`（既定）を使うには `::cache(dir: "...")` の宣言が要る。
+- `local: true` を使うには `::cache(local: true)` の宣言が要る。
+
+=[ 配置とファイル名 ]
+
+1キーにつき1ファイルを置く。
+
+```text
+`` <cache_dir>/<kind>/<sha256>.cache.ctmt
+```
+
+- `<sha256>` は、キー文字列（UTF-8 バイト列）の SHA-256 ダイジェスト（小文字 hex 64文字）。
+- `<cache_dir>` は、`local: false` なら `::cache(dir: ...)` のパス（vault ルート基準）、`local: true` なら `$TOMET_CACHE_DIR`、未設定時は `$XDG_CACHE_HOME/tomet/cache/<vault識別子>`（既定 `~/.cache/tomet/cache/<vault識別子>`）。
+- `<vault識別子>` は、vault ルートの正規化パスの SHA-256（小文字 hex）とする。
+
+=[ キャッシュファイルの形式 ]
+
+キャッシュファイルは `cotomet`（`.ctmt`）で書く。
+
+```text
+`` ::kind(cache)
+``
+`` key:   "wc -l < scripts/deploy.sh"
+`` value: "42"
+`` meta:  (
+``   inputs: (
+``     "scripts/deploy.sh": "e3b0c442..."
+``   )
+`` )
+```
+
+- `tomet` が解釈するのは `::kind(cache)`、`key`、`value` のみ。
+- `meta` などの追加フィールドは生産者が自由に記録でき、`tomet` は無視する。
+- `key` が参照元のキー文字列と一致しない場合（またはファイル名の SHA-256 と一致しない場合）は、キャッシュ破損として扱う。
+
+=[ 値の型と解釈 ]
+
+`$cache.<kind>(...)` は、キャッシュファイルの `value` に格納された Cotomet の値（文字列・数値・真偽・Seq・Map 等）をそのまま返す。
+
+- 暗黙の変換は既存の式と同じくスカラーからテキストへのみ（@file(tmtroot/spec/expressions/overview.expr.tmt)）。
+- コードブロックとして出したいときは `$raw(cache.command("..."), lang: "text")` のように既存の関数と組み合わせる。
+
+=[ 失敗と検証 ]
+
+`tomet check` は次をエラーとして報告する。
+
+- `::cache` が未宣言の vault で `$cache.*` が使われている（または `local: true` が許可されていない）。
+- 対応する `<sha256>.cache.ctmt` が存在しない（キャッシュミス）。
+- キャッシュファイルが読めない、構文エラーがある、`key` が一致しない。
+
+出力時（`export` 等）に未解決だった場合は、既存の式の失敗規則に従い、元の表記（`$cache.command("...")`）を消さずに残して診断を出す。

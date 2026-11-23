@@ -280,3 +280,46 @@ See $macro.gh(7) about $(var.topic) in $(self::path).
     };
     assert_eq!(outside, inside);
 }
+
+#[test]
+fn a_cache_expression_freezes_when_present_and_is_left_when_unresolved() {
+    let source = "Rev: $cache.command(\"git rev-parse --short HEAD\")\n";
+    let doc = tomet_ast_parser::parse_file(source).expect("parses");
+
+    let hit_resolver = MemoryResolver::new().with_cache(
+        "command",
+        "git rev-parse --short HEAD",
+        tomet_expr::EvalValue::Scalar(Scalar::Text("a1b2c3d".to_string())),
+    );
+    let frozen = make_standalone(
+        &vault(),
+        &doc,
+        Path::new(PATH),
+        &hit_resolver,
+        &Options::default(),
+    );
+    let frozen_text = printed(&frozen);
+    assert!(frozen_text.contains("Rev: a1b2c3d"), "{frozen_text}");
+    assert!(!frozen_text.contains("cache.command"), "{frozen_text}");
+    assert_eq!(treatments(&frozen), vec![Treatment::Frozen]);
+    assert!(frozen.remaining.is_empty(), "{:?}", frozen.remaining);
+
+    let miss_resolver = MemoryResolver::new();
+    let left = make_standalone(
+        &vault(),
+        &doc,
+        Path::new(PATH),
+        &miss_resolver,
+        &Options::default(),
+    );
+    let left_text = printed(&left);
+    assert!(
+        left_text.contains("$cache.command(\"git rev-parse --short HEAD\")"),
+        "{left_text}"
+    );
+    assert!(matches!(
+        &treatments(&left)[..],
+        [Treatment::Left { reason }] if reason.contains("cache miss")
+    ));
+    assert_eq!(left.remaining.len(), 1);
+}

@@ -58,3 +58,10 @@ Blueprint, vocabulary and dictionary file registry declarations.
 - `blueprints` (list(string)): Blueprint files this vault declares, as paths relative to the config's directory.
 - `vocabularies` (list(string)): Vocabulary files this vault declares, each naming itself with `::vocabulary(ns)`.
 - `dictionaries` (list(string)): Dictionary files this vault declares, each naming itself with `::dictionary(name)`.
+
+==[ cache ]
+
+Cache configuration for vault-level `$cache.*` expression resolution.
+
+- `cache.dir` (string): Directory for repository-shared cache files, relative to the vault root. There is no default path; `$cache.*` cannot resolve without an explicit `::cache` declaration.
+- `cache.local` (bool, default: `false`): Whether local-only cache references (`$cache.<kind>(..., local: true)`) are permitted.

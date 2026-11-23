@@ -1154,6 +1154,7 @@ mod tests {
             "::field(url.wiki: (type: list(string)))\n",
             "::var(n: (type: int, default: 3))\n",
             "::workspace(ignore: (\"target\", \".git\"))\n",
+            "::cache(dir: \".tomet/cache\", local: true)\n",
             "::format(table: (max_col_width: 50))\n",
             "::blueprint(daily: @file(daily.blueprint.tmt))\n",
             "::vocabulary(@file(deck@0.1.0.vocabulary.tmt))\n",
@@ -1244,6 +1245,25 @@ mod tests {
         assert_eq!(
             found[0].1.to_string(),
             "`::fields` is retired; write `::field(<name>: ...)`"
+        );
+    }
+
+    #[test]
+    fn cache_declaration_accepts_entries_and_rejects_duplicates() {
+        assert!(problems_of("::cache(dir: \".tomet/cache\", local: true)\n").is_empty());
+        assert!(problems_of("::cache(local: false)\n").is_empty());
+        assert_eq!(
+            problems_of("::cache(dir: \".tomet/cache\")\n::cache(local: true)\n"),
+            [Problem::Repeated {
+                declaration: "cache",
+                first: 0,
+            }]
+        );
+        assert_eq!(
+            problems_of("::cache(\"not-an-entry\")\n"),
+            [Problem::ExpectedEntries {
+                declaration: "cache",
+            }]
         );
     }
 }

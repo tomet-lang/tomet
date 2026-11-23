@@ -32,6 +32,8 @@ pub enum DeclKind {
     Field,
     /// `::workspace(ignore: ("target"))`: which paths are part of the vault. Only the vault config may write it.
     Workspace,
+    /// `::cache(dir: ".tomet/cache", local: true)`: where cached expression values live. Only the vault config may write it.
+    Cache,
     /// `::export(type, path)`: where and in which formats this document is exported.
     Export,
     /// Two things, told apart by its form: `::blueprint(kind)` is the header of a
@@ -197,7 +199,7 @@ const fn spec(
 }
 
 /// Every standard declaration, in the order they are listed to people.
-const SPECS: [Spec; 19] = [
+const SPECS: [Spec; 20] = [
     Spec {
         // The second slot is the version of that kind's definition, a `version`, and may be
         // left out. The validator checks the value; nothing reads it yet.
@@ -269,6 +271,16 @@ const SPECS: [Spec; 19] = [
             DeclKind::Workspace,
             "workspace",
             Cardinality::Many,
+            Scope::Tmt,
+            Shape::Entries,
+        )
+    },
+    Spec {
+        vault_only: true,
+        ..spec(
+            DeclKind::Cache,
+            "cache",
+            Cardinality::Once,
             Scope::Tmt,
             Shape::Entries,
         )
@@ -390,7 +402,7 @@ const RETIRED: [(&str, DeclKind); 7] = [
 
 impl DeclKind {
     /// Every standard declaration.
-    pub const ALL: [DeclKind; 19] = [
+    pub const ALL: [DeclKind; 20] = [
         DeclKind::Kind,
         DeclKind::Id,
         DeclKind::Version,
@@ -399,6 +411,7 @@ impl DeclKind {
         DeclKind::Format,
         DeclKind::Field,
         DeclKind::Workspace,
+        DeclKind::Cache,
         DeclKind::Export,
         DeclKind::Blueprint,
         DeclKind::Vocabulary,
@@ -551,12 +564,12 @@ mod tests {
     }
 
     #[test]
-    fn only_the_workspace_is_the_vaults_alone() {
+    fn only_vault_only_declarations_are_the_vaults_alone() {
         let vault_only: Vec<DeclKind> = DeclKind::ALL
             .into_iter()
             .filter(|k| k.is_vault_only())
             .collect();
-        assert_eq!(vault_only, [DeclKind::Workspace]);
+        assert_eq!(vault_only, [DeclKind::Workspace, DeclKind::Cache]);
     }
 
     #[test]
@@ -573,6 +586,7 @@ mod tests {
                 DeclKind::Version,
                 DeclKind::Profile,
                 DeclKind::Meta,
+                DeclKind::Cache,
                 DeclKind::Export,
                 DeclKind::Migration
             ]

@@ -10,7 +10,21 @@ use std::sync::{Arc, Mutex};
 
 use tomet_ast::{Block, File, Value};
 
+use super::error::EvalError;
 use super::value::{DirRef, DocRef, EvalValue};
+
+/// A request to look up a cached value for `$cache.<kind>(key, local: ..., inputs: ...)`.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct CacheRequest {
+    /// Cache kind (e.g. `command`, `http`, `ai`), opaque to `tomet`.
+    pub kind: String,
+    /// Unique cache key string within the vault.
+    pub key: String,
+    /// Whether to consult the user-local cache instead of the vault-local cache.
+    pub local: bool,
+    /// Input paths declared for stale detection by external cache producers.
+    pub inputs: Vec<String>,
+}
 
 /// Looks things up in the vault on the evaluator's behalf.
 ///
@@ -56,6 +70,12 @@ pub trait Resolver {
     /// this does.
     fn rebase_links(&self, blocks: Vec<Block>, _from: &DocRef, _to: &DocRef) -> Vec<Block> {
         blocks
+    }
+    /// Looks up a cached value for `$cache.<kind>(key, ...)`.
+    fn cache(&self, _req: &CacheRequest) -> Result<EvalValue, EvalError> {
+        Err(EvalError::Unresolved(
+            "cache resolution is not supported by this resolver".to_string(),
+        ))
     }
 }
 
@@ -134,6 +154,12 @@ impl Resolver for NoResolver {
         _includes: &[DocRef],
     ) -> Result<PreparedBlocks, String> {
         Err(format!("no vault to prepare the content of `{}` in", doc.0))
+    }
+    fn cache(&self, req: &CacheRequest) -> Result<EvalValue, EvalError> {
+        Err(EvalError::Unresolved(format!(
+            "no vault to resolve `cache.{}({:?})` in",
+            req.kind, req.key
+        )))
     }
 }
 

@@ -15,8 +15,9 @@ use tomet_ast::{
 };
 use tomet_declaration::{Arity, Placeholder, is_ident_placeholder, placeholder_of};
 use tomet_expr::{
-    Closure, DirRef, DocRef, Env, EvalContext, EvalError, EvalValue, Namespace, RESERVED_VALUES,
-    construct_with, datetime_member, evaluate_type_with, is_constructor, named_type,
+    CacheRequest, Closure, DirRef, DocRef, Env, EvalContext, EvalError, EvalValue, Namespace,
+    RESERVED_VALUES, construct_with, datetime_member, evaluate_type_with, is_constructor,
+    named_type,
 };
 use tomet_scalar::Scalar;
 use tomet_span::Span;
@@ -213,6 +214,7 @@ fn name_value(name: &str, cx: &EvalContext, env: &Env) -> Result<EvalValue, Eval
     match name {
         "self" => Ok(EvalValue::Document(cx.self_doc.clone())),
         "macro" => Ok(EvalValue::Namespace(Namespace::Macro)),
+        "cache" => Ok(EvalValue::Namespace(Namespace::Cache)),
         "vault" => Ok(EvalValue::Directory(DirRef(String::new()))),
         "var" => Ok(cx.var.clone()),
         _ => named_type(name)
@@ -262,6 +264,9 @@ fn member_value(value: EvalValue, member: &str) -> Result<EvalValue, EvalError> 
         EvalValue::Namespace(Namespace::Macro) => Err(EvalError::message(format!(
             "the macro `{member}` has to be called: `macro.{member}(...)`"
         ))),
+        EvalValue::Namespace(Namespace::Cache) => Err(EvalError::message(format!(
+            "the cache kind `{member}` has to be called: `cache.{member}(\"...\")`"
+        ))),
         _ => Err(EvalError::UnknownMember {
             on: value.type_name(),
             member: member.to_string(),
@@ -310,9 +315,13 @@ fn call(
         }
         InterpExprKind::Member { object, member } => {
             let receiver = eval(object, cx, env)?;
+            if matches!(receiver, EvalValue::Namespace(Namespace::Cache)) {
+                return cache_call(member, args, cx, env);
+            }
             let args = eval_args(args, cx, env)?;
             match receiver {
                 EvalValue::Namespace(Namespace::Macro) => macro_call(member, args, cx),
+                EvalValue::Namespace(Namespace::Cache) => unreachable!("handled above"),
                 EvalValue::Part { doc, part } => parts::part_method(&doc, &part, member, args),
                 EvalValue::Document(doc) => parts::document_method(&doc, member, args, cx),
                 EvalValue::Scalar(Scalar::Text(text)) if member == "addr" => {
@@ -326,6 +335,124 @@ fn call(
             "`::{member}` is not a method; a method is called with a dot, `.{member}(...)`"
         ))),
         _ => Err(EvalError::message("only a name or a member can be called")),
+    }
+}
+
+fn cache_call(
+    kind: &str,
+    args: &[InterpExpr],
+    cx: &EvalContext,
+    env: &Env,
+) -> Result<EvalValue, EvalError> {
+    let mut positional = Vec::new();
+    let mut local: Option<bool> = None;
+    let mut inputs: Option<Vec<String>> = None;
+
+    for arg in args {
+        match &arg.kind {
+            InterpExprKind::NamedArg { name, value } => {
+                let evaluated = eval(value, cx, env)?;
+                match name.as_str() {
+                    "local" => {
+                        if local.is_some() {
+                            return Err(EvalError::message(format!(
+                                "duplicate named argument `local` in `cache.{kind}`"
+                            )));
+                        }
+                        match evaluated {
+                            EvalValue::Scalar(Scalar::Bool(b)) => local = Some(b),
+                            other => {
+                                return Err(EvalError::mismatch(
+                                    format!("`local` in `cache.{kind}`"),
+                                    "a bool",
+                                    other.type_name(),
+                                ));
+                            }
+                        }
+                    }
+                    "inputs" => {
+                        if inputs.is_some() {
+                            return Err(EvalError::message(format!(
+                                "duplicate named argument `inputs` in `cache.{kind}`"
+                            )));
+                        }
+                        inputs = Some(parse_cache_inputs(kind, value, evaluated)?);
+                    }
+                    other => {
+                        return Err(EvalError::message(format!(
+                            "unknown named argument `{other}` in `cache.{kind}`"
+                        )));
+                    }
+                }
+            }
+            _ => positional.push(eval(arg, cx, env)?),
+        }
+    }
+
+    if positional.len() != 1 {
+        return Err(EvalError::WrongArgCount {
+            function: format!("cache.{kind}"),
+            expected: "1".to_string(),
+            got: positional.len(),
+        });
+    }
+    let key = match positional.pop().expect("checked length 1") {
+        EvalValue::Scalar(Scalar::Text(key)) => key,
+        other => {
+            return Err(EvalError::mismatch(
+                format!("`cache.{kind}`"),
+                "a string key",
+                other.type_name(),
+            ));
+        }
+    };
+
+    cx.resolver.cache(&CacheRequest {
+        kind: kind.to_string(),
+        key,
+        local: local.unwrap_or(false),
+        inputs: inputs.unwrap_or_default(),
+    })
+}
+
+fn parse_cache_inputs(
+    kind: &str,
+    expr: &InterpExpr,
+    value: EvalValue,
+) -> Result<Vec<String>, EvalError> {
+    match value {
+        EvalValue::Tuple(tuple) => {
+            let mut out = Vec::with_capacity(tuple.len());
+            for entry in tuple.entries() {
+                if let Some(name) = entry.name() {
+                    return Err(EvalError::message(format!(
+                        "`inputs` in `cache.{kind}` takes unnamed strings, not named entry `{name}`"
+                    )));
+                }
+                match entry.value() {
+                    EvalValue::Scalar(Scalar::Text(s)) => out.push(s.clone()),
+                    other => {
+                        return Err(EvalError::mismatch(
+                            format!("an entry of `inputs` in `cache.{kind}`"),
+                            "a string",
+                            other.type_name(),
+                        ));
+                    }
+                }
+            }
+            Ok(out)
+        }
+        // Single-item `("scripts/deploy.sh")` parses as `Group(...)` in expressions.
+        EvalValue::Scalar(Scalar::Text(s))
+            if matches!(&expr.kind, InterpExprKind::Group(_)) =>
+        {
+            Ok(vec![s])
+        }
+        other => Err(EvalError::mismatch(
+            format!("`inputs` in `cache.{kind}`"),
+            "a tuple of strings",
+            other.type_name(),
+        )),
     }
 }
 

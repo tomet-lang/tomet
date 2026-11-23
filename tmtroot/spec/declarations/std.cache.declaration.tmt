@@ -1,0 +1,28 @@
+::kind(element)
+::id(std.cache)
+
+=[ 全容 ]
+
+```tm
+`` ::cache(
+``   dir:   ".tomet/cache"
+``   local: true
+`` )
+```
+
+vault が使うキャッシュの置き場所を宣言する。既定パスはない。`::cache` が宣言されていない vault では、式 `$cache.<kind>(...)` は使えず、`tomet check` がエラーとして報告する。
+
+- `dir`: リポジトリ内（共有）キャッシュのディレクトリ。vault のルートからの相対パスで書く。
+- `local`: ローカル限定キャッシュ（`$cache.<kind>(..., local: true)`）を許すかどうか。真偽値（既定 `false`）。有効なときの置き場所は、環境変数 `TOMET_CACHE_DIR`、未設定なら `$XDG_CACHE_HOME/tomet/cache/<vault識別子>`（既定 `~/.cache/tomet/cache/<vault識別子>`）。
+
+キャッシュの仕組みとファイル形式は @file(tmtroot/spec/features/cache.tmt)。
+
+=[ 書く場所 ]
+
+@term(tomet#vault-config) の中に、一つだけ。@file(tmtroot/spec/declarations/std.workspace.declaration.tmt) と同じく、vault の設定にしか書けない。
+
+フォルダの @term(tomet#folder-config) や文書の先頭に書いても効かず、`tomet check` が報告する。設定の層ではない `::kind(config)` の文書（見本や雛形）は読まれないので報告しない。層の仕組みは @file(tmtroot/spec/features/config.tmt)。
+
+=[ 走査からの除外 ]
+
+`dir` で宣言したキャッシュディレクトリは、vault の通常の文書走査（`tomet check` の一般文書検査や `tomet export`、`tomet format` など）の対象から外れる。

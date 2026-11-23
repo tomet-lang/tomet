@@ -1,6 +1,6 @@
 //! =[ tomet-config ]
 //!
-//! Configuration parsing and styling rule definitions ([`Config`], [`FormatConfig`], [`MetaConfig`], [`WorkspaceConfig`]).
+//! Configuration parsing and styling rule definitions ([`Config`], [`FormatConfig`], [`MetaConfig`], [`WorkspaceConfig`], [`CacheConfig`]).
 //!
 //! =[ Architecture & Responsibilities ]
 //!
@@ -9,7 +9,7 @@
 //!   | ([`load_config_from_str`]). Finding and reading a config file off
 //!   | disk is `tomet-load-config`'s job, one layer up.
 //! - (Root Group Modules)
-//!   - (groups) Root configuration groups ([`FormatConfig`], [`MetaConfig`], [`WorkspaceConfig`], [`RegistryConfig`], [`ApiConfig`]).
+//!   - (groups) Root configuration groups ([`FormatConfig`], [`MetaConfig`], [`WorkspaceConfig`], [`CacheConfig`], [`RegistryConfig`]).
 //!   - (discovery) Configuration parsing and error handling.
 //!   - (tree) AST tree normalization and path lookup utilities.
 
@@ -31,8 +31,8 @@ pub mod tree;
 
 pub use discovery::{ConfigError, load_config_from_str};
 pub use groups::{
-    ElementConfig, FieldConfig, FormatConfig, MetaConfig, RegistryConfig, WorkspaceConfig, format,
-    meta, registry, workspace,
+    CacheConfig, ElementConfig, FieldConfig, FormatConfig, MetaConfig, RegistryConfig,
+    WorkspaceConfig, cache, format, meta, registry, workspace,
 };
 pub use layer::{ConfigLayer, registered_by, registry_entries};
 pub use schema::{ConfigEntrySpec, ConfigGroupSpec, ConfigSpecProvider, all_config_specs};
@@ -49,6 +49,7 @@ pub struct Config {
     pub format: FormatConfig,
     pub meta: MetaConfig,
     pub workspace: WorkspaceConfig,
+    pub cache: CacheConfig,
     /// The macros a vault defines with `::macro`: name to template. Not a
     /// setting, so it is not read from the `::settings`/`::config` tree.
     pub macros: std::collections::HashMap<String, tomet_ast::Value>,
@@ -91,7 +92,7 @@ impl Config {
 
     /// Reads the typed groups off one value tree assembled from the declarations: `::format` is
     /// the root, the `::field` are its `meta` map (beside the `meta` formatting hints), the
-    /// `::workspace` its `workspace` map, and the registries lists of paths.
+    /// `::workspace` its `workspace` map, the `::cache` its `cache` map, and the registries lists of paths.
     fn from_merged(layer: &ConfigLayer) -> Self {
         let mut root = Tuple::new();
         for (key, value) in layer.format() {
@@ -104,6 +105,10 @@ impl Config {
         for (key, value) in layer.workspace() {
             let entry = Value::Tuple(Tuple::from_named([(key.clone(), value.clone())]));
             merge_entry(&mut root, "workspace", &entry);
+        }
+        for (key, value) in layer.cache() {
+            let entry = Value::Tuple(Tuple::from_named([(key.clone(), value.clone())]));
+            merge_entry(&mut root, "cache", &entry);
         }
         let paths = |paths: Vec<String>| {
             Value::Tuple(Tuple::from_unnamed(
@@ -119,6 +124,7 @@ impl Config {
             format: FormatConfig::from_root(&root),
             meta: MetaConfig::from_root(&root),
             workspace: WorkspaceConfig::from_root(&root),
+            cache: CacheConfig::from_root(&root),
             macros: layer.macros().clone(),
             vars: layer.vars().to_vec(),
             registry: RegistryConfig::from_root(&root),

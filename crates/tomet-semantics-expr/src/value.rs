@@ -106,6 +106,8 @@ impl Part {
 pub enum Namespace {
     /// `macro`: the macros defined by `::macro`.
     Macro,
+    /// `cache`: external cached values looked up via `cache.<kind>(...)`.
+    Cache,
 }
 
 /// A lambda together with the names it closed over.
@@ -425,6 +427,7 @@ mod tests {
         assert_eq!(EvalValue::Document(doc()).to_ast(), None);
         assert_eq!(EvalValue::Directory(DirRef("d".into())).to_ast(), None);
         assert_eq!(EvalValue::Namespace(Namespace::Macro).to_ast(), None);
+        assert_eq!(EvalValue::Namespace(Namespace::Cache).to_ast(), None);
         assert_eq!(EvalValue::Type(Type::bare(Kind::String)).to_ast(), None);
         // One of them anywhere inside makes the whole thing not data.
         assert_eq!(
