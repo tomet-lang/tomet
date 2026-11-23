@@ -339,7 +339,7 @@ export function tometLoader(options: TometLoaderOptions): Loader {
 
       const untouchedIds = new Set(store.keys());
 
-      async function processFile(file: { absPath: string; relPath: string }) {
+      async function loadEntry(file: { absPath: string; relPath: string }) {
         const id = generateId
           ? generateId(file)
           : file.relPath.replace(/\.(tmt|tm)$/, "");
@@ -525,7 +525,7 @@ export function tometLoader(options: TometLoaderOptions): Loader {
       }
 
       // Process in batches
-      await mapConcurrent(matchedFiles, concurrency, processFile);
+      await mapConcurrent(matchedFiles, concurrency, loadEntry);
 
       // Clean up deleted entries
       for (const deletedId of untouchedIds) {
@@ -550,7 +550,7 @@ export function tometLoader(options: TometLoaderOptions): Loader {
                 .stat(resolvedConfigPath)
                 .catch(() => null);
               configKey = newStat ? `${newStat.mtimeMs}` : "";
-              await mapConcurrent(matchedFiles, concurrency, processFile);
+              await mapConcurrent(matchedFiles, concurrency, loadEntry);
             } catch (err) {
               logger.error(
                 `Failed to reload config ${resolvedConfigPath}: ${err}`,
@@ -574,7 +574,7 @@ export function tometLoader(options: TometLoaderOptions): Loader {
               return;
             if (changedPath.endsWith(".tmt") || changedPath.endsWith(".tm")) {
               if (filter && !filter(relPath)) return;
-              await processFile({ absPath: changedPath, relPath });
+              await loadEntry({ absPath: changedPath, relPath });
             }
           }
         };
