@@ -75,6 +75,8 @@
       "packages/*/dist/*"
       "crates/tree-sitter-*/src/grammar.json"
       "crates/tree-sitter-*/src/node-types.json"
+      # Snapshot references: the test compares the output with them byte for byte.
+      "tests/ref/*"
     ];
 
     formatter = {
