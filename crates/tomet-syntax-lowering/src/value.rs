@@ -33,8 +33,7 @@ pub fn shift_spans(value: &mut Value, delta: usize) {
             seat.span.end += delta;
         }
         Value::Tuple(tuple) | Value::Call(_, tuple) => {
-            if !tuple.span().is_dummy() {
-                let s = tuple.span();
+            if let Some(s) = tuple.span() {
                 tuple.set_span(tomet_span::Span::new(s.start + delta, s.end + delta));
             }
             for i in 0..tuple.len() {

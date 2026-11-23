@@ -1,7 +1,10 @@
 from typing import Any, Optional, Union
 
 def loads(source: str) -> Any:
-    """Parse a data-only .tmt document into native Python objects (dict, list, str, int, float, bool, None)."""
+    """Parse a data-only .tmt document into plain Python data (dict, list, str, int, float, bool, None).
+
+    Raises ValueError, naming it, if the document holds anything that is not data (a call, an
+    interpolation, an element, auto, ...). parse_file shows the AST."""
     ...
 
 def parse_file(source: str) -> dict[str, Any]:

@@ -59,7 +59,7 @@ pub(crate) fn lower_paren_value(node: &SyntaxNode) -> Result<Tuple> {
 
     if entry_children.is_empty() {
         if closed {
-            return Ok(Tuple::new());
+            return Ok(Tuple::new().with_span(span_of(node)));
         } else {
             return Err(err(
                 usize::from(node.text_range().end()),
@@ -305,7 +305,7 @@ pub(crate) fn lower_value(root: &SyntaxNode) -> Result<Value> {
         .children()
         .any(|c| matches!(c.kind(), K::MAP_ENTRY | K::SEQ_ITEM | K::ERROR));
     if !has_entries {
-        return Ok(Value::Tuple(Tuple::new()));
+        return Ok(Value::Tuple(Tuple::new().with_span(span_of(root))));
     }
 
     let tuple = lower_tuple_entries(root, false, true, false)?;
@@ -321,7 +321,7 @@ pub(crate) fn lower_file_body(root: &SyntaxNode) -> Result<Value> {
         .children()
         .any(|c| matches!(c.kind(), K::MAP_ENTRY | K::SEQ_ITEM | K::ERROR));
     if !has_entries {
-        return Ok(Value::Tuple(Tuple::new()));
+        return Ok(Value::Tuple(Tuple::new().with_span(span_of(root))));
     }
 
     let entries = lower_tuple_entries(root, true, true, false)?;
@@ -434,6 +434,7 @@ pub(crate) fn lower_tuple_entries(
         EntryKey::Name(name) => TupleEntry::named(name, value),
         EntryKey::TypeSeat(seat) => TupleEntry::type_seat(seat, value),
     }))
+    .map(|tuple| tuple.with_span(span_of(node)))
     .map_err(|duplicate| duplicate_key_error(offsets[duplicate.index], &duplicate.key))
 }
 
@@ -893,4 +894,12 @@ fn construct_float(args: &Tuple) -> std::result::Result<Value, String> {
         }
         Some(other) => Err(format!("float() takes a number or a string, got {other:?}")),
     }
+}
+
+/// Where `node` is written: the span of a tuple that is read from it.
+fn span_of(node: &SyntaxNode) -> tomet_span::Span {
+    tomet_span::Span::new(
+        usize::from(node.text_range().start()),
+        usize::from(node.text_range().end()),
+    )
 }

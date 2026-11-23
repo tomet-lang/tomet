@@ -30,6 +30,19 @@ export async function processTomet(source, options) {
     return processFile(source, options);
 }
 /**
+ * The kind a document declares with its `::kind(...)`, read from the declarations of
+ * `ProcessedFile.header`: the text of the first unnamed entry of its arguments, or `null`
+ * if the document declares none (or declares one that is not written as a text).
+ */
+export function declaredKind(header) {
+    const kind = header.find((declaration) => declaration.name.namespace === null && declaration.name.name === "kind");
+    const first = kind?.data.args?.entries.find((entry) => entry.key === null);
+    const scalar = first !== undefined && "Scalar" in first.value ? first.value.Scalar : null;
+    return scalar !== null && typeof scalar === "object" && "Text" in scalar
+        ? scalar.Text
+        : null;
+}
+/**
  * Resolves a raw asset reference (e.g. `@link(ref:+hash.png)`, `+hash.png`, `https://...`)
  * to a browser-accessible URL.
  */
@@ -202,7 +215,7 @@ export function tometLoader(options) {
                         return;
                     }
                     // Generate digest using mtime, size, and workspace config mtime
-                    const digest = generateDigest(`${stat.mtimeMs}:${stat.size}:${configKey}:v5`);
+                    const digest = generateDigest(`${stat.mtimeMs}:${stat.size}:${configKey}:v6`);
                     const existing = store.get(id);
                     if (existing && existing.digest === digest) {
                         // Unchanged: cache hit!
@@ -218,16 +231,13 @@ export function tometLoader(options) {
                         assetPrefix,
                         config: workspaceConfig,
                     });
-                    // `::meta(...)` is a tuple; only its named form, an object, has fields.
-                    const meta = processed.meta;
-                    const metaObj = meta !== null && typeof meta === "object" && !Array.isArray(meta)
-                        ? meta
-                        : null;
+                    // `meta` is the plain-data entries of `::meta(...)`: an object, or null without a `::meta`.
+                    // What is not data (`icon: @doc.icon(...)`) is in `processed.header`.
+                    const metaObj = processed.meta;
                     const fallbackTitle = basename(file.relPath).replace(/\.(tmt|tm)$/, "");
                     const title = metaObj?.title ?? fallbackTitle;
                     const section = file.relPath.split("/")[0] ?? "";
-                    const kindMatch = content.match(/^@kind\(([^)]*)\)/m);
-                    const kind = processed.kind ?? (kindMatch ? kindMatch[1].trim() : null);
+                    const kind = declaredKind(processed.header);
                     // Resolve banner and images
                     const fileRelDir = dirname(file.relPath).replace(/\\/g, "/");
                     let rawBanner = metaObj?.banner;

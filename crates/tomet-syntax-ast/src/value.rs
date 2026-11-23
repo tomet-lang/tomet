@@ -4,11 +4,23 @@ use crate::{Block, Element, Hole, Interpolation, TypeSeat};
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
-/// A pure data value: the subset of Tomet with a direct serde
-/// equivalent (no headings, prose, or links).
+/// What can stand where a value goes: a scalar, a tuple, or a node the parser keeps for a
+/// later layer (a call, an interpolation, a hole, a type seat, an element, block content).
 ///
 /// A scalar value is held in [`Value::Scalar`], wrapping [`tomet_scalar::Scalar`].
-#[derive(Debug, Clone, PartialEq)]
+///
+/// =[ Wire ]
+///
+/// On the wire a `Value` is what every other AST node is: an externally tagged enum, a variant name
+/// and its payload, and it reads back as exactly the variant that was written.
+/// `Value::Scalar(Scalar::Int(1))` is `{"Scalar":{"Int":1}}`, `Value::Call("enum", args)` is
+/// `{"Call":["enum", <Tuple>]}`, and a [`Value::TypeSeat`] and a [`Value::Interp`] are as
+/// different on the wire as they are in memory. Nothing is lost and nothing is ambiguous, which is
+/// what a document needs that is handed to another process and handed back.
+///
+/// A data consumer that wants `null`, numbers, strings, arrays and objects, and accepts losing
+/// what those cannot say, reads the plain-data projection instead: [`Value::to_plain`].
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum Value {
     /// A scalar value: `none`, `auto`, a boolean, an integer, a float,
     /// a number kept as written, or text. See [`tomet_scalar::Scalar`].
@@ -73,7 +85,9 @@ pub enum Value {
 }
 
 /// The key of a [`TupleEntry`] when one was written: a plain/quoted name, or a type seat (`<$type>`).
-#[derive(Debug, Clone, PartialEq)]
+///
+/// On the wire the two kinds stay apart: `{"Name":"a"}` and `{"TypeSeat":{...}}`.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum EntryKey {
     Name(String),
     TypeSeat(crate::TypeSeat),
@@ -84,7 +98,9 @@ pub enum EntryKey {
 /// An entry with no key is an entry whose key was not written; its key is its position among
 /// the unnamed entries of its tuple. An entry does not know that position: ask the tuple
 /// ([`Tuple::keyed`], [`Tuple::get`]).
-#[derive(Debug, Clone, PartialEq)]
+///
+/// On the wire an entry is `{"key": null | EntryKey, "value": V}`; `null` is a key that was not written.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct TupleEntry<V = Value> {
     key: Option<EntryKey>,
     value: V,
@@ -200,17 +216,54 @@ impl std::error::Error for DuplicateKey {}
 ///   ones after it by itself.
 /// - no key is held twice. Every way to build or change a tuple that could repeat one is
 ///   fallible and returns [`DuplicateKey`]; nothing else can add an entry.
-#[derive(Debug, Clone, PartialEq)]
+///
+/// =[ Wire ]
+///
+/// On the wire a tuple is its entries in written order, and its span if it has one (`null` if it is not written anywhere):
+/// `{"entries":[{"key":null,"value":...},{"key":{"Name":"k"},"value":...}],"span":{"start":0,"end":9}}`. Every entry
+/// keeps the kind of its key (none, a name, a type seat) and its place, so no reader tells a list
+/// from a map by looking at the data, and no order is lost to a language whose objects sort their
+/// keys. Reading a tuple builds it like any other way of building one does: a name that is the
+/// position the entry would have unnamed is the unnamed entry, and a key written twice is an error,
+/// not a tuple.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(try_from = "TupleWire<V>", bound(deserialize = "V: Deserialize<'de>"))]
 pub struct Tuple<V = Value> {
     entries: Vec<TupleEntry<V>>,
-    span: tomet_span::Span,
+    span: Option<tomet_span::Span>,
+}
+
+/// What a [`Tuple`] is read from: its fields as written, before the rules of its keys apply.
+#[derive(Deserialize)]
+#[serde(bound(deserialize = "V: Deserialize<'de>"))]
+struct TupleWire<V> {
+    entries: Vec<TupleEntry<V>>,
+    span: Option<tomet_span::Span>,
+}
+
+impl<V> TryFrom<TupleWire<V>> for Tuple<V> {
+    type Error = DuplicateKey;
+
+    fn try_from(wire: TupleWire<V>) -> Result<Self, DuplicateKey> {
+        let mut tuple = Self::try_from_entries(wire.entries)?;
+        tuple.span = wire.span;
+        Ok(tuple)
+    }
+}
+
+/// By its entries, in order. A span is where a tuple was written, not what it says, so it does not
+/// count (as no [`Span`](tomet_span::Span) does): a parsed tuple equals the one built in code.
+impl<V: PartialEq> PartialEq for Tuple<V> {
+    fn eq(&self, other: &Self) -> bool {
+        self.entries == other.entries
+    }
 }
 
 impl<V> Default for Tuple<V> {
     fn default() -> Self {
         Self {
             entries: Vec::new(),
-            span: tomet_span::Span::dummy(),
+            span: None,
         }
     }
 }
@@ -297,23 +350,25 @@ impl<V> Tuple<V> {
     pub fn from_unnamed(values: impl IntoIterator<Item = V>) -> Self {
         Self {
             entries: values.into_iter().map(TupleEntry::unnamed).collect(),
-            span: tomet_span::Span::dummy(),
+            span: None,
         }
     }
 
-    /// The source span of this tuple (or of the [`Value::Call`] that holds it).
-    pub fn span(&self) -> tomet_span::Span {
+    /// Where this tuple is written in the source (or, for a [`Value::Call`]'s arguments, where the
+    /// whole call is), or `None` if it is not written anywhere: a tuple built in code, or put together
+    /// by a pass from others.
+    pub fn span(&self) -> Option<tomet_span::Span> {
         self.span
     }
 
     /// Sets the source span of this tuple.
     pub fn set_span(&mut self, span: tomet_span::Span) {
-        self.span = span;
+        self.span = Some(span);
     }
 
     /// Returns this tuple with its source span set to `span`.
     pub fn with_span(mut self, span: tomet_span::Span) -> Self {
-        self.span = span;
+        self.span = Some(span);
         self
     }
 
@@ -577,76 +632,6 @@ impl<'a, V> IntoIterator for &'a Tuple<V> {
     }
 }
 
-/// By its keys: no entry is `{}`; keys that are `0`, `1`, ... in the order written (every entry
-/// unnamed) are an array; anything else is an object keyed by the keys.
-impl Serialize for Tuple {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        if !self.is_empty() && self.has_no_named() {
-            use serde::ser::SerializeSeq;
-            let mut s = serializer.serialize_seq(Some(self.len()))?;
-            for value in self.values() {
-                s.serialize_element(value)?;
-            }
-            s.end()
-        } else {
-            use serde::ser::SerializeMap;
-            let mut m = serializer.serialize_map(Some(self.len()))?;
-            for (key, value) in self.keyed() {
-                m.serialize_entry(key.as_ref(), value)?;
-            }
-            m.end()
-        }
-    }
-}
-
-/// An array gives the keys `0`, `1`, ...; an object its keys. `{"0": "a"}` and `["a"]` are the
-/// same tuple. An object that repeats a key is an error.
-impl<'de> Deserialize<'de> for Tuple {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        struct TupleVisitor;
-
-        impl<'de> serde::de::Visitor<'de> for TupleVisitor {
-            type Value = Tuple;
-
-            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-                formatter.write_str("an array or an object")
-            }
-
-            fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
-            where
-                A: serde::de::SeqAccess<'de>,
-            {
-                let mut values = Vec::new();
-                while let Some(item) = seq.next_element()? {
-                    values.push(item);
-                }
-                Ok(Tuple::from_unnamed(values))
-            }
-
-            fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
-            where
-                A: serde::de::MapAccess<'de>,
-            {
-                let mut tuple = Tuple::new();
-                while let Some((k, v)) = map.next_entry::<String, Value>()? {
-                    tuple
-                        .try_push_named(k, v)
-                        .map_err(serde::de::Error::custom)?;
-                }
-                Ok(tuple)
-            }
-        }
-
-        deserializer.deserialize_any(TupleVisitor)
-    }
-}
-
 impl Value {
     /// The scalar this value is, if it is one.
     pub fn as_scalar(&self) -> Option<&tomet_scalar::Scalar> {
@@ -663,134 +648,50 @@ impl From<tomet_scalar::Scalar> for Value {
     }
 }
 
-impl Serialize for Value {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        match self {
-            Value::Scalar(s) => match s {
-                tomet_scalar::Scalar::None => serializer.serialize_none(),
-                tomet_scalar::Scalar::Auto => Err(serde::ser::Error::custom(
-                    "`auto` has no JSON representation",
-                )),
-                tomet_scalar::Scalar::Bool(b) => serializer.serialize_bool(*b),
-                tomet_scalar::Scalar::Int(i) => serializer.serialize_i64(*i),
-                tomet_scalar::Scalar::Float(f) => serializer.serialize_f64(*f),
-                // A number on the wire is an f64: that is the most a serializer
-                // that has no arbitrary-precision number can say. One that cannot
-                // be one (too large) is sent as the text it was written as.
-                tomet_scalar::Scalar::Number(text) => match text.parse::<f64>() {
-                    Ok(f) if f.is_finite() => serializer.serialize_f64(f),
-                    _ => serializer.serialize_str(text),
-                },
-                tomet_scalar::Scalar::Text(s) => serializer.serialize_str(s),
-            },
-            Value::Tuple(tuple) => tuple.serialize(serializer),
-            Value::Call(name, args) => {
-                use serde::ser::SerializeMap;
-                let mut m = serializer.serialize_map(Some(2))?;
-                m.serialize_entry("call", name)?;
-                m.serialize_entry("args", args)?;
-                m.end()
-            }
-            Value::Interp(interp) => interp.serialize(serializer),
-            Value::Hole(hole) => hole.serialize(serializer),
-            Value::TypeSeat(seat) => seat.serialize(serializer),
-            Value::Element(el) => el.serialize(serializer),
-            Value::Blocks(blocks) => {
-                use serde::ser::SerializeSeq;
-                let mut s = serializer.serialize_seq(Some(blocks.len()))?;
-                for block in blocks {
-                    s.serialize_element(block)?;
-                }
-                s.end()
-            }
-        }
-    }
-}
-
-// Deliberately no `Value::Call`, `Value::Interp`, `Value::Hole`, `Value::TypeSeat`,
-// `Value::Element`, or `Value::Blocks` arm below: all six are only ever produced by
-// `tomet-syntax-parser` reading source text (`name(...)` / `{$ ... }` /
-// `<$type>` / `@name(...)` / `key: [...]`), never by
-// deserializing inbound data -- there is no `visit_call` and nothing in
-// serde's data model looks like an `Element` or a `Vec<Block>` either. This
-// is not an oversight.
-impl<'de> Deserialize<'de> for Value {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        struct ValueVisitor;
-
-        impl<'de> serde::de::Visitor<'de> for ValueVisitor {
-            type Value = Value;
-
-            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-                formatter.write_str("any valid Tomet data value")
-            }
-
-            fn visit_bool<E>(self, v: bool) -> Result<Self::Value, E> {
-                Ok(Value::Scalar(tomet_scalar::Scalar::Bool(v)))
-            }
-
-            fn visit_i64<E>(self, v: i64) -> Result<Self::Value, E> {
-                Ok(Value::Scalar(tomet_scalar::Scalar::Int(v)))
-            }
-
-            fn visit_u64<E>(self, v: u64) -> Result<Self::Value, E> {
-                Ok(Value::Scalar(tomet_scalar::Scalar::Int(v as i64)))
-            }
-
-            fn visit_f64<E>(self, v: f64) -> Result<Self::Value, E> {
-                Ok(Value::Scalar(tomet_scalar::Scalar::Float(v)))
-            }
-
-            fn visit_str<E>(self, v: &str) -> Result<Self::Value, E> {
-                Ok(Value::Scalar(tomet_scalar::Scalar::Text(v.to_string())))
-            }
-
-            fn visit_string<E>(self, v: String) -> Result<Self::Value, E> {
-                Ok(Value::Scalar(tomet_scalar::Scalar::Text(v)))
-            }
-
-            fn visit_none<E>(self) -> Result<Self::Value, E> {
-                Ok(Value::Scalar(tomet_scalar::Scalar::None))
-            }
-
-            fn visit_unit<E>(self) -> Result<Self::Value, E> {
-                Ok(Value::Scalar(tomet_scalar::Scalar::None))
-            }
-
-            // An array and an object are a tuple, read as `Tuple` reads them.
-            fn visit_seq<A>(self, seq: A) -> Result<Self::Value, A::Error>
-            where
-                A: serde::de::SeqAccess<'de>,
-            {
-                Tuple::deserialize(serde::de::value::SeqAccessDeserializer::new(seq))
-                    .map(Value::Tuple)
-            }
-
-            fn visit_map<A>(self, map: A) -> Result<Self::Value, A::Error>
-            where
-                A: serde::de::MapAccess<'de>,
-            {
-                Tuple::deserialize(serde::de::value::MapAccessDeserializer::new(map))
-                    .map(Value::Tuple)
-            }
-        }
-
-        deserializer.deserialize_any(ValueVisitor)
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::{Block, Data, Element, Hole, Interpolation, Name, Paragraph, Placement};
+    use serde_json::json;
+    use tomet_span::Span;
 
     fn int(n: i64) -> Value {
         Value::Scalar(tomet_scalar::Scalar::Int(n))
+    }
+
+    fn text(s: &str) -> Value {
+        Value::Scalar(tomet_scalar::Scalar::Text(s.into()))
+    }
+
+    fn ident(name: &str) -> crate::InterpExpr {
+        crate::InterpExpr {
+            kind: crate::InterpExprKind::Identifier(name.into()),
+            span: Span::dummy(),
+        }
+    }
+
+    fn seat(name: &str) -> TypeSeat {
+        TypeSeat {
+            expr: ident(name),
+            span: Span::dummy(),
+        }
+    }
+
+    /// The wire form of `value`, as a JSON tree.
+    fn wire<T: Serialize>(value: &T) -> serde_json::Value {
+        serde_json::to_value(value).unwrap()
+    }
+
+    /// `value` written and read back: equal, and writing it again says the same thing (which also
+    /// holds what `==` does not: a [`Span`] is equal to every other).
+    fn round_trip<T: Serialize + serde::de::DeserializeOwned + PartialEq + fmt::Debug>(
+        value: &T,
+    ) -> T {
+        let written = serde_json::to_string(value).unwrap();
+        let read: T = serde_json::from_str(&written).unwrap();
+        assert_eq!(&read, value);
+        assert_eq!(serde_json::to_string(&read).unwrap(), written);
+        read
     }
 
     fn tuple(entries: impl IntoIterator<Item = (Option<&'static str>, i64)>) -> Tuple {
@@ -808,11 +709,6 @@ mod tests {
         let written = tuple([(Some("0"), 1), (Some("1"), 2)]);
         assert_eq!(unnamed, written);
         assert!(written.has_no_named());
-        assert_eq!(serde_json::to_string(&written).unwrap(), "[1,2]");
-        // `{"0": 1}` and `[1]` read as the same tuple.
-        let object: Tuple = serde_json::from_str(r#"{"0": 1}"#).unwrap();
-        let array: Tuple = serde_json::from_str("[1]").unwrap();
-        assert_eq!(object, array);
     }
 
     #[test]
@@ -825,8 +721,8 @@ mod tests {
         assert_eq!(reordered.get("0"), Some(&int(1)));
         assert_eq!(reordered.get("1"), Some(&int(2)));
         assert_eq!(
-            serde_json::to_string(&reordered).unwrap(),
-            r#"{"1":2,"0":1}"#
+            reordered.nth(0).unwrap().key(),
+            Some(&EntryKey::Name("1".into()))
         );
     }
 
@@ -874,141 +770,234 @@ mod tests {
     }
 
     #[test]
-    fn test_tuple_and_value_json_serde() {
-        // Empty tuple serializes to `{}`
-        let empty = Tuple::new();
-        assert_eq!(serde_json::to_string(&empty).unwrap(), "{}");
+    fn two_spellings_of_one_tuple_are_one_wire() {
+        let unnamed = Value::Tuple(Tuple::from_unnamed([int(1), int(2)]));
+        let written = Value::Tuple(Tuple::from_named([
+            ("0".to_string(), int(1)),
+            ("1".to_string(), int(2)),
+        ]));
+        assert_eq!(wire(&unnamed), wire(&written));
         assert_eq!(
-            serde_json::to_string(&Value::Tuple(empty.clone())).unwrap(),
-            "{}"
+            wire(&unnamed),
+            json!({"Tuple": {"entries": [
+                {"key": null, "value": {"Scalar": {"Int": 1}}},
+                {"key": null, "value": {"Scalar": {"Int": 2}}},
+            ], "span": null}})
         );
+        // A name that is the position its entry would have unnamed is read as the unnamed entry.
+        let read: Value = serde_json::from_value(json!({"Tuple": {"entries": [
+            {"key": {"Name": "0"}, "value": {"Scalar": {"Int": 1}}},
+            {"key": {"Name": "1"}, "value": {"Scalar": {"Int": 2}}},
+        ], "span": null}}))
+        .unwrap();
+        assert_eq!(read, unnamed);
+        assert_eq!(wire(&read), wire(&unnamed));
+    }
 
-        // All unnamed entries serialize to array
-        let unnamed = Tuple::from_unnamed([
-            Value::Scalar(tomet_scalar::Scalar::Int(1)),
-            Value::Scalar(tomet_scalar::Scalar::Int(2)),
+    #[test]
+    fn a_tuple_keeps_the_order_and_the_kind_of_its_keys() {
+        // `(10, foo: 20, 30)`: the order of mixed entries survives, and so does which have a key.
+        let mixed = Tuple::try_from_entries([
+            TupleEntry::unnamed(int(10)),
+            TupleEntry::named("foo", int(20)),
+            TupleEntry::unnamed(int(30)),
+        ])
+        .unwrap();
+        let keys: Vec<serde_json::Value> = wire(&mixed)["entries"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|entry| entry["key"].clone())
+            .collect();
+        assert_eq!(keys, [json!(null), json!({"Name": "foo"}), json!(null)]);
+        round_trip(&mixed);
+
+        // `("1": 2, "0": 1)` is not `(2, 1)`'s lookalike `(1, 2)`: the first entry is named.
+        let reordered = tuple([(Some("1"), 2), (Some("0"), 1)]);
+        assert_ne!(reordered, tuple([(None, 1), (None, 2)]));
+        assert_ne!(wire(&reordered), wire(&tuple([(None, 1), (None, 2)])));
+        round_trip(&reordered);
+
+        // A name that merely looks like a type seat is not a type seat key.
+        let name = TupleEntry::named("<$int>", int(1));
+        let seat_entry = TupleEntry::type_seat(seat("int"), int(1));
+        let by_name = Tuple::from_entries([name]);
+        let by_seat = Tuple::from_entries([seat_entry]);
+        assert_ne!(by_name, by_seat);
+        assert_eq!(
+            wire(&by_name)["entries"][0]["key"],
+            json!({"Name": "<$int>"})
+        );
+        assert!(wire(&by_seat)["entries"][0]["key"]["TypeSeat"].is_object());
+        assert_eq!(round_trip(&by_seat).nth(0).unwrap().name(), None);
+        assert!(
+            round_trip(&by_seat)
+                .nth(0)
+                .unwrap()
+                .type_seat_key()
+                .is_some()
+        );
+    }
+
+    #[test]
+    fn a_tuple_is_read_with_the_rules_of_its_keys() {
+        let entry = |key: serde_json::Value| json!({"key": key, "value": {"Scalar": "None"}});
+        let tuple = |entries: Vec<serde_json::Value>| {
+            serde_json::from_value::<Tuple>(
+                json!({"entries": entries, "span": {"start": 1, "end": 4}}),
+            )
+        };
+        let repeated = tuple(vec![
+            entry(json!({"Name": "a"})),
+            entry(json!({"Name": "a"})),
         ]);
-        assert_eq!(serde_json::to_string(&unnamed).unwrap(), "[1,2]");
-        assert_eq!(
-            serde_json::to_string(&Value::Tuple(unnamed.clone())).unwrap(),
-            "[1,2]"
+        assert!(
+            repeated
+                .unwrap_err()
+                .to_string()
+                .contains("duplicate key `a`")
         );
-
-        // All named entries serialize to object
-        let named = Tuple::from_named([
-            ("a".to_string(), Value::Scalar(tomet_scalar::Scalar::Int(1))),
-            ("b".to_string(), Value::Scalar(tomet_scalar::Scalar::Int(2))),
-        ]);
-        assert_eq!(serde_json::to_string(&named).unwrap(), r#"{"a":1,"b":2}"#);
-        assert_eq!(
-            serde_json::to_string(&Value::Tuple(named)).unwrap(),
-            r#"{"a":1,"b":2}"#
+        // Position 0 twice: unnamed, then named `0`.
+        let repeated = tuple(vec![entry(json!(null)), entry(json!({"Name": "0"}))]);
+        assert!(
+            repeated
+                .unwrap_err()
+                .to_string()
+                .contains("duplicate key `0`")
         );
+        // The span is read, not defaulted.
+        let held = tuple(vec![entry(json!(null))]).unwrap();
+        assert!(held.span().unwrap().exact_eq(&Span::new(1, 4)));
+    }
 
-        // Mixed serialize to object with unnamed entries keyed by their index among unnamed
-        let mut mixed = Tuple::new();
-        mixed
-            .try_push_unnamed(Value::Scalar(tomet_scalar::Scalar::Int(10)))
-            .unwrap();
-        mixed
-            .try_push_named("foo", Value::Scalar(tomet_scalar::Scalar::Int(20)))
-            .unwrap();
-        mixed
-            .try_push_unnamed(Value::Scalar(tomet_scalar::Scalar::Int(30)))
-            .unwrap();
-        assert_eq!(
-            serde_json::to_string(&mixed).unwrap(),
-            r#"{"0":10,"foo":20,"1":30}"#
+    #[test]
+    fn what_used_to_look_alike_is_told_apart() {
+        let args = Tuple::from_unnamed([int(1), int(2)]);
+
+        // A call, and a tuple that spells the keys `call` and `args`.
+        let call = Value::Call("enum".into(), args.clone());
+        let lookalike = Value::Tuple(
+            Tuple::try_from_entries([
+                TupleEntry::named("call", text("enum")),
+                TupleEntry::named("args", Value::Tuple(args)),
+            ])
+            .unwrap(),
         );
-        assert_eq!(
-            serde_json::to_string(&Value::Tuple(mixed)).unwrap(),
-            r#"{"0":10,"foo":20,"1":30}"#
+        assert_ne!(call, lookalike);
+        assert_ne!(wire(&call), wire(&lookalike));
+        assert_eq!(wire(&call)["Call"][0], json!("enum"));
+        assert_eq!(round_trip(&call), call);
+        assert_eq!(round_trip(&lookalike), lookalike);
+
+        // An interpolation and a type seat with the same expression and span.
+        let interp = Value::Interp(Interpolation {
+            expr: ident("int"),
+            span: Span::dummy(),
+        });
+        let type_seat = Value::TypeSeat(seat("int"));
+        assert_ne!(wire(&interp), wire(&type_seat));
+        assert!(matches!(round_trip(&interp), Value::Interp(_)));
+        assert!(matches!(round_trip(&type_seat), Value::TypeSeat(_)));
+
+        // A tuple that spells the keys of an interpolation.
+        let spelled = Value::Tuple(
+            Tuple::try_from_entries([
+                TupleEntry::named("expr", text("int")),
+                TupleEntry::named("span", int(0)),
+            ])
+            .unwrap(),
         );
+        assert!(matches!(round_trip(&spelled), Value::Tuple(_)));
+        assert_ne!(wire(&spelled), wire(&interp));
 
-        // Deserialization: [] and {} both deserialize to empty tuple
-        let from_empty_obj: Value = serde_json::from_str("{}").unwrap();
-        match from_empty_obj {
-            Value::Tuple(t) => assert!(t.is_empty()),
-            other => panic!("expected Tuple, got {other:?}"),
-        }
-        let from_empty_arr: Value = serde_json::from_str("[]").unwrap();
-        match from_empty_arr {
-            Value::Tuple(t) => assert!(t.is_empty()),
-            other => panic!("expected Tuple, got {other:?}"),
-        }
+        // Block content, an empty one, and the empty tuple.
+        let blocks = Value::Blocks(vec![Block::Paragraph(Paragraph {
+            content: vec![],
+            span: Span::dummy(),
+        })]);
+        let empty_blocks = Value::Blocks(vec![]);
+        let empty_tuple = Value::Tuple(Tuple::new());
+        assert_eq!(wire(&empty_blocks), json!({"Blocks": []}));
+        assert!(matches!(round_trip(&blocks), Value::Blocks(b) if b.len() == 1));
+        assert!(matches!(round_trip(&empty_blocks), Value::Blocks(b) if b.is_empty()));
+        assert!(matches!(round_trip(&empty_tuple), Value::Tuple(t) if t.is_empty()));
 
-        // Deserialization: array yields unnamed entries
-        let from_arr: Value = serde_json::from_str("[1, 2]").unwrap();
-        match from_arr {
-            Value::Tuple(t) => {
-                assert_eq!(t.len(), 2);
-                assert!(t.has_no_named());
-                assert_eq!(
-                    t.nth_unnamed(0),
-                    Some(&Value::Scalar(tomet_scalar::Scalar::Int(1)))
-                );
-                assert_eq!(
-                    t.nth_unnamed(1),
-                    Some(&Value::Scalar(tomet_scalar::Scalar::Int(2)))
-                );
-            }
-            other => panic!("expected Tuple, got {other:?}"),
-        }
+        // A hole, and an element, each as itself.
+        let hole = Value::Hole(Box::new(Hole {
+            matcher: Some(Name::bare("m")),
+            placement: Placement::Inline,
+            data: Data::default(),
+            content: None,
+            span: Span::dummy(),
+        }));
+        let element = Value::Element(Box::new(Element {
+            name: Name::namespaced("doc", "icon"),
+            placement: Placement::Inline,
+            data: Data {
+                args: Some(Tuple::from_unnamed([text("triangle")])),
+                value: None,
+            },
+            content: None,
+            id: None,
+            connects: vec![],
+            span: Span::dummy(),
+        }));
+        assert!(matches!(round_trip(&hole), Value::Hole(_)));
+        assert_eq!(round_trip(&element), element);
+        assert_ne!(wire(&hole), wire(&element));
+    }
 
-        // Deserialization: object yields named entries
-        let from_obj: Value = serde_json::from_str(r#"{"a": 1}"#).unwrap();
-        match from_obj {
-            Value::Tuple(t) => {
-                assert_eq!(t.len(), 1);
-                assert!(t.has_no_unnamed());
-                assert_eq!(
-                    t.get("a"),
-                    Some(&Value::Scalar(tomet_scalar::Scalar::Int(1)))
-                );
-            }
-            other => panic!("expected Tuple, got {other:?}"),
-        }
-
-        // Call serialization with Tuple fields
-        let call = Value::Call(
-            "my_fn".to_string(),
-            Tuple::from_unnamed([
-                Value::Scalar(tomet_scalar::Scalar::Int(1)),
-                Value::Scalar(tomet_scalar::Scalar::Int(2)),
-            ]),
-        );
-        assert_eq!(
-            serde_json::to_string(&call).unwrap(),
-            r#"{"call":"my_fn","args":[1,2]}"#
-        );
-
-        let call_empty = Value::Call("empty_fn".to_string(), Tuple::new());
-        assert_eq!(
-            serde_json::to_string(&call_empty).unwrap(),
-            r#"{"call":"empty_fn","args":{}}"#
-        );
-
-        // Deserialization: ["a"] and {"0": "a"} read as the same tuple
-        let from_arr: Value = serde_json::from_str(r#"["a"]"#).unwrap();
-        let from_obj: Value = serde_json::from_str(r#"{"0": "a"}"#).unwrap();
-        assert_eq!(from_arr, from_obj);
-
-        // AST equality: (a, b) and ("0": a, "1": b) are the same tree
-        let unnamed_tuple = Tuple::from_unnamed([
-            Value::Scalar(tomet_scalar::Scalar::Text("a".into())),
-            Value::Scalar(tomet_scalar::Scalar::Text("b".into())),
-        ]);
-        let named_tuple = Tuple::from_named([
+    #[test]
+    fn every_scalar_comes_back_as_itself() {
+        use tomet_scalar::Scalar;
+        let scalars = [
+            (Scalar::None, json!("None")),
+            (Scalar::Auto, json!("Auto")),
+            (Scalar::Bool(true), json!({"Bool": true})),
+            (Scalar::Int(-7), json!({"Int": -7})),
+            (Scalar::Float(1.0), json!({"Float": 1.0})),
+            (Scalar::Float(0.1), json!({"Float": 0.1})),
+            (Scalar::Number("1.10".into()), json!({"Number": "1.10"})),
+            (Scalar::Number("1e3".into()), json!({"Number": "1e3"})),
+            (Scalar::Number("-0".into()), json!({"Number": "-0"})),
             (
-                "0".into(),
-                Value::Scalar(tomet_scalar::Scalar::Text("a".into())),
+                Scalar::Number("123456789012345678901234567890".into()),
+                json!({"Number": "123456789012345678901234567890"}),
             ),
-            (
-                "1".into(),
-                Value::Scalar(tomet_scalar::Scalar::Text("b".into())),
-            ),
-        ]);
-        assert_eq!(unnamed_tuple, named_tuple);
+            (Scalar::Text("auto".into()), json!({"Text": "auto"})),
+            (Scalar::Text("1.10".into()), json!({"Text": "1.10"})),
+        ];
+        for (scalar, expected) in scalars {
+            let value = Value::Scalar(scalar);
+            assert_eq!(wire(&value), json!({ "Scalar": expected }));
+            assert_eq!(round_trip(&value), value);
+        }
+        // An integer and the float that prints like one are not the same value on the wire.
+        assert_ne!(
+            wire(&Value::Scalar(tomet_scalar::Scalar::Int(1))),
+            wire(&Value::Scalar(tomet_scalar::Scalar::Float(1.0)))
+        );
+    }
+
+    #[test]
+    fn a_tuple_of_any_value_type_has_a_wire() {
+        let tuple =
+            Tuple::try_from_entries([TupleEntry::unnamed(10_i32), TupleEntry::named("k", 20)])
+                .unwrap()
+                .with_span(Span::new(2, 9));
+        assert_eq!(
+            wire(&tuple),
+            json!({"entries": [
+                {"key": null, "value": 10},
+                {"key": {"Name": "k"}, "value": 20},
+            ], "span": {"start": 2, "end": 9}})
+        );
+        assert!(
+            round_trip(&tuple)
+                .span()
+                .unwrap()
+                .exact_eq(&Span::new(2, 9))
+        );
     }
 
     #[test]

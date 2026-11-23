@@ -3,15 +3,26 @@
 //! Shared AST and `Value` data models for the Tomet toolchain ([`File`], [`Block`],
 //! [`Inline`], [`Element`], [`ElementView`], [`BodyView`], [`Declaration`], [`Interpolation`],
 //! [`Hole`], [`TypeSeat`], [`ListItem`], [`Value`], [`Tuple`], [`TupleEntry`], [`Span`](tomet_span::Span)).
-//! A [`Value`] holds a [`Scalar`](tomet_scalar::Scalar) for scalar data.
+//! A [`Value`] holds a [`Scalar`](tomet_scalar::Scalar) for scalar data. [`PlainValue`] is a [`Value`] as data and nothing else.
 //!
 //! =[ Design Policy ]
 //!
 //! - (Pure Data Models & Structural Accessors Only)
 //!   | `tomet-ast` is the foundational AST crate referenced across the workspace,
-//!   | depending only on `tomet-span`, `serde`, and `unicode-width`.
+//!   | depending only on `tomet-scalar`, `tomet-span`, `tomet-spelling`, `serde`, and `unicode-width`.
 //!   | It contains only struct/enum definitions and pure inherent methods for construction
 //!   | (`new`, `with_*`) and structural inspection (`as_str()`, `get()`, `is_none()`).
+//! - (Two Serde Forms, For Two Readers)
+//!   | Every node is plain `#[derive(Serialize, Deserialize)]`, and that derived form is the AST wire:
+//!   | the shape a document takes when it is handed to another process and handed back. It is lossless
+//!   | and reads back as exactly what was written, including a [`Value`] (an externally tagged enum) and a
+//!   | [`Tuple`] (its entries in order, each with the kind of its key). There is no hand-written serde
+//!   | in this crate for the wire, because a wire that is hand-written is a wire that is lossy where
+//!   | the author did not look.
+//!   | A reader that wants data, not the AST, has a second form that says so by its type:
+//!   | [`Value::to_plain`] gives a [`PlainValue`] (`null`, booleans, numbers, strings, arrays, objects),
+//!   | which is lossy on purpose, does not read back into a [`Value`], and refuses (as [`NotPlain`])
+//!   | the nodes that are not data. Which form a consumer wants is its choice, never a flag.
 //! - (A Node's Role Is Its Type)
 //!   | A `{$ ... }`, `$(...)` or `$name(...)` is an [`Interpolation`] (an expression and a span), not an [`Element`]:
 //!   | it has no name, no groups and no connects, so it is a variant of [`Block`],
@@ -54,6 +65,7 @@
 mod document;
 mod interpolation;
 mod nexus;
+mod plain;
 mod value;
 
 pub use document::{
@@ -67,4 +79,5 @@ pub use nexus::{
     BodyView, Connect, Data, Declaration, Element, ElementView, Entry, Group, Hole, Id, Name,
     Placement,
 };
+pub use plain::{NotPlain, NotPlainReason, PlainValue};
 pub use value::{DuplicateKey, EntryKey, Tuple, TupleEntry, Value};

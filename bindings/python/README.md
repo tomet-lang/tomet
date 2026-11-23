@@ -13,7 +13,7 @@ pip install tomet
 ```python
 import tomet
 
-# 1. Parse data documents (like json.loads)
+# 1. Parse data documents (like json.loads): plain data only, anything else raises ValueError
 data = tomet.loads("name: 'Alice'\ncount: 42")
 print(data)  # {'name': 'Alice', 'count': 42}
 

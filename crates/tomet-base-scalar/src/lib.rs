@@ -20,10 +20,11 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum Scalar {
     /// `none`: the value is nothing, and says so. It is not an absent key, which says nothing, and not
-    /// `auto`, which leaves the value to the system. JSON `null` is this value at the JSON boundary.
+    /// `auto`, which leaves the value to the system. Plain JSON data writes it as `null`; serialized as a scalar it is `"None"`.
     None,
     /// `auto`: the system supplies the value. A field takes it only where its schema says so, and a later layer
-    /// can write it to put a field back in the system's hands. It has no JSON form yet.
+    /// can write it to put a field back in the system's hands. Serialized it is its own value (`"Auto"`), neither
+    /// `null` (that is `none`) nor the text `auto`: JSON data has no value for it.
     Auto,
     Bool(bool),
     Int(i64),

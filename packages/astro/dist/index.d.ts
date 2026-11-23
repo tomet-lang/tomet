@@ -6,7 +6,7 @@
  */
 import type { AstroIntegration } from "astro";
 import type { Loader } from "astro/loaders";
-import { type ProcessOptions, type ProcessedFile, type TocItem } from "@tomet/wasm";
+import { type Declaration, type ProcessOptions, type ProcessedFile, type TocItem } from "@tomet/wasm";
 export type { ProcessOptions, ProcessedFile, TocItem };
 /**
  * Ensures the WebAssembly engine is loaded and initialized.
@@ -20,6 +20,12 @@ export declare function renderTomet(source: string, options?: ProcessOptions): P
  * Process a single `.tmt` source string to a `ProcessedFile` in-process.
  */
 export declare function processTomet(source: string, options?: ProcessOptions): Promise<ProcessedFile>;
+/**
+ * The kind a document declares with its `::kind(...)`, read from the declarations of
+ * `ProcessedFile.header`: the text of the first unnamed entry of its arguments, or `null`
+ * if the document declares none (or declares one that is not written as a text).
+ */
+export declare function declaredKind(header: readonly Declaration[]): string | null;
 export interface TometLoaderOptions {
     /**
      * Base directory containing `.tmt` files.

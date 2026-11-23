@@ -20,6 +20,7 @@ import { fileURLToPath } from "node:url";
 import initWasm, {
   processFile,
   setVaultFiles,
+  type Declaration,
   type ProcessOptions,
   type ProcessedFile,
   type TocItem,
@@ -61,6 +62,24 @@ export async function processTomet(
 ): Promise<ProcessedFile> {
   await ensureWasm();
   return processFile(source, options);
+}
+
+/**
+ * The kind a document declares with its `::kind(...)`, read from the declarations of
+ * `ProcessedFile.header`: the text of the first unnamed entry of its arguments, or `null`
+ * if the document declares none (or declares one that is not written as a text).
+ */
+export function declaredKind(header: readonly Declaration[]): string | null {
+  const kind = header.find(
+    (declaration) =>
+      declaration.name.namespace === null && declaration.name.name === "kind",
+  );
+  const first = kind?.data.args?.entries.find((entry) => entry.key === null);
+  const scalar =
+    first !== undefined && "Scalar" in first.value ? first.value.Scalar : null;
+  return scalar !== null && typeof scalar === "object" && "Text" in scalar
+    ? scalar.Text
+    : null;
 }
 
 export interface TometLoaderOptions {
@@ -356,7 +375,7 @@ export function tometLoader(options: TometLoaderOptions): Loader {
 
           // Generate digest using mtime, size, and workspace config mtime
           const digest = generateDigest(
-            `${stat.mtimeMs}:${stat.size}:${configKey}:v5`,
+            `${stat.mtimeMs}:${stat.size}:${configKey}:v6`,
           );
           const existing = store.get(id);
 
@@ -376,12 +395,9 @@ export function tometLoader(options: TometLoaderOptions): Loader {
             config: workspaceConfig,
           });
 
-          // `::meta(...)` is a tuple; only its named form, an object, has fields.
-          const meta = processed.meta;
-          const metaObj: Record<string, unknown> | null =
-            meta !== null && typeof meta === "object" && !Array.isArray(meta)
-              ? meta
-              : null;
+          // `meta` is the plain-data entries of `::meta(...)`: an object, or null without a `::meta`.
+          // What is not data (`icon: @doc.icon(...)`) is in `processed.header`.
+          const metaObj: Record<string, unknown> | null = processed.meta;
 
           const fallbackTitle = basename(file.relPath).replace(
             /\.(tmt|tm)$/,
@@ -390,9 +406,7 @@ export function tometLoader(options: TometLoaderOptions): Loader {
           const title = (metaObj?.title as string) ?? fallbackTitle;
           const section = file.relPath.split("/")[0] ?? "";
 
-          const kindMatch = content.match(/^@kind\(([^)]*)\)/m);
-          const kind =
-            (processed as any).kind ?? (kindMatch ? kindMatch[1].trim() : null);
+          const kind = declaredKind(processed.header);
 
           // Resolve banner and images
           const fileRelDir = dirname(file.relPath).replace(/\\/g, "/");

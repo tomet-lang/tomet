@@ -56,11 +56,17 @@ fn document(source_or_doc: &Bound<'_, PyAny>) -> PyResult<(tomet_crate::File, Bi
     Ok((doc, bindings))
 }
 
-/// Parse a data-only `.tmt` document into native Python objects (dict, list, str, int, float, bool, None).
+/// Parse a data-only `.tmt` document into plain Python data (dict, list, str, int, float, bool, None).
+///
+/// A document that holds anything that is not data (a call, an interpolation, an element, `auto`, ...)
+/// raises `ValueError` naming it; `parse_file` shows the AST.
 #[pyfunction]
 fn loads<'py>(py: Python<'py>, source: &str) -> PyResult<Bound<'py, PyAny>> {
     let val = tomet_crate::parse_value(source).map_err(|e| PyValueError::new_err(e.to_string()))?;
-    pythonize::pythonize(py, &val).map_err(|e| PyValueError::new_err(e.to_string()))
+    let plain = val
+        .to_plain()
+        .map_err(|e| PyValueError::new_err(e.to_string()))?;
+    pythonize::pythonize(py, &plain).map_err(|e| PyValueError::new_err(e.to_string()))
 }
 
 /// Parse a full `.tmt` markup source text into a Python dict representing the File AST.

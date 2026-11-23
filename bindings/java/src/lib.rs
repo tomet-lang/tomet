@@ -53,7 +53,9 @@ pub extern "system" fn Java_org_tomet_tomet_Tomet_parseFileJson(
         .unwrap_or(std::ptr::null_mut())
 }
 
-/// Parse a data-only `.tmt` document into a JSON string.
+/// Parse a data-only `.tmt` document into a JSON string of plain data (`null`, booleans, numbers, strings,
+/// arrays, objects). A document that holds anything that is not data (a call, an interpolation, an element,
+/// `auto`, ...) throws, naming it.
 #[unsafe(no_mangle)]
 pub extern "system" fn Java_org_tomet_tomet_Tomet_parseValueJson(
     mut env: JNIEnv,
@@ -68,7 +70,11 @@ pub extern "system" fn Java_org_tomet_tomet_Tomet_parseValueJson(
         Ok(v) => v,
         Err(e) => return throw_err(&mut env, e),
     };
-    let json = match serde_json::to_string(&val) {
+    let plain = match val.to_plain() {
+        Ok(p) => p,
+        Err(e) => return throw_err(&mut env, e),
+    };
+    let json = match serde_json::to_string(&plain) {
         Ok(j) => j,
         Err(e) => return throw_err(&mut env, e),
     };
@@ -317,8 +323,13 @@ mod tests {
 
         let val_src = "name: \"Tomet\"\ncount: 42";
         let val = tomet::parse_value(val_src).unwrap();
-        let val_json = serde_json::to_string(&val).unwrap();
+        let val_json = serde_json::to_string(&val.to_plain().unwrap()).unwrap();
         assert_eq!(val_json, r#"{"name":"Tomet","count":42}"#);
+        let not_data = tomet::parse_value("t: enum(1)").unwrap();
+        assert_eq!(
+            not_data.to_plain().unwrap_err().to_string(),
+            "a call is not plain data (at `t`)"
+        );
 
         let html = tomet::html::render_body(&doc, &bindings);
         assert!(html.contains("Hello Java"));

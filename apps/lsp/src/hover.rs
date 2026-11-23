@@ -105,7 +105,7 @@ pub fn hover_in(
                     if let Some(norm_args) = element_args_view_in(view, self.bindings) {
                         desc.push_str(&format!(
                             "- **Normalized Args**: `{:?}`\n",
-                            norm_args.tuple()
+                            norm_args.tuple().entries().collect::<Vec<_>>()
                         ));
                     }
                     Some(Hover {
@@ -234,7 +234,7 @@ fn declaration_hover(
         if let Some(norm_args) = &args {
             desc.push_str(&format!(
                 "- **Normalized Args**: `{:?}`\n",
-                norm_args.tuple()
+                norm_args.tuple().entries().collect::<Vec<_>>()
             ));
         }
         desc

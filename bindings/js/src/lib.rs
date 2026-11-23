@@ -16,9 +16,10 @@ fn bindings_of(doc: &tomet::File) -> tomet::semantics::Bindings {
     empty_vault().bindings(doc)
 }
 
-/// Hands `value` to JavaScript in its JSON shape: a named tuple is a plain object, never a
-/// `Map`, and an absent value is `null`, never `undefined`. Every Rust value leaves this
-/// module through here, so JavaScript sees the shape `serde_json` gives Python and Java.
+/// Hands `value` to JavaScript in the JSON shape its `Serialize` gives, whatever that is: the AST
+/// wire for a `File` (see `tomet-ast`'s `Value`), plain data for a `PlainValue`. A map is a plain
+/// object, never a `Map`, and an absent value is `null`, never `undefined`. Every Rust value leaves
+/// this module through here, so JavaScript sees the shape `serde_json` gives Python and Java.
 fn to_js<T: serde::Serialize + ?Sized>(value: &T) -> Result<JsValue, JsValue> {
     value
         .serialize(&serde_wasm_bindgen::Serializer::json_compatible())
@@ -40,11 +41,16 @@ pub fn parse_file(source: &str) -> Result<JsValue, JsValue> {
     to_js(&doc)
 }
 
-/// Parse a data-only `.tmt` document into a native JavaScript object/primitive.
+/// Parse a data-only `.tmt` document into plain JavaScript data: `null`, booleans, numbers, strings,
+/// arrays and objects. A document that holds anything that is not data (a call, an interpolation, an
+/// element, `auto`, ...) is an error naming it: read it with `parseFile` to see the AST.
 #[wasm_bindgen(js_name = parseValue)]
 pub fn parse_value(source: &str) -> Result<JsValue, JsValue> {
     let val = tomet::parse_value(source).map_err(|e| JsValue::from_str(&e.to_string()))?;
-    to_js(&val)
+    let plain = val
+        .to_plain()
+        .map_err(|e| JsValue::from_str(&e.to_string()))?;
+    to_js(&plain)
 }
 
 /// Options controlling HTML rendering and document processing.
@@ -167,11 +173,25 @@ pub struct TocItem {
 }
 
 /// High-level output of processing a `.tmt` file.
-#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
+///
+/// The document's `::meta` has two windows, for two readers.
+///
+/// - `meta` is the data of it: an object of the `::meta` entries whose values are plain data
+///   (`null`, booleans, numbers, strings, arrays, objects). An entry that is not data (an
+///   element such as `icon: @doc.icon("star")`, a call, `auto`, ...) is not in `meta`; nothing
+///   stands in its place and it is not an error. `meta` is `null` if the document writes no
+///   `::meta`, and `{}` if it writes one with no entry that is data.
+/// - `header` is everything the document declares, `::meta` included, in the lossless AST wire
+///   form ([`Declaration`](tomet::ast::Declaration)): what an application reads to interpret what
+///   `meta` leaves out. Tomet does not resolve an icon; the application does.
+///
+/// Both are read after the expressions of the document are resolved.
+#[derive(serde::Serialize, Debug, Clone)]
 pub struct ProcessedFile {
     pub title: Option<String>,
     pub html: String,
-    pub meta: Option<tomet::ast::Value>,
+    pub meta: Option<tomet::ast::PlainValue>,
+    pub header: Vec<tomet::ast::Declaration>,
     pub toc: Vec<TocItem>,
     pub is_data_only: bool,
 }
@@ -183,8 +203,14 @@ pub fn process_file_internal(mut doc: tomet::ast::File, opts: &ProcessOptions) -
     let is_data_only = html.trim().is_empty();
 
     // 1. Meta & Title from ::meta(title: ...)
-    let meta = tomet::declaration::document_meta(&doc);
-    let meta_title = meta.as_ref().and_then(|v| match v {
+    let meta_value = tomet::declaration::document_meta(&doc);
+    let meta = match &meta_value {
+        Some(tomet::ast::Value::Tuple(m)) => {
+            Some(tomet::ast::PlainValue::Object(m.plain_entries().collect()))
+        }
+        _ => None,
+    };
+    let meta_title = meta_value.as_ref().and_then(|v| match v {
         tomet::ast::Value::Tuple(m) => m
             .get("title")
             .and_then(|val| val.as_scalar().and_then(|s| s.text()))
@@ -238,6 +264,7 @@ pub fn process_file_internal(mut doc: tomet::ast::File, opts: &ProcessOptions) -
         title,
         html,
         meta,
+        header: doc.header,
         toc,
         is_data_only,
     }
@@ -411,6 +438,7 @@ pub fn highlight_spans(source: &str) -> Result<JsValue, JsValue> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use tomet::ast::PlainValue;
 
     #[test]
     fn test_parse_and_html_roundtrip() {
@@ -443,6 +471,77 @@ mod tests {
         assert_eq!(res.toc[0].level, 2);
         assert_eq!(res.toc[0].text, "Section One");
         assert_eq!(res.toc[0].id, "section-one");
+    }
+
+    fn processed(src: &str) -> ProcessedFile {
+        process_file_internal(parse_plain(src).unwrap(), &ProcessOptions::default())
+    }
+
+    fn object(entries: Vec<(&str, PlainValue)>) -> PlainValue {
+        PlainValue::Object(entries.into_iter().map(|(k, v)| (k.into(), v)).collect())
+    }
+
+    #[test]
+    fn meta_is_the_entries_that_are_data_and_header_is_everything() {
+        let res = processed(
+            "::meta(title: \"T\", n: 1, tags: (a, b), icon: @doc.icon(\"star\"), mode: auto, t: enum(1))\n\nBody.\n",
+        );
+        assert_eq!(
+            res.meta,
+            Some(object(vec![
+                ("title", PlainValue::Text("T".into())),
+                ("n", PlainValue::Int(1)),
+                (
+                    "tags",
+                    PlainValue::Array(vec![
+                        PlainValue::Text("a".into()),
+                        PlainValue::Text("b".into())
+                    ])
+                ),
+            ]))
+        );
+        // What `meta` leaves out is in the header, as the AST.
+        let args = res.header[0].data.args.as_ref().expect("::meta args");
+        let Some(tomet::ast::Value::Element(icon)) = args.get("icon") else {
+            panic!("the icon is an element in the header")
+        };
+        assert_eq!(icon.name.to_string(), "doc.icon");
+    }
+
+    #[test]
+    fn meta_is_null_without_a_meta_and_empty_without_data() {
+        let none = processed("Body.\n");
+        assert_eq!(none.meta, None);
+        assert!(none.header.is_empty());
+        let only_an_element = processed("::meta(icon: @doc.icon(\"star\"))\n\nBody.\n");
+        assert_eq!(only_an_element.meta, Some(object(vec![])));
+        assert_eq!(processed("::meta()\n").meta, Some(object(vec![])));
+    }
+
+    #[test]
+    fn parse_value_is_plain_data_or_an_error_that_names_what_is_not() {
+        let plain = tomet::parse_value("a: 1\nb: (x, y)\n")
+            .unwrap()
+            .to_plain()
+            .unwrap();
+        assert_eq!(
+            plain,
+            object(vec![
+                ("a", PlainValue::Int(1)),
+                (
+                    "b",
+                    PlainValue::Array(vec![
+                        PlainValue::Text("x".into()),
+                        PlainValue::Text("y".into())
+                    ])
+                ),
+            ])
+        );
+        let err = tomet::parse_value("a: enum(1)\n")
+            .unwrap()
+            .to_plain()
+            .unwrap_err();
+        assert_eq!(err.to_string(), "a call is not plain data (at `a`)");
     }
 
     #[test]

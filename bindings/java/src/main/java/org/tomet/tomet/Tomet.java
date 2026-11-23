@@ -44,11 +44,13 @@ public final class Tomet {
     public static native String parseFileJson(String source) throws TometException;
 
     /**
-     * Parses a data-only .tmt document into a JSON string.
+     * Parses a data-only .tmt document into a JSON string of plain data: null, booleans, numbers,
+     * strings, arrays and objects.
      *
      * @param source the data-only Tomet source text
      * @return JSON string of the parsed value
-     * @throws TometException if syntax parsing fails
+     * @throws TometException if syntax parsing fails, or if the document holds anything that is not
+     *     data (a call, an interpolation, an element, auto, ...); the message names it
      */
     public static native String parseValueJson(String source) throws TometException;
 

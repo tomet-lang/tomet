@@ -75,6 +75,10 @@ path = "src/block_value_loss.rs"
 name = "vault_eval"
 path = "src/vault_eval.rs"
 
+[[test]]
+name = "wire"
+path = "src/wire.rs"
+
 [dependencies]
 cotomet             = { workspace = true }
 tomet-ast           = { workspace = true }

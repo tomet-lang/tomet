@@ -443,10 +443,14 @@ mod tests {
         assert_eq!(view_with.get("0"), view_with.get("target"));
         assert_eq!(view_with.entry_alias(0), Some("target"));
 
-        // 3. Invariance: an alias NEVER shows up in the tuple's printed text, JSON or equality
+        // 3. Invariance: an alias NEVER shows up in the tuple's printed text, wire form or equality
         assert_eq!(view_with.tuple(), el.data.args.as_ref().unwrap());
         let json = serde_json::to_string(view_with.tuple()).unwrap();
-        assert_eq!(json, r#"["https://example.com"]"#);
+        assert_eq!(
+            json,
+            serde_json::to_string(el.data.args.as_ref().unwrap()).unwrap(),
+            "the view serializes as the tuple it views"
+        );
         assert!(!json.contains("target"));
 
         // 4. The slot an entry already has by NAME is skipped

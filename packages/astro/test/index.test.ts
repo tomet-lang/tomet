@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   renderTomet,
   processTomet,
+  declaredKind,
   resolveAssetUrl,
   tometLoader,
 } from "../dist/index.js";
@@ -39,6 +40,39 @@ describe("tomet renderer in Astro integration", () => {
     const bare = await processTomet("Text");
     assert.strictEqual(bare.title, null);
     assert.strictEqual(bare.meta, null);
+  });
+
+  test("leaves what is not data out of meta and keeps it in the header", async () => {
+    const doc = await processTomet(
+      '::meta(\n  title: "T"\n  icon: @doc.icon("star")\n  mode: auto\n)\n\nText',
+    );
+    // `meta` holds the entries that are data; the element and `auto` are not there, and it is no error.
+    assert.deepStrictEqual(doc.meta, { title: "T" });
+    // The header holds the declarations as the AST, so an application can read the icon.
+    assert.equal(doc.header.length, 1);
+    assert.equal(doc.header[0].name.name, "meta");
+    const entries = doc.header[0].data.args?.entries ?? [];
+    const icon = entries.find(
+      (entry) =>
+        entry.key !== null && "Name" in entry.key && entry.key.Name === "icon",
+    );
+    assert.ok(icon && "Element" in icon.value);
+    assert.equal(icon.value.Element.name.namespace, "doc");
+    assert.equal(icon.value.Element.name.name, "icon");
+
+    // A `::meta` with nothing that is data is an empty object, no `::meta` at all is null.
+    const onlyIcon = await processTomet('::meta(icon: @doc.icon("star"))\n\nText');
+    assert.deepStrictEqual(onlyIcon.meta, {});
+    assert.deepStrictEqual((await processTomet("Text")).header, []);
+  });
+
+  test("reads the kind from the ::kind declaration of the header", async () => {
+    const guide = await processTomet("::kind(guide)\n\nText");
+    assert.equal(declaredKind(guide.header), "guide");
+    // Not a regex over the source: a `@kind(...)` line in the text is no declaration.
+    const none = await processTomet("Text\n\n@kind(guide)\n");
+    assert.equal(declaredKind(none.header), null);
+    assert.equal(declaredKind((await processTomet("Text")).header), null);
   });
 });
 

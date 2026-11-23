@@ -80,7 +80,7 @@ re-merging it would not be.
 - **In-process WebAssembly compilation**: Uses `@tomet/wasm` to parse and render `.tmt` files in-process without spawning CLI sub-processes.
 - **Incremental Digest Caching**: Content digests combine file mtime, size, and workspace config mtime (`configKey`) to skip unchanged documents across builds.
 - **Proximity-aware Link & Asset Resolution**: Automatically resolves `ref:` links and `@embed` image references against the scanned vault and asset map.
-- **Rich Metadata & TOC**: Automatically surfaces document titles, headings (TOC), `@kind`, banners, thumbnails, tags, and custom metadata into `entry.data`.
+- **Rich Metadata & TOC**: Automatically surfaces document titles, headings (TOC), `::kind`, banners, thumbnails, tags, and custom metadata into `entry.data`.
 - **Live Dev Mode Synchronization**: The dev watcher tracks `.tmt` files, images, assets, and workspace configuration changes with live vault index re-indexing.
 
 ## Loader Options
@@ -108,8 +108,8 @@ interface TometEntryData {
   section: string;        // Top-level folder name
   sourcePath: string;     // Source path (e.g. 'docs/intro.tmt')
   toc: TocItem[];         // Headings with id, level (2 or 3), and text
-  meta: Record<string, unknown> | null; // Raw metadata object
-  kind: string | null;    // Document kind (from @kind(...) or meta)
+  meta: Record<string, unknown> | null; // The plain-data entries of `::meta(...)`; the rest is in `processFile`'s `header`
+  kind: string | null;    // Document kind, from its `::kind(...)` declaration
   isDataOnly: boolean;    // True if document produces no body HTML
   description?: string;   // Meta description or auto-extracted excerpt
   tags?: string[];        // Tags array normalized from metadata
