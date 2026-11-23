@@ -19,6 +19,11 @@ flake-parts.lib.mkFlake { inherit inputs; } {
       tomet = pkgs.callPackage ./pkgs/tomet.nix { inherit craneLib; };
       tomet-lsp = pkgs.callPackage ./pkgs/tomet-lsp.nix { inherit craneLib; };
       vscodeExtension = pkgs.callPackage ./pkgs/vscode-extension.nix { };
+      tomet-wasm = pkgs.callPackage ./pkgs/tomet-wasm.nix {
+        inherit craneLib;
+        fenix = inputs.fenix.packages.${pkgs.stdenv.hostPlatform.system};
+      };
+      tomet-astro = pkgs.callPackage ./pkgs/tomet-astro.nix { inherit tomet-wasm; };
     in
     {
       packages = {
@@ -27,6 +32,8 @@ flake-parts.lib.mkFlake { inherit inputs; } {
           tomet
           tomet-lsp
           vscodeExtension
+          tomet-wasm
+          tomet-astro
           ;
 
         # What CI builds and sends to Cachix (.github/workflows/nix-ci.yml).
@@ -38,6 +45,14 @@ flake-parts.lib.mkFlake { inherit inputs; } {
           {
             name = "tomet-lsp";
             path = tomet-lsp;
+          }
+          {
+            name = "tomet-wasm";
+            path = tomet-wasm;
+          }
+          {
+            name = "tomet-astro";
+            path = tomet-astro;
           }
         ];
       };
