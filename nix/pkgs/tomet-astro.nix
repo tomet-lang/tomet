@@ -54,7 +54,7 @@ buildNpmPackage {
     runHook preInstall
     mkdir -p $out/node_modules/@tomet
     jq 'del(.devDependencies, .scripts)' package.json > $out/package.json
-    cp -r README.md dist $out/
+    cp -r README.md dist src $out/
     ln -s ${tomet-wasm} $out/node_modules/@tomet/wasm
     runHook postInstall
   '';

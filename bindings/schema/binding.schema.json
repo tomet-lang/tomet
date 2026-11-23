@@ -1,0 +1,1788 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/tomet-lang/tomet/schemas/0.5.0/binding.schema.json",
+  "title": "Tomet bindings",
+  "$defs": {
+    "VaultSources": {
+      "type": "object",
+      "properties": {
+        "files": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "The path of every file of the vault, from its root, with `/` between the segments. A `ref:` link\nand an embed name one of them."
+        },
+        "documents": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          },
+          "description": "The documents the site has a page for, a part of `files`. Defaults to every `.tmt`, `.tm` and\n`.md` of `files`. A link to a document that is not here is a link to nothing."
+        },
+        "config": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "The settings, as the text of a config document (`vault.config.tmt`): macros, variables, and\nthe `type:` of `::meta` fields."
+        },
+        "vocabularies": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "The vocabularies, as the text of the documents the config registers, by the path the config\ngives them."
+        },
+        "dictionaries": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "The dictionaries, as the text of the documents the config registers, by the path the config gives them."
+        },
+        "blueprints": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "The blueprints, as text. A document is checked against the one for its `::kind`."
+        },
+        "urlPrefix": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Where the pages of the site are: `/docs` gives `/docs/spec/syntax`. Defaults to `/docs`."
+        },
+        "assetPrefix": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Where the files that are not documents are: `/vault` gives `/vault/img/x.png`. Defaults to `/vault`."
+        },
+        "basePath": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Where the files given are in the vault, from its root, when they are a part of it: `tmtroot`\nif the files are what is under `tmtroot/`. A path in a document is written from the root of the\nvault, and this is what it is read from. Defaults to `\"\"`: the files are the vault."
+        },
+        "sourceUrl": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SourceUrls"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Where the source of the project is on the web. Without it, a link to a file that has no page is\na diagnostic."
+        }
+      },
+      "description": "What a vault is made of. Everything is optional: `{}` is a vault of nothing, in which a document is\nread with `std` alone and links go nowhere."
+    },
+    "SourceUrls": {
+      "type": "object",
+      "properties": {
+        "file": {
+          "type": "string",
+          "description": "The URL of a file, with `{path}` where its path from the root of the vault goes (each segment\npercent-encoded): `https://github.com/org/repo/blob/<revision>/{path}`."
+        },
+        "dir": {
+          "type": "string",
+          "description": "The URL of a directory, with `{path}` as in `file`: `https://github.com/org/repo/tree/<revision>/{path}`."
+        }
+      },
+      "required": [
+        "file",
+        "dir"
+      ],
+      "description": "Where the source of the project is on the web, for what a page has no page for: a `file:` or `dir:`\nlink to a file that is not a published document."
+    },
+    "ProcessOptions": {
+      "type": "object",
+      "properties": {
+        "advanced": {
+          "type": [
+            "boolean",
+            "null"
+          ],
+          "description": "Number the headings (`1`, `1.1`, ...) and give each an `id` made from its text: the default\nof `numberHeadings` and `autoSlugHeadings`, which switch each on its own."
+        },
+        "numberHeadings": {
+          "type": [
+            "boolean",
+            "null"
+          ],
+          "description": "Number the headings. Defaults to `advanced`."
+        },
+        "autoSlugHeadings": {
+          "type": [
+            "boolean",
+            "null"
+          ],
+          "description": "Give every heading an `id` made from its text. Defaults to `advanced`."
+        },
+        "lang": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "The language of the page, for the `lang` of what is rendered."
+        },
+        "currentPath": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Where the document is in the vault, from the root of the files the vault was given: what a\n`./` link, a note name and an expression such as `self::path` are read from."
+        }
+      },
+      "description": "What to read one document with. Every field is optional."
+    },
+    "ProcessedFile": {
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "The `title` of `::meta`, or else the first heading of level 1. `null` if there is neither."
+        },
+        "html": {
+          "type": "string",
+          "description": "The body, rendered."
+        },
+        "meta": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "additionalProperties": {
+            "$ref": "#/$defs/PlainValue"
+          },
+          "description": "The data of `::meta`: an object, or `null` if the document writes none."
+        },
+        "header": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Declaration"
+          },
+          "description": "Everything the document declares."
+        },
+        "toc": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/TocItem"
+          },
+          "description": "The headings of level 2 and 3."
+        },
+        "is_data_only": {
+          "type": "boolean",
+          "description": "Whether the document has nothing to show: it declares and holds data, and its body is empty."
+        },
+        "diagnostics": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Diagnostic"
+          },
+          "description": "Everything found wrong with the document, or that it says about itself, in the order it is in\nthe text: what `tomet check` reports, a link or an embed that goes nowhere, an expression that\nhas no value. A page with a diagnostic of any severity is not as its author wrote it."
+        }
+      },
+      "required": [
+        "title",
+        "html",
+        "meta",
+        "header",
+        "toc",
+        "is_data_only",
+        "diagnostics"
+      ],
+      "description": "What reading a document for a page gives.\n\nThe document's `::meta` is seen through two windows:\n\n- `meta` is the data of it, as an object of plain data. An entry that is not data (an element such\n  as `icon: @doc.icon(\"star\")`, a call, `auto`, ...) is not in it: nothing stands in its place, and it\n  is not an error. `meta` is `null` if the document writes no `::meta`, and `{}` if it writes one\n  with no entry that is data.\n- `header` is everything the document declares, `::meta` included, as the AST: where an application\n  finds what `meta` leaves out, and interprets it. Tomet does not resolve an icon; the application does.\n\nBoth are read after the expressions of the document are resolved."
+    },
+    "PlainValue": {
+      "anyOf": [
+        {
+          "type": "null",
+          "description": "`none`."
+        },
+        {
+          "type": "boolean",
+          "description": "A boolean."
+        },
+        {
+          "type": "integer",
+          "format": "int64",
+          "description": "An integer."
+        },
+        {
+          "type": "number",
+          "format": "double",
+          "description": "A float, or a number kept as written."
+        },
+        {
+          "type": "string",
+          "description": "A text."
+        },
+        {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/PlainValue"
+          },
+          "description": "A tuple with entries, none of them keyed."
+        },
+        {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/PlainValue"
+          },
+          "description": "Any other tuple, in written order: an entry's key is its name, or its position among the\nunnamed entries if it has none. An empty tuple is the empty object."
+        }
+      ],
+      "description": "Plain data: what a `Value` says when it is only data, as the JSON every language has. It is\nwhat `parseValue`, `loads`, and the `meta` of a processed file hand out.\n\n**Rules**\n\nThe projection is explicitly lossy, and it does not round-trip: a `PlainValue` is not a\n`Value`, and nothing reads one back into one (it is written, never read).\n\n- `none` is `null`, a boolean is a boolean, an integer is an integer and a text is a string.\n- A float, and a number kept as written, is a float: `1.10` is `1.1`, `1e3` is `1000.0` and an\n  integer beyond an `i64` is the nearest `f64`. One with no finite `f64` (`1e999`, `NaN`) has no\n  plain form and is an error: a string that stood for it would be indistinguishable from a text.\n- A tuple with at least one entry, and no entry with a key, is an array. Any other tuple is an\n  object, in written order: an entry's key is its name, or its position in decimal if it has\n  none, so `(a, k: b)` is `{\"0\": a, \"k\": b}`. An empty tuple is an empty object, not an empty\n  array: it has no entry to say it is a list, and an object is the container that can hold what\n  a tuple can. A reader that must tell `(a, b)` from `(\"0\": a, \"1\": b)` cannot: they are one tuple.\n- Everything else has no plain form and is refused (`NotPlain`), never lowered to a stand-in. `auto` is\n  not `null` (that is `none`) and not the text `\"auto\"`; a `Value::Call`, `Value::Interp`,\n  `Value::Hole`, `Value::TypeSeat`, `Value::Element`, `Value::Blocks` and a type-seat key\n  are nodes, and an object that stood for one would be exactly the ambiguity the wire exists\n  to remove. A reader that wants those reads the AST wire.\n\nAn object keeps its entries in order and holds no key twice. Serialized, it is the natural JSON\nof its shape (`null`, a boolean, a number, a string, an array, an object) with no tag of its own."
+    },
+    "Declaration": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "$ref": "#/$defs/Name"
+        },
+        "data": {
+          "$ref": "#/$defs/Data"
+        },
+        "content": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "$ref": "#/$defs/Block"
+          }
+        },
+        "id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Id"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "span": {
+          "$ref": "#/$defs/Span"
+        }
+      },
+      "required": [
+        "name",
+        "data",
+        "content",
+        "id",
+        "span"
+      ],
+      "description": "A `::name(args){data}[content]#(id)` declaration about the file itself,\nnot content in it.\n\nIt takes the groups an element does and is introduced by `::` instead of\n`@`. The sigil says *where* it belongs -- in the file's preamble header\n(`File::header`), the run of `::` declarations at the top -- so the preamble can be\nfound without loading any vocabulary. Which names may be written this way is the\n`Region` a vocabulary declares for them, and whether one takes `[content]`\nis that vocabulary's call too, so the parser does not decide it.\n\nIt sits in `File::header`: a `::` has to open its line and stand alone on it,\nand so has no `Placement`. And it is attached to nothing, so unlike an\n`Element` it takes no `::connect`."
+    },
+    "Name": {
+      "type": "object",
+      "properties": {
+        "namespace": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "name": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "namespace",
+        "name"
+      ],
+      "description": "An element's name, split into its optional namespace and its own name.\n\nThe separator is `.`: `deck.bookmark` is the namespace `deck` and the name\n`bookmark`. Exactly two namespaces may be\nwritten bare: `std`, which the language carries, and the document's\nown `::kind`, declared on its first line. A name from any other\nnamespace -- anything brought in with `::use` -- is always written\nout, and a bare name in neither of the two is an error rather than\nfalling back to a `Custom` kind. That check is `Bindings::classify`\nin `tomet-semantics`, not the free `classify_std` beside it, which only\nknows `std`. This type only records the split.\n\nBoth halves are ASCII identifiers (`[A-Za-z_][A-Za-z0-9_-]*`). `.` is\nthe separator, so it is deliberately *not* an identifier character\nhere -- unlike in entry names, where `url.wiki` is one flat name."
+    },
+    "Data": {
+      "type": "object",
+      "properties": {
+        "args": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Tuple"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "value": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Group"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "args",
+        "value"
+      ],
+      "description": "The data a node carries: its `(args)` tuple and its `{value}` group, each\noptional and at most one of each.\n\nEvery node that takes either holds them as a `Data`, so what reads them\n(the walkers, the printer, `merge_values`) is written once for all of\nthem. `[content]` and `#(id)` are not in here on purpose: they differ in\nkind (child blocks, an address) and not every node takes them."
+    },
+    "Tuple": {
+      "type": "object",
+      "properties": {
+        "entries": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/TupleEntry"
+          }
+        },
+        "span": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Span"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "entries",
+        "span"
+      ],
+      "description": "An ordered run of `TupleEntry` items, each with a name or without one.\n\nThe one data container in the AST: the fields handed to a head (a nexus's `(args)`, the\n`(...)` of a `Value::Call`) or, with no head written, a value of its own. There is no list\nand no map as kinds of value: a tuple whose entries are all unnamed is what a list was, one\nwhose entries are all named what a map was, and a tuple may mix both.\n\n**Keys**\n\nA key is text, and there is one key space: a key is not a value and has no type. Quoting a key\nis spelling (`\"a\": 1` is `a: 1`), and so is leaving it out: an unnamed entry's key is its\nposition among the unnamed entries, in decimal (`0`, `1`, `12`). So `(a, b)` and\n`(\"0\": a, \"1\": b)` are the same tuple, and `(\"0\": a, b)` writes the key `0` twice, which is\nan error: a key is held once.\n\n**Wire**\n\nOn the wire a tuple is its entries in written order, and its span if it has one (`null` if it is not written anywhere):\n`{\"entries\":[{\"key\":null,\"value\":...},{\"key\":{\"Name\":\"k\"},\"value\":...}],\"span\":{\"start\":0,\"end\":9}}`. Every entry\nkeeps the kind of its key (none, a name, a type seat) and its place, so no reader tells a list\nfrom a map by looking at the data, and no order is lost to a language whose objects sort their\nkeys. Reading a tuple builds it like any other way of building one does: a name that is the\nposition the entry would have unnamed is the unnamed entry, and a key written twice is an error,\nnot a tuple."
+    },
+    "TupleEntry": {
+      "type": "object",
+      "properties": {
+        "key": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/EntryKey"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "value": {
+          "$ref": "#/$defs/Value"
+        }
+      },
+      "required": [
+        "key",
+        "value"
+      ],
+      "description": "One entry of a `Tuple`: a value, with a key or without one.\n\nAn entry with no key is an entry whose key was not written; its key is its position among\nthe unnamed entries of its tuple. An entry does not know that position: ask the tuple\n(`Tuple::keyed`, `Tuple::get`).\n\nOn the wire an entry is `{\"key\": null | EntryKey, \"value\": V}`; `null` is a key that was not written."
+    },
+    "EntryKey": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "Name": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "Name"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "TypeSeat": {
+              "$ref": "#/$defs/TypeSeat"
+            }
+          },
+          "required": [
+            "TypeSeat"
+          ],
+          "additionalProperties": false
+        }
+      ],
+      "description": "The key of a `TupleEntry` when one was written: a plain/quoted name, or a type seat (`<$type>`).\n\nOn the wire the two kinds stay apart: `{\"Name\":\"a\"}` and `{\"TypeSeat\":{...}}`."
+    },
+    "TypeSeat": {
+      "type": "object",
+      "properties": {
+        "expr": {
+          "$ref": "#/$defs/InterpExpr"
+        },
+        "span": {
+          "$ref": "#/$defs/Span"
+        }
+      },
+      "required": [
+        "expr",
+        "span"
+      ],
+      "description": "A `<$type(args)>` seat: the type of a value that is not there yet, written where the value\ngoes. `<$date(default: auto)>`, `<$list(string, length: 6)>`, `<$uuid>`.\n\nIt is a box, `<...>`, whose head is the `$` mark and the type, as the expression it is: a\nbare name (`uuid`) or a call of one (`list(string, length: 6)`), with its arguments in `()`\nand nowhere else. `<$uuid>` and `<$uuid()>` are two written forms, a name and a call with no\narguments, and stay two here. It takes no `{value}`, no `[content]`, no `#(id)` and no\n`::connect`, so it holds the type and a span and nothing else: it is not a `Hole`, which\nhas a matcher and groups, and not an `Interpolation`, which is evaluated where it stands.\n\n`tomet-ast` never interprets the expression: which type names are valid, what their arguments\nmean, and that `auto` in `default: auto` is not a variable, are for `tomet-type` and the\nsemantics. To the AST `auto` is a name like any other.\n\nA seat sits where a value, a block or running text does, so it is a variant of `Block`,\n`Inline` and `Value`, and not of `Entry`: a `{...}` group holds `key: value` entries\nand elements, and a seat is neither."
+    },
+    "InterpExpr": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "$ref": "#/$defs/InterpExprKind"
+        },
+        "span": {
+          "$ref": "#/$defs/Span"
+        }
+      },
+      "required": [
+        "kind",
+        "span"
+      ],
+      "description": "One node of an interpolation's parsed expression tree."
+    },
+    "InterpExprKind": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "Identifier": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "Identifier"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "Id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "Id"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "Literal": {
+              "$ref": "#/$defs/Scalar"
+            }
+          },
+          "required": [
+            "Literal"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "Call": {
+              "type": "object",
+              "properties": {
+                "callee": {
+                  "$ref": "#/$defs/InterpExpr"
+                },
+                "args": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/$defs/InterpExpr"
+                  }
+                }
+              },
+              "required": [
+                "callee",
+                "args"
+              ]
+            }
+          },
+          "required": [
+            "Call"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "Member": {
+              "type": "object",
+              "properties": {
+                "object": {
+                  "$ref": "#/$defs/InterpExpr"
+                },
+                "member": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "object",
+                "member"
+              ]
+            }
+          },
+          "required": [
+            "Member"
+          ],
+          "additionalProperties": false,
+          "description": "`object.member`: a named entry of the data an element, a tuple or a section holds, or the start of a\nmethod call (`object.member(...)` is `InterpExprKind::Call` on this). A node's own\nattributes are not read with a dot; see `InterpExprKind::Connect`."
+        },
+        {
+          "type": "object",
+          "properties": {
+            "Connect": {
+              "type": "object",
+              "properties": {
+                "object": {
+                  "$ref": "#/$defs/InterpExpr"
+                },
+                "member": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "object",
+                "member"
+              ]
+            }
+          },
+          "required": [
+            "Connect"
+          ],
+          "additionalProperties": false,
+          "description": "`object::member`: from a node to what hangs off it -- an attribute of the node (`::id`,\n`::name`, a document's `::path`), the connect of that name (`::meta`), or the document or\ndirectory it leads to. The dot reads data inside a node; the double colon goes from node to node."
+        },
+        {
+          "type": "object",
+          "properties": {
+            "NamedArg": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "value": {
+                  "$ref": "#/$defs/InterpExpr"
+                }
+              },
+              "required": [
+                "name",
+                "value"
+              ]
+            }
+          },
+          "required": [
+            "NamedArg"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "Binary": {
+              "type": "object",
+              "properties": {
+                "op": {
+                  "$ref": "#/$defs/BinaryOp"
+                },
+                "lhs": {
+                  "$ref": "#/$defs/InterpExpr"
+                },
+                "rhs": {
+                  "$ref": "#/$defs/InterpExpr"
+                }
+              },
+              "required": [
+                "op",
+                "lhs",
+                "rhs"
+              ]
+            }
+          },
+          "required": [
+            "Binary"
+          ],
+          "additionalProperties": false,
+          "description": "`lhs op rhs`: `+`, `-`, a comparison, `&&` or `||`; see `BinaryOp` for the precedence."
+        },
+        {
+          "type": "object",
+          "properties": {
+            "DocId": {
+              "type": "object",
+              "properties": {
+                "doc": {
+                  "$ref": "#/$defs/InterpExpr"
+                },
+                "id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "doc",
+                "id"
+              ]
+            }
+          },
+          "required": [
+            "DocId"
+          ],
+          "additionalProperties": false,
+          "description": "`doc#id` -- the element with that unique id inside `doc`, where `doc`\nis any expression that yields a document. The leading form `#id`\n(no document on the left) is `InterpExprKind::Id` and means the\nsame thing with `self` on the left."
+        },
+        {
+          "type": "object",
+          "properties": {
+            "Addr": {
+              "type": "object",
+              "properties": {
+                "text": {
+                  "type": "string"
+                },
+                "raw": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "text",
+                "raw"
+              ]
+            }
+          },
+          "required": [
+            "Addr"
+          ],
+          "additionalProperties": false,
+          "description": "`addr(tmt:docs/a.tmt#intro)` or `addr(\"...\")` -- an address written as\ntext. `raw` records the spelling the author used, so printing gives\nit back: the raw form reads everything up to the matching `)` without\ntreating `:`, `.`, `-` or `/` as expression symbols."
+        },
+        {
+          "type": "object",
+          "properties": {
+            "Group": {
+              "$ref": "#/$defs/InterpExpr"
+            }
+          },
+          "required": [
+            "Group"
+          ],
+          "additionalProperties": false,
+          "description": "`( expr )`. Kept as a node, not dropped, so printing a parsed\nexpression gives back the parentheses the author wrote."
+        },
+        {
+          "type": "object",
+          "properties": {
+            "Seq": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/InterpExpr"
+              }
+            }
+          },
+          "required": [
+            "Seq"
+          ],
+          "additionalProperties": false,
+          "description": "`()` (empty), `(a,)` (one item), or `(a, b, ...)` (two or more items). Kept as a sequence\nexpression. `(a)` with no comma is `InterpExprKind::Group`."
+        },
+        {
+          "type": "object",
+          "properties": {
+            "Lambda": {
+              "type": "object",
+              "properties": {
+                "params": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "body": {
+                  "$ref": "#/$defs/InterpExpr"
+                }
+              },
+              "required": [
+                "params",
+                "body"
+              ]
+            }
+          },
+          "required": [
+            "Lambda"
+          ],
+          "additionalProperties": false,
+          "description": "`x => body` or `(a, b) => body`. The body is one expression."
+        }
+      ]
+    },
+    "Scalar": {
+      "oneOf": [
+        {
+          "type": "string",
+          "const": "None",
+          "description": "`none`: the value is nothing, and says so. It is not an absent key, which says nothing, and not\n`auto`, which leaves the value to the system. Plain JSON data writes it as `null`; serialized as a scalar it is `\"None\"`."
+        },
+        {
+          "type": "string",
+          "const": "Auto",
+          "description": "`auto`: the system supplies the value. A field takes it only where its schema says so, and a later layer\ncan write it to put a field back in the system's hands. Serialized it is its own value (`\"Auto\"`), neither\n`null` (that is `none`) nor the text `auto`: JSON data has no value for it."
+        },
+        {
+          "type": "object",
+          "properties": {
+            "Bool": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "Bool"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "Int": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          "required": [
+            "Int"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "Float": {
+              "type": "number",
+              "format": "double"
+            }
+          },
+          "required": [
+            "Float"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "Number": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "Number"
+          ],
+          "additionalProperties": false,
+          "description": "A number kept as written, because reading it as an `i64` or `f64` would change it:\n`1.10` (an `f64` prints `1.1`), `1e3`, `-0`, or an integer too large for an `i64`."
+        },
+        {
+          "type": "object",
+          "properties": {
+            "Text": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "Text"
+          ],
+          "additionalProperties": false
+        }
+      ],
+      "description": "The scalar values a document can hold."
+    },
+    "BinaryOp": {
+      "type": "string",
+      "enum": [
+        "Add",
+        "Sub",
+        "Eq",
+        "Ne",
+        "Lt",
+        "Le",
+        "Gt",
+        "Ge",
+        "And",
+        "Or"
+      ],
+      "description": "A binary operator in an expression.\n\n`+` and `-` are written with white space on both sides: `-` is also part of a name\n(`daily-note`), so `a-b` is one name and `a - b` is a subtraction. The other arithmetic is\nfunctions (`mul`, `div`, `mod`), and there is no `!` (`not`). `&&` and `||` are the only\noperators that may skip their right-hand side, which is why they are symbols and not functions.\n\nPrecedence, tightest first: the postfix forms, additive, comparison, `&&`, `||`, then `=>`."
+    },
+    "Span": {
+      "type": "object",
+      "properties": {
+        "start": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0,
+          "description": "Byte offset of the first byte."
+        },
+        "end": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0,
+          "description": "Byte offset one past the last byte."
+        }
+      },
+      "required": [
+        "start",
+        "end"
+      ],
+      "description": "A source span: a range of byte offsets into the text it was parsed from.\n\nA span deliberately holds no line or column. Those are a view of the source\ntext, not a property of the node, and computing them while parsing made\nevery node cost a rescan of everything before it. Resolve them on demand\nwith `LineIndex`."
+    },
+    "Value": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "Scalar": {
+              "$ref": "#/$defs/Scalar"
+            }
+          },
+          "required": [
+            "Scalar"
+          ],
+          "additionalProperties": false,
+          "description": "A scalar value: `none`, `auto`, a boolean, an integer, a float,\na number kept as written, or text. See `Scalar`."
+        },
+        {
+          "type": "object",
+          "properties": {
+            "Tuple": {
+              "$ref": "#/$defs/Tuple"
+            }
+          },
+          "required": [
+            "Tuple"
+          ],
+          "additionalProperties": false,
+          "description": "`(a, b, k: v)` -- an ordered run of entries, each with a\nname or without one. `()` is the empty tuple and `(x)` is a tuple with\none unnamed entry. See `Tuple`."
+        },
+        {
+          "type": "object",
+          "properties": {
+            "Call": {
+              "type": "array",
+              "prefixItems": [
+                {
+                  "type": "string"
+                },
+                {
+                  "$ref": "#/$defs/Tuple"
+                }
+              ],
+              "minItems": 2,
+              "maxItems": 2
+            }
+          },
+          "required": [
+            "Call"
+          ],
+          "additionalProperties": false,
+          "description": "`name(a, b, ...)` -- a call the parser did not resolve: a head and its\nfields.\n\nThe parser resolves the literal constructors (`string`, `int`, `float`)\nto the plain value they stand for. Every other callee -- `list` (a\ntype: `list(string)`), `enum`, a typo -- is kept here as an\nuninterpreted `String`, the same way the parser never judges a\n`::name(...)` connect's name; only `tomet-semantics` knows which of\nthose are real. `list(a, b)` is not a tuple literal: write `(a, b)`.\n\nDeliberately not the same mechanism as `$func(args)`'s\n`InterpExprKind::Call`: that callee can itself be a path\nexpression and is evaluated later, while this is a literal fixed\nat parse time. Sharing surface syntax (`name(args)`) is coincidence,\nnot kinship -- conflating the two would blur which one is\nevaluated for a reader of either."
+        },
+        {
+          "type": "object",
+          "properties": {
+            "Interp": {
+              "$ref": "#/$defs/Interpolation"
+            }
+          },
+          "required": [
+            "Interp"
+          ],
+          "additionalProperties": false,
+          "description": "`{$ ... }` / `$name(...)` sitting where a value goes -- evaluated later,\nso `tomet-semantics` never looks inside it as data. See `Interpolation`."
+        },
+        {
+          "type": "object",
+          "properties": {
+            "Hole": {
+              "$ref": "#/$defs/Hole"
+            }
+          },
+          "required": [
+            "Hole"
+          ],
+          "additionalProperties": false,
+          "description": "A `<?matcher(...)>` hole sitting where a value goes. See `Hole`."
+        },
+        {
+          "type": "object",
+          "properties": {
+            "TypeSeat": {
+              "$ref": "#/$defs/TypeSeat"
+            }
+          },
+          "required": [
+            "TypeSeat"
+          ],
+          "additionalProperties": false,
+          "description": "A `<$type(...)>` seat sitting where a value goes. See `TypeSeat`."
+        },
+        {
+          "type": "object",
+          "properties": {
+            "Element": {
+              "$ref": "#/$defs/Element"
+            }
+          },
+          "required": [
+            "Element"
+          ],
+          "additionalProperties": false,
+          "description": "A real, `@`-sigiled element sitting where a value goes --\n`::meta(icon: @doc.icon(\"triangle\"))`. Unlike `Value::Call`, this\nis the same `Element` any other position produces: it has a\n`name`, classifies and validates through `Bindings` like any other\nelement (an unregistered name is still an error here), and can\nitself carry `args`/`content`/`value`. What distinguishes it from a\ncall is exactly the `@` -- a call is inert, uninterpreted data\n(`tomet-semantics` never looks inside a `Value::Call`); an embedded\nelement is a first-class element that happens to sit in a value\nslot, which is why `Entry::Element` already lets one stand\nas a bare, keyless entry in a `{...}` group -- this variant is what\nlets the same thing be a named `key: @name(...)` value, or an\nunnamed entry in a tuple, too, since `Value` is the type those\npositions share.\n\nParsed with `allow_colon_connect: false`, same as\n`Entry::Element` -- `::name(...)` stays unavailable inside\nany value position, deliberately: a `{...}`/`(...)` group is data,\nand a connect changes what the *enclosing* element means, which\nhas no sense for an element that is itself sitting inside a value."
+        },
+        {
+          "type": "object",
+          "properties": {
+            "Blocks": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Block"
+              }
+            }
+          },
+          "required": [
+            "Blocks"
+          ],
+          "additionalProperties": false,
+          "description": "`key: [ ... ]` -- block content (the same grammar as\nan element's own `[content]`/`|content` slot, see\n`tmtroot/docs/spec/feature/content-shape.tmt`) sitting as a named\nvalue inside `(args)`/`{data}`, e.g. `@conflict(a: [ ... ], b: [\n... ])`. `[...]` means block content uniformly at any\nvalue position, as it does at the element level; a tuple is\n`(a, b)`, and `[a, b]` is not a list literal."
+        }
+      ],
+      "description": "What can stand where a value goes: a scalar, a tuple, or a node the parser keeps for a\nlater layer (a call, an interpolation, a hole, a type seat, an element, block content).\n\nA scalar value is held in `Value::Scalar`, wrapping `Scalar`.\n\n**Wire**\n\nOn the wire a `Value` is what every other AST node is: an externally tagged enum, a variant name\nand its payload, and it reads back as exactly the variant that was written.\n`Value::Scalar(Scalar::Int(1))` is `{\"Scalar\":{\"Int\":1}}`, `Value::Call(\"enum\", args)` is\n`{\"Call\":[\"enum\", <Tuple>]}`, and a `Value::TypeSeat` and a `Value::Interp` are as\ndifferent on the wire as they are in memory. Nothing is lost and nothing is ambiguous, which is\nwhat a document needs that is handed to another process and handed back.\n\nA data consumer that wants `null`, numbers, strings, arrays and objects, and accepts losing\nwhat those cannot say, reads the plain-data projection instead: `Value::to_plain`."
+    },
+    "Interpolation": {
+      "type": "object",
+      "properties": {
+        "expr": {
+          "$ref": "#/$defs/InterpExpr"
+        },
+        "span": {
+          "$ref": "#/$defs/Span"
+        }
+      },
+      "required": [
+        "expr",
+        "span"
+      ],
+      "description": "An interpolation: an expression to be evaluated where it stands. It is written in one of three\nspellings, told apart by what the expression is (`InterpSpelling`): `{$ expr }` for any\nexpression, `$(ref)` for one reference, `$name(args)` for one call.\n\nIt is not an `Element`: it has no name, no `(args)` / `[content]` and no\n`#(id)`, and it never takes a `::connect`. It holds an expression and the\nspan of the whole `$`-form, and nothing else. It sits in three places, as\n`Block::Interp`, `Inline::Interp` and `Value::Interp`."
+    },
+    "Hole": {
+      "type": "object",
+      "properties": {
+        "matcher": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Name"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "placement": {
+          "$ref": "#/$defs/Placement"
+        },
+        "data": {
+          "$ref": "#/$defs/Data"
+        },
+        "content": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "$ref": "#/$defs/Block"
+          }
+        },
+        "span": {
+          "$ref": "#/$defs/Span"
+        }
+      },
+      "required": [
+        "matcher",
+        "placement",
+        "data",
+        "content",
+        "span"
+      ],
+      "description": "A `<?matcher(name, args){options}>[content]` hole: the description of a value that is\nnot there yet, in a pattern.\n\nIt is a box, `<...>`, whose head (the `?` mark, the matcher and the `(args)` and `{options}`\ngroups) is inside and whose `[content]` follows the `>`. Its groups are read by the\nsame code as an element's. Differences: its head is a *matcher*, not an element name, and it is\noptional (`<?>` and `<?(n)>` have none); and it takes no `::connect`. A box that does not close\nor does not fit is text, so ordinary prose such as `本当に?(はい)` or `a < b` is never a hole.\n\nA hole sits where an element sits, so it is a variant of `Block`, `Inline`, `Entry`\nand `Value`, in the same tree a document is: a pattern is written in, and printed as,\nordinary tomet, and `parse_document` reads one like any other construct.\n\nThe matcher is not an element name: `<?meta>` is not the `meta` element. What a matcher\nmeans, and what a hole matches, is the host's (tandr's), not tomet's. See\n`tmtroot/spec/syntax/hole.tmt`."
+    },
+    "Placement": {
+      "type": "string",
+      "enum": [
+        "Block",
+        "Inline"
+      ],
+      "description": "Where an element sits: on its own as a block, or inside running text.\n\nThe parser derives this from position alone -- never from the element's\nname, so the vocabulary-free invariant holds. An element is\n`Placement::Block` when it is in block context (document start, after\na blank line, or after a block closed) *and* it ends its line; anything\nelse is `Placement::Inline`.\n\nIt is recorded rather than implied by the tree because `Element`'s\n`content` is a list of blocks: an element written at a line start inside\nanother element's `[content]` is a block, and this field is the only\nplace that survives.\n\nThis is placement, not shape. Which shape an element is *allowed* to\ntake is a vocabulary question, answered by `tomet-semantics`'\n`required_shape` and checked against this field by `shape_mismatch`."
+    },
+    "Block": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "Paragraph": {
+              "$ref": "#/$defs/Paragraph"
+            }
+          },
+          "required": [
+            "Paragraph"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "Element": {
+              "$ref": "#/$defs/Element"
+            }
+          },
+          "required": [
+            "Element"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "Section": {
+              "$ref": "#/$defs/Section"
+            }
+          },
+          "required": [
+            "Section"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "List": {
+              "$ref": "#/$defs/List"
+            }
+          },
+          "required": [
+            "List"
+          ],
+          "additionalProperties": false,
+          "description": "A `-`/`-.` list, first-class like `Section` rather than encoded as\na named `Element`. See `List`."
+        },
+        {
+          "type": "object",
+          "properties": {
+            "Hole": {
+              "$ref": "#/$defs/Hole"
+            }
+          },
+          "required": [
+            "Hole"
+          ],
+          "additionalProperties": false,
+          "description": "A `<?matcher(...)>` hole standing as a block. See `Hole`."
+        },
+        {
+          "type": "object",
+          "properties": {
+            "TypeSeat": {
+              "$ref": "#/$defs/TypeSeat"
+            }
+          },
+          "required": [
+            "TypeSeat"
+          ],
+          "additionalProperties": false,
+          "description": "A `<$type(...)>` seat standing as a block. See `TypeSeat`."
+        },
+        {
+          "type": "object",
+          "properties": {
+            "Interp": {
+              "$ref": "#/$defs/Interpolation"
+            }
+          },
+          "required": [
+            "Interp"
+          ],
+          "additionalProperties": false,
+          "description": "A `{$ ... }` that stands alone on its line, in block context. It is a\nblock of its own, and not a one-item paragraph, because what it\nevaluates to may be blocks (an include, a generated table)."
+        }
+      ]
+    },
+    "Paragraph": {
+      "type": "object",
+      "properties": {
+        "content": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Inline"
+          }
+        },
+        "span": {
+          "$ref": "#/$defs/Span"
+        }
+      },
+      "required": [
+        "content",
+        "span"
+      ]
+    },
+    "Inline": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "Text": {
+              "$ref": "#/$defs/Text"
+            }
+          },
+          "required": [
+            "Text"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "Element": {
+              "$ref": "#/$defs/Element"
+            }
+          },
+          "required": [
+            "Element"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "Interp": {
+              "$ref": "#/$defs/Interpolation"
+            }
+          },
+          "required": [
+            "Interp"
+          ],
+          "additionalProperties": false,
+          "description": "`{$ ... }` / `$name(...)` inside running text. See `Interpolation`."
+        },
+        {
+          "type": "object",
+          "properties": {
+            "Hole": {
+              "$ref": "#/$defs/Hole"
+            }
+          },
+          "required": [
+            "Hole"
+          ],
+          "additionalProperties": false,
+          "description": "A `<?matcher(...)>` hole inside running text. See `Hole`."
+        },
+        {
+          "type": "object",
+          "properties": {
+            "TypeSeat": {
+              "$ref": "#/$defs/TypeSeat"
+            }
+          },
+          "required": [
+            "TypeSeat"
+          ],
+          "additionalProperties": false,
+          "description": "A `<$type(...)>` seat inside running text. See `TypeSeat`."
+        },
+        {
+          "type": "object",
+          "properties": {
+            "SoftBreak": {
+              "$ref": "#/$defs/SoftBreak"
+            }
+          },
+          "required": [
+            "SoftBreak"
+          ],
+          "additionalProperties": false,
+          "description": "A source line break that is semantically whitespace. Unlike\nfolding it into a literal `' '` (or nothing, between two\nEast-Asian-wide characters) at parse time, this keeps the break's\nexistence in the tree instead of destroying it -- there is no way to\nrecover \"the author wrapped a line\" from a plain space once it has\nbeen baked into a `Text.value`. How it is realized (a space, a literal\nnewline, nothing) is left to whichever consumer renders the tree, the\nsame way CommonMark's own softbreak leaves that choice to the\nrenderer."
+        },
+        {
+          "type": "object",
+          "properties": {
+            "LineBreak": {
+              "$ref": "#/$defs/LineBreak"
+            }
+          },
+          "required": [
+            "LineBreak"
+          ],
+          "additionalProperties": false,
+          "description": "A real forced line break: always rendered as one, never folded."
+        },
+        {
+          "type": "object",
+          "properties": {
+            "Raw": {
+              "$ref": "#/$defs/RawText"
+            }
+          },
+          "required": [
+            "Raw"
+          ],
+          "additionalProperties": false,
+          "description": "Verbatim text that may legitimately contain `'\\n'`/`'\\r'` (currently\nonly fenced code block bodies). Kept as its own variant so `Text`\ncarries a real invariant: it never contains a raw newline."
+        }
+      ]
+    },
+    "Text": {
+      "type": "object",
+      "properties": {
+        "value": {
+          "type": "string"
+        },
+        "span": {
+          "$ref": "#/$defs/Span"
+        }
+      },
+      "required": [
+        "value",
+        "span"
+      ],
+      "description": "A run of prose text, folded from source the way any wrapped inline\ncontent is. Invariant: `value` never contains `'\\n'` or `'\\r'` -- a source\nline break becomes an `Inline::SoftBreak` or `Inline::LineBreak`\ninstead of a character here. Verbatim text that may contain real newlines\n(code block bodies) is `RawText`, not this."
+    },
+    "Element": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "$ref": "#/$defs/Name",
+          "description": "The name after `@`. It is mandatory: a nameless `@(url:...)` is not an element,\nbecause a kind is not inferred from a key in the args."
+        },
+        "placement": {
+          "$ref": "#/$defs/Placement"
+        },
+        "data": {
+          "$ref": "#/$defs/Data"
+        },
+        "content": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "$ref": "#/$defs/Block"
+          },
+          "description": "`[content]` / `|content`, parsed with the exact same recursive block\ngrammar as `file.body`/`Section.blocks`: a bare run with no\nblock markers becomes `[Paragraph(...)]`, and blank lines, `=[...]`\nheadings, lists etc. inside the brackets/pipe-run nest as their own\n`Block`s, same as at the top level. Whether a *given* element's\nvocabulary actually permits more than one block (or anything beyond\ninline-shaped content) here is not this field's concern -- the\nparser builds this uniformly, with no branch on the element's name,\nand `tomet-semantics` enforces legality downstream (builtin\ncontent-shape table for `BUILTIN_KINDS`, `@content{allow:}` for a\nvocabulary's own elements). See `tmtroot/docs/spec/feature/\ncontent-shape.tmt`."
+        },
+        "id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Id"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "connects": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Connect"
+          }
+        },
+        "span": {
+          "$ref": "#/$defs/Span"
+        }
+      },
+      "required": [
+        "name",
+        "placement",
+        "data",
+        "content",
+        "id",
+        "connects",
+        "span"
+      ],
+      "description": "An `@name(args)[content]{value}` element.\n\nThe one element sigil is `@`; it says \"an element starts here\" and nothing\nelse. Whether the element stands as a block or belongs to a paragraph is\n`Placement`, which the parser derives from position, and origin is\ncarried by `Name`'s namespace. Two other axes would carry no\ninformation: `<T>` vs `@name` (official vs user-defined, but both\nclassified through the same arm) and `#name` vs `@name` (shape, which\n`tomet-semantics`' `required_shape` already knew). `#(id)` is not a second\nsigil either: it is `Element::id`, a slot in the element's own groups.\n\nA node that has no name of its own, a plain list item, is not an element at all.\n\n`(args)` / `[content]` / `{value}`, each optional and at most one of each,\nin any order in the source.\n\n`id` is a single slot, written `#(foobar)`, read after those three\ngroups but strictly before any connect -- see `Id`.\n\n`connects` is unrelated to those three: it is the `::name(...)` family\nstacked after them (`@x(...)::as(y)::rule(...)`), zero or more, each a\n`Connect`. Order-preserving, empty when nothing follows."
+    },
+    "Id": {
+      "type": "string",
+      "description": "An element's own id, written `#(foobar)` right after its own\n`(args)[content]{value}` groups and before any `::name(...)` connect.\n\nA plain `String`, not `Value`: `#(...)` is parsed with a narrower,\nscalar-only grammar (a bare identifier-like token or a quoted\nstring) than the general value grammar `(args)`/`{value}` use, so a\ntuple or call can never end up here -- unlike `Name`, there is no\nnamespace concept for an id. No ASCII restriction, unlike `Name`:\nthe content is a value, not a structural identifier, so it is as\nfree as any other string value (e.g. `@line(天音かなた)` elsewhere in\nthis codebase already allows non-ASCII value text)."
+    },
+    "Connect": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "$ref": "#/$defs/Name"
+        },
+        "data": {
+          "$ref": "#/$defs/Data"
+        },
+        "content": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "$ref": "#/$defs/Block"
+          }
+        },
+        "span": {
+          "$ref": "#/$defs/Span"
+        }
+      },
+      "required": [
+        "name",
+        "data",
+        "content",
+        "span"
+      ],
+      "description": "A `::name(...)` connect stacked after an element, a section or a list\n(`@x(...)::as(y)::rule(...)`): metadata about its owner, not content of the\ndocument. It takes `(args)`, `[content]` and `{value}` like an element does,\nand nothing else: no `#(id)` (an id belongs to the owner, written before the\nfirst connect), no connects of its own, and no placement."
+    },
+    "SoftBreak": {
+      "type": "object",
+      "properties": {
+        "span": {
+          "$ref": "#/$defs/Span"
+        }
+      },
+      "required": [
+        "span"
+      ]
+    },
+    "LineBreak": {
+      "type": "object",
+      "properties": {
+        "span": {
+          "$ref": "#/$defs/Span"
+        }
+      },
+      "required": [
+        "span"
+      ]
+    },
+    "RawText": {
+      "type": "object",
+      "properties": {
+        "value": {
+          "type": "string"
+        },
+        "span": {
+          "$ref": "#/$defs/Span"
+        }
+      },
+      "required": [
+        "value",
+        "span"
+      ],
+      "description": "Verbatim text, captured byte-for-byte from source. See\n`Inline::Raw` for why this is a separate type from `Text`."
+    },
+    "Section": {
+      "type": "object",
+      "properties": {
+        "level": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "title": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Inline"
+          }
+        },
+        "data": {
+          "$ref": "#/$defs/Data"
+        },
+        "id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Id"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "connects": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Connect"
+          }
+        },
+        "blocks": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Block"
+          }
+        },
+        "span": {
+          "$ref": "#/$defs/Span"
+        }
+      },
+      "required": [
+        "level",
+        "title",
+        "data",
+        "id",
+        "connects",
+        "blocks",
+        "span"
+      ],
+      "description": "A hierarchical section: introduced by `=`, `==`, etc.\n\nContains its nesting level (`=` is 1, `==` is 2, etc.), title inlines,\noptional arguments (`(id: intro)`), optional value group (`{attrs}`),\nconnects (`::as(...)`), and child blocks (paragraphs, lists, sub-sections)\nscoped to this section."
+    },
+    "List": {
+      "type": "object",
+      "properties": {
+        "ordered": {
+          "type": "boolean"
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ListItem"
+          }
+        },
+        "id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Id"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "connects": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Connect"
+          }
+        },
+        "span": {
+          "$ref": "#/$defs/Span"
+        }
+      },
+      "required": [
+        "ordered",
+        "items",
+        "id",
+        "connects",
+        "span"
+      ],
+      "description": "A `-` (unordered) or `-.` (ordered) list: first-class, like `Section`,\nrather than a named `Element` holding bare sub-`Element`s.\n\nNo `args`/`content`/`value`, unlike `Section` -- none of the three had a\nconcrete use case (a caption for the whole list, attrs on the list as a\nwhole, an ordered list's starting number) when this type was designed;\nadd one later if a real want surfaces, with the use case stated\nalongside the field. `id`/`connects` were kept: `id` mirrors `Section`'s\nown anchor-reference use (`#(id)` on the whole list), and `connects` is\nwhat a `::rule(allow:(...))` attached to the list itself (restricting\nwhat its own items may be) needs to live on."
+    },
+    "ListItem": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Name"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The element's name for the combine notation `-@name(...)`; `null` for a plain `- content`."
+        },
+        "data": {
+          "$ref": "#/$defs/Data"
+        },
+        "content": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Block"
+          }
+        },
+        "id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Id"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "connects": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Connect"
+          }
+        },
+        "sublist": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/List"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "span": {
+          "$ref": "#/$defs/Span"
+        }
+      },
+      "required": [
+        "name",
+        "data",
+        "content",
+        "id",
+        "connects",
+        "sublist",
+        "span"
+      ],
+      "description": "One item of a `List`: a plain `- content`, or `-@name(...) content`\n(the combine notation), which is the item *and* an element of that name.\n\nIt takes the groups an element does -- `(args)` is the item's marker,\n`{value}` its attributes, `#(id)` and `::connect`s -- and its `content` is\nalways there (possibly empty). It has no placement: an item is always a\nblock of its own list. `name` is `None` for a plain item and the element's\nname for the combine notation.\n\n`sublist` is the one genuinely new thing: an indented list directly\nbelow this item. Typed as a list, not as blocks,\nbecause the parser only ever produces one specific shape here (another\nlist) -- giving it its own field makes that a compiler-checked fact\ninstead of a convention."
+    },
+    "Group": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/Entry"
+      },
+      "description": "The entries of a `{...}` group, in source order.\n\n`{...}` is always data: it parses uniformly into `Entry` items in\nsource order, whatever the element is called. \"Is this a data group or a\nlist of children?\" is not a parse-time branch -- it is a view\ncomputed downstream in `tomet-semantics`, which is what lets the parser\nbuild the tree without consulting any element vocabulary.\n\nA group holds a source-order sequence of entries\nand provides named-entry operations exclusively for `Entry::Pair` entries.\nNon-pair entries (`Entry::Element`, `Entry::Hole`) are\nhandled directly by callers through exhaustive pattern matching."
+    },
+    "Entry": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "Pair": {
+              "type": "array",
+              "prefixItems": [
+                {
+                  "type": "string"
+                },
+                {
+                  "$ref": "#/$defs/Value"
+                }
+              ],
+              "minItems": 2,
+              "maxItems": 2
+            }
+          },
+          "required": [
+            "Pair"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "Element": {
+              "$ref": "#/$defs/Element"
+            }
+          },
+          "required": [
+            "Element"
+          ],
+          "additionalProperties": false,
+          "description": "A named entry, `@name(...)`."
+        },
+        {
+          "type": "object",
+          "properties": {
+            "Hole": {
+              "$ref": "#/$defs/Hole"
+            }
+          },
+          "required": [
+            "Hole"
+          ],
+          "additionalProperties": false,
+          "description": "A `<?matcher(...)>` hole standing as an entry. See `Hole`."
+        }
+      ],
+      "description": "One entry inside an element's `{value}` group: either a `key: value`\npair or a nested element.\n\n`Pair` is a named entry (`key: value`), which lets the data view be\nrebuilt as a `Tuple` from a group without copying any other structure."
+    },
+    "TocItem": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "The `id` of the heading, to link to it with `#id`."
+        },
+        "level": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0,
+          "description": "The level of the heading: 2 or 3."
+        },
+        "text": {
+          "type": "string",
+          "description": "The text of the heading, without its number."
+        }
+      },
+      "required": [
+        "id",
+        "level",
+        "text"
+      ],
+      "description": "An entry in the document's table of contents."
+    },
+    "Diagnostic": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "string",
+          "description": "What kind of finding it is, in lower case with hyphens: `unknown-element`, `dangling-anchor`,\n`draft`, `unresolved-link`, `unresolved-expression`. Stable: a tool can tell findings apart by it."
+        },
+        "severity": {
+          "$ref": "#/$defs/Severity",
+          "description": "How much it matters."
+        },
+        "message": {
+          "type": "string",
+          "description": "What it says, in words, for a person."
+        },
+        "span": {
+          "$ref": "#/$defs/Span",
+          "description": "Where it is, as a range of bytes of the source."
+        },
+        "start": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Position"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Where it starts, as a line and a column. `null` when the document was given as a tree and not as\ntext, so there is no text to count in."
+        },
+        "end": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Position"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Where it ends, as a line and a column. `null` as `start` is."
+        }
+      },
+      "required": [
+        "code",
+        "severity",
+        "message",
+        "span",
+        "start",
+        "end"
+      ],
+      "description": "Something wrong with a document, or something it says about itself: what `tomet check` reports,\nplus the links a page could not be given a target for.\n\nWhat found it does not matter to whoever reads it: a document that does not read as the\nvocabulary says, a link that goes nowhere and an expression that has no value all come as this."
+    },
+    "Severity": {
+      "oneOf": [
+        {
+          "type": "string",
+          "const": "error",
+          "description": "The document is wrong."
+        },
+        {
+          "type": "string",
+          "const": "warning",
+          "description": "The document says something about itself, or leaves something unresolved, that a reader\nshould see; it is otherwise fine. `@draft`, `@fixme` and an expression that has no value are\nwarnings."
+        }
+      ],
+      "description": "How much a diagnostic matters."
+    },
+    "Position": {
+      "type": "object",
+      "properties": {
+        "line": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0,
+          "description": "The line, counted from 1."
+        },
+        "column": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0,
+          "description": "The column, counted from 1, in characters."
+        }
+      },
+      "required": [
+        "line",
+        "column"
+      ],
+      "description": "A place in the source, as a person counts it."
+    },
+    "Registry": {
+      "type": "object",
+      "properties": {
+        "vocabularies": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "The vocabulary documents, as paths from the directory of the config."
+        },
+        "dictionaries": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "The dictionary documents, as paths from the directory of the config."
+        },
+        "blueprints": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "The blueprint documents, as paths from the directory of the config."
+        }
+      },
+      "required": [
+        "vocabularies",
+        "dictionaries",
+        "blueprints"
+      ],
+      "description": "The files the vault registers, which a host reads to make the `VaultSources` of it."
+    },
+    "HighlightSpan": {
+      "type": "object",
+      "properties": {
+        "from": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0,
+          "description": "Where the range starts."
+        },
+        "to": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0,
+          "description": "Where the range ends, exclusive."
+        },
+        "tag": {
+          "type": "string",
+          "description": "What the range is: `heading`, `bracket`, `tagName`, `string`, ..."
+        },
+        "depth": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0,
+          "description": "How deep the range is nested in brackets."
+        }
+      },
+      "required": [
+        "from",
+        "to",
+        "tag",
+        "depth"
+      ],
+      "description": "A range of the source to color. Offsets are bytes of the source."
+    }
+  }
+}

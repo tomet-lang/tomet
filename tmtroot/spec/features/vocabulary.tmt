@@ -58,7 +58,7 @@ vocabulary は、文書やデータが使える名前と、それぞれが取る
 |[ `about`     ][ なし  ][ 要素の散文。検査は読まない ]
 
 `content` の `allow:` は、`(a, b)`（この名前だけ）、`inline`（段落一つだけ）、
-`any` のいずれか。詳細は @link[`content-shape.tmt`](file:spec/features/content-shape.tmt)。
+`any` のいずれか。詳細は @link[`content-shape.tmt`](file:tmtroot/spec/features/content-shape.tmt)。
 
 要素は本文に置くもので、置き場所を選ぶフィールドは無い。文書の先頭に書くものは属性として宣言する。
 知らないフィールド（`region` もその一つ）は、語彙を読むときに `tomet check` が報告する。

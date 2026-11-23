@@ -1,0 +1,26 @@
+[package]
+name                 = "tomet-binding"
+version.workspace    = true
+edition.workspace    = true
+description          = "What the language bindings hand out and take: a vault to read documents in, the processed document, and the diagnostics about it."
+license.workspace    = true
+repository.workspace = true
+publish              = false
+
+[features]
+# `JsonSchema` for the types that cross the boundary: what `tomet spec ast-schema` writes the
+# binding schema from.
+schema = ["dep:schemars", "tomet-ast/schema", "tomet-span/schema"]
+
+[dependencies]
+tomet = { workspace = true, features = ["html", "highlight", "links"] }
+tomet-ast      = { workspace = true }
+tomet-eval     = { workspace = true }
+tomet-links    = { workspace = true }
+tomet-position = { workspace = true }
+tomet-span     = { workspace = true }
+tomet-transform = { workspace = true }
+#--- Crates.io ---
+regex    = { workspace = true }
+schemars = { workspace = true, optional = true }
+serde    = { workspace = true }

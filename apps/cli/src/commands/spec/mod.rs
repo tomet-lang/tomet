@@ -20,11 +20,13 @@ pub enum SpecTarget {
     Cli,
     /// Vault and document configuration schema derived from tomet-config domain models.
     Config,
-    /// JSON Schemas of the AST wire format and of plain data (`ast.schema.json`, `plain.schema.json`),
-    /// derived from the AST types. `--out` is the directory to write them to; not part of `--all`.
+    /// JSON Schemas of the AST wire format, of plain data and of what the bindings hand out
+    /// (`ast.schema.json`, `plain.schema.json`, `binding.schema.json`), derived from the Rust types.
+    /// `--out` is the directory to write them to; not part of `--all`.
     AstSchema,
-    /// TypeScript declarations of the AST wire format and of plain data (`ast.d.ts`), generated from the
-    /// JSON Schemas. `--out` is the directory to write it to; not part of `--all`.
+    /// TypeScript declarations of the AST wire format and of plain data (`ast.d.ts`) and of what the
+    /// bindings hand out (`binding.d.ts`), generated from the JSON Schemas. `--out` is the directory to
+    /// write them to; not part of `--all`.
     AstTypes,
 }
 
@@ -62,7 +64,7 @@ pub fn spec_cmd(
     write_or_check(&out_path, &rendered, check, &regenerate)
 }
 
-/// Writes (or checks) the schema documents of the AST into the directory `out`.
+/// Writes (or checks) the schema documents of the AST and of the bindings into the directory `out`.
 fn ast_schema_cmd(out: Option<&Path>, check: bool) -> anyhow::Result<()> {
     let Some(out) = out else {
         anyhow::bail!(
@@ -76,17 +78,22 @@ fn ast_schema_cmd(out: Option<&Path>, check: bool) -> anyhow::Result<()> {
     Ok(())
 }
 
-/// Writes (or checks) the TypeScript declarations of the AST into the directory `out`.
+/// Writes (or checks) the TypeScript declarations of the AST and of the bindings into the directory `out`.
 fn ast_types_cmd(out: Option<&Path>, check: bool) -> anyhow::Result<()> {
     let Some(out) = out else {
         anyhow::bail!(
             "`ast-types` writes a file next to the bindings: give the directory with --out <DIR>"
         );
     };
-    let text =
-        ast_types::render().map_err(|e| anyhow::anyhow!("cannot generate the types: {e}"))?;
     let regenerate = format!("tomet spec ast-types --out {}", out.display());
-    write_or_check(&out.join(ast_types::FILE), &text, check, &regenerate)
+    for (file, rendered) in [
+        (ast_types::FILE, ast_types::render()),
+        (ast_types::BINDING_FILE, ast_types::render_binding()),
+    ] {
+        let text = rendered.map_err(|e| anyhow::anyhow!("cannot generate {file}: {e}"))?;
+        write_or_check(&out.join(file), &text, check, &regenerate)?;
+    }
+    Ok(())
 }
 
 fn generate_all(out_dir: &Path, check: bool) -> anyhow::Result<()> {

@@ -5,6 +5,7 @@ members = [
   "apps/cli",
   "apps/lsp",
   #--- Bindings ---
+  "bindings/core",
   "bindings/java",
   "bindings/js",
   "bindings/python",
@@ -194,6 +195,8 @@ tomet-links       = { path = "crates/tomet-workspace-links", version = "0.5.0", 
 tomet-load        = { path = "crates/tomet-load", version = "0.5.0" }
 tomet-load-config = { path = "crates/tomet-load-config", version = "0.5.0" }
 tomet-workspace   = { path = "crates/tomet-workspace", version = "0.5.0" }
+#--- Bindings ---
+tomet-binding = { path = "bindings/core", version = "0.5.0" }
 #---
 serde_cotomet       = { path = "crates/serde_cotomet", version = "0.5.0" }
 tree-sitter-cotomet = { path = "crates/tree-sitter-cotomet", version = "0.5.0" }

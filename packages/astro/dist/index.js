@@ -1,7 +1,9 @@
+import { createHash } from "node:crypto";
 import { existsSync, promises as fs } from "node:fs";
+import { createRequire } from "node:module";
 import { basename, dirname, isAbsolute, join, normalize, relative, resolve, } from "node:path";
 import { fileURLToPath } from "node:url";
-import initWasm, { processFile, setVaultFiles, } from "@tomet/wasm";
+import initWasm, { Vault, processFile, vaultRegistry, } from "@tomet/wasm";
 let wasmReady = null;
 /**
  * Ensures the WebAssembly engine is loaded and initialized.
@@ -41,6 +43,27 @@ export function declaredKind(header) {
     return scalar !== null && typeof scalar === "object" && "Text" in scalar
         ? scalar.Text
         : null;
+}
+/**
+ * What a strict load throws: every problem found, one per line, with where it is.
+ */
+export class TometLoaderError extends Error {
+    problems;
+    constructor(collection, problems) {
+        const files = new Set(problems.map((p) => p.path)).size;
+        const lines = problems.map((p) => `  ${describe(p)}`);
+        super(`${problems.length} problem(s) in ${files} file(s) of the "${collection}" collection:\n${lines.join("\n")}`);
+        this.name = "TometLoaderError";
+        this.problems = problems;
+        // The message is the whole report; a stack through the loader adds only noise to it.
+        this.stack = `${this.name}: ${this.message}`;
+    }
+}
+function describe(problem) {
+    const at = problem.line === null
+        ? problem.path
+        : `${problem.path}:${problem.line}:${problem.column ?? 1}`;
+    return `${at}: ${problem.severity} ${problem.code}: ${problem.message}`;
 }
 /**
  * Resolves a raw asset reference (e.g. `@link(ref:+hash.png)`, `+hash.png`, `https://...`)
@@ -143,6 +166,44 @@ async function scanVault(dir, baseDir = dir) {
     return { allFiles, docFiles };
 }
 /**
+ * What identifies the renderer: a hash of the WebAssembly module. The version of the package says
+ * nothing (it does not change from one revision of Tomet to the next), the bytes do.
+ */
+let rendererKey = null;
+function rendererIdentity() {
+    rendererKey ??= (async () => {
+        const wasm = createRequire(import.meta.url).resolve("@tomet/wasm/wasm");
+        return createHash("sha256")
+            .update(await fs.readFile(wasm))
+            .digest("hex");
+    })();
+    return rendererKey;
+}
+/** A line and column out of the `2:5: expected ')'` a document that does not parse is thrown as. */
+function parseProblem(path, err) {
+    const text = err?.message ?? String(err);
+    const at = /^(\d+):(\d+): ([\s\S]*)$/.exec(text);
+    return {
+        path,
+        line: at ? Number(at[1]) : null,
+        column: at ? Number(at[2]) : null,
+        severity: "error",
+        code: "parse-error",
+        message: at ? at[3] : text,
+    };
+}
+/** The problems a document's diagnostics are, in the file they are in. */
+function problemsOf(path, diagnostics) {
+    return diagnostics.map((d) => ({
+        path,
+        line: d.start?.line ?? null,
+        column: d.start?.column ?? null,
+        severity: d.severity,
+        code: d.code,
+        message: d.message,
+    }));
+}
+/**
  * Astro 5 Content Layer Loader for Tomet documents.
  *
  * ```ts
@@ -156,257 +217,367 @@ async function scanVault(dir, baseDir = dir) {
  *   }),
  * };
  * ```
+ *
+ * =[ Problems ]
+ *
+ * Every problem is found before any is reported: a build fails once, with all of them
+ * (`TometLoaderError`), each with its file, line and column. That includes a document that does not
+ * parse, an empty one, an `@draft`, a link that goes nowhere, and an unknown element, and also a
+ * `base` that is not there and a `filter` that matches nothing. What a site does not want to publish is
+ * left out with `filter`; nothing is skipped silently.
  */
 export function tometLoader(options) {
-    const { base, advanced = true, concurrency = 32, generateId, filter, urlPrefix = "/docs", assetPrefix = "/vault", sourcePathPrefix = "docs", configPath, } = options;
+    const { base, advanced = true, concurrency = 32, filter, urlPrefix = "/docs", assetPrefix = "/vault", sourcePathPrefix = "docs", vault: vaultConfig, basePath = "", sourceUrl, } = options;
     return {
         name: "@tomet/astro-loader",
-        load: async ({ config, store, logger, generateDigest, watcher, }) => {
+        load: async ({ collection, config, store, logger, generateDigest, watcher, }) => {
             await ensureWasm();
+            const strict = options.strict ?? watcher === undefined;
             const rootDir = config.root instanceof URL
                 ? fileURLToPath(config.root)
                 : String(config.root);
             const baseDir = isAbsolute(base) ? base : resolve(rootDir, base);
-            if (!existsSync(baseDir)) {
-                logger.warn(`Tomet loader base directory not found: ${baseDir}`);
-                return;
-            }
-            // Read optional workspace vault.config.tmt
-            const resolvedConfigPath = configPath
-                ? isAbsolute(configPath)
-                    ? configPath
-                    : resolve(rootDir, configPath)
+            const display = (absPath) => {
+                const rel = relative(rootDir, absPath).split("\\").join("/");
+                return rel.startsWith("..") ? absPath : rel;
+            };
+            const configPath = vaultConfig
+                ? isAbsolute(vaultConfig)
+                    ? vaultConfig
+                    : resolve(rootDir, vaultConfig)
                 : join(baseDir, "vault.config.tmt");
-            let workspaceConfig = existsSync(resolvedConfigPath)
-                ? await fs.readFile(resolvedConfigPath, "utf8")
-                : undefined;
-            const configStat = workspaceConfig
-                ? await fs.stat(resolvedConfigPath).catch(() => null)
-                : null;
-            let configKey = configStat ? `${configStat.mtimeMs}` : "";
-            logger.info(`Scanning Tomet documents and assets in ${baseDir}...`);
-            const scanned = await scanVault(baseDir);
-            const allFiles = scanned.docFiles;
-            const matchedFiles = filter
-                ? allFiles.filter((f) => filter(f.relPath))
-                : allFiles;
-            // Pre-build link resolution index once in Wasm memory
-            logger.info(`Building link index for ${scanned.allFiles.length} files...`);
-            setVaultFiles(scanned.allFiles);
-            const allFilesSet = new Set(scanned.allFiles);
-            const assetMap = new Map();
-            for (const f of scanned.allFiles) {
-                const b = basename(f);
-                if (!assetMap.has(b)) {
-                    assetMap.set(b, f);
+            async function build() {
+                const problems = [];
+                const collectionProblem = (path, code, message) => problems.push({
+                    path,
+                    line: null,
+                    column: null,
+                    severity: "error",
+                    code,
+                    message,
+                });
+                if (!existsSync(baseDir)) {
+                    collectionProblem(display(baseDir), "missing-base", "the directory of the documents does not exist");
                 }
-            }
-            const untouchedIds = new Set(store.keys());
-            async function loadEntry(file) {
-                const id = generateId
-                    ? generateId(file)
-                    : file.relPath.replace(/\.(tmt|tm)$/, "");
-                untouchedIds.delete(id);
+                const scanned = await scanVault(baseDir);
+                const docs = filter
+                    ? scanned.docFiles.filter((f) => filter(f.relPath))
+                    : scanned.docFiles;
+                if (docs.length === 0 && existsSync(baseDir)) {
+                    collectionProblem(display(baseDir), "no-documents", "no document of the directory is published: the collection would be empty");
+                }
+                const sources = {
+                    files: scanned.allFiles,
+                    documents: docs.map((d) => d.relPath),
+                    urlPrefix,
+                    assetPrefix,
+                    basePath,
+                    sourceUrl,
+                };
+                const parts = [];
+                const partsText = [];
+                if (existsSync(configPath)) {
+                    parts.push(configPath);
+                    const text = await fs.readFile(configPath, "utf8");
+                    sources.config = text;
+                    partsText.push(text);
+                    const configDir = dirname(configPath);
+                    try {
+                        const registry = vaultRegistry(text);
+                        const read = async (path) => {
+                            const file = resolve(configDir, path);
+                            parts.push(file);
+                            try {
+                                const body = await fs.readFile(file, "utf8");
+                                partsText.push(body);
+                                return body;
+                            }
+                            catch (err) {
+                                collectionProblem(display(file), "unreadable", `registered by ${display(configPath)} but cannot be read: ${err.message}`);
+                                return "";
+                            }
+                        };
+                        sources.vocabularies = {};
+                        for (const path of registry.vocabularies)
+                            sources.vocabularies[path] = await read(path);
+                        sources.dictionaries = {};
+                        for (const path of registry.dictionaries)
+                            sources.dictionaries[path] = await read(path);
+                        // A `.ctmt` blueprint is the schema of a data document, not of a `.tmt`.
+                        sources.blueprints = [];
+                        for (const path of registry.blueprints)
+                            if (!path.endsWith(".ctmt"))
+                                sources.blueprints.push(await read(path));
+                    }
+                    catch (err) {
+                        collectionProblem(display(configPath), "invalid-vault", err.message ?? String(err));
+                    }
+                }
+                else if (vaultConfig) {
+                    collectionProblem(display(configPath), "missing-vault-config", "the vault config does not exist");
+                }
+                let vault;
                 try {
-                    const stat = await fs.stat(file.absPath);
-                    // Skip empty placeholder files
-                    if (stat.size === 0) {
-                        store.delete(id);
-                        return;
-                    }
-                    // Generate digest using mtime, size, and workspace config mtime
-                    const digest = generateDigest(`${stat.mtimeMs}:${stat.size}:${configKey}:v6`);
-                    const existing = store.get(id);
-                    if (existing && existing.digest === digest) {
-                        // Unchanged: cache hit!
-                        return;
-                    }
-                    const content = await fs.readFile(file.absPath, "utf8");
-                    const processed = processFile(content, {
+                    vault = new Vault(sources);
+                }
+                catch (err) {
+                    collectionProblem(display(configPath), "invalid-vault", err.message ?? String(err));
+                    // The problem is reported; the documents are still read, in the vault as far as it is usable.
+                    vault = new Vault({
+                        files: scanned.allFiles,
+                        documents: sources.documents,
+                        urlPrefix,
+                        assetPrefix,
+                        basePath,
+                        sourceUrl,
+                    });
+                }
+                const assetMap = new Map();
+                for (const f of scanned.allFiles) {
+                    const b = basename(f);
+                    if (!assetMap.has(b))
+                        assetMap.set(b, f);
+                }
+                // What an entry was rendered with besides its own text: the files of the vault (a link
+                // depends on which exist, not on the bytes of the file it is in), what the vault is made
+                // of, the renderer, and how it was asked to render.
+                const vaultKey = createHash("sha256")
+                    .update(JSON.stringify({
+                    files: [...scanned.allFiles].sort(),
+                    documents: [...(sources.documents ?? [])].sort(),
+                    parts: partsText,
+                    renderer: await rendererIdentity(),
+                    advanced,
+                    urlPrefix,
+                    assetPrefix,
+                    basePath,
+                    sourceUrl,
+                    sourcePathPrefix,
+                }))
+                    .digest("hex");
+                return {
+                    vault,
+                    vaultKey,
+                    files: new Set(scanned.allFiles),
+                    docs,
+                    assetMap,
+                    parts,
+                    problems,
+                };
+            }
+            let state = await build();
+            /** Reads one document into the store and says what is wrong with it. */
+            async function loadEntry(file, current) {
+                const id = file.relPath.replace(/\.(tmt|tm)$/, "");
+                const path = display(file.absPath);
+                const problem = (code, message) => [
+                    { path, line: 1, column: 1, severity: "error", code, message },
+                ];
+                let content;
+                try {
+                    content = await fs.readFile(file.absPath, "utf8");
+                }
+                catch (err) {
+                    store.delete(id);
+                    return problem("unreadable", err.message);
+                }
+                // A placeholder that says nothing is not a page: it is a document that is missing.
+                if (content.trim() === "") {
+                    store.delete(id);
+                    return problem("empty-document", "the document is empty");
+                }
+                const digest = generateDigest({ content, vault: current.vaultKey });
+                const existing = store.get(id);
+                if (existing && existing.digest === digest) {
+                    // Unchanged: cache hit. What was found is still found.
+                    const found = existing.data.diagnostics ?? [];
+                    return problemsOf(path, found);
+                }
+                let processed;
+                try {
+                    processed = current.vault.processFile(content, {
                         advanced,
                         numberHeadings: advanced,
                         autoSlugHeadings: advanced,
                         currentPath: file.relPath,
-                        urlPrefix,
-                        assetPrefix,
-                        config: workspaceConfig,
-                    });
-                    // `meta` is the plain-data entries of `::meta(...)`: an object, or null without a `::meta`.
-                    // What is not data (`icon: @doc.icon(...)`) is in `processed.header`.
-                    const metaObj = processed.meta;
-                    const fallbackTitle = basename(file.relPath).replace(/\.(tmt|tm)$/, "");
-                    const title = metaObj?.title ?? fallbackTitle;
-                    const section = file.relPath.split("/")[0] ?? "";
-                    const kind = declaredKind(processed.header);
-                    // Resolve banner and images
-                    const fileRelDir = dirname(file.relPath).replace(/\\/g, "/");
-                    let rawBanner = metaObj?.banner;
-                    if (Array.isArray(rawBanner))
-                        rawBanner = rawBanner[0];
-                    const banner = resolveAssetUrl(rawBanner, fileRelDir, assetMap, allFilesSet, assetPrefix);
-                    const rawBannerY = metaObj?.["banner-y"] ?? metaObj?.bannerY;
-                    const bannerY = typeof rawBannerY === "number"
-                        ? rawBannerY
-                        : rawBannerY
-                            ? parseInt(String(rawBannerY), 10)
-                            : null;
-                    let rawImages = [];
-                    if (Array.isArray(metaObj?.images)) {
-                        rawImages = metaObj.images;
-                    }
-                    else if (typeof metaObj?.images === "string") {
-                        rawImages = [metaObj.images];
-                    }
-                    else if (metaObj?.image) {
-                        rawImages = Array.isArray(metaObj.image)
-                            ? metaObj.image
-                            : [metaObj.image];
-                    }
-                    const images = rawImages
-                        .map((img) => resolveAssetUrl(img, fileRelDir, assetMap, allFilesSet, assetPrefix))
-                        .filter((u) => Boolean(u));
-                    let thumbnail = images[0] ?? banner ?? null;
-                    if (!thumbnail && processed.html) {
-                        const match = processed.html.match(/<img[^>]+src=["']([^"']+)["']/i);
-                        if (match) {
-                            thumbnail = match[1];
-                        }
-                    }
-                    let description = metaObj?.description ?? null;
-                    if (!description && processed.html) {
-                        const pMatch = processed.html.match(/<p>([\s\S]*?)<\/p>/i);
-                        if (pMatch) {
-                            const rawSnippet = pMatch[1].replace(/<[^>]+>/g, "").trim();
-                            if (rawSnippet) {
-                                description =
-                                    rawSnippet.length > 200
-                                        ? `${rawSnippet.slice(0, 197)}...`
-                                        : rawSnippet;
-                            }
-                        }
-                    }
-                    let tags;
-                    if (Array.isArray(metaObj?.tags)) {
-                        tags = metaObj.tags.map(String);
-                    }
-                    else if (typeof metaObj?.tags === "string") {
-                        tags = metaObj.tags
-                            .split(",")
-                            .map((t) => t.trim())
-                            .filter(Boolean);
-                    }
-                    const rawDate = metaObj?.date ?? metaObj?.created ?? metaObj?.publishDate;
-                    const date = rawDate ? String(rawDate) : null;
-                    const sourcePath = sourcePathPrefix
-                        ? `${sourcePathPrefix.replace(/\/$/, "")}/${file.relPath}`
-                        : file.relPath;
-                    const entryData = {
-                        ...(metaObj ?? {}),
-                        title,
-                        slug: id,
-                        section,
-                        sourcePath,
-                        toc: processed.toc ?? [],
-                        meta: metaObj,
-                        kind,
-                        isDataOnly: processed.is_data_only,
-                        description,
-                        tags,
-                        date,
-                        banner,
-                        bannerY,
-                        images,
-                        thumbnail,
-                    };
-                    const relToRoot = relative(rootDir, file.absPath)
-                        .split("\\")
-                        .join("/");
-                    store.set({
-                        id,
-                        data: entryData,
-                        body: processed.is_data_only ? content : "",
-                        rendered: {
-                            html: processed.html,
-                        },
-                        filePath: relToRoot,
-                        digest,
                     });
                 }
                 catch (err) {
-                    const msg = err?.message || String(err);
-                    logger.error(`Failed to process Tomet file ${file.absPath}: ${msg}`);
+                    // A document that does not parse has no page; one that did before must not stay.
+                    store.delete(id);
+                    return [parseProblem(path, err)];
+                }
+                // `meta` is the plain-data entries of `::meta(...)`: an object, or null without a `::meta`.
+                // What is not data (`icon: @doc.icon(...)`) is in `processed.header`.
+                const metaObj = processed.meta;
+                const fallbackTitle = basename(file.relPath).replace(/\.(tmt|tm)$/, "");
+                const title = processed.title ?? fallbackTitle;
+                const section = file.relPath.split("/")[0] ?? "";
+                const kind = declaredKind(processed.header);
+                // Resolve banner and images
+                const fileRelDir = dirname(file.relPath).replace(/\\/g, "/");
+                let rawBanner = metaObj?.banner;
+                if (Array.isArray(rawBanner))
+                    rawBanner = rawBanner[0];
+                const banner = resolveAssetUrl(rawBanner, fileRelDir, current.assetMap, current.files, assetPrefix);
+                const rawBannerY = metaObj?.["banner-y"] ?? metaObj?.bannerY;
+                const bannerY = typeof rawBannerY === "number"
+                    ? rawBannerY
+                    : rawBannerY
+                        ? parseInt(String(rawBannerY), 10)
+                        : null;
+                let rawImages = [];
+                if (Array.isArray(metaObj?.images)) {
+                    rawImages = metaObj.images;
+                }
+                else if (typeof metaObj?.images === "string") {
+                    rawImages = [metaObj.images];
+                }
+                else if (metaObj?.image) {
+                    rawImages = Array.isArray(metaObj.image)
+                        ? metaObj.image
+                        : [metaObj.image];
+                }
+                const images = rawImages
+                    .map((img) => resolveAssetUrl(img, fileRelDir, current.assetMap, current.files, assetPrefix))
+                    .filter((u) => Boolean(u));
+                let thumbnail = images[0] ?? banner ?? null;
+                if (!thumbnail && processed.html) {
+                    const match = processed.html.match(/<img[^>]+src=["']([^"']+)["']/i);
+                    if (match) {
+                        thumbnail = match[1];
+                    }
+                }
+                let description = metaObj?.description ?? null;
+                if (!description && processed.html) {
+                    const pMatch = processed.html.match(/<p>([\s\S]*?)<\/p>/i);
+                    if (pMatch) {
+                        const rawSnippet = pMatch[1].replace(/<[^>]+>/g, "").trim();
+                        if (rawSnippet) {
+                            description =
+                                rawSnippet.length > 200
+                                    ? `${rawSnippet.slice(0, 197)}...`
+                                    : rawSnippet;
+                        }
+                    }
+                }
+                let tags;
+                if (Array.isArray(metaObj?.tags)) {
+                    tags = metaObj.tags.map(String);
+                }
+                else if (typeof metaObj?.tags === "string") {
+                    tags = metaObj.tags
+                        .split(",")
+                        .map((t) => t.trim())
+                        .filter(Boolean);
+                }
+                const rawDate = metaObj?.date ?? metaObj?.created ?? metaObj?.publishDate;
+                const date = rawDate ? String(rawDate) : null;
+                const sourcePath = sourcePathPrefix
+                    ? `${sourcePathPrefix.replace(/\/$/, "")}/${file.relPath}`
+                    : file.relPath;
+                const entryData = {
+                    ...(metaObj ?? {}),
+                    title,
+                    slug: id,
+                    section,
+                    sourcePath,
+                    toc: processed.toc ?? [],
+                    meta: metaObj,
+                    kind,
+                    isDataOnly: processed.is_data_only,
+                    diagnostics: processed.diagnostics,
+                    description,
+                    tags,
+                    date,
+                    banner,
+                    bannerY,
+                    images,
+                    thumbnail,
+                };
+                store.set({
+                    id,
+                    data: entryData,
+                    body: processed.is_data_only ? content : "",
+                    rendered: {
+                        html: processed.html,
+                    },
+                    filePath: relative(rootDir, file.absPath).split("\\").join("/"),
+                    digest,
+                });
+                return problemsOf(path, processed.diagnostics);
+            }
+            /** Reports problems in the dev server: logged, never thrown. */
+            const log = (problems) => {
+                for (const p of problems) {
+                    (p.severity === "error" ? logger.error : logger.warn)(describe(p));
+                }
+            };
+            async function loadAll(current) {
+                logger.info(`Reading Tomet documents in ${baseDir}...`);
+                const untouched = new Set(store.keys());
+                for (const file of current.docs) {
+                    untouched.delete(file.relPath.replace(/\.(tmt|tm)$/, ""));
+                }
+                const found = await mapConcurrent(current.docs, concurrency, (file) => loadEntry(file, current));
+                // Entries of documents that are gone, or no longer published.
+                for (const gone of untouched)
+                    store.delete(gone);
+                // The collection's own problems first, then the documents', in a fixed order.
+                const problems = [
+                    ...current.problems,
+                    ...found.flat().sort((a, b) => a.path.localeCompare(b.path) ||
+                        (a.line ?? 0) - (b.line ?? 0) ||
+                        (a.column ?? 0) - (b.column ?? 0)),
+                ];
+                logger.info(`Loaded ${store.keys().length} Tomet documents` +
+                    (problems.length > 0 ? ` with ${problems.length} problem(s).` : "."));
+                if (problems.length > 0) {
+                    if (strict)
+                        throw new TometLoaderError(collection, problems);
+                    log(problems);
                 }
             }
-            // Process in batches
-            await mapConcurrent(matchedFiles, concurrency, loadEntry);
-            // Clean up deleted entries
-            for (const deletedId of untouchedIds) {
-                store.delete(deletedId);
-            }
-            logger.info(`Loaded ${matchedFiles.length} Tomet documents.`);
+            await loadAll(state);
             // Watcher for dev mode
             if (watcher) {
                 watcher.add(baseDir);
-                if (workspaceConfig && existsSync(resolvedConfigPath)) {
-                    watcher.add(resolvedConfigPath);
-                }
-                const handleUpdate = async (changedPath) => {
-                    if (resolve(changedPath) === resolve(resolvedConfigPath)) {
-                        logger.info("Workspace config changed, reloading Tomet files...");
-                        try {
-                            workspaceConfig = await fs.readFile(resolvedConfigPath, "utf8");
-                            const newStat = await fs
-                                .stat(resolvedConfigPath)
-                                .catch(() => null);
-                            configKey = newStat ? `${newStat.mtimeMs}` : "";
-                            await mapConcurrent(matchedFiles, concurrency, loadEntry);
-                        }
-                        catch (err) {
-                            logger.error(`Failed to reload config ${resolvedConfigPath}: ${err}`);
-                        }
+                for (const part of state.parts)
+                    watcher.add(part);
+                const isDoc = (path) => path.endsWith(".tmt") || path.endsWith(".tm");
+                const reload = async () => {
+                    try {
+                        state = await build();
+                        await loadAll(state);
+                    }
+                    catch (err) {
+                        logger.error(`Failed to reload Tomet documents: ${err}`);
+                    }
+                };
+                const handleChange = async (changedPath) => {
+                    if (state.parts.some((p) => resolve(p) === resolve(changedPath))) {
+                        logger.info("The vault config or a file it registers changed, reloading...");
+                        return reload();
+                    }
+                    if (!changedPath.startsWith(baseDir))
                         return;
-                    }
-                    if (changedPath.startsWith(baseDir)) {
-                        const relPath = relative(baseDir, changedPath)
-                            .split("\\")
-                            .join("/");
-                        // Maintain vault asset and file index
-                        if (!allFilesSet.has(relPath)) {
-                            allFilesSet.add(relPath);
-                            scanned.allFiles.push(relPath);
-                            assetMap.set(basename(relPath), relPath);
-                            setVaultFiles(scanned.allFiles);
-                        }
-                        if (changedPath.endsWith(".tmt") && !changedPath.endsWith(".tm"))
-                            return;
-                        if (changedPath.endsWith(".tmt") || changedPath.endsWith(".tm")) {
-                            if (filter && !filter(relPath))
-                                return;
-                            await loadEntry({ absPath: changedPath, relPath });
-                        }
-                    }
+                    const relPath = relative(baseDir, changedPath).split("\\").join("/");
+                    // A file that was not there changes what links can reach: the vault is made again.
+                    if (!state.files.has(relPath))
+                        return reload();
+                    if (!isDoc(changedPath))
+                        return;
+                    const file = state.docs.find((d) => d.relPath === relPath);
+                    if (!file)
+                        return;
+                    log(await loadEntry(file, state));
                 };
                 const handleUnlink = async (deletedPath) => {
-                    if (deletedPath.startsWith(baseDir)) {
-                        const relPath = relative(baseDir, deletedPath)
-                            .split("\\")
-                            .join("/");
-                        if (allFilesSet.has(relPath)) {
-                            allFilesSet.delete(relPath);
-                            const idx = scanned.allFiles.indexOf(relPath);
-                            if (idx !== -1)
-                                scanned.allFiles.splice(idx, 1);
-                            assetMap.delete(basename(relPath));
-                            setVaultFiles(scanned.allFiles);
-                        }
-                        const id = generateId
-                            ? generateId({ relPath, absPath: deletedPath })
-                            : relPath.replace(/\.(tmt|tm)$/, "");
-                        store.delete(id);
-                    }
+                    if (deletedPath.startsWith(baseDir))
+                        await reload();
                 };
-                watcher.on("add", handleUpdate);
-                watcher.on("change", handleUpdate);
+                watcher.on("add", handleChange);
+                watcher.on("change", handleChange);
                 watcher.on("unlink", handleUnlink);
             }
         },

@@ -78,10 +78,22 @@ re-merging it would not be.
 ## Features & Architecture
 
 - **In-process WebAssembly compilation**: Uses `@tomet/wasm` to parse and render `.tmt` files in-process without spawning CLI sub-processes.
-- **Incremental Digest Caching**: Content digests combine file mtime, size, and workspace config mtime (`configKey`) to skip unchanged documents across builds.
-- **Proximity-aware Link & Asset Resolution**: Automatically resolves `ref:` links and `@embed` image references against the scanned vault and asset map.
+- **Incremental Digest Caching**: A document is rendered again unless the digest of its text, the files of the vault, the vault config and what it registers, the options, and the WebAssembly module that renders it are all as before. (File times say nothing: they are the same for every file in the Nix store.)
+- **Link & Asset Resolution**: `ref:` notes, `file:`, `dir:` and `tmt:` paths and `@embed` are resolved against the files of the vault into the URL of a page, an asset, or the source of the project. A link that goes nowhere is a problem, never a dead `href`.
+- **No silent skips**: see *Problems* below.
+- **One vault per collection**: each collection reads in its own `Vault` of `@tomet/wasm`; two collections never see each other's files.
 - **Rich Metadata & TOC**: Automatically surfaces document titles, headings (TOC), `::kind`, banners, thumbnails, tags, and custom metadata into `entry.data`.
-- **Live Dev Mode Synchronization**: The dev watcher tracks `.tmt` files, images, assets, and workspace configuration changes with live vault index re-indexing.
+- **Live Dev Mode Synchronization**: The dev watcher tracks `.tmt` files, images, assets, and the vault config; a file that is added or removed makes the vault again, since what links can reach has changed.
+
+## Problems
+
+A loader that skips what it cannot publish publishes a broken site, so this one does not skip. A *problem* is anything wrong with a document or with the collection: a document that does not parse, an empty one, a link that goes nowhere (a note, a path, an embed, a document the `filter` left out), an unknown element, an expression with no value, a dangling anchor, an `@draft`, a `base` that is not there, a `filter` that matches nothing. A problem has a file, a line and a column.
+
+- In a build (`astro build`, `astro sync`), every problem is found before any is reported, and the load throws one `TometLoaderError` that lists all of them, one per line: `docs/spec/a.tmt:12:3: error unresolved-link: ...`. The build fails.
+- In the dev server (`LoaderContext.watcher` is set) the problems are logged and the pages are still served, with what is wrong in `entry.data.diagnostics`.
+- `strict` overrides which of the two it is.
+
+What a site does not want to publish is left out with `filter`. A link to a document it left out is a problem too: the site has no page for it.
 
 ## Loader Options
 
@@ -90,12 +102,16 @@ re-merging it would not be.
 | `base` | `string` | *(required)* | Path to the directory containing `.tmt` documents (relative or absolute). |
 | `advanced` | `boolean` | `true` | Enables auto-numbering headings and generating slug IDs. |
 | `concurrency` | `number` | `32` | Maximum concurrent files to read and parse simultaneously. |
-| `urlPrefix` | `string` | `'/docs'` | URL prefix prepended to resolved `ref:` note links. |
+| `urlPrefix` | `string` | `'/docs'` | Where the pages are: `/docs` gives `/docs/spec/syntax` for the entry `spec/syntax`. |
 | `assetPrefix` | `string` | `'/vault'` | URL prefix prepended to resolved asset/image links. |
 | `sourcePathPrefix` | `string` | `'docs'` | Prefix prepended to `sourcePath` (e.g. `'docs'` -> `docs/path/to/file.tmt`). |
-| `configPath` | `string` | `default.config.tmt` | Path to the workspace configuration file. |
-| `filter` | `(relPath: string) => boolean` | — | Predicate to include or exclude specific documents. |
-| `generateId` | `(p: { relPath, absPath }) => string` | — | Custom entry ID generator (defaults to relative path without extension). |
+| `vault` | `string` | `<base>/vault.config.tmt` | The vault config the documents are read with: macros, variables, and the vocabularies, dictionaries and blueprints it registers (read from its directory). Without one, `std` alone. |
+| `basePath` | `string` | `''` | Where `base` is in the vault, from its root (`'tmtroot'`): paths in documents (`file:tmtroot/spec/x.tmt`) are written from the vault's root. |
+| `sourceUrl` | `{ file: string; dir: string }` | — | Where the source of the project is, as URL templates with `{path}`: what a `file:` or `dir:` link has no page for goes there. Without it, such a link is a problem. |
+| `strict` | `boolean` | `true` in a build, `false` in dev | Whether a problem fails the load. |
+| `filter` | `(relPath: string) => boolean` | — | The documents of `base` that become entries. |
+
+The id of an entry is the path of its document without the extension, always: it is the rule links are written on, so it cannot be changed.
 
 ## Entry Data (`TometEntryData`)
 
@@ -103,7 +119,7 @@ The loader injects parsed document metadata into Astro's `entry.data`:
 
 ```typescript
 interface TometEntryData {
-  title: string;          // From @meta{title}, fallback to first h1 or filename
+  title: string;          // From ::meta(title), fallback to the first h1, then the filename
   slug: string;           // Entry slug / ID
   section: string;        // Top-level folder name
   sourcePath: string;     // Source path (e.g. 'docs/intro.tmt')
@@ -111,6 +127,7 @@ interface TometEntryData {
   meta: Record<string, unknown> | null; // The plain-data entries of `::meta(...)`; the rest is in `processFile`'s `header`
   kind: string | null;    // Document kind, from its `::kind(...)` declaration
   isDataOnly: boolean;    // True if document produces no body HTML
+  diagnostics: Diagnostic[]; // What is wrong with the document or what it says about itself (see `@tomet/wasm`)
   description?: string;   // Meta description or auto-extracted excerpt
   tags?: string[];        // Tags array normalized from metadata
   date?: string;          // Creation / publication date

@@ -13,11 +13,16 @@ document, spans included. It is what `parseFile` returns and what `toHtml(file)`
 design and does not read back into the AST. It is what `parseValue` (JavaScript), `loads` (Python), `parseValueJson` (Java) and the
 `meta` of a processed file hand out.
 
-They are two files because they are two contracts with nothing in common: a consumer of one has no use for the other.
+- **`binding.schema.json`**: What the functions of a binding take and return besides a document: the vault to read documents in
+
+(`VaultSources`), the processed file (`ProcessedFile`) with its diagnostics (`Diagnostic`), the options and the files a config
+registers. It has no root: every type in it is a definition. It carries the AST definitions it refers to, so that it can be read alone.
+
+They are three files because they are three contracts: a consumer of one has no use for the others.
 
 ## Generated, not written
 
-Both files are generated from the Rust types by `tomet spec ast-schema`, and descriptions are the doc comments of those types.
+All three files are generated from the Rust types by `tomet spec ast-schema`, and descriptions are the doc comments of those types.
 Do not edit them: change the types or their doc comments, then regenerate.
 
 ```bash
@@ -29,8 +34,10 @@ tomet spec ast-schema --check --out bindings/schema
 `cargo test` holds them to the types too (`tomet-cli`'s `ast_schema` tests), and checks that every document of the test corpus
 serializes to something valid against `ast.schema.json` (`tomet-tests`' `schema` test).
 
-The TypeScript declarations of the wire, `bindings/js/ast.d.ts`, are generated from these two files by `tomet spec ast-types --out bindings/js`
-(it refuses a schema construct it does not know, so a new keyword cannot become an `unknown`); they ship with `@tomet/wasm`.
+The TypeScript declarations, `bindings/js/ast.d.ts` for the wire and `bindings/js/binding.d.ts` for the bindings, are generated from these files by
+`tomet spec ast-types --out bindings/js` (it refuses a schema construct it does not know, so a new keyword cannot become an `unknown`); they ship
+with `@tomet/wasm`. `binding.d.ts` imports the AST types it refers to from `ast.d.ts` instead of declaring them twice, and fails if the two schemas
+define one name differently. The types are defined in `tomet-binding` (`bindings/core`), which the JavaScript, Python and Java bindings share.
 
 ## Identity and versions
 

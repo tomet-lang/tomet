@@ -2223,6 +2223,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "tomet-binding"
+version = "0.5.0"
+dependencies = [
+ "regex",
+ "schemars",
+ "serde",
+ "tomet",
+ "tomet-ast",
+ "tomet-eval",
+ "tomet-links",
+ "tomet-position",
+ "tomet-span",
+ "tomet-transform",
+]
+
+[[package]]
 name = "tomet-cli"
 version = "0.5.0"
 dependencies = [
@@ -2239,6 +2255,7 @@ dependencies = [
  "serde_json",
  "tomet-ast",
  "tomet-ast-parser",
+ "tomet-binding",
  "tomet-config",
  "tomet-convert-standalone",
  "tomet-declaration",
@@ -2470,13 +2487,10 @@ version = "0.5.0"
 dependencies = [
  "getrandom 0.2.17",
  "js-sys",
- "regex",
  "serde",
  "serde-wasm-bindgen",
  "tomet",
- "tomet-eval",
- "tomet-links",
- "tomet-transform",
+ "tomet-binding",
  "wasm-bindgen",
 ]
 

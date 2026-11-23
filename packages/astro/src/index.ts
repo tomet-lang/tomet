@@ -3,10 +3,18 @@
  *
  * Provides `tometLoader` for Astro 5 Content Collections, rendering `.tmt` documents
  * in-process via `@tomet/wasm` with incremental caching designed for up to 50,000+ files.
+ *
+ * A loader that skips what it cannot publish publishes a broken site, so `tometLoader` does not skip.
+ * Anything wrong with a document -- it does not parse, it is empty, a link goes nowhere, an element is
+ * unknown, it still says `@draft` -- is a *problem*. In a build every problem is collected, with the
+ * file, line and column, and the build fails with all of them at once. In the dev server the same
+ * problems are logged and the pages are still served, so a typo does not take the server down.
  */
 import type { AstroIntegration } from "astro";
 import type { Loader, LoaderContext } from "astro/loaders";
+import { createHash } from "node:crypto";
 import { existsSync, promises as fs } from "node:fs";
+import { createRequire } from "node:module";
 import {
   basename,
   dirname,
@@ -18,15 +26,18 @@ import {
 } from "node:path";
 import { fileURLToPath } from "node:url";
 import initWasm, {
+  Vault,
   processFile,
-  setVaultFiles,
+  vaultRegistry,
   type Declaration,
+  type Diagnostic,
   type ProcessOptions,
   type ProcessedFile,
   type TocItem,
+  type VaultSources,
 } from "@tomet/wasm";
 
-export type { ProcessOptions, ProcessedFile, TocItem };
+export type { Diagnostic, ProcessOptions, ProcessedFile, TocItem };
 
 let wasmReady: Promise<void> | null = null;
 
@@ -86,6 +97,9 @@ export interface TometLoaderOptions {
   /**
    * Base directory containing `.tmt` files.
    * Can be relative to the Astro project root or absolute.
+   *
+   * The id of an entry is the path of its document from here without the extension (`spec/syntax`), and
+   * the page of that entry is at `<urlPrefix>/<id>`: a link to a document is written on that rule.
    */
   base: string;
   /**
@@ -99,21 +113,18 @@ export interface TometLoaderOptions {
    */
   concurrency?: number;
   /**
-   * Custom slug / entry ID generator.
-   * By default, strips `.tmt` / `.tm` extension and uses the relative POSIX path.
-   */
-  generateId?: (params: { relPath: string; absPath: string }) => string;
-  /**
-   * Custom filter to include or exclude paths.
-   * Return `false` to skip a file.
+   * Custom filter to include or exclude paths: the documents of `base` that become entries. Return
+   * `false` to leave one out. A document that is left out is not read, and a link to it is a problem:
+   * the site has no page for it.
    */
   filter?: (relPath: string) => boolean;
   /**
-   * URL prefix prepended to resolved `ref:` links (default: `'/docs'`).
+   * URL prefix of the pages: `/docs` (the default) gives `/docs/spec/syntax`.
    */
   urlPrefix?: string;
   /**
-   * URL prefix prepended to resolved image/asset `@embed` targets (default: `'/vault'`).
+   * URL prefix of the files that are not documents (images, ...): `/vault` (the default) gives
+   * `/vault/img/x.png`. Serving them is the site's job.
    */
   assetPrefix?: string;
   /**
@@ -122,9 +133,29 @@ export interface TometLoaderOptions {
    */
   sourcePathPrefix?: string;
   /**
-   * Optional path to the workspace configuration file (defaults to `vault.config.tmt` under `base`).
+   * The vault config (`vault.config.tmt`) the documents are read with: macros, variables, and the
+   * vocabularies, dictionaries and blueprints it registers, which are read from the directory it is in.
+   * Relative to the Astro project root, or absolute. Defaults to `vault.config.tmt` under `base`, if
+   * there is one. Without a config, documents are read with `std` alone.
    */
-  configPath?: string;
+  vault?: string;
+  /**
+   * Where `base` is in the vault, from the vault's root, when it is a part of it: `tmtroot` if `base` is
+   * the `tmtroot/` of the vault. A path a document writes (`file:tmtroot/spec/x.tmt`) is written from
+   * the vault's root, and this is what it is read from. Defaults to `''`: `base` is the vault.
+   */
+  basePath?: string;
+  /**
+   * Where the source of the project is on the web, as URL templates with `{path}` for the path from
+   * the vault's root (percent-encoded). A `file:` or `dir:` link to something the site has no page for
+   * goes there; without it, such a link is a problem.
+   */
+  sourceUrl?: { file: string; dir: string };
+  /**
+   * Whether a problem fails the load. Defaults to `true` in a build and `false` in the dev server, where
+   * problems are logged and the pages are still served.
+   */
+  strict?: boolean;
 }
 
 export interface TometEntryData {
@@ -136,6 +167,8 @@ export interface TometEntryData {
   meta: Record<string, unknown> | null;
   kind: string | null;
   isDataOnly: boolean;
+  /** What is wrong with the document, or what it says about itself (`@draft`): see `Diagnostic`. */
+  diagnostics: Diagnostic[];
   description?: string | null;
   tags?: string[];
   date?: string | null;
@@ -144,6 +177,48 @@ export interface TometEntryData {
   images?: string[];
   thumbnail?: string | null;
   [key: string]: unknown;
+}
+
+/**
+ * Something wrong with a document, or with the collection it is in, and where.
+ */
+export interface Problem {
+  /** The file, relative to the Astro project root when it is under it. */
+  path: string;
+  /** Counted from 1; `null` for a problem of the whole file or collection. */
+  line: number | null;
+  column: number | null;
+  severity: "error" | "warning";
+  /** What kind of problem: a `Diagnostic.code`, or `parse-error`, `empty-document`, `unreadable`, ... */
+  code: string;
+  message: string;
+}
+
+/**
+ * What a strict load throws: every problem found, one per line, with where it is.
+ */
+export class TometLoaderError extends Error {
+  readonly problems: readonly Problem[];
+
+  constructor(collection: string, problems: readonly Problem[]) {
+    const files = new Set(problems.map((p) => p.path)).size;
+    const lines = problems.map((p) => `  ${describe(p)}`);
+    super(
+      `${problems.length} problem(s) in ${files} file(s) of the "${collection}" collection:\n${lines.join("\n")}`,
+    );
+    this.name = "TometLoaderError";
+    this.problems = problems;
+    // The message is the whole report; a stack through the loader adds only noise to it.
+    this.stack = `${this.name}: ${this.message}`;
+  }
+}
+
+function describe(problem: Problem): string {
+  const at =
+    problem.line === null
+      ? problem.path
+      : `${problem.path}:${problem.line}:${problem.column ?? 1}`;
+  return `${at}: ${problem.severity} ${problem.code}: ${problem.message}`;
 }
 
 /**
@@ -272,6 +347,47 @@ async function scanVault(
 }
 
 /**
+ * What identifies the renderer: a hash of the WebAssembly module. The version of the package says
+ * nothing (it does not change from one revision of Tomet to the next), the bytes do.
+ */
+let rendererKey: Promise<string> | null = null;
+function rendererIdentity(): Promise<string> {
+  rendererKey ??= (async () => {
+    const wasm = createRequire(import.meta.url).resolve("@tomet/wasm/wasm");
+    return createHash("sha256")
+      .update(await fs.readFile(wasm))
+      .digest("hex");
+  })();
+  return rendererKey;
+}
+
+/** A line and column out of the `2:5: expected ')'` a document that does not parse is thrown as. */
+function parseProblem(path: string, err: unknown): Problem {
+  const text = (err as Error)?.message ?? String(err);
+  const at = /^(\d+):(\d+): ([\s\S]*)$/.exec(text);
+  return {
+    path,
+    line: at ? Number(at[1]) : null,
+    column: at ? Number(at[2]) : null,
+    severity: "error",
+    code: "parse-error",
+    message: at ? at[3] : text,
+  };
+}
+
+/** The problems a document's diagnostics are, in the file they are in. */
+function problemsOf(path: string, diagnostics: Diagnostic[]): Problem[] {
+  return diagnostics.map((d) => ({
+    path,
+    line: d.start?.line ?? null,
+    column: d.start?.column ?? null,
+    severity: d.severity,
+    code: d.code,
+    message: d.message,
+  }));
+}
+
+/**
  * Astro 5 Content Layer Loader for Tomet documents.
  *
  * ```ts
@@ -285,23 +401,33 @@ async function scanVault(
  *   }),
  * };
  * ```
+ *
+ * =[ Problems ]
+ *
+ * Every problem is found before any is reported: a build fails once, with all of them
+ * (`TometLoaderError`), each with its file, line and column. That includes a document that does not
+ * parse, an empty one, an `@draft`, a link that goes nowhere, and an unknown element, and also a
+ * `base` that is not there and a `filter` that matches nothing. What a site does not want to publish is
+ * left out with `filter`; nothing is skipped silently.
  */
 export function tometLoader(options: TometLoaderOptions): Loader {
   const {
     base,
     advanced = true,
     concurrency = 32,
-    generateId,
     filter,
     urlPrefix = "/docs",
     assetPrefix = "/vault",
     sourcePathPrefix = "docs",
-    configPath,
+    vault: vaultConfig,
+    basePath = "",
+    sourceUrl,
   } = options;
 
   return {
     name: "@tomet/astro-loader",
     load: async ({
+      collection,
       config,
       store,
       logger,
@@ -309,306 +435,440 @@ export function tometLoader(options: TometLoaderOptions): Loader {
       watcher,
     }: LoaderContext) => {
       await ensureWasm();
+      const strict = options.strict ?? watcher === undefined;
 
       const rootDir =
         config.root instanceof URL
           ? fileURLToPath(config.root)
           : String(config.root);
       const baseDir = isAbsolute(base) ? base : resolve(rootDir, base);
-      if (!existsSync(baseDir)) {
-        logger.warn(`Tomet loader base directory not found: ${baseDir}`);
-        return;
+      const display = (absPath: string): string => {
+        const rel = relative(rootDir, absPath).split("\\").join("/");
+        return rel.startsWith("..") ? absPath : rel;
+      };
+
+      /** Everything a load is made from: made again whenever the files of the vault change. */
+      interface State {
+        vault: Vault;
+        vaultKey: string;
+        files: Set<string>;
+        docs: { absPath: string; relPath: string }[];
+        assetMap: Map<string, string>;
+        /** The files whose change changes the vault itself: its config and what it registers. */
+        parts: string[];
+        /** Problems of the collection as a whole, not of a document. */
+        problems: Problem[];
       }
 
-      // Read optional workspace vault.config.tmt
-      const resolvedConfigPath = configPath
-        ? isAbsolute(configPath)
-          ? configPath
-          : resolve(rootDir, configPath)
+      const configPath = vaultConfig
+        ? isAbsolute(vaultConfig)
+          ? vaultConfig
+          : resolve(rootDir, vaultConfig)
         : join(baseDir, "vault.config.tmt");
-      let workspaceConfig = existsSync(resolvedConfigPath)
-        ? await fs.readFile(resolvedConfigPath, "utf8")
-        : undefined;
-      const configStat = workspaceConfig
-        ? await fs.stat(resolvedConfigPath).catch(() => null)
-        : null;
-      let configKey = configStat ? `${configStat.mtimeMs}` : "";
 
-      logger.info(`Scanning Tomet documents and assets in ${baseDir}...`);
-      const scanned = await scanVault(baseDir);
-      const allFiles = scanned.docFiles;
-      const matchedFiles = filter
-        ? allFiles.filter((f) => filter(f.relPath))
-        : allFiles;
+      async function build(): Promise<State> {
+        const problems: Problem[] = [];
+        const collectionProblem = (path: string, code: string, message: string) =>
+          problems.push({
+            path,
+            line: null,
+            column: null,
+            severity: "error",
+            code,
+            message,
+          });
 
-      // Pre-build link resolution index once in Wasm memory
-      logger.info(
-        `Building link index for ${scanned.allFiles.length} files...`,
-      );
-      setVaultFiles(scanned.allFiles);
-
-      const allFilesSet = new Set(scanned.allFiles);
-      const assetMap = new Map<string, string>();
-      for (const f of scanned.allFiles) {
-        const b = basename(f);
-        if (!assetMap.has(b)) {
-          assetMap.set(b, f);
+        if (!existsSync(baseDir)) {
+          collectionProblem(
+            display(baseDir),
+            "missing-base",
+            "the directory of the documents does not exist",
+          );
         }
+        const scanned = await scanVault(baseDir);
+        const docs = filter
+          ? scanned.docFiles.filter((f) => filter(f.relPath))
+          : scanned.docFiles;
+        if (docs.length === 0 && existsSync(baseDir)) {
+          collectionProblem(
+            display(baseDir),
+            "no-documents",
+            "no document of the directory is published: the collection would be empty",
+          );
+        }
+
+        const sources: VaultSources = {
+          files: scanned.allFiles,
+          documents: docs.map((d) => d.relPath),
+          urlPrefix,
+          assetPrefix,
+          basePath,
+          sourceUrl,
+        };
+        const parts: string[] = [];
+        const partsText: string[] = [];
+        if (existsSync(configPath)) {
+          parts.push(configPath);
+          const text = await fs.readFile(configPath, "utf8");
+          sources.config = text;
+          partsText.push(text);
+          const configDir = dirname(configPath);
+          try {
+            const registry = vaultRegistry(text);
+            const read = async (path: string): Promise<string> => {
+              const file = resolve(configDir, path);
+              parts.push(file);
+              try {
+                const body = await fs.readFile(file, "utf8");
+                partsText.push(body);
+                return body;
+              } catch (err) {
+                collectionProblem(
+                  display(file),
+                  "unreadable",
+                  `registered by ${display(configPath)} but cannot be read: ${(err as Error).message}`,
+                );
+                return "";
+              }
+            };
+            sources.vocabularies = {};
+            for (const path of registry.vocabularies)
+              sources.vocabularies[path] = await read(path);
+            sources.dictionaries = {};
+            for (const path of registry.dictionaries)
+              sources.dictionaries[path] = await read(path);
+            // A `.ctmt` blueprint is the schema of a data document, not of a `.tmt`.
+            sources.blueprints = [];
+            for (const path of registry.blueprints)
+              if (!path.endsWith(".ctmt"))
+                sources.blueprints.push(await read(path));
+          } catch (err) {
+            collectionProblem(
+              display(configPath),
+              "invalid-vault",
+              (err as Error).message ?? String(err),
+            );
+          }
+        } else if (vaultConfig) {
+          collectionProblem(
+            display(configPath),
+            "missing-vault-config",
+            "the vault config does not exist",
+          );
+        }
+
+        let vault: Vault;
+        try {
+          vault = new Vault(sources);
+        } catch (err) {
+          collectionProblem(
+            display(configPath),
+            "invalid-vault",
+            (err as Error).message ?? String(err),
+          );
+          // The problem is reported; the documents are still read, in the vault as far as it is usable.
+          vault = new Vault({
+            files: scanned.allFiles,
+            documents: sources.documents,
+            urlPrefix,
+            assetPrefix,
+            basePath,
+            sourceUrl,
+          });
+        }
+
+        const assetMap = new Map<string, string>();
+        for (const f of scanned.allFiles) {
+          const b = basename(f);
+          if (!assetMap.has(b)) assetMap.set(b, f);
+        }
+
+        // What an entry was rendered with besides its own text: the files of the vault (a link
+        // depends on which exist, not on the bytes of the file it is in), what the vault is made
+        // of, the renderer, and how it was asked to render.
+        const vaultKey = createHash("sha256")
+          .update(
+            JSON.stringify({
+              files: [...scanned.allFiles].sort(),
+              documents: [...(sources.documents ?? [])].sort(),
+              parts: partsText,
+              renderer: await rendererIdentity(),
+              advanced,
+              urlPrefix,
+              assetPrefix,
+              basePath,
+              sourceUrl,
+              sourcePathPrefix,
+            }),
+          )
+          .digest("hex");
+
+        return {
+          vault,
+          vaultKey,
+          files: new Set(scanned.allFiles),
+          docs,
+          assetMap,
+          parts,
+          problems,
+        };
       }
 
-      const untouchedIds = new Set(store.keys());
+      let state = await build();
 
-      async function loadEntry(file: { absPath: string; relPath: string }) {
-        const id = generateId
-          ? generateId(file)
-          : file.relPath.replace(/\.(tmt|tm)$/, "");
+      /** Reads one document into the store and says what is wrong with it. */
+      async function loadEntry(
+        file: { absPath: string; relPath: string },
+        current: State,
+      ): Promise<Problem[]> {
+        const id = file.relPath.replace(/\.(tmt|tm)$/, "");
+        const path = display(file.absPath);
+        const problem = (code: string, message: string): Problem[] => [
+          { path, line: 1, column: 1, severity: "error", code, message },
+        ];
 
-        untouchedIds.delete(id);
-
+        let content: string;
         try {
-          const stat = await fs.stat(file.absPath);
-          // Skip empty placeholder files
-          if (stat.size === 0) {
-            store.delete(id);
-            return;
-          }
+          content = await fs.readFile(file.absPath, "utf8");
+        } catch (err) {
+          store.delete(id);
+          return problem("unreadable", (err as Error).message);
+        }
+        // A placeholder that says nothing is not a page: it is a document that is missing.
+        if (content.trim() === "") {
+          store.delete(id);
+          return problem("empty-document", "the document is empty");
+        }
 
-          // Generate digest using mtime, size, and workspace config mtime
-          const digest = generateDigest(
-            `${stat.mtimeMs}:${stat.size}:${configKey}:v6`,
-          );
-          const existing = store.get(id);
+        const digest = generateDigest({ content, vault: current.vaultKey });
+        const existing = store.get(id);
+        if (existing && existing.digest === digest) {
+          // Unchanged: cache hit. What was found is still found.
+          const found = (existing.data as TometEntryData).diagnostics ?? [];
+          return problemsOf(path, found);
+        }
 
-          if (existing && existing.digest === digest) {
-            // Unchanged: cache hit!
-            return;
-          }
-
-          const content = await fs.readFile(file.absPath, "utf8");
-          const processed: ProcessedFile = processFile(content, {
+        let processed: ProcessedFile;
+        try {
+          processed = current.vault.processFile(content, {
             advanced,
             numberHeadings: advanced,
             autoSlugHeadings: advanced,
             currentPath: file.relPath,
-            urlPrefix,
-            assetPrefix,
-            config: workspaceConfig,
-          });
-
-          // `meta` is the plain-data entries of `::meta(...)`: an object, or null without a `::meta`.
-          // What is not data (`icon: @doc.icon(...)`) is in `processed.header`.
-          const metaObj: Record<string, unknown> | null = processed.meta;
-
-          const fallbackTitle = basename(file.relPath).replace(
-            /\.(tmt|tm)$/,
-            "",
-          );
-          const title = (metaObj?.title as string) ?? fallbackTitle;
-          const section = file.relPath.split("/")[0] ?? "";
-
-          const kind = declaredKind(processed.header);
-
-          // Resolve banner and images
-          const fileRelDir = dirname(file.relPath).replace(/\\/g, "/");
-
-          let rawBanner = metaObj?.banner;
-          if (Array.isArray(rawBanner)) rawBanner = rawBanner[0];
-          const banner = resolveAssetUrl(
-            rawBanner,
-            fileRelDir,
-            assetMap,
-            allFilesSet,
-            assetPrefix,
-          );
-
-          const rawBannerY = metaObj?.["banner-y"] ?? metaObj?.bannerY;
-          const bannerY =
-            typeof rawBannerY === "number"
-              ? rawBannerY
-              : rawBannerY
-                ? parseInt(String(rawBannerY), 10)
-                : null;
-
-          let rawImages: unknown[] = [];
-          if (Array.isArray(metaObj?.images)) {
-            rawImages = metaObj.images;
-          } else if (typeof metaObj?.images === "string") {
-            rawImages = [metaObj.images];
-          } else if (metaObj?.image) {
-            rawImages = Array.isArray(metaObj.image)
-              ? metaObj.image
-              : [metaObj.image];
-          }
-
-          const images = rawImages
-            .map((img) =>
-              resolveAssetUrl(
-                img,
-                fileRelDir,
-                assetMap,
-                allFilesSet,
-                assetPrefix,
-              ),
-            )
-            .filter((u): u is string => Boolean(u));
-
-          let thumbnail: string | null = images[0] ?? banner ?? null;
-          if (!thumbnail && processed.html) {
-            const match = processed.html.match(
-              /<img[^>]+src=["']([^"']+)["']/i,
-            );
-            if (match) {
-              thumbnail = match[1];
-            }
-          }
-
-          let description = (metaObj?.description as string) ?? null;
-          if (!description && processed.html) {
-            const pMatch = processed.html.match(/<p>([\s\S]*?)<\/p>/i);
-            if (pMatch) {
-              const rawSnippet = pMatch[1].replace(/<[^>]+>/g, "").trim();
-              if (rawSnippet) {
-                description =
-                  rawSnippet.length > 200
-                    ? `${rawSnippet.slice(0, 197)}...`
-                    : rawSnippet;
-              }
-            }
-          }
-
-          let tags: string[] | undefined;
-          if (Array.isArray(metaObj?.tags)) {
-            tags = metaObj.tags.map(String);
-          } else if (typeof metaObj?.tags === "string") {
-            tags = metaObj.tags
-              .split(",")
-              .map((t) => t.trim())
-              .filter(Boolean);
-          }
-
-          const rawDate =
-            metaObj?.date ?? metaObj?.created ?? metaObj?.publishDate;
-          const date = rawDate ? String(rawDate) : null;
-
-          const sourcePath = sourcePathPrefix
-            ? `${sourcePathPrefix.replace(/\/$/, "")}/${file.relPath}`
-            : file.relPath;
-
-          const entryData: TometEntryData = {
-            ...(metaObj ?? {}),
-            title,
-            slug: id,
-            section,
-            sourcePath,
-            toc: processed.toc ?? [],
-            meta: metaObj,
-            kind,
-            isDataOnly: processed.is_data_only,
-            description,
-            tags,
-            date,
-            banner,
-            bannerY,
-            images,
-            thumbnail,
-          };
-
-          const relToRoot = relative(rootDir, file.absPath)
-            .split("\\")
-            .join("/");
-
-          store.set({
-            id,
-            data: entryData,
-            body: processed.is_data_only ? content : "",
-            rendered: {
-              html: processed.html,
-            },
-            filePath: relToRoot,
-            digest,
           });
         } catch (err) {
-          const msg = (err as Error)?.message || String(err);
-          logger.error(`Failed to process Tomet file ${file.absPath}: ${msg}`);
+          // A document that does not parse has no page; one that did before must not stay.
+          store.delete(id);
+          return [parseProblem(path, err)];
+        }
+
+        // `meta` is the plain-data entries of `::meta(...)`: an object, or null without a `::meta`.
+        // What is not data (`icon: @doc.icon(...)`) is in `processed.header`.
+        const metaObj: Record<string, unknown> | null = processed.meta;
+
+        const fallbackTitle = basename(file.relPath).replace(/\.(tmt|tm)$/, "");
+        const title = processed.title ?? fallbackTitle;
+        const section = file.relPath.split("/")[0] ?? "";
+
+        const kind = declaredKind(processed.header);
+
+        // Resolve banner and images
+        const fileRelDir = dirname(file.relPath).replace(/\\/g, "/");
+
+        let rawBanner = metaObj?.banner;
+        if (Array.isArray(rawBanner)) rawBanner = rawBanner[0];
+        const banner = resolveAssetUrl(
+          rawBanner,
+          fileRelDir,
+          current.assetMap,
+          current.files,
+          assetPrefix,
+        );
+
+        const rawBannerY = metaObj?.["banner-y"] ?? metaObj?.bannerY;
+        const bannerY =
+          typeof rawBannerY === "number"
+            ? rawBannerY
+            : rawBannerY
+              ? parseInt(String(rawBannerY), 10)
+              : null;
+
+        let rawImages: unknown[] = [];
+        if (Array.isArray(metaObj?.images)) {
+          rawImages = metaObj.images;
+        } else if (typeof metaObj?.images === "string") {
+          rawImages = [metaObj.images];
+        } else if (metaObj?.image) {
+          rawImages = Array.isArray(metaObj.image)
+            ? metaObj.image
+            : [metaObj.image];
+        }
+
+        const images = rawImages
+          .map((img) =>
+            resolveAssetUrl(
+              img,
+              fileRelDir,
+              current.assetMap,
+              current.files,
+              assetPrefix,
+            ),
+          )
+          .filter((u): u is string => Boolean(u));
+
+        let thumbnail: string | null = images[0] ?? banner ?? null;
+        if (!thumbnail && processed.html) {
+          const match = processed.html.match(/<img[^>]+src=["']([^"']+)["']/i);
+          if (match) {
+            thumbnail = match[1];
+          }
+        }
+
+        let description = (metaObj?.description as string) ?? null;
+        if (!description && processed.html) {
+          const pMatch = processed.html.match(/<p>([\s\S]*?)<\/p>/i);
+          if (pMatch) {
+            const rawSnippet = pMatch[1].replace(/<[^>]+>/g, "").trim();
+            if (rawSnippet) {
+              description =
+                rawSnippet.length > 200
+                  ? `${rawSnippet.slice(0, 197)}...`
+                  : rawSnippet;
+            }
+          }
+        }
+
+        let tags: string[] | undefined;
+        if (Array.isArray(metaObj?.tags)) {
+          tags = metaObj.tags.map(String);
+        } else if (typeof metaObj?.tags === "string") {
+          tags = metaObj.tags
+            .split(",")
+            .map((t) => t.trim())
+            .filter(Boolean);
+        }
+
+        const rawDate =
+          metaObj?.date ?? metaObj?.created ?? metaObj?.publishDate;
+        const date = rawDate ? String(rawDate) : null;
+
+        const sourcePath = sourcePathPrefix
+          ? `${sourcePathPrefix.replace(/\/$/, "")}/${file.relPath}`
+          : file.relPath;
+
+        const entryData: TometEntryData = {
+          ...(metaObj ?? {}),
+          title,
+          slug: id,
+          section,
+          sourcePath,
+          toc: processed.toc ?? [],
+          meta: metaObj,
+          kind,
+          isDataOnly: processed.is_data_only,
+          diagnostics: processed.diagnostics,
+          description,
+          tags,
+          date,
+          banner,
+          bannerY,
+          images,
+          thumbnail,
+        };
+
+        store.set({
+          id,
+          data: entryData,
+          body: processed.is_data_only ? content : "",
+          rendered: {
+            html: processed.html,
+          },
+          filePath: relative(rootDir, file.absPath).split("\\").join("/"),
+          digest,
+        });
+        return problemsOf(path, processed.diagnostics);
+      }
+
+      /** Reports problems in the dev server: logged, never thrown. */
+      const log = (problems: Problem[]) => {
+        for (const p of problems) {
+          (p.severity === "error" ? logger.error : logger.warn)(describe(p));
+        }
+      };
+
+      async function loadAll(current: State): Promise<void> {
+        logger.info(`Reading Tomet documents in ${baseDir}...`);
+        const untouched = new Set(store.keys());
+        for (const file of current.docs) {
+          untouched.delete(file.relPath.replace(/\.(tmt|tm)$/, ""));
+        }
+        const found = await mapConcurrent(current.docs, concurrency, (file) =>
+          loadEntry(file, current),
+        );
+        // Entries of documents that are gone, or no longer published.
+        for (const gone of untouched) store.delete(gone);
+
+        // The collection's own problems first, then the documents', in a fixed order.
+        const problems = [
+          ...current.problems,
+          ...found.flat().sort(
+            (a, b) =>
+              a.path.localeCompare(b.path) ||
+              (a.line ?? 0) - (b.line ?? 0) ||
+              (a.column ?? 0) - (b.column ?? 0),
+          ),
+        ];
+        logger.info(
+          `Loaded ${store.keys().length} Tomet documents` +
+            (problems.length > 0 ? ` with ${problems.length} problem(s).` : "."),
+        );
+        if (problems.length > 0) {
+          if (strict) throw new TometLoaderError(collection, problems);
+          log(problems);
         }
       }
 
-      // Process in batches
-      await mapConcurrent(matchedFiles, concurrency, loadEntry);
-
-      // Clean up deleted entries
-      for (const deletedId of untouchedIds) {
-        store.delete(deletedId);
-      }
-
-      logger.info(`Loaded ${matchedFiles.length} Tomet documents.`);
+      await loadAll(state);
 
       // Watcher for dev mode
       if (watcher) {
         watcher.add(baseDir);
-        if (workspaceConfig && existsSync(resolvedConfigPath)) {
-          watcher.add(resolvedConfigPath);
-        }
+        for (const part of state.parts) watcher.add(part);
 
-        const handleUpdate = async (changedPath: string) => {
-          if (resolve(changedPath) === resolve(resolvedConfigPath)) {
-            logger.info("Workspace config changed, reloading Tomet files...");
-            try {
-              workspaceConfig = await fs.readFile(resolvedConfigPath, "utf8");
-              const newStat = await fs
-                .stat(resolvedConfigPath)
-                .catch(() => null);
-              configKey = newStat ? `${newStat.mtimeMs}` : "";
-              await mapConcurrent(matchedFiles, concurrency, loadEntry);
-            } catch (err) {
-              logger.error(
-                `Failed to reload config ${resolvedConfigPath}: ${err}`,
-              );
-            }
-            return;
+        const isDoc = (path: string) =>
+          path.endsWith(".tmt") || path.endsWith(".tm");
+        const reload = async () => {
+          try {
+            state = await build();
+            await loadAll(state);
+          } catch (err) {
+            logger.error(`Failed to reload Tomet documents: ${err}`);
           }
+        };
 
-          if (changedPath.startsWith(baseDir)) {
-            const relPath = relative(baseDir, changedPath)
-              .split("\\")
-              .join("/");
-            // Maintain vault asset and file index
-            if (!allFilesSet.has(relPath)) {
-              allFilesSet.add(relPath);
-              scanned.allFiles.push(relPath);
-              assetMap.set(basename(relPath), relPath);
-              setVaultFiles(scanned.allFiles);
-            }
-            if (changedPath.endsWith(".tmt") && !changedPath.endsWith(".tm"))
-              return;
-            if (changedPath.endsWith(".tmt") || changedPath.endsWith(".tm")) {
-              if (filter && !filter(relPath)) return;
-              await loadEntry({ absPath: changedPath, relPath });
-            }
+        const handleChange = async (changedPath: string) => {
+          if (state.parts.some((p) => resolve(p) === resolve(changedPath))) {
+            logger.info(
+              "The vault config or a file it registers changed, reloading...",
+            );
+            return reload();
           }
+          if (!changedPath.startsWith(baseDir)) return;
+          const relPath = relative(baseDir, changedPath).split("\\").join("/");
+          // A file that was not there changes what links can reach: the vault is made again.
+          if (!state.files.has(relPath)) return reload();
+          if (!isDoc(changedPath)) return;
+          const file = state.docs.find((d) => d.relPath === relPath);
+          if (!file) return;
+          log(await loadEntry(file, state));
         };
 
         const handleUnlink = async (deletedPath: string) => {
-          if (deletedPath.startsWith(baseDir)) {
-            const relPath = relative(baseDir, deletedPath)
-              .split("\\")
-              .join("/");
-            if (allFilesSet.has(relPath)) {
-              allFilesSet.delete(relPath);
-              const idx = scanned.allFiles.indexOf(relPath);
-              if (idx !== -1) scanned.allFiles.splice(idx, 1);
-              assetMap.delete(basename(relPath));
-              setVaultFiles(scanned.allFiles);
-            }
-            const id = generateId
-              ? generateId({ relPath, absPath: deletedPath })
-              : relPath.replace(/\.(tmt|tm)$/, "");
-            store.delete(id);
-          }
+          if (deletedPath.startsWith(baseDir)) await reload();
         };
 
-        watcher.on("add", handleUpdate);
-        watcher.on("change", handleUpdate);
+        watcher.on("add", handleChange);
+        watcher.on("change", handleChange);
         watcher.on("unlink", handleUnlink);
       }
     },

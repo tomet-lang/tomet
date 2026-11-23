@@ -62,6 +62,142 @@ pub fn render() -> Result<String, String> {
     Ok(out)
 }
 
+/// The file `tomet spec ast-types` writes for what the bindings hand out.
+pub const BINDING_FILE: &str = "binding.d.ts";
+
+/// The definitions of the AST schemas, by name: every definition of each document, and the root of
+/// each (`File`, `PlainValue`) under its own name.
+fn ast_definitions() -> Result<Map<String, Value>, String> {
+    let mut found = Map::new();
+    for (file, schema) in ast_schema::documents() {
+        let root_name = match file {
+            "ast.schema.json" => "File",
+            "plain.schema.json" => "PlainValue",
+            other => return Err(format!("{other}: no root type is named for this schema")),
+        };
+        let Value::Object(mut root) = schema else {
+            return Err(format!("{file}: a schema document is an object"));
+        };
+        let defs = match root.remove("$defs") {
+            Some(Value::Object(defs)) => defs,
+            _ => Map::new(),
+        };
+        for annotation in ["$schema", "$id", "title"] {
+            root.remove(annotation);
+        }
+        // The root refers to itself as `#`; as a definition, it is `#/$defs/<name>`.
+        let mut root = Value::Object(root);
+        name_the_root(&mut root, root_name);
+        found.insert(root_name.to_string(), root);
+        found.extend(defs);
+    }
+    Ok(found)
+}
+
+/// Every `$ref` to the root of its document (`#`) in `schema`, as the `$ref` to the definition `name`.
+fn name_the_root(schema: &mut Value, name: &str) {
+    match schema {
+        Value::Object(map) => {
+            for (key, value) in map.iter_mut() {
+                match value {
+                    Value::String(target) if key == "$ref" && target == "#" => {
+                        *target = format!("#/$defs/{name}");
+                    }
+                    other => name_the_root(other, name),
+                }
+            }
+        }
+        Value::Array(items) => items.iter_mut().for_each(|item| name_the_root(item, name)),
+        _ => {}
+    }
+}
+
+/// The names `schema` refers to with `$ref`.
+fn references(schema: &Value, found: &mut BTreeSet<String>) {
+    match schema {
+        Value::Object(map) => {
+            for (key, value) in map {
+                match value {
+                    Value::String(target) if key == "$ref" => {
+                        if let Some(name) = target.strip_prefix("#/$defs/") {
+                            found.insert(name.to_string());
+                        }
+                    }
+                    other => references(other, found),
+                }
+            }
+        }
+        Value::Array(items) => items.iter().for_each(|item| references(item, found)),
+        _ => {}
+    }
+}
+
+/// The declarations of what the bindings hand out: the vault to read in, the processed file, the
+/// diagnostics. What of the AST they hold is imported from `ast.d.ts`, not declared a second time.
+pub fn render_binding() -> Result<String, String> {
+    let schema = ast_schema::binding_document();
+    let Value::Object(map) = &schema else {
+        return Err(format!("{BINDING_FILE}: a schema document is an object"));
+    };
+    let defs = match map.get("$defs") {
+        Some(Value::Object(defs)) => defs,
+        _ => return Err(format!("{BINDING_FILE}: `$defs` is not an object")),
+    };
+    let ast = ast_definitions()?;
+
+    let generator = Generator {
+        file: ast_schema::BINDING_FILE,
+        root: "",
+        defs: defs.keys().cloned().collect(),
+    };
+    let mut imports = BTreeSet::new();
+    let mut declarations: Vec<(String, String)> = Vec::new();
+    for (name, def) in defs {
+        if let Some(of_the_ast) = ast.get(name) {
+            // The same name must be the same type: the two documents are generated from one source,
+            // and a name that means two things is a clash, not an import.
+            if of_the_ast != def {
+                return Err(format!(
+                    "{}: `{name}` is not the type the AST schemas define under that name",
+                    ast_schema::BINDING_FILE
+                ));
+            }
+            continue;
+        }
+        let mut referred = BTreeSet::new();
+        references(def, &mut referred);
+        imports.extend(referred.into_iter().filter(|r| ast.contains_key(r)));
+        declarations.push((
+            name.clone(),
+            generator.declaration(name, def, &format!("#/$defs/{name}"))?,
+        ));
+    }
+    declarations.sort();
+
+    let mut out = String::from(BINDING_HEADER);
+    if !imports.is_empty() {
+        let names: Vec<&str> = imports.iter().map(String::as_str).collect();
+        let _ = writeln!(
+            out,
+            "import type {{ {} }} from \"./ast.js\";",
+            names.join(", ")
+        );
+    }
+    for (_, text) in declarations {
+        out.push('\n');
+        out.push_str(&text);
+    }
+    Ok(out)
+}
+
+const BINDING_HEADER: &str = "\
+// Generated by `tomet spec ast-types` from the JSON Schema of the bindings (`bindings/schema/binding.schema.json`).
+// Do not edit it: change the doc comments of the Rust types, then run `tomet spec ast-schema` and
+// `tomet spec ast-types` again (`just docs`).
+//
+// What the functions of `@tomet/wasm` take and return besides a document. The AST it refers to is `ast.d.ts`.
+";
+
 const HEADER: &str = "\
 // Generated by `tomet spec ast-types` from the JSON Schemas of the AST (`bindings/schema/`).
 // Do not edit it: change the doc comments of the Rust types, then run `tomet spec ast-schema` and

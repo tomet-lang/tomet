@@ -1,5 +1,5 @@
 # `@tomet/wasm` as an npm package directory: bindings/js compiled to wasm32 and
-# run through wasm-bindgen, next to the hand-written index.js / index.d.ts and the generated ast.d.ts.
+# run through wasm-bindgen, next to the hand-written index.js / index.d.ts and the generated ast.d.ts / binding.d.ts.
 #
 # Consumers (packages/astro, the website) take this instead of a locally built
 # bindings/js/pkg, so the renderer they ship is the revision they lock.
@@ -59,6 +59,7 @@ stdenvNoCC.mkDerivation {
       ../../bindings/js/index.js
       ../../bindings/js/index.d.ts
       ../../bindings/js/ast.d.ts
+      ../../bindings/js/binding.d.ts
     ];
   };
 

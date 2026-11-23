@@ -163,3 +163,255 @@ describe("tometLoader contract", () => {
     assert.equal(typeof loader.load, "function");
   });
 });
+
+// ---------------------------------------------------------------------------------------------
+// The loader on a real directory: what it publishes, and what it refuses to publish silently.
+// ---------------------------------------------------------------------------------------------
+
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { pathToFileURL } from "node:url";
+import { createHash } from "node:crypto";
+import { TometLoaderError } from "../dist/index.js";
+
+type Entry = {
+  id: string;
+  digest?: string;
+  data: Record<string, any>;
+  rendered?: { html: string };
+};
+
+/** The pieces of Astro's `LoaderContext` the loader uses. */
+function context(root: string, store = new Map<string, Entry>(), dev = false) {
+  const logged: { level: string; message: string }[] = [];
+  const log = (level: string) => (message: string) => logged.push({ level, message });
+  const handlers: Record<string, ((path: string) => unknown)[]> = {};
+  const watcher = dev
+    ? {
+        add() {},
+        on(event: string, handler: (path: string) => unknown) {
+          (handlers[event] ??= []).push(handler);
+        },
+      }
+    : undefined;
+  return {
+    store,
+    logged,
+    handlers,
+    context: {
+      collection: "docs",
+      config: { root: pathToFileURL(`${root}/`) },
+      logger: {
+        info: log("info"),
+        warn: log("warn"),
+        error: log("error"),
+        debug: log("debug"),
+      },
+      generateDigest: (data: unknown) =>
+        createHash("sha256")
+          .update(typeof data === "string" ? data : JSON.stringify(data))
+          .digest("hex"),
+      store: {
+        get: (id: string) => store.get(id),
+        set: (entry: Entry) => {
+          store.set(entry.id, entry);
+          return true;
+        },
+        delete: (id: string) => void store.delete(id),
+        keys: () => [...store.keys()],
+      },
+      watcher,
+    } as any,
+  };
+}
+
+/** A directory of documents: `files` maps a path to its text. */
+function site(files: Record<string, string>): string {
+  const root = mkdtempSync(join(tmpdir(), "tomet-astro-"));
+  for (const [path, text] of Object.entries(files)) {
+    const file = join(root, "docs", path);
+    mkdirSync(join(file, ".."), { recursive: true });
+    writeFileSync(file, text);
+  }
+  return root;
+}
+
+async function failure(load: Promise<unknown>): Promise<TometLoaderError> {
+  try {
+    await load;
+  } catch (err) {
+    assert.ok(err instanceof TometLoaderError, String(err));
+    return err;
+  }
+  assert.fail("the load did not fail");
+}
+
+describe("tometLoader on a directory", () => {
+  const broken = {
+    "good.tmt": "=[ Good ]\n\nFine.\n",
+    "parse.tmt": "@foo(\n=[ x",
+    "empty.tmt": "\n",
+    "draft.tmt": "=[ Draft ]\n\n@draft(例)\n",
+    "unknown.tmt": "=[ U ]\n\n@frobnicate[ hi ]\n",
+    "links.tmt": "=[ L ]\n\n@link(ref:Nowhere)[x]\n",
+  };
+
+  test("a build fails with every problem at once, each with file, line and column", async () => {
+    const root = site(broken);
+    const { context: ctx } = context(root);
+    const error = await failure(
+      tometLoader({ base: "docs" }).load(ctx),
+    );
+    const lines = error.message.split("\n").slice(1);
+    const has = (text: string) =>
+      assert.ok(
+        lines.some((l) => l.includes(text)),
+        `${text}\n${error.message}`,
+      );
+    has("docs/parse.tmt:2:5: error parse-error: expected ')'");
+    has("docs/empty.tmt:1:1: error empty-document");
+    has("docs/draft.tmt:3:1: warning draft");
+    has("docs/unknown.tmt:3:1: error unknown-element");
+    has("docs/links.tmt:3:1: error unresolved-link");
+    assert.equal(error.problems.length, 5);
+    assert.ok(!error.message.includes("good.tmt"));
+    rmSync(root, { recursive: true });
+  });
+
+  test("the dev server logs the same problems and keeps serving", async () => {
+    const root = site(broken);
+    const { context: ctx, logged, store } = context(root, new Map(), true);
+    await tometLoader({ base: "docs" }).load(ctx);
+    const problems = logged.filter((l) => l.level === "error" || l.level === "warn");
+    assert.equal(problems.length, 5);
+    // What parses is served, with what is wrong with it; what does not parse and what is empty is not.
+    assert.deepEqual([...store.keys()].sort(), ["draft", "good", "links", "unknown"]);
+    assert.equal(store.get("draft")!.data.diagnostics[0].code, "draft");
+    rmSync(root, { recursive: true });
+  });
+
+  test("an empty collection and a missing directory are problems, not an empty site", async () => {
+    const root = site({ "a.tmt": "=[ A ]\n\nx\n" });
+    const none = await failure(
+      tometLoader({ base: "docs", filter: () => false }).load(context(root).context),
+    );
+    assert.match(none.message, /no-documents/);
+    const missing = await failure(
+      tometLoader({ base: "nowhere" }).load(context(root).context),
+    );
+    assert.match(missing.message, /missing-base/);
+    rmSync(root, { recursive: true });
+  });
+
+  test("a link to a document the filter left out is a problem", async () => {
+    const root = site({
+      "a.tmt": "=[ A ]\n\n@link(ref:Hidden)[hidden]\n\n@link(ref:b)[b]\n",
+      "b.tmt": "=[ B ]\n\nText.\n",
+      "Hidden.tmt": "=[ Hidden ]\n\nText.\n",
+    });
+    const error = await failure(
+      tometLoader({ base: "docs", filter: (p) => p !== "Hidden.tmt" }).load(
+        context(root).context,
+      ),
+    );
+    assert.equal(error.problems.length, 1);
+    assert.match(error.problems[0].message, /not published/);
+    assert.equal(error.problems[0].line, 3);
+    rmSync(root, { recursive: true });
+  });
+
+  test("a cache hit reports what was found before", async () => {
+    const root = site({ "a.tmt": "=[ A ]\n\n@draft(x)\n" });
+    const store = new Map<string, Entry>();
+    const loader = tometLoader({ base: "docs", strict: false });
+    await loader.load(context(root, store).context);
+    const first = store.get("a")!.digest;
+    // The same store, nothing changed: the entry is not rendered again, and is still not clean.
+    const again = context(root, store);
+    await loader.load(again.context);
+    assert.equal(store.get("a")!.digest, first);
+    assert.equal(again.logged.filter((l) => l.level === "warn").length, 1);
+    const error = await failure(tometLoader({ base: "docs" }).load(context(root, store).context));
+    assert.match(error.message, /docs\/a\.tmt:3:1: warning draft/);
+    rmSync(root, { recursive: true });
+  });
+
+  test("a document is rendered again when a file it links to is gone", async () => {
+    const root = site({
+      "a.tmt": "=[ A ]\n\n@link(ref:b)[b]\n",
+      "b.tmt": "=[ B ]\n\nText.\n",
+    });
+    const store = new Map<string, Entry>();
+    await tometLoader({ base: "docs" }).load(context(root, store).context);
+    assert.match(store.get("a")!.rendered!.html, /href="\/docs\/b"/);
+    rmSync(join(root, "docs", "b.tmt"));
+    const error = await failure(
+      tometLoader({ base: "docs" }).load(context(root, store).context),
+    );
+    assert.match(error.message, /docs\/a\.tmt:3:1: error unresolved-link/);
+    rmSync(root, { recursive: true });
+  });
+
+  test("two collections never see each other's files", async () => {
+    const one = site({ "a.tmt": "=[ A ]\n\n@link(ref:Note)[n]\n", "Note.tmt": "=[ N ]\n\nx\n" });
+    const two = site({ "a.tmt": "=[ A ]\n\n@link(ref:Note)[n]\n", "Other.tmt": "=[ O ]\n\nx\n" });
+    const [ok, bad] = await Promise.allSettled([
+      tometLoader({ base: "docs" }).load(context(one).context),
+      tometLoader({ base: "docs" }).load(context(two).context),
+    ]);
+    assert.equal(ok.status, "fulfilled");
+    assert.equal(bad.status, "rejected");
+    rmSync(one, { recursive: true });
+    rmSync(two, { recursive: true });
+  });
+
+  test("a file: link goes to the page, to the source URL, or is a problem", async () => {
+    const root = site({
+      "spec/a.tmt":
+        "=[ A ]\n\n@link(file:tmtroot/spec/b.tmt#sec)[page]\n\n@link(file:crates/x/lib.rs)[source]\n\n@link(dir:tmtroot/spec)[dir]\n",
+      "spec/b.tmt": "=[ B ]\n\n==[ Sec ]\n\nx\n",
+    });
+    const store = new Map<string, Entry>();
+    const sourceUrl = {
+      file: "https://git.example/blob/rev/{path}",
+      dir: "https://git.example/tree/rev/{path}",
+    };
+    await tometLoader({ base: "docs", basePath: "tmtroot", sourceUrl }).load(
+      context(root, store).context,
+    );
+    const html = store.get("spec/a")!.rendered!.html;
+    assert.match(html, /href="\/docs\/spec\/b#sec"/);
+    assert.match(html, /href="https:\/\/git\.example\/blob\/rev\/crates\/x\/lib\.rs"/);
+    assert.match(html, /href="https:\/\/git\.example\/tree\/rev\/tmtroot\/spec"/);
+
+    // Without a source URL, what has no page is a problem: never a raw path.
+    const error = await failure(
+      tometLoader({ base: "docs", basePath: "tmtroot" }).load(context(root).context),
+    );
+    assert.equal(error.problems.length, 2);
+    assert.match(error.problems[0].message, /source URL/);
+    rmSync(root, { recursive: true });
+  });
+
+  test("the vault config gives the documents its vocabularies and dictionaries", async () => {
+    const root = site({
+      "a.tmt": "=[ A ]\n\n@term(tomet#config)\n",
+      "vault.config.tmt": "::dictionary(tomet: @file(dict.tmt))\n",
+      "dict.tmt": '::dictionary(tomet)\n\n;@term("config")[ the settings ]#(config)\n',
+    });
+    const loader = (vault?: string) =>
+      tometLoader({
+        base: "docs",
+        filter: (p) => p === "a.tmt",
+        ...(vault ? { vault } : {}),
+      });
+    // The config is under `base` by default; with it the term is known.
+    await loader().load(context(root).context);
+    rmSync(join(root, "docs", "vault.config.tmt"));
+    rmSync(join(root, "docs", "dict.tmt"));
+    const error = await failure(loader().load(context(root).context));
+    assert.match(error.message, /unresolved-term/);
+    rmSync(root, { recursive: true });
+  });
+});

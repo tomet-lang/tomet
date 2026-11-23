@@ -1,16 +1,20 @@
-//! JSON Schema of the AST wire format, generated from the Rust types.
+//! JSON Schema of the AST wire format and of what the bindings hand out, generated from the Rust types.
 //!
-//! The AST crates derive `schemars::JsonSchema` (behind their `schema` feature) next to the serde
-//! derives, so the schema is the serde shape of the types and cannot be described by hand. Two
-//! documents come out, one per contract a consumer can hold:
+//! The AST crates and `tomet-binding` derive `schemars::JsonSchema` (behind their `schema` feature)
+//! next to the serde derives, so the schema is the serde shape of the types and cannot be described by
+//! hand. Three documents come out, one per contract a consumer can hold:
 //!
 //! - `ast.schema.json`: the AST wire, rooted at `File`. Lossless; what `parseFile` hands out and
 //!   `toHtml(file)` and friends take back.
 //! - `plain.schema.json`: plain data, rooted at `PlainValue`. Lossy by design; what `parseValue`, `loads`
 //!   and a processed file's `meta` hand out.
+//! - `binding.schema.json`: what the functions of a binding take and return besides a document: the
+//!   vault to read in, the processed file, the diagnostics, the options. It has no root, every type in
+//!   it is a definition. It carries the AST definitions it refers to (`Declaration`, `PlainValue`,
+//!   `Span`), so that it can be read alone; the TypeScript declarations import them instead.
 //!
-//! They are two files because they are two contracts with nothing in common: a consumer that wants
-//! one should not have to carry, or to resolve a `$ref` into, the other.
+//! They are three files because they are three contracts: a consumer that wants one should not have to
+//! carry, or to resolve a `$ref` into, the others.
 //!
 //! Descriptions are the Rust doc comments, rewritten for a reader who does not know Rust: rustdoc
 //! links lose their link (`` [`Entry`](crate::Entry) `` is `` `Entry` ``), Rust paths lose their crate
@@ -20,7 +24,7 @@ use schemars::JsonSchema;
 use schemars::generate::{Contract, SchemaSettings};
 use serde_json::{Map, Value};
 
-/// The schema documents `tomet spec ast-schema` writes: file name, and the schema.
+/// The schema documents of the AST: file name, and the schema.
 ///
 /// `tomet spec ast-types` reads these same documents, so the types and the schemas have one source.
 pub fn documents() -> Vec<(&'static str, Value)> {
@@ -36,10 +40,14 @@ pub fn documents() -> Vec<(&'static str, Value)> {
     ]
 }
 
-/// The schema documents, rendered: file name, and the text of the file.
+/// The file of what the bindings hand out.
+pub const BINDING_FILE: &str = "binding.schema.json";
+
+/// The schema documents `tomet spec ast-schema` writes, rendered: file name, and the text of the file.
 pub fn render() -> Vec<(&'static str, String)> {
     documents()
         .into_iter()
+        .chain([(BINDING_FILE, binding_document())])
         .map(|(file, schema)| {
             let mut text = serde_json::to_string_pretty(&schema).expect("a schema serializes");
             text.push('\n');
@@ -55,12 +63,53 @@ const VERSION: &str = env!("CARGO_PKG_VERSION");
 /// Where the schemas are published. An identifier, not a locator: nothing is fetched from it.
 const ID_BASE: &str = "https://github.com/tomet-lang/tomet/schemas";
 
-fn document<T: JsonSchema>(file: &str, title: &str) -> Value {
-    let settings = SchemaSettings::draft2020_12().with(|s| {
+fn settings() -> SchemaSettings {
+    SchemaSettings::draft2020_12().with(|s| {
         // What this crate writes: every field is present (an absent one is `null`), so the schema
-        // says so, which is what a reader of the type needs. The reading side accepts the same.
+        // says so, which is what a reader of the type needs. The reading side accepts the same. A
+        // field a caller may leave out is declared `skip_serializing_if`, which is what makes it optional.
         s.contract = Contract::Serialize;
-    });
+    })
+}
+
+/// The schema of what the functions of a binding take and return besides a document.
+///
+/// There is no root: every type is a definition. The types named here are the ones the functions
+/// take (`VaultSources`, `ProcessOptions`) and return (`ProcessedFile`, `Registry`, `HighlightSpan`);
+/// what those hold (`Diagnostic`, `TocItem`, `Declaration`, ...) comes with them.
+pub fn binding_document() -> Value {
+    let settings = settings();
+    let meta_schema = settings
+        .meta_schema
+        .as_ref()
+        .expect("draft 2020-12 names its dialect")
+        .to_string();
+    let mut generator = settings.into_generator();
+    generator.subschema_for::<tomet_binding::VaultSources>();
+    generator.subschema_for::<tomet_binding::ProcessOptions>();
+    generator.subschema_for::<tomet_binding::ProcessedFile>();
+    generator.subschema_for::<tomet_binding::Registry>();
+    generator.subschema_for::<tomet_binding::HighlightSpan>();
+    let mut root = Map::new();
+    root.insert(
+        "$defs".into(),
+        Value::Object(generator.take_definitions(true)),
+    );
+    clean_descriptions(&mut root);
+
+    let mut out = Map::new();
+    out.insert("$schema".into(), Value::String(meta_schema));
+    out.insert(
+        "$id".into(),
+        Value::String(format!("{ID_BASE}/{VERSION}/{BINDING_FILE}")),
+    );
+    out.insert("title".into(), Value::String("Tomet bindings".into()));
+    out.extend(root);
+    Value::Object(out)
+}
+
+fn document<T: JsonSchema>(file: &str, title: &str) -> Value {
+    let settings = settings();
     let schema = settings.into_generator().into_root_schema_for::<T>();
     let mut root = match schema.to_value() {
         Value::Object(map) => map,

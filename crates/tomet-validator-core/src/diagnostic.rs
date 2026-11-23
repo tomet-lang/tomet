@@ -433,6 +433,55 @@ impl Diagnostic {
             _ => Severity::Error,
         }
     }
+
+    /// A stable name for the kind of finding, in lower case with hyphens (`unknown-element`): what a tool
+    /// that does not read the message can tell apart, and what a report carries as its `code`.
+    pub fn code(&self) -> &'static str {
+        match self {
+            Diagnostic::DuplicateId { .. } => "duplicate-id",
+            Diagnostic::DanglingAnchor { .. } => "dangling-anchor",
+            Diagnostic::MissingRequiredMetaKey { .. } => "missing-required-meta-key",
+            Diagnostic::MissingRequiredSection { .. } => "missing-required-section",
+            Diagnostic::UnknownElement { .. } => "unknown-element",
+            Diagnostic::UnknownAttribute { .. } => "unknown-attribute",
+            Diagnostic::DuplicateSingleton { .. } => "duplicate-singleton",
+            Diagnostic::WrongSigil { .. } => "wrong-sigil",
+            Diagnostic::ShapeMismatch { .. } => "shape-mismatch",
+            Diagnostic::UnknownArgument { .. } => "unknown-argument",
+            Diagnostic::InvalidArgument { .. } => "invalid-argument",
+            Diagnostic::MissingRequiredArgument { .. } => "missing-required-argument",
+            Diagnostic::TooManyArguments { .. } => "too-many-arguments",
+            Diagnostic::UnknownConstructor { .. } => "unknown-constructor",
+            Diagnostic::TooManyPositionalArguments { .. } => "too-many-positional-arguments",
+            Diagnostic::DuplicateArgument { .. } => "duplicate-argument",
+            Diagnostic::Draft { .. } => "draft",
+            Diagnostic::Fixme { .. } => "fixme",
+            Diagnostic::Conflict { .. } => "conflict",
+            Diagnostic::UnknownConnect { .. } => "unknown-connect",
+            Diagnostic::DisallowedByRule { .. } => "disallowed-by-rule",
+            Diagnostic::ContentNotInline { .. } => "content-not-inline",
+            Diagnostic::DisallowedInContent { .. } => "disallowed-in-content",
+            Diagnostic::VaultOnlyDeclaration { .. } => "vault-only-declaration",
+            Diagnostic::RegistryNameMismatch { .. } => "registry-name-mismatch",
+            Diagnostic::UnresolvedTerm { .. } => "unresolved-term",
+            Diagnostic::NotStandalone { .. } => "not-standalone",
+            Diagnostic::MetaIdMoved { .. } => "meta-id-moved",
+            Diagnostic::InvalidDefinition { .. } => "invalid-definition",
+            Diagnostic::InvalidFieldValue { .. } => "invalid-field-value",
+            Diagnostic::NotForThisHost { .. } => "not-for-this-host",
+            Diagnostic::InvalidUse { .. } => "invalid-use",
+            Diagnostic::UnexpectedDeclarationData { .. } => "unexpected-declaration-data",
+            Diagnostic::ExpectedEntries { .. } => "expected-entries",
+            Diagnostic::UnexpectedDeclarationProse { .. } => "unexpected-declaration-prose",
+            Diagnostic::RetiredDeclaration { .. } => "retired-declaration",
+            Diagnostic::TypeSeatOutsideBlueprint { .. } => "type-seat-outside-blueprint",
+            Diagnostic::InvalidTypeSeat { .. } => "invalid-type-seat",
+            Diagnostic::MissingRequiredKey { .. } => "missing-required-key",
+            Diagnostic::UnknownKey { .. } => "unknown-key",
+            Diagnostic::MissingRequiredHeaderAttr { .. } => "missing-required-header-attr",
+            Diagnostic::InvalidBlueprintValue { .. } => "invalid-blueprint-value",
+        }
+    }
 }
 
 /// `Display` has no source text, so it cannot say where a *related* span (the first

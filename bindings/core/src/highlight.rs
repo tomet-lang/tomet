@@ -2,10 +2,15 @@ use serde::{Deserialize, Serialize};
 
 /// A range of the source to color. Offsets are bytes of the source.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct HighlightSpan {
+    /// Where the range starts.
     pub from: usize,
+    /// Where the range ends, exclusive.
     pub to: usize,
+    /// What the range is: `heading`, `bracket`, `tagName`, `string`, ...
     pub tag: String,
+    /// How deep the range is nested in brackets.
     pub depth: usize,
 }
 

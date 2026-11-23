@@ -19,6 +19,7 @@
     "index.js",
     "index.d.ts",
     "ast.d.ts",
+    "binding.d.ts",
     "pkg"
   ],
   "keywords": [

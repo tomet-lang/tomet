@@ -15,6 +15,7 @@ path = "src/main.rs"
 cotomet                  = { workspace = true }
 cotomet-eval             = { workspace = true }
 tomet-ast                = { workspace = true, features = ["schema"] }
+tomet-binding            = { workspace = true, features = ["schema"] }
 tomet-ast-parser         = { workspace = true }
 tomet-config             = { workspace = true }
 tomet-convert-standalone = { workspace = true }

@@ -3,11 +3,17 @@
  *
  * Provides `tometLoader` for Astro 5 Content Collections, rendering `.tmt` documents
  * in-process via `@tomet/wasm` with incremental caching designed for up to 50,000+ files.
+ *
+ * A loader that skips what it cannot publish publishes a broken site, so `tometLoader` does not skip.
+ * Anything wrong with a document -- it does not parse, it is empty, a link goes nowhere, an element is
+ * unknown, it still says `@draft` -- is a *problem*. In a build every problem is collected, with the
+ * file, line and column, and the build fails with all of them at once. In the dev server the same
+ * problems are logged and the pages are still served, so a typo does not take the server down.
  */
 import type { AstroIntegration } from "astro";
 import type { Loader } from "astro/loaders";
-import { type Declaration, type ProcessOptions, type ProcessedFile, type TocItem } from "@tomet/wasm";
-export type { ProcessOptions, ProcessedFile, TocItem };
+import { type Declaration, type Diagnostic, type ProcessOptions, type ProcessedFile, type TocItem } from "@tomet/wasm";
+export type { Diagnostic, ProcessOptions, ProcessedFile, TocItem };
 /**
  * Ensures the WebAssembly engine is loaded and initialized.
  */
@@ -30,6 +36,9 @@ export interface TometLoaderOptions {
     /**
      * Base directory containing `.tmt` files.
      * Can be relative to the Astro project root or absolute.
+     *
+     * The id of an entry is the path of its document from here without the extension (`spec/syntax`), and
+     * the page of that entry is at `<urlPrefix>/<id>`: a link to a document is written on that rule.
      */
     base: string;
     /**
@@ -43,24 +52,18 @@ export interface TometLoaderOptions {
      */
     concurrency?: number;
     /**
-     * Custom slug / entry ID generator.
-     * By default, strips `.tmt` / `.tm` extension and uses the relative POSIX path.
-     */
-    generateId?: (params: {
-        relPath: string;
-        absPath: string;
-    }) => string;
-    /**
-     * Custom filter to include or exclude paths.
-     * Return `false` to skip a file.
+     * Custom filter to include or exclude paths: the documents of `base` that become entries. Return
+     * `false` to leave one out. A document that is left out is not read, and a link to it is a problem:
+     * the site has no page for it.
      */
     filter?: (relPath: string) => boolean;
     /**
-     * URL prefix prepended to resolved `ref:` links (default: `'/docs'`).
+     * URL prefix of the pages: `/docs` (the default) gives `/docs/spec/syntax`.
      */
     urlPrefix?: string;
     /**
-     * URL prefix prepended to resolved image/asset `@embed` targets (default: `'/vault'`).
+     * URL prefix of the files that are not documents (images, ...): `/vault` (the default) gives
+     * `/vault/img/x.png`. Serving them is the site's job.
      */
     assetPrefix?: string;
     /**
@@ -69,9 +72,32 @@ export interface TometLoaderOptions {
      */
     sourcePathPrefix?: string;
     /**
-     * Optional path to the workspace configuration file (defaults to `vault.config.tmt` under `base`).
+     * The vault config (`vault.config.tmt`) the documents are read with: macros, variables, and the
+     * vocabularies, dictionaries and blueprints it registers, which are read from the directory it is in.
+     * Relative to the Astro project root, or absolute. Defaults to `vault.config.tmt` under `base`, if
+     * there is one. Without a config, documents are read with `std` alone.
      */
-    configPath?: string;
+    vault?: string;
+    /**
+     * Where `base` is in the vault, from the vault's root, when it is a part of it: `tmtroot` if `base` is
+     * the `tmtroot/` of the vault. A path a document writes (`file:tmtroot/spec/x.tmt`) is written from
+     * the vault's root, and this is what it is read from. Defaults to `''`: `base` is the vault.
+     */
+    basePath?: string;
+    /**
+     * Where the source of the project is on the web, as URL templates with `{path}` for the path from
+     * the vault's root (percent-encoded). A `file:` or `dir:` link to something the site has no page for
+     * goes there; without it, such a link is a problem.
+     */
+    sourceUrl?: {
+        file: string;
+        dir: string;
+    };
+    /**
+     * Whether a problem fails the load. Defaults to `true` in a build and `false` in the dev server, where
+     * problems are logged and the pages are still served.
+     */
+    strict?: boolean;
 }
 export interface TometEntryData {
     title: string;
@@ -82,6 +108,8 @@ export interface TometEntryData {
     meta: Record<string, unknown> | null;
     kind: string | null;
     isDataOnly: boolean;
+    /** What is wrong with the document, or what it says about itself (`@draft`): see `Diagnostic`. */
+    diagnostics: Diagnostic[];
     description?: string | null;
     tags?: string[];
     date?: string | null;
@@ -90,6 +118,27 @@ export interface TometEntryData {
     images?: string[];
     thumbnail?: string | null;
     [key: string]: unknown;
+}
+/**
+ * Something wrong with a document, or with the collection it is in, and where.
+ */
+export interface Problem {
+    /** The file, relative to the Astro project root when it is under it. */
+    path: string;
+    /** Counted from 1; `null` for a problem of the whole file or collection. */
+    line: number | null;
+    column: number | null;
+    severity: "error" | "warning";
+    /** What kind of problem: a `Diagnostic.code`, or `parse-error`, `empty-document`, `unreadable`, ... */
+    code: string;
+    message: string;
+}
+/**
+ * What a strict load throws: every problem found, one per line, with where it is.
+ */
+export declare class TometLoaderError extends Error {
+    readonly problems: readonly Problem[];
+    constructor(collection: string, problems: readonly Problem[]);
 }
 /**
  * Resolves a raw asset reference (e.g. `@link(ref:+hash.png)`, `+hash.png`, `https://...`)
@@ -110,6 +159,14 @@ export declare function resolveAssetUrl(raw: unknown, fileRelDir: string, assetM
  *   }),
  * };
  * ```
+ *
+ * =[ Problems ]
+ *
+ * Every problem is found before any is reported: a build fails once, with all of them
+ * (`TometLoaderError`), each with its file, line and column. That includes a document that does not
+ * parse, an empty one, an `@draft`, a link that goes nowhere, and an unknown element, and also a
+ * `base` that is not there and a `filter` that matches nothing. What a site does not want to publish is
+ * left out with `filter`; nothing is skipped silently.
  */
 export declare function tometLoader(options: TometLoaderOptions): Loader;
 /** Options accepted by the Astro integration. */

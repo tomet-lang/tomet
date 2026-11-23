@@ -1,14 +1,20 @@
+//! The WebAssembly binding: `@tomet/wasm`.
+//!
+//! This crate moves values across the boundary and nothing more. What a vault is, what reading a
+//! document for a page gives and what the diagnostics about it are, is `tomet-binding`'s; the
+//! TypeScript types of those are generated from its definitions (`bindings/js/binding.d.ts`) and of
+//! the AST from the AST's (`bindings/js/ast.d.ts`), so `index.d.ts` only declares the functions.
+
 use tomet::config::PrinterConfig;
-use tomet::vault::Vault;
+use tomet_binding::{Input, Vault as Inner, VaultSources};
 use wasm_bindgen::prelude::*;
 
-/// A vault with no vocabularies of its own: what this module reads every document in.
+/// A vault with no vocabularies of its own: what the functions that take no vault read every document in.
 ///
-/// The facade has no bare parse on purpose (see `tomet`'s crate doc), and
-/// nothing here but `validateWith` needs one: reading a document as `std`
-/// alone is exactly what an empty vault does.
-fn empty_vault() -> Vault {
-    Vault::from_sources(PrinterConfig::default(), ".", &[])
+/// The facade has no bare parse on purpose (see `tomet`'s crate doc), and nothing here but a vault
+/// needs one: reading a document as `std` alone is exactly what an empty vault does.
+fn empty_vault() -> tomet::vault::Vault {
+    tomet::vault::Vault::from_sources(PrinterConfig::default(), ".", &[])
 }
 
 /// The names `doc` has in scope in the [`empty_vault`], which is what a converter is handed.
@@ -26,6 +32,35 @@ fn to_js<T: serde::Serialize + ?Sized>(value: &T) -> Result<JsValue, JsValue> {
         .map_err(|e| JsValue::from_str(&e.to_string()))
 }
 
+fn from_js<T: serde::de::DeserializeOwned + Default>(value: Option<JsValue>) -> Result<T, JsValue> {
+    match value {
+        Some(value) if !value.is_undefined() && !value.is_null() => {
+            serde_wasm_bindgen::from_value(value).map_err(|e| JsValue::from_str(&e.to_string()))
+        }
+        _ => Ok(T::default()),
+    }
+}
+
+fn error(e: impl ToString) -> JsValue {
+    JsValue::from_str(&e.to_string())
+}
+
+/// Runs `read` with the document `source_or_file` is: text, or a `File` AST object.
+fn with_input<T>(
+    source_or_file: &JsValue,
+    read: impl FnOnce(Input<'_>) -> Result<T, String>,
+) -> Result<T, JsValue> {
+    let result = match source_or_file.as_string() {
+        Some(text) => read(Input::Source(&text)),
+        None => {
+            let doc: tomet::ast::File =
+                serde_wasm_bindgen::from_value(source_or_file.clone()).map_err(error)?;
+            read(Input::File(doc))
+        }
+    };
+    result.map_err(error)
+}
+
 /// Parses `source` in the [`empty_vault`].
 fn parse_plain(source: &str) -> Result<tomet::File, String> {
     empty_vault()
@@ -37,7 +72,7 @@ fn parse_plain(source: &str) -> Result<tomet::File, String> {
 /// Parse `.tmt` markup source text into a JavaScript `File` AST object.
 #[wasm_bindgen(js_name = parseFile)]
 pub fn parse_file(source: &str) -> Result<JsValue, JsValue> {
-    let doc = parse_plain(source).map_err(|e| JsValue::from_str(&e.to_string()))?;
+    let doc = parse_plain(source).map_err(error)?;
     to_js(&doc)
 }
 
@@ -46,276 +81,77 @@ pub fn parse_file(source: &str) -> Result<JsValue, JsValue> {
 /// element, `auto`, ...) is an error naming it: read it with `parseFile` to see the AST.
 #[wasm_bindgen(js_name = parseValue)]
 pub fn parse_value(source: &str) -> Result<JsValue, JsValue> {
-    let val = tomet::parse_value(source).map_err(|e| JsValue::from_str(&e.to_string()))?;
-    let plain = val
-        .to_plain()
-        .map_err(|e| JsValue::from_str(&e.to_string()))?;
+    let val = tomet::parse_value(source).map_err(error)?;
+    let plain = val.to_plain().map_err(error)?;
     to_js(&plain)
 }
 
-/// Options controlling HTML rendering and document processing.
-#[derive(serde::Serialize, serde::Deserialize, Default, Debug, Clone)]
-#[serde(rename_all = "camelCase")]
-pub struct ProcessOptions {
-    pub advanced: Option<bool>,
-    #[serde(alias = "number_headings")]
-    pub number_headings: Option<bool>,
-    #[serde(alias = "auto_slug_headings")]
-    pub auto_slug_headings: Option<bool>,
-    pub lang: Option<String>,
-    #[serde(alias = "current_path")]
-    pub current_path: Option<String>,
-    #[serde(alias = "url_prefix")]
-    pub url_prefix: Option<String>,
-    #[serde(alias = "asset_prefix")]
-    pub asset_prefix: Option<String>,
-    #[serde(alias = "vault_files")]
-    pub vault_files: Option<Vec<String>>,
-    pub config: Option<String>,
+/// A vault to read documents in: made once from its sources, it owns all of its state, so two
+/// vaults never see each other's files.
+#[wasm_bindgen]
+pub struct Vault {
+    inner: Inner,
 }
 
-impl ProcessOptions {
-    fn to_render_options(&self) -> tomet::html::RenderOptions {
-        let advanced = self.advanced.unwrap_or(false);
-        tomet::html::RenderOptions {
-            number_headings: self.number_headings.unwrap_or(advanced),
-            auto_slug_headings: self.auto_slug_headings.unwrap_or(advanced),
-            lang: self.lang.clone(),
-            ..Default::default()
-        }
+#[wasm_bindgen]
+impl Vault {
+    /// Makes a vault of `sources`. Throws, naming it, if a part of them is not usable.
+    #[wasm_bindgen(constructor)]
+    pub fn new(sources: Option<JsValue>) -> Result<Vault, JsValue> {
+        let sources: VaultSources = from_js(sources)?;
+        Ok(Vault {
+            inner: Inner::new(&sources).map_err(error)?,
+        })
+    }
+
+    /// Reads `.tmt` source text or a `File` AST object for a page: HTML, metadata, title, table of
+    /// contents, and the diagnostics about the document. Throws if the document does not parse.
+    #[wasm_bindgen(js_name = processFile)]
+    pub fn process_file(
+        &self,
+        source_or_file: &JsValue,
+        options: Option<JsValue>,
+    ) -> Result<JsValue, JsValue> {
+        let options = from_js(options)?;
+        let processed = with_input(source_or_file, |input| self.inner.process(input, &options))?;
+        to_js(&processed)
+    }
+
+    /// Validates `.tmt` source text or a `File` AST object the way `tomet check` does, in this vault.
+    pub fn validate(&self, source_or_file: &JsValue) -> Result<JsValue, JsValue> {
+        let found = with_input(source_or_file, |input| self.inner.check(input))?;
+        to_js(&found)
     }
 }
 
-use std::sync::Mutex;
-use tomet_links::VaultLinkIndex;
-
-static GLOBAL_VAULT_INDEX: Mutex<Option<VaultLinkIndex>> = Mutex::new(None);
-
-/// Pre-builds and caches the link resolution index in Wasm memory once for the entire vault.
-#[wasm_bindgen(js_name = setVaultFiles)]
-pub fn set_vault_files(files: Vec<String>) {
-    let index = VaultLinkIndex::from_paths(&files);
-    let mut lock = GLOBAL_VAULT_INDEX.lock().unwrap();
-    *lock = Some(index);
+/// The files `config` registers (vocabularies, dictionaries, blueprints), as paths from the config's
+/// directory: what to read to make the sources of a vault.
+#[wasm_bindgen(js_name = vaultRegistry)]
+pub fn vault_registry(config: &str) -> Result<JsValue, JsValue> {
+    to_js(&tomet_binding::registry(config).map_err(error)?)
 }
 
-/// Clears the cached link resolution index.
-#[wasm_bindgen(js_name = clearVaultFiles)]
-pub fn clear_vault_files() {
-    let mut lock = GLOBAL_VAULT_INDEX.lock().unwrap();
-    *lock = None;
-}
-
-fn prepare_file(mut doc: tomet::ast::File, opts: &ProcessOptions) -> tomet::ast::File {
-    // 1. Inject the macros and variables of an external workspace config, if provided
-    if let Some(cfg_src) = &opts.config
-        && let Ok(cfg_doc) = parse_plain(cfg_src)
-    {
-        let mut prefix_header = Vec::new();
-        for decl in cfg_doc.header {
-            if matches!(
-                tomet::declaration::DeclKind::from_name(&decl.name.name),
-                Some(tomet::declaration::DeclKind::Macro | tomet::declaration::DeclKind::Var)
-            ) {
-                prefix_header.push(decl);
-            }
-        }
-        if !prefix_header.is_empty() {
-            prefix_header.append(&mut doc.header);
-            doc.header = prefix_header;
-        }
-    }
-
-    // 2. Resolve every `{$ ... }`: macros, references inside the document, and
-    // the rest. There is no disk here, so an expression that reaches for
-    // another document stays as written, which is what `NoResolver` gives.
-    let here = opts.current_path.as_deref().unwrap_or("document.tmt");
-    let vault = empty_vault();
-    let scope = vault.scope_for(&doc, std::path::Path::new(here), &tomet::vault::NoResolver);
-    tomet_eval::resolve_expressions(&mut doc, &scope.context());
-    vault.fill_terms(&mut doc);
-
-    // 3. Resolve links against cached index or vault_files option
-    let lock = GLOBAL_VAULT_INDEX.lock().unwrap();
-    let maybe_index = lock.as_ref();
-
-    let from_path = opts.current_path.as_deref().map(std::path::Path::new);
-    let mode = tomet_transform::TargetMode::WebSlug {
-        url_prefix: opts.url_prefix.clone().unwrap_or_else(|| "/docs".into()),
-        asset_prefix: opts.asset_prefix.clone().unwrap_or_else(|| "/vault".into()),
-    };
-
-    if let Some(index) = maybe_index {
-        tomet_transform::resolve_document_links(
-            &mut doc,
-            from_path,
-            |target, from| index.resolve_ref(target, from).map(|p| p.to_path_buf()),
-            &mode,
-        );
-    } else if let Some(files) = &opts.vault_files {
-        let index = VaultLinkIndex::from_paths(files);
-        tomet_transform::resolve_document_links(
-            &mut doc,
-            from_path,
-            |target, from| index.resolve_ref(target, from).map(|p| p.to_path_buf()),
-            &mode,
-        );
-    }
-    doc
-}
-
-/// An entry in the document's table of contents.
-#[derive(serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq, Eq)]
-pub struct TocItem {
-    pub id: String,
-    pub level: u32,
-    pub text: String,
-}
-
-/// High-level output of processing a `.tmt` file.
-///
-/// The document's `::meta` has two windows, for two readers.
-///
-/// - `meta` is the data of it: an object of the `::meta` entries whose values are plain data
-///   (`null`, booleans, numbers, strings, arrays, objects). An entry that is not data (an
-///   element such as `icon: @doc.icon("star")`, a call, `auto`, ...) is not in `meta`; nothing
-///   stands in its place and it is not an error. `meta` is `null` if the document writes no
-///   `::meta`, and `{}` if it writes one with no entry that is data.
-/// - `header` is everything the document declares, `::meta` included, in the lossless AST wire
-///   form ([`Declaration`](tomet::ast::Declaration)): what an application reads to interpret what
-///   `meta` leaves out. Tomet does not resolve an icon; the application does.
-///
-/// Both are read after the expressions of the document are resolved.
-#[derive(serde::Serialize, Debug, Clone)]
-pub struct ProcessedFile {
-    pub title: Option<String>,
-    pub html: String,
-    pub meta: Option<tomet::ast::PlainValue>,
-    pub header: Vec<tomet::ast::Declaration>,
-    pub toc: Vec<TocItem>,
-    pub is_data_only: bool,
-}
-
-pub fn process_file_internal(mut doc: tomet::ast::File, opts: &ProcessOptions) -> ProcessedFile {
-    doc = prepare_file(doc, opts);
-    let render_opts = opts.to_render_options();
-    let html = tomet::html::render_body_with(&doc, &bindings_of(&doc), &render_opts);
-    let is_data_only = html.trim().is_empty();
-
-    // 1. Meta & Title from ::meta(title: ...)
-    let meta_value = tomet::declaration::document_meta(&doc);
-    let meta = match &meta_value {
-        Some(tomet::ast::Value::Tuple(m)) => {
-            Some(tomet::ast::PlainValue::Object(m.plain_entries().collect()))
-        }
-        _ => None,
-    };
-    let meta_title = meta_value.as_ref().and_then(|v| match v {
-        tomet::ast::Value::Tuple(m) => m
-            .get("title")
-            .and_then(|val| val.as_scalar().and_then(|s| s.text()))
-            .map(|t| t.into_owned()),
-        _ => None,
-    });
-
-    // 2. Headings and TOC from HTML
-    let mut first_h1: Option<String> = None;
-    let mut toc = Vec::new();
-
-    use std::sync::LazyLock;
-    static HEADING_RE: LazyLock<regex::Regex> =
-        LazyLock::new(|| regex::Regex::new(r#"<h([1-6])\b([^>]*)>([\s\S]*?)</h([1-6])>"#).unwrap());
-    static ID_RE: LazyLock<regex::Regex> =
-        LazyLock::new(|| regex::Regex::new(r#"id="([^"]*)""#).unwrap());
-    static HEADING_NUMBER_RE: LazyLock<regex::Regex> = LazyLock::new(|| {
-        regex::Regex::new(r#"<span class="tm-heading-number">[^<]*</span>"#).unwrap()
-    });
-    static TAG_RE: LazyLock<regex::Regex> =
-        LazyLock::new(|| regex::Regex::new(r#"<[^>]+>"#).unwrap());
-
-    for cap in HEADING_RE.captures_iter(&html) {
-        let open_level: u32 = cap[1].parse().unwrap_or(1);
-        let close_level: u32 = cap[4].parse().unwrap_or(1);
-        if open_level != close_level {
-            continue;
-        }
-        let level = open_level;
-        let attrs = &cap[2];
-        let inner = &cap[3];
-
-        let id = ID_RE
-            .captures(attrs)
-            .map(|c| c[1].to_string())
-            .unwrap_or_default();
-        let cleaned = HEADING_NUMBER_RE.replace_all(inner, "");
-        let text = TAG_RE.replace_all(&cleaned, "").trim().to_string();
-
-        if level == 1 && first_h1.is_none() && !text.is_empty() {
-            first_h1 = Some(text.clone());
-        }
-        if (level == 2 || level == 3) && !text.is_empty() {
-            toc.push(TocItem { id, level, text });
-        }
-    }
-
-    let title = meta_title.or(first_h1);
-
-    ProcessedFile {
-        title,
-        html,
-        meta,
-        header: doc.header,
-        toc,
-        is_data_only,
-    }
-}
-
-/// Convert `.tmt` source text or a `File` AST object into an HTML body string.
+/// Convert `.tmt` source text or a `File` AST object into an HTML string, in a vault of nothing.
 #[wasm_bindgen(js_name = toHtml)]
 pub fn to_html(source_or_file: &JsValue, options: Option<JsValue>) -> Result<String, JsValue> {
-    let opts: ProcessOptions = if let Some(opts_val) = options {
-        serde_wasm_bindgen::from_value(opts_val).map_err(|e| JsValue::from_str(&e.to_string()))?
-    } else {
-        ProcessOptions::default()
-    };
-    let render_opts = opts.to_render_options();
-
-    let mut doc = if let Some(src) = source_or_file.as_string() {
-        parse_plain(&src).map_err(|e| JsValue::from_str(&e.to_string()))?
-    } else {
-        let doc: tomet::ast::File = serde_wasm_bindgen::from_value(source_or_file.clone())
-            .map_err(|e| JsValue::from_str(&e.to_string()))?;
-        doc
-    };
-    doc = prepare_file(doc, &opts);
-    Ok(tomet::html::render_body_with(
-        &doc,
-        &bindings_of(&doc),
-        &render_opts,
-    ))
+    let options = from_js(options)?;
+    let processed = with_input(source_or_file, |input| {
+        Inner::empty().process(input, &options)
+    })?;
+    Ok(processed.html)
 }
 
-/// Process `.tmt` markup source text or a `File` AST object into HTML, metadata, title, and TOC.
+/// Process `.tmt` markup source text or a `File` AST object into HTML, metadata, title, and TOC, in
+/// a vault of nothing. For a document that links to others, make a `Vault`.
 #[wasm_bindgen(js_name = processFile)]
 pub fn process_file(
     source_or_file: &JsValue,
     options: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
-    let opts: ProcessOptions = if let Some(opts_val) = options {
-        serde_wasm_bindgen::from_value(opts_val).map_err(|e| JsValue::from_str(&e.to_string()))?
-    } else {
-        ProcessOptions::default()
-    };
-
-    let processed = if let Some(src) = source_or_file.as_string() {
-        let doc = parse_plain(&src).map_err(|e| JsValue::from_str(&e.to_string()))?;
-        process_file_internal(doc, &opts)
-    } else {
-        let doc: tomet::ast::File = serde_wasm_bindgen::from_value(source_or_file.clone())
-            .map_err(|e| JsValue::from_str(&e.to_string()))?;
-        process_file_internal(doc, &opts)
-    };
-
+    let options = from_js(options)?;
+    let processed = with_input(source_or_file, |input| {
+        Inner::empty().process(input, &options)
+    })?;
     to_js(&processed)
 }
 
@@ -323,11 +159,11 @@ pub fn process_file(
 #[wasm_bindgen(js_name = toMarkdown)]
 pub fn to_markdown(source_or_file: &JsValue) -> Result<String, JsValue> {
     if let Some(src) = source_or_file.as_string() {
-        let doc = parse_plain(&src).map_err(|e| JsValue::from_str(&e.to_string()))?;
+        let doc = parse_plain(&src).map_err(error)?;
         Ok(tomet::markdown::to_markdown(&doc, &bindings_of(&doc)))
     } else {
-        let doc: tomet::ast::File = serde_wasm_bindgen::from_value(source_or_file.clone())
-            .map_err(|e| JsValue::from_str(&e.to_string()))?;
+        let doc: tomet::ast::File =
+            serde_wasm_bindgen::from_value(source_or_file.clone()).map_err(error)?;
         Ok(tomet::markdown::to_markdown(&doc, &bindings_of(&doc)))
     }
 }
@@ -336,11 +172,11 @@ pub fn to_markdown(source_or_file: &JsValue) -> Result<String, JsValue> {
 #[wasm_bindgen(js_name = toTypst)]
 pub fn to_typst(source_or_file: &JsValue) -> Result<String, JsValue> {
     if let Some(src) = source_or_file.as_string() {
-        let doc = parse_plain(&src).map_err(|e| JsValue::from_str(&e.to_string()))?;
+        let doc = parse_plain(&src).map_err(error)?;
         Ok(tomet::typst::to_typst(&doc, &bindings_of(&doc)))
     } else {
-        let doc: tomet::ast::File = serde_wasm_bindgen::from_value(source_or_file.clone())
-            .map_err(|e| JsValue::from_str(&e.to_string()))?;
+        let doc: tomet::ast::File =
+            serde_wasm_bindgen::from_value(source_or_file.clone()).map_err(error)?;
         Ok(tomet::typst::to_typst(&doc, &bindings_of(&doc)))
     }
 }
@@ -355,8 +191,7 @@ pub fn from_markdown(markdown: &str) -> Result<JsValue, JsValue> {
 /// Serialize a `File` AST object back into formatted `.tmt` source code.
 #[wasm_bindgen(js_name = printFile)]
 pub fn print_file(doc_val: &JsValue) -> Result<String, JsValue> {
-    let doc: tomet::ast::File = serde_wasm_bindgen::from_value(doc_val.clone())
-        .map_err(|e| JsValue::from_str(&e.to_string()))?;
+    let doc: tomet::ast::File = serde_wasm_bindgen::from_value(doc_val.clone()).map_err(error)?;
     Ok(tomet::printer::document_to_tm(&doc))
 }
 
@@ -366,79 +201,24 @@ pub fn format_source(source: &str) -> String {
     tomet::format::format_source(source)
 }
 
-pub mod highlight;
-pub use highlight::{HighlightSpan, compute_highlight_spans};
-
-/// Validate `.tmt` source text and return an array of validation diagnostics.
-///
-/// This is [`validate_with`] with nothing passed: `std` alone, the default
-/// settings, no blueprint.
-#[wasm_bindgen(js_name = validate)]
-pub fn validate(source: &str) -> Result<JsValue, JsValue> {
-    validate_with(source, Vec::new(), None)
-}
-
-/// What [`validate_with`] takes besides the source and the vocabularies.
-#[derive(serde::Deserialize, Default)]
-struct ValidateOptions {
-    /// The settings, as a config document (what `default.config.tmt` holds).
-    config: Option<String>,
-    /// `@blueprint(kind)` documents, as source text.
-    blueprints: Option<Vec<String>>,
-}
-
-/// Validate `.tmt` source text the way `tomet check` does, given the pieces
-/// of the vault as source text.
-///
-/// A host that has the vault's files can pass their contents. Without them,
-/// `validate` knows only `std`, so every element a vocabulary declares comes
-/// back as unknown -- correct, since nothing said it existed, but not useful
-/// in an editor that could have said so.
-///
-/// - `vocabularies`: `@vocabulary(ns)` documents. A source that does not
-///   parse, carries no header, or claims a reserved or already-taken
-///   namespace is skipped: it declares no namespace, so there is nothing to
-///   bind. `doc.index` is always known, as it is to the CLI.
-/// - `options.config`: the settings. They declare the `type:` of `@meta`
-///   fields, which is what is checked. One that does not parse is an error.
-/// - `options.blueprints`: a document is checked against the one for its
-///   `@kind`. One that does not parse is skipped.
-///
-/// An expression that reaches another document is not reported: none is
-/// given to reach. Check vocabularies themselves with `tomet check`.
-#[wasm_bindgen(js_name = validateWith)]
-pub fn validate_with(
-    source: &str,
-    vocabularies: Vec<String>,
-    options: Option<JsValue>,
-) -> Result<JsValue, JsValue> {
-    let options: ValidateOptions = match options {
-        Some(value) if !value.is_undefined() && !value.is_null() => {
-            serde_wasm_bindgen::from_value(value).map_err(|e| JsValue::from_str(&e.to_string()))?
-        }
-        _ => ValidateOptions::default(),
-    };
-    let diagnostics = tomet::vault::validate_sources(
-        source,
-        &vocabularies,
-        options.config.as_deref(),
-        &options.blueprints.unwrap_or_default(),
-    )
-    .map_err(|e| JsValue::from_str(&e))?;
-    to_js(&diagnostics)
+/// Validate `.tmt` source text the way `tomet check` does, in a vault of nothing: `std` alone, so
+/// every element a vocabulary declares comes back as unknown. For the vault of a project, make a `Vault`.
+#[wasm_bindgen]
+pub fn validate(source_or_file: &JsValue) -> Result<JsValue, JsValue> {
+    let found = with_input(source_or_file, |input| Inner::empty().check(input))?;
+    to_js(&found)
 }
 
 /// Compute syntax highlight token spans for CodeMirror and other editors.
 #[wasm_bindgen(js_name = highlightSpans)]
 pub fn highlight_spans(source: &str) -> Result<JsValue, JsValue> {
-    let spans = compute_highlight_spans(source);
+    let spans = tomet_binding::compute_highlight_spans(source);
     to_js(&spans)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tomet::ast::PlainValue;
 
     #[test]
     fn test_parse_and_html_roundtrip() {
@@ -457,141 +237,19 @@ mod tests {
     }
 
     #[test]
-    fn test_process_document_with_meta_title() {
-        let src = "::meta(\n  title: \"My Meta Title\"\n)\n\n=[ Document Title ]\n\n==[ Section One ]\n\nContent.\n";
-        let doc = parse_plain(src).unwrap();
-        let opts = ProcessOptions {
-            advanced: Some(true),
-            ..Default::default()
-        };
-        let res = process_file_internal(doc, &opts);
-        assert_eq!(res.title.as_deref(), Some("My Meta Title"));
-        assert!(!res.is_data_only);
-        assert_eq!(res.toc.len(), 1);
-        assert_eq!(res.toc[0].level, 2);
-        assert_eq!(res.toc[0].text, "Section One");
-        assert_eq!(res.toc[0].id, "section-one");
-    }
-
-    fn processed(src: &str) -> ProcessedFile {
-        process_file_internal(parse_plain(src).unwrap(), &ProcessOptions::default())
-    }
-
-    fn object(entries: Vec<(&str, PlainValue)>) -> PlainValue {
-        PlainValue::Object(entries.into_iter().map(|(k, v)| (k.into(), v)).collect())
-    }
-
-    #[test]
-    fn meta_is_the_entries_that_are_data_and_header_is_everything() {
-        let res = processed(
-            "::meta(title: \"T\", n: 1, tags: (a, b), icon: @doc.icon(\"star\"), mode: auto, t: enum(1))\n\nBody.\n",
-        );
-        assert_eq!(
-            res.meta,
-            Some(object(vec![
-                ("title", PlainValue::Text("T".into())),
-                ("n", PlainValue::Int(1)),
-                (
-                    "tags",
-                    PlainValue::Array(vec![
-                        PlainValue::Text("a".into()),
-                        PlainValue::Text("b".into())
-                    ])
-                ),
-            ]))
-        );
-        // What `meta` leaves out is in the header, as the AST.
-        let args = res.header[0].data.args.as_ref().expect("::meta args");
-        let Some(tomet::ast::Value::Element(icon)) = args.get("icon") else {
-            panic!("the icon is an element in the header")
-        };
-        assert_eq!(icon.name.to_string(), "doc.icon");
-    }
-
-    #[test]
-    fn meta_is_null_without_a_meta_and_empty_without_data() {
-        let none = processed("Body.\n");
-        assert_eq!(none.meta, None);
-        assert!(none.header.is_empty());
-        let only_an_element = processed("::meta(icon: @doc.icon(\"star\"))\n\nBody.\n");
-        assert_eq!(only_an_element.meta, Some(object(vec![])));
-        assert_eq!(processed("::meta()\n").meta, Some(object(vec![])));
-    }
-
-    #[test]
     fn parse_value_is_plain_data_or_an_error_that_names_what_is_not() {
         let plain = tomet::parse_value("a: 1\nb: (x, y)\n")
             .unwrap()
             .to_plain()
             .unwrap();
-        assert_eq!(
-            plain,
-            object(vec![
-                ("a", PlainValue::Int(1)),
-                (
-                    "b",
-                    PlainValue::Array(vec![
-                        PlainValue::Text("x".into()),
-                        PlainValue::Text("y".into())
-                    ])
-                ),
-            ])
-        );
+        let tomet::ast::PlainValue::Object(entries) = plain else {
+            panic!("an object")
+        };
+        assert_eq!(entries.len(), 2);
         let err = tomet::parse_value("a: enum(1)\n")
             .unwrap()
             .to_plain()
             .unwrap_err();
         assert_eq!(err.to_string(), "a call is not plain data (at `a`)");
-    }
-
-    #[test]
-    fn test_process_document_with_h1_fallback() {
-        let src = "=[ First Heading Title ]\n\n==[ Section A ]\n\n===[ Sub Section ]\n";
-        let doc = parse_plain(src).unwrap();
-        let opts = ProcessOptions {
-            advanced: Some(true),
-            ..Default::default()
-        };
-        let res = process_file_internal(doc, &opts);
-        assert_eq!(res.title.as_deref(), Some("First Heading Title"));
-        assert!(!res.is_data_only);
-        assert_eq!(res.toc.len(), 2);
-        assert_eq!(res.toc[0].text, "Section A");
-        assert_eq!(res.toc[0].level, 2);
-        assert_eq!(res.toc[1].text, "Sub Section");
-        assert_eq!(res.toc[1].level, 3);
-    }
-
-    #[test]
-    fn test_process_document_data_only() {
-        let src = "::version(1.0)\n::meta(\n  title: \"Just Config\"\n)\n";
-        let doc = parse_plain(src).unwrap();
-        let opts = ProcessOptions::default();
-        let res = process_file_internal(doc, &opts);
-        assert_eq!(res.title.as_deref(), Some("Just Config"));
-        assert!(res.is_data_only);
-        assert!(res.toc.is_empty());
-    }
-
-    #[test]
-    fn test_process_document_with_resolved_links() {
-        let src =
-            "- @link(\"ref:Linux\")[Go to Linux]\n- @link(\"ref:NonExistentNote\")[Missing]\n";
-        let doc = parse_plain(src).unwrap();
-        let opts = ProcessOptions {
-            vault_files: Some(vec![
-                "30-39 Knowledge/Linux.tmt".into(),
-                "10-19 Journal/daily/memo.tmt".into(),
-            ]),
-            url_prefix: Some("/docs".into()),
-            current_path: Some("10-19 Journal/daily/memo.tmt".into()),
-            ..Default::default()
-        };
-        let res = process_file_internal(doc, &opts);
-        assert!(
-            res.html
-                .contains("href=\"/docs/30-39 Knowledge/Linux\">Go to Linux</a>")
-        );
-        assert!(res.html.contains("class=\"tm-ref tm-ref-unresolved\" aria-disabled=\"true\" data-ref=\"NonExistentNote\">Missing</a>"));
     }
 }

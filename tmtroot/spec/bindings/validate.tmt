@@ -18,11 +18,13 @@ JS・Java・Python の `validate`: vault をディスクではなくソース文
 
 @table
 |[ 言語   ][ 入口 ]
-|[ JS     ][ `validate(source)` と `validateWith(source, vocabularies, { config, blueprints })` ]
+|[ JS     ][ `validate(source)`（何も渡さない vault）と、`new Vault(sources).validate(source)`。`sources` は `VaultSources`（`bindings/js/binding.d.ts`）で、設定、語彙、辞書、ブループリントをソース文字列で持つ ]
 |[ Python ][ `validate(source)` と `validate_with(source, vocabularies, config=None, blueprints=None)` ]
 |[ Java   ][ `validateJson(source)`、`validateJsonWith(source, vocabulariesJson)`、`validateJsonWithSettings(source, vocabulariesJson, config, blueprintsJson)`。配列は JSON 文字列、`null` は「渡さない」 ]
 
-`validate(source)` は、何も渡さない `validateWith` と同じ。
+JS の `validate(source)` は、何も渡さない `Vault` の `validate` と同じ。
+
+返すものも言語で違う。JS は `Diagnostic[]`: `code`、`severity`、`message`、`span`、`start`・`end`（行と列）を持つ平らな報告で、型は Rust の型（`tomet-binding`）から `bindings/schema/binding.schema.json` と `bindings/js/binding.d.ts` に生成される。Python と Java は、serde の形の `Diagnostic` をそのまま返す。
 
 =[ 何を調べるか ]
 
@@ -32,18 +34,20 @@ JS・Java・Python の `validate`: vault をディスクではなくソース文
 - 渡した設定が宣言する `type:` に、`::meta` のフィールドが合っているか。
 - 渡したブループリントのうち、文書の `::kind` を名指すものに適合しているか。`::kind` が `blueprint` の文書は、ブループリントを当てない。
 
-3つの入口と、CLI・LSP の `Vault::findings` は、同じ `Vault::diagnostics` を呼ぶ。`validate_sources` が、ソース文字列を `Vault` に組み立てる共通の部分。
+3つの入口と、CLI・LSP の `Vault::findings` は、同じ `Vault::diagnostics` を呼ぶ。Python と Java は `validate_sources` で `Vault` を組み立て、JS は `tomet-binding` の `Vault`（`VaultSources` から組み立てる）を使う。
 
 =[ 失敗の扱い ]
 
 - 検査する文書が構文として読めなければ、エラー（JS は例外、Python は `ValueError`、Java は `TometException`）。
 - 設定が読めなければ、同じくエラー。黙って既定の設定で検査すると、`type:` の検査が何も言わずに外れる。
-- 読めない語彙とブループリントは、読み飛ばす。そのものの検査は `tomet check` の仕事。
+- Python と Java は、読めない語彙とブループリントを読み飛ばす。そのものの検査は `tomet check` の仕事。
+- JS の `Vault` は、読めない設定、語彙、辞書、ブループリントを、名前を挙げてエラーにする。黙って外すと、サイトの全ページが「未知の要素」になる。
 
 =[ 現状の実装との差 ]
 
 - 他の文書に届く式（`${doc#id}`、`include`）は報告しない。届く先の文書を渡す手段がない。
-- Java の名前は、既存の `validateJsonWith` の延長で `validateJsonWithSettings` とした。他の言語の `validateWith` とは揃っていない。
+- Java の名前は、既存の `validateJsonWith` の延長で `validateJsonWithSettings` とした。Python の `validate_with` とは揃っていない。
+- Python と Java は、JS の `Vault` と平らな `Diagnostic` にまだ揃えていない。
 - `tomet-edit` の編集後の報告（`diagnostics.rs`）は、設定を受け取らない。
 
 =[ まだ決まっていないこと ]
