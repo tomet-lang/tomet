@@ -66,6 +66,15 @@
   settings = {
     global.excludes = [
       "*.lock"
+      # Generated files: their bytes are what their generator writes, and the
+      # freshness checks (`tomet spec ... --check`, the cargo tests, the
+      # astro dist rebuilt from src) compare them byte for byte.
+      "bindings/schema/*.schema.json"
+      "bindings/js/ast.d.ts"
+      "bindings/js/binding.d.ts"
+      "packages/*/dist/*"
+      "crates/tree-sitter-*/src/grammar.json"
+      "crates/tree-sitter-*/src/node-types.json"
     ];
 
     formatter = {
