@@ -14,7 +14,7 @@
 
 **tomet がどう整形するか**を書く。`tomet format` と、各形式への出力が従う規則。要素ごとに、キーが並ぶ。
 
-名前の定義（マクロ、変数）は整形の規則ではないので、ここには書かない（@file(tmtroot/spec/declarations/std.macros.declaration.tmt)、@file(tmtroot/spec/declarations/std.vars.declaration.tmt)）。どんな要素があるかも、ここには書かない。それは語彙が言う（@file(tmtroot/spec/declarations/std.vocabularies.declaration.tmt)）。
+名前の定義（マクロ、変数）は整形の規則ではないので、ここには書かない（@file(tmtroot/spec/elements/std.macros.element.tmt)、@file(tmtroot/spec/elements/std.vars.element.tmt)）。どんな要素があるかも、ここには書かない。それは語彙が言う（@file(tmtroot/spec/declarations/std.vocabularies.declaration.tmt)）。
 
 キーの一覧は @file(tmtroot/generated/config.tmt)。実装の側の定義が正しい情報源で、そのドキュメントコメントから生成される。
 

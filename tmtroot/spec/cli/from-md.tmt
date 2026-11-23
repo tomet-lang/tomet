@@ -6,7 +6,7 @@
 
 共通の決まりは @file(tmtroot/spec/cli/overview.tmt)。変換器の実装は @file(tmtroot/generated/crates/tomet-markdown.tmt)。
 
-TUI の Migration タブ（@file(tmtroot/spec/cli/tui.tmt)）も、Markdown を `.tmt` に変換する。
+TUI の Migration タブも、Markdown を `.tmt` に変換する。
 
 =[ 変換 ]
 

@@ -14,7 +14,7 @@
 @table
 |[ 書き方      ][ 読み ]
 |[ `<PATH>`    ][ 名札。読み手への名前の札で、tomet は意味を読まない。 ]
-|[ `<?int(n)>` ][ 穴(@file(tmtroot/spec/syntax/hole.tmt))。照合の席。 ]
+|[ `<?int(n)>` ][ 穴(@file(tmtroot/spec/forms/hole.tmt))。照合の席。 ]
 
 - `::id(config-vault)` はリテラル、`::id(<name>)` は席。例か既定値か分からない問題が、構文で解ける。
 - 印は箱の先頭に置く。`!` と `/` は、印にしない。
