@@ -9,7 +9,7 @@ import {
 
 describe("tomet renderer in Astro integration", () => {
   test("renders basic tomet elements to HTML", async () => {
-    const html = await renderTomet("#[ My Heading ]\nThis is paragraph.");
+    const html = await renderTomet("=[ My Heading ]\nThis is paragraph.");
     assert.ok(html.includes("<h1"));
     assert.ok(html.includes("My Heading"));
     assert.ok(html.includes("<p>This is paragraph.</p>"));
@@ -17,7 +17,7 @@ describe("tomet renderer in Astro integration", () => {
 
   test("processes tomet document with metadata and toc", async () => {
     const doc = await processTomet(
-      '@meta{\n  title: "Test Title"\n  tags: [astro, tomet]\n  date: "2026-09-10"\n}\n\n#[ Heading 1 ]\nSome text\n\n##[ Heading 2 ]\nMore text\n\n###[ Heading 3 ]\nSub text',
+      '::meta(\n  title: "Test Title"\n  tags: (astro, tomet)\n  date: "2026-09-10"\n)\n\n=[ Heading 1 ]\nSome text\n\n==[ Heading 2 ]\nMore text\n\n===[ Heading 3 ]\nSub text',
     );
     assert.ok(doc.html.includes("Heading 1"));
     assert.equal(doc.title, "Test Title");
