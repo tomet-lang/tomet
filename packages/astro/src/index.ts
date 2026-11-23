@@ -376,17 +376,12 @@ export function tometLoader(options: TometLoaderOptions): Loader {
             config: workspaceConfig,
           });
 
-          let metaObj: Record<string, unknown> | null = null;
-          if (processed.meta) {
-            if (typeof (processed.meta as any).forEach === "function") {
-              metaObj = {};
-              (processed.meta as any).forEach((v: unknown, k: string) => {
-                if (v !== undefined) (metaObj as any)[k] = v;
-              });
-            } else if (typeof processed.meta === "object") {
-              metaObj = processed.meta as Record<string, unknown>;
-            }
-          }
+          // `::meta(...)` is a tuple; only its named form, an object, has fields.
+          const meta = processed.meta;
+          const metaObj: Record<string, unknown> | null =
+            meta !== null && typeof meta === "object" && !Array.isArray(meta)
+              ? meta
+              : null;
 
           const fallbackTitle = basename(file.relPath).replace(
             /\.(tmt|tm)$/,

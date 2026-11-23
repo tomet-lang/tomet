@@ -27,6 +27,19 @@ describe("tomet renderer in Astro integration", () => {
     assert.equal(doc.toc[1].text, "Heading 3");
     assert.equal(doc.toc[1].level, 3);
   });
+
+  test("hands values over in their JSON shape", async () => {
+    const doc = await processTomet(
+      '::meta(\n  title: "T"\n  tags: (a, b)\n)\n\nText',
+    );
+    // A named tuple is a plain object (a Map would fail this), an unnamed one an array.
+    assert.deepStrictEqual(doc.meta, { title: "T", tags: ["a", "b"] });
+
+    // Absent is null, not undefined.
+    const bare = await processTomet("Text");
+    assert.strictEqual(bare.title, null);
+    assert.strictEqual(bare.meta, null);
+  });
 });
 
 describe("resolveAssetUrl", () => {

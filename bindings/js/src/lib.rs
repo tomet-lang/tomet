@@ -16,6 +16,15 @@ fn bindings_of(doc: &tomet::File) -> tomet::semantics::Bindings {
     empty_vault().bindings(doc)
 }
 
+/// Hands `value` to JavaScript in its JSON shape: a named tuple is a plain object, never a
+/// `Map`, and an absent value is `null`, never `undefined`. Every Rust value leaves this
+/// module through here, so JavaScript sees the shape `serde_json` gives Python and Java.
+fn to_js<T: serde::Serialize + ?Sized>(value: &T) -> Result<JsValue, JsValue> {
+    value
+        .serialize(&serde_wasm_bindgen::Serializer::json_compatible())
+        .map_err(|e| JsValue::from_str(&e.to_string()))
+}
+
 /// Parses `source` in the [`empty_vault`].
 fn parse_plain(source: &str) -> Result<tomet::File, String> {
     empty_vault()
@@ -28,14 +37,14 @@ fn parse_plain(source: &str) -> Result<tomet::File, String> {
 #[wasm_bindgen(js_name = parseFile)]
 pub fn parse_file(source: &str) -> Result<JsValue, JsValue> {
     let doc = parse_plain(source).map_err(|e| JsValue::from_str(&e.to_string()))?;
-    serde_wasm_bindgen::to_value(&doc).map_err(|e| JsValue::from_str(&e.to_string()))
+    to_js(&doc)
 }
 
 /// Parse a data-only `.tmt` document into a native JavaScript object/primitive.
 #[wasm_bindgen(js_name = parseValue)]
 pub fn parse_value(source: &str) -> Result<JsValue, JsValue> {
     let val = tomet::parse_value(source).map_err(|e| JsValue::from_str(&e.to_string()))?;
-    serde_wasm_bindgen::to_value(&val).map_err(|e| JsValue::from_str(&e.to_string()))
+    to_js(&val)
 }
 
 /// Options controlling HTML rendering and document processing.
@@ -280,7 +289,7 @@ pub fn process_file(
         process_file_internal(doc, &opts)
     };
 
-    serde_wasm_bindgen::to_value(&processed).map_err(|e| JsValue::from_str(&e.to_string()))
+    to_js(&processed)
 }
 
 /// Convert `.tmt` source text or a `File` AST object into a CommonMark Markdown string.
@@ -313,7 +322,7 @@ pub fn to_typst(source_or_file: &JsValue) -> Result<String, JsValue> {
 #[wasm_bindgen(js_name = fromMarkdown)]
 pub fn from_markdown(markdown: &str) -> Result<JsValue, JsValue> {
     let doc = tomet::markdown::from_markdown(markdown);
-    serde_wasm_bindgen::to_value(&doc).map_err(|e| JsValue::from_str(&e.to_string()))
+    to_js(&doc)
 }
 
 /// Serialize a `File` AST object back into formatted `.tmt` source code.
@@ -389,14 +398,14 @@ pub fn validate_with(
         &options.blueprints.unwrap_or_default(),
     )
     .map_err(|e| JsValue::from_str(&e))?;
-    serde_wasm_bindgen::to_value(&diagnostics).map_err(|e| JsValue::from_str(&e.to_string()))
+    to_js(&diagnostics)
 }
 
 /// Compute syntax highlight token spans for CodeMirror and other editors.
 #[wasm_bindgen(js_name = highlightSpans)]
 pub fn highlight_spans(source: &str) -> Result<JsValue, JsValue> {
     let spans = compute_highlight_spans(source);
-    serde_wasm_bindgen::to_value(&spans).map_err(|e| JsValue::from_str(&e.to_string()))
+    to_js(&spans)
 }
 
 #[cfg(test)]

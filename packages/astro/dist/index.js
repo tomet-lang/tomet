@@ -218,19 +218,11 @@ export function tometLoader(options) {
                         assetPrefix,
                         config: workspaceConfig,
                     });
-                    let metaObj = null;
-                    if (processed.meta) {
-                        if (typeof processed.meta.forEach === "function") {
-                            metaObj = {};
-                            processed.meta.forEach((v, k) => {
-                                if (v !== undefined)
-                                    metaObj[k] = v;
-                            });
-                        }
-                        else if (typeof processed.meta === "object") {
-                            metaObj = processed.meta;
-                        }
-                    }
+                    // `::meta(...)` is a tuple; only its named form, an object, has fields.
+                    const meta = processed.meta;
+                    const metaObj = meta !== null && typeof meta === "object" && !Array.isArray(meta)
+                        ? meta
+                        : null;
                     const fallbackTitle = basename(file.relPath).replace(/\.(tmt|tm)$/, "");
                     const title = metaObj?.title ?? fallbackTitle;
                     const section = file.relPath.split("/")[0] ?? "";

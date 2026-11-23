@@ -27,7 +27,8 @@ export type Id = string;
  * - entries, none named: an array;
  * - entries, all named: an object;
  * - both: an object, an unnamed entry under its position among the unnamed
- *   ones (`"0"`, `"1"`).
+ *   ones (`"0"`, `"1"`). A JavaScript object lists such keys before every
+ *   other, so this shape keeps the entries but not how they interleave.
  *
  * `(x)` is a tuple of one entry, `[x]`, never the bare `x`.
  */
