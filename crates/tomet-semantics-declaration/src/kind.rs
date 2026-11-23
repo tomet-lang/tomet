@@ -42,10 +42,9 @@ pub enum DeclKind {
     /// reports one that is not. The value is `@file`, not a new element: it is a link `tomet` already
     /// tracks and can rewrite when the file moves.
     Blueprint,
-    /// Two things, told apart by its form: `::vocabulary(ns, version: "1.0.0")` is the header of a vocabulary
-    /// document, and `::vocabulary(ns: @file(path))` registers the file under the
-    /// namespace `ns` in a vault or folder config. The registered name must be the namespace the file
-    /// gives itself.
+    /// Two things, told apart by its form: `::vocabulary(ns, version: "0.1.0")` is the header of a vocabulary
+    /// document, and `::vocabulary(@file(path), ...)` registers vocabulary files in a vault or folder config.
+    /// Each vocabulary file names its own namespace and version in its header.
     Vocabulary,
     /// Two things, told apart by its form: `::dictionary(name)` is the header of a dictionary document
     /// (the name its terms are mentioned by, `@term(name#id)`); `::dictionary(name: @file(path))` registers
@@ -131,9 +130,10 @@ impl Scope {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Shape {
     /// `::kind(config, 2)`: `(args)` bound to the declaration's positional slots, no `{...}`,
-    /// unless the declaration has a header of its own ([`Spec::own_header`]), where named entries
-    /// register files: `::dictionary(tomet)` is the header of a dictionary,
-    /// `::dictionary(tomet: @file(...))` registers one.
+    /// unless the declaration has a header of its own ([`Spec::own_header`]), where the registration
+    /// form registers files: `::dictionary(tomet)` is the header of a dictionary and
+    /// `::dictionary(tomet: @file(...))` registers one, while `::vocabulary(ns, version: "0.1.0")` is
+    /// the header of a vocabulary and `::vocabulary(@file(...))` registers vocabulary files.
     Args,
     /// `::meta(title: T)` or `::field(author: (type: string))`: a tree of entries, written as named
     /// arguments of the declaration. No `{...}`.
@@ -152,9 +152,11 @@ pub struct Spec {
     /// `version`. Once, here, for every host that reads a declaration.
     pub positional: &'static [&'static str],
     pub cardinality: Cardinality,
-    /// Whether the form with positional slots names the document itself and so may be written once, even
+    /// Whether the form that names the document itself may be written once, even
     /// though the declaration as a whole is [`Cardinality::Many`]: `::blueprint(daily)` is the
-    /// header of a blueprint, `::blueprint(daily: @file(...))` one of many registrations.
+    /// header of a blueprint and `::blueprint(daily: @file(...))` one of many registrations;
+    /// `::vocabulary(ns, version: "0.1.0")` is the header of a vocabulary and
+    /// `::vocabulary(@file(...))` one of many registrations.
     pub own_header: bool,
     pub scope: Scope,
     /// What it is written with: whether `(...)` holds entries and whether it takes a `{...}`.

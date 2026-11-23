@@ -98,6 +98,7 @@ pub use vocabulary::{
     ATTRIBUTE_KEYS, AttributeDecl, Bindings, CONSTRUCTOR_KEYS, CallError, Constructed,
     ConstructorDecl, ContentAllow, ELEMENT_KEYS, ElementDecl, EntryProblem, HOST_VALUES,
     LoadedVocabularies, PARAM_KEYS, ParamDecl, RESERVED_ELEMENT_NAMES, RESERVED_NAMESPACES, TABLES,
-    USE_ARGS, Use, UseProblem, Vocabulary, builtin_doc_vocabularies, check_call_params,
-    entry_problems_in, is_alias, is_reserved_element_name, read_call, use_problems, uses,
+    USE_ARGS, Use, UseProblem, VersionMismatch, Vocabulary, builtin_doc_vocabularies,
+    check_call_params, entry_problems_in, is_alias, is_reserved_element_name, read_call,
+    use_problems, uses,
 };

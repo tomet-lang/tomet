@@ -6,8 +6,9 @@
 //! `::blueprint`, `::vocabulary`, `::dictionary`, `::macro`, `::var`), and a layer keeps what
 //! each one said.
 //! They are of three kinds, and the kind decides how they are read: tables from a name to a
-//! definition (`::macro`, `::var`, `::field`, `::blueprint`, `::vocabulary`,
-//! `::dictionary`: merged by name), knobs of a tool (`::format`, `::workspace`, `::export`:
+//! definition (`::macro`, `::var`, `::field`, `::blueprint`,
+//! `::dictionary`: merged by name), file lists (`::vocabulary`: stacked in registration order),
+//! knobs of a tool (`::format`, `::workspace`, `::export`:
 //! merged key by key), and pointers to other files (`::import`, not implemented yet).
 //! Merging happens on those values, before they become a [`Config`](crate::Config): a typed group
 //! cannot tell a key that was never written from one written with its default, so two typed groups
@@ -16,7 +17,7 @@
 use std::collections::HashMap;
 
 use tomet_ast::{Element, File, Value};
-use tomet_declaration::{DeclKind, VarDecl, document_entries};
+use tomet_declaration::{DeclKind, VarDecl, document_entries, document_vocabulary_entries};
 use tomet_scalar::Scalar;
 use tomet_tree::ValueExt;
 
@@ -27,7 +28,7 @@ pub struct ConfigLayer {
     fields: Vec<(String, Value)>,
     workspace: Vec<(String, Value)>,
     blueprints: Vec<(String, Value)>,
-    vocabularies: Vec<(String, Value)>,
+    vocabularies: Vec<Value>,
     dictionaries: Vec<(String, Value)>,
     macros: HashMap<String, Value>,
     vars: Vec<(String, VarDecl)>,
@@ -41,7 +42,7 @@ impl ConfigLayer {
             fields: document_entries(doc, DeclKind::Field),
             workspace: document_entries(doc, DeclKind::Workspace),
             blueprints: document_entries(doc, DeclKind::Blueprint),
-            vocabularies: document_entries(doc, DeclKind::Vocabulary),
+            vocabularies: document_vocabulary_entries(doc),
             dictionaries: document_entries(doc, DeclKind::Dictionary),
             macros: tomet_declaration::document_macros(doc)
                 .into_iter()
@@ -51,14 +52,13 @@ impl ConfigLayer {
     }
 
     /// The entries this layer holds for the map-like declaration `kind`; `None` for a declaration
-    /// that is not a setting of the vault.
+    /// that is not a map-like setting of the vault.
     fn entries_mut(&mut self, kind: DeclKind) -> Option<&mut Vec<(String, Value)>> {
         match kind {
             DeclKind::Format => Some(&mut self.format),
             DeclKind::Field => Some(&mut self.fields),
             DeclKind::Workspace => Some(&mut self.workspace),
             DeclKind::Blueprint => Some(&mut self.blueprints),
-            DeclKind::Vocabulary => Some(&mut self.vocabularies),
             DeclKind::Dictionary => Some(&mut self.dictionaries),
             _ => None,
         }
@@ -125,10 +125,18 @@ impl ConfigLayer {
         registered_paths(&self.blueprints)
     }
 
-    /// The registered vocabulary files, in the order registered; a name registered twice is the
-    /// later one.
+    /// The registered vocabulary files, in the order registered; a path registered twice is kept
+    /// once, in registration order.
     pub(crate) fn vocabulary_paths(&self) -> Vec<String> {
-        registered_paths(&self.vocabularies)
+        let mut paths = Vec::new();
+        for value in &self.vocabularies {
+            if let Some(path) = registered_path(value)
+                && !paths.contains(&path)
+            {
+                paths.push(path);
+            }
+        }
+        paths
     }
 
     /// The registered dictionary files, in the order registered; a name registered twice is the
@@ -138,7 +146,7 @@ impl ConfigLayer {
     }
 }
 
-/// The `(name, path)` pairs a document registers in its `::blueprint`, `::vocabulary` or
+/// The `(name, path)` pairs a document registers in its `::blueprint` or
 /// `::dictionary` (`kind`), in the order written: `::blueprint(writ: @file(path))`. An entry that is not a reference to a file is left out.
 pub fn registry_entries<B>(doc: &File<B>, kind: DeclKind) -> Vec<(String, String)> {
     document_entries(doc, kind)
@@ -147,7 +155,7 @@ pub fn registry_entries<B>(doc: &File<B>, kind: DeclKind) -> Vec<(String, String
         .collect()
 }
 
-/// The `(name, path)` pairs one declaration registers; see [`registry_entries`].
+/// The `(name, path)` pairs one keyed registry declaration (`::blueprint` or `::dictionary`) registers; see [`registry_entries`].
 pub fn registered_by(declaration: &tomet_declaration::Declaration) -> Vec<(String, String)> {
     declaration
         .entries()
@@ -253,13 +261,32 @@ mod tests {
     #[test]
     fn a_registry_entry_that_is_not_a_file_registers_nothing() {
         let cfg = Config::from_layers([&layer(
-            "::vocabulary(deck: @file(deck.tmt), odd: 3, link: @link(x))\n",
+            "::vocabulary(@file(deck.tmt), 3, @link(x))\n",
         )]);
         assert_eq!(cfg.registry.vocabularies, vec!["deck.tmt".to_string()]);
     }
 
     #[test]
-    fn dictionaries_are_registered_like_vocabularies_and_stacked_by_name() {
+    fn multiple_vocabularies_including_multiple_versions_are_preserved_in_order() {
+        let outer = layer(
+            "::vocabulary(@file(writ@0.1.0.vocabulary.tmt), @file(writ@0.2.0.vocabulary.tmt))\n",
+        );
+        let inner = layer(
+            "::vocabulary(@file(writ@0.1.0.vocabulary.tmt), @file(deck@0.1.0.vocabulary.tmt))\n",
+        );
+        let cfg = Config::from_layers([&outer, &inner]);
+        assert_eq!(
+            cfg.registry.vocabularies,
+            vec![
+                "writ@0.1.0.vocabulary.tmt".to_string(),
+                "writ@0.2.0.vocabulary.tmt".to_string(),
+                "deck@0.1.0.vocabulary.tmt".to_string(),
+            ]
+        );
+    }
+
+    #[test]
+    fn dictionaries_are_registered_and_stacked_by_name() {
         let outer = layer("::dictionary(tomet: @file(a.tmt), user: @file(u.tmt))\n");
         let inner = layer("::dictionary(tomet: @file(b.tmt))\n");
         let cfg = Config::from_layers([&outer, &inner]);

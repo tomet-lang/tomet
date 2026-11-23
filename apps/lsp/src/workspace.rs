@@ -330,7 +330,7 @@ mod tests {
     fn the_vaults_vocabulary_is_in_scope() {
         let root = vault(
             "vocab",
-            "::kind(config)\n::vocabulary(deck: @file(.tomet/vocabularies/deck.vocabulary.tmt))\n",
+            "::kind(config)\n::vocabulary(@file(.tomet/vocabularies/deck.vocabulary.tmt))\n",
             &[(
                 ".tomet/vocabularies/deck.vocabulary.tmt",
                 "::kind(vocabulary)\n::vocabulary(deck)\n\n::element(card: {})\n",
@@ -446,7 +446,7 @@ mod tests {
     fn a_vault_complaint_is_made_once_until_it_is_fixed_and_broken_again() {
         let root = vault(
             "notices",
-            "::kind(config)\n::vocabulary(missing: @file(.tomet/vocabularies/missing.vocabulary.tmt))\n",
+            "::kind(config)\n::vocabulary(@file(.tomet/vocabularies/missing.vocabulary.tmt))\n",
             &[],
         );
         let path = root.join("a.tmt");
@@ -526,7 +526,7 @@ mod tests {
     fn hover_shows_an_aliased_name_in_its_real_namespace() {
         let root = vault(
             "hover_alias",
-            "::kind(config)\n::vocabulary(node-graph: @file(.tomet/vocabularies/node-graph.vocabulary.tmt))\n",
+            "::kind(config)\n::vocabulary(@file(.tomet/vocabularies/node-graph.vocabulary.tmt))\n",
             &[(
                 ".tomet/vocabularies/node-graph.vocabulary.tmt",
                 "::kind(vocabulary)\n::vocabulary(node-graph)\n\n\
@@ -611,7 +611,7 @@ mod tests {
     fn at_offers_the_elements_of_the_vocabulary_in_scope() {
         let root = vault(
             "at",
-            "::kind(config)\n::vocabulary(deck: @file(.tomet/vocabularies/deck.vocabulary.tmt))\n",
+            "::kind(config)\n::vocabulary(@file(.tomet/vocabularies/deck.vocabulary.tmt))\n",
             &[(".tomet/vocabularies/deck.vocabulary.tmt", DECK)],
         );
         let in_deck = completions_at_the_end(&root, "::kind(deck)\n\n@");
@@ -640,7 +640,7 @@ mod tests {
         const CARDS: &str = "::kind(vocabulary)\n::vocabulary(cards)\n\n::element(tile: ())\n::attribute(theme: (args: (name: (type: string, positional: true))))\n";
         let root = vault(
             "alias",
-            "::kind(config)\n::vocabulary(cards: @file(.tomet/vocabularies/cards.vocabulary.tmt))\n",
+            "::kind(config)\n::vocabulary(@file(.tomet/vocabularies/cards.vocabulary.tmt))\n",
             &[(".tomet/vocabularies/cards.vocabulary.tmt", CARDS)],
         );
         let aliased = "::use(cards, as: c)\n";

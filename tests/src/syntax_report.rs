@@ -634,7 +634,7 @@ const CASES: &[Case] = &[
         "::meta(title: \"x\")\n::macro(gh: \"https://x/$(1)\")\n::var(a: (type: string))\n\
          ::format(table: (max_col_width: 50))\n::field(created: (type: datetime))\n\
          ::workspace(ignore: (\"a\"))\n::export(type: commonmark)\n::blueprint(b: \"b.tmt\")\n\
-         ::vocabulary(v: \"v.tmt\")\n::dictionary(d: \"d.tmt\")\n::migration(m: 1)\n\
+         ::vocabulary(@file(v.tmt))\n::dictionary(d: \"d.tmt\")\n::migration(m: 1)\n\
          ::element(card: (display: block))\n",
     ),
     case(

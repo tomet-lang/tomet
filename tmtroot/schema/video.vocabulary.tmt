@@ -1,5 +1,5 @@
 ::kind(vocabulary)
-::vocabulary(video, version: "1.0.0")
+::vocabulary(video, version: "0.1.0")
 ::element(
   timestamp: (
     display: block

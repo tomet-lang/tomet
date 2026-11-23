@@ -149,6 +149,21 @@ pub fn check_header(
     host: Host,
     errors: &mut Vec<Diagnostic>,
 ) {
+    for mismatch in &bindings.version_mismatches {
+        if let Some(decl) = header.get(mismatch.declaration_index) {
+            errors.push(Diagnostic::VocabularyVersionMismatch {
+                declaration: mismatch.declaration,
+                namespace: mismatch.namespace.clone(),
+                requested: mismatch.requested.to_string(),
+                available: mismatch
+                    .available
+                    .iter()
+                    .filter_map(|v| v.as_ref().map(ToString::to_string))
+                    .collect(),
+                span: decl.span,
+            });
+        }
+    }
     for (idx, problem) in tomet_semantics::use_problems(header) {
         let first = match &problem {
             tomet_semantics::UseProblem::UsedTwice { first, .. } => Some(header[*first].span),

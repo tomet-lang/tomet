@@ -4,10 +4,15 @@
 =[ 全容 ]
 
 ```tm
-`` ::vocabulary(deck: @file(tmtroot/schema/deck.vocabulary.tmt))
+`` ::vocabulary(
+``   @file(tmtroot/schema/writ@0.1.0.vocabulary.tmt)
+``   @file(tmtroot/schema/rust@0.1.0.vocabulary.tmt)
+`` )
 ```
 
-この vault が使う語彙のファイルを、名前をつけて登録する。キー（`deck`）は、ファイルが `::vocabulary(deck, version: "1.0.0")` で名乗る名前空間。語彙のファイル自身の先頭にある `::vocabulary(deck, ...)` は位置引数に名前空間を取り、登録の `::vocabulary(deck: @file(...))` は名前空間をキーにファイルを取る。2つは同じ文書に並ばない。登録の決まりは @file(tmtroot/spec/declarations/std.blueprints.declaration.tmt) と同じ。
+この vault が使う語彙のファイルを登録する。語彙のファイル自身が先頭で `::vocabulary(writ, version: "0.1.0")` と名前空間と版を名乗るので、登録ではキーを書かず `@file(パス)` を並べる（キーを書けば `tomet check` が報告する）。語彙のファイル自身の先頭にある `::vocabulary(writ, ...)` と、登録の `::vocabulary(@file(...))` は、同じ文書に並ばない。
+
+互換の境目（左から最初に `0` でない桁）が違う版（`writ@0.1.0` と `writ@0.2.0` など）は、同じ vault に並べて登録できる。同じ境目の版を二つ登録すると `tomet check` が報告する。`@file` で渡すことや層の重なりは @file(tmtroot/spec/declarations/std.blueprints.declaration.tmt) と同じ。
 
 =[ 要素はここには書かない ]
 

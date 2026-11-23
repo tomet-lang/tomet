@@ -548,7 +548,7 @@ fn a_vault_with_a_missing_vocabulary_says_so_in_the_log() {
     std::fs::create_dir_all(&root).unwrap();
     std::fs::write(
         root.join(tomet_load_config::VAULT_CONFIG_FILE),
-        "::kind(config)\n::vocabulary(missing: @file(.tomet/vocabularies/missing.vocabulary.tmt))\n",
+        "::kind(config)\n::vocabulary(@file(.tomet/vocabularies/missing.vocabulary.tmt))\n",
     )
     .unwrap();
     let path = root.join("a.tmt");

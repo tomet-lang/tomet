@@ -200,6 +200,42 @@ impl Version {
             .map_or(0, |i| i + 1);
         &self.parts[..end]
     }
+
+    /// The compatibility track of this version: the prefix of its numeric core up to and
+    /// including the left-most non-zero component, or `&[]` when every component is `0`.
+    ///
+    /// Versions on the same track share their breaking-change boundary (Cargo SemVer rule):
+    /// - `1.2.3`, `1.0.0`, `1.0`, `1` -> `&[1]`
+    /// - `0.1.2`, `0.1.0`, `0.1` -> `&[0, 1]`
+    /// - `0.0.2`, `0.0.2.0` -> `&[0, 0, 2]`
+    /// - `0`, `0.0`, `0.0.0` -> `&[]`
+    pub fn compatibility_track(&self) -> &[u64] {
+        let end = self
+            .parts
+            .iter()
+            .position(|&n| n != 0)
+            .map_or(0, |i| i + 1);
+        &self.parts[..end]
+    }
+
+    /// Whether this version (declared by a vocabulary) satisfies `requested` (asked for by
+    /// `::kind(ns, ver)` or `::use(ns, ver)`).
+    ///
+    /// `self` satisfies `requested` when:
+    /// - Both share the same [`compatibility_track`](Version::compatibility_track).
+    /// - `self >= requested`.
+    /// - If `self` is a pre-release, `requested` must also be a pre-release on the exact same
+    ///   core tuple (a pre-release never satisfies a normal version request or a pre-release
+    ///   on a different core tuple).
+    pub fn satisfies(&self, requested: &Version) -> bool {
+        if self.compatibility_track() != requested.compatibility_track() || self < requested {
+            return false;
+        }
+        if self.is_prerelease() {
+            return requested.is_prerelease() && self.significant() == requested.significant();
+        }
+        true
+    }
 }
 
 impl PartialEq for Version {
@@ -516,5 +552,74 @@ mod tests {
     fn a_leading_zero_in_a_component_is_read_as_the_number() {
         assert_eq!(v("2026.01"), v("2026.1"));
         assert!(v("2026.10") > v("2026.09"));
+    }
+
+    #[test]
+    fn compatibility_track_is_up_to_the_first_non_zero_component() {
+        for text in ["1", "1.0", "1.0.0", "1.2.3", "1.0.0-alpha+build"] {
+            assert_eq!(v(text).compatibility_track(), &[1], "{text}");
+        }
+        assert_eq!(v("2.0.0").compatibility_track(), &[2]);
+        for text in ["0.1", "0.1.0", "0.1.2", "0.1.0-beta"] {
+            assert_eq!(v(text).compatibility_track(), &[0, 1], "{text}");
+        }
+        assert_eq!(v("0.2.0").compatibility_track(), &[0, 2]);
+        for text in ["0.0.2", "0.0.2.0", "0.0.2.5"] {
+            assert_eq!(v(text).compatibility_track(), &[0, 0, 2], "{text}");
+        }
+        for text in ["0", "0.0", "0.0.0", "0.0.0-alpha"] {
+            assert_eq!(v(text).compatibility_track(), &[] as &[u64], "{text}");
+        }
+    }
+
+    #[test]
+    fn satisfies_follows_compatibility_track_and_prerelease_rules() {
+        // Major track (1.x.y)
+        assert!(v("1.0.0").satisfies(&v("1")));
+        assert!(v("1.0.0").satisfies(&v("1.0")));
+        assert!(v("1.0.0").satisfies(&v("1.0.0")));
+        assert!(v("1.2.3").satisfies(&v("1.0.0")));
+        assert!(v("1.2.3").satisfies(&v("1.2.0")));
+        assert!(v("1.2.3").satisfies(&v("1.2.3")));
+        assert!(!v("1.2.0").satisfies(&v("1.2.3")));
+        assert!(!v("2.0.0").satisfies(&v("1.0.0")));
+        assert!(!v("0.1.0").satisfies(&v("1.0.0")));
+
+        // Minor 0.y.z track
+        assert!(v("0.1.0").satisfies(&v("0.1")));
+        assert!(v("0.1").satisfies(&v("0.1.0")));
+        assert!(v("0.1.2").satisfies(&v("0.1.0")));
+        assert!(v("0.1.2").satisfies(&v("0.1")));
+        assert!(!v("0.1.0").satisfies(&v("0.1.2")));
+        assert!(!v("0.2.0").satisfies(&v("0.1.0")));
+        assert!(!v("1.0.0").satisfies(&v("0.1.0")));
+
+        // Patch 0.0.z track
+        assert!(v("0.0.2").satisfies(&v("0.0.2")));
+        assert!(v("0.0.2.0").satisfies(&v("0.0.2")));
+        assert!(v("0.0.2.1").satisfies(&v("0.0.2")));
+        assert!(!v("0.0.3").satisfies(&v("0.0.2")));
+        assert!(!v("0.0.1").satisfies(&v("0.0.2")));
+        assert!(!v("0.1.0").satisfies(&v("0.0.2")));
+
+        // Zero track
+        assert!(v("0").satisfies(&v("0.0.0")));
+        assert!(v("0.0.0").satisfies(&v("0")));
+        assert!(!v("0.0.1").satisfies(&v("0")));
+        assert!(!v("0.1.0").satisfies(&v("0")));
+
+        // Pre-releases
+        assert!(!v("0.1.0-alpha").satisfies(&v("0.1.0")));
+        assert!(!v("0.1.1-alpha").satisfies(&v("0.1.0")));
+        assert!(!v("0.1.1-alpha").satisfies(&v("0.1.0-alpha")));
+        assert!(v("0.1.0-alpha.2").satisfies(&v("0.1.0-alpha.1")));
+        assert!(v("0.1.0-beta").satisfies(&v("0.1.0-alpha")));
+        assert!(!v("0.1.0-alpha").satisfies(&v("0.1.0-beta")));
+        assert!(v("0.1.0").satisfies(&v("0.1.0-alpha")));
+        assert!(v("0.1.2").satisfies(&v("0.1.0-alpha")));
+
+        // Build metadata is ignored
+        assert!(v("0.1.0+build.1").satisfies(&v("0.1.0+build.2")));
+        assert!(v("0.1.2+build.1").satisfies(&v("0.1.0+build.2")));
     }
 }

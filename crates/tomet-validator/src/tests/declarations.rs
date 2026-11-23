@@ -54,7 +54,7 @@ fn the_config_declarations_are_clean() {
         "::kind(config)\n::format(callout: (style: (content: block)))\n\
          ::field(created: (type: datetime))\n\
          ::blueprint(a: @file(a.blueprint.tmt))\n\
-         ::vocabulary(deck: @file(deck.vocabulary.tmt))\n\
+         ::vocabulary(@file(deck.vocabulary.tmt))\n\
          ::workspace(ignore: (\"x\"))\n\
          ::export(type: commonmark)\n",
     );

@@ -89,7 +89,8 @@ impl Declaration {
     }
 
     /// Whether this is the header a document names itself with, as against an entry of a registry:
-    /// `::blueprint(daily)` and `::dictionary(name: tomet)` are, `::blueprint(daily: @file(...))` is not.
+    /// `::blueprint(daily)`, `::dictionary(name: tomet)`, and `::vocabulary(deck, version: "0.1.0")` are;
+    /// `::blueprint(daily: @file(...))` and `::vocabulary(@file(...))` are not.
     /// Only a declaration with a header of its own ([`Spec::own_header`](crate::Spec::own_header)) can be one.
     pub fn is_own_header(&self) -> bool {
         let Some(kind) = self.kind() else {
@@ -98,12 +99,21 @@ impl Declaration {
         if !kind.spec().own_header {
             return false;
         }
-        match &self.args {
-            Some(tuple) => tuple.entries().any(|entry| match entry.name() {
+        match (kind, &self.args) {
+            (_, None) => true,
+            (DeclKind::Vocabulary, Some(tuple)) => {
+                tuple.entries().any(|entry| match entry.name() {
+                    Some("namespace" | "version" | "open") => true,
+                    Some(_) => false,
+                    None => false,
+                }) || tuple
+                    .nth_unnamed(0)
+                    .is_some_and(|first| !matches!(first, Value::Element(_)))
+            }
+            (_, Some(tuple)) => tuple.entries().any(|entry| match entry.name() {
                 None => true,
                 Some(name) => kind.positional_keys().contains(&name),
             }),
-            None => true,
         }
     }
 

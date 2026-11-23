@@ -2343,7 +2343,7 @@ unknown attribute `x`: only `std` and this document's own `::kind` may be writte
 ::workspace(ignore: ("a"))
 ::export(type: commonmark)
 ::blueprint(b: "b.tmt")
-::vocabulary(v: "v.tmt")
+::vocabulary(@file(v.tmt))
 ::dictionary(d: "d.tmt")
 ::migration(m: 1)
 ::element(card: (display: block))
@@ -2367,7 +2367,7 @@ Declaration ::export
 Declaration ::blueprint
   args    {b: "b.tmt"}
 Declaration ::vocabulary
-  args    {v: "v.tmt"}
+  args    (@file("v.tmt"))
 Declaration ::dictionary
   args    {d: "d.tmt"}
 Declaration ::migration

@@ -166,3 +166,32 @@ fn a_version_field_in_meta_reads_a_bare_number_as_text() {
         assert_eq!(problems(&format!("::meta(rev: {bad})\n")), 1, "{bad}");
     }
 }
+
+#[test]
+fn vocabulary_version_mismatch_is_reported_as_a_diagnostic() {
+    let writ_02 = tomet_semantics::Vocabulary::from_file(&parse(
+        "::kind(vocabulary)\n::vocabulary(writ, version: \"0.2.0\")\n::element(layers: ())\n",
+    ))
+    .unwrap();
+    let deck_unversioned = tomet_semantics::Vocabulary::from_file(&parse(
+        "::kind(vocabulary)\n::vocabulary(deck)\n::element(card: ())\n",
+    ))
+    .unwrap();
+
+    let doc = parse("::kind(writ, 0.1)\n::use(deck, 0.1.0)\n");
+    let bindings =
+        tomet_semantics::Bindings::for_document(&doc, [writ_02.clone(), deck_unversioned.clone()]);
+    let errors = validate_document_with(&doc, &bindings);
+    let mismatches: Vec<String> = errors
+        .iter()
+        .filter(|e| matches!(e, Diagnostic::VocabularyVersionMismatch { .. }))
+        .map(ToString::to_string)
+        .collect();
+    assert_eq!(
+        mismatches,
+        [
+            "`::kind(writ, 0.1)`: version `0.1` is not satisfied by available `writ` vocabulary version `0.2.0`",
+            "`::use(deck, 0.1.0)`: version `0.1.0` was requested, but vocabulary `deck` declares no `version:`",
+        ]
+    );
+}

@@ -21,6 +21,13 @@ pub fn kind_name(declaration: &Declaration) -> Option<String> {
     args.get("kind").and_then(text)
 }
 
+/// The version of the kind a `::kind(name, 0.1.0)` or `::kind(name, version: "0.1.0")` asks for.
+pub fn kind_version(declaration: &Declaration) -> Option<tomet_type::Version> {
+    let args = declaration.args_view()?;
+    let raw = scalar_text_or_debug(args.get("version")?);
+    tomet_type::Version::parse(&raw)
+}
+
 /// The identity a `::id(...)` declares: `::id(std.config)` or `::id(id: std.config)`.
 ///
 /// `None` when it is not written as text, such as `::id($uuid())` before it is evaluated.
@@ -46,6 +53,29 @@ pub fn dictionary_name(declaration: &Declaration) -> Option<String> {
 pub fn vocabulary_namespace(declaration: &Declaration) -> Option<String> {
     let args = declaration.args_view()?;
     args.get("namespace").and_then(text)
+}
+
+/// The version a vocabulary declares in its `::vocabulary(ns, version: "0.1.0")` header.
+pub fn vocabulary_version(declaration: &Declaration) -> Option<tomet_type::Version> {
+    if !declaration.is_own_header() {
+        return None;
+    }
+    let args = declaration.args.as_ref()?;
+    let raw = scalar_text_or_debug(args.get("version")?);
+    tomet_type::Version::parse(&raw)
+}
+
+/// The `@file(...)` values a registration `::vocabulary(@file(...), ...)` holds, in the order written.
+///
+/// Empty for a vocabulary document's own header (`::vocabulary(ns, version: "0.1.0")`).
+pub fn vocabulary_files(declaration: &Declaration) -> Vec<Value> {
+    if declaration.is_own_header() {
+        return Vec::new();
+    }
+    match &declaration.args {
+        Some(tuple) => tuple.unnamed().cloned().collect(),
+        None => Vec::new(),
+    }
 }
 
 /// The names a `::profile(...)` is written with, as written and in order: `::profile(oneline, standalone)` is
@@ -134,6 +164,11 @@ pub fn document_kind<B>(doc: &File<B>) -> Option<String> {
     kind_name(&first(doc, DeclKind::Kind)?)
 }
 
+/// The version of the kind this document asks for with its first `::kind(...)`.
+pub fn document_kind_version<B>(doc: &File<B>) -> Option<tomet_type::Version> {
+    kind_version(&first(doc, DeclKind::Kind)?)
+}
+
 /// The identity this document declares with its first `::id(...)`.
 pub fn document_id<B>(doc: &File<B>) -> Option<String> {
     id_name(&first(doc, DeclKind::Id)?)
@@ -162,13 +197,32 @@ pub fn document_dictionary<B>(doc: &File<B>) -> Option<String> {
 }
 
 /// The namespace of the vocabulary a document is, from its `::vocabulary(ns)` header; `None` for a
-/// document that is not one. A registration (`::vocabulary(ns: @file(...))`) does not make the
+/// document that is not one. A registration (`::vocabulary(@file(...))`) does not make the
 /// document that writes it a vocabulary.
 pub fn document_vocabulary<B>(doc: &File<B>) -> Option<String> {
     let header = declarations(doc)
         .into_iter()
         .find(|found| found.kind == DeclKind::Vocabulary && found.declaration.is_own_header())?;
     vocabulary_namespace(&header.declaration)
+}
+
+/// The version of the vocabulary a document is, from its `::vocabulary(ns, version: "0.1.0")` header;
+/// `None` when the document is not a vocabulary or does not declare a version.
+pub fn document_vocabulary_version<B>(doc: &File<B>) -> Option<tomet_type::Version> {
+    let header = declarations(doc)
+        .into_iter()
+        .find(|found| found.kind == DeclKind::Vocabulary && found.declaration.is_own_header())?;
+    vocabulary_version(&header.declaration)
+}
+
+/// Every `@file(...)` entry from registration `::vocabulary(...)` declarations in the document,
+/// in the order written.
+pub fn document_vocabulary_entries<B>(doc: &File<B>) -> Vec<Value> {
+    declarations(doc)
+        .into_iter()
+        .filter(|found| found.kind == DeclKind::Vocabulary && !found.declaration.is_own_header())
+        .flat_map(|found| vocabulary_files(&found.declaration))
+        .collect()
 }
 
 /// The language version this document declares, as written.
@@ -453,5 +507,50 @@ mod tests {
         assert_eq!(vars[0].0, "a");
         assert_eq!(vars[0].1.default, Some(Value::Scalar(Scalar::Int(2))));
         assert_eq!(vars[1].0, "b");
+    }
+
+    #[test]
+    fn kind_version_reads_the_version_slot_of_kind() {
+        let v = |s: &str| tomet_type::Version::parse(s).unwrap();
+        assert_eq!(
+            document_kind_version(&parse("::kind(writ, 0.1.0)\n")),
+            Some(v("0.1.0"))
+        );
+        assert_eq!(
+            document_kind_version(&parse("::kind(writ, \"0.1.0\")\n")),
+            Some(v("0.1.0"))
+        );
+        assert_eq!(
+            document_kind_version(&parse("::kind(writ, version: \"0.2.0\")\n")),
+            Some(v("0.2.0"))
+        );
+        assert_eq!(document_kind_version(&parse("::kind(writ)\n")), None);
+        assert_eq!(document_kind_version(&parse("::kind(writ, abc)\n")), None);
+    }
+
+    #[test]
+    fn vocabulary_version_and_registration_entries() {
+        let v = |s: &str| tomet_type::Version::parse(s).unwrap();
+        let header_doc = parse("::vocabulary(deck, version: \"0.1.0\")\n");
+        assert_eq!(document_vocabulary(&header_doc).as_deref(), Some("deck"));
+        assert_eq!(document_vocabulary_version(&header_doc), Some(v("0.1.0")));
+        assert!(document_vocabulary_entries(&header_doc).is_empty());
+
+        let unversioned_header = parse("::vocabulary(deck)\n");
+        assert_eq!(
+            document_vocabulary(&unversioned_header).as_deref(),
+            Some("deck")
+        );
+        assert_eq!(document_vocabulary_version(&unversioned_header), None);
+
+        let reg_doc = parse(
+            "::vocabulary(@file(writ@0.1.0.vocabulary.tmt), @file(writ@0.2.0.vocabulary.tmt))\n\
+             ::vocabulary(@file(deck@0.1.0.vocabulary.tmt))\n",
+        );
+        assert_eq!(document_vocabulary(&reg_doc), None);
+        assert_eq!(document_vocabulary_version(&reg_doc), None);
+        let entries = document_vocabulary_entries(&reg_doc);
+        assert_eq!(entries.len(), 3);
+        assert!(entries.iter().all(|e| matches!(e, Value::Element(_))));
     }
 }

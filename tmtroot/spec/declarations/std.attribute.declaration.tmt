@@ -5,7 +5,7 @@
 
 ```tm
 `` ::kind(vocabulary)
-`` ::vocabulary(deck, version: "1.0.0")
+`` ::vocabulary(deck, version: "0.1.0")
 `` ::attribute(
 ``   theme: (
 ``     about: | 全体の配色。

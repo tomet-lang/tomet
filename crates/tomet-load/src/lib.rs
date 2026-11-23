@@ -682,7 +682,7 @@ mod tests {
         let path = root.join(tomet_load_config::VAULT_CONFIG_FILE);
         fs::write(
             &path,
-            "::kind(config)\n::blueprint(note: @file(bp.blueprint.tmt), wrong: @file(bp.blueprint.tmt), catasto: @file(ctmt.blueprint.ctmt), bad_ctmt: @file(ctmt.blueprint.ctmt))\n::vocabulary(deck: @file(deck.vocabulary.tmt), other: @file(deck.vocabulary.tmt))\n::dictionary(tomet: @file(tomet.dictionary.tmt), words: @file(tomet.dictionary.tmt))\n",
+            "::kind(config)\n::blueprint(note: @file(bp.blueprint.tmt), wrong: @file(bp.blueprint.tmt), catasto: @file(ctmt.blueprint.ctmt), bad_ctmt: @file(ctmt.blueprint.ctmt))\n::vocabulary(@file(deck.vocabulary.tmt))\n::dictionary(tomet: @file(tomet.dictionary.tmt), words: @file(tomet.dictionary.tmt))\n",
         )
         .unwrap();
         let vault = Vault::discover(&root);
@@ -703,7 +703,6 @@ mod tests {
             [
                 ("blueprint".to_string(), "wrong".to_string()),
                 ("blueprint".to_string(), "bad_ctmt".to_string()),
-                ("vocabulary".to_string(), "other".to_string()),
                 ("dictionary".to_string(), "words".to_string()),
             ]
         );

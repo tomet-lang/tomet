@@ -209,8 +209,12 @@ pub fn check_declarations(declarations: &[Declaration], host: Host) -> Vec<(usiz
             DeclKind::Kind | DeclKind::Use => {
                 check_version_slot(idx, decl, spec.name, &mut problems);
             }
-            DeclKind::Version | DeclKind::Vocabulary | DeclKind::Blueprint => {
+            DeclKind::Version | DeclKind::Blueprint => {
                 check_declared_version(idx, decl, kind, spec.name, &mut problems);
+            }
+            DeclKind::Vocabulary => {
+                check_declared_version(idx, decl, kind, spec.name, &mut problems);
+                check_vocabulary(idx, decl, spec.name, &mut problems);
             }
             DeclKind::Profile => {
                 check_profile(idx, decl, spec.name, &mut problems);
@@ -313,6 +317,46 @@ fn check_declared_version(
 ) {
     if let Some(written) = written_version(decl, kind) {
         check_version(idx, name, &written, problems);
+    }
+}
+
+fn check_vocabulary(
+    idx: usize,
+    decl: &Declaration,
+    name: &'static str,
+    problems: &mut Vec<(usize, Problem)>,
+) {
+    let Some(tuple) = &decl.args else {
+        return;
+    };
+    if decl.is_own_header() {
+        for (key, _) in tuple.named() {
+            if !matches!(key, "namespace" | "version" | "open") {
+                problems.push((
+                    idx,
+                    Problem::InvalidDefinition {
+                        declaration: name,
+                        name: key.to_string(),
+                        reason: "a vocabulary header takes only `namespace`, `version`, and `open`"
+                            .to_string(),
+                    },
+                ));
+            }
+        }
+    } else {
+        for (key, _) in tuple.named() {
+            problems.push((
+                idx,
+                Problem::InvalidDefinition {
+                    declaration: name,
+                    name: key.to_string(),
+                    reason: "a vocabulary registration takes `@file(...)` entries without keys, as \
+                             `::vocabulary(@file(...))` -- the vocabulary file names its own \
+                             namespace"
+                        .to_string(),
+                },
+            ));
+        }
     }
 }
 
@@ -1062,9 +1106,26 @@ mod tests {
     }
 
     #[test]
-    fn a_vocabulary_header_names_itself_positionally_and_registers_by_key() {
-        assert!(problems_of("::vocabulary(deck, version: \"1.0.0\")\n").is_empty());
-        assert!(problems_of("::vocabulary(deck: @file(deck.vocabulary.tmt))\n").is_empty());
+    fn a_vocabulary_header_names_itself_positionally_and_registers_as_file_list() {
+        assert!(problems_of("::vocabulary(deck, version: \"0.1.0\")\n").is_empty());
+        assert!(problems_of("::vocabulary(namespace: deck, version: \"0.1.0\", open: true)\n").is_empty());
+        assert!(problems_of("::vocabulary(@file(deck@0.1.0.vocabulary.tmt))\n").is_empty());
+        assert!(
+            problems_of(
+                "::vocabulary(@file(writ@0.1.0.vocabulary.tmt), @file(writ@0.2.0.vocabulary.tmt))\n"
+            )
+            .is_empty()
+        );
+        assert_eq!(
+            problems_of("::vocabulary(deck: @file(deck.vocabulary.tmt))\n"),
+            [Problem::InvalidDefinition {
+                declaration: "vocabulary",
+                name: "deck".into(),
+                reason: "a vocabulary registration takes `@file(...)` entries without keys, as \
+                         `::vocabulary(@file(...))` -- the vocabulary file names its own namespace"
+                    .into(),
+            }]
+        );
     }
 
     #[test]
@@ -1095,7 +1156,7 @@ mod tests {
             "::workspace(ignore: (\"target\", \".git\"))\n",
             "::format(table: (max_col_width: 50))\n",
             "::blueprint(daily: @file(daily.blueprint.tmt))\n",
-            "::vocabulary(deck: @file(deck.vocabulary.tmt))\n",
+            "::vocabulary(@file(deck@0.1.0.vocabulary.tmt))\n",
             "::dictionary(tomet: @file(tomet.dict.tmt))\n",
             "::element(card: (display: block))\n",
         ] {

@@ -1,5 +1,5 @@
 ::kind(vocabulary)
-::vocabulary(roots, version: "1.0.0")
+::vocabulary(roots, version: "0.1.0")
 ::element(
   root: (
     display: block

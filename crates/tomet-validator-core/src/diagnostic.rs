@@ -243,13 +243,22 @@ pub enum Diagnostic {
     /// Reported rather than ignored quietly: a setting that does nothing and says nothing is how a
     /// reader comes to believe it is obeyed. `span` is the declaration.
     VaultOnlyDeclaration { name: String, span: Span },
-    /// A `::blueprint` / `::vocabulary` entry whose key is not the name the file it registers
-    /// gives itself (`::blueprint(x)`, `::vocabulary(x)`). The key is the name it is registered under;
+    /// A `::blueprint` or `::dictionary` entry whose key is not the name the file it registers
+    /// gives itself (`::blueprint(x)`, `::dictionary(x)`). The key is the name it is registered under;
     /// the file must agree. `declared` is `None` when the file names nothing. `span` is the declaration.
     RegistryNameMismatch {
         declaration: &'static str,
         name: String,
         declared: Option<String>,
+        span: Span,
+    },
+    /// A `::kind(ns, version)` or `::use(ns, version)` requests a version that no registered
+    /// vocabulary for `ns` satisfies.
+    VocabularyVersionMismatch {
+        declaration: &'static str,
+        namespace: String,
+        requested: String,
+        available: Vec<String>,
         span: Span,
     },
     /// A `@term` mention that names no term of the dictionaries the vault registers. `target` is
@@ -393,6 +402,7 @@ impl Diagnostic {
             Diagnostic::VaultOnlyDeclaration { span, .. } => *span,
             Diagnostic::MetaIdMoved { span } => *span,
             Diagnostic::RegistryNameMismatch { span, .. } => *span,
+            Diagnostic::VocabularyVersionMismatch { span, .. } => *span,
             Diagnostic::UnresolvedTerm { span, .. } => *span,
             Diagnostic::NotStandalone { span, .. } => *span,
             Diagnostic::InvalidDefinition { span, .. } => *span,
@@ -463,6 +473,7 @@ impl Diagnostic {
             Diagnostic::DisallowedInContent { .. } => "disallowed-in-content",
             Diagnostic::VaultOnlyDeclaration { .. } => "vault-only-declaration",
             Diagnostic::RegistryNameMismatch { .. } => "registry-name-mismatch",
+            Diagnostic::VocabularyVersionMismatch { .. } => "vocabulary-version-mismatch",
             Diagnostic::UnresolvedTerm { .. } => "unresolved-term",
             Diagnostic::NotStandalone { .. } => "not-standalone",
             Diagnostic::MetaIdMoved { .. } => "meta-id-moved",
@@ -796,6 +807,36 @@ impl Diagnostic {
                     "`{name}` in `::{declaration}` registers a file that gives itself no name"
                 ),
             },
+            Diagnostic::VocabularyVersionMismatch {
+                declaration,
+                namespace,
+                requested,
+                available,
+                ..
+            } => {
+                if available.is_empty() {
+                    write!(
+                        f,
+                        "`::{declaration}({namespace}, {requested})`: version `{requested}` was requested, \
+                         but vocabulary `{namespace}` declares no `version:`"
+                    )
+                } else if available.len() == 1 {
+                    write!(
+                        f,
+                        "`::{declaration}({namespace}, {requested})`: version `{requested}` is not \
+                         satisfied by available `{namespace}` vocabulary version `{}`",
+                        available[0]
+                    )
+                } else {
+                    let list: Vec<String> = available.iter().map(|v| format!("`{v}`")).collect();
+                    write!(
+                        f,
+                        "`::{declaration}({namespace}, {requested})`: version `{requested}` is not \
+                         satisfied by available `{namespace}` vocabulary versions {}",
+                        list.join(", ")
+                    )
+                }
+            }
             Diagnostic::UnresolvedTerm { target, reason, .. } => {
                 write!(f, "`@term({target})` names no term: {reason}")
             }

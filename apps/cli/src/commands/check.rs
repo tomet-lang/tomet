@@ -317,9 +317,7 @@ fn check_ctmt(file: &Path, src: &str, vault: &tomet_load::Vault, json: bool) -> 
 
     let is_blueprint = tomet_declaration::document_kind(&parsed).as_deref() == Some("blueprint");
     let eval_errors: Vec<_> = if is_blueprint {
-        diagnostics.extend(tomet_validator::validate_ctmt_blueprint(
-            &parsed, &bindings,
-        ));
+        diagnostics.extend(tomet_validator::validate_ctmt_blueprint(&parsed, &bindings));
         Vec::new()
     } else {
         tomet_validator::check_ctmt_type_seats(&parsed, &mut diagnostics);
@@ -429,12 +427,12 @@ mod tests {
         fs::create_dir_all(dir.join(".tomet/vocabularies")).unwrap();
         fs::write(
             dir.join(tomet_load_config::VAULT_CONFIG_FILE),
-            "::kind(config)\n::vocabulary(deck: @file(.tomet/vocabularies/deck.vocabulary.tmt))\n",
+            "::kind(config)\n::vocabulary(@file(.tomet/vocabularies/deck.vocabulary.tmt))\n",
         )
         .unwrap();
         fs::write(
             dir.join(".tomet/vocabularies/deck.vocabulary.tmt"),
-            "::kind(vocabulary)\n::vocabulary(deck)\n\n::element(card: ())\n",
+            "::kind(vocabulary)\n::vocabulary(deck, version: \"1.0.0\")\n\n::element(card: ())\n",
         )
         .unwrap();
         dir
@@ -975,7 +973,7 @@ mod tests {
         .unwrap();
         fs::write(
             root.join(tomet_load_config::VAULT_CONFIG_FILE),
-            "::kind(config)\n::vocabulary(catasto: @file(.tomet/vocabularies/catasto.vocabulary.tmt))\n::blueprint(catasto: @file(catasto.blueprint.ctmt))\n",
+            "::kind(config)\n::vocabulary(@file(.tomet/vocabularies/catasto.vocabulary.tmt))\n::blueprint(catasto: @file(catasto.blueprint.ctmt))\n",
         )
         .unwrap();
 

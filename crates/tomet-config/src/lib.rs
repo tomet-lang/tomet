@@ -443,7 +443,7 @@ mod tests {
 )
 ::workspace(ignore: ("target", "build"), unswept: ("tests/fixtures"))
 ::blueprint(note: @file(note.blueprint.tmt))
-::vocabulary(deck: @file(deck.vocabulary.tmt))
+::vocabulary(@file(deck.vocabulary.tmt))
 ::dictionary(tomet: @file(tomet.dict.tmt))
 "#,
         )

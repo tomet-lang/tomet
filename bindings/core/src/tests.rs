@@ -214,7 +214,7 @@ fn a_document_that_does_not_parse_is_an_error_with_its_place() {
 #[test]
 fn the_registry_names_the_files_a_config_registers() {
     let registry = registry(
-        "::vocabulary(writ: @file(schema/writ.vocabulary.tmt))\n::dictionary(tomet: @file(dict/tomet.dict.tmt))\n",
+        "::vocabulary(@file(schema/writ.vocabulary.tmt))\n::dictionary(tomet: @file(dict/tomet.dict.tmt))\n",
     )
     .unwrap();
     assert_eq!(registry.vocabularies, ["schema/writ.vocabulary.tmt"]);

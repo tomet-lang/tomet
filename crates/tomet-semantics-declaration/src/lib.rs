@@ -58,8 +58,10 @@ pub use macros::{Arity, Placeholder, expressions_in_body, is_ident_placeholder, 
 pub use profile::Profile;
 pub use read::{
     blueprint_target, dictionary_name, document_blueprint, document_dictionary, document_entries,
-    document_id, document_kind, document_macros, document_meta, document_profiles, document_vars,
-    document_version, document_vocabulary, id_name, is_blueprint, kind_name, macros, meta,
-    profile_names, version_string, vocabulary_namespace,
+    document_id, document_kind, document_kind_version, document_macros, document_meta,
+    document_profiles, document_vars, document_version, document_vocabulary,
+    document_vocabulary_entries, document_vocabulary_version, id_name, is_blueprint, kind_name,
+    kind_version, macros, meta, profile_names, version_string, vocabulary_files,
+    vocabulary_namespace, vocabulary_version,
 };
 pub use vars::{VAR_KEYS, VarDecl, read_var_decls};

@@ -136,7 +136,7 @@ fn folder_entry_problem(doc: &File) -> Option<tomet_validator::Diagnostic> {
 }
 
 impl Vault {
-    /// The entries of `doc`'s `::blueprint`, `::vocabulary` and `::dictionary` whose key is not the name the
+    /// The entries of `doc`'s `::blueprint` and `::dictionary` whose key is not the name the
     /// registered file gives itself. A file that cannot be read or parsed is not reported here: the
     /// vault reports that once, where it loads it.
     fn registry_name_mismatches(&self, doc: &File) -> Vec<tomet_validator::Diagnostic> {
@@ -146,7 +146,6 @@ impl Vault {
         for found in tomet_declaration::declarations(doc) {
             let declaration = match found.kind {
                 DeclKind::Blueprint => "blueprint",
-                DeclKind::Vocabulary => "vocabulary",
                 DeclKind::Dictionary => "dictionary",
                 _ => continue,
             };
@@ -168,8 +167,7 @@ impl Vault {
                     match found.kind {
                         DeclKind::Blueprint => tomet_declaration::document_blueprint(&registered),
                         DeclKind::Dictionary => tomet_declaration::document_dictionary(&registered),
-                        _ => tomet_semantics::Vocabulary::from_file(&registered)
-                            .map(|vocabulary| vocabulary.namespace),
+                        _ => None,
                     }
                 };
                 if declared.as_deref() != Some(name.as_str()) {

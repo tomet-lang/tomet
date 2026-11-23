@@ -14,7 +14,7 @@
 
 =[ 登録の決まり ]
 
-`::blueprint`、`::vocabulary`、`::dictionary` は同じ形で、同じ決まりに従う。
+`::blueprint` と `::dictionary` は同じ形で、次の決まりに従う（`::vocabulary` は語彙自身が名前空間と版を持ち、版違いを並べて登録できるため、キーを書かず `@file(パス)` を直接並べる。@file(tmtroot/spec/declarations/std.vocabularies.declaration.tmt)）。
 
 - 名前をキーにした表を渡す。キー（`writ: @file(...)` の `writ`）が、登録する名前。
 - 登録する名前はファイルが自分で名乗る名前（`::blueprint(writ)` の `writ`）と同じでなければならない。食い違えば `tomet check` が報告する。

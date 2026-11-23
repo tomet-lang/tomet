@@ -10,7 +10,7 @@ vocabulary は、文書やデータが使える名前と、それぞれが取る
 
 ```tm
 `` ::kind(vocabulary)
-`` ::vocabulary(deck, version: "1.0.0")
+`` ::vocabulary(deck, version: "0.1.0")
 `` 
 `` ::attribute(
 ``   theme: (
@@ -35,8 +35,11 @@ vocabulary は、文書やデータが使える名前と、それぞれが取る
 `` )
 ```
 
-`version:` は版で、`1.0.0` や `1.10` のように、ピリオドで区切った整数
+`version:` は版で、`0.1.0` や `1.10` のように、ピリオドで区切った整数
 （@file(tmtroot/spec/declarations/std.version.declaration.tmt)）。形が違えば `tomet check` が報告する。
+文書が `::kind(ns, version)` や `::use(ns, version)` で版を求めたとき、この `version:` と照合される。
+互換の境目は左から見て最初に `0` でない桁（`0.1.2` なら `0.1`、`1.2.3` なら `1`）で、同じ境目を持ち求める版以上であれば束縛される。
+境目が違う版（`0.1.0` と `0.2.0` など）は同じ vault に並べて登録でき、版を省いた `::kind(ns)` や `::use(ns)` には一番新しい版が束縛される。
 
 #[ 名前はキー ]
 

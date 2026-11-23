@@ -385,6 +385,8 @@ fn param_of<'a>(params: &'a [ParamDecl], name: &str) -> Option<&'a ParamDecl> {
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct Vocabulary {
     pub namespace: String,
+    /// `version:` from `::vocabulary(ns, version: "0.1.0")`.
+    pub version: Option<tomet_type::Version>,
     /// `::element`: the `@name`s.
     pub elements: BTreeMap<String, ElementDecl>,
     /// `::attribute`: the `::name`s.
@@ -455,6 +457,7 @@ pub fn builtin_doc_vocabularies() -> Vec<Vocabulary> {
     vec![
         Vocabulary {
             namespace: "doc.index".to_string(),
+            version: None,
             elements: BTreeMap::new(),
             attributes: BTreeMap::new(),
             constructors: BTreeMap::new(),
@@ -462,6 +465,7 @@ pub fn builtin_doc_vocabularies() -> Vec<Vocabulary> {
         },
         Vocabulary {
             namespace: "doc".to_string(),
+            version: None,
             elements: BTreeMap::from([(
                 "icon".to_string(),
                 ElementDecl {
@@ -517,9 +521,10 @@ impl Vocabulary {
     /// to contain `::element`. That is the same rule `::blueprint` needed
     /// after `extract_blueprint_schema` had counted any `::kind` at all.
     pub fn from_file<B>(doc: &File<B>) -> Option<Self> {
-        let (namespace, open) = header(doc)?;
+        let (namespace, version, open) = header(doc)?;
         let mut vocab = Vocabulary {
             namespace,
+            version,
             elements: BTreeMap::new(),
             attributes: BTreeMap::new(),
             constructors: BTreeMap::new(),
@@ -830,15 +835,17 @@ pub fn check_call_params(
 /// this type's business, so both get the same verdicts.
 #[derive(Debug)]
 pub struct LoadedVocabularies {
-    /// By the namespace each one names for itself.
-    pub by_namespace: BTreeMap<String, Vocabulary>,
+    /// Accepted vocabularies by namespace, sorted in ascending version order so the latest
+    /// version is last. Multiple versions of the same namespace may coexist when their
+    /// compatibility tracks differ.
+    pub by_namespace: BTreeMap<String, Vec<Vocabulary>>,
     /// Declared vocabularies that are missing, unreadable, unparseable,
-    /// headerless, claim a namespace twice, claim a reserved namespace,
-    /// or shadow a builtin name.
+    /// headerless, claim a namespace on the same compatibility track twice,
+    /// claim a reserved namespace, or shadow a builtin name.
     pub errors: Vec<String>,
-    /// The label each accepted namespace was declared under, so a
+    /// The label each accepted `(namespace, compatibility_track)` was declared under, so a
     /// duplicate can name both sides.
-    declared_as: BTreeMap<String, String>,
+    declared_as: BTreeMap<(String, Option<Vec<u64>>), String>,
 }
 
 impl Default for LoadedVocabularies {
@@ -852,12 +859,13 @@ impl Default for LoadedVocabularies {
             declared_as: BTreeMap::new(),
         };
         for builtin in builtin_doc_vocabularies() {
-            loaded
-                .declared_as
-                .insert(builtin.namespace.clone(), "<builtin>".to_string());
+            loaded.declared_as.insert(
+                (builtin.namespace.clone(), None),
+                "<builtin>".to_string(),
+            );
             loaded
                 .by_namespace
-                .insert(builtin.namespace.clone(), builtin);
+                .insert(builtin.namespace.clone(), vec![builtin]);
         }
         loaded
     }
@@ -910,21 +918,88 @@ impl LoadedVocabularies {
             ));
         }
 
-        if let Some(first) = self.declared_as.get(&vocab.namespace) {
-            self.errors.push(format!(
-                "two vocabularies both call themselves `{}`: {first} and {label}",
-                vocab.namespace
-            ));
+        let track = vocab
+            .version
+            .as_ref()
+            .map(|v| v.compatibility_track().to_vec());
+        let key = (vocab.namespace.clone(), track);
+        if let Some(first) = self.declared_as.get(&key) {
+            let msg = if key.1.is_some() {
+                format!(
+                    "two vocabularies both call themselves `{}` on the same compatibility track: {first} and {label}",
+                    vocab.namespace
+                )
+            } else {
+                format!(
+                    "two vocabularies both call themselves `{}`: {first} and {label}",
+                    vocab.namespace
+                )
+            };
+            self.errors.push(msg);
             return;
         }
-        self.declared_as
-            .insert(vocab.namespace.clone(), label.to_string());
-        self.by_namespace.insert(vocab.namespace.clone(), vocab);
+        self.declared_as.insert(key, label.to_string());
+        let list = self.by_namespace.entry(vocab.namespace.clone()).or_default();
+        list.push(vocab);
+        list.sort_by(|a, b| a.version.cmp(&b.version));
     }
 
     /// The namespaces `doc` has in scope out of what was accepted.
     pub fn bindings_for<B>(&self, doc: &File<B>) -> Bindings {
-        Bindings::for_document(doc, self.by_namespace.values().cloned())
+        Bindings::for_document(doc, self.by_namespace.values().flatten().cloned())
+    }
+}
+
+/// A `::kind(ns, version)` or `::use(ns, version)` whose requested version is not satisfied by
+/// any available vocabulary for `ns`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct VersionMismatch {
+    /// The index of the offending declaration in `doc.header`.
+    pub declaration_index: usize,
+    /// `"kind"` or `"use"`.
+    pub declaration: &'static str,
+    /// The vocabulary namespace requested.
+    pub namespace: String,
+    /// The version the declaration asked for.
+    pub requested: tomet_type::Version,
+    /// The versions of `namespace` that are available (`None` entry if an unversioned vocabulary is available).
+    pub available: Vec<Option<tomet_type::Version>>,
+}
+
+impl std::fmt::Display for VersionMismatch {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let VersionMismatch {
+            declaration,
+            namespace,
+            requested,
+            available,
+            ..
+        } = self;
+        let versioned: Vec<String> = available
+            .iter()
+            .filter_map(|v| v.as_ref().map(|ver| format!("`{ver}`")))
+            .collect();
+        if versioned.is_empty() {
+            write!(
+                f,
+                "`::{declaration}({namespace}, {requested})`: version `{requested}` was requested, \
+                 but vocabulary `{namespace}` declares no `version:`"
+            )
+        } else if versioned.len() == 1 {
+            write!(
+                f,
+                "`::{declaration}({namespace}, {requested})`: version `{requested}` is not \
+                 satisfied by available `{namespace}` vocabulary version {}",
+                versioned[0]
+            )
+        } else {
+            write!(
+                f,
+                "`::{declaration}({namespace}, {requested})`: version `{requested}` is not \
+                 satisfied by available `{namespace}` vocabulary versions {}",
+                versioned.join(", ")
+            )
+        }
     }
 }
 
@@ -949,6 +1024,9 @@ pub struct Bindings {
     /// stands for. Read from the document alone, so it holds whether or not the vocabulary is at
     /// hand ([`classify_lenient`](Bindings::classify_lenient)).
     pub aliases: BTreeMap<String, String>,
+    /// Requested versions on `::kind(ns, version)` or `::use(ns, version)` that no available
+    /// vocabulary for `ns` satisfies.
+    pub version_mismatches: Vec<VersionMismatch>,
 }
 
 impl Bindings {
@@ -970,35 +1048,108 @@ impl Bindings {
     where
         I: IntoIterator<Item = Vocabulary>,
     {
-        let by_namespace: BTreeMap<String, Vocabulary> = available
-            .into_iter()
-            .map(|v| (v.namespace.clone(), v))
-            .collect();
+        let mut by_namespace: BTreeMap<String, Vec<Vocabulary>> = BTreeMap::new();
+        for v in available {
+            by_namespace
+                .entry(v.namespace.clone())
+                .or_default()
+                .push(v);
+        }
+        for list in by_namespace.values_mut() {
+            list.sort_by(|a, b| a.version.cmp(&b.version));
+        }
 
-        let kind = tomet_declaration::document_kind(doc)
-            .and_then(|kind| {
-                by_namespace.get(&kind).or_else(|| {
-                    if kind == "blueprint" {
-                        tomet_declaration::document_blueprint(doc)
-                            .and_then(|target| by_namespace.get(&target))
-                    } else {
-                        None
+        let select = |namespace: &str,
+                      requested: Option<&tomet_type::Version>|
+         -> Option<Result<Vocabulary, Vec<Option<tomet_type::Version>>>> {
+            let candidates = by_namespace.get(namespace)?;
+            match requested {
+                None => candidates.last().cloned().map(Ok),
+                Some(req) => {
+                    let matched = candidates
+                        .iter()
+                        .filter(|v| {
+                            v.version.as_ref().is_some_and(|ver| ver.satisfies(req))
+                                || namespace == "doc.index"
+                        })
+                        .next_back()
+                        .cloned();
+                    match matched {
+                        Some(vocab) => Some(Ok(vocab)),
+                        None => Some(Err(
+                            candidates.iter().map(|v| v.version.clone()).collect()
+                        )),
                     }
-                })
-            })
-            .cloned();
+                }
+            }
+        };
+
+        let mut version_mismatches = Vec::new();
+        let mut kind = None;
+
+        if let Some((idx, decl)) = doc
+            .header
+            .iter()
+            .enumerate()
+            .find(|(_, d)| classify_declaration_lenient(d) == ElementKind::Declaration(DeclKind::Kind))
+            .and_then(|(idx, d)| tomet_declaration::Declaration::from_ast(d).map(|decl| (idx, decl)))
+            && let Some(kind_name) = tomet_declaration::kind_name(&decl)
+        {
+            let requested = tomet_declaration::kind_version(&decl);
+            if let Some(res) = select(&kind_name, requested.as_ref()) {
+                match res {
+                    Ok(vocab) => kind = Some(vocab),
+                    Err(avail) => {
+                        if let Some(req) = requested {
+                            version_mismatches.push(VersionMismatch {
+                                declaration_index: idx,
+                                declaration: "kind",
+                                namespace: kind_name,
+                                requested: req,
+                                available: avail,
+                            });
+                        }
+                    }
+                }
+            } else if kind_name == "blueprint"
+                && let Some(target) = tomet_declaration::document_blueprint(doc)
+                && let Some(Ok(vocab)) = select(&target, None)
+            {
+                kind = Some(vocab);
+            }
+        }
 
         let mut used = BTreeMap::new();
         let mut aliases = BTreeMap::new();
-        for found in uses(doc) {
+        for (idx, declaration) in doc.header.iter().enumerate() {
+            let Some(found) = use_of(declaration) else {
+                continue;
+            };
             if let Some(alias) = &found.alias {
                 aliases
                     .entry(alias.clone())
                     .or_insert_with(|| found.namespace.clone());
             }
-            if let Some(vocab) = by_namespace.get(&found.namespace) {
-                used.entry(found.local().to_string())
-                    .or_insert_with(|| vocab.clone());
+            if used.contains_key(found.local()) {
+                continue;
+            }
+            if let Some(res) = select(&found.namespace, found.version.as_ref()) {
+                match res {
+                    Ok(vocab) => {
+                        used.insert(found.local().to_string(), vocab);
+                    }
+                    Err(avail) => {
+                        if let Some(req) = found.version {
+                            version_mismatches.push(VersionMismatch {
+                                declaration_index: idx,
+                                declaration: "use",
+                                namespace: found.namespace,
+                                requested: req,
+                                available: avail,
+                            });
+                        }
+                    }
+                }
             }
         }
 
@@ -1006,6 +1157,7 @@ impl Bindings {
             kind,
             used,
             aliases,
+            version_mismatches,
         }
     }
 
@@ -1258,6 +1410,8 @@ pub const USE_ARGS: [&str; 3] = ["target", "version", "as"];
 pub struct Use {
     /// The namespace the vocabulary calls itself.
     pub namespace: String,
+    /// The version requested, when `version` is written and parses as a [`tomet_type::Version`].
+    pub version: Option<tomet_type::Version>,
     /// `as:`, when it is written and is a bare name ([`is_alias`]).
     pub alias: Option<String>,
 }
@@ -1290,12 +1444,21 @@ fn use_of(declaration: &tomet_ast::Declaration) -> Option<Use> {
     }
     let args = declaration_args_view(declaration)?;
     let namespace = args.get("target").and_then(|v| v.as_str())?.to_string();
+    let version = args
+        .get("version")
+        .and_then(|v| v.as_scalar())
+        .and_then(|s| s.text())
+        .and_then(|raw| tomet_type::Version::parse(&raw));
     let alias = args
         .get("as")
         .and_then(|v| v.as_str())
         .filter(|text| is_alias(text))
         .map(str::to_string);
-    Some(Use { namespace, alias })
+    Some(Use {
+        namespace,
+        version,
+        alias,
+    })
 }
 
 /// Every `::use` a document writes, in order.
@@ -1451,12 +1614,12 @@ fn is_body_kind_name(name: &str) -> bool {
     body_kind(name).is_some()
 }
 
-/// The namespace a vocabulary's own header names, and whether it is open: `::vocabulary(ns, version: "1.0.0")`
-/// names `ns`, and `open: true` marks it open.
+/// The namespace and version a vocabulary's own header names, and whether it is open:
+/// `::vocabulary(ns, version: "0.1.0")` names `ns` at version `0.1.0`, and `open: true` marks it open.
 ///
-/// `::vocabulary(ns: @file(...))` is a registration of the file in a vault's config,
-/// which is not a vocabulary's header: it has no positional namespace argument.
-fn header<B>(doc: &File<B>) -> Option<(String, bool)> {
+/// `::vocabulary(@file(...))` is a registration of vocabulary files in a vault's config,
+/// which is not a vocabulary's header: its positional argument is an `@file(...)` element, not a namespace string.
+fn header<B>(doc: &File<B>) -> Option<(String, Option<tomet_type::Version>, bool)> {
     for declaration in &doc.header {
         if classify_declaration_lenient(declaration)
             != ElementKind::Declaration(DeclKind::Vocabulary)
@@ -1469,8 +1632,13 @@ fn header<B>(doc: &File<B>) -> Option<(String, bool)> {
         let Some(namespace) = args.get("namespace").and_then(|v| v.as_str()) else {
             continue;
         };
+        let version = args
+            .get("version")
+            .and_then(|v| v.as_scalar())
+            .and_then(|s| s.text())
+            .and_then(|raw| tomet_type::Version::parse(&raw));
         let open = args.get("open").and_then(|v| v.as_bool()).unwrap_or(false);
-        return Some((namespace.to_string(), open));
+        return Some((namespace.to_string(), version, open));
     }
     None
 }
@@ -2414,20 +2582,95 @@ mod tests {
         );
     }
 
-    /// A version after the name is declared, not acted on: the namespace binds
-    /// the same with or without it.
+    /// A matching version after the name binds that vocabulary, as omitting the version does.
     #[test]
     fn a_version_after_the_name_does_not_change_what_binds() {
-        let deck = vocab("::vocabulary(deck)\n\n::element(ref: ())\n");
+        let deck = vocab("::vocabulary(deck, version: \"3.0.0\")\n\n::element(ref: ())\n");
         for src in [
             "::kind(writ, 1)\n::use(deck, 3)\n\n@deck.ref(id:1)\n",
             "::kind(writ)\n::use(deck)\n\n@deck.ref(id:1)\n",
         ] {
             let doc = tomet_ast_parser::parse_file(src).expect("document parses");
             let bound = Bindings::for_document(&doc, [vocab(WRIT), deck.clone()]);
+            assert!(bound.version_mismatches.is_empty(), "{src}");
             assert!(bound.classify(&name("layers")).is_ok(), "{src}");
             assert!(bound.classify(&name("deck.ref")).is_ok(), "{src}");
         }
+    }
+
+    #[test]
+    fn multi_version_vocabularies_on_different_compatibility_tracks_coexist() {
+        let v01 = parsed(
+            "::kind(vocabulary)\n::vocabulary(writ, version: \"0.1.0\")\n::element(old_rule: ())\n",
+        );
+        let v02 = parsed(
+            "::kind(vocabulary)\n::vocabulary(writ, version: \"0.2.0\")\n::element(new_rule: ())\n",
+        );
+        let mut loaded = LoadedVocabularies::default();
+        loaded.add("writ@0.2.0.tmt", &v02);
+        loaded.add("writ@0.1.0.tmt", &v01);
+        assert!(loaded.errors.is_empty(), "{:?}", loaded.errors);
+        assert_eq!(loaded.by_namespace["writ"].len(), 2);
+
+        // Requesting 0.1 binds 0.1.0
+        let doc_01 = parsed("::kind(writ, 0.1)\n");
+        let b_01 = loaded.bindings_for(&doc_01);
+        assert!(b_01.version_mismatches.is_empty());
+        assert!(b_01.classify(&name("old_rule")).is_ok());
+        assert!(b_01.classify(&name("new_rule")).is_err());
+
+        // Requesting 0.2 via ::use binds 0.2.0
+        let doc_02 = parsed("::use(writ, 0.2)\n");
+        let b_02 = loaded.bindings_for(&doc_02);
+        assert!(b_02.version_mismatches.is_empty());
+        assert!(b_02.classify(&name("writ.new_rule")).is_ok());
+        assert!(b_02.classify(&name("writ.old_rule")).is_err());
+
+        // Omitting version binds the highest available version (0.2.0)
+        let doc_latest = parsed("::kind(writ)\n");
+        let b_latest = loaded.bindings_for(&doc_latest);
+        assert!(b_latest.version_mismatches.is_empty());
+        assert!(b_latest.classify(&name("new_rule")).is_ok());
+        assert!(b_latest.classify(&name("old_rule")).is_err());
+    }
+
+    #[test]
+    fn two_vocabularies_on_the_same_compatibility_track_are_rejected() {
+        let v010 = parsed("::kind(vocabulary)\n::vocabulary(writ, version: \"0.1.0\")\n");
+        let v012 = parsed("::kind(vocabulary)\n::vocabulary(writ, version: \"0.1.2\")\n");
+        let mut loaded = LoadedVocabularies::default();
+        loaded.add("a.tmt", &v010);
+        loaded.add("b.tmt", &v012);
+        assert_eq!(loaded.errors.len(), 1, "{:?}", loaded.errors);
+        assert!(
+            loaded.errors[0].contains("same compatibility track")
+                && loaded.errors[0].contains("a.tmt")
+                && loaded.errors[0].contains("b.tmt"),
+            "{:?}",
+            loaded.errors
+        );
+    }
+
+    #[test]
+    fn version_mismatch_is_recorded_when_requested_version_is_not_satisfied() {
+        let v01 = vocab("::vocabulary(writ, version: \"0.1.0\")\n::element(layers: ())\n");
+        let v02 = vocab("::vocabulary(writ, version: \"0.2.0\")\n::element(layers: ())\n");
+        let unversioned = vocab("::vocabulary(deck)\n::element(card: ())\n");
+
+        // Requesting 0.3 when 0.1.0 and 0.2.0 are available
+        let doc = parsed("::kind(writ, 0.3)\n::use(deck, 0.1.0)\n");
+        let bound = Bindings::for_document(&doc, [v01, v02, unversioned]);
+        assert!(bound.kind.is_none());
+        assert!(!bound.used.contains_key("deck"));
+        assert_eq!(bound.version_mismatches.len(), 2);
+        assert_eq!(
+            bound.version_mismatches[0].to_string(),
+            "`::kind(writ, 0.3)`: version `0.3` is not satisfied by available `writ` vocabulary versions `0.1.0`, `0.2.0`"
+        );
+        assert_eq!(
+            bound.version_mismatches[1].to_string(),
+            "`::use(deck, 0.1.0)`: version `0.1.0` was requested, but vocabulary `deck` declares no `version:`"
+        );
     }
 
     /// A vocabulary that is available but not asked for stays out of
