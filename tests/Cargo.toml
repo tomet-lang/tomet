@@ -115,3 +115,8 @@ tree-sitter-tomet   = { workspace = true }
 #= Crates.io
 serde_json  = { workspace = true }
 tree-sitter = { workspace = true }
+
+[dev-dependencies]
+# Holds the generated JSON Schemas of the AST to what serde writes. Without the default features:
+# nothing is fetched from a `$ref`, and no TLS or HTTP client is compiled.
+jsonschema = { version = "0.63", default-features = false }

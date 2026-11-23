@@ -1,0 +1,193 @@
+{
+  "pandoc-api-version": [
+    1,
+    23,
+    1
+  ],
+  "meta": {
+    "id": {
+      "t": "MetaInlines",
+      "c": [
+        {
+          "t": "Str",
+          "c": "doc-value-interp"
+        }
+      ]
+    },
+    "size": {
+      "t": "MetaString",
+      "c": ""
+    },
+    "title": {
+      "t": "MetaString",
+      "c": ""
+    }
+  },
+  "blocks": [
+    {
+      "t": "Header",
+      "c": [
+        1,
+        [
+          "",
+          [],
+          []
+        ],
+        [
+          {
+            "t": "Str",
+            "c": "In"
+          },
+          {
+            "t": "Space"
+          },
+          {
+            "t": "Str",
+            "c": "the"
+          },
+          {
+            "t": "Space"
+          },
+          {
+            "t": "Str",
+            "c": "arguments"
+          }
+        ]
+      ]
+    },
+    {
+      "t": "Div",
+      "c": [
+        [
+          "",
+          [
+            "tomet-memo"
+          ],
+          [
+            [
+              "tomet-data",
+              "{\"args\":{\"n\":{\"interp\":\"count\"},\"total\":{\"interp\":\"1 + 2\"}}}"
+            ]
+          ]
+        ],
+        []
+      ]
+    },
+    {
+      "t": "Div",
+      "c": [
+        [
+          "",
+          [
+            "tomet-memo"
+          ],
+          [
+            [
+              "tomet-data",
+              "{\"args\":[{\"interp\":\"count\"},{\"interp\":\"1 + 2\"}]}"
+            ]
+          ]
+        ],
+        []
+      ]
+    },
+    {
+      "t": "Header",
+      "c": [
+        1,
+        [
+          "",
+          [],
+          []
+        ],
+        [
+          {
+            "t": "Str",
+            "c": "In"
+          },
+          {
+            "t": "Space"
+          },
+          {
+            "t": "Str",
+            "c": "a"
+          },
+          {
+            "t": "Space"
+          },
+          {
+            "t": "Str",
+            "c": "tuple"
+          }
+        ]
+      ]
+    },
+    {
+      "t": "Div",
+      "c": [
+        [
+          "",
+          [
+            "tomet-memo"
+          ],
+          [
+            [
+              "tomet-data",
+              "{\"args\":{\"parts\":{\"0\":{\"interp\":\"a\"},\"1\":{\"interp\":\"sum(1, 2)\"},\"2\":\"plain\",\"k\":{\"interp\":\"3\"}}}}"
+            ]
+          ]
+        ],
+        []
+      ]
+    },
+    {
+      "t": "Header",
+      "c": [
+        1,
+        [
+          "",
+          [],
+          []
+        ],
+        [
+          {
+            "t": "Str",
+            "c": "In"
+          },
+          {
+            "t": "Space"
+          },
+          {
+            "t": "Str",
+            "c": "a"
+          },
+          {
+            "t": "Space"
+          },
+          {
+            "t": "Str",
+            "c": "group"
+          }
+        ]
+      ]
+    },
+    {
+      "t": "Div",
+      "c": [
+        [
+          "",
+          [
+            "tomet-memo"
+          ],
+          [
+            [
+              "tomet-data",
+              "{\"args\":{},\"value\":{\"name\":{\"interp\":\"filename\"},\"size\":{\"interp\":\"sum(1, 2)\"}}}"
+            ]
+          ]
+        ],
+        []
+      ]
+    }
+  ]
+}

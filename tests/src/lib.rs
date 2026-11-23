@@ -162,6 +162,12 @@ pub const KNOWN_TS_ERRORS: &[(&str, &[&str])] = &[
     // the corpus for that); highlighting a hole in a value is not worth a second
     // scanner state. A name tag there is text, so it is not the cause.
     ("syntax/slot-value.tmt", &[ANY_ERROR]),
+    // A type seat where a tuple's key goes (`@memo(<$int>: a)`): `grammar.js` reads a seat as a
+    // value and in running text, but a key before `:` is an identifier, a quoted string or a
+    // number, so the seat is read and the `:` after it is missing. `tomet-parser` reads it as a
+    // `TupleEntry` keyed by the seat (`syntax/value-lookalike.tmt` holds it for the wire's tests,
+    // which must tell it from the quoted key `"<$int>"` beside it).
+    ("syntax/value-lookalike.tmt", &[MISSING_NODE]),
     // A fenced code block nested inside `[content]`, which shares the
     // block grammar with the document root in the real parser.
     // `grammar.js`'s own content rule,

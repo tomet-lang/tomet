@@ -1,0 +1,16 @@
+::kind(fixture)
+
+::id(doc-value-interp)
+
+::meta(title: $(filename), size: $sum(1, 2))
+
+=[In the arguments]
+@memo(n: $(count), total: {$ 1 + 2 })
+
+@memo($(count), {$ 1 + 2 })
+
+=[In a tuple]
+@memo(parts: ($(a), $sum(1, 2), plain, k: $(3)))
+
+=[In a group]
+@memo(){ name: $(filename), size: $sum(1, 2) }

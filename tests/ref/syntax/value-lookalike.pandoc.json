@@ -1,0 +1,397 @@
+{
+  "pandoc-api-version": [
+    1,
+    23,
+    1
+  ],
+  "meta": {
+    "call": {
+      "t": "MetaString",
+      "c": ""
+    },
+    "entries": {
+      "t": "MetaMap",
+      "c": {
+        "k": {
+          "t": "MetaInlines",
+          "c": [
+            {
+              "t": "Str",
+              "c": "b"
+            }
+          ]
+        }
+      }
+    },
+    "id": {
+      "t": "MetaInlines",
+      "c": [
+        {
+          "t": "Str",
+          "c": "doc-value-lookalike"
+        }
+      ]
+    },
+    "scalar": {
+      "t": "MetaMap",
+      "c": {
+        "Scalar": {
+          "t": "MetaMap",
+          "c": {
+            "Int": {
+              "t": "MetaString",
+              "c": "1"
+            }
+          }
+        }
+      }
+    },
+    "span": {
+      "t": "MetaMap",
+      "c": {
+        "end": {
+          "t": "MetaString",
+          "c": "4"
+        },
+        "start": {
+          "t": "MetaString",
+          "c": "0"
+        }
+      }
+    },
+    "spelled": {
+      "t": "MetaMap",
+      "c": {
+        "args": {
+          "t": "MetaList",
+          "c": [
+            {
+              "t": "MetaString",
+              "c": "1"
+            },
+            {
+              "t": "MetaString",
+              "c": "2"
+            }
+          ]
+        },
+        "call": {
+          "t": "MetaInlines",
+          "c": [
+            {
+              "t": "Str",
+              "c": "enum"
+            }
+          ]
+        }
+      }
+    }
+  },
+  "blocks": [
+    {
+      "t": "Header",
+      "c": [
+        1,
+        [
+          "",
+          [],
+          []
+        ],
+        [
+          {
+            "t": "Str",
+            "c": "Keys"
+          },
+          {
+            "t": "Space"
+          },
+          {
+            "t": "Str",
+            "c": "that"
+          },
+          {
+            "t": "Space"
+          },
+          {
+            "t": "Str",
+            "c": "look"
+          },
+          {
+            "t": "Space"
+          },
+          {
+            "t": "Str",
+            "c": "like"
+          },
+          {
+            "t": "Space"
+          },
+          {
+            "t": "Str",
+            "c": "wire"
+          },
+          {
+            "t": "Space"
+          },
+          {
+            "t": "Str",
+            "c": "variants"
+          }
+        ]
+      ]
+    },
+    {
+      "t": "Div",
+      "c": [
+        [
+          "",
+          [
+            "tomet-memo"
+          ],
+          [
+            [
+              "entries",
+              "a, b"
+            ],
+            [
+              "tomet-data",
+              "{\"args\":{\"spelled\":{\"call\":\"enum\",\"args\":[1,2]},\"scalar\":{\"Scalar\":{\"Int\":1}},\"entries\":[\"a\",\"b\"]}}"
+            ]
+          ]
+        ],
+        []
+      ]
+    },
+    {
+      "t": "Div",
+      "c": [
+        [
+          "",
+          [
+            "tomet-memo"
+          ],
+          [
+            [
+              "tomet-data",
+              "{\"args\":{\"tuple\":{\"Tuple\":{\"entries\":{\"key\":null,\"value\":1},\"span\":null}}}}"
+            ]
+          ]
+        ],
+        []
+      ]
+    },
+    {
+      "t": "Header",
+      "c": [
+        1,
+        [
+          "",
+          [],
+          []
+        ],
+        [
+          {
+            "t": "Str",
+            "c": "A"
+          },
+          {
+            "t": "Space"
+          },
+          {
+            "t": "Str",
+            "c": "type"
+          },
+          {
+            "t": "Space"
+          },
+          {
+            "t": "Str",
+            "c": "seat"
+          },
+          {
+            "t": "Space"
+          },
+          {
+            "t": "Str",
+            "c": "as"
+          },
+          {
+            "t": "Space"
+          },
+          {
+            "t": "Str",
+            "c": "a"
+          },
+          {
+            "t": "Space"
+          },
+          {
+            "t": "Str",
+            "c": "key,"
+          },
+          {
+            "t": "Space"
+          },
+          {
+            "t": "Str",
+            "c": "and"
+          },
+          {
+            "t": "Space"
+          },
+          {
+            "t": "Str",
+            "c": "the"
+          },
+          {
+            "t": "Space"
+          },
+          {
+            "t": "Str",
+            "c": "text"
+          },
+          {
+            "t": "Space"
+          },
+          {
+            "t": "Str",
+            "c": "that"
+          },
+          {
+            "t": "Space"
+          },
+          {
+            "t": "Str",
+            "c": "spells"
+          },
+          {
+            "t": "Space"
+          },
+          {
+            "t": "Str",
+            "c": "one"
+          }
+        ]
+      ]
+    },
+    {
+      "t": "Div",
+      "c": [
+        [
+          "",
+          [
+            "tomet-memo"
+          ],
+          [
+            [
+              "value",
+              "a"
+            ],
+            [
+              "tomet-data",
+              "{\"args\":{\"<$int>\":\"b\",\"<$uuid>\":\"c\"}}"
+            ]
+          ]
+        ],
+        []
+      ]
+    },
+    {
+      "t": "Header",
+      "c": [
+        1,
+        [
+          "",
+          [],
+          []
+        ],
+        [
+          {
+            "t": "Str",
+            "c": "Named"
+          },
+          {
+            "t": "Space"
+          },
+          {
+            "t": "Str",
+            "c": "and"
+          },
+          {
+            "t": "Space"
+          },
+          {
+            "t": "Str",
+            "c": "unnamed"
+          },
+          {
+            "t": "Space"
+          },
+          {
+            "t": "Str",
+            "c": "entries"
+          },
+          {
+            "t": "Space"
+          },
+          {
+            "t": "Str",
+            "c": "together"
+          }
+        ]
+      ]
+    },
+    {
+      "t": "Div",
+      "c": [
+        [
+          "",
+          [
+            "tomet-memo"
+          ],
+          [
+            [
+              "k",
+              "c"
+            ],
+            [
+              "5",
+              "d"
+            ],
+            [
+              "value",
+              "a"
+            ],
+            [
+              "tomet-data",
+              "{\"args\":{\"0\":\"a\",\"1\":\"b\",\"k\":\"c\",\"5\":\"d\"}}"
+            ]
+          ]
+        ],
+        []
+      ]
+    },
+    {
+      "t": "Div",
+      "c": [
+        [
+          "",
+          [
+            "tomet-memo"
+          ],
+          [
+            [
+              "value",
+              "a, b"
+            ],
+            [
+              "tomet-data",
+              "{\"args\":[[\"a\",\"b\"],{\"k\":\"a\",\"j\":\"b\"},[[\"x\"],{}]]}"
+            ]
+          ]
+        ],
+        []
+      ]
+    }
+  ]
+}

@@ -1,0 +1,14 @@
+::id(doc-value-interp)
+
+::meta(size: "", title: "")
+
+=[In the arguments]
+@memo(n: (interp: count), total: (interp: "1 + 2"))[]
+
+@memo((interp: count), (interp: "1 + 2"))[]
+
+=[In a tuple]
+@memo(parts: ((interp: a), (interp: "sum(1, 2)"), plain, k: (interp: "3")))[]
+
+=[In a group]
+@memo()[]{ name: (interp: filename), size: (interp: "sum(1, 2)") }

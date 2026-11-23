@@ -1,0 +1,16 @@
+::id(doc-value-lookalike)
+
+::meta(call: "", entries: (k: b), scalar: (Scalar: (Int: "1")), span: (end: "4", start: "0"), spelled: (args: ("1", "2"), call: enum))
+
+=[Keys that look like wire variants]
+@memo(spelled: (call: enum, args: (1, 2)), scalar: (Scalar: (Int: 1)), entries: (a, b))[]
+
+@memo(tuple: (Tuple: (entries: (key: none, value: 1), span: none)))[]
+
+=[A type seat as a key, and the text that spells one]
+@memo("<$int>": b, "<$uuid>": c)[]
+
+=[Named and unnamed entries together]
+@memo(a, b, k: c, 5: d)[]
+
+@memo((a, b), (k: a, j: b), ((x), ()))[]

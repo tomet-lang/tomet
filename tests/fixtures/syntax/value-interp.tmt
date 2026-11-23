@@ -1,0 +1,20 @@
+::kind(fixture)
+::id(doc-value-interp)
+::meta(title: {$ filename }, size: $sum(1, 2))
+
+// An interpolation is evaluated where it stands, so it can stand where a value goes:
+// in `(args)`, as the value of a `key: value` entry, in a tuple, and in a `{value}` group.
+
+=[ In the arguments ]
+
+@memo(n: $(count), total: {$ 1 + 2 })
+
+@memo($(count), {$ 1 + 2 })
+
+=[ In a tuple ]
+
+@memo(parts: ($(a), $sum(1, 2), plain, k: {$ 3 }))
+
+=[ In a group ]
+
+@memo(){ name: {$ filename }, size: $sum(1, 2) }
