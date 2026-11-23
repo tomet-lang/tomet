@@ -122,6 +122,7 @@ impl List {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct ListItem {
+    /// The element's name for the combine notation `-@name(...)`; `null` for a plain `- content`.
     pub name: Option<Name>,
     pub data: Data,
     pub content: Vec<Block>,

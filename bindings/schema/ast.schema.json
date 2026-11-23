@@ -1273,7 +1273,8 @@
             {
               "type": "null"
             }
-          ]
+          ],
+          "description": "The element's name for the combine notation `-@name(...)`; `null` for a plain `- content`."
         },
         "data": {
           "$ref": "#/$defs/Data"

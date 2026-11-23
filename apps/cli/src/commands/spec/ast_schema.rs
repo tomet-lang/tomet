@@ -20,8 +20,10 @@ use schemars::JsonSchema;
 use schemars::generate::{Contract, SchemaSettings};
 use serde_json::{Map, Value};
 
-/// The schema documents `tomet spec ast-schema` writes: file name, and the rendered text.
-pub fn render() -> Vec<(&'static str, String)> {
+/// The schema documents `tomet spec ast-schema` writes: file name, and the schema.
+///
+/// `tomet spec ast-types` reads these same documents, so the types and the schemas have one source.
+pub fn documents() -> Vec<(&'static str, Value)> {
     vec![
         (
             "ast.schema.json",
@@ -34,6 +36,18 @@ pub fn render() -> Vec<(&'static str, String)> {
     ]
 }
 
+/// The schema documents, rendered: file name, and the text of the file.
+pub fn render() -> Vec<(&'static str, String)> {
+    documents()
+        .into_iter()
+        .map(|(file, schema)| {
+            let mut text = serde_json::to_string_pretty(&schema).expect("a schema serializes");
+            text.push('\n');
+            (file, text)
+        })
+        .collect()
+}
+
 /// The version every identifier carries: the workspace version, which is the version of `tomet-ast`
 /// (every crate of the workspace takes `version.workspace`). A change of the wire is a release.
 const VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -41,7 +55,7 @@ const VERSION: &str = env!("CARGO_PKG_VERSION");
 /// Where the schemas are published. An identifier, not a locator: nothing is fetched from it.
 const ID_BASE: &str = "https://github.com/tomet-lang/tomet/schemas";
 
-fn document<T: JsonSchema>(file: &str, title: &str) -> String {
+fn document<T: JsonSchema>(file: &str, title: &str) -> Value {
     let settings = SchemaSettings::draft2020_12().with(|s| {
         // What this crate writes: every field is present (an absent one is `null`), so the schema
         // says so, which is what a reader of the type needs. The reading side accepts the same.
@@ -73,9 +87,7 @@ fn document<T: JsonSchema>(file: &str, title: &str) -> String {
     }
     out.extend(root);
 
-    let mut text = serde_json::to_string_pretty(&Value::Object(out)).expect("a schema serializes");
-    text.push('\n');
-    text
+    Value::Object(out)
 }
 
 /// Rewrites every `description` under `value` for a reader who does not know Rust.

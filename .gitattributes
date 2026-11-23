@@ -29,6 +29,8 @@ docs/guide/**/*.md linguist-generated=true
 # their README from `tmtroot/bindings/schema/readme.tmt`.
 /bindings/schema/*.json linguist-generated=true
 /bindings/schema/README.md linguist-generated=true
+# The TypeScript declarations of the wire: written by `tomet spec ast-types` from those schemas.
+/bindings/js/ast.d.ts linguist-generated=true
 
 # Frozen parser/formatter test inputs, deliberately not synced with docs/.
 tests/fixtures/ linguist-vendored=true

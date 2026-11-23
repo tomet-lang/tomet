@@ -6,6 +6,7 @@ use std::path::{Path, PathBuf};
 use clap::ValueEnum;
 
 pub mod ast_schema;
+pub mod ast_types;
 pub mod cli;
 pub mod config;
 pub mod util;
@@ -22,6 +23,9 @@ pub enum SpecTarget {
     /// JSON Schemas of the AST wire format and of plain data (`ast.schema.json`, `plain.schema.json`),
     /// derived from the AST types. `--out` is the directory to write them to; not part of `--all`.
     AstSchema,
+    /// TypeScript declarations of the AST wire format and of plain data (`ast.d.ts`), generated from the
+    /// JSON Schemas. `--out` is the directory to write it to; not part of `--all`.
+    AstTypes,
 }
 
 pub fn spec_cmd(
@@ -45,6 +49,7 @@ pub fn spec_cmd(
             "config",
         ),
         SpecTarget::AstSchema => return ast_schema_cmd(out, check),
+        SpecTarget::AstTypes => return ast_types_cmd(out, check),
     };
 
     let Some(out) = out else {
@@ -69,6 +74,19 @@ fn ast_schema_cmd(out: Option<&Path>, check: bool) -> anyhow::Result<()> {
         write_or_check(&out.join(file), &content, check, &regenerate)?;
     }
     Ok(())
+}
+
+/// Writes (or checks) the TypeScript declarations of the AST into the directory `out`.
+fn ast_types_cmd(out: Option<&Path>, check: bool) -> anyhow::Result<()> {
+    let Some(out) = out else {
+        anyhow::bail!(
+            "`ast-types` writes a file next to the bindings: give the directory with --out <DIR>"
+        );
+    };
+    let text =
+        ast_types::render().map_err(|e| anyhow::anyhow!("cannot generate the types: {e}"))?;
+    let regenerate = format!("tomet spec ast-types --out {}", out.display());
+    write_or_check(&out.join(ast_types::FILE), &text, check, &regenerate)
 }
 
 fn generate_all(out_dir: &Path, check: bool) -> anyhow::Result<()> {

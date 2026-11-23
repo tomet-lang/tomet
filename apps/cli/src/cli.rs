@@ -220,16 +220,16 @@ pub enum Command {
         force: bool,
     },
 
-    /// Generate automated reference specifications: `cli` and `config` in `.tmt` format, and `ast-schema`,
-    /// the JSON Schemas of the AST.
+    /// Generate automated reference specifications: `cli` and `config` in `.tmt` format, `ast-schema`,
+    /// the JSON Schemas of the AST, and `ast-types`, their TypeScript declarations.
     ///
     /// The target defaults to `cli` when omitted. With `--all`, writes both `cli.tmt`
-    /// and `config.tmt` into the directory specified by `--out`; `ast-schema` is not part of
-    /// `--all`, it writes `ast.schema.json` and `plain.schema.json` into the directory given
-    /// to `--out`. With `--check`, exits non-zero if target files on disk disagree with
+    /// and `config.tmt` into the directory specified by `--out`; `ast-schema` and `ast-types` are not part of
+    /// `--all`: `ast-schema` writes `ast.schema.json` and `plain.schema.json` into the directory given
+    /// to `--out`, `ast-types` writes `ast.d.ts` there. With `--check`, exits non-zero if target files on disk disagree with
     /// newly generated output.
     Spec {
-        /// Specification target to generate (`cli` | `config` | `ast-schema`).
+        /// Specification target to generate (`cli` | `config` | `ast-schema` | `ast-types`).
         #[arg(value_name = "TARGET")]
         target: Option<crate::commands::spec::SpecTarget>,
         /// Generate every `.tmt` specification target (`cli`, `config`). Requires `--out <DIR>`.

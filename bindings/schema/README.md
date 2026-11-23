@@ -29,6 +29,9 @@ tomet spec ast-schema --check --out bindings/schema
 `cargo test` holds them to the types too (`tomet-cli`'s `ast_schema` tests), and checks that every document of the test corpus
 serializes to something valid against `ast.schema.json` (`tomet-tests`' `schema` test).
 
+The TypeScript declarations of the wire, `bindings/js/ast.d.ts`, are generated from these two files by `tomet spec ast-types --out bindings/js`
+(it refuses a schema construct it does not know, so a new keyword cannot become an `unknown`); they ship with `@tomet/wasm`.
+
 ## Identity and versions
 
 Each schema's `$id` carries the version of the workspace, which is the version of `tomet-ast`:
